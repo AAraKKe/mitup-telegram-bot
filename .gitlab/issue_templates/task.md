@@ -10,4 +10,4 @@ Describe what is it that we want to achieve with this task in detail. Include wh
 
 <!-- When can we consider that this task is finished? Be as detailed as possible explaining what end state are we after. -->
 
-/label ~task
+/label ~type::task ~state::discussion

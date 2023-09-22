@@ -5,8 +5,12 @@ Before creating a new issue make sure that there is no other issue opened on the
 
 Describe what is the proposal. Try to be as compelte as possible specifying:
 - What use cases are we trying to solve with this proposal
-- What would be the usage from the point of view of the user
 - What problems the users are facing currently that would be solved by implementing this
 -->
 
-/label ~proposal
+## Expected behavior
+<!--
+Explain what is the expected behaviour once this feature is implemented
+-->
+
+/label ~type::proposal state::discussion
