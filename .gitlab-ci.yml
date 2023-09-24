@@ -14,11 +14,12 @@ sast:
 
 echo:
   stage: build
-  script: 
+  script:
   - echo "Default job to be able to keep pipelines running"
   rules:
     - when: always
 
 include:
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
+- template: Security/SAST.gitlab-ci.yml
+- template: Security/Dependency-Scanning.gitlab-ci.yml
+- template: Security/Secret-Detection.gitlab-ci.yml
