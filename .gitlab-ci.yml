@@ -6,9 +6,19 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
-- test
+  - build
+  - test
+
 sast:
   stage: test
+
+echo:
+  stage: build
+  script: 
+  - echo "Default job to be able to keep pipelines running"
+  rules:
+    - when: always
+
 include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
