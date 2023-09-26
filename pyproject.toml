@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mitup-telegram-bot"
+dynamic = ["version"]
+description = "Telegram social bot to manage your meetings"
+readme = "README.md"
+licence = "MIT"
+requires-python = ">=3.11"
+authors = [
+  { name = "Enrique Araque", email = "minixute@gmail.com" },
+  { name = "Juanpe Araque", email = "erjuanpea@gmail.com" }
+]
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: FastAPI",
+  "Framework :: Hatch",
+  "Topic :: Communications :: Chat"
+]
+dependencies = []
+
+[project.urls]
+Source = "https://gitlab.com/meetupbot/mitup-telegram-bot"
+Documentation = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/README.md"
+Issues = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues"
+
+[tool.hatch.version]
+path = "mitup_bot/__about__.py"
+
+[tool.hatch.envs.dev]
+description = """
+Enviroment to be used for bot testing
+"""
+dependencies = [
+  "pytest"
+]
+
+[tool.hatch.envs.dev.scripts]
+test = "pytest {args:tests}"
+
+[tool.hatch.envs.production]
+dependencies = [
+  "python-telegram-bot"
+]
+
+[tool.hatch.envs.production.scripts]
+bot = "python mitup_bot/launch.py"
