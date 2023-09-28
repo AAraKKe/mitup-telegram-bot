@@ -1,22 +1,81 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
-# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
-# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
-# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
-stages:
-- build
-- test
-sast:
-  stage: test
-echo:
-  stage: build
-  script:
-  - echo "Default job to be able to keep pipelines running"
-  rules:
-  - when: always
+# Custom image created for CI/CD purposes from Dockerfile.ci
+image: registry.gitlab.com/meetupbot/mitup-telegram-bot/ci-python
+
+# Templates for security and and code analysis
 include:
 - template: Security/SAST.gitlab-ci.yml
 - template: Security/Dependency-Scanning.gitlab-ci.yml
 - template: Security/Secret-Detection.gitlab-ci.yml
+
+# Only run in MergeRequests, tags and default branch
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+
+# Default cace for Hatch environments
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths:
+  - .hatch
+
+# This is a GitLab provided job, no need to configure it
+sast:
+  stage: analysis
+
+stages:
+- analysis
+- build
+- test
+
+cache-hatch:
+  stage: build
+  script:
+  - python --version
+  - pip --version
+  - hatch --version
+  - hatch config set dirs.env.virtual .hatch
+  - hatch config set dirs.cache .hatch
+  # Trigger dev environment to cache it
+  - hatch run dev:echo
+
+pytest:
+  stage: test
+  script: hatch run dev:test-cov
+  coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
+  needs: [cache-hatch]
+  artifacts:
+    when: always  # Important to get reports when test fail
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+format-check:
+  stage: test
+  script: hatch run dev:format-check
+  needs: [cache-hatch]
+
+build-docker-ci:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.14.0-debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/dev/docker/Dockerfile.ci"
+      --destination "${CI_REGISTRY_IMAGE}/ci-python${DOCKER_CI_TAG}"
+  rules:
+    - if: $CI_COMMIT_TAG
+    # When requested adding [build-ci] to the commit message
+    - if: $CI_COMMIT_MESSAGE =~ /\[build-ci\]/
+    # If no rule matched yet, allow building manually anytime that is needed
+    - when: manual
+      allow_failure: true
+      variables:
+        # Give specific tag to make sure default is not overriden
+        DOCKER_CI_TAG: ":${CI_COMMIT_REF_SLUG}"

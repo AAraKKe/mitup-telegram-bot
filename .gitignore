@@ -1,2 +1,7 @@
-# Ignorar archivos .DS_Store generados por macOS
+# Ignore MacOs generated files
 .DS_Store
+
+# Ignore pycache folders
+__pycache__
+
+coverage.xml
