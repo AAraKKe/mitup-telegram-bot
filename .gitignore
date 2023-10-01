@@ -4,4 +4,14 @@
 # Ignore pycache folders
 __pycache__
 
-coverage.xml
+# Test reports
+cov.xml
+report.xml
+
+# Local .hatch folder
+.hatch
+
+# Ignore some vscode files to allow setting it up
+# by the tool and allow any developer to tweak theirs
+.vscode/settings.json
+.vscode/launch.json

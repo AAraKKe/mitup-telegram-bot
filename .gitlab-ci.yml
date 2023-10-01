@@ -59,6 +59,16 @@ format-check:
   script: hatch run dev:format-check
   needs: [cache-hatch]
 
+flake8-lint:
+  stage: test
+  script: hatch run dev:lint
+  needs: [cache-hatch]
+
+mypy-typecheck:
+  stage: test
+  script: hatch run dev:lint
+  needs: [cache-hatch]
+
 build-docker-ci:
   stage: build
   image:

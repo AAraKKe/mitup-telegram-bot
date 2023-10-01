@@ -5,18 +5,18 @@ description = "Telegram social bot to manage your meetings"
 licence = "MIT"
 requires-python = ">=3.11"
 authors = [
-  { name = "Enrique Araque", email = "minixute@gmail.com" },
-  { name = "Juanpe Araque", email = "erjuanpea@gmail.com" }
+    { name = "Enrique Araque", email = "minixute@gmail.com" },
+    { name = "Juanpe Araque", email = "erjuanpea@gmail.com" }
 ]
 classifiers = [
-  "Development Status :: 1 - Planning",
-  "Programming Language :: Python :: 3.12",
-  "Framework :: FastAPI",
-  "Framework :: Hatch",
-  "Topic :: Communications :: Chat"
+    "Development Status :: 1 - Planning",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Framework :: Hatch",
+    "Topic :: Communications :: Chat"
 ]
 dependencies = [
-  "python-telegram-bot"
+    "python-telegram-bot"
 ]
 
 [project.urls]
@@ -24,14 +24,30 @@ Source = "https://gitlab.com/meetupbot/mitup-telegram-bot"
 Documentation = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/README.md"
 Issues = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues"
 
+[tool.hatch.version]
+path = "mitup_bot/__about__.py"
+
 [tool.isort]
 profile = "black"
 src_paths = ["mitup_bot", "tests"]
 skip = [".hatch"]
 color_output = true
 
-[tool.hatch.version]
-path = "mitup_bot/__about__.py"
+# Global pytest setup, mainline to run from VSCode
+# Cannot launch VSCode tests/debug with cov plugin
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = "tests"
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+omit = [
+    # Don't run coverage bon bin scripts. These are scripts that are not forced to be tested as they
+    # have no impact in production and mainly helper scripts
+    "bin",
+]
 
 # --------------------------
 # Development/CI environment
@@ -41,24 +57,36 @@ description = """
 Enviroment to be used for bot testing
 """
 dependencies = [
-  "pytest~=7.3",
-  "pytest-asyncio~=0.21",
-  "pytest-cov~=4.1",
-  "black~=23.7",
-  "isort[colors]~=5.0"
+    "pytest~=7.3",
+    "pytest-asyncio~=0.21",
+    "pytest-cov~=4.1",
+    "black~=23.7",
+    "isort[colors]~=5.0",
+    "flake8",
+    "mypy~=1.0",
+    "rich~=13.0"
 ]
 
 [tool.hatch.envs.dev.scripts]
-test = "pytest --cov=mitup_bot --cov-report term tests/"
+test = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests"
 test-cov = "pytest --cov=mitup_bot --cov-report term tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
 format = [
-  "black .",
-  "isort ."
+    "black .",
+    "isort ."
 ]
 format-check = [
-  "black --check .",
-  "isort --check-only ."
+    "black --check .",
+    "isort --check-only ."
 ]
+lint = "flake8 ."
+type-check = "mypy tests mitup_bot bin"
+validate = [
+    "test",
+    "format-check",
+    "lint",
+    "type-check",
+]
+setup-vscode = "python bin/setup_vscode.py"
 
 # ----------------------
 # Production environment

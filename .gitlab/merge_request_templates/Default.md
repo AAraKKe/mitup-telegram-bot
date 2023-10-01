@@ -36,6 +36,6 @@ This [checklist](https://docs.gitlab.com/ee/user/markdown.html#task-lists) encou
 - [ ] Any new or modified functionality is covered by tests. If not, tests have been added to ensure its coverage.
 - [ ] This modification has been tested in a local environment and proof has been presented and evaluated.
 - [ ] The documentation has been updated accordingly
-- [ ] The code has been properly formatted with Black
+- [ ] The code in the MR has been validated (run `hatch run dev:validate`)
 
 /assign me
