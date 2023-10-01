@@ -2,7 +2,6 @@
 name = "mitup-telegram-bot"
 dynamic = ["version"]
 description = "Telegram social bot to manage your meetings"
-readme = "README.md"
 licence = "MIT"
 requires-python = ">=3.11"
 authors = [
