@@ -17,4 +17,4 @@ Describe what is not working as expected. Include how did you find this issue if
 
 <!-- Add any screenshot showing the actuall issue if possible -->
 
-/label ~type::bug
+/label ~"type::bug"

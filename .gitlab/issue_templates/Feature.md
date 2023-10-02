@@ -13,4 +13,4 @@ Describe what is the proposal. Try to be as compelte as possible specifying:
 Explain what is the expected behaviour once this feature is implemented
 -->
 
-/label ~type::proposal state::discussion
+/labels ~"type::proposal" ~"state::discussion"

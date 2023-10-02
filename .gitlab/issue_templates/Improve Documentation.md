@@ -6,4 +6,4 @@ Describe what do you feel is missing in the documentation by trying to providing
 - What was the context in which that information would have been helpful
 -->
 
-/label ~type::documentation state::discussion
+/labels ~"type::documentation" ~"state::discussion"

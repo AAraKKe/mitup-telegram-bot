@@ -95,7 +95,7 @@ def can_run_update(
     current: dict[str, TSettingValue], proposed_settings: dict[str, TSettingValue]
 ) -> bool:
     print_compare(current, proposed_settings)
-    return Confirm.ask("Do you want to apply thesem modifications?")
+    return Confirm.ask("Do you want to apply these modifications?")
 
 
 def main():
@@ -113,7 +113,7 @@ def main():
             try:
                 settings.write(json.dumps(proposed_settings, indent=4))
                 print(
-                    "[bold green]VSCode Settings have been updated for this workspace![/bold green]"
+                    "[bold green]VSCode settings have been updated for this workspace![/bold green]"
                 )
             except Exception:
                 from rich.console import Console
