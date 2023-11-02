@@ -64,7 +64,11 @@ dependencies = [
     "isort[colors]~=5.0",
     "flake8",
     "mypy~=1.0",
-    "rich~=13.0"
+    "rich~=13.0",
+    "postgres",
+    "sqlalchemy~=1.4",
+    "alembic~=1.6",
+    "python-dateutil"
 ]
 
 [tool.hatch.envs.dev.scripts]
@@ -87,6 +91,8 @@ validate = [
     "type-check",
 ]
 setup-vscode = "python bin/setup_vscode.py"
+migrations-upgrade = "alembic upgrade head"
+migrations-downgrade = "alembic downgrade -1"
 
 # ----------------------
 # Production environment

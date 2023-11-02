@@ -15,3 +15,6 @@ report.xml
 # by the tool and allow any developer to tweak theirs
 .vscode/settings.json
 .vscode/launch.json
+
+# Database files
+postgres-data

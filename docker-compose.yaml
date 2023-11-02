@@ -1,0 +1,29 @@
+services: 
+  run-tests:
+    build:
+      dockerfile: ./dev/docker/Dockerfile.dev
+    volumes:
+      - .:/bot
+    command: hatch run dev:test
+
+  run-migrations:
+    build:
+      dockerfile: ./dev/docker/Dockerfile.dev
+    depends_on:
+      - postgres
+    volumes:
+      - .:/bot
+    command: hatch run dev:migrations-upgrade
+    #command: hatch run dev:migrations-downgrade
+
+  postgres:
+    image: postgres:12.1
+    restart: always
+    environment:
+      POSTGRES_USER: mitupbot
+      POSTGRES_PASSWORD: 12345pass
+      POSTGRES_DB: mitup
+    ports:
+      - 5432:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
