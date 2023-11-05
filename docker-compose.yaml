@@ -14,7 +14,7 @@ services:
     volumes:
       - .:/bot
     command: hatch run dev:migrations-upgrade
-    #command: hatch run dev:migrations-downgrade
+    # command: hatch run dev:migrations-downgrade
 
   postgres:
     image: postgres:12.1

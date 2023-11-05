@@ -16,7 +16,8 @@ classifiers = [
     "Topic :: Communications :: Chat"
 ]
 dependencies = [
-    "python-telegram-bot"
+    "python-telegram-bot",
+    "sqlmodel"
 ]
 
 [project.urls]
@@ -68,7 +69,7 @@ dependencies = [
     "postgres",
     "sqlalchemy~=1.4",
     "alembic~=1.6",
-    "python-dateutil"
+    "python-dateutil",
 ]
 
 [tool.hatch.envs.dev.scripts]
@@ -93,6 +94,7 @@ validate = [
 setup-vscode = "python bin/setup_vscode.py"
 migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -1"
+
 
 # ----------------------
 # Production environment
