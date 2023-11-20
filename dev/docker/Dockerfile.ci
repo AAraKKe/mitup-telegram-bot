@@ -3,6 +3,10 @@
 # The image is build by a manual job in any pipeline
 FROM python:3.11-slim-bookworm
 
+RUN apt-get update && \
+    apt-get install -y libpq-dev gcc && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install Hatch
 RUN pip install hatch
 

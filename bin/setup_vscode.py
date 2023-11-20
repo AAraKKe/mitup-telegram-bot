@@ -18,7 +18,7 @@ SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
     "editor.tabSize": 4,
     "python.analysis.autoFormatStrings": True,
     "pythonIndent.trimLinesWithOnlyWhitespace": True,
-    "coverage-gutters.coverageFileNames": ["cov.xml"],
+    "coverage-gutters.coverageFileNames": ["coverage.xml"],
     "black-formatter.importStrategy": "fromEnvironment",
     "editor.formatOnSave": True,
 }

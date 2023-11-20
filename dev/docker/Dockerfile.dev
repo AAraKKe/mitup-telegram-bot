@@ -1,5 +1,10 @@
 FROM python:3.11-slim-bookworm
 
+# Install libraries needed to run pyscopg2
+RUN apt-get update && \
+    apt-get install -y libpq-dev gcc && \
+    rm -rf /var/lib/apt/lists/*
+
 # Set the working directory to /mitup-telegram-bot
 WORKDIR /bot
 

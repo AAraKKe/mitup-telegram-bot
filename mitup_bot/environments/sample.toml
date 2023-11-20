@@ -1,0 +1,33 @@
+# This is a sample configuration file use to supply configuration to the project.
+#
+# The main interface to read configuration values is `mitup_bot.config.Config` and supports
+# different configuration providers. The TOML files can be used with the TomlConfigProviders.
+#
+# The following sections are sample values for all the supported configuration options.
+#
+# IMPORTANT: copy this file to `mitup_bot/environments/dev.toml` before modifying values in it.
+#            You can keep the `dev.toml` file locally with any configuration you need and is
+#            ignored by git.
+
+[bot]
+# Telegram bot configuration related with API configuration as well as internal configuration
+# of the bot related features of the telegram-bot package
+# Secret token. Get one through BothFather and add it here.
+token = "123123123987987987"
+
+[db]
+# Database connection configuration
+username = "mitupbot"
+database = "mitup"
+password = "12345pass"
+port = "5432"
+
+[app]
+# MitupBot App configuration.
+# Run mode can be set to 2 different values:
+# 1. polling -> will poll for updates as much as possible
+# 2. webhook -> Telegram will send updates to a webhook where the app
+#               should be listining. For this to work the bot to which
+#               the supplied tocken belongs needs to have a webhook properly
+#               configured.
+run_mode = "polling"

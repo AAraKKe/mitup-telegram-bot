@@ -5,6 +5,8 @@
 __pycache__
 
 # Test reports
+.coverage
+coverage.xml
 cov.xml
 report.xml
 
@@ -18,3 +20,7 @@ report.xml
 
 # Database files
 postgres-data
+
+# Ignroe dev.toml for local configuration to avoid
+# secrets in commits
+dev.toml

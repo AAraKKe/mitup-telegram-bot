@@ -1,4 +1,4 @@
-services: 
+services:
   run-tests:
     build:
       dockerfile: ./dev/docker/Dockerfile.dev
@@ -6,15 +6,26 @@ services:
       - .:/bot
     command: hatch run dev:test
 
-  run-migrations:
+  migrations-upgrade: &migrations-service
+    # Intended only for local migrations
     build:
       dockerfile: ./dev/docker/Dockerfile.dev
     depends_on:
       - postgres
     volumes:
       - .:/bot
+    environment:
+      - MITUPBOT__DB__USERNAME=mitupbot
+      - MITUPBOT__DB__PASSWORD=12345pass
+      - MITUPBOT__DB__DATABASE=mitup
+      - MITUPBOT__DB__URL=postgres
+      - MITUPBOT__DB__PORT=5432
     command: hatch run dev:migrations-upgrade
-    # command: hatch run dev:migrations-downgrade
+
+  migrations-downgrade:
+    # Intended only for local migrations
+    <<: *migrations-service
+    command: hatch run dev:migrations-downgrade
 
   postgres:
     image: postgres:12.1
@@ -24,6 +35,15 @@ services:
       POSTGRES_PASSWORD: 12345pass
       POSTGRES_DB: mitup
     ports:
-      - 5432:5432
+      - "5444:5432"
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
+
+  mitup:
+    depends_on:
+      - postgres
+    build:
+      dockerfile: ./dev/docker/Dockerfile.dev
+    volumes:
+      - .:/bot
+    command: hatch run dev:launch

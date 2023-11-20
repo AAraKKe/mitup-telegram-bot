@@ -16,8 +16,17 @@ classifiers = [
     "Topic :: Communications :: Chat"
 ]
 dependencies = [
-    "python-telegram-bot",
-    "sqlmodel"
+    "python-telegram-bot~=20.0",
+    "click~=8.0",
+    "python-dateutil",
+    "sqlalchemy~=1.4",
+    "alembic~=1.6",
+    "psycopg2~=2.9",
+    "sqlmodel",
+    "sqlalchemy~=1.4",
+    "alembic~=1.6",
+    "python-dateutil",
+    "rich~=13.0",
 ]
 
 [project.urls]
@@ -39,6 +48,7 @@ color_output = true
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = "tests"
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 branch = true
@@ -48,6 +58,11 @@ omit = [
     # Don't run coverage bon bin scripts. These are scripts that are not forced to be tested as they
     # have no impact in production and mainly helper scripts
     "bin",
+    "__about__.py",
+]
+exclude_also = [
+    # Exclude protocol classes since they have no logic
+    "class .*\\bProtocol\\):"
 ]
 
 # --------------------------
@@ -65,16 +80,12 @@ dependencies = [
     "isort[colors]~=5.0",
     "flake8",
     "mypy~=1.0",
-    "rich~=13.0",
-    "postgres",
-    "sqlalchemy~=1.4",
-    "alembic~=1.6",
-    "python-dateutil",
+    "pytest-asyncio",
 ]
 
 [tool.hatch.envs.dev.scripts]
 test = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests"
-test-cov = "pytest --cov=mitup_bot --cov-report term tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
+test-cov = "pytest --cov=mitup_bot --cov-report term-missing tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
 format = [
     "black .",
     "isort ."
@@ -94,6 +105,7 @@ validate = [
 setup-vscode = "python bin/setup_vscode.py"
 migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -1"
+launch = "python -m mitup_bot.cli.launch"
 
 
 # ----------------------
@@ -101,7 +113,7 @@ migrations-downgrade = "alembic downgrade -1"
 # ----------------------
 
 [tool.hatch.envs.production.scripts]
-bot = "python mitup_bot/launch.py"
+launch = "python -m mitup_bot.cli.launch --env prod"
 
 [build-system]
 requires = ["hatchling"]

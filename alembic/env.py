@@ -3,9 +3,19 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from mitup_bot.cli.options import Env
+from mitup_bot.config import Config, EnvVariablesConfigProvider, TomlConfigProvider
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Load config from environment provider to get the db url
+# this can be overriden later in deployment pipelines
+# with proper environment configuration
+mitup_config = Config.from_providers(
+    EnvVariablesConfigProvider(), TomlConfigProvider(Env.SAMPLE)
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -36,9 +46,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=mitup_config.db.full_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -59,6 +68,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        url=mitup_config.db.full_url,
     )
 
     with connectable.connect() as connection:
