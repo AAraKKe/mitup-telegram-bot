@@ -21,6 +21,7 @@ username = "mitupbot"
 database = "mitup"
 password = "12345pass"
 port = "5432"
+url = "postgres"
 
 [app]
 # MitupBot App configuration.

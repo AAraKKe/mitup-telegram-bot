@@ -10,3 +10,6 @@ WORKDIR /bot
 
 # Install Hatch
 RUN pip install hatch
+
+# Cache hatch environment
+RUN hatch config set dirs.env.virtual /bot/.hatch

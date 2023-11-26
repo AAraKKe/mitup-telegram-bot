@@ -50,6 +50,9 @@ addopts = "-ra"
 testpaths = "tests"
 asyncio_mode = "auto"
 
+[tool.mypy]
+exclude = "conftest.py"
+
 [tool.coverage.run]
 branch = true
 
@@ -81,11 +84,12 @@ dependencies = [
     "flake8",
     "mypy~=1.0",
     "pytest-asyncio",
+    "freezegun"
 ]
 
 [tool.hatch.envs.dev.scripts]
 test = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests"
-test-cov = "pytest --cov=mitup_bot --cov-report term-missing tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
+test-cov = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
 format = [
     "black .",
     "isort ."

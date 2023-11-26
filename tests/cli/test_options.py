@@ -6,20 +6,20 @@ import pytest
 from mitup_bot.cli import options
 
 
-class TestEnumOptions(StrEnum):
+class EnumOptionsImpl(StrEnum):
     OPT1 = "opt1"
     OPT2 = "opt2"
 
 
 def test_enum_choice_returns_enum():
-    choice = options.EnumChoice(TestEnumOptions)
+    choice = options.EnumChoice(EnumOptionsImpl)
 
-    assert choice.convert("opt1", None, None) is TestEnumOptions.OPT1
-    assert choice.convert("opt2", None, None) is TestEnumOptions.OPT2
+    assert choice.convert("opt1", None, None) is EnumOptionsImpl.OPT1
+    assert choice.convert("opt2", None, None) is EnumOptionsImpl.OPT2
 
 
 def test_enum_choice_fails_with_invalid_input():
-    choice = options.EnumChoice(TestEnumOptions)
+    choice = options.EnumChoice(EnumOptionsImpl)
 
     with pytest.raises(click.BadParameter):
         choice.convert("something", None, None)

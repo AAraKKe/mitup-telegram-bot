@@ -109,6 +109,7 @@ class DbConfig(BaseModel):
     database: str
     port: int = 5432
     url_schema: str = "postgresql"
+    engine_echo: bool = False
 
     @property
     def full_url(self) -> str:

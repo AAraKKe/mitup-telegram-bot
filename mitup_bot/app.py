@@ -10,6 +10,7 @@ from mitup_bot.config import (
     TomlConfigProvider,
 )
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.models import MitupBaseModel
 
 
 class MitupRuntime:
@@ -30,6 +31,10 @@ class MitupRuntime:
             TomlConfigProvider(env=env),
         )
         self.app = self.__build_application()
+        self.__setup_db()
+
+    def __setup_db(self):
+        MitupBaseModel.set_engine(self.config.db)
 
     def __build_application(self) -> Application:
         builder = Application.builder()
