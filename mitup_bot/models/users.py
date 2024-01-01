@@ -1,10 +1,13 @@
 import datetime as dt
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import TIMESTAMP, BigInteger, Column
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Relationship
 
 from .mitup_base_model import MitupBaseModel
+
+if TYPE_CHECKING:
+    from . import Settings
 
 
 class User(MitupBaseModel, SQLModel, table=True):
@@ -22,3 +25,4 @@ class User(MitupBaseModel, SQLModel, table=True):
     )
     last_name: Optional[str]
     username: Optional[str]
+    settings: "Settings" = Relationship(back_populates="user")
