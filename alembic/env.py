@@ -15,7 +15,7 @@ config = context.config
 # this can be overriden later in deployment pipelines
 # with proper environment configuration
 mitup_config = Config.from_providers(
-    EnvVariablesConfigProvider(), TomlConfigProvider(Env.SAMPLE)
+    EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV)
 )
 
 # Interpret the config file for Python logging.
@@ -71,6 +71,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
         url=mitup_config.db.full_url,
     )
+    print(mitup_config.db.full_url)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

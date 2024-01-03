@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import TIMESTAMP, BigInteger, Column
+from sqlalchemy import TIMESTAMP, BigInteger, Column, func
 from sqlmodel import Field, SQLModel, Relationship
 
 from .mitup_base_model import MitupBaseModel
@@ -18,11 +18,11 @@ class User(MitupBaseModel, SQLModel, table=True):
     tg_user_id: int = Field(sa_column=Column(BigInteger, nullable=False))
     id: Optional[int] = Field(default=None, primary_key=True)
     created_time: Optional[dt.datetime] = Field(
-        default=None, sa_column=Column(TIMESTAMP)
+        sa_column=Column(TIMESTAMP, server_default=func.now())
     )
     updated_time: Optional[dt.datetime] = Field(
-        default=None, sa_column=Column(TIMESTAMP)
+        sa_column=Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     )
     last_name: Optional[str]
     username: Optional[str]
-    settings: "Settings" = Relationship(back_populates="user")
+    settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})

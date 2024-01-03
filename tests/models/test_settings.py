@@ -16,6 +16,7 @@ def test_settings_is_created(mock_session: mock.MagicMock):
     )
     settings = Settings(
         languaje="es",
+        timezone="Jaen",
         user=user,
     )
 
@@ -34,8 +35,10 @@ def test_settings_is_updated_with_updated_update_time(mock_session: mock.MagicMo
         last_name="lastname",
         username="username",
     )
+
     settings = Settings(
         languaje="es",
+        timezone="Jaen",
         user=user,
     )
 
