@@ -1,5 +1,5 @@
 [project]
-name = "mitup-telegram-bot"
+name = "mitup_bot"
 dynamic = ["version"]
 description = "Telegram social bot to manage your meetings"
 licence = "MIT"
@@ -19,11 +19,10 @@ dependencies = [
     "python-telegram-bot~=20.0",
     "click~=8.0",
     "python-dateutil",
-    "sqlalchemy~=1.4",
-    "alembic~=1.6",
+    "sqlalchemy~=2.0.25",
+    "alembic~=1.12",
     "psycopg2~=2.9",
-    "sqlmodel",
-    "sqlalchemy~=1.4",
+    "sqlmodel~=0.0.14",
     "alembic~=1.6",
     "python-dateutil",
     "rich~=13.0",
@@ -79,7 +78,7 @@ dependencies = [
     "pytest~=7.3",
     "pytest-asyncio~=0.21",
     "pytest-cov~=4.1",
-    "black~=23.7",
+    "black",
     "isort[colors]~=5.0",
     "flake8",
     "mypy~=1.0",

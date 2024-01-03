@@ -156,4 +156,4 @@ class Config(BaseModel):
                 data.setdefault(group, {})
                 data[group] |= config
 
-        return Config.parse_obj(data)
+        return Config.model_validate(data)

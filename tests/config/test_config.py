@@ -75,8 +75,8 @@ def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
 
     # Assert that there are 2 errors for the missing pieces of db
     assert 2 == len(exc_info.value.errors())
-    assert "value_error.missing" == exc_info.value.errors()[0]["type"]
-    assert "value_error.missing" == exc_info.value.errors()[1]["type"]
+    assert "missing" == exc_info.value.errors()[0]["type"]
+    assert "missing" == exc_info.value.errors()[1]["type"]
     assert ("db", "username") == exc_info.value.errors()[0]["loc"]
     assert ("db", "password") == exc_info.value.errors()[1]["loc"]
-    assert "Config" == exc_info.value.model.__name__
+    assert "Config" == exc_info.value.title

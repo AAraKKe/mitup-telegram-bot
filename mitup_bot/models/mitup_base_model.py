@@ -1,33 +1,48 @@
-import datetime as dt
-from datetime import timezone
+from contextlib import contextmanager
+from typing import Generator
 
+from pydantic import PrivateAttr
+from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 from mitup_bot.config import DbConfig
 
+from .exceptions import MissingSessionError
+
 
 class MitupBaseModel(SQLModel):
+    _engine: Engine | None = PrivateAttr(default=None)
+    _session: Session | None = PrivateAttr(default=None)
+
+    model_config = {
+        "arbitrary_types_allowed": True,
+    }
+
     @classmethod
     def set_engine(cls, config: DbConfig):
         cls.postgres_url = config.full_url
-        cls.engine = create_engine(config.full_url, echo=config.engine_echo)
+        cls._engine = create_engine(config.full_url, echo=config.engine_echo)
 
     def update(self):
         """
-        Update a given entry in the database. If the object has an `updated_time` field it will
-        be automatically updated to the current UTC time.
+        Update the instance in the database.
         """
-        if hasattr(self, "updated_time"):
-            self.updated_time = dt.datetime.now(timezone.utc)
-
-        with Session(bind=self.engine) as session:
-            session.add(self)
-            session.commit()
+        self.create()
 
     def create(self):
         """
         Create an entry in the database to represent the object
         """
-        with Session(bind=self.engine) as session:
-            session.add(self)
-            session.commit()
+        if self.__class__._session is None:
+            raise MissingSessionError()
+
+        self.__class__._session.add(self)
+        self.__class__._session.commit()
+
+    @classmethod
+    @contextmanager
+    def open_session(cls) -> Generator[Session, None, None]:
+        with Session(bind=cls._engine) as session:
+            cls._session = session
+            yield session
+            cls._session = None
