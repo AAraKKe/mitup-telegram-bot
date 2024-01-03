@@ -26,7 +26,7 @@ def mock_session(db_config: DbConfig) -> Generator[mock.MagicMock, None, None]:
         mocked_session.__enter__.return_value = mocked_session
 
         with mock.patch("mitup_bot.models.mitup_base_model.create_engine"):
-            # Patch create_engine to and make sure we are not creating an engine while
+            # Patch create_engine too and make sure we are not creating an engine while
             # testing
             MitupBaseModel.set_engine(db_config)
             yield mocked_session

@@ -1,12 +1,11 @@
 {
     "recommendations": [
         "ms-python.python",
-        "ms-python.black-formatter",
-        "ms-python.flake8",
         "kevinrose.vsc-python-indent",
         "visualstudioexptteam.vscodeintellicode",
         "njpwerner.autodocstring",
         "ms-python.isort",
-        "rangav.vscode-thunder-client"
+        "rangav.vscode-thunder-client",
+        "charliermarsh.ruff"
     ]
 }

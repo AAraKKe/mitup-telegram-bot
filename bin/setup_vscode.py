@@ -6,7 +6,7 @@ from rich import print
 from rich.prompt import Confirm
 
 TSettingType = int | str | bool | float
-TSettingValue = TSettingType | list[TSettingType] | dict[str, TSettingType]
+TSettingValue = TSettingType | list[TSettingType] | dict[str, "TSettingValue"]
 
 
 SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
@@ -19,8 +19,14 @@ SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
     "python.analysis.autoFormatStrings": True,
     "pythonIndent.trimLinesWithOnlyWhitespace": True,
     "coverage-gutters.coverageFileNames": ["coverage.xml"],
-    "black-formatter.importStrategy": "fromEnvironment",
     "editor.formatOnSave": True,
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": True,
+            "source.organizeImports": True,
+        },
+    },
 }
 
 
@@ -55,9 +61,7 @@ def generate_settings() -> dict[str, TSettingValue]:
     return settings
 
 
-def print_compare(
-    current: dict[str, TSettingValue], proposed: dict[str, TSettingValue]
-):
+def print_compare(current: dict[str, TSettingValue], proposed: dict[str, TSettingValue]):
     # Need to transform values into strings because json can have dicts and lists as values
     # which are not hashable into a set
     current_set = {(k, str(v)) for k, v in current.items()}
@@ -65,9 +69,7 @@ def print_compare(
     diff = current_set ^ proposed_set
 
     if len(diff) == 0:
-        print(
-            "Your current VSCode settings [bold green]are compatiblep[/bold green] with this project settigns!"
-        )
+        print("Your current VSCode settings " "[bold green]are compatiblep[/bold green] " "with this project settigns!")
         exit(0)
 
     diff_dict = dict(diff)
@@ -79,9 +81,7 @@ def print_compare(
         else:
             diff_str += f"  [bold red]- {name!r}: {value!r}[/bold red],\n"
             if name in proposed:
-                diff_str += (
-                    f"  [bold green]+ {name!r}: {proposed[name]!r}[/bold green],\n"
-                )
+                diff_str += f"  [bold green]+ {name!r}: {proposed[name]!r}[/bold green],\n"
 
     for name, value in diff_dict.items():
         if name not in current:
@@ -91,9 +91,7 @@ def print_compare(
     print(diff_str)
 
 
-def can_run_update(
-    current: dict[str, TSettingValue], proposed_settings: dict[str, TSettingValue]
-) -> bool:
+def can_run_update(current: dict[str, TSettingValue], proposed_settings: dict[str, TSettingValue]) -> bool:
     print_compare(current, proposed_settings)
     return Confirm.ask("Do you want to apply these modifications?")
 
@@ -112,9 +110,7 @@ def main():
         with open(".vscode/settings.json", "w") as settings:
             try:
                 settings.write(json.dumps(proposed_settings, indent=4))
-                print(
-                    "[bold green]VSCode settings have been updated for this workspace![/bold green]"
-                )
+                print("[bold green]VSCode settings have been updated for this workspace![/bold green]")
             except Exception:
                 from rich.console import Console
 
