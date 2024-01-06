@@ -9,6 +9,10 @@ class WrongCommandNameError(ValueError):
     pass
 
 
+class WrongMessageNameError(ValueError):
+    pass
+
+
 class HandlerNotRegistered(RuntimeError):
     def __init__(self, name: str):
         super().__init__(f"The hander {name!r} has not been registered")

@@ -2,9 +2,10 @@ import datetime as dt
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import TIMESTAMP, BigInteger, Column, func
-from sqlmodel import Field, SQLModel, Relationship
+from sqlmodel import Field, SQLModel, Relationship, select
 
 from .mitup_base_model import MitupBaseModel
+from .exceptions import MissingSessionError
 
 if TYPE_CHECKING:
     from . import Settings
@@ -26,3 +27,14 @@ class User(MitupBaseModel, SQLModel, table=True):
     last_name: Optional[str]
     username: Optional[str]
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
+
+    @classmethod
+    def find_by_tg_user_id(cls, tg_user_id: int) -> Optional["User"]:
+        if cls._session is None:
+            raise MissingSessionError()
+
+        statement = select(cls).where(cls.tg_user_id == tg_user_id)
+        if cls._session.exec(statement).first() is not None:
+            return cls._session.exec(statement).first()
+
+        return None
