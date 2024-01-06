@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 from .registry import HandlersRegistry
 
 
-@HandlersRegistry.register_command
+@HandlersRegistry.register_command("start_command")
 async def command_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")

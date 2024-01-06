@@ -1,6 +1,8 @@
 class HandlerRegisteredError(AttributeError):
-    def __init__(self, name: str):
-        super().__init__(f"The handler {name} has already been registered")
+    def __init__(self, key: str):
+        super().__init__(
+            f"A hanlder with key {key!r} has already been registered and is marked as unique"
+        )
 
 
 class WrongCommandNameError(ValueError):
