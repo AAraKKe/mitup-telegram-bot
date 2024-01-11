@@ -15,4 +15,4 @@ class WrongMessageNameError(ValueError):
 
 class HandlerNotRegistered(RuntimeError):
     def __init__(self, name: str):
-        super().__init__(f"The hander {name!r} has not been registered")
+        super().__init__(f"The handler(s) {name!r} has not been registered")
