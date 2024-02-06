@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 import logging
 from collections.abc import Callable, Coroutine
-from typing import Any
+from typing import Any, Optional
 from enum import Enum
 from datetime import timedelta
 
 from telegram import Update
-from telegram.ext import Application, BaseHandler, CommandHandler, MessageHandler, ConversationHandler
+from telegram.ext import Application, BaseHandler, CommandHandler, MessageHandler, ConversationHandler, CallbackQueryHandler
 from telegram.ext.filters import BaseFilter
 
 from mitup_bot.handlers.exceptions import (
@@ -143,6 +143,58 @@ class HandlersRegistry:
             cls.handlers[handler_name] = HandlerWrapper(
                 handler=MessageHandler(
                     filters=filters, callback=callback, block=block
+                ),
+                bindable=bindable,
+                group=group,
+            )
+            return callback
+
+        return wrapper
+
+    @classmethod
+    def register_callback_query(
+        cls,
+        handler_name: str,
+        bindable: bool = True,
+        group: int = 0,
+        pattern: Optional[str] = None,
+        block: bool = True,
+    ) -> Callable[
+        [Callable[[Update, CCT], Any]],
+        Callable[[Update, CCT], Coroutine[Any, Any, Any]],
+    ]:
+        """
+        Decorator used to register a callback for a CallbackQueryHandler.
+
+        Every argument provided is the same as those that can be provided to a CallbackQueryHandler
+
+        For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.callbackqueryhandler.html
+
+        Args:
+
+            handler_name (str): Mandatory argument defining the name of the handler to register. This must be unique.
+            pattern (str | None): The pattern to register. If the pattern name is not supplied, the method name is obtained from the decorated method by following the naming convention: callback_query_<name>.
+                Defaults to None.
+            block (bool): Whether the command should block other handlers.
+                Defaults to False.
+
+        Raises:
+            HandlerRegisteredError: If a handler with the same handler_name has already been registered.
+        """
+
+        def wrapper(
+            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]]
+        ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
+            func_name = callback.__name__
+
+            if handler_name in cls.handlers:
+                raise HandlerRegisteredError(func_name)
+
+            cls.handlers[handler_name] = HandlerWrapper(
+                handler=CallbackQueryHandler(
+                    pattern=pattern,
+                    callback=callback,
+                    block=block,
                 ),
                 bindable=bindable,
                 group=group,
