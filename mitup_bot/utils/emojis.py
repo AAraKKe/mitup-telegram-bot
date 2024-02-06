@@ -1,0 +1,55 @@
+from enum import Enum
+
+
+class Emojis(Enum):
+    # FLAGS
+    FLAG_BR = "🇧🇷"
+    FLAG_ES = "🇪🇸"
+    FLAG_US = "🇺🇸"
+    FLAG_DE = "🇩🇪"
+    FLAG_IT = "🇮🇹"
+
+    # Symbols
+    CLOCK = "🕒"
+    PROHIB = "🚫"
+    MAP = "🗺️"
+    PEOPLE = "👥"
+    DESCRIPTION = "📄"
+    USER_WAITING = "📝"
+    LOCK = "🔒"
+    CALENDAR = "🗓️"
+    TITLE = "🅰️"
+    PIN = "📍"
+    HOME = "🏠"
+    CHECK = "✅"
+    CANCEL = "❌"
+    DELETE = "🗑️"
+    EDIT = "✏️"
+    CHAT = "💬"
+    SHARE = "📨"
+    RED_CIRCLE = "🔴"
+    NEW_MEETING = "➕"
+    LIST = "📂"
+    PAST = "💾"
+    JOINED = "👥"
+    SETTINGS = "⚙️"
+    HELP = "❓"
+    HEART = "♥"
+    DONATE = "💶"
+    REPLY = "▶"
+    REPLY_ALL = "⏩"
+    ACTIVATE = "🔄"
+    TIME = "🌐"
+    ATTACH = "⬇"
+    DEATTACH = "⬆"
+    TIMEOUT = "⌛"
+    NOTIF = "⏰"
+    LANG = "🔣"
+    WAITING = "😴"
+    PUBLIC = "🌎"
+    SHIELD = "🛡️"
+    FRIEND = "😄"
+    GLASSES = "🕶"
+
+    def __str__(self):
+        return self.value
