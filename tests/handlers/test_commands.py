@@ -1,11 +1,17 @@
 from typing import cast
+from unittest import mock
+from unittest.mock import MagicMock
 
 import pytest
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 from telegram.ext.filters import CAPTION, PHOTO
 
-from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers import Conversation_Settings_State, HandlersRegistry
+from mitup_bot.handlers.commands import (
+    command_start_with_existing_user,
+    command_start_with_new_user,
+)
 from mitup_bot.handlers.exceptions import (
     HandlerNotRegistered,
     HandlerRegisteredError,
@@ -101,3 +107,47 @@ def test_multiple_commands_can_be_registered_with_different_names():
 def test_registry_fails_to_get_handler_that_does_not_exist():
     with pytest.raises(HandlerNotRegistered):
         HandlersRegistry.get_handler("I_do_not_exist")
+
+
+@pytest.mark.asyncio
+async def test_command_start_with_new_user(mock_session: MagicMock):
+    update = MagicMock()
+    context = MagicMock()
+
+    update.effective_user.first_name = "John"
+    update.effective_user.last_name = "Doe"
+    update.effective_user.id = 123456789
+    update.effective_user.username = "johndoe"
+
+    with mock.patch("mitup_bot.handlers.commands.send_message") as mock_send_message:
+        result = await command_start_with_new_user(update, context)
+
+        assert mock_session.add.called
+        assert mock_session.commit.called
+        assert update.effective_user is not None
+        mock_send_message.assert_called_once_with(
+            context, update, "Welcome to Mitup Bot John! Please, tell me your timezone."
+        )
+        assert result == Conversation_Settings_State.TIMEZONE
+
+
+@pytest.mark.asyncio
+async def test_command_start_fails_without_effective_chat():
+    update = MagicMock()
+    context = MagicMock()
+
+    update.effective_chat = None
+
+    with pytest.raises(RuntimeError):
+        await command_start_with_new_user(update, context)
+
+
+@pytest.mark.asyncio
+async def test_command_start_with_existing_user(update: MagicMock, context: MagicMock):
+    with mock.patch(
+        "mitup_bot.handlers.commands.send_message_view"
+    ) as mock_send_message_view:
+        result = await command_start_with_existing_user(update, context)
+
+        assert mock_send_message_view.called
+        assert result is None
