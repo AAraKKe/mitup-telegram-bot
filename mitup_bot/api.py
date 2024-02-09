@@ -20,14 +20,16 @@ async def edit_message(context: ContextTypes.DEFAULT_TYPE, update: Update, messa
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
-    if update.effective_message is not None:
-        message_id = update.effective_message.message_id
+    if update.effective_message is None:
+        raise RuntimeError("Effective message not set")
 
-        await context.bot.edit_message_text(sanitize_message(message),
-                                            update.effective_chat.id,
-                                            message_id=message_id,
-                                            parse_mode='MarkdownV2'
-                                            )
+    message_id = update.effective_message.message_id
+
+    await context.bot.edit_message_text(sanitize_message(message),
+                                        update.effective_chat.id,
+                                        message_id=message_id,
+                                        parse_mode='MarkdownV2'
+                                        )
 
 
 async def send_message_view(
@@ -54,12 +56,14 @@ async def edit_message_view(
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
-    if update.effective_message is not None:
-        message_id = update.effective_message.message_id
+    if update.effective_message is None:
+        raise RuntimeError("Effective message not set")
 
-        await context.bot.edit_message_text(view.description,
-                                            update.effective_chat.id,
-                                            message_id=message_id,
-                                            reply_markup=view.markup,
-                                            parse_mode='MarkdownV2'
-                                            )
+    message_id = update.effective_message.message_id
+
+    await context.bot.edit_message_text(view.description,
+                                        update.effective_chat.id,
+                                        message_id=message_id,
+                                        reply_markup=view.markup,
+                                        parse_mode='MarkdownV2'
+                                        )

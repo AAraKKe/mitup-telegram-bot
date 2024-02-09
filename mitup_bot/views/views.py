@@ -24,7 +24,7 @@ def main_menu_view(message: str = DEFAULT_MAIN_MENU_MESSAGE) -> MitupView:
             ],
             [
                 ButtonConfig(f"{Emojis.JOINED} Joined meetings", callback_data="meetups"),
-                ButtonConfig(f"{Emojis.SETTINGS} Settings", callback_data="settings"),  
+                ButtonConfig(f"{Emojis.SETTINGS} Settings", callback_data="settings"),
             ],
             [
                 ButtonConfig(f"{Emojis.HELP} Help", callback_data="help"),
