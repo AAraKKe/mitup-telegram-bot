@@ -1,9 +1,8 @@
 import datetime as dt
 from datetime import timezone
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import Generator
 
-from pydantic import PrivateAttr
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
