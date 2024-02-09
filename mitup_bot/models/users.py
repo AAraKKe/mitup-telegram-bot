@@ -30,11 +30,22 @@ class User(MitupBaseModel, SQLModel, table=True):
 
     @classmethod
     def find_by_tg_user_id(cls, tg_user_id: int) -> Optional["User"]:
-        if cls._session is None:
+        session = cls.get_session()
+
+        if session is None:
             raise MissingSessionError()
 
         statement = select(cls).where(cls.tg_user_id == tg_user_id)
-        if cls._session.exec(statement).first() is not None:
-            return cls._session.exec(statement).first()
+        if session.exec(statement).first() is not None:
+            return session.exec(statement).first()
 
         return None
+
+    @classmethod
+    def get_settings_from_user(cls, tg_user_id: int) -> Optional["Settings"]:
+        if cls.get_session() is None:
+            raise MissingSessionError()
+
+        user = cls.find_by_tg_user_id(tg_user_id)
+
+        return user.settings if user is not None else None
