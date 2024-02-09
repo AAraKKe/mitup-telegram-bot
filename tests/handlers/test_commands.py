@@ -143,7 +143,10 @@ async def test_command_start_fails_without_effective_chat():
 
 
 @pytest.mark.asyncio
-async def test_command_start_with_existing_user(update: MagicMock, context: MagicMock):
+async def test_command_start_with_existing_user():
+    update = MagicMock()
+    context = MagicMock()
+
     with mock.patch(
         "mitup_bot.handlers.commands.send_message_view"
     ) as mock_send_message_view:
