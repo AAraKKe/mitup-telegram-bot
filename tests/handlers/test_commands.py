@@ -122,8 +122,8 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
     with mock.patch("mitup_bot.handlers.commands.send_message") as mock_send_message:
         result = await command_start_with_new_user(update, context)
 
-        assert mock_session.add.called
-        assert mock_session.commit.called
+        mock_session.add.assert_called_once()
+        mock_session.commit.assert_called_once()
         assert update.effective_user is not None
         mock_send_message.assert_called_once_with(
             context, update, "Welcome to Mitup Bot John! Please, tell me your timezone."
@@ -150,7 +150,6 @@ async def test_command_start_with_existing_user():
     with mock.patch(
         "mitup_bot.handlers.commands.send_message_view"
     ) as mock_send_message_view:
-        result = await command_start_with_existing_user(update, context)
+        await command_start_with_existing_user(update, context)
 
         assert mock_send_message_view.called
-        assert result is None
