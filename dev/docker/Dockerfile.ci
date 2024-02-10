@@ -9,4 +9,3 @@ RUN apt-get update && \
 
 # Install Hatch
 RUN pip install hatch
-

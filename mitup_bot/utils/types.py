@@ -1,4 +1,5 @@
 """This module contains custom types to be used through the project for type hinting"""
+
 from collections.abc import Callable, Collection, Coroutine
 from typing import Any, TypeVar, Union
 
