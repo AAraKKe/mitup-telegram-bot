@@ -34,8 +34,8 @@ class User(MitupBaseModel, SQLModel, table=True):
             raise MissingSessionError()
 
         statement = select(cls).where(cls.tg_user_id == tg_user_id)
-        if session.exec(statement).first() is not None:
-            return session.exec(statement).first()
+        if (found_user := session.exec(statement).first()) is not None:
+            return found_user
 
         return None
 

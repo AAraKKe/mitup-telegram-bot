@@ -1,7 +1,9 @@
 from unittest import mock
 
-from mitup_bot.models import User
+from sqlalchemy.dialects import postgresql
 
+from mitup_bot.models import User
+from tests.utils import get_querys_from_session
 
 def test_user_dont_exist(mock_session: mock.MagicMock):
     with User.open_session():
@@ -16,13 +18,14 @@ def test_user_dont_exist(mock_session: mock.MagicMock):
 
 def test_user_exist(mock_session: mock.MagicMock):
     with User.open_session():
-        with mock.patch("mitup_bot.models.users.select") as select_mock:
-            user = User.find_by_tg_user_id(1)
+        mock_user = mock.MagicMock(name="my_user")
+        mock_session.exec.return_value.first.return_value = mock_user
 
-            select_mock.assert_called_once_with(User)
-            mock_session.exec.assert_called_with(select_mock.return_value.where())
+        user = User.find_by_tg_user_id(1)
+        expected_query = get_querys_from_session(mock_session)[0]
 
-            assert user is not None
+        assert "WHERE users.tg_user_id = 1" in expected_query
+        assert user == mock_user
 
 
 def test_settings_exist(mock_session: mock.MagicMock):
