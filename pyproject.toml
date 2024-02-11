@@ -35,12 +35,6 @@ Issues = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues"
 [tool.hatch.version]
 path = "mitup_bot/__about__.py"
 
-[tool.isort]
-profile = "black"
-src_paths = ["mitup_bot", "tests"]
-skip = [".hatch"]
-color_output = true
-
 # Global pytest setup, mainline to run from VSCode
 # Cannot launch VSCode tests/debug with cov plugin
 [tool.pytest.ini_options]
@@ -78,6 +72,45 @@ exclude = [
 ]
 packages = ["mitup_bot"]
 
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist"]
+src = ["mitup_bot", "tests"]
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+ignore = ["SIM117"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mitup_bot", "tests"]
+# Eensure alembic is not confused with our local alembic folder
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 120
+max-line-length = 120
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+
 # --------------------------
 # Development/CI environment
 # --------------------------
@@ -89,26 +122,18 @@ dependencies = [
     "pytest~=7.3",
     "pytest-asyncio~=0.21",
     "pytest-cov~=4.1",
-    "black",
-    "isort[colors]~=5.0",
-    "flake8",
     "mypy~=1.0",
     "pytest-asyncio",
-    "freezegun"
+    "freezegun",
+    "ruff~=0.2",
 ]
 
 [tool.hatch.envs.dev.scripts]
 test = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests"
 test-cov = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
-format = [
-    "black .",
-    "isort ."
-]
-format-check = [
-    "black --check .",
-    "isort --check-only ."
-]
-lint = "flake8 ."
+format = "ruff format ."
+format-check = "ruff format --check ."
+lint = "ruff check {args:.}  --unsafe-fixes ."
 type-check = "mypy tests mitup_bot bin"
 validate = [
     "test",
@@ -121,7 +146,6 @@ migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -1"
 launch = "python -m mitup_bot.cli.launch"
 help = "python -m mitup_bot.cli.launch --help"
-
 
 # ----------------------
 # Production environment
