@@ -1,5 +1,6 @@
-from . import User, Settings, MitupBaseModel
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Session, select
+
+from . import User
 
 
 def get_user_by_tg_user_id(tg_user_id: int) -> User:

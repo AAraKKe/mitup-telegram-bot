@@ -1,6 +1,5 @@
-from .registry import HandlersRegistry
 from .conversations_states import Conversation_Settings_State
-
+from .registry import HandlersRegistry
 
 HandlersRegistry.register_conversation_handler(
     "register_user_conversation_start",

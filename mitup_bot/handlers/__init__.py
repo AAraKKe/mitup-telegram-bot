@@ -1,12 +1,6 @@
 # Export all handlers available to make sure we register them
-__all__ = (
-    "commands",
-    "HandlersRegistry",
-    "messages",
-    "callback_query",
-    "conversations",
-    "Conversation_Settings_State"
-)
+# isort: skip_file
+__all__ = ("commands", "HandlersRegistry", "messages", "callback_query", "conversations", "Conversation_Settings_State")
 
 from . import commands
 from . import messages

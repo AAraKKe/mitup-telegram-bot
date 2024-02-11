@@ -1,10 +1,8 @@
 from unittest import mock
+
 import pytest
 
-from mitup_bot.handlers.messages import (
-    first_timezone_message_handler,
-    second_timezone_message_handler
-    )
+from mitup_bot.handlers.messages import first_timezone_message_handler, second_timezone_message_handler
 from mitup_bot.models import User
 
 

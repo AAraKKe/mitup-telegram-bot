@@ -38,10 +38,10 @@ def test_wrong_event_fails():
     with pytest.raises(ValidationError) as exc_info:
         run_migrations(event, None)
 
-    assert 1 == exc_info.value.error_count()
+    assert exc_info.value.error_count() == 1
 
     error = exc_info.value.errors()[0]
     # Validate that there was an error parsing action, as it is not recognized in the enum
-    assert "enum" == error["type"]
-    assert "action" == error["loc"][0]
-    assert "myAction" == error["input"]
+    assert error["type"] == "enum"
+    assert error["loc"][0] == "action"
+    assert error["input"] == "myAction"

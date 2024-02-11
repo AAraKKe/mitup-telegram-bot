@@ -27,7 +27,8 @@ class RunModes(StrEnum):
 class ConfigProvider(Protocol):
     """Protocol for a configuration provider"""
 
-    def get_config(self) -> ConfigMap: ...
+    def get_config(self) -> ConfigMap:
+        ...
 
 
 @dataclass
@@ -53,13 +54,11 @@ class TomlConfigProvider:
         except Exception as exc:
             # If there is an error reading the config file we just log a warning and
             # return no content. Data validation by the Config will piont out the issue
-            logging.warning(
-                f"Could not read configuration file {config_file}. Error: {exc}"
-            )
+            logging.warning(f"Could not read configuration file {config_file}. Error: {exc}")
             return {}
 
     def __process_config_file(self, config_path: Path) -> ConfigMap:
-        with open(config_path, "r") as config_file:
+        with open(config_path) as config_file:
             return tomllib.loads(config_file.read())
 
 
@@ -81,9 +80,7 @@ class EnvVariablesConfigProvider:
         for variable, value in os.environ.items():
             if variable.startswith("MITUPBOT__"):
                 _, group, key = variable.split("__")
-                config.setdefault(group.lower(), {})[key.lower()] = (
-                    self.__convert_value(value)
-                )
+                config.setdefault(group.lower(), {})[key.lower()] = self.__convert_value(value)
         return config
 
     def __convert_value(self, value: str) -> str | bool | int | float:

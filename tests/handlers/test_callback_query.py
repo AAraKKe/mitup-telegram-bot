@@ -1,15 +1,15 @@
-import pytest
 from unittest import mock
 
+import pytest
+
 from mitup_bot.handlers.callback_query import (
+    callback_query_cancel_settings,
     callback_query_settings,
     callback_query_timezone,
-    callback_query_cancel_settings,
-    )
-
+)
 from mitup_bot.handlers.conversations_states import Conversation_Settings_State
-from mitup_bot.views.views import settings_view
 from mitup_bot.models import User
+from mitup_bot.views.views import settings_view
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,6 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
             with mock.patch(
                 "mitup_bot.handlers.callback_query.change_settings_element_view"
             ) as mock_change_settings_element_view:
-
                 result = await callback_query_timezone(update, context)
 
                 mock_user_find.assert_called_once_with(update.effective_user.id)

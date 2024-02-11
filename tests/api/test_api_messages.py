@@ -1,7 +1,8 @@
 from unittest import mock
+
 import pytest
 
-from mitup_bot.api import send_message, edit_message, send_message_view, edit_message_view
+from mitup_bot.api import edit_message, edit_message_view, send_message, send_message_view
 from mitup_bot.views import MitupView
 
 
@@ -15,10 +16,7 @@ async def test_send_message():
 
     await send_message(context, update, message)
 
-    context.bot.send_message.assert_called_once_with(chat_id=123456789,
-                                                     text="Hello, World",
-                                                     parse_mode='MarkdownV2'
-                                                     )
+    context.bot.send_message.assert_called_once_with(chat_id=123456789, text="Hello, World", parse_mode="MarkdownV2")
 
 
 @pytest.mark.asyncio
@@ -33,11 +31,9 @@ async def test_edit_message():
     await edit_message(context, update, message)
 
     assert update.effective_message is not None
-    context.bot.edit_message_text.assert_called_once_with("Hello, World",
-                                                          123456789,
-                                                          message_id=123,
-                                                          parse_mode='MarkdownV2'
-                                                          )
+    context.bot.edit_message_text.assert_called_once_with(
+        "Hello, World", 123456789, message_id=123, parse_mode="MarkdownV2"
+    )
 
 
 @pytest.mark.asyncio
@@ -61,11 +57,9 @@ async def test_send_message_view(default_view: MitupView):
 
     await send_message_view(context, update, default_view)
 
-    context.bot.send_message.assert_called_once_with(chat_id=123456789,
-                                                     text=default_view.description,
-                                                     reply_markup=default_view.markup,
-                                                     parse_mode='MarkdownV2'
-                                                     )
+    context.bot.send_message.assert_called_once_with(
+        chat_id=123456789, text=default_view.description, reply_markup=default_view.markup, parse_mode="MarkdownV2"
+    )
 
 
 @pytest.mark.asyncio
@@ -79,12 +73,9 @@ async def test_edit_message_view(default_view: MitupView):
     await edit_message_view(context, update, default_view)
 
     assert update.effective_message is not None
-    context.bot.edit_message_text.assert_called_once_with(default_view.description,
-                                                          123456789,
-                                                          message_id=123,
-                                                          reply_markup=default_view.markup,
-                                                          parse_mode='MarkdownV2'
-                                                          )
+    context.bot.edit_message_text.assert_called_once_with(
+        default_view.description, 123456789, message_id=123, reply_markup=default_view.markup, parse_mode="MarkdownV2"
+    )
 
 
 @pytest.mark.asyncio

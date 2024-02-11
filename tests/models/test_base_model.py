@@ -1,10 +1,8 @@
+import datetime as dt
 from unittest import mock
 
-import datetime as dt
-
-from freezegun import freeze_time
-
 import pytest
+from freezegun import freeze_time
 from pydantic import SecretStr
 from sqlmodel import SQLModel
 
@@ -19,13 +17,9 @@ class BaseModelImpl(MitupBaseModel, SQLModel):
 
 
 def test_engine_generated_properly():
-    config = DbConfig(
-        username="user", password=SecretStr("password"), url="url", database="db"
-    )
+    config = DbConfig(username="user", password=SecretStr("password"), url="url", database="db")
 
-    with mock.patch(
-        "mitup_bot.models.mitup_base_model.create_engine"
-    ) as create_engine_mock:
+    with mock.patch("mitup_bot.models.mitup_base_model.create_engine") as create_engine_mock:
         create_engine_mock.return_value = mock.sentinel.engine
         MitupBaseModel.set_engine(config)
 
@@ -43,7 +37,7 @@ def test_create(mock_session: mock.MagicMock):
     mock_session.commit.assert_called_once()
 
 
-@freeze_time(dt.datetime(2023, 11, 20, 12, 12, tzinfo=dt.timezone.utc))
+@freeze_time(dt.datetime(2023, 11, 20, 12, 12, tzinfo=dt.UTC))
 def test_update(mock_session: mock.MagicMock):
     with BaseModelImpl.open_session():
         impl = BaseModelImpl(name="test")
@@ -55,7 +49,7 @@ def test_update(mock_session: mock.MagicMock):
 
     # The updated_time of the settings used as first argument on the first call is now
     added_settings: BaseModelImpl = mock_session.add.call_args_list[0].args[0]
-    assert dt.datetime.now(dt.timezone.utc) == added_settings.updated_time
+    assert dt.datetime.now(dt.UTC) == added_settings.updated_time
 
 
 def test_create_fails_without_session():

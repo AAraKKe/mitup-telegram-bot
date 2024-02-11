@@ -1,12 +1,19 @@
-from dataclasses import dataclass
 import logging
 from collections.abc import Callable, Coroutine
-from typing import Any, Optional
-from enum import Enum
+from dataclasses import dataclass
 from datetime import timedelta
+from enum import Enum
+from typing import Any
 
 from telegram import Update
-from telegram.ext import Application, BaseHandler, CommandHandler, MessageHandler, ConversationHandler, CallbackQueryHandler
+from telegram.ext import (
+    Application,
+    BaseHandler,
+    CallbackQueryHandler,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+)
 from telegram.ext.filters import BaseFilter
 
 from mitup_bot.handlers.exceptions import (
@@ -75,7 +82,7 @@ class HandlersRegistry:
         """  # noqa: E501
 
         def wrapper(
-            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]]
+            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
             func_name = callback.__name__
             if command is None and not func_name.startswith("command_"):
@@ -135,15 +142,13 @@ class HandlersRegistry:
         """  # noqa: E501
 
         def wrapper(
-            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]]
+            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
             if handler_name in cls.handlers:
                 raise HandlerRegisteredError(callback.__name__)
 
             cls.handlers[handler_name] = HandlerWrapper(
-                handler=MessageHandler(
-                    filters=filters, callback=callback, block=block
-                ),
+                handler=MessageHandler(filters=filters, callback=callback, block=block),
                 bindable=bindable,
                 group=group,
             )
@@ -157,7 +162,7 @@ class HandlersRegistry:
         handler_name: str,
         bindable: bool = True,
         group: int = 0,
-        pattern: Optional[str] = None,
+        pattern: str | None = None,
         block: bool = True,
     ) -> Callable[
         [Callable[[Update, CCT], Any]],
@@ -173,7 +178,8 @@ class HandlersRegistry:
         Args:
 
             handler_name (str): Mandatory argument defining the name of the handler to register. This must be unique.
-            pattern (str | None): The pattern to register. If the pattern name is not supplied, the method name is obtained from the decorated method by following the naming convention: callback_query_<name>.
+            pattern (str | None): The pattern to register. If the pattern name is not supplied, the method name is
+                obtained from the decorated method by following the naming convention: callback_query_<name>.
                 Defaults to None.
             block (bool): Whether the command should block other handlers.
                 Defaults to False.
@@ -183,7 +189,7 @@ class HandlersRegistry:
         """
 
         def wrapper(
-            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]]
+            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
             func_name = callback.__name__
 

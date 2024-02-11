@@ -11,7 +11,7 @@ T = TypeVar("T")
 RT = TypeVar("RT")
 """References the return type of a handler callback"""
 
-OneOrMany = Union[T, Collection[T]]
+OneOrMany = Union[T, Collection[T]]  # noqa: UP007
 """Type that defines one or a collection of T objects"""
 
 CCT = TypeVar("CCT", bound=CallbackContext[Any, Any, Any, Any])

@@ -1,10 +1,7 @@
-from mitup_bot.views import ButtonConfig, MitupView
 from mitup_bot.utils import Emojis, sanitize_message
+from mitup_bot.views import ButtonConfig, MitupView
 
-DEFAULT_MAIN_MENU_MESSAGE = (
-    "Welcome to Mitup Bot! \n"
-    "Choose one of the following options:"
-)
+DEFAULT_MAIN_MENU_MESSAGE = "Welcome to Mitup Bot! \n" "Choose one of the following options:"
 
 DEFAULT_SETTINGS_MESSAGE = "Configure MitUp."
 
@@ -30,7 +27,7 @@ def main_menu_view(message: str = DEFAULT_MAIN_MENU_MESSAGE) -> MitupView:
                 ButtonConfig(f"{Emojis.HELP} Help", callback_data="help"),
                 ButtonConfig(f"{Emojis.HEART} Collaborate", callback_data="collaborate"),
             ],
-        ]
+        ],
     )
 
 
@@ -50,9 +47,7 @@ def settings_view(message: str = DEFAULT_SETTINGS_MESSAGE) -> MitupView:
                 ButtonConfig(f"{Emojis.PEOPLE} Default Options", callback_data="default_options"),
                 ButtonConfig(f"{Emojis.SHIELD} Privacy", callback_data="privacy"),
             ],
-            [
-                ButtonConfig("≪ Main Menu", callback_data="main_menu")
-            ],
+            [ButtonConfig("≪ Main Menu", callback_data="main_menu")],
         ],
     )
 

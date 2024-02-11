@@ -1,4 +1,4 @@
-from typing import Generator
+from collections.abc import Generator
 from unittest import mock
 
 import pytest
@@ -22,9 +22,7 @@ def mock_toml_config(
         # Mock the resources files method to avoid attempting to read resources during tests
         with mock.patch("mitup_bot.config.as_file") as mock_as_file:
             # Mock the as_file method as there is not real resource that needs to be read as file
-            with mock.patch(
-                "mitup_bot.config.open", mock.mock_open(read_data=request.param)
-            ):
+            with mock.patch("mitup_bot.config.open", mock.mock_open(read_data=request.param)):
                 # Mock the open method to return the expected toml content when opening the file
                 # Once all patches are applied just yield them to the test
                 yield (mock_files, mock_as_file)

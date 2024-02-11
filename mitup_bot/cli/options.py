@@ -1,5 +1,5 @@
 from enum import StrEnum, auto
-from typing import Generic, Type, TypeVar
+from typing import Generic, TypeVar
 
 from click import Choice
 from click.core import Context, Parameter
@@ -28,7 +28,7 @@ class EnumChoice(Generic[T], Choice):
 
     name = "enum_choice"
 
-    def __init__(self, choices: Type[T]) -> None:
+    def __init__(self, choices: type[T]) -> None:
         """Define the choices as the valid values of the Enum supplied"""
         self.enum_type = choices
         valid_choices = [choice.value.lower() for choice in choices]

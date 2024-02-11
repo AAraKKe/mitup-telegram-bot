@@ -1,15 +1,11 @@
 import datetime as dt
-from datetime import timezone
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
-from pydantic import PrivateAttr
-from sqlalchemy.engine import Engine
 
 from mitup_bot.config import DbConfig
-from .exceptions import MissingSessionError
 
 from .exceptions import MissingSessionError
 
@@ -49,7 +45,7 @@ class MitupBaseModel(SQLModel):
             raise MissingSessionError()
 
         if hasattr(self, "updated_time"):
-            self.updated_time = dt.datetime.now(timezone.utc)
+            self.updated_time = dt.datetime.now(dt.UTC)
 
             session.add(self)
             session.commit()

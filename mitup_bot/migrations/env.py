@@ -14,9 +14,7 @@ config = context.config
 # Load config from environment provider to get the db url
 # this can be overriden later in deployment pipelines
 # with proper environment configuration
-mitup_config = Config.from_providers(
-    EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV)
-)
+mitup_config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

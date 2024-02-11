@@ -76,7 +76,7 @@ packages = ["mitup_bot"]
 [tool.ruff]
 line-length = 120
 indent-width = 4
-exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist"]
+exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "__init__.py"]
 src = ["mitup_bot", "tests"]
 
 [tool.ruff.lint]
@@ -136,10 +136,10 @@ format-check = "ruff format --check ."
 lint = "ruff check {args:.}  --unsafe-fixes ."
 type-check = "mypy tests mitup_bot bin"
 validate = [
-    "test",
-    "format-check",
-    "lint",
-    "type-check",
+    "- test",
+    "- format-check",
+    "- lint",
+    "- type-check",
 ]
 setup-vscode = "python bin/setup_vscode.py"
 migrations-upgrade = "alembic upgrade head"

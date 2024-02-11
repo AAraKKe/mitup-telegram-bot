@@ -56,13 +56,11 @@ def test_config_properly_setup(
     mock_env_config: None,
 ):
     # Given a valid configuration set from toml and environment we can use the providers to get a config object
-    config = Config.from_providers(
-        EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV)
-    )
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
     # Password from environment variable takes precedence as it is defined before Toml
-    assert "postgresql://username:1234abc@some.url.com:12/mydb" == config.db.full_url
-    assert "abcd12345" == config.bot.token.get_secret_value()
+    assert config.db.full_url == "postgresql://username:1234abc@some.url.com:12/mydb"
+    assert config.bot.token.get_secret_value() == "abcd12345"
     assert RunModes.POLLING is config.app.run_mode
 
 
@@ -74,9 +72,9 @@ def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
         Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
     # Assert that there are 2 errors for the missing pieces of db
-    assert 2 == len(exc_info.value.errors())
-    assert "missing" == exc_info.value.errors()[0]["type"]
-    assert "missing" == exc_info.value.errors()[1]["type"]
-    assert ("db", "username") == exc_info.value.errors()[0]["loc"]
-    assert ("db", "password") == exc_info.value.errors()[1]["loc"]
-    assert "Config" == exc_info.value.title
+    assert len(exc_info.value.errors()) == 2
+    assert exc_info.value.errors()[0]["type"] == "missing"
+    assert exc_info.value.errors()[1]["type"] == "missing"
+    assert exc_info.value.errors()[0]["loc"] == ("db", "username")
+    assert exc_info.value.errors()[1]["loc"] == ("db", "password")
+    assert exc_info.value.title == "Config"

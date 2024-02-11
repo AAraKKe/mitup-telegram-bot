@@ -1,4 +1,7 @@
-CHARACTERS_TO_SCAPE = [".", "!",]
+CHARACTERS_TO_SCAPE = [
+    ".",
+    "!",
+]
 
 
 def sanitize_message(message: str) -> str:

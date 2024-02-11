@@ -1,6 +1,6 @@
 import pytest
-from mitup_bot.utils.messages import sanitize_message
 
+from mitup_bot.utils.messages import sanitize_message
 from mitup_bot.views import MitupView
 from mitup_bot.views.mitup_view import ButtonConfig
 

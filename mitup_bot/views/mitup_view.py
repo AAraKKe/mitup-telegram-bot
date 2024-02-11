@@ -1,7 +1,7 @@
-from typing import Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 @dataclass
@@ -28,10 +28,5 @@ class MitupView:
 
     @property
     def markup(self):
-        inline_keyboard = [
-            [
-                button_config.button for button_config in row
-            ]
-            for row in self.keyboard
-        ]
+        inline_keyboard = [[button_config.button for button_config in row] for row in self.keyboard]
         return InlineKeyboardMarkup(inline_keyboard)

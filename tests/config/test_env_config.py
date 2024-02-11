@@ -21,4 +21,4 @@ def test_config_loads_properly(mock_env_config):
 
     # The config returned from environment variables should be the same as the
     # one provided
-    assert VALID_CONFIG == config
+    assert config == VALID_CONFIG

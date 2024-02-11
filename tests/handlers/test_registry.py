@@ -32,7 +32,9 @@ def test_only_bindable_handlers_are_registered():
         return "Done!"
 
     bindable_element = "CommandHandler[callback=test_only_bindable_handlers_are_registered.<locals>.command_bindable]"
-    not_bindable_element = "CommandHandler[callback=test_only_bindable_handlers_are_registered.<locals>.command_not_bindable]"
+    not_bindable_element = (
+        "CommandHandler[callback=test_only_bindable_handlers_are_registered.<locals>.command_not_bindable]"
+    )
 
     app = ApplicationBuilder().token("AAA").build()
     HandlersRegistry.bind(app)

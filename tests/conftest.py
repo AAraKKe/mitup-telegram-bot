@@ -1,8 +1,8 @@
-import pytest
+from collections.abc import Generator
 from unittest import mock
-from typing import Generator
-from pydantic import SecretStr
 
+import pytest
+from pydantic import SecretStr
 from sqlmodel import Session
 
 from mitup_bot.config import DbConfig
