@@ -122,6 +122,7 @@ dependencies = [
     "pytest~=7.3",
     "pytest-asyncio~=0.21",
     "pytest-cov~=4.1",
+    "pytest-xdist~=3.5",
     "mypy~=1.0",
     "pytest-asyncio",
     "freezegun",
@@ -129,8 +130,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.dev.scripts]
-test = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests"
-test-cov = "pytest --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
+test = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests"
+test-cov = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
 format = "ruff format ."
 format-check = "ruff format --check ."
 lint = "ruff check {args:.}  --unsafe-fixes ."
