@@ -27,8 +27,7 @@ class RunModes(StrEnum):
 class ConfigProvider(Protocol):
     """Protocol for a configuration provider"""
 
-    def get_config(self) -> ConfigMap:
-        ...
+    def get_config(self) -> ConfigMap: ...
 
 
 @dataclass
@@ -82,9 +81,9 @@ class EnvVariablesConfigProvider:
         for variable, value in os.environ.items():
             if variable.startswith("MITUPBOT__"):
                 _, group, key = variable.split("__")
-                config.setdefault(group.lower(), {})[
-                    key.lower()
-                ] = self.__convert_value(value)
+                config.setdefault(group.lower(), {})[key.lower()] = (
+                    self.__convert_value(value)
+                )
         return config
 
     def __convert_value(self, value: str) -> str | bool | int | float:

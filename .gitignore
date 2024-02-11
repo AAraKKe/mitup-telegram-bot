@@ -24,3 +24,9 @@ postgres-data
 # Ignroe dev.toml for local configuration to avoid
 # secrets in commits
 dev.toml
+
+# Ignore build dist
+dist
+
+# Ignore any caching folders generated
+.*_cache
