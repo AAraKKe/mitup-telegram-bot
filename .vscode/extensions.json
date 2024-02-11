@@ -6,6 +6,7 @@
         "njpwerner.autodocstring",
         "ms-python.isort",
         "rangav.vscode-thunder-client",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "ryanluker.vscode-coverage-gutters"
     ]
 }
