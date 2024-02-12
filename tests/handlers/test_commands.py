@@ -8,15 +8,8 @@ from telegram.ext import CommandHandler, ContextTypes
 from telegram.ext.filters import CAPTION, PHOTO
 
 from mitup_bot.handlers import Conversation_Settings_State, HandlersRegistry
-from mitup_bot.handlers.commands import (
-    command_start_with_existing_user,
-    command_start_with_new_user,
-)
-from mitup_bot.handlers.exceptions import (
-    HandlerNotRegistered,
-    HandlerRegisteredError,
-    WrongCommandNameError,
-)
+from mitup_bot.handlers.commands import command_cancel, command_start_with_existing_user, command_start_with_new_user
+from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 
 
 async def test_command_registry_can_register_command_handlers():
@@ -118,17 +111,6 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
 
 
 @pytest.mark.asyncio
-async def test_command_start_fails_without_effective_chat():
-    update = MagicMock()
-    context = MagicMock()
-
-    update.effective_chat = None
-
-    with pytest.raises(RuntimeError):
-        await command_start_with_new_user(update, context)
-
-
-@pytest.mark.asyncio
 async def test_command_start_with_existing_user():
     update = MagicMock()
     context = MagicMock()
@@ -136,4 +118,26 @@ async def test_command_start_with_existing_user():
     with mock.patch("mitup_bot.handlers.commands.send_message_view") as mock_send_message_view:
         await command_start_with_existing_user(update, context)
 
-        assert mock_send_message_view.called
+        mock_send_message_view.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_command_cancel():
+    update = MagicMock()
+    context = MagicMock()
+
+    with mock.patch("mitup_bot.handlers.commands.send_message") as mock_send_message:
+        await command_cancel(update, context)
+
+        mock_send_message.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_any_command_fails_without_effective_chat(command_list):
+    update = MagicMock()
+    context = MagicMock()
+
+    update.effective_chat = None
+
+    with pytest.raises(RuntimeError):
+        await command_list(update, context)

@@ -51,3 +51,14 @@ async def test_second_timezone_message_handler_without_effective_user(mock_sessi
 
     with pytest.raises(RuntimeError):
         await second_timezone_message_handler(update, context)
+
+
+@pytest.mark.asyncio
+async def test_any_message_handler_fails_without_effective_chat(message_list):
+    update = mock.AsyncMock()
+    context = mock.AsyncMock()
+
+    update.effective_chat = None
+
+    with pytest.raises(RuntimeError):
+        await message_list(update, context)

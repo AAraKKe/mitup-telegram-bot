@@ -52,3 +52,14 @@ async def test_callback_query_cancel_setting_calls_to_settings_view():
         await callback_query_cancel_settings(update, context)
 
         mock_send_message_view.assert_called_once_with(context, update, settings_view())
+
+
+@pytest.mark.asyncio
+async def test_any_callback_query_fails_without_effective_chat(callback_query_list):
+    update = mock.AsyncMock()
+    context = mock.AsyncMock()
+
+    update.effective_chat = None
+
+    with pytest.raises(RuntimeError):
+        await callback_query_list(update, context)
