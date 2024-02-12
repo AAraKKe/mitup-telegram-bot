@@ -87,3 +87,25 @@ async def test_edit_message_view_without_effective_message(default_view: MitupVi
 
     with pytest.raises(RuntimeError):
         await edit_message_view(context, update, default_view)
+
+
+@pytest.mark.asyncio
+async def test_any_api_view_messages_fails_without_effective_chat(api_view_method, default_view):
+    context = mock.AsyncMock()
+    update = mock.MagicMock()
+
+    update.effective_chat = None
+
+    with pytest.raises(RuntimeError):
+        await api_view_method(context, update, default_view)
+
+
+@pytest.mark.asyncio
+async def test_any_api_messages_without_view_fails_without_effective_chat(api_method):
+    context = mock.AsyncMock()
+    update = mock.MagicMock()
+
+    update.effective_chat = None
+
+    with pytest.raises(RuntimeError):
+        await api_method(context, update, "Hello, World")
