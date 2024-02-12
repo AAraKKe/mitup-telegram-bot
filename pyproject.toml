@@ -44,7 +44,7 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 exclude = "conftest.py"
-
+packages = "tests,mitup_bot,bin" 
 [tool.coverage.run]
 branch = true
 
@@ -135,7 +135,7 @@ test-cov = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered t
 format = "ruff format ."
 format-check = "ruff format --check ."
 lint = "ruff check {args:.}  --unsafe-fixes ."
-type-check = "mypy tests mitup_bot bin"
+type-check = "mypy"
 validate = [
     "- test",
     "- format-check",
