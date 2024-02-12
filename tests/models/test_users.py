@@ -1,9 +1,8 @@
 from unittest import mock
 
-from sqlalchemy.dialects import postgresql
-
 from mitup_bot.models import User
 from tests.utils import get_querys_from_session
+
 
 def test_user_dont_exist(mock_session: mock.MagicMock):
     with User.open_session():
