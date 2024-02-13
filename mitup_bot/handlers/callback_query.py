@@ -28,14 +28,16 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
+    if update.effective_user is None:
+        raise RuntimeError("Effective user not set")
+
+    if update.effective_message is None:
+        raise RuntimeError("Effective message not set")
+
     logging.info("Enter into callback_query_settings_timezone")
 
     with User.open_session():
-        if (
-            update.effective_user is not None
-            and update.effective_message is not None
-            and (user := User.find_by_tg_user_id(update.effective_user.id))
-        ):
+        if user := User.find_by_tg_user_id(update.effective_user.id):
             message = (
                 f"Your timezone is set to *{user.settings.timezone}*. \n"
                 "Send me the name of your city or your location to set your "
@@ -47,6 +49,8 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
             await send_message_view(context, update, view)
 
             return Conversation_Settings_State.TIMEZONE
+        else:
+            raise RuntimeError("User not found")
 
 
 @HandlersRegistry.register_callback_query("callback_query_cancel_settings", pattern="^cancel_settings$", bindable=False)
