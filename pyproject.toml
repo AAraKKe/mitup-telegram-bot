@@ -76,7 +76,7 @@ packages = ["mitup_bot"]
 [tool.ruff]
 line-length = 120
 indent-width = 4
-exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "__init__.py"]
+exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist"]
 src = ["mitup_bot", "tests"]
 
 [tool.ruff.lint]
