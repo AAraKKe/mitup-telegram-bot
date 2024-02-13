@@ -6,7 +6,7 @@ __all__ = (
     "messages",
     "callback_query",
     "conversations",
-    "Conversation_Settings_State",
+    "ConversationSettingsState",
     "UserExistFilter",
 )
 
@@ -18,5 +18,5 @@ from . import (
 )
 
 from .personal_filters import UserExistFilter
-from .conversations_states import Conversation_Settings_State
+from .conversations_states import ConversationSettingsState
 from .registry import HandlersRegistry

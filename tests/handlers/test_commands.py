@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 from telegram.ext.filters import CAPTION, PHOTO
 
-from mitup_bot.handlers import Conversation_Settings_State, HandlersRegistry
+from mitup_bot.handlers import ConversationSettingsState, HandlersRegistry
 from mitup_bot.handlers.commands import command_cancel, command_start_with_existing_user, command_start_with_new_user
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 
@@ -107,7 +107,7 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
         mock_send_message.assert_called_once_with(
             context, update, "Welcome to Mitup Bot John! Please, tell me your timezone."
         )
-        assert result == Conversation_Settings_State.TIMEZONE
+        assert result == ConversationSettingsState.TIMEZONE
 
 
 @pytest.mark.asyncio

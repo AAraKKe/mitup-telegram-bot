@@ -8,7 +8,7 @@ from mitup_bot.handlers.callback_query import (
     callback_query_settings,
     callback_query_timezone,
 )
-from mitup_bot.handlers.conversations_states import Conversation_Settings_State
+from mitup_bot.handlers.conversations_states import ConversationSettingsState
 from mitup_bot.models import User
 from mitup_bot.views.views import main_menu_view, settings_view
 
@@ -41,12 +41,14 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
                 mock_user_find.assert_called_once_with(update.effective_user.id)
                 mock_send_message_view.assert_called_once()
                 mock_change_settings_element_view.assert_called_once()
-                assert result == Conversation_Settings_State.TIMEZONE
+                assert result == ConversationSettingsState.TIMEZONE
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("effective_user, effective_message", [(None,1), (1,None), (None, None)])
-async def test_callback_query_timezone_without_effective_user_and_message(effective_user, effective_message, mock_session: mock.MagicMock):
+@pytest.mark.parametrize("effective_user, effective_message", [(None, 1), (1, None), (None, None)])
+async def test_callback_query_timezone_without_effective_user_and_message(
+    effective_user, effective_message, mock_session: mock.MagicMock
+):
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
@@ -55,6 +57,7 @@ async def test_callback_query_timezone_without_effective_user_and_message(effect
 
     with pytest.raises(RuntimeError):
         await callback_query_timezone(update, context)
+
 
 @pytest.mark.asyncio
 async def test_callback_query_timezone_without_found_user(mock_session: mock.MagicMock):

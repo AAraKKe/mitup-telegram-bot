@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.handlers.conversations_states import Conversation_Settings_State
+from mitup_bot.handlers.conversations_states import ConversationSettingsState
 from mitup_bot.handlers.exceptions import HandlerNotRegistered
 
 
@@ -17,7 +17,7 @@ def test_conversation_fails_without_existing_handler():
             "conversetion_with_no_handlers",
             entry_points_handler_names=["new_command_registered"],
             states={
-                Conversation_Settings_State.TIMEZONE: ["new_command_not_registered"],
+                ConversationSettingsState.TIMEZONE: ["new_command_not_registered"],
             },
             fallbacks=["new_command_registered"],
         )
@@ -32,7 +32,7 @@ def test_conversation_handler_can_be_registered():
         "conversation_with_handlers",
         entry_points_handler_names=["new_command_conversation_registered"],
         states={
-            Conversation_Settings_State.TIMEZONE: ["new_command_conversation_registered"],
+            ConversationSettingsState.TIMEZONE: ["new_command_conversation_registered"],
         },
         fallbacks=["new_command_conversation_registered"],
     )

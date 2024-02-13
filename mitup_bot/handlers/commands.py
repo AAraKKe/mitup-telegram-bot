@@ -5,7 +5,7 @@ from mitup_bot.api import send_message, send_message_view
 from mitup_bot.models import Settings, User
 from mitup_bot.views.views import main_menu_view
 
-from .conversations_states import Conversation_Settings_State
+from .conversations_states import ConversationSettingsState
 from .personal_filters import UserExistFilter
 from .registry import HandlersRegistry
 
@@ -31,7 +31,7 @@ async def command_start_with_new_user(update: Update, context: ContextTypes.DEFA
 
             await send_message(context, update, message)
 
-            return Conversation_Settings_State.TIMEZONE
+            return ConversationSettingsState.TIMEZONE
 
 
 @HandlersRegistry.register_command("start_command_with_existing_user", command="start", filters=UserExistFilter())

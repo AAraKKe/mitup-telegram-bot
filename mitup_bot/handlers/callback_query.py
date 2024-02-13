@@ -7,7 +7,7 @@ from mitup_bot.api import edit_message_view, send_message_view
 from mitup_bot.models import User
 from mitup_bot.views.views import change_settings_element_view, main_menu_view, settings_view
 
-from .conversations_states import Conversation_Settings_State
+from .conversations_states import ConversationSettingsState
 from .registry import HandlersRegistry
 
 
@@ -50,7 +50,7 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
 
             await send_message_view(context, update, view)
 
-            return Conversation_Settings_State.TIMEZONE
+            return ConversationSettingsState.TIMEZONE
         else:
             raise RuntimeError("User not found")
 
