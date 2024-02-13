@@ -41,7 +41,7 @@ def settings_view(message: str = DEFAULT_SETTINGS_MESSAGE) -> MitupView:
             ],
             [
                 ButtonConfig(f"{Emojis.NOTIF} Notifications", callback_data="notifications"),
-                ButtonConfig(f"{Emojis.TIME} Timezone", callback_data="timezone"),
+                ButtonConfig(f"{Emojis.TIME} Timezone", callback_data="global_timezone"),
             ],
             [
                 ButtonConfig(f"{Emojis.PEOPLE} Default Options", callback_data="default_options"),

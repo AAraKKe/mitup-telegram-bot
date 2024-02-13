@@ -23,7 +23,9 @@ async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_
     await edit_message_view(context, update, view)
 
 
-@HandlersRegistry.register_callback_query("callback_query_settings_timezone", pattern="^timezone$", bindable=False)
+@HandlersRegistry.register_callback_query(
+    "callback_query_settings_timezone", pattern="^global_timezone$", bindable=False
+)
 async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
