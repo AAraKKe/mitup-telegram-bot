@@ -24,7 +24,7 @@ async def command_start_with_new_user(update: Update, context: ContextTypes.DEFA
                 tg_user_id=update.effective_user.id,
                 last_name=update.effective_user.last_name,
                 username=update.effective_user.username,
-                settings=Settings(timezone="Jaen"),  # type: ignore
+                settings=Settings(),
             )
             user.create()
             message = f"Welcome to Mitup Bot {user.first_name}! Please, tell me your timezone."

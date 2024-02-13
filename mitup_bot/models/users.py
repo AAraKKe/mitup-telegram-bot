@@ -18,9 +18,8 @@ class User(MitupBaseModel, SQLModel, table=True):
     first_name: str
     tg_user_id: int = Field(sa_column=Column(BigInteger, nullable=False))
     id: int | None = Field(default=None, primary_key=True)
-    created_time: dt.datetime | None = Field(sa_column=Column(TIMESTAMP, server_default=func.now()))
-    updated_time: dt.datetime | None = Field(
-        sa_column=Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
+    updated_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP)
     )
     last_name: str | None
     username: str | None
