@@ -69,7 +69,6 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
         url=mitup_config.db.full_url,
     )
-    print(mitup_config.db.full_url)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
