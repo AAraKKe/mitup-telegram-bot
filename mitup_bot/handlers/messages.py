@@ -1,9 +1,9 @@
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, filters
 
-from mitup_bot.api import send_message, send_message_view
+from mitup_bot.api import send_message_view
 from mitup_bot.models import Settings, User
-from mitup_bot.views.views import settings_view
+from mitup_bot.views.views import main_menu_view, settings_view
 
 from .registry import HandlersRegistry
 
@@ -24,8 +24,9 @@ async def registration_timezone_message_handler(update: Update, context: Context
             user.update()
 
             text = f"Perfect! Your timezone is {user.settings.timezone}"
+            view = main_menu_view(text)
 
-            await send_message(context, update, text)
+            await send_message_view(context, update, view)
 
         return ConversationHandler.END
 

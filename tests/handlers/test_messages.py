@@ -7,21 +7,22 @@ from mitup_bot.models import User
 
 
 @pytest.mark.asyncio
-async def test_registration_timezone_message_handler(mock_session: mock.MagicMock):
+async def test_registration_timezone_message_handler_with_correct_view(mock_session: mock.MagicMock):
     update = mock.AsyncMock()
     context = mock.AsyncMock()
     update.effective_message.text = "Europe/Madrid"
 
-    with mock.patch("mitup_bot.handlers.messages.send_message") as mock_send_message:
+    with mock.patch("mitup_bot.handlers.messages.send_message_view") as mock_send_message_view:
         with mock.patch.object(User, "find_by_tg_user_id") as mock_find_user:
             mock_user = mock.MagicMock()
             mock_find_user.return_value = mock_user
+            with mock.patch("mitup_bot.handlers.messages.main_menu_view") as mock_main_menu_view:
+                await registration_timezone_message_handler(update, context)
 
-            await registration_timezone_message_handler(update, context)
-
-            mock_user.update.assert_called_once()
-            assert mock_user.settings.timezone == update.effective_message.text
-            mock_send_message.assert_called_once()
+                mock_main_menu_view.assert_called_once()
+                mock_user.update.assert_called_once()
+                assert mock_user.settings.timezone == update.effective_message.text
+                mock_send_message_view.assert_called_once()
 
 
 @pytest.mark.asyncio
