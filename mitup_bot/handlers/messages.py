@@ -8,8 +8,8 @@ from mitup_bot.views.views import settings_view
 from .registry import HandlersRegistry
 
 
-@HandlersRegistry.register_message("set_first_timezone_settings", filters.TEXT, bindable=False)
-async def first_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@HandlersRegistry.register_message("set_registration_timezone_settings", filters.TEXT, bindable=False)
+async def registration_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
@@ -31,7 +31,7 @@ async def first_timezone_message_handler(update: Update, context: ContextTypes.D
 
 
 @HandlersRegistry.register_message("set_timezone_settings", filters.TEXT, bindable=False)
-async def second_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def settings_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 

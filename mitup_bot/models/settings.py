@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import TYPE_CHECKING
 
-from sqlalchemy import TIMESTAMP, Column, func
+from sqlalchemy import TIMESTAMP, Column
 from sqlmodel import Field, Relationship, SQLModel
 
 from .mitup_base_model import MitupBaseModel
