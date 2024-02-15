@@ -1,4 +1,5 @@
 from unittest import mock
+
 import pytest
 
 from mitup_bot.models import User
@@ -41,6 +42,5 @@ def test_settings_exist(mock_session: mock.MagicMock):
 
 
 def test_session_is_not_set(user_query_list):
-
     with pytest.raises(MissingSessionError):
         user_query_list(1)
