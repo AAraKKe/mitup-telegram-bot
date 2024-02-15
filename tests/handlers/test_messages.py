@@ -19,10 +19,10 @@ async def test_registration_timezone_message_handler_with_correct_view(mock_sess
             with mock.patch("mitup_bot.handlers.messages.main_menu_view") as mock_main_menu_view:
                 await registration_timezone_message_handler(update, context)
 
-                mock_main_menu_view.assert_called_once()
                 mock_user.update.assert_called_once()
                 assert mock_user.settings.timezone == update.effective_message.text
                 mock_send_message_view.assert_called_once()
+                assert mock_main_menu_view.return_value in mock_send_message_view.call_args_list[0].args
 
 
 @pytest.mark.asyncio
@@ -40,26 +40,37 @@ async def test_settings_timezone_message_handler_with_correct_view(mock_session:
 
                 assert mock_settings.timezone == update.effective_message.text
                 mock_settings.update.assert_called_once()
-                mock_settings_view.assert_called_once()
                 mock_send_message_view.assert_called_once()
+                assert mock_settings_view.return_value in mock_send_message_view.call_args_list[0].args
 
 
 @pytest.mark.asyncio
-async def test_settings_timezone_message_handler_without_effective_user(mock_session: mock.MagicMock):
-    update = mock.AsyncMock()
-    context = mock.AsyncMock()
-    update.effective_user = None
-
-    with pytest.raises(RuntimeError):
-        await settings_timezone_message_handler(update, context)
-
-
-@pytest.mark.asyncio
-async def test_any_message_handler_fails_without_effective_chat(message_list):
+@pytest.mark.parametrize(
+    "effective_chat, effective_user, effective_message", [(None, 1, 1), (1, None, 1), (1, 1, None), (1, 1, None)]
+)
+async def test_any_message_handler_fails_without_effective_chat_user_and_message(
+    message_list, effective_chat, effective_user, effective_message
+):
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    update.effective_chat = None
+    update.effective_chat = effective_chat
+    update.effective_user = effective_user
+    update.effective_message = effective_message
+    update.effective_message = effective_message
 
     with pytest.raises(RuntimeError):
         await message_list(update, context)
+
+
+@pytest.mark.asyncio
+async def test_settings_timezone_message_handler_without_effective_text_message(
+    mock_session: mock.MagicMock, message_list
+):
+    update = mock.AsyncMock()
+    context = mock.AsyncMock()
+    update.effective_message.text = None
+
+    with pytest.raises(RuntimeError):
+        await message_list(update, context)
+

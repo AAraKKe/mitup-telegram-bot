@@ -1,6 +1,8 @@
 from unittest import mock
+import pytest
 
 from mitup_bot.models import User
+from mitup_bot.models.exceptions import MissingSessionError
 from tests.helpers import get_querys_from_session
 
 
@@ -36,3 +38,9 @@ def test_settings_exist(mock_session: mock.MagicMock):
             mock_session.exec.assert_called_with(select_mock.return_value.where())
 
             assert user is not None
+
+
+def test_session_is_not_set(user_query_list):
+
+    with pytest.raises(MissingSessionError):
+        user_query_list(1)

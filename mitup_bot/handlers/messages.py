@@ -13,13 +13,17 @@ async def registration_timezone_message_handler(update: Update, context: Context
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
+    if update.effective_user is None:
+        raise RuntimeError("Effective user not set")
+
+    if update.effective_message is None:
+        raise RuntimeError("Effective message not set")
+
+    if update.effective_message.text is None:
+        raise RuntimeError("Effective message text not set")
+
     with User.open_session():
-        if (
-            update.effective_user is not None
-            and update.effective_message is not None
-            and update.effective_message.text is not None
-            and (user := User.find_by_tg_user_id(update.effective_user.id))
-        ):
+        if user := User.find_by_tg_user_id(update.effective_user.id):
             user.settings.timezone = update.effective_message.text
             user.update()
 
@@ -36,6 +40,15 @@ async def settings_timezone_message_handler(update: Update, context: ContextType
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
+    if update.effective_user is None:
+        raise RuntimeError("Effective user not set")
+
+    if update.effective_message is None:
+        raise RuntimeError("Effective message not set")
+
+    if update.effective_message.text is None:
+        raise RuntimeError("Effective message text not set")
+
     # with User.open_session():
     #     if update.effective_user is not None and update.effective_message is not None:
     #         if user := User.find_by_tg_user_id(update.effective_user.id):
@@ -49,18 +62,10 @@ async def settings_timezone_message_handler(update: Update, context: ContextType
     #                 await send_message_view(context, update, view)
 
     with User.open_session():
-        user_settings = None
-        if update.effective_user is None:
-            raise RuntimeError("Effective user not set")
-
         user_settings = User.get_settings_from_user(update.effective_user.id)
 
     with Settings.open_session():
-        if (
-            user_settings is not None
-            and update.effective_message is not None
-            and update.effective_message.text is not None
-        ):
+        if (user_settings is not None):
             user_settings.timezone = update.effective_message.text
             user_settings.update()
 

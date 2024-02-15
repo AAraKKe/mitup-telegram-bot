@@ -21,8 +21,8 @@ async def test_callback_query_settings_is_called_with_settings_view():
     with mock.patch("mitup_bot.handlers.callback_query.edit_message_view") as mock_edit_message_view:
         await callback_query_settings(update, context)
 
-        mock_edit_message_view.assert_called_once_with(context, update, settings_view())
-
+        mock_edit_message_view.assert_called_once()
+        assert settings_view() in mock_edit_message_view.call_args_list[0].args
 
 @pytest.mark.asyncio
 async def test_callback_query_timezone_with_correct_view(mock_session: mock.MagicMock):
@@ -40,7 +40,7 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
 
                 mock_user_find.assert_called_once_with(update.effective_user.id)
                 mock_send_message_view.assert_called_once()
-                mock_change_settings_element_view.assert_called_once()
+                assert mock_change_settings_element_view.return_value in mock_send_message_view.call_args_list[0].args
                 assert result == ConversationSettingsState.TIMEZONE
 
 
@@ -79,8 +79,8 @@ async def test_callback_query_main_manu_calls_to_main_menu_view():
     with mock.patch("mitup_bot.handlers.callback_query.edit_message_view") as mock_edit_message_view:
         await callback_query_main_menu(update, context)
 
-        mock_edit_message_view.assert_called_once_with(context, update, main_menu_view())
-
+        mock_edit_message_view.assert_called_once()
+        assert main_menu_view() in mock_edit_message_view.call_args_list[0].args
 
 @pytest.mark.asyncio
 async def test_callback_query_cancel_setting_calls_to_settings_view():
@@ -90,7 +90,8 @@ async def test_callback_query_cancel_setting_calls_to_settings_view():
     with mock.patch("mitup_bot.handlers.callback_query.send_message_view") as mock_send_message_view:
         await callback_query_cancel_settings(update, context)
 
-        mock_send_message_view.assert_called_once_with(context, update, settings_view())
+        mock_send_message_view.assert_called_once()
+        assert settings_view() in mock_send_message_view.call_args_list[0].args
 
 
 @pytest.mark.asyncio
