@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, filters
 
+from mitup_bot import messages
 from mitup_bot.api import send_message_view
 from mitup_bot.models import Settings, User
 from mitup_bot.views.views import main_menu_view, settings_view
@@ -27,8 +28,8 @@ async def registration_timezone_message_handler(update: Update, context: Context
             user.settings.timezone = update.effective_message.text
             user.update()
 
-            text = f"Perfect! Your timezone is {user.settings.timezone}"
-            view = main_menu_view(text)
+            message = messages.REGISTRATION_TIMEZONE_SET_SUCCESS.substitute(timezone=user.settings.timezone)
+            view = main_menu_view(message)
 
             await send_message_view(context, update, view)
 
@@ -65,11 +66,11 @@ async def settings_timezone_message_handler(update: Update, context: ContextType
         user_settings = User.get_settings_from_user(update.effective_user.id)
 
     with Settings.open_session():
-        if (user_settings is not None):
+        if user_settings is not None:
             user_settings.timezone = update.effective_message.text
             user_settings.update()
 
-            message = f"Your timezone has been set to: *{user_settings.timezone}* "
+            message = messages.TIMEZONE_SETTINGS_SET_SUCCESS.substitute(timezone=user_settings.timezone)
             view = settings_view(message)
 
             await send_message_view(context, update, view)

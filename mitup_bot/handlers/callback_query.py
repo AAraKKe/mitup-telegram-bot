@@ -3,6 +3,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
+from mitup_bot import messages
 from mitup_bot.api import edit_message_view, send_message_view
 from mitup_bot.models import User
 from mitup_bot.views.views import change_settings_element_view, main_menu_view, settings_view
@@ -40,11 +41,7 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
 
     with User.open_session():
         if user := User.find_by_tg_user_id(update.effective_user.id):
-            message = (
-                f"Your timezone is set to *{user.settings.timezone}*. \n"
-                "Send me the name of your city or your location to set your "
-                "timezone or touch in *Cancel* to go back."
-            )
+            message = messages.SET_TIMEZONE_SETTINGS.substitute(timezone=user.settings.timezone)
 
             view = change_settings_element_view(message)
 

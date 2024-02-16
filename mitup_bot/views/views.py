@@ -1,12 +1,9 @@
+from mitup_bot import messages
 from mitup_bot.utils import Emojis, sanitize_message
 from mitup_bot.views import ButtonConfig, MitupView
 
-DEFAULT_MAIN_MENU_MESSAGE = "Welcome to Mitup Bot! \n" "Choose one of the following options:"
 
-DEFAULT_SETTINGS_MESSAGE = "Configure MitUp."
-
-
-def main_menu_view(message: str = DEFAULT_MAIN_MENU_MESSAGE) -> MitupView:
+def main_menu_view(message: str = messages.DEFAULT_MAIN_MENU_DESCRIPTION) -> MitupView:
     return MitupView(
         sanitize_message(message),
         keyboard=[
@@ -31,7 +28,7 @@ def main_menu_view(message: str = DEFAULT_MAIN_MENU_MESSAGE) -> MitupView:
     )
 
 
-def settings_view(message: str = DEFAULT_SETTINGS_MESSAGE) -> MitupView:
+def settings_view(message: str = messages.DEFAULT_SETTINGS_DESCRIPTION) -> MitupView:
     return MitupView(
         sanitize_message(message),
         [

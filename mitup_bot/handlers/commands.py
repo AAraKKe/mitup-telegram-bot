@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
+from mitup_bot import messages
 from mitup_bot.api import send_message, send_message_view
 from mitup_bot.models import Settings, User
 from mitup_bot.views.views import main_menu_view
@@ -27,7 +28,7 @@ async def command_start_with_new_user(update: Update, context: ContextTypes.DEFA
                 settings=Settings(),
             )
             user.create()
-            message = f"Welcome to Mitup Bot {user.first_name}! Please, tell me your timezone."
+            message = messages.SET_REGISTRATION_TIMEZONE.substitute(first_name=user.first_name)
 
             await send_message(context, update, message)
 
