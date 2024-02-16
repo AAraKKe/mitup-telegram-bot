@@ -73,4 +73,3 @@ async def test_settings_timezone_message_handler_without_effective_text_message(
 
     with pytest.raises(RuntimeError):
         await message_list(update, context)
-

@@ -24,6 +24,7 @@ async def test_callback_query_settings_is_called_with_settings_view():
         mock_edit_message_view.assert_called_once()
         assert settings_view() in mock_edit_message_view.call_args_list[0].args
 
+
 @pytest.mark.asyncio
 async def test_callback_query_timezone_with_correct_view(mock_session: mock.MagicMock):
     update = mock.AsyncMock()
@@ -81,6 +82,7 @@ async def test_callback_query_main_manu_calls_to_main_menu_view():
 
         mock_edit_message_view.assert_called_once()
         assert main_menu_view() in mock_edit_message_view.call_args_list[0].args
+
 
 @pytest.mark.asyncio
 async def test_callback_query_cancel_setting_calls_to_settings_view():
