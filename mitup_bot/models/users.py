@@ -1,7 +1,6 @@
 import datetime as dt
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import TIMESTAMP, BigInteger, Column
 from sqlmodel import Field, Relationship, SQLModel, select
 
 from .exceptions import MissingSessionError
@@ -16,10 +15,10 @@ class User(MitupBaseModel, SQLModel, table=True):
     __tablename__: str = "users"  # type: ignore
 
     first_name: str
-    tg_user_id: int = Field(sa_column=Column(BigInteger, nullable=False))
+    tg_user_id: int
     id: int | None = Field(default=None, primary_key=True)
-    created_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
-    updated_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
+    created_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow)
+    updated_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow)
     last_name: str | None = None
     username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})

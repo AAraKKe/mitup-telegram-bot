@@ -1,7 +1,6 @@
 import datetime as dt
 from typing import TYPE_CHECKING
 
-from sqlalchemy import TIMESTAMP, Column
 from sqlmodel import Field, Relationship, SQLModel
 
 from .mitup_base_model import MitupBaseModel
@@ -15,8 +14,8 @@ class Settings(MitupBaseModel, SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(default=None, foreign_key="users.id")
-    created_time: dt.datetime = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
+    created_time: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    updated_time: dt.datetime = Field(default_factory=dt.datetime.utcnow)
     languaje: str = "en"
     timezone: str = "UTC"
     notification: bool = True
