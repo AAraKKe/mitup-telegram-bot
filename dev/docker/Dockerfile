@@ -14,6 +14,7 @@ RUN pip install hatch
 # Copy bot into container
 COPY mitup_bot /mitup-telegram-bot/mitup_bot
 COPY pyproject.toml /mitup-telegram-bot/pyproject.toml
+COPY LICENSE /mitup-telegram-bot/LICENSE
 
 # Setup hatch prod environment
 RUN hatch run prod:help

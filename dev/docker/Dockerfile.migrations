@@ -18,6 +18,7 @@ RUN pip install hatch
 COPY mitup_bot ${LAMBDA_TASK_ROOT}/mitup_bot
 COPY alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
 COPY pyproject.toml ${LAMBDA_TASK_ROOT}/pyproject.toml
+COPY LICENSE ${LAMBDA_TASK_ROOT}/LICENSE
 
 # Build the project
 RUN hatch build -t wheel
