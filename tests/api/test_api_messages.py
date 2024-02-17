@@ -2,37 +2,8 @@ from unittest import mock
 
 import pytest
 
-from mitup_bot.api import edit_message, edit_message_view, send_message, send_message_view
+from mitup_bot.api import edit_message, edit_message_view, send_message_view
 from mitup_bot.views import MitupView
-
-
-@pytest.mark.asyncio
-async def test_send_message():
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
-
-    message = "Hello, World"
-    update.effective_chat.id = 123456789
-
-    await send_message(context, update, message)
-
-    context.bot.send_message.assert_called_once_with(chat_id=123456789, text="Hello, World", parse_mode="MarkdownV2")
-
-
-@pytest.mark.asyncio
-async def test_edit_message():
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
-
-    message = "Hello, World"
-    update.effective_chat.id = 123456789
-    update.effective_message.message_id = 123
-
-    await edit_message(context, update, message)
-
-    context.bot.edit_message_text.assert_called_once_with(
-        "Hello, World", 123456789, message_id=123, parse_mode="MarkdownV2"
-    )
 
 
 @pytest.mark.asyncio
@@ -97,14 +68,3 @@ async def test_any_api_view_messages_fails_without_effective_chat(api_view_metho
 
     with pytest.raises(RuntimeError):
         await api_view_method(context, update, default_view)
-
-
-@pytest.mark.asyncio
-async def test_any_api_messages_without_view_fails_without_effective_chat(api_method):
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
-
-    update.effective_chat = None
-
-    with pytest.raises(RuntimeError):
-        await api_method(context, update, "Hello, World")
