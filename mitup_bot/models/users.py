@@ -20,8 +20,8 @@ class User(MitupBaseModel, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     created_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
     updated_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow, sa_column=Column(TIMESTAMP))
-    last_name: str | None = Field(default=None)
-    username: str | None = Field(default=None)
+    last_name: str | None = None
+    username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
 
     @classmethod
