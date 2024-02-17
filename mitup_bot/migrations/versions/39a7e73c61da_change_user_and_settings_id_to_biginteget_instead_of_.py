@@ -1,4 +1,4 @@
-"""Change user id to BigInteget instead of Integer
+"""Change user and settings id to BigInteget instead of Integer
 
 Revision ID: 39a7e73c61da
 Revises: abfe726f246e
@@ -19,7 +19,9 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.alter_column("users", "id", existing_type=sa.Integer, type_=sa.BigInteger)
+    op.alter_column("settings", "id", existing_type=sa.Integer, type_=sa.BigInteger)
 
 
 def downgrade() -> None:
     op.alter_column("users", "id", existing_type=sa.BigInteger, type_=sa.Integer)
+    op.alter_column("settings", "id", existing_type=sa.BigInteger, type_=sa.Integer)
