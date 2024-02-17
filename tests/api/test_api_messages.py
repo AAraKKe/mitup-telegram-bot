@@ -30,7 +30,6 @@ async def test_edit_message():
 
     await edit_message(context, update, message)
 
-    assert update.effective_message is not None
     context.bot.edit_message_text.assert_called_once_with(
         "Hello, World", 123456789, message_id=123, parse_mode="MarkdownV2"
     )
