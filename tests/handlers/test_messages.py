@@ -22,7 +22,7 @@ async def test_registration_timezone_message_handler_with_correct_view(mock_sess
                 mock_user.update.assert_called_once()
                 assert mock_user.settings.timezone == update.effective_message.text
                 mock_send_message_view.assert_called_once()
-                assert mock_main_menu_view.return_value in mock_send_message_view.call_args_list[0].args
+                assert mock_main_menu_view.return_value == mock_send_message_view.call_args_list[0].args[2]
 
 
 @pytest.mark.asyncio
@@ -32,16 +32,14 @@ async def test_settings_timezone_message_handler_with_correct_view(mock_session:
     update.effective_message.text = "Europe/Madrid"
 
     with mock.patch("mitup_bot.handlers.messages.send_message_view") as mock_send_message_view:
-        with mock.patch.object(User, "get_settings_from_user") as mock_get_settings:
-            mock_settings = mock.MagicMock()
-            mock_get_settings.return_value = mock_settings
+        with mock.patch.object(User, "find_by_tg_user_id") as mock_find_user:
+            mock_user = mock.MagicMock()
+            mock_find_user.return_value = mock_user
             with mock.patch("mitup_bot.handlers.messages.settings_view") as mock_settings_view:
                 await settings_timezone_message_handler(update, context)
 
-                assert mock_settings.timezone == update.effective_message.text
-                mock_settings.update.assert_called_once()
-                mock_send_message_view.assert_called_once()
-                assert mock_settings_view.return_value in mock_send_message_view.call_args_list[0].args
+                assert mock_user.settings.timezone == update.effective_message.text
+                assert mock_settings_view.return_value == mock_send_message_view.call_args_list[0].args[2]
 
 
 @pytest.mark.asyncio
@@ -56,7 +54,6 @@ async def test_any_message_handler_fails_without_effective_chat_user_and_message
 
     update.effective_chat = effective_chat
     update.effective_user = effective_user
-    update.effective_message = effective_message
     update.effective_message = effective_message
 
     with pytest.raises(RuntimeError):

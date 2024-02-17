@@ -30,17 +30,6 @@ def test_user_exist(mock_session: mock.MagicMock):
         assert user == mock_user
 
 
-def test_settings_exist(mock_session: mock.MagicMock):
-    with User.open_session():
-        with mock.patch("mitup_bot.models.users.select") as select_mock:
-            user = User.get_settings_from_user(1)
-
-            select_mock.assert_called_once_with(User)
-            mock_session.exec.assert_called_with(select_mock.return_value.where())
-
-            assert user is not None
-
-
 def test_session_is_not_set(user_query_list):
     with pytest.raises(MissingSessionError):
         user_query_list(1)
