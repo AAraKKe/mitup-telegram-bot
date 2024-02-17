@@ -239,6 +239,7 @@ push-migrations-latest-prod:
     - aws lambda update-function-code
       --function-name MitupMigrationsLambda
       --image-uri $MIGRATIONS_IMAGE_TAG
+      --region eu-west-1
     - aws lambda invoke
       --function-name MitupMigrationsLambda
       --payload file://payload.json
