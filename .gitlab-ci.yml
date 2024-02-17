@@ -139,6 +139,7 @@ build-docker-ci:
     - echo "ECR_MITUP_REPO_URI=$ECR_MITUP_REPO_URI" >> dotenv
     - echo "ECR_MIGRATIONS_REPO_URI=$ECR_MIGRATIONS_REPO_URI" >> dotenv
     - echo "BOT_IMAGE_TAG=$ECR_MITUP_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
+    - echo "MIGRATIONS_IMAGE_TAG=$ECR_MIGRATIONS_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
 
   artifacts:
     reports:
@@ -187,6 +188,11 @@ push-migrations-lambda-staging:
   extends: push-bot-tagged-staging
   variables:
     DOCKERFILE: Dockerfile.migrations
+    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
+
+push-migrations-latest-staging:
+  extends: push-migrations-lambda-staging
+  variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
 ## ------------- Push to prod --------------
@@ -207,6 +213,11 @@ push-migrations-lambda-prod:
   extends: push-bot-tagged-prod
   variables:
     DOCKERFILE: Dockerfile.migrations
+    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
+
+push-migrations-latest-prod:
+  extends: push-migrations-lambda-prod
+  variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
 # --------------------
@@ -225,6 +236,9 @@ push-migrations-lambda-prod:
     - yum install jq -y
     - |
       echo '{"action": "upgrade", "revision": "head"}' > payload.json
+    - aws lambda update-function-code
+      --function-name MitupMigrationsLambda
+      --image-uri $MIGRATIONS_IMAGE_TAG
     - aws lambda invoke
       --function-name MitupMigrationsLambda
       --payload file://payload.json
