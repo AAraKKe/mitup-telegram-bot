@@ -1,11 +1,10 @@
-from mitup_bot import messages
-from mitup_bot.utils import Emojis, sanitize_message
+from mitup_bot.utils import Emojis, Messages
 from mitup_bot.views import ButtonConfig, MitupView
 
 
-def main_menu_view(message: str = messages.DEFAULT_MAIN_MENU_DESCRIPTION) -> MitupView:
+def main_menu_view(message: str = Messages.DEFAULT_MAIN_MENU_DESCRIPTION.get()) -> MitupView:
     return MitupView(
-        sanitize_message(message),
+        message,
         keyboard=[
             [
                 ButtonConfig(f"{Emojis.NEW_MEETING} New meeting", callback_data="new_meeting"),
@@ -28,9 +27,9 @@ def main_menu_view(message: str = messages.DEFAULT_MAIN_MENU_DESCRIPTION) -> Mit
     )
 
 
-def settings_view(message: str = messages.DEFAULT_SETTINGS_DESCRIPTION) -> MitupView:
+def settings_view(message: str = Messages.DEFAULT_SETTINGS_DESCRIPTION.get()) -> MitupView:
     return MitupView(
-        sanitize_message(message),
+        message,
         [
             [
                 ButtonConfig(f"{Emojis.LANG} Language", callback_data="language"),
@@ -51,7 +50,7 @@ def settings_view(message: str = messages.DEFAULT_SETTINGS_DESCRIPTION) -> Mitup
 
 def change_settings_element_view(message: str) -> MitupView:
     return MitupView(
-        sanitize_message(message),
+        message,
         [
             [
                 ButtonConfig(f"{Emojis.CANCEL} Cancel", callback_data="cancel_settings"),

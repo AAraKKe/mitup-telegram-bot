@@ -10,6 +10,7 @@ from telegram.ext.filters import CAPTION, PHOTO
 from mitup_bot.handlers import ConversationSettingsState, HandlersRegistry
 from mitup_bot.handlers.commands import command_cancel, command_start_with_existing_user, command_start_with_new_user
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
+from mitup_bot.utils import Messages
 
 
 async def test_command_registry_can_register_command_handlers():
@@ -105,7 +106,7 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
         mock_session.commit.assert_called_once()
         assert update.effective_user is not None
         mock_send_message.assert_called_once_with(
-            context, update, "Welcome to Mitup Bot John! Please, tell me your timezone."
+            context, update, Messages.SET_REGISTRATION_TIMEZONE.get(first_name="John")
         )
         assert result == ConversationSettingsState.TIMEZONE
 

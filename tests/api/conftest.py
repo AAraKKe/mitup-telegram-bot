@@ -1,7 +1,6 @@
 import pytest
 
 from mitup_bot.api import edit_message_view, send_message_view
-from mitup_bot.utils.messages import sanitize_message
 from mitup_bot.views import MitupView
 from mitup_bot.views.mitup_view import ButtonConfig
 
@@ -9,7 +8,7 @@ from mitup_bot.views.mitup_view import ButtonConfig
 @pytest.fixture
 def default_view() -> MitupView:
     return MitupView(
-        sanitize_message("Test message"),
+        "Test message",
         [
             [
                 ButtonConfig("Testing", callback_data="test_data"),

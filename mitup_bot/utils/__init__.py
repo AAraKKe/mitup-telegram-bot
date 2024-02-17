@@ -1,8 +1,8 @@
 # isort: skip_file
 __all__ = (
     "Emojis",
-    "sanitize_message",
+    "Messages",
 )
 
 from .emojis import Emojis
-from .messages import sanitize_message
+from .messages import Messages
