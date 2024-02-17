@@ -16,11 +16,7 @@ from telegram.ext import (
 )
 from telegram.ext.filters import BaseFilter
 
-from mitup_bot.handlers.exceptions import (
-    HandlerNotRegistered,
-    HandlerRegisteredError,
-    WrongCommandNameError,
-)
+from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT
 
 
@@ -63,22 +59,6 @@ class HandlersRegistry:
         Every argument provided is the same as those that can be provided to a CommandHandler
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.commandhandler.html
-
-        Args:
-            handler_name (str): Mandatory argument defining the name of the handler to register. This must be unique.
-            command (str | None): The command to register. If the command name is not supplied, the method name is obtained from the decorated method by following the naming convention: command_<name>.
-                Defaults to None.
-            filters (BaseFilter | None, default = None): The filters to apply to the command as defined in CommandHandler.
-                Defaults to None
-            block (bool): Whether the command should block other handlers.
-                Defaults to False.
-            has_args (bool | int | None): Whether the command has arguments. Check CommandHanlder for more informaiton.
-                Defaults to None.
-
-        Raises:
-            WrongCommandNameError: If the method name does not match the naming convention and no command name
-                is provided.
-            HandlerRegisteredError: If a handler with the same handler_name has already been registered.
         """  # noqa: E501
 
         def wrapper(
@@ -129,16 +109,6 @@ class HandlersRegistry:
         Every argument provided is the same as those that can be provided to a MessageHandler
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.messagehandler.html
-
-        Args:
-            handler_name (str): Mandatory argument defining the name of the handler to register. This must be unique.
-            filters (BaseFilter | None, default = None): The filters to apply to the command as defined in MessageHandler.
-                Defaults to None
-            block (bool): Whether the command should block other handlers.
-                Defaults to False.
-
-        Raises:
-            HandlerRegisteredError: If a handler with the same handler_name has already been registered.
         """  # noqa: E501
 
         def wrapper(
@@ -174,18 +144,6 @@ class HandlersRegistry:
         Every argument provided is the same as those that can be provided to a CallbackQueryHandler
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.callbackqueryhandler.html
-
-        Args:
-
-            handler_name (str): Mandatory argument defining the name of the handler to register. This must be unique.
-            pattern (str | None): The pattern to register. If the pattern name is not supplied, the method name is
-                obtained from the decorated method by following the naming convention: callback_query_<name>.
-                Defaults to None.
-            block (bool): Whether the command should block other handlers.
-                Defaults to False.
-
-        Raises:
-            HandlerRegisteredError: If a handler with the same handler_name has already been registered.
         """
 
         def wrapper(
