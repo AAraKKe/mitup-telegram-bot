@@ -239,13 +239,17 @@ push-migrations-latest-prod:
     - aws lambda update-function-code
       --function-name MitupMigrationsLambda
       --image-uri $MIGRATIONS_IMAGE_TAG
-      --region eu-west-1
+      --publish
+      --region eu-west-1 > update-output.json
     - aws lambda invoke
       --function-name MitupMigrationsLambda
       --payload file://payload.json
       --region eu-west-1
+      --log-type Tail
       --cli-binary-format raw-in-base64-out
-      inoke_output > response.json
+      invoke_output > response.json
+    - jq '.ExecutedVersion' response.json
+    - cat invoke_output
     # Fail if lambda did not run
     - test $(jq '.StatusCode' response.json) -eq 200
     # Get the task definition
