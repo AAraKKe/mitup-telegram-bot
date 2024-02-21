@@ -1,3 +1,5 @@
+from enum import auto
+
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, filters
 
@@ -6,10 +8,15 @@ from mitup_bot.models import User
 from mitup_bot.utils import Messages
 from mitup_bot.views.views import main_menu_view, settings_view
 
-from .registry import HandlersRegistry
+from .registry import CallbackId, HandlersRegistry
 
 
-@HandlersRegistry.register_message("set_registration_timezone_settings", filters.TEXT, bindable=False)
+class MessagesId(CallbackId):
+    MESSAGE_SET_REGISTRATION_TIMEZONE = auto()
+    MESSAGE_SET_SETTINGS_TIMEZONE = auto()
+
+
+@HandlersRegistry.register_message(MessagesId.MESSAGE_SET_REGISTRATION_TIMEZONE, filters.TEXT, bindable=False)
 async def registration_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -36,7 +43,7 @@ async def registration_timezone_message_handler(update: Update, context: Context
         return ConversationHandler.END
 
 
-@HandlersRegistry.register_message("set_timezone_settings", filters.TEXT, bindable=False)
+@HandlersRegistry.register_message(MessagesId.MESSAGE_SET_SETTINGS_TIMEZONE, filters.TEXT, bindable=False)
 async def settings_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")

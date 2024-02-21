@@ -1,3 +1,5 @@
+from enum import auto
+
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -8,11 +10,17 @@ from mitup_bot.views.views import main_menu_view
 
 from .conversations_states import ConversationSettingsState
 from .personal_filters import UserExistFilter
-from .registry import HandlersRegistry
+from .registry import CallbackId, HandlersRegistry
+
+
+class CommandsId(CallbackId):
+    COMMAND_START_WITH_NO_USER = auto()
+    COMMAND_START_WITH_EXISTING_USER = auto()
+    COMMAND_CANCEL = auto()
 
 
 @HandlersRegistry.register_command(
-    "start_command_with_new_user", command="start", filters=~UserExistFilter(), bindable=False
+    CommandsId.COMMAND_START_WITH_NO_USER, command="start", filters=~UserExistFilter(), bindable=False
 )
 async def command_start_with_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
@@ -35,7 +43,9 @@ async def command_start_with_new_user(update: Update, context: ContextTypes.DEFA
             return ConversationSettingsState.TIMEZONE
 
 
-@HandlersRegistry.register_command("start_command_with_existing_user", command="start", filters=UserExistFilter())
+@HandlersRegistry.register_command(
+    CommandsId.COMMAND_START_WITH_EXISTING_USER, command="start", filters=UserExistFilter()
+)
 async def command_start_with_existing_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -46,7 +56,7 @@ async def command_start_with_existing_user(update: Update, context: ContextTypes
         await send_message_view(context, update, view)
 
 
-@HandlersRegistry.register_command("cancel_command", command="cancel", bindable=False)
+@HandlersRegistry.register_command(CommandsId.COMMAND_CANCEL, command="cancel", bindable=False)
 async def command_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")

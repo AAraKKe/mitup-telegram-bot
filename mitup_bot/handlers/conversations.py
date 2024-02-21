@@ -1,20 +1,31 @@
+from enum import auto
+
+from .callback_query import CallbackQueryId
+from .commands import CommandsId
 from .conversations_states import ConversationSettingsState
-from .registry import HandlersRegistry
+from .messages import MessagesId
+from .registry import CallbackId, HandlersRegistry
+
+
+class ConversationId(CallbackId):
+    CONVERSATION_NEW_USER_START = auto()
+    CONVERSATION_CHANGE_USER_SETTINGS = auto()
+
 
 HandlersRegistry.register_conversation_handler(
-    "register_user_conversation_start",
-    entry_points_handler_names=["start_command_with_new_user"],
+    ConversationId.CONVERSATION_NEW_USER_START,
+    entry_points_handler_names=[CommandsId.COMMAND_START_WITH_NO_USER],
     states={
-        ConversationSettingsState.TIMEZONE: ["set_registration_timezone_settings"],
+        ConversationSettingsState.TIMEZONE: [MessagesId.MESSAGE_SET_REGISTRATION_TIMEZONE],
     },
-    fallbacks=["cancel_command"],
+    fallbacks=[CommandsId.COMMAND_CANCEL],
 )
 
 HandlersRegistry.register_conversation_handler(
-    "register_user_conversation_settings",
-    entry_points_handler_names=["callback_query_settings_timezone"],
+    ConversationId.CONVERSATION_CHANGE_USER_SETTINGS,
+    entry_points_handler_names=[CallbackQueryId.CALLBACK_QUERY_SETTINGS_TIMEZONE],
     states={
-        ConversationSettingsState.TIMEZONE: ["set_timezone_settings"],
+        ConversationSettingsState.TIMEZONE: [MessagesId.MESSAGE_SET_SETTINGS_TIMEZONE],
     },
-    fallbacks=["callback_query_cancel_settings"],
+    fallbacks=[CallbackQueryId.CALLBACK_QUERY_CANCEL_SETTINGS],
 )

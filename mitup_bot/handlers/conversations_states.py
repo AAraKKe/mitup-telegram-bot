@@ -1,6 +1,6 @@
-from enum import Enum
+from enum import Enum, auto
 
 
 class ConversationSettingsState(Enum):
-    CHOOSE_SETTINGS = 0
-    TIMEZONE = 1
+    CHOOSE_SETTINGS = auto()
+    TIMEZONE = auto()

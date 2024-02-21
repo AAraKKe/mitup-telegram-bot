@@ -1,4 +1,5 @@
 import logging
+from enum import auto
 
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
@@ -9,10 +10,17 @@ from mitup_bot.utils import Messages
 from mitup_bot.views.views import change_settings_element_view, main_menu_view, settings_view
 
 from .conversations_states import ConversationSettingsState
-from .registry import HandlersRegistry
+from .registry import CallbackId, HandlersRegistry
 
 
-@HandlersRegistry.register_callback_query("callback_query_settings", pattern="^settings$", bindable=True)
+class CallbackQueryId(CallbackId):
+    CALLBACK_QUERY_SETTINGS = auto()
+    CALLBACK_QUERY_SETTINGS_TIMEZONE = auto()
+    CALLBACK_QUERY_CANCEL_SETTINGS = auto()
+    CALLBACK_QUERY_MAIN_MENU = auto()
+
+
+@HandlersRegistry.register_callback_query(CallbackQueryId.CALLBACK_QUERY_SETTINGS, pattern="^settings$", bindable=True)
 async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -25,7 +33,7 @@ async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_
 
 
 @HandlersRegistry.register_callback_query(
-    "callback_query_settings_timezone", pattern="^global_timezone$", bindable=False
+    CallbackQueryId.CALLBACK_QUERY_SETTINGS_TIMEZONE, pattern="^global_timezone$", bindable=False
 )
 async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
@@ -52,7 +60,9 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
             raise RuntimeError("User not found")
 
 
-@HandlersRegistry.register_callback_query("callback_query_cancel_settings", pattern="^cancel_settings$", bindable=False)
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.CALLBACK_QUERY_CANCEL_SETTINGS, pattern="^cancel_settings$", bindable=False
+)
 async def callback_query_cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -64,7 +74,9 @@ async def callback_query_cancel_settings(update: Update, context: ContextTypes.D
     return ConversationHandler.END
 
 
-@HandlersRegistry.register_callback_query("callback_query_main_menu", pattern="^main_menu$", bindable=True)
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.CALLBACK_QUERY_MAIN_MENU, pattern="^main_menu$", bindable=True
+)
 async def callback_query_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")

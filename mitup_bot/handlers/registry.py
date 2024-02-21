@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 from telegram import Update
@@ -18,6 +18,10 @@ from telegram.ext.filters import BaseFilter
 
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT
+
+
+class CallbackId(StrEnum):
+    pass
 
 
 @dataclass
@@ -37,12 +41,12 @@ class HandlersRegistry:
     as callbacks for different handlers.
     """
 
-    handlers: dict[str, HandlerWrapper] = {}
+    handlers: dict[CallbackId, HandlerWrapper] = {}
 
     @classmethod
     def register_command(
         cls,
-        handler_name: str,
+        callback_id: CallbackId,
         bindable: bool = True,
         group: int = 0,
         command: str | None = None,
@@ -73,10 +77,10 @@ class HandlersRegistry:
 
             command_name = command or func_name.replace("command_", "")
 
-            if handler_name in cls.handlers:
+            if callback_id in cls.handlers:
                 raise HandlerRegisteredError(func_name)
 
-            cls.handlers[handler_name] = HandlerWrapper(
+            cls.handlers[callback_id] = HandlerWrapper(
                 handler=CommandHandler(
                     command_name,
                     callback=callback,
@@ -94,7 +98,7 @@ class HandlersRegistry:
     @classmethod
     def register_message(
         cls,
-        handler_name: str,
+        callback_id: CallbackId,
         filters: BaseFilter,
         bindable: bool = True,
         group: int = 0,
@@ -114,10 +118,10 @@ class HandlersRegistry:
         def wrapper(
             callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
-            if handler_name in cls.handlers:
+            if callback_id in cls.handlers:
                 raise HandlerRegisteredError(callback.__name__)
 
-            cls.handlers[handler_name] = HandlerWrapper(
+            cls.handlers[callback_id] = HandlerWrapper(
                 handler=MessageHandler(filters=filters, callback=callback, block=block),
                 bindable=bindable,
                 group=group,
@@ -129,7 +133,7 @@ class HandlersRegistry:
     @classmethod
     def register_callback_query(
         cls,
-        handler_name: str,
+        callback_id: CallbackId,
         bindable: bool = True,
         group: int = 0,
         pattern: str | None = None,
@@ -151,10 +155,10 @@ class HandlersRegistry:
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
             func_name = callback.__name__
 
-            if handler_name in cls.handlers:
+            if callback_id in cls.handlers:
                 raise HandlerRegisteredError(func_name)
 
-            cls.handlers[handler_name] = HandlerWrapper(
+            cls.handlers[callback_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
                     pattern=pattern,
                     callback=callback,
@@ -176,7 +180,7 @@ class HandlersRegistry:
                 app.add_handler(wrapper.handler)
 
     @classmethod
-    def get_handler(cls, key: str) -> BaseHandler:
+    def get_handler(cls, key: CallbackId) -> BaseHandler:
         if key not in cls.handlers:
             raise HandlerNotRegistered(key)
         return cls.handlers[key].handler
@@ -184,10 +188,10 @@ class HandlersRegistry:
     @classmethod
     def register_conversation_handler(
         cls,
-        handler_name: str,
-        entry_points_handler_names: list[str],
-        states: dict[Enum, list[str]],
-        fallbacks: list[str],
+        callback_id: CallbackId,
+        entry_points_handler_names: list[CallbackId],
+        states: dict[Enum, list[CallbackId]],
+        fallbacks: list[CallbackId],
         bindable: bool = True,
         group: int = 0,
         allow_reentry: bool = False,
@@ -199,8 +203,8 @@ class HandlersRegistry:
         map_to_parent: dict[object, object] | None = None,
         block: bool = True,
     ):
-        if handler_name in cls.handlers:
-            raise HandlerRegisteredError(handler_name)
+        if callback_id in cls.handlers:
+            raise HandlerRegisteredError(callback_id)
 
         missing_handlers = [name for name in entry_points_handler_names if name not in cls.handlers]
         missing_handlers += [name for state in states.values() for name in state if name not in cls.handlers]
@@ -209,7 +213,7 @@ class HandlersRegistry:
         if missing_handlers:
             raise HandlerNotRegistered(", ".join(missing_handlers))
 
-        cls.handlers[handler_name] = HandlerWrapper(
+        cls.handlers[callback_id] = HandlerWrapper(
             ConversationHandler(
                 entry_points=[cls.handlers[name].handler for name in entry_points_handler_names],
                 states={
@@ -224,7 +228,7 @@ class HandlersRegistry:
                 conversation_timeout=conversation_timeout,
                 persistent=persistent,
                 map_to_parent=map_to_parent,
-                name=handler_name,
+                name=callback_id,
                 block=block,
             ),
             bindable=bindable,

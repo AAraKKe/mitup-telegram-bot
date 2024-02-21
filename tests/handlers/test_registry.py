@@ -1,7 +1,12 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers import CallbackId, HandlersRegistry
+
+
+class CommandsTestId(CallbackId):
+    COMMAND_BINDABLE = "bindable_command"
+    COMMAND_NOT_BINDABLE = "not_bindable_command"
 
 
 def test_registry_has_handlers():
@@ -23,11 +28,11 @@ def test_handlers_registered_when_bound_to_app():
 
 
 def test_only_bindable_handlers_are_registered():
-    @HandlersRegistry.register_command("not_bindable_command", bindable=False)
+    @HandlersRegistry.register_command(CommandsTestId.COMMAND_NOT_BINDABLE, bindable=False)
     async def command_not_bindable(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return "Done!"
 
-    @HandlersRegistry.register_command("bindable_command", bindable=True)
+    @HandlersRegistry.register_command(CommandsTestId.COMMAND_BINDABLE, bindable=True)
     async def command_bindable(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return "Done!"
 
@@ -42,5 +47,5 @@ def test_only_bindable_handlers_are_registered():
 
     assert "bindable" in command_handlers
     assert "not_bindable" not in command_handlers
-    assert "not_bindable_command" in HandlersRegistry.handlers
-    assert "bindable_command" in HandlersRegistry.handlers
+    assert CommandsTestId.COMMAND_NOT_BINDABLE in HandlersRegistry.handlers
+    assert CommandsTestId.COMMAND_BINDABLE in HandlersRegistry.handlers
