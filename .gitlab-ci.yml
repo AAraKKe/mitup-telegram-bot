@@ -226,40 +226,13 @@ push-migrations-latest-prod:
 .migrate-and-deploy: &deploy
   # This job will first run the migrations on the database and the update ECS
   stage: deploy
-  image:
-    name: public.ecr.aws/aws-cli/aws-cli
-    entrypoint: [""]
   <<: *tokens
   before_script:
     *aws-prep
   script:
-    - yum install jq -y
-    - |
-      echo '{"action": "upgrade", "revision": "head"}' > payload.json
-    - aws lambda update-function-code
-      --function-name MitupMigrationsLambda
-      --image-uri $MIGRATIONS_IMAGE_TAG
-      --publish
-      --region eu-west-1 > update-output.json
-    - aws lambda invoke
-      --function-name MitupMigrationsLambda
-      --payload file://payload.json
-      --region eu-west-1
-      --log-type Tail
-      --cli-binary-format raw-in-base64-out
-      invoke_output > response.json
-    - jq '.ExecutedVersion' response.json
-    - cat invoke_output
-    # Fail if lambda did not run
-    - test $(jq '.StatusCode' response.json) -eq 200
-    # Get the task definition
-    - aws ecs describe-task-definition --region eu-west-1 --task-definition mitup > task_definition.json
-    # Replace the tag to be used and store the task definition json
-    - |
-      jq -c --arg IMAGE "$BOT_IMAGE_TAG" '.taskDefinition.containerDefinitions[0].image = $IMAGE | {containerDefinitions: .taskDefinition.containerDefinitions, executionRoleArn: .taskDefinition.executionRoleArn}' task_definition.json > new_task.json
-    # Register the new task definition
-    - aws ecs register-task-definition --region eu-west-1 --family mitup --cli-input-json file://new_task.json
-    - aws ecs update-service --region eu-west-1 --cluster mitup --service mitup --task-definition mitup
+    - hatch run dev:deploy
+      --migrations-image $MIGRATIONS_IMAGE_TAG
+      --bot-image $BOT_IMAGE_TAG
 
 
 ## -------------- Deploy staging ---------------

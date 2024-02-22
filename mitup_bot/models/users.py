@@ -17,8 +17,8 @@ class User(MitupBaseModel, SQLModel, table=True):
     first_name: str
     tg_user_id: int
     id: int | None = Field(default=None, primary_key=True)
-    created_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow)
-    updated_time: dt.datetime | None = Field(default_factory=dt.datetime.utcnow)
+    created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
+    updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
     last_name: str | None = None
     username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})

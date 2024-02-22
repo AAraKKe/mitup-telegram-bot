@@ -13,7 +13,7 @@ from mitup_bot.models.exceptions import MissingSessionError
 
 class BaseModelImpl(MitupBaseModel, SQLModel):
     name: str
-    updated_time: dt.datetime | None = None
+    updated_time: dt.datetime = dt.datetime.now(dt.UTC)
 
 
 def test_engine_generated_properly():
@@ -23,7 +23,7 @@ def test_engine_generated_properly():
         create_engine_mock.return_value = mock.sentinel.engine
         MitupBaseModel.set_engine(config)
 
-    assert MitupBaseModel._engine is mock.sentinel.engine
+    assert MitupBaseModel.get_engine() is mock.sentinel.engine
     create_engine_mock.assert_called_once_with(config.full_url, echo=False)
 
 

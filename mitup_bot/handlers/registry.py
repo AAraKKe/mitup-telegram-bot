@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, StrEnum
 from typing import Any
+from warnings import filterwarnings
 
 from telegram import Update
 from telegram.ext import (
@@ -15,9 +16,18 @@ from telegram.ext import (
     MessageHandler,
 )
 from telegram.ext.filters import BaseFilter
+from telegram.warnings import PTBUserWarning
 
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT
+
+# Remove the warning that is sent when using the per_message option in the registry.
+# We have a case in which the user can interact with a simialr message in different palces
+# but the handler for that will never be part of a conversation handler. The users only interact
+# witht he bot through the bot chat.
+# For more information:
+# https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do
+filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
 
 class CallbackId(StrEnum):

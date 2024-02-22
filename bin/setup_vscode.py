@@ -10,7 +10,7 @@ TSettingValue = TSettingType | list[TSettingType] | dict[str, "TSettingValue"]
 
 
 SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
-    "files.exclude": {"__pycache__": True},
+    "files.exclude": {"__pycache__": True, ".*_cache": True, ".docker_hatch": True},
     "python.testing.unittestEnabled": False,
     "python.testing.pytestEnabled": True,
     "python.analysis.inlayHints.pytestParameters": True,
@@ -27,6 +27,7 @@ SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
             "source.organizeImports": True,
         },
     },
+    "search.exclude": {".hatch": True},
 }
 
 
