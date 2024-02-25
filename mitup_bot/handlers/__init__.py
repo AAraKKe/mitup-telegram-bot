@@ -1,5 +1,4 @@
 # Export all handlers available to make sure we register them
-# isort: skip_file
 __all__ = (
     "commands",
     "HandlersRegistry",

@@ -1,4 +1,3 @@
-# isort: skip_file
 __all__ = (
     "MitupView",
     "ButtonConfig",
