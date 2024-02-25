@@ -12,7 +12,7 @@ async def test_registration_timezone_message_handler_with_correct_view(mock_sess
     context = mock.AsyncMock()
     update.effective_message.text = "Europe/Madrid"
 
-    with mock.patch("mitup_bot.handlers.messages.send_message_view") as mock_send_message_view:
+    with mock.patch("mitup_bot.handlers.messages.send_message") as mock_send_message:
         with mock.patch.object(User, "find_by_tg_user_id") as mock_find_user:
             mock_user = mock.MagicMock()
             mock_find_user.return_value = mock_user
@@ -21,8 +21,8 @@ async def test_registration_timezone_message_handler_with_correct_view(mock_sess
 
                 mock_user.update.assert_called_once()
                 assert mock_user.settings.timezone == update.effective_message.text
-                mock_send_message_view.assert_called_once()
-                assert mock_main_menu_view.return_value == mock_send_message_view.call_args_list[0].args[2]
+                mock_send_message.assert_called_once()
+                assert mock_main_menu_view.return_value == mock_send_message.call_args_list[0].args[2]
 
 
 @pytest.mark.asyncio
@@ -31,7 +31,7 @@ async def test_settings_timezone_message_handler_with_correct_view(mock_session:
     context = mock.AsyncMock()
     update.effective_message.text = "Europe/Madrid"
 
-    with mock.patch("mitup_bot.handlers.messages.send_message_view") as mock_send_message_view:
+    with mock.patch("mitup_bot.handlers.messages.send_message") as mock_send_message:
         with mock.patch.object(User, "find_by_tg_user_id") as mock_find_user:
             mock_user = mock.MagicMock()
             mock_find_user.return_value = mock_user
@@ -39,7 +39,7 @@ async def test_settings_timezone_message_handler_with_correct_view(mock_session:
                 await settings_timezone_message_handler(update, context)
 
                 assert mock_user.settings.timezone == update.effective_message.text
-                assert mock_settings_view.return_value == mock_send_message_view.call_args_list[0].args[2]
+                assert mock_settings_view.return_value == mock_send_message.call_args_list[0].args[2]
 
 
 @pytest.mark.asyncio

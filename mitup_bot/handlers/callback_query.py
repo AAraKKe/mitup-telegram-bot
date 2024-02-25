@@ -4,7 +4,7 @@ from enum import auto
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from mitup_bot.api import edit_message_view, send_message_view
+from mitup_bot.api import edit_message, send_message
 from mitup_bot.models import User
 from mitup_bot.utils import Messages
 from mitup_bot.views.views import change_settings_element_view, main_menu_view, settings_view
@@ -29,7 +29,7 @@ async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_
 
     view = settings_view()
 
-    await edit_message_view(context, update, view)
+    await edit_message(context, update, view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -53,7 +53,7 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
 
             view = change_settings_element_view(message)
 
-            await send_message_view(context, update, view)
+            await send_message(context, update, view)
 
             return ConversationSettingsState.TIMEZONE
         else:
@@ -69,7 +69,7 @@ async def callback_query_cancel_settings(update: Update, context: ContextTypes.D
 
     view = settings_view()
 
-    await send_message_view(context, update, view)
+    await send_message(context, update, view)
 
     return ConversationHandler.END
 
@@ -83,4 +83,4 @@ async def callback_query_main_menu(update: Update, context: ContextTypes.DEFAULT
 
     view = main_menu_view()
 
-    await edit_message_view(context, update, view)
+    await edit_message(context, update, view)

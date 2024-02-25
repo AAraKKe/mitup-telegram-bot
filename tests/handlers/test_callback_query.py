@@ -18,11 +18,11 @@ async def test_callback_query_settings_is_called_with_settings_view():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.edit_message_view") as mock_edit_message_view:
+    with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
         await callback_query_settings(update, context)
 
-        mock_edit_message_view.assert_called_once()
-        assert settings_view() in mock_edit_message_view.call_args_list[0].args
+        mock_edit_message.assert_called_once()
+        assert settings_view() in mock_edit_message.call_args_list[0].args
 
 
 @pytest.mark.asyncio
@@ -30,7 +30,7 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.send_message_view") as mock_send_message_view:
+    with mock.patch("mitup_bot.handlers.callback_query.send_message") as mock_send_message:
         with mock.patch.object(User, "find_by_tg_user_id") as mock_user_find:
             mock_user = mock.MagicMock()
             mock_user_find.return_value = mock_user
@@ -40,8 +40,8 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
                 result = await callback_query_timezone(update, context)
 
                 mock_user_find.assert_called_once_with(update.effective_user.id)
-                mock_send_message_view.assert_called_once()
-                assert mock_change_settings_element_view.return_value in mock_send_message_view.call_args_list[0].args
+                mock_send_message.assert_called_once()
+                assert mock_change_settings_element_view.return_value in mock_send_message.call_args_list[0].args
                 assert result == ConversationSettingsState.TIMEZONE
 
 
@@ -77,11 +77,11 @@ async def test_callback_query_main_manu_calls_to_main_menu_view():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.edit_message_view") as mock_edit_message_view:
+    with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
         await callback_query_main_menu(update, context)
 
-        mock_edit_message_view.assert_called_once()
-        assert main_menu_view() in mock_edit_message_view.call_args_list[0].args
+        mock_edit_message.assert_called_once()
+        assert main_menu_view() in mock_edit_message.call_args_list[0].args
 
 
 @pytest.mark.asyncio
@@ -89,11 +89,11 @@ async def test_callback_query_cancel_setting_calls_to_settings_view():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.send_message_view") as mock_send_message_view:
+    with mock.patch("mitup_bot.handlers.callback_query.send_message") as mock_send_message:
         await callback_query_cancel_settings(update, context)
 
-        mock_send_message_view.assert_called_once()
-        assert settings_view() in mock_send_message_view.call_args_list[0].args
+        mock_send_message.assert_called_once()
+        assert settings_view() in mock_send_message.call_args_list[0].args
 
 
 @pytest.mark.asyncio

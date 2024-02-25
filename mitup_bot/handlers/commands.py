@@ -3,7 +3,7 @@ from enum import auto
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from mitup_bot.api import send_message, send_message_view
+from mitup_bot.api import send_message
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import Messages
 from mitup_bot.views.views import main_menu_view
@@ -53,7 +53,7 @@ async def command_start_with_existing_user(update: Update, context: ContextTypes
     view = main_menu_view()
 
     if update.effective_message is not None and update.effective_user is not None:
-        await send_message_view(context, update, view)
+        await send_message(context, update, view)
 
 
 @HandlersRegistry.register_command(CommandsId.COMMAND_CANCEL, command="cancel", bindable=False)

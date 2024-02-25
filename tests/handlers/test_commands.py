@@ -129,10 +129,10 @@ async def test_command_start_with_existing_user():
     update = MagicMock()
     context = MagicMock()
 
-    with mock.patch("mitup_bot.handlers.commands.send_message_view") as mock_send_message_view:
+    with mock.patch("mitup_bot.handlers.commands.send_message") as mock_send_message:
         await command_start_with_existing_user(update, context)
 
-        mock_send_message_view.assert_called_once()
+        mock_send_message.assert_called_once()
 
 
 @pytest.mark.asyncio
