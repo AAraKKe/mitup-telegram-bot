@@ -11,7 +11,7 @@ def default_view() -> MitupView:
         "Test message",
         [
             [
-                ButtonConfig("Testing", callback_data="test_data"),
+                ButtonConfig(text="Testing", callback_data="test_data"),
             ],
         ],
     )

@@ -27,7 +27,7 @@ HandlersRegistry.register_conversation_handler(
 
 HandlersRegistry.register_conversation_handler(
     ConversationId.CONVERSATION_CHANGE_USER_SETTINGS,
-    entry_points_handler_names=[CallbackQueryId.CALLBACK_QUERY_SETTINGS_TIMEZONE],
+    entry_points_handler_names=[CallbackQueryId.SETTINGS_TIMEZONE],
     states={
         ConversationSettingsState.TIMEZONE: [
             MessagesId.MESSAGE_SET_SETTINGS_TIMEZONE,

@@ -6,7 +6,7 @@ from sqlmodel import Field, Relationship, Session, SQLModel, select
 from . import Meetup
 
 if TYPE_CHECKING:
-    from . import Settings
+    from . import Meetup, Settings
 
 
 class User(SQLModel, table=True):

@@ -2,20 +2,36 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Self
 
+from pydantic import BaseModel, field_validator
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from mitup_bot.callback_data import CallbackData
 
-@dataclass
-class ButtonConfig:
+
+class ButtonConfig(BaseModel):
     text: str
-    callback_data: str | object
+    # Allow str as type as an intermediate step for backward compatibility
+    # will be moving this to CallbackData to make sure we have safeguards in
+    # the future
+    callback_data: CallbackData | str | None = None
+    switch_inline_query: str | None = None
+
+    @field_validator("callback_data")
+    @classmethod
+    def validate_callback_data(cls, value: CallbackData | str | None) -> CallbackData | str | None:
+        str_value = str(value)
+        assert (
+            len(str_value.encode()) <= 64
+        ), f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram"
+        return value
 
     @property
     def button(self) -> InlineKeyboardButton:
-        kwargs = {
-            "callback_data": self.callback_data,
-        }
-        return InlineKeyboardButton(self.text, **kwargs)  # type: ignore
+        return InlineKeyboardButton(
+            self.text,
+            callback_data=str(self.callback_data) if self.callback_data else None,
+            switch_inline_query=self.switch_inline_query,
+        )
 
 
 ButtonRow = Sequence[ButtonConfig]
