@@ -17,6 +17,7 @@ class CommandsId(CallbackId):
     COMMAND_START_WITH_NO_USER = auto()
     COMMAND_START_WITH_EXISTING_USER = auto()
     COMMAND_CANCEL = auto()
+    COMMAND_MAIN_MENU = auto()
 
 
 @HandlersRegistry.register_command(
@@ -54,6 +55,11 @@ async def command_start_with_existing_user(update: Update, context: ContextTypes
 
     if update.effective_message is not None and update.effective_user is not None:
         await send_message(context, update, view)
+
+
+@HandlersRegistry.register_command(CommandsId.COMMAND_MAIN_MENU, command="main_menu")
+async def command_go_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await command_start_with_existing_user(update, context)
 
 
 @HandlersRegistry.register_command(CommandsId.COMMAND_CANCEL, command="cancel", bindable=False)

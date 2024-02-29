@@ -8,7 +8,12 @@ from telegram.ext import CommandHandler, ContextTypes
 from telegram.ext.filters import CAPTION, PHOTO
 
 from mitup_bot.handlers import CallbackId, ConversationSettingsState, HandlersRegistry
-from mitup_bot.handlers.commands import command_cancel, command_start_with_existing_user, command_start_with_new_user
+from mitup_bot.handlers.commands import (
+    command_cancel,
+    command_go_to_main_menu,
+    command_start_with_existing_user,
+    command_start_with_new_user,
+)
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils import Messages
 
@@ -125,7 +130,8 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
 
 
 @pytest.mark.asyncio
-async def test_command_start_with_existing_user():
+@pytest.mark.parametrize("command_list", [command_start_with_existing_user, command_go_to_main_menu])
+async def test_commands_to_show_main_menu(command_list):
     update = MagicMock()
     context = MagicMock()
 

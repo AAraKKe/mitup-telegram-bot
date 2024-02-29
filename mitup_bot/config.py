@@ -27,8 +27,7 @@ class RunModes(StrEnum):
 class ConfigProvider(Protocol):
     """Protocol for a configuration provider"""
 
-    def get_config(self) -> ConfigMap:
-        ...
+    def get_config(self) -> ConfigMap: ...
 
 
 @dataclass
