@@ -1,9 +1,11 @@
 from enum import auto
 
+from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, filters
 
 from mitup_bot.api import send_message
+from mitup_bot.db import with_async_session
 from mitup_bot.models import User
 from mitup_bot.utils import Messages
 from mitup_bot.views.views import main_menu_view, settings_view
@@ -17,7 +19,8 @@ class MessagesId(CallbackId):
 
 
 @HandlersRegistry.register_message(MessagesId.MESSAGE_SET_REGISTRATION_TIMEZONE, filters.TEXT, bindable=False)
-async def registration_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@with_async_session
+async def registration_timezone_message_handler(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
@@ -30,21 +33,21 @@ async def registration_timezone_message_handler(update: Update, context: Context
     if update.effective_message.text is None:
         raise RuntimeError("Effective message text not set")
 
-    with User.open_session():
-        if user := User.find_by_tg_user_id(update.effective_user.id):
-            user.settings.timezone = update.effective_message.text
-            user.update()
+    if user := User.find_by_tg_user_id(session, update.effective_user.id):
+        user.settings.timezone = update.effective_message.text
+        session.add(user)
 
-            message = Messages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
-            view = main_menu_view(message)
+        message = Messages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
+        view = main_menu_view(message)
 
-            await send_message(context, update, view)
+        await send_message(context, update, view)
 
-        return ConversationHandler.END
+    return ConversationHandler.END
 
 
 @HandlersRegistry.register_message(MessagesId.MESSAGE_SET_SETTINGS_TIMEZONE, filters.TEXT, bindable=False)
-async def settings_timezone_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@with_async_session
+async def settings_timezone_message_handler(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
@@ -57,14 +60,13 @@ async def settings_timezone_message_handler(update: Update, context: ContextType
     if update.effective_message.text is None:
         raise RuntimeError("Effective message text not set")
 
-    with User.open_session():
-        if user := User.find_by_tg_user_id(update.effective_user.id):
-            user.settings.timezone = update.effective_message.text
-            user.update()
+    if user := User.find_by_tg_user_id(session, update.effective_user.id):
+        user.settings.timezone = update.effective_message.text
+        session.add(user)
 
-            message = Messages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
-            view = settings_view(message)
+        message = Messages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
+        view = settings_view(message)
 
-            await send_message(context, update, view)
+        await send_message(context, update, view)
 
-        return ConversationHandler.END
+    return ConversationHandler.END

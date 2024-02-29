@@ -3,13 +3,11 @@ from typing import TYPE_CHECKING
 
 from sqlmodel import Field, Relationship, SQLModel
 
-from .mitup_base_model import MitupBaseModel
-
 if TYPE_CHECKING:
     from .users import User
 
 
-class Settings(MitupBaseModel, SQLModel, table=True):
+class Settings(SQLModel, table=True):
     __tablename__: str = "settings"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)

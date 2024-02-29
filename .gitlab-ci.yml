@@ -3,9 +3,9 @@ image: registry.gitlab.com/meetupbot/mitup-telegram-bot/ci-python
 
 # Templates for security and and code analysis
 include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Dependency-Scanning.gitlab-ci.yml
-- template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
 
 # Global variables for all jobs
 variables:
@@ -23,53 +23,52 @@ workflow:
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
   - |
-      mkdir -p ~/.aws
-      mkdir -p /tmp
-      echo "${OIDC_TOKEN}" > /tmp/web_identity_token
-      echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
+    mkdir -p ~/.aws
+    mkdir -p /tmp
+    echo "${OIDC_TOKEN}" > /tmp/web_identity_token
+    echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
 
 .tokens: &tokens
   id_tokens:
-      OIDC_TOKEN:
-          aud: mitup-gitlab-ci-service
+    OIDC_TOKEN:
+      aud: mitup-gitlab-ci-service
 
 # Default cache for Hatch environments
 cache:
   key: $CI_COMMIT_REF_SLUG
   paths:
-  - .hatch
+    - .hatch
 
 # This is a GitLab provided job, no need to configure it
 sast:
   stage: analysis
 
 stages:
-- analysis
-- build-ci
-- test
-- prepare-deployment
-- push-ecr
-- deploy
-- validate
+  - analysis
+  - build-ci
+  - test
+  - prepare-deployment
+  - push-ecr
+  - deploy
+  - validate
 
-cache-hatch:
+preparation:
   stage: build-ci
   script:
-  - python --version
-  - pip --version
-  - hatch --version
-  - hatch config set dirs.env.virtual .hatch
-  - hatch config set dirs.cache .hatch
-  # Trigger dev environment to cache it
-  - hatch run dev:echo
+    - python --version
+    - pip --version
+    - hatch --version
+    # Trigger dev environment to cache it
+    - hatch run dev:echo
+    - hatch run dev:pip list --local
 
-pytest:
+test:
   stage: test
   script: hatch run dev:test-cov
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
-  needs: [cache-hatch]
+  needs: [preparation]
   artifacts:
-    when: always  # Important to get reports when test fail
+    when: always # Important to get reports when test fail
     reports:
       junit: report.xml
       coverage_report:
@@ -79,18 +78,17 @@ pytest:
 format-check:
   stage: test
   script: hatch run dev:format-check
-  needs: [cache-hatch]
+  needs: [preparation]
 
-flake8-lint:
+linter:
   stage: test
   script: hatch run dev:lint
-  needs: [cache-hatch]
+  needs: [preparation]
 
-mypy-typecheck:
+pyte-check:
   stage: test
   script: hatch run dev:type-check
-  needs: [cache-hatch]
-
+  needs: [preparation]
 
 # --------------------
 # Docker build and push images
@@ -129,8 +127,7 @@ build-docker-ci:
     entrypoint: [""] # Avoid loading the entry point that forces an AWS command
   stage: prepare-deployment
   <<: *tokens
-  before_script:
-    *aws-prep
+  before_script: *aws-prep
   script:
     - yum install jq -y # Install jq not avilable in the aws-cli docker image
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
@@ -164,8 +161,7 @@ config-prod:
 .push-ecr: &push-ecr
   stage: push-ecr
   <<: *tokens
-  before_script:
-    *aws-prep
+  before_script: *aws-prep
   <<: *kaniko
 
 ## ------------- Push to staging --------------
@@ -223,17 +219,15 @@ push-migrations-latest-prod:
 # --------------------
 # Deploy
 # ---------------------
-.migrate-and-deploy: &deploy
-  # This job will first run the migrations on the database and the update ECS
+.migrate-and-deploy:
+  &deploy # This job will first run the migrations on the database and the update ECS
   stage: deploy
   <<: *tokens
-  before_script:
-    *aws-prep
+  before_script: *aws-prep
   script:
     - hatch run dev:deploy
       --migrations-image $MIGRATIONS_IMAGE_TAG
       --bot-image $BOT_IMAGE_TAG
-
 
 ## -------------- Deploy staging ---------------
 deploy-staging:

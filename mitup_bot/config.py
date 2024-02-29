@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Protocol
 
 from pydantic import BaseModel, SecretStr
+from sqlalchemy import URL
 
 from mitup_bot.cli.options import Env
 
@@ -107,9 +108,16 @@ class DbConfig(BaseModel):
     engine_echo: bool = False
 
     @property
-    def full_url(self) -> str:
+    def full_url(self) -> URL:
         secret_pass = self.password.get_secret_value()
-        return f"{self.url_schema}://{self.username}:{secret_pass}@{self.url}:{self.port}/{self.database}"
+        return URL.create(
+            drivername=self.url_schema,
+            username=self.username,
+            password=secret_pass,
+            host=self.url,
+            port=self.port,
+            database=self.database,
+        )
 
 
 class AppConfig(BaseModel):

@@ -1,10 +1,12 @@
 import logging
 from enum import auto
 
+from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from mitup_bot.api import edit_message, send_message
+from mitup_bot.db import with_async_session
 from mitup_bot.models import User
 from mitup_bot.utils import Messages
 from mitup_bot.views.views import change_settings_element_view, main_menu_view, settings_view
@@ -35,7 +37,8 @@ async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_
 @HandlersRegistry.register_callback_query(
     CallbackQueryId.CALLBACK_QUERY_SETTINGS_TIMEZONE, pattern="^global_timezone$", bindable=False
 )
-async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@with_async_session
+async def callback_query_timezone(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
@@ -47,17 +50,16 @@ async def callback_query_timezone(update: Update, context: ContextTypes.DEFAULT_
 
     logging.info("Enter into callback_query_settings_timezone")
 
-    with User.open_session():
-        if user := User.find_by_tg_user_id(update.effective_user.id):
-            message = Messages.SET_TIMEZONE_SETTINGS.get(timezone=user.settings.timezone)
+    if user := User.find_by_tg_user_id(session, update.effective_user.id):
+        message = Messages.SET_TIMEZONE_SETTINGS.get(timezone=user.settings.timezone)
 
-            view = change_settings_element_view(message)
+        view = change_settings_element_view(message)
 
-            await send_message(context, update, view)
+        await send_message(context, update, view)
 
-            return ConversationSettingsState.TIMEZONE
-        else:
-            raise RuntimeError("User not found")
+        return ConversationSettingsState.TIMEZONE
+    else:
+        raise RuntimeError("User not found")
 
 
 @HandlersRegistry.register_callback_query(

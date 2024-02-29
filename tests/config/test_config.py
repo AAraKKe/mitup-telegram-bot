@@ -2,6 +2,7 @@ from unittest import mock
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import URL
 
 from mitup_bot.cli.options import Env
 from mitup_bot.config import Config, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
@@ -54,7 +55,10 @@ def test_config_properly_setup(
     config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
     # Password from environment variable takes precedence as it is defined before Toml
-    assert config.db.full_url == "postgresql://username:1234abc@some.url.com:12/mydb"
+    expected_url = URL.create(
+        drivername="postgresql", username="username", password="1234abc", host="some.url.com", port=12, database="mydb"
+    )
+    assert config.db.full_url == expected_url
     assert config.bot.token.get_secret_value() == "abcd12345"
     assert RunModes.POLLING is config.app.run_mode
 

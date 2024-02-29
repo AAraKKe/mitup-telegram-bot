@@ -1,16 +1,13 @@
 import datetime as dt
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Self
 
-from sqlmodel import Field, Relationship, SQLModel, select
-
-from .exceptions import MissingSessionError
-from .mitup_base_model import MitupBaseModel
+from sqlmodel import Field, Relationship, Session, SQLModel, select
 
 if TYPE_CHECKING:
     from . import Settings
 
 
-class User(MitupBaseModel, SQLModel, table=True):
+class User(SQLModel, table=True):
     # Until better configuration is available through SQLModel (https://github.com/tiangolo/sqlmodel/issues/159)
     __tablename__: str = "users"  # type: ignore
 
@@ -24,12 +21,7 @@ class User(MitupBaseModel, SQLModel, table=True):
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
 
     @classmethod
-    def find_by_tg_user_id(cls, tg_user_id: int) -> Optional["User"]:
-        session = cls.get_session()
-
-        if session is None:
-            raise MissingSessionError()
-
+    def find_by_tg_user_id(cls, session: Session, tg_user_id: int) -> Self | None:
         statement = select(cls).where(cls.tg_user_id == tg_user_id)
         if (found_user := session.exec(statement).first()) is not None:
             return found_user

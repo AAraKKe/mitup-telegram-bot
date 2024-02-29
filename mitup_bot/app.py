@@ -2,6 +2,7 @@ import logging
 
 from telegram.ext import Application
 
+from mitup_bot import db
 from mitup_bot.cli.options import Env
 from mitup_bot.config import (
     Config,
@@ -10,7 +11,6 @@ from mitup_bot.config import (
     TomlConfigProvider,
 )
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.models import MitupBaseModel
 
 
 class MitupRuntime:
@@ -34,7 +34,7 @@ class MitupRuntime:
         self.__setup_db()
 
     def __setup_db(self):
-        MitupBaseModel.set_engine(self.config.db)
+        db.configure_db(self.config.db)
 
     def __build_application(self) -> Application:
         builder = Application.builder()

@@ -121,7 +121,6 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
         result = await command_start_with_new_user(update, context)
 
         mock_session.add.assert_called_once()
-        mock_session.commit.assert_called_once()
         assert update.effective_user is not None
         mock_send_message.assert_called_once_with(
             context, update, Messages.SET_REGISTRATION_TIMEZONE.get(first_name="John")

@@ -20,5 +20,5 @@ CCT = TypeVar("CCT", bound=CallbackContext[Any, Any, Any, Any])
 UT = TypeVar("UT", bound=Update)
 """Type that defines and Update objects or a subclass of it"""
 
-HandlerCallback = Callable[[UT, CCT], Coroutine[Any, Any, T]]
+HandlerCallback = Callable[[UT, CCT], Coroutine[Any, Any, RT]]
 """Type to define the callback of a given handler"""

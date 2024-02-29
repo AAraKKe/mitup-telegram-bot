@@ -19,7 +19,7 @@ from telegram.ext.filters import BaseFilter
 from telegram.warnings import PTBUserWarning
 
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
-from mitup_bot.utils.types import CCT
+from mitup_bot.utils.types import CCT, HandlerCallback
 
 # Remove the warning that is sent when using the per_message option in the registry.
 # We have a case in which the user can interact with a simialr message in different palces
@@ -63,10 +63,7 @@ class HandlersRegistry:
         filters: BaseFilter | None = None,
         block: bool = True,
         has_args: bool | int | None = None,
-    ) -> Callable[
-        [Callable[[Update, CCT], Any]],
-        Callable[[Update, CCT], Coroutine[Any, Any, Any]],
-    ]:
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a CommandHandler.
 
@@ -76,8 +73,8 @@ class HandlersRegistry:
         """  # noqa: E501
 
         def wrapper(
-            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
-        ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
             func_name = callback.__name__
             if command is None and not func_name.startswith("command_"):
                 raise WrongCommandNameError(
@@ -88,7 +85,7 @@ class HandlersRegistry:
             command_name = command or func_name.replace("command_", "")
 
             if callback_id in cls.handlers:
-                raise HandlerRegisteredError(func_name)
+                raise HandlerRegisteredError(callback_id.value)
 
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CommandHandler(

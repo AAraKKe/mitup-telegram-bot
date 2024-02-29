@@ -5,8 +5,8 @@ import pytest
 from pydantic import SecretStr
 from sqlmodel import Session
 
+from mitup_bot import db
 from mitup_bot.config import DbConfig
-from mitup_bot.models import MitupBaseModel
 
 
 @pytest.fixture
@@ -19,18 +19,18 @@ def mock_session(db_config: DbConfig) -> Generator[mock.MagicMock, None, None]:
     Since we are centralizing db interaction through the base model we can easily
     patch Session there without having to worry it being instantiated anywhere else
     """
-    with mock.patch("mitup_bot.models.mitup_base_model.Session") as session_patch:
+    with mock.patch("mitup_bot.db.sessionmaker") as maker_patch:
         mocked_session = mock.MagicMock(spec=Session, name="MitupMockedSession")
-        # Make sure the instances of the Session class are the ones
-        # we will be accessing later
-        session_patch.return_value = mocked_session
-        mocked_session.__enter__.return_value = mocked_session
+        # Setup a factory that returns our mocked_session
+        maker_patch.return_value = lambda: mocked_session
 
-        with mock.patch("mitup_bot.models.mitup_base_model.create_engine"):
+        with mock.patch("mitup_bot.db.create_engine"):
             # Patch create_engine to and make sure we are not creating an engine while
             # testing
-            MitupBaseModel.set_engine(db_config)
+            db.configure_db(db_config)
             yield mocked_session
+            # Unset the module level sessionmaker for the next test
+            db.__sessionmaker = None  # type: ignore
 
 
 @pytest.fixture(scope="session")

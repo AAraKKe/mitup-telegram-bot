@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 # Install libraries needed to run pyscopg2
 RUN apt-get update && \

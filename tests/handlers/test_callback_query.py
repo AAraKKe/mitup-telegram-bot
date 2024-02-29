@@ -39,7 +39,7 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
             ) as mock_change_settings_element_view:
                 result = await callback_query_timezone(update, context)
 
-                mock_user_find.assert_called_once_with(update.effective_user.id)
+                mock_user_find.assert_called_once_with(mock_session, update.effective_user.id)
                 mock_send_message.assert_called_once()
                 assert mock_change_settings_element_view.return_value in mock_send_message.call_args_list[0].args
                 assert result == ConversationSettingsState.TIMEZONE
