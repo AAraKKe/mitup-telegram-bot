@@ -28,7 +28,7 @@ services:
     command: hatch run dev:migrations-downgrade
 
   postgres:
-    image: postgres:12.1
+    image: postgres:16.2
     restart: always
     environment:
       POSTGRES_USER: mitupbot
