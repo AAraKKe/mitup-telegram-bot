@@ -10,11 +10,16 @@
   "packageRules": [
     {
       "matchFileNames": ["**/Dockerfile*"],
-      "addLabels": ["scope::containers"]
+      "addLabels": ["scope::containers"],
+      "additionalBranchPrefix": "docker-"
     },
     {
       "matchFileNames": ["pyproject.toml"],
-      "addLabels": ["scope::environment"]
+      "addLabels": ["scope::environment"],
+      "additionalBranchPrefix": "python-"
     }
-  ]
+  ],
+  "major": {
+    "additionalBranchPrefix": "major-"
+  }
 }
