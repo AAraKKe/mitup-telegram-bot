@@ -2,5 +2,19 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "reviewers": ["@jparaque"],
+  "dependencyDashboardAutoclose": true,
+  "dependencyDashboardLabels": ["type::dependency-upgrade"],
+  "labels": ["type::dependency-upgrade"],
+  "packageRules": [
+    {
+      "matchFileNames": ["**/Dockerfile*"],
+      "addLabels": ["scope::containers"]
+    },
+    {
+      "matchFileNames": ["pyproject.toml"],
+      "addLabels": ["scope::environment"]
+    }
   ]
 }
