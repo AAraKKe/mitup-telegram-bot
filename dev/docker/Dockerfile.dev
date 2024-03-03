@@ -12,4 +12,4 @@ WORKDIR /bot
 RUN pip install hatch
 
 # Cache hatch environment
-RUN hatch config set dirs.env.virtual /bot/.hatch
+RUN hatch config set dirs.env.virtual /.docker_hatch

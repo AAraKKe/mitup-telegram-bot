@@ -46,4 +46,5 @@ services:
       dockerfile: ./dev/docker/Dockerfile.dev
     volumes:
       - .:/bot
+      - ./.docker_hatch:/.docker_hatch
     command: hatch run dev:launch
