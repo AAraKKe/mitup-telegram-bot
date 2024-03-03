@@ -85,9 +85,14 @@ linter:
   script: hatch run dev:lint
   needs: [preparation]
 
-pyte-check:
+type-check:
   stage: test
   script: hatch run dev:type-check
+  needs: [preparation]
+
+validate-migrations:
+  stage: test
+  script: hatch run dev:validate-migrations
   needs: [preparation]
 
 # --------------------

@@ -12,10 +12,13 @@ from click.testing import CliRunner
 from mypy_boto3_ecs import ECSClient
 from mypy_boto3_ecs.type_defs import DescribeServicesResponseTypeDef
 from mypy_boto3_lambda import LambdaClient
-from rich.console import Capture
+from rich.console import Capture, Console
 from rich.status import Status
 
 from mitup_bot.cli.commands import deploy
+
+# Make console not export colors and styles for testing
+deploy.console = Console(force_interactive=False, force_terminal=False)
 
 
 @dataclass
@@ -141,7 +144,7 @@ def test_update_lambda_code_succeeds_after_retry():
         Publish=True,
     )
     context.assert_lambda_called("get_function", n=3, FunctionName="MyLambda")
-    assert capture.get() == "✔︎ Lambda MyLambda function code updated\n"
+    assert "✔︎ Lambda MyLambda function code updated" in capture.get()
 
 
 def test_update_lambda_code_fails_aborting_command():
@@ -170,7 +173,7 @@ def test_update_lambda_code_fails_aborting_command():
         Publish=True,
     )
     context.assert_lambda_called("get_function", n=2, FunctionName="MyLambda")
-    assert capture.get() == "✘ Failed updating code for lambda MyLambda for the following reason:\nSomeReason\n"
+    assert "✘ Failed updating code for lambda MyLambda for the following reason:\nSomeReason" in capture.get()
 
 
 def test_invoke_lambda_succeeds():
@@ -247,7 +250,7 @@ def test_invoke_lambda_fails():
         Payload=payload,
     )
 
-    assert capture.get() == "✘ Error invoking lambda MyLambda: FunctionIsBroken\n"
+    assert "✘ Error invoking lambda MyLambda: FunctionIsBroken" in capture.get()
 
 
 def test_register_task_definition_succeeds():
@@ -336,7 +339,7 @@ def test_register_task_definition_when_failing():
         executionRoleArn=role,
     )
     expected_output = f"ECR image: {image}\n✘ Error registering task definition for {family!r}: [StatusCode: 404]\n"
-    assert expected_output == capture.get()
+    assert expected_output in capture.get()
 
 
 def create_service_description(

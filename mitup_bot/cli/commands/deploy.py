@@ -180,8 +180,7 @@ def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, servic
 @click.command()
 @click.option("--migrations-image", help="Uri of the lambda image pushed to ECR")
 @click.option("--bot-image", help="Uri of the bot image pushed to ECR")
-@click.pass_context
-def cli(ctx: click.Context, migrations_image: str, bot_image: str):
+def cli(migrations_image: str, bot_image: str):
     lambda_client = boto3.client("lambda", region_name="eu-west-1")
     ecs_client = boto3.client("ecs", region_name="eu-west-1")
 
