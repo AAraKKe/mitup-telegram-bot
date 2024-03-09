@@ -9,14 +9,17 @@
   "labels": ["type::dependency-upgrade"],
   "packageRules": [
     {
-      "matchFileNames": ["**/Dockerfile*"],
+      "matchFileNames": ["dev/docker/**"],
       "addLabels": ["scope::containers"],
-      "additionalBranchPrefix": "docker-"
+      "matchUpdateTypes": ["major", "minor"],
+      "additionalBranchPrefix": "docker-",
+      "groupName": "Docker images"
     },
     {
       "matchFileNames": ["pyproject.toml"],
       "addLabels": ["scope::environment"],
-      "additionalBranchPrefix": "python-"
+      "additionalBranchPrefix": "python-",
+      "groupName": "Python dependencies"
     }
   ],
   "major": {
