@@ -3,23 +3,49 @@
   "extends": [
     "config:recommended"
   ],
-  "reviewers": ["@jparaque"],
+  "reviewers": [
+    "@jparaque"
+  ],
   "dependencyDashboardAutoclose": true,
-  "dependencyDashboardLabels": ["type::dependency-upgrade"],
-  "labels": ["type::dependency-upgrade"],
+  "dependencyDashboardLabels": [
+    "type::dependency-upgrade"
+  ],
+  "labels": [
+    "type::dependency-upgrade"
+  ],
   "packageRules": [
     {
-      "matchDatasources": ["docker"],
-      "addLabels": ["scope::containers"],
-      "matchUpdateTypes": ["major", "minor"],
+      "matchDatasources": [
+        "docker"
+      ],
+      "addLabels": [
+        "scope::containers"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
       "additionalBranchPrefix": "docker-",
       "groupName": "Docker images"
     },
     {
-      "matchFileNames": ["pyproject.toml"],
-      "addLabels": ["scope::environment"],
+      "matchFileNames": [
+        "pyproject.toml"
+      ],
+      "addLabels": [
+        "scope::environment"
+      ],
       "additionalBranchPrefix": "python-",
       "groupName": "Python dependencies"
+    },
+    {
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchFileNames": [
+        ".gitlab-ci.yml"
+      ],
+      "enabled": false
     }
   ],
   "major": {
