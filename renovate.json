@@ -9,7 +9,7 @@
   "labels": ["type::dependency-upgrade"],
   "packageRules": [
     {
-      "matchFileNames": ["dev/docker/**"],
+      "matchDatasources": ["docker"],
       "addLabels": ["scope::containers"],
       "matchUpdateTypes": ["major", "minor"],
       "additionalBranchPrefix": "docker-",
@@ -20,11 +20,6 @@
       "addLabels": ["scope::environment"],
       "additionalBranchPrefix": "python-",
       "groupName": "Python dependencies"
-    },
-    {
-      "matchUpdateTypes": ["patch"],
-      "matchFileNames": [".gitlab-ci.yaml"],
-      "enabled": false
     }
   ],
   "major": {
