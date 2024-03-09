@@ -23,7 +23,7 @@
     },
     {
       "matchUpdateTypes": ["patch"],
-      "matchFileNames": ["dev/docker/**"],
+      "matchFileNames": [".gitlab-ci.yaml"],
       "enabled": false
     }
   ],
