@@ -20,6 +20,11 @@
       "addLabels": ["scope::environment"],
       "additionalBranchPrefix": "python-",
       "groupName": "Python dependencies"
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "matchFileNames": ["dev/docker/**"],
+      "enabled": false
     }
   ],
   "major": {
