@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Communications :: Chat"
 ]
 dependencies = [
-    "python-telegram-bot~=20.0",
+    "python-telegram-bot~=21.0",
     "click~=8.0",
     "python-dateutil",
     "sqlalchemy~=2.0.25",
