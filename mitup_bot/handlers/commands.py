@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from mitup_bot.api import send_message
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Settings, User
-from mitup_bot.utils import Messages
+from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.views import main_menu_view
 
 from .conversations_states import ConversationSettingsState
@@ -39,7 +39,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
             settings=Settings(),
         )
         session.add(user)
-        message = Messages.SET_REGISTRATION_TIMEZONE.get(first_name=user.first_name)
+        message = SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=user.first_name)
 
         await send_message(context, update, message)
 
@@ -68,9 +68,6 @@ async def command_go_to_main_menu(update: Update, context: ContextTypes.DEFAULT_
 
 @HandlersRegistry.register_command(CommandsId.COMMAND_CANCEL, command="cancel", bindable=False)
 async def command_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat is None:
-        raise RuntimeError("Effective chat not set")
-
-    await send_message(context, update, "Bye!")
+    await command_start_with_existing_user(update, context)
 
     return ConversationHandler.END

@@ -1,8 +1,4 @@
-__all__ = (
-    "Emojis",
-    "Messages",
-    "ButtonMessages",
-)
+__all__ = ("Emojis", "Messages", "ButtonMessages", "MeetingMessages", "SettingsMessages")
 
 from .emojis import Emojis
-from .messages import Messages, ButtonMessages
+from .messages import ButtonMessages, MeetingMessages, Messages, SettingsMessages

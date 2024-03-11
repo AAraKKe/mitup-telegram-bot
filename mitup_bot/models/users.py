@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Self
 
 from sqlmodel import Field, Relationship, Session, SQLModel, select
 
+from . import Meetup
+
 if TYPE_CHECKING:
     from . import Settings
 
@@ -19,11 +21,16 @@ class User(SQLModel, table=True):
     last_name: str | None = None
     username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
+    meetups: list["Meetup"] = Relationship(back_populates="owner")
 
     @classmethod
-    def find_by_tg_user_id(cls, session: Session, tg_user_id: int) -> Self | None:
+    def by_tg_user_id(cls, session: Session, tg_user_id: int) -> Self | None:
         statement = select(cls).where(cls.tg_user_id == tg_user_id)
         if (found_user := session.exec(statement).first()) is not None:
             return found_user
 
         return None
+
+    def own_meeting(self, session: Session, meeting_id: int) -> Meetup | None:  # type: ignore
+        statement = select(Meetup).where(Meetup.id == meeting_id, Meetup.owner_id == self.id)
+        return meeting if (meeting := session.exec(statement).first()) else None

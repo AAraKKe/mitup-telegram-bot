@@ -15,7 +15,7 @@ from mitup_bot.handlers.commands import (
     command_start_with_new_user,
 )
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
-from mitup_bot.utils import Messages
+from mitup_bot.utils import SettingsMessages
 
 
 class CommandsTestId(CallbackId):
@@ -123,7 +123,7 @@ async def test_command_start_with_new_user(mock_session: MagicMock):
         mock_session.add.assert_called_once()
         assert update.effective_user is not None
         mock_send_message.assert_called_once_with(
-            context, update, Messages.SET_REGISTRATION_TIMEZONE.get(first_name="John")
+            context, update, SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name="John")
         )
         assert result == ConversationSettingsState.TIMEZONE
 

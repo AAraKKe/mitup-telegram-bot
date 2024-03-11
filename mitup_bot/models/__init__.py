@@ -1,4 +1,5 @@
-__all__ = ("User", "Settings")
+__all__ = ("User", "Settings", "Meetup")
 
-from .users import User
+from .meetups import Meetup
 from .settings import Settings
+from .users import User
