@@ -31,6 +31,7 @@ class User(SQLModel, table=True):
 
         return None
 
-    def own_meeting(self, session: Session, meeting_id: int) -> Meetup | None:  # type: ignore
-        statement = select(Meetup).where(Meetup.id == meeting_id, Meetup.owner_id == self.id)
-        return meeting if (meeting := session.exec(statement).first()) else None
+    def own_meeting(self, meeting_id: int) -> Meetup | None:  # type: ignore
+        return next(
+            (meetup for meetup in self.meetups if meetup.id == meeting_id), None
+        )

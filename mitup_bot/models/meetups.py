@@ -52,20 +52,20 @@ class Meetup(SQLModel, table=True):
             features_message,
             [
                 [
-                    ButtonConfig(ButtonMessages.JOIN.get(), callback_data="join_meeting"),
-                    ButtonConfig(ButtonMessages.INVITE.get(), callback_data="invite_meeting"),
-                    ButtonConfig(ButtonMessages.LEAVE.get(), callback_data="leave_meeting"),
+                    ButtonConfig(text=ButtonMessages.JOIN.get(), callback_data="join_meeting"),
+                    ButtonConfig(text=ButtonMessages.INVITE.get(), callback_data="invite_meeting"),
+                    ButtonConfig(text=ButtonMessages.LEAVE.get(), callback_data="leave_meeting"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.EDIT.get(), callback_data="edit_meeting"),
-                    ButtonConfig(ButtonMessages.CHAT.get(), callback_data="chat_meeting"),
-                    ButtonConfig(ButtonMessages.DELETE.get(), callback_data="delete_meeting"),
+                    ButtonConfig(text=ButtonMessages.EDIT.get(), callback_data="edit_meeting"),
+                    ButtonConfig(text=ButtonMessages.CHAT.get(), callback_data="chat_meeting"),
+                    ButtonConfig(text=ButtonMessages.DELETE.get(), callback_data="delete_meeting"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.SHARE.get(), callback_data="share_meeting"),
+                    ButtonConfig(text=ButtonMessages.SHARE.get(), callback_data="share_meeting"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.MAIN_MENU.get(), callback_data="main_menu"),
+                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data="main_menu"),
                 ],
             ],
         )
@@ -85,26 +85,26 @@ class Meetup(SQLModel, table=True):
             features_message,
             [
                 [
-                    ButtonConfig(ButtonMessages.TITLE.get(), callback_data="meeting_title"),
-                    ButtonConfig(ButtonMessages.DESCRIPTION.get(), callback_data="meeting_description"),
+                    ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data="meeting_title"),
+                    ButtonConfig(text=ButtonMessages.DESCRIPTION.get(), callback_data="meeting_description"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.DATE.get(), callback_data="meeting_date"),
-                    ButtonConfig(ButtonMessages.CLOCK.get(), callback_data="meeting_time"),
+                    ButtonConfig(text=ButtonMessages.DATE.get(), callback_data="meeting_date"),
+                    ButtonConfig(text=ButtonMessages.CLOCK.get(), callback_data="meeting_time"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.PARTICIPANTS.get(), callback_data="meeting_participants"),
-                    ButtonConfig(ButtonMessages.LOCATION.get(), callback_data="meeting_location"),
+                    ButtonConfig(text=ButtonMessages.PARTICIPANTS.get(), callback_data="meeting_participants"),
+                    ButtonConfig(text=ButtonMessages.LOCATION.get(), callback_data="meeting_location"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.LANGUAGE.get(), callback_data="meeting_languaje"),
-                    ButtonConfig(ButtonMessages.SETTINGS.get(), callback_data="meeting_settings"),
+                    ButtonConfig(text=ButtonMessages.LANGUAGE.get(), callback_data="meeting_languaje"),
+                    ButtonConfig(text=ButtonMessages.SETTINGS.get(), callback_data="meeting_settings"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.DONE.get(), callback_data=f"meeting_done_{self.id}"),
+                    ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=f"meeting_done_{self.id}"),
                 ],
                 [
-                    ButtonConfig(ButtonMessages.MAIN_MENU.get(), callback_data="main_menu"),
+                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data="main_menu"),
                 ],
             ],
         )

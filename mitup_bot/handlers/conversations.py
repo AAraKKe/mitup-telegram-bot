@@ -31,7 +31,7 @@ HandlersRegistry.register_conversation_handler(
     states={
         ConversationSettingsState.TIMEZONE: [
             MessagesId.MESSAGE_SET_SETTINGS_TIMEZONE,
-            CallbackQueryId.CALLBACK_QUERY_CANCEL_SETTINGS,
+            CallbackQueryId.CANCEL_SETTINGS,
         ],
     },
     fallbacks=[
@@ -42,11 +42,11 @@ HandlersRegistry.register_conversation_handler(
 
 HandlersRegistry.register_conversation_handler(
     ConversationId.CONVERSATION_CREATE_MEETING,
-    entry_points_handler_names=[CallbackQueryId.CALLBACK_QUERY_CREATE_MEETING],
+    entry_points_handler_names=[CallbackQueryId.CREATE_MEETING],
     states={
         ConversationMeetingState.TITLE: [
             MessagesId.MESSAGE_CREATE_MEETING,
-            CallbackQueryId.CALLBACK_QUERY_CANCEL_MEETING,
+            CallbackQueryId.CANCEL_MEETING,
         ],
     },
     fallbacks=[CommandsId.COMMAND_CANCEL, MessagesId.MESSAGE_WITHOUT_TEXT],

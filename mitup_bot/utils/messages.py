@@ -75,33 +75,6 @@ class MeetingMessages(MessageBase):
     PARTICIPANTS_NOT_SET = "Empty"
 
 
-class MeetingMessages(MessageBase):
-    CREATE_MEETING_TITLE = "Lets create a meeting. What is the title?"
-
-    MEETING_CREATED_SUCCESS = (
-        "A meeting has been created with the title: *$title*\n\n"
-        "You can add more information to the meeting with the options below. "
-        "The information which has not been added won't be shown when the meeting is shared.\n\n"
-        f"When finished click on {Emojis.CHECK}"
-    )
-
-    MEETING_FEATURES = (
-        "*$title* (Created by: $owner)\n\n"
-        f"--- {Emojis.DESCRIPTION} $description\n"
-        f"--- {Emojis.CLOCK} $date\n"
-        f"--- {Emojis.MAP} $location\n"
-        f"--- {Emojis.JOINED} $participants\n"
-    )
-
-    MEETING_DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
-
-    MEETING_DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
-
-    MEETING_LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
-
-    MEETING_PARTICIPANTS_NOT_SET = "Empty"
-
-
 class ButtonMessages(MessageBase):
     NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"
     ACTIVE_MEETINGS = f"{Emojis.LIST} Your active meetings"
