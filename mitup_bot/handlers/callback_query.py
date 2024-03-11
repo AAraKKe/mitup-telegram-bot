@@ -9,8 +9,8 @@ from mitup_bot.api import edit_message, send_message
 from mitup_bot.db import with_async_session
 from mitup_bot.models import User
 from mitup_bot.utils import SettingsMessages
-from mitup_bot.views.views import change_settings_element_view, create_meeting_view, main_menu_view, settings_view
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views.views import change_settings_element_view, create_meeting_view, main_menu_view, settings_view
 
 from .conversations_states import ConversationMeetingState, ConversationSettingsState
 from .registry import CallbackId, HandlersRegistry
@@ -90,9 +90,7 @@ async def callback_query_create_meeting(update: Update, context: ContextTypes.DE
     return ConversationMeetingState.TITLE
 
 
-@HandlersRegistry.register_callback_query(
-    CallbackQueryId.SHOW_MEETING, pattern=r"^meeting_done_\d*", bindable=True
-)
+@HandlersRegistry.register_callback_query(CallbackQueryId.SHOW_MEETING, pattern=r"^meeting_done_\d*", bindable=True)
 @with_async_session
 async def callback_query_show_meeting(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("Enter into callback_query_show_meeting")
@@ -116,7 +114,7 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
         logging.info(f"meeting id: {meeting_id}")
 
         if user := User.by_tg_user_id(session, update.effective_user.id):
-            meeting = user.own_meeting(session, int(meeting_id))
+            meeting = user.own_meeting(int(meeting_id))
 
             if meeting is not None:
                 view = meeting.main_view

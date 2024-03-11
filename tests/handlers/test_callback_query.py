@@ -149,28 +149,25 @@ async def test_callback_query_does_not_show_meeting_without_effective_callback_q
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "current_meeting", [EXAMPLE_MEETING, None], ids=["with_found_meeting", "without_found_meeting"]
-)
+@pytest.mark.parametrize("meeting_id", [123, 1], ids=["with_found_meeting", "without_found_meeting"])
 async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     mock_session: mock.MagicMock,
-    current_meeting: Meetup | None,  # type: ignore
+    meeting_id: int,  # type: ignore
 ):
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    update.callback_query.data = "meeting_done_123"
+    update.callback_query.data = f"meeting_done_{meeting_id}"
 
     with mock.patch.object(User, "by_tg_user_id") as mock_by_tg_user_id:
-        mock_user = mock.MagicMock()
-        mock_by_tg_user_id.return_value = mock_user
-        mock_user.own_meeting.return_value = current_meeting
+        user = User(first_name="Juan", tg_user_id=12345, meetups=[EXAMPLE_MEETING])
+        mock_by_tg_user_id.return_value = user
 
         with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
             await callback_query_show_meeting(update, context)
 
-            if current_meeting:
-                expected_view = current_meeting.main_view
+            if meeting_id == 123:
+                expected_view = EXAMPLE_MEETING.main_view
                 mock_edit_message.assert_called_once_with(context, update, expected_view)
             else:
                 mock_edit_message.assert_not_called()

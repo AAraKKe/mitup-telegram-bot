@@ -146,7 +146,9 @@ test = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests
 test-cov = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml"
 format = "ruff format ."
 format-check = "ruff format --check ."
-lint = "ruff check {args:}  --unsafe-fixes ."
+lint = "ruff check {args:} --unsafe-fixes ."
+fix-lint = "ruff check --fix --unsafe-fixes ."
+fix = ["format", "fix-lint"]
 type-check = "pyright --stats --warnings mitup_bot tests bin"
 validate = [
     "- format-check",

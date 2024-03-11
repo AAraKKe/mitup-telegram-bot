@@ -32,6 +32,4 @@ class User(SQLModel, table=True):
         return None
 
     def own_meeting(self, meeting_id: int) -> Meetup | None:  # type: ignore
-        return next(
-            (meetup for meetup in self.meetups if meetup.id == meeting_id), None
-        )
+        return next((meetup for meetup in self.meetups if meetup.id == meeting_id), None)
