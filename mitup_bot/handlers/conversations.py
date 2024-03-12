@@ -8,13 +8,15 @@ from .registry import CallbackId, HandlersRegistry
 
 
 class ConversationId(CallbackId):
-    CONVERSATION_NEW_USER_START = auto()
-    CONVERSATION_CHANGE_USER_SETTINGS = auto()
-    CONVERSATION_CREATE_MEETING = auto()
+    NEW_USER_START = auto()
+    SETTINGS_UPDATE_TIMEZONE = auto()
+    # CalbackId is a StrEnum. If the value is the same as any other StrEnum they are considered
+    # the same and we already have a CREATE_MEETING enum.
+    CREATE_MEETING = "conversation_to_create_meeting"
 
 
 HandlersRegistry.register_conversation_handler(
-    ConversationId.CONVERSATION_NEW_USER_START,
+    ConversationId.NEW_USER_START,
     entry_points_handler_names=[CommandsId.COMMAND_START_WITH_NO_USER],
     states={
         ConversationSettingsState.TIMEZONE: [MessagesId.MESSAGE_SET_REGISTRATION_TIMEZONE],
@@ -26,7 +28,7 @@ HandlersRegistry.register_conversation_handler(
 )
 
 HandlersRegistry.register_conversation_handler(
-    ConversationId.CONVERSATION_CHANGE_USER_SETTINGS,
+    ConversationId.SETTINGS_UPDATE_TIMEZONE,
     entry_points_handler_names=[CallbackQueryId.SETTINGS_TIMEZONE],
     states={
         ConversationSettingsState.TIMEZONE: [
@@ -41,7 +43,7 @@ HandlersRegistry.register_conversation_handler(
 )
 
 HandlersRegistry.register_conversation_handler(
-    ConversationId.CONVERSATION_CREATE_MEETING,
+    ConversationId.CREATE_MEETING,
     entry_points_handler_names=[CallbackQueryId.CREATE_MEETING],
     states={
         ConversationMeetingState.TITLE: [

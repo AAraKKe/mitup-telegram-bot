@@ -38,6 +38,7 @@ class MitupRuntime:
 
     def __build_application(self) -> Application:
         builder = Application.builder()
+        logging.info(HandlersRegistry.handlers)
         builder.token(self.config.bot.token.get_secret_value())
 
         app = builder.build()

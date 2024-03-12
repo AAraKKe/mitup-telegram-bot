@@ -5,9 +5,11 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.handlers import CallbackId, HandlersRegistry
 from mitup_bot.handlers.exceptions import HandlerRegisteredError
 from mitup_bot.handlers.registry import HandlerWrapper
+from mitup_bot.utils import callbacks as cb
 
 
 class ClearableRegistry(HandlersRegistry):
@@ -111,18 +113,18 @@ def test_cannot_register_same_message_twice(filters: tuple[BaseFilter, BaseFilte
 
 
 @pytest.mark.parametrize(
-    "patterns",
-    [("^settings$", "^settings$"), ("^settings$", "^timezone$")],
-    ids=["with_same_pattern", "with_different_pattern"],
+    "cbs",
+    [(cb.SETTINGS, cb.SETTINGS), (cb.SETTINGS, cb.MAIN_MENU)],
+    ids=["with_same_cb_data", "with_different_cb_data"],
 )
-def test_cannot_register_same_callback_query_twice(patterns: tuple[str, str]):
-    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, pattern=patterns[0])
+def test_cannot_register_same_callback_query_twice(cbs: tuple[CallbackData, CallbackData]):
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, callback_data=cbs[0])
     async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return "Done!"
 
     with pytest.raises(HandlerRegisteredError):
 
-        @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, pattern=patterns[1])
+        @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, callback_data=cbs[1])
         async def another_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return "Done!"
 

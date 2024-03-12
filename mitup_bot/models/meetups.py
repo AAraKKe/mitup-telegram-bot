@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Self
 from sqlmodel import Field, Relationship, Session, SQLModel, desc, select
 
 from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView
 from mitup_bot.views.mitup_view import ButtonConfig
 
@@ -52,20 +53,20 @@ class Meetup(SQLModel, table=True):
             features_message,
             [
                 [
-                    ButtonConfig(text=ButtonMessages.JOIN.get(), callback_data="join_meeting"),
-                    ButtonConfig(text=ButtonMessages.INVITE.get(), callback_data="invite_meeting"),
-                    ButtonConfig(text=ButtonMessages.LEAVE.get(), callback_data="leave_meeting"),
+                    ButtonConfig(text=ButtonMessages.JOIN.get(), callback_data=cb.JOIN),
+                    ButtonConfig(text=ButtonMessages.INVITE.get(), callback_data=cb.INVITE),
+                    ButtonConfig(text=ButtonMessages.LEAVE.get(), callback_data=cb.LEAVE),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.EDIT.get(), callback_data="edit_meeting"),
-                    ButtonConfig(text=ButtonMessages.CHAT.get(), callback_data="chat_meeting"),
-                    ButtonConfig(text=ButtonMessages.DELETE.get(), callback_data="delete_meeting"),
+                    ButtonConfig(text=ButtonMessages.EDIT.get(), callback_data=cb.EDIT_MEETING),
+                    ButtonConfig(text=ButtonMessages.CHAT.get(), callback_data=cb.CHAT),
+                    ButtonConfig(text=ButtonMessages.DELETE.get(), callback_data=cb.DELETE_MEETING),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.SHARE.get(), callback_data="share_meeting"),
+                    ButtonConfig(text=ButtonMessages.SHARE.get(), callback_data=cb.SHARE),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data="main_menu"),
+                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU),
                 ],
             ],
         )
@@ -81,30 +82,32 @@ class Meetup(SQLModel, table=True):
             participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
         )
 
+        assert self.id is not None, "View cannot be generated without id"
+
         return MitupView(
             features_message,
             [
                 [
-                    ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data="meeting_title"),
-                    ButtonConfig(text=ButtonMessages.DESCRIPTION.get(), callback_data="meeting_description"),
+                    ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data=cb.EDIT_MEETING_TITLE),
+                    ButtonConfig(text=ButtonMessages.DESCRIPTION.get(), callback_data=cb.EDIT_MEETING_DESCRIPTION),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.DATE.get(), callback_data="meeting_date"),
-                    ButtonConfig(text=ButtonMessages.CLOCK.get(), callback_data="meeting_time"),
+                    ButtonConfig(text=ButtonMessages.DATE.get(), callback_data=cb.EDIT_MEETING_DATE),
+                    ButtonConfig(text=ButtonMessages.CLOCK.get(), callback_data=cb.EDIT_MEETING_TIME),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.PARTICIPANTS.get(), callback_data="meeting_participants"),
-                    ButtonConfig(text=ButtonMessages.LOCATION.get(), callback_data="meeting_location"),
+                    ButtonConfig(text=ButtonMessages.PARTICIPANTS.get(), callback_data=cb.EDIT_MEETING_PARTICIPANTS),
+                    ButtonConfig(text=ButtonMessages.LOCATION.get(), callback_data=cb.EDIT_MEETING_LOCATION),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.LANGUAGE.get(), callback_data="meeting_languaje"),
-                    ButtonConfig(text=ButtonMessages.SETTINGS.get(), callback_data="meeting_settings"),
+                    ButtonConfig(text=ButtonMessages.LANGUAGE.get(), callback_data=cb.EDIT_MEETING_LANGUAGE),
+                    ButtonConfig(text=ButtonMessages.SETTINGS.get(), callback_data=cb.EDIT_MEETING_SETTINGS),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=f"meeting_done_{self.id}"),
+                    ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=cb.DONE_MEETING.with_id(self.id)),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data="main_menu"),
+                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU),
                 ],
             ],
         )

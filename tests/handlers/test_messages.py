@@ -120,19 +120,28 @@ async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_cor
     update.effective_message.text = "Meeting"
 
     with mock.patch.object(User, "by_tg_user_id") as mock_find_user:
-        mock_user = mock.MagicMock()
-        mock_find_user.return_value = mock_user
+        user = User(first_name="Juan", tg_user_id=123)
+        mock_find_user.return_value = user
 
-        meeting = Meetup(
-            title=update.effective_message.text,
-            owner=mock_user,
-        )
+        def flush():
+            # We flush after having added the meetup
+            assert len(user.meetups) > 0, "Flush is being called without having adding a meeting first"
+            user.meetups[0].id = 1
+
+        # Mimic flush behaviour
+        mock_session.flush.side_effect = flush
+
         with mock.patch("mitup_bot.handlers.messages.send_message") as mock_send_message:
             await create_meeting_message_handler(update, context)
 
             mock_session.add.assert_called_once()
             assert isinstance(mock_session.add.call_args_list[0].args[0], Meetup)
 
+            meeting = Meetup(
+                title=update.effective_message.text,
+                owner=user,
+                id=1,
+            )
             message = MeetingMessages.CREATED_SUCCESS.get(title=meeting.title)
             mock_send_message.assert_called_once_with(context, update, meeting.edit_view.with_context(message))
 

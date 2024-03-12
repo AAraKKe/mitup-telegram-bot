@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 from mitup_bot.api import edit_message, send_message
 from mitup_bot.db import with_async_session
+from mitup_bot.handlers.exceptions import MalformedCallbackData
 from mitup_bot.models import User
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.utils import callbacks as cb
@@ -26,7 +27,7 @@ class CallbackQueryId(CallbackId):
     SHOW_MEETING = auto()
 
 
-@HandlersRegistry.register_callback_query(CallbackQueryId.SETTINGS, pattern="^settings$", bindable=True)
+@HandlersRegistry.register_callback_query(CallbackQueryId.SETTINGS, callback_data=cb.SETTINGS, bindable=True)
 async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -39,7 +40,7 @@ async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_
 
 
 @HandlersRegistry.register_callback_query(
-    CallbackQueryId.SETTINGS_TIMEZONE, pattern="^global_timezone$", bindable=False
+    CallbackQueryId.SETTINGS_TIMEZONE, callback_data=cb.EDIT_TIEMZONE, bindable=False
 )
 @with_async_session
 async def callback_query_timezone(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -66,7 +67,9 @@ async def callback_query_timezone(session: Session, update: Update, context: Con
         raise RuntimeError("User not found")
 
 
-@HandlersRegistry.register_callback_query(CallbackQueryId.CANCEL_SETTINGS, pattern="^cancel_settings$", bindable=False)
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.CANCEL_SETTINGS, callback_data=cb.CANCEL_SETTINGS, bindable=False
+)
 async def callback_query_cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -78,7 +81,9 @@ async def callback_query_cancel_settings(update: Update, context: ContextTypes.D
     return ConversationHandler.END
 
 
-@HandlersRegistry.register_callback_query(CallbackQueryId.CREATE_MEETING, pattern="^new_meeting$", bindable=False)
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.CREATE_MEETING, callback_data=cb.CREATE_MEETING, bindable=False
+)
 async def callback_query_create_meeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
@@ -90,7 +95,7 @@ async def callback_query_create_meeting(update: Update, context: ContextTypes.DE
     return ConversationMeetingState.TITLE
 
 
-@HandlersRegistry.register_callback_query(CallbackQueryId.SHOW_MEETING, pattern=r"^meeting_done_\d*", bindable=True)
+@HandlersRegistry.register_callback_query(CallbackQueryId.SHOW_MEETING, callback_data=cb.DONE_MEETING, bindable=True)
 @with_async_session
 async def callback_query_show_meeting(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("Enter into callback_query_show_meeting")
@@ -106,15 +111,18 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
     if update.callback_query.data is None:
         raise RuntimeError("Callback query data not set")
 
-    if callback := update.callback_query.data:
-        logging.info(f"callback: {callback}")
+    if matches := context.matches:
+        callback_data = cb.DONE_MEETING.parse(matches[0])
+        logging.info(f"callback: {callback_data}")
 
-        meeting_id = callback.split("_")[2]
+        if callback_data.id is None:
+            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETING.value, callback_data)
 
+        meeting_id = callback_data.id
         logging.info(f"meeting id: {meeting_id}")
 
         if user := User.by_tg_user_id(session, update.effective_user.id):
-            meeting = user.own_meeting(int(meeting_id))
+            meeting = user.own_meeting(meeting_id)
 
             if meeting is not None:
                 view = meeting.main_view
@@ -122,14 +130,16 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
                 await edit_message(context, update, view)
 
 
-@HandlersRegistry.register_callback_query(CallbackQueryId.CANCEL_MEETING, pattern="^cancel_meeting$", bindable=False)
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.CANCEL_MEETING, callback_data=cb.CANCEL_MEETING, bindable=False
+)
 async def callback_query_cancel_meeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await callback_query_main_menu(update, context)
 
     return ConversationHandler.END
 
 
-@HandlersRegistry.register_callback_query(CallbackQueryId.MAIN_MENU, pattern=cb.MAIN_MENU.pattern, bindable=True)
+@HandlersRegistry.register_callback_query(CallbackQueryId.MAIN_MENU, callback_data=cb.MAIN_MENU, bindable=True)
 async def callback_query_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")

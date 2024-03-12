@@ -18,6 +18,7 @@ from telegram.ext import (
 from telegram.ext.filters import BaseFilter
 from telegram.warnings import PTBUserWarning
 
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT, HandlerCallback
 
@@ -143,7 +144,7 @@ class HandlersRegistry:
         callback_id: CallbackId,
         bindable: bool = True,
         group: int = 0,
-        pattern: str | None = None,
+        callback_data: CallbackData | None = None,
         block: bool = True,
     ) -> Callable[
         [Callable[[Update, CCT], Any]],
@@ -167,7 +168,7 @@ class HandlersRegistry:
 
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
-                    pattern=pattern,
+                    pattern=callback_data.pattern if callback_data else None,
                     callback=callback,
                     block=block,
                 ),

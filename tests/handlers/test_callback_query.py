@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from unittest import mock
 
@@ -15,6 +16,7 @@ from mitup_bot.handlers.callback_query import (
 from mitup_bot.handlers.conversations_states import ConversationMeetingState, ConversationSettingsState
 from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
+from mitup_bot.utils import callbacks as cb
 from mitup_bot.views.views import create_meeting_view, main_menu_view, settings_view
 
 EXAMPLE_MEETING = Meetup(
@@ -157,7 +159,7 @@ async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    update.callback_query.data = f"meeting_done_{meeting_id}"
+    context.matches = [re.match(cb.DONE_MEETING.pattern, str(cb.DONE_MEETING.with_id(meeting_id)))]
 
     with mock.patch.object(User, "by_tg_user_id") as mock_by_tg_user_id:
         user = User(first_name="Juan", tg_user_id=12345, meetups=[EXAMPLE_MEETING])
