@@ -152,7 +152,7 @@ async def test_callback_query_does_not_show_meeting_without_effective_callback_q
 @pytest.mark.parametrize("meeting_id", [123, 1], ids=["with_found_meeting", "without_found_meeting"])
 async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     mock_session: mock.MagicMock,
-    meeting_id: int,  # type: ignore
+    meeting_id: int,
 ):
     update = mock.AsyncMock()
     context = mock.AsyncMock()

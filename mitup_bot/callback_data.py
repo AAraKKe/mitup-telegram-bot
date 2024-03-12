@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 class CallbackData(BaseModel):
     entity: str
     action: str = "show"
-    id: int | None = Field(default=None, ge=1)
+    id: int | None = Field(default=None, ge=0)
 
     def __str__(self):
         return f"{self.action};{self.entity}:{self.id or ''}"
