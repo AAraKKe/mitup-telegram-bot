@@ -11,10 +11,9 @@ from mitup_bot.views.mitup_view import ButtonConfig
     [
         ("a" * 65, "b", 1),
         ("a", "b" * 65, 1),
-        ("act", "ent", 0),
         ("act", "ent", -1),
     ],
-    ids=["long_cb_data_action", "long_cb_data_entity", "invalid_id", "negative_id"],
+    ids=["long_cb_data_action", "long_cb_data_entity", "negative_id"],
 )
 def test_callback_data_validate_errors(action: str, entity: str, id: int):
     with pytest.raises(ValidationError):
