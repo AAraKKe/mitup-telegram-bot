@@ -1,9 +1,12 @@
 from unittest import mock
 
 import pytest
+from telegram import Update
 
 from mitup_bot.api import edit_message, send_message
+from mitup_bot.exceptions import EffectiveChatNotSet, EffectiveMessageNotSet
 from mitup_bot.views import MitupView
+from tests.helpers import UpdateRequest
 
 
 @pytest.mark.asyncio
@@ -47,42 +50,38 @@ async def test_send_message_without_view():
 
 
 @pytest.mark.asyncio
-async def test_edit_message_with_a_view(default_view: MitupView):
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
+async def test_edit_message_with_a_view(default_view: MitupView, tg_update: Update, tg_context: mock.MagicMock):
+    assert tg_update.effective_message is not None
 
-    update.effective_chat.id = 123456789
-    update.effective_message.message_id = 123
+    await edit_message(tg_context, tg_update, default_view)
 
-    await edit_message(context, update, default_view)
-
-    assert update.effective_message is not None
-    context.bot.edit_message_text.assert_called_once_with(
-        default_view.description, 123456789, message_id=123, reply_markup=default_view.markup, parse_mode="MarkdownV2"
+    tg_context.bot.edit_message_text.assert_called_once_with(
+        default_view.description, 123, message_id=123, reply_markup=default_view.markup, parse_mode="MarkdownV2"
     )
 
 
 @pytest.mark.asyncio
-async def test_edit_message_without_view():
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
+async def test_edit_message_without_view(tg_update: Update, tg_context: mock.MagicMock):
+    await edit_message(tg_context, tg_update, "Hello, World")
 
-    update.effective_chat.id = 123456789
-    update.effective_message.message_id = 123
-
-    await edit_message(context, update, "Hello, World")
-
-    context.bot.edit_message_text.assert_called_once_with(
-        "Hello, World", 123456789, message_id=123, reply_markup=None, parse_mode="MarkdownV2"
+    tg_context.bot.edit_message_text.assert_called_once_with(
+        "Hello, World", 123, message_id=123, reply_markup=None, parse_mode="MarkdownV2"
     )
 
 
+@pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)
 @pytest.mark.asyncio
-async def test_any_api_messages_fails_without_effective_chat(api_method, default_view: MitupView):
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
+async def test_edit_message_fails_without_effective_message(
+    default_view: MitupView, tg_update: Update, tg_context: mock.MagicMock
+):
+    with pytest.raises(EffectiveMessageNotSet):
+        await edit_message(tg_context, tg_update, default_view)
 
-    update.effective_chat = None
 
-    with pytest.raises(RuntimeError):
-        await api_method(context, update, default_view)
+@pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)
+@pytest.mark.asyncio
+async def test_send_message_fails_without_effective_chat(
+    default_view: MitupView, tg_update: Update, tg_context: mock.MagicMock
+):
+    with pytest.raises(EffectiveChatNotSet):
+        await send_message(tg_context, tg_update, default_view)

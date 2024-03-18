@@ -34,7 +34,7 @@ async def test_callback_query_settings_is_called_with_settings_view():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
+    with mock.patch("mitup_bot.handlers.callback_query.api.edit_message") as mock_edit_message:
         await callback_query_settings(update, context)
 
         mock_edit_message.assert_called_once()
@@ -46,7 +46,7 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.send_message") as mock_send_message:
+    with mock.patch("mitup_bot.handlers.callback_query.api.send_message") as mock_send_message:
         with mock.patch.object(User, "by_tg_user_id") as mock_user_find:
             mock_user = mock.MagicMock()
             mock_user_find.return_value = mock_user
@@ -98,7 +98,7 @@ async def test_callback_query_show_main_menu(callback_query_list):
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
+    with mock.patch("mitup_bot.handlers.callback_query.api.edit_message") as mock_edit_message:
         await callback_query_list(update, context)
 
         mock_edit_message.assert_called_once()
@@ -110,7 +110,7 @@ async def test_callback_query_cancel_setting_calls_to_settings_view():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.send_message") as mock_send_message:
+    with mock.patch("mitup_bot.handlers.callback_query.api.send_message") as mock_send_message:
         await callback_query_cancel_settings(update, context)
 
         mock_send_message.assert_called_once()
@@ -122,7 +122,7 @@ async def test_callback_query_create_meeting_calls_to_create_meeting_view():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
+    with mock.patch("mitup_bot.handlers.callback_query.api.edit_message") as mock_edit_message:
         await callback_query_create_meeting(update, context)
 
         mock_edit_message.assert_called_once_with(context, update, create_meeting_view())
@@ -133,7 +133,7 @@ async def test_callback_query_create_meeting_return_the_correct_state():
     update = mock.AsyncMock()
     context = mock.AsyncMock()
 
-    with mock.patch("mitup_bot.handlers.callback_query.edit_message"):
+    with mock.patch("mitup_bot.handlers.callback_query.api.edit_message"):
         result = await callback_query_create_meeting(update, context)
 
         assert result == ConversationMeetingState.TITLE
@@ -165,7 +165,7 @@ async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is
         user = User(first_name="Juan", tg_user_id=12345, meetups=[EXAMPLE_MEETING])
         mock_by_tg_user_id.return_value = user
 
-        with mock.patch("mitup_bot.handlers.callback_query.edit_message") as mock_edit_message:
+        with mock.patch("mitup_bot.handlers.callback_query.api.edit_message") as mock_edit_message:
             await callback_query_show_meeting(update, context)
 
             if meeting_id == 123:

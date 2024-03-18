@@ -2,9 +2,9 @@ import pytest
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from mitup_bot.exceptions import HandlerNotRegistered
 from mitup_bot.handlers import CallbackId, HandlersRegistry
 from mitup_bot.handlers.conversations_states import ConversationSettingsState
-from mitup_bot.handlers.exceptions import HandlerNotRegistered
 
 
 class CommandsTestId(CallbackId):

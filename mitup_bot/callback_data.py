@@ -1,4 +1,5 @@
 import re
+from typing import Self
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -30,3 +31,6 @@ class CallbackData(BaseModel):
     def with_id(self, id: int) -> "CallbackData":
         """Creates a CallbackData with the same information but different ID"""
         return CallbackData(entity=self.entity, action=self.action, id=id)
+
+    def __eq__(self, other: Self) -> bool:
+        return self.id == other.id and self.entity == other.entity and self.action == other.action

@@ -1,4 +1,11 @@
-__all__ = ("Emojis", "Messages", "ButtonMessages", "MeetingMessages", "SettingsMessages", "callbacks")
+__all__ = (
+    "Emojis",
+    "Messages",
+    "ButtonMessages",
+    "MeetingMessages",
+    "SettingsMessages",
+    "callbacks",
+)
 
 from . import callbacks
 from .emojis import Emojis

@@ -19,7 +19,7 @@ from telegram.ext.filters import BaseFilter
 from telegram.warnings import PTBUserWarning
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.handlers.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
+from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT, HandlerCallback
 
 # Remove the warning that is sent when using the per_message option in the registry.

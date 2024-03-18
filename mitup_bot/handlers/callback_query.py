@@ -5,9 +5,9 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from mitup_bot.api import edit_message, send_message
+from mitup_bot import api, guards
 from mitup_bot.db import with_async_session
-from mitup_bot.handlers.exceptions import MalformedCallbackData
+from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.models import User
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.utils import callbacks as cb
@@ -25,6 +25,7 @@ class CallbackQueryId(CallbackId):
     MAIN_MENU = auto()
     CREATE_MEETING = auto()
     SHOW_MEETING = auto()
+    EDIT_MEETING = auto()
 
 
 @HandlersRegistry.register_callback_query(CallbackQueryId.SETTINGS, callback_data=cb.SETTINGS, bindable=True)
@@ -36,7 +37,7 @@ async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_
 
     view = settings_view()
 
-    await edit_message(context, update, view)
+    await api.edit_message(context, update, view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -60,7 +61,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Con
 
         view = change_settings_element_view(message)
 
-        await send_message(context, update, view)
+        await api.send_message(context, update, view)
 
         return ConversationSettingsState.TIMEZONE
     else:
@@ -76,7 +77,7 @@ async def callback_query_cancel_settings(update: Update, context: ContextTypes.D
 
     view = settings_view()
 
-    await send_message(context, update, view)
+    await api.send_message(context, update, view)
 
     return ConversationHandler.END
 
@@ -90,7 +91,7 @@ async def callback_query_create_meeting(update: Update, context: ContextTypes.DE
 
     view = create_meeting_view()
 
-    await edit_message(context, update, view)
+    await api.edit_message(context, update, view)
 
     return ConversationMeetingState.TITLE
 
@@ -127,7 +128,7 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
             if meeting is not None:
                 view = meeting.main_view
 
-                await edit_message(context, update, view)
+                await api.edit_message(context, update, view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -146,4 +147,27 @@ async def callback_query_main_menu(update: Update, context: ContextTypes.DEFAULT
 
     view = main_menu_view()
 
-    await edit_message(context, update, view)
+    await api.edit_message(context, update, view)
+
+
+@HandlersRegistry.register_callback_query(CallbackQueryId.EDIT_MEETING, callback_data=cb.EDIT_MEETING, bindable=True)
+@with_async_session
+async def callback_query_edit_meeting(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info("Enter into callback_query_edit_meeting")
+    assert context.matches is not None
+
+    user = guards.current_user(update, session)
+    callback_data = cb.EDIT_MEETING.parse(context.matches[0])
+
+    if callback_data.id is None:
+        raise MalformedCallbackData(CallbackQueryId.EDIT_MEETING, callback_data)
+
+    meeting = user.own_meeting(callback_data.id)
+    if meeting is not None:
+        # Only allow editing the meeting if the meeting belongs to the user
+        await api.edit_message(context, update, meeting.edit_view)
+    else:
+        logging.warn(
+            "User tried editing meeting that does not belong to them. "
+            f"Meeting id: {callback_data.id}, user id: {user.id}"
+        )

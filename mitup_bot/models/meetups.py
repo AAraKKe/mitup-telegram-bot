@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Self, cast
 
 from sqlmodel import Field, Relationship, Session, SQLModel, desc, select
 
@@ -58,7 +58,9 @@ class Meetup(SQLModel, table=True):
                     ButtonConfig(text=ButtonMessages.LEAVE.get(), callback_data=cb.LEAVE),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.EDIT.get(), callback_data=cb.EDIT_MEETING),
+                    ButtonConfig(
+                        text=ButtonMessages.EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(cast(int, self.id))
+                    ),
                     ButtonConfig(text=ButtonMessages.CHAT.get(), callback_data=cb.CHAT),
                     ButtonConfig(text=ButtonMessages.DELETE.get(), callback_data=cb.DELETE_MEETING),
                 ],
