@@ -39,7 +39,7 @@ services:
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
 
-  mitup:
+  mitup: &launch-bot
     depends_on:
       - postgres
     build:
@@ -48,3 +48,9 @@ services:
       - .:/bot
       - ./.docker_hatch:/.docker_hatch
     command: hatch run dev:launch
+
+  debug:
+    <<: *launch-bot
+    command: hatch run dev:debug
+    ports:
+      - 5678:5678
