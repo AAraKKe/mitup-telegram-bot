@@ -10,6 +10,7 @@ from telegram import Update
 from telegram.ext import (
     Application,
     BaseHandler,
+    CallbackContext,
     CallbackQueryHandler,
     CommandHandler,
     ConversationHandler,
@@ -18,6 +19,7 @@ from telegram.ext import (
 from telegram.ext.filters import BaseFilter
 from telegram.warnings import PTBUserWarning
 
+from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT, HandlerCallback
@@ -40,6 +42,16 @@ class HandlerWrapper:
     handler: BaseHandler
     bindable: bool
     group: int = 0
+
+
+async def callback_query_fallback(update: Update, context: CallbackContext):
+    """Fallback callback query handler. This will be called when no other callback query handler is found."""
+    callback_query = guards.callback_query(update)
+
+    # No need to create a message for this as there will be no transaltions. Before translations
+    # are added all features should be finished.
+    message = "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀"
+    await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
 
 
 class HandlersRegistry:
@@ -186,6 +198,10 @@ class HandlersRegistry:
             if wrapper.bindable:
                 logging.info(f"Binding {key} handler to application")
                 app.add_handler(wrapper.handler)
+        # Add a fallback handler for any update that is not handled by any of the registered handlers
+        # the intention is that the user gets a message saying that it is not implemented yet instead of
+        # the bot not responding at all.
+        app.add_handler(CallbackQueryHandler(callback=callback_query_fallback))
 
     @classmethod
     def get_handler(cls, key: CallbackId) -> BaseHandler:

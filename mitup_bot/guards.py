@@ -1,7 +1,8 @@
 from sqlmodel import Session
-from telegram import Chat, Message, Update
+from telegram import CallbackQuery, Chat, Message, Update
 
 from mitup_bot.exceptions import (
+    CallbackQueryNotSet,
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
@@ -33,3 +34,10 @@ def message(update: Update) -> Message:
         raise EffectiveMessageNotSet(update)
 
     return update.effective_message
+
+
+def callback_query(update: Update) -> CallbackQuery:
+    if update.callback_query is None:
+        raise CallbackQueryNotSet(update)
+
+    return update.callback_query
