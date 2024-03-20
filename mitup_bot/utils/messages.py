@@ -73,6 +73,7 @@ class MeetingMessages(MessageBase):
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
     PARTICIPANTS_NOT_SET = "Empty"
+    ACTIVE = "These are all your active meetings."
 
 
 class ButtonMessages(MessageBase):
@@ -105,3 +106,5 @@ class ButtonMessages(MessageBase):
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     CHAT = f"{Emojis.CHAT} Chat"
+    GO_BACK = "≪"
+    GO_FORWARD = "≫"

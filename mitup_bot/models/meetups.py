@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import TYPE_CHECKING, Self, cast
 
-from sqlmodel import Field, Relationship, Session, SQLModel, desc, select
+from sqlmodel import Field, Relationship, Session, SQLModel, select
 
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
@@ -106,7 +106,7 @@ class Meetup(SQLModel, table=True):
                     ButtonConfig(text=ButtonMessages.SETTINGS.get(), callback_data=cb.EDIT_MEETING_SETTINGS),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=cb.DONE_MEETING.with_id(self.id)),
+                    ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=cb.SHOW_MEETING.with_id(self.id)),
                 ],
                 [
                     ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU),
@@ -119,13 +119,5 @@ class Meetup(SQLModel, table=True):
         statement = select(cls).where(cls.id == meetup_id)
         if (found_meetup := session.exec(statement).first()) is not None:
             return found_meetup
-
-        return None
-
-    @classmethod
-    def get_last_from_user(cls, session: Session, owner_id: int) -> Self | None:
-        statement = select(cls).where(cls.owner_id == owner_id).order_by(desc(cls.id)).limit(1)
-        if (last_meetup := session.exec(statement).first()) is not None:
-            return last_meetup
 
         return None

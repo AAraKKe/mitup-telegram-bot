@@ -7,10 +7,10 @@ from mitup_bot.callback_data import CallbackData
 
 # Meeting callbacks
 SHOW_MEETING = CallbackData(action="show", entity="meeting")
+SHOW_ACTIVE_MEETING_PAGE = CallbackData(action="show", entity="active_meeting_page")
 EDIT_MEETING = CallbackData(action="edit", entity="meeting")
 CREATE_MEETING = CallbackData(action="create", entity="meeting")
 CANCEL_MEETING = CallbackData(action="cancel", entity="meeting")
-DONE_MEETING = CallbackData(action="done", entity="meeting")
 JOIN = CallbackData(action="join", entity="meeting")
 INVITE = CallbackData(action="invite", entity="meeting")
 LEAVE = CallbackData(action="leave", entity="meeting")

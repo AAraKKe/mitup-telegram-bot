@@ -11,7 +11,9 @@ def main_menu_view(message: str = Messages.DEFAULT_MAIN_MENU_DESCRIPTION.get()) 
                 ButtonConfig(text=ButtonMessages.NEW_MEETING.get(), callback_data=cb.CREATE_MEETING),
             ],
             [
-                ButtonConfig(text=ButtonMessages.ACTIVE_MEETINGS.get(), callback_data=cb.ACTIVE_MEETINGS),
+                ButtonConfig(
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(), callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1)
+                ),
             ],
             [
                 ButtonConfig(text=ButtonMessages.PAST_MEETINGS.get(), callback_data=cb.PAST_MEETINGS),
