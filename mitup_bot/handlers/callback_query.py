@@ -6,16 +6,15 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from mitup_bot import api, guards
+from mitup_bot import api, guards, views
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, PaginatedMitupView
-from mitup_bot.views.views import change_settings_element_view, create_meeting_view, main_menu_view, settings_view
 
 from .conversations_states import ConversationMeetingState, ConversationSettingsState
-from .registry import CallbackId, HandlersRegistry
+from .registry import HandlersRegistry
 
 
 class CallbackQueryId(CallbackId):
@@ -35,7 +34,7 @@ class CallbackQueryId(CallbackId):
 async def callback_query_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("Enter into callback_query_settings")
 
-    view = settings_view()
+    view = views.factory.settings_view()
 
     await api.edit_message(context, update, view)
 
@@ -50,7 +49,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Con
     user = guards.current_user(update, session)
     message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone=user.settings.timezone)
 
-    view = change_settings_element_view(message)
+    view = views.factory.change_settings_element_view(message)
 
     await api.send_message(context, update, view)
 
@@ -61,7 +60,10 @@ async def callback_query_timezone(session: Session, update: Update, context: Con
     CallbackQueryId.CANCEL_SETTINGS, callback_data=cb.CANCEL_SETTINGS, bindable=False
 )
 async def callback_query_cancel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    view = settings_view()
+    if update.effective_chat is None:
+        raise RuntimeError("Effective chat not set")
+
+    view = views.factory.settings_view()
 
     await api.send_message(context, update, view)
 
@@ -72,7 +74,10 @@ async def callback_query_cancel_settings(update: Update, context: ContextTypes.D
     CallbackQueryId.CREATE_MEETING, callback_data=cb.CREATE_MEETING, bindable=False
 )
 async def callback_query_create_meeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    view = create_meeting_view()
+    if update.effective_chat is None:
+        raise RuntimeError("Effective chat not set")
+
+    view = views.factory.create_meeting_view()
 
     await api.edit_message(context, update, view)
 
@@ -89,7 +94,7 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
         logging.info(f"callback: {callback_data}")
 
         if callback_data.id is None:
-            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETING.value, callback_data)
+            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETING, callback_data)
 
         meeting_id = callback_data.id
         logging.info(f"meeting id: {meeting_id}")
@@ -121,7 +126,7 @@ async def callback_query_cancel_meeting(update: Update, context: ContextTypes.DE
 async def callback_query_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logging.info("Enter into callback_query_main_menu")
 
-    view = main_menu_view()
+    view = views.factory.main_menu_view()
 
     await api.edit_message(context, update, view)
 
@@ -138,17 +143,17 @@ async def callback_query_show_meetings(session: Session, update: Update, context
         logging.info(f"callback: {callback_data}")
 
         if callback_data.id is None:
-            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETINGS.value, callback_data)
+            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETINGS, callback_data)
 
         owner_user = guards.current_user(update, session)
         user_meetings = owner_user.meetups
 
-        user_meetings_buttons: list[ButtonConfig] = [
-            ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)))
+        user_meetings_buttons: list[views.ButtonConfig] = [
+            views.ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)))
             for meeting in user_meetings
         ]
 
-        view = PaginatedMitupView(
+        view = views.PaginatedMitupView(
             description=MeetingMessages.ACTIVE.get(),
             buttons=user_meetings_buttons,
             page_number=callback_data.id,

@@ -2,7 +2,6 @@
 __all__ = (
     "commands",
     "HandlersRegistry",
-    "CallbackId",
     "messages",
     "callback_query",
     "conversations",
@@ -14,4 +13,4 @@ __all__ = (
 from . import callback_query, commands, conversations, messages
 from .conversations_states import ConversationMeetingState, ConversationSettingsState
 from .personal_filters import UserExistFilter
-from .registry import CallbackId, HandlersRegistry
+from .registry import HandlersRegistry

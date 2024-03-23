@@ -6,8 +6,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.exceptions import HandlerRegisteredError
-from mitup_bot.handlers import CallbackId, HandlersRegistry
+from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.registry import HandlerWrapper
 from mitup_bot.utils import callbacks as cb
 

@@ -5,13 +5,14 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, filters
 
 from mitup_bot.api import send_message
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import MeetingMessages, SettingsMessages
-from mitup_bot.views.views import main_menu_view, settings_view
+from mitup_bot.views.factory import main_menu_view, settings_view
 
 from .conversations_states import ConversationSettingsState
-from .registry import CallbackId, HandlersRegistry
+from .registry import HandlersRegistry
 
 
 class MessagesId(CallbackId):
@@ -103,7 +104,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
     return ConversationHandler.END
 
 
-@HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT, bindable=False)
+@HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT | filters.COMMAND, bindable=False)
 async def filter_messages_without_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")

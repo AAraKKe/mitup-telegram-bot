@@ -31,7 +31,7 @@ async def test_send_message_with_a_view(default_view: MitupView):
     await send_message(context, update, default_view)
 
     context.bot.send_message.assert_called_once_with(
-        chat_id=123456789, text=default_view.description, reply_markup=default_view.markup, parse_mode="MarkdownV2"
+        chat_id=123456789, text=default_view.description, reply_markup=default_view.markup
     )
 
 
@@ -44,9 +44,7 @@ async def test_send_message_without_view():
 
     await send_message(context, update, "Hello, World")
 
-    context.bot.send_message.assert_called_once_with(
-        chat_id=123456789, text="Hello, World", reply_markup=None, parse_mode="MarkdownV2"
-    )
+    context.bot.send_message.assert_called_once_with(chat_id=123456789, text="Hello, World", reply_markup=None)
 
 
 @pytest.mark.asyncio
@@ -56,7 +54,7 @@ async def test_edit_message_with_a_view(default_view: MitupView, tg_update: Upda
     await edit_message(tg_context, tg_update, default_view)
 
     tg_context.bot.edit_message_text.assert_called_once_with(
-        default_view.description, 123, message_id=123, reply_markup=default_view.markup, parse_mode="MarkdownV2"
+        default_view.description, 123, message_id=123, reply_markup=default_view.markup
     )
 
 
@@ -64,9 +62,7 @@ async def test_edit_message_with_a_view(default_view: MitupView, tg_update: Upda
 async def test_edit_message_without_view(tg_update: Update, tg_context: mock.MagicMock):
     await edit_message(tg_context, tg_update, "Hello, World")
 
-    tg_context.bot.edit_message_text.assert_called_once_with(
-        "Hello, World", 123, message_id=123, reply_markup=None, parse_mode="MarkdownV2"
-    )
+    tg_context.bot.edit_message_text.assert_called_once_with("Hello, World", 123, message_id=123, reply_markup=None)
 
 
 @pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)

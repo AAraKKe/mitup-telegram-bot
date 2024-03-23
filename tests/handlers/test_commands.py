@@ -7,8 +7,9 @@ from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 from telegram.ext.filters import CAPTION, PHOTO
 
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
-from mitup_bot.handlers import CallbackId, ConversationSettingsState, HandlersRegistry
+from mitup_bot.handlers import ConversationSettingsState, HandlersRegistry
 from mitup_bot.handlers.commands import (
     command_cancel,
     command_go_to_main_menu,
@@ -38,7 +39,7 @@ async def test_command_registry_can_register_command_handlers():
     handler = HandlersRegistry.get_handler(CommandsTestId.COMMAND_EXAMPLE)
     assert isinstance(handler, CommandHandler)
     assert handler.has_args is None
-    assert CommandsTestId.COMMAND_EXAMPLE in handler.commands
+    assert "my_command" in handler.commands
 
     callback_return = await handler.callback(Update(0), None)
     assert callback_return == "Done!"

@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum, StrEnum
+from enum import Enum
 from typing import Any
 from warnings import filterwarnings
 
@@ -21,6 +21,7 @@ from telegram.warnings import PTBUserWarning
 
 from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.utils.types import CCT, HandlerCallback
 
@@ -33,15 +34,14 @@ from mitup_bot.utils.types import CCT, HandlerCallback
 filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
 
-class CallbackId(StrEnum):
-    pass
-
-
 @dataclass
 class HandlerWrapper:
     handler: BaseHandler
     bindable: bool
     group: int = 0
+
+    def is_conversation(self) -> bool:
+        return isinstance(self.handler, ConversationHandler)
 
 
 async def callback_query_fallback(update: Update, context: CallbackContext):
@@ -98,7 +98,7 @@ class HandlersRegistry:
             command_name = command or func_name.replace("command_", "")
 
             if callback_id in cls.handlers:
-                raise HandlerRegisteredError(callback_id.value)
+                raise HandlerRegisteredError(callback_id)
 
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CommandHandler(
@@ -139,7 +139,7 @@ class HandlersRegistry:
             callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
             if callback_id in cls.handlers:
-                raise HandlerRegisteredError(callback.__name__)
+                raise HandlerRegisteredError(callback_id)
 
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=MessageHandler(filters=filters, callback=callback, block=block),
@@ -155,6 +155,7 @@ class HandlersRegistry:
         cls,
         callback_id: CallbackId,
         bindable: bool = True,
+        auto_answer: bool = True,
         group: int = 0,
         callback_data: CallbackData | None = None,
         block: bool = True,
@@ -163,7 +164,9 @@ class HandlersRegistry:
         Callable[[Update, CCT], Coroutine[Any, Any, Any]],
     ]:
         """
-        Decorator used to register a callback for a CallbackQueryHandler.
+        Decorator used to register a callback for a CallbackQueryHandler. Set auto_answer to False if you want to answer
+        the callback query from the callback itself. Otherwise, a dummy answer will be sent to Telegram once the
+        callback finishes to make sure the Telegram client knows that the callback has been processed.
 
         Every argument provided is the same as those that can be provided to a CallbackQueryHandler
 
@@ -173,20 +176,26 @@ class HandlersRegistry:
         def wrapper(
             callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
         ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
-            func_name = callback.__name__
-
             if callback_id in cls.handlers:
-                raise HandlerRegisteredError(func_name)
+                raise HandlerRegisteredError(callback_id)
+
+            async def inner_wrapper(update: Update, context: CCT):
+                result = await callback(update, context)
+                if auto_answer:
+                    assert update.callback_query is not None
+                    await context.bot.answer_callback_query(update.callback_query.id)
+                return result
 
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
                     pattern=callback_data.pattern if callback_data else None,
-                    callback=callback,
+                    callback=inner_wrapper,
                     block=block,
                 ),
                 bindable=bindable,
                 group=group,
             )
+
             return callback
 
         return wrapper
@@ -194,7 +203,10 @@ class HandlersRegistry:
     @classmethod
     def bind(cls, app: Application):
         """Bind all registered handlers to a given application"""
-        for key, wrapper in cls.handlers.items():
+        # Sort them setting conversation handlers first to be sure that any unexpected answer to a conversation is
+        # handled by its fallbacks
+        sorted_items = sorted(cls.handlers.items(), key=lambda v: v[1].is_conversation(), reverse=True)
+        for key, wrapper in sorted_items:
             if wrapper.bindable:
                 logging.info(f"Binding {key} handler to application")
                 app.add_handler(wrapper.handler)
@@ -218,7 +230,7 @@ class HandlersRegistry:
         fallbacks: list[CallbackId],
         bindable: bool = True,
         group: int = 0,
-        allow_reentry: bool = False,
+        allow_reentry: bool = True,
         per_chat: bool = True,
         per_user: bool = True,
         per_message: bool = False,
@@ -235,7 +247,7 @@ class HandlersRegistry:
         missing_handlers += [name for name in fallbacks if name not in cls.handlers]
 
         if missing_handlers:
-            raise HandlerNotRegistered(", ".join(missing_handlers))
+            raise HandlerNotRegistered(missing_handlers)
 
         cls.handlers[callback_id] = HandlerWrapper(
             ConversationHandler(
@@ -252,7 +264,7 @@ class HandlersRegistry:
                 conversation_timeout=conversation_timeout,
                 persistent=persistent,
                 map_to_parent=map_to_parent,
-                name=callback_id,
+                name=callback_id.value,
                 block=block,
             ),
             bindable=bindable,

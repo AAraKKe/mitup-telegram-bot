@@ -5,14 +5,15 @@ from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from mitup_bot.api import send_message
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import SettingsMessages
-from mitup_bot.views.views import main_menu_view
+from mitup_bot.views.factory import main_menu_view
 
 from .conversations_states import ConversationSettingsState
 from .personal_filters import UserExistFilter
-from .registry import CallbackId, HandlersRegistry
+from .registry import HandlersRegistry
 
 
 class CommandsId(CallbackId):

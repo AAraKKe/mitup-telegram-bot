@@ -12,7 +12,7 @@ from mitup_bot.handlers.messages import (
 )
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import MeetingMessages, SettingsMessages
-from mitup_bot.views.views import main_menu_view
+from mitup_bot.views.factory import main_menu_view
 
 
 @pytest.mark.asyncio

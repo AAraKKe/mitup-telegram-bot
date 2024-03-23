@@ -4,26 +4,10 @@ from typing import Any
 
 from mitup_bot.utils import Emojis
 
-CHARACTERS_TO_SCAPE = [
-    ".",
-    "!",
-    "(",
-    ")",
-    "-",
-    "<",
-    ">",
-    "&",
-    "|",
-    "_",
-    "{",
-    "}",
-    "[",
-    "]",
-    "~",
-    "`",
-    "#",
-    "+",
-]
+# https://core.telegram.org/bots/api#markdownv2-style
+# Keep here only cahracters that we can use in normal text but not markdown
+# Do not add any character we normally use to format markdown text.
+CHARACTERS_TO_SCAPE = ["~", ">", "#", "+", "-", "=", "|", ".", "!"]
 
 
 def _sanitize(message: str) -> str:
@@ -38,7 +22,7 @@ class MessageBase(StrEnum):
 
 
 class Messages(MessageBase):
-    DEFAULT_MAIN_MENU_DESCRIPTION = "Welcome to Mitup Bot! \n" "Choose one of the following options:"
+    DEFAULT_MAIN_MENU_DESCRIPTION = "Welcome to Mitup Bot!\n" "Choose one of the following options:"
     DEFAULT_SETTINGS_DESCRIPTION = "Configure MitUp."
 
 
@@ -63,7 +47,7 @@ class MeetingMessages(MessageBase):
         f"When finished click on {Emojis.CHECK}"
     )
     FEATURES = (
-        "*$title* (Created by: $owner)\n\n"
+        "*$title* \\(Created by: $owner\\)\n\n"
         f"--- {Emojis.DESCRIPTION} $description\n"
         f"--- {Emojis.CLOCK} $date\n"
         f"--- {Emojis.MAP} $location\n"

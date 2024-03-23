@@ -1,18 +1,18 @@
 from enum import auto
 
+from mitup_bot.callback_id import CallbackId
+
 from .callback_query import CallbackQueryId
 from .commands import CommandsId
 from .conversations_states import ConversationMeetingState, ConversationSettingsState
 from .messages import MessagesId
-from .registry import CallbackId, HandlersRegistry
+from .registry import HandlersRegistry
 
 
 class ConversationId(CallbackId):
     NEW_USER_START = auto()
     SETTINGS_UPDATE_TIMEZONE = auto()
-    # CalbackId is a StrEnum. If the value is the same as any other StrEnum they are considered
-    # the same and we already have a CREATE_MEETING enum.
-    CREATE_MEETING = "conversation_to_create_meeting"
+    CREATE_MEETING = auto()
 
 
 HandlersRegistry.register_conversation_handler(

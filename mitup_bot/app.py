@@ -1,6 +1,7 @@
 import logging
 
-from telegram.ext import Application
+from telegram import constants
+from telegram.ext import Application, Defaults
 
 from mitup_bot import db
 from mitup_bot.cli.options import Env
@@ -40,6 +41,9 @@ class MitupRuntime:
         builder = Application.builder()
         logging.info(HandlersRegistry.handlers)
         builder.token(self.config.bot.token.get_secret_value())
+
+        # Set markdown as default
+        builder.defaults(Defaults(parse_mode=constants.ParseMode.MARKDOWN_V2))
 
         app = builder.build()
 

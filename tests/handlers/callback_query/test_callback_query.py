@@ -23,8 +23,8 @@ from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.views.factory import create_meeting_view, main_menu_view, settings_view
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
-from mitup_bot.views.views import create_meeting_view, main_menu_view, settings_view
 from tests.helpers import MockApi, UpdateRequest, add_user_to_session
 
 # Callback data from update object
@@ -73,7 +73,7 @@ async def test_callback_query_timezone_with_correct_view(mock_session: mock.Magi
             mock_user = mock.MagicMock()
             mock_user_find.return_value = mock_user
             with mock.patch(
-                "mitup_bot.handlers.callback_query.change_settings_element_view"
+                "mitup_bot.handlers.callback_query.views.factory.change_settings_element_view"
             ) as mock_change_settings_element_view:
                 result = await callback_query_timezone(update, context)
 

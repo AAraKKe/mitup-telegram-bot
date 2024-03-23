@@ -1,11 +1,12 @@
 from telegram import Update
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_id import CallbackId
 
 
 class HandlerRegisteredError(AttributeError):
-    def __init__(self, key: str):
-        super().__init__(f"A handler with ID {key!r} has already been registered and is marked as unique")
+    def __init__(self, callback: CallbackId):
+        super().__init__(f"A handler with ID {callback!r} has already been registered and is marked as unique")
 
 
 class WrongCommandNameError(ValueError):
@@ -17,12 +18,13 @@ class WrongMessageNameError(ValueError):
 
 
 class HandlerNotRegistered(RuntimeError):
-    def __init__(self, name: str):
-        super().__init__(f"The handler(s) {name!r} has not been registered")
+    def __init__(self, name: CallbackId | list[CallbackId]):
+        handler_list = ", ".join([repr(n) for n in name]) if isinstance(name, list) else repr(name)
+        super().__init__(f"The handler(s) {handler_list!r} has not been registered")
 
 
 class MalformedCallbackData(RuntimeError):
-    def __init__(self, handler: str, callback_data: CallbackData) -> None:
+    def __init__(self, handler: CallbackId, callback_data: CallbackData) -> None:
         super().__init__(f"Callback data {callback_data!r} received in handler {handler!r} is malformed.")
 
 
