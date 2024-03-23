@@ -1,15 +1,40 @@
 import datetime as dt
-from typing import TYPE_CHECKING, Self, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 
+from pydantic.config import ConfigDict
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, Session, SQLModel, select
 
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.exceptions import MeetupNotFound
+from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView
 from mitup_bot.views.mitup_view import ButtonConfig
 
-if TYPE_CHECKING:
+from .mutable_model import MutableModel
+
+if TYPE_CHECKING:  # pragma: no cover
     from .users import User
+
+
+class MeetupLocation(MutableModel):
+    name: str | None = None
+    coordinates: tuple[float, float] | None = None
+
+    # Make sure to forbid extra parameters to not allow serialization of randome strigns
+    # since both name and coordinates are optional
+    model_config: ClassVar[ConfigDict] = {"extra": "forbid"}
+
+    def __str__(self) -> str:
+        clean_name = None if self.name is None else None if len(self.name.strip()) == 0 else self.name
+
+        match clean_name, self.coordinates:
+            case (None, None):
+                return MeetingMessages.LOCATION_NOT_SET.get()
+            case _:
+                result = f"{clean_name} " if clean_name else ""
+                result += f"[{Emojis.PIN}]" if self.coordinates else ""
+                return result
 
 
 class Meetup(SQLModel, table=True):
@@ -25,7 +50,10 @@ class Meetup(SQLModel, table=True):
     time: dt.time | None = None
     max_members: int | None = None
     language: str = "en"
-    location: str | None = None
+    location: MeetupLocation = Field(
+        default=MeetupLocation(),
+        sa_column=Column(type_=MeetupLocation.as_mutable(JSON(none_as_null=True)), nullable=True),
+    )
     active: bool = True
 
     owner: "User" = Relationship(back_populates="meetups")
@@ -90,20 +118,32 @@ class Meetup(SQLModel, table=True):
             features_message,
             [
                 [
-                    ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data=cb.EDIT_MEETING_TITLE),
-                    ButtonConfig(text=ButtonMessages.DESCRIPTION.get(), callback_data=cb.EDIT_MEETING_DESCRIPTION),
+                    ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data=cb.EDIT_MEETING_TITLE.with_id(self.id)),
+                    ButtonConfig(
+                        text=ButtonMessages.DESCRIPTION.get(),
+                        callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(self.id),
+                    ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.DATE.get(), callback_data=cb.EDIT_MEETING_DATE),
-                    ButtonConfig(text=ButtonMessages.CLOCK.get(), callback_data=cb.EDIT_MEETING_TIME),
+                    ButtonConfig(text=ButtonMessages.DATE.get(), callback_data=cb.EDIT_MEETING_DATE.with_id(self.id)),
+                    ButtonConfig(text=ButtonMessages.CLOCK.get(), callback_data=cb.EDIT_MEETING_TIME.with_id(self.id)),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.PARTICIPANTS.get(), callback_data=cb.EDIT_MEETING_PARTICIPANTS),
-                    ButtonConfig(text=ButtonMessages.LOCATION.get(), callback_data=cb.EDIT_MEETING_LOCATION),
+                    ButtonConfig(
+                        text=ButtonMessages.PARTICIPANTS.get(),
+                        callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(self.id),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.LOCATION.get(), callback_data=cb.EDIT_MEETING_LOCATION.with_id(self.id)
+                    ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.LANGUAGE.get(), callback_data=cb.EDIT_MEETING_LANGUAGE),
-                    ButtonConfig(text=ButtonMessages.SETTINGS.get(), callback_data=cb.EDIT_MEETING_SETTINGS),
+                    ButtonConfig(
+                        text=ButtonMessages.LANGUAGE.get(), callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(self.id)
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.SETTINGS.get(), callback_data=cb.EDIT_MEETING_SETTINGS.with_id(self.id)
+                    ),
                 ],
                 [
                     ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=cb.SHOW_MEETING.with_id(self.id)),
@@ -114,10 +154,21 @@ class Meetup(SQLModel, table=True):
             ],
         )
 
+    @overload
     @classmethod
-    def by_id(cls, session: Session, meetup_id: int) -> Self | None:
+    def by_id(cls, session: Session, meetup_id: int, must_exist: Literal[True]) -> Self: ...  # pragma: no cover
+
+    @overload
+    @classmethod
+    def by_id(cls, session: Session, meetup_id: int, must_exist: bool = ...) -> Self | None: ...  # pragma: no cover
+
+    @classmethod
+    def by_id(cls, session: Session, meetup_id: int, must_exist: bool = False) -> Self | None:
         statement = select(cls).where(cls.id == meetup_id)
         if (found_meetup := session.exec(statement).first()) is not None:
             return found_meetup
+
+        if must_exist:
+            raise MeetupNotFound(meetup_id)
 
         return None

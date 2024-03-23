@@ -1,11 +1,13 @@
 from collections.abc import Callable, Coroutine, Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import Any, Concatenate, Protocol
 
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, create_engine
 
 from mitup_bot.config import DbConfig
+from mitup_bot.models import MeetupLocation
 
 __sessionmaker: sessionmaker[Session] | None = None
 
@@ -24,6 +26,20 @@ class SessionDecorableCallback(Protocol):
     def __call__(self, *args: Any | None, db_session: Session, **kwargs: Any | None) -> Any: ...
 
 
+def serialize_pydantic_model(model: BaseModel) -> str:
+    return model.model_dump_json()
+
+
+def deserialize_pydantic_model(data: str) -> BaseModel | None:
+    # Try deserializing with each model until one works.
+    # This is a pretty ugly solution but the deserialization seems to only be possible at an engine level
+    # and we need to know the model to deserialize it.
+    # We would need to keep adding more of these if we add more models with JSON fields.
+    with suppress(ValidationError):
+        return MeetupLocation.model_validate_json(data)
+    return None
+
+
 def configure_db(db_config: DbConfig):
     """Configure the db module by creating the engine and the session factory"""
     global __sessionmaker
@@ -31,7 +47,12 @@ def configure_db(db_config: DbConfig):
     if __sessionmaker is not None:
         raise DbAlreadyInitializedError()
 
-    engine = create_engine(db_config.full_url, echo=db_config.engine_echo)
+    engine = create_engine(
+        db_config.full_url,
+        echo=db_config.engine_echo,
+        json_serializer=serialize_pydantic_model,
+        json_deserializer=deserialize_pydantic_model,
+    )
     __sessionmaker = sessionmaker(bind=engine, class_=Session)
 
 

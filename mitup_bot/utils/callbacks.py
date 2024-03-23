@@ -17,14 +17,19 @@ LEAVE = CallbackData(action="leave", entity="meeting")
 CHAT = CallbackData(action="chat", entity="meeting")
 DELETE_MEETING = CallbackData(action="delete", entity="meeting")
 SHARE = CallbackData(action="share", entity="meeting")
+
+# Edit meeting callbacks
 EDIT_MEETING_DESCRIPTION = CallbackData(action="edit", entity="meet_desc")
 EDIT_MEETING_TITLE = CallbackData(action="edit", entity="meet_title")
 EDIT_MEETING_DATE = CallbackData(action="edit", entity="meet_date")
 EDIT_MEETING_TIME = CallbackData(action="edit", entity="meet_time")
 EDIT_MEETING_PARTICIPANTS = CallbackData(action="edit", entity="meet_part")
 EDIT_MEETING_LOCATION = CallbackData(action="edit", entity="meet_loc")
+EDIT_MEETING_LOCATION_NAME = CallbackData(action="edit", entity="meet_loc_name")
+EDIT_MEETING_LOCATION_COORDINATES = CallbackData(action="edit", entity="meet_loc_coords")
 EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
 EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
+EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 
 # Main menu callbacks
 MAIN_MENU = CallbackData(entity="main_menu")

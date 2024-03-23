@@ -71,3 +71,20 @@ def change_settings_element_view(message: str) -> MitupView:
             ],
         ],
     )
+
+
+def edit_meeting_property_view(
+    message: str,
+    meeting_id: int,
+    extra_buttons: list[list[ButtonConfig]] | None = None,
+    back_button: ButtonConfig | None = None,
+) -> MitupView:
+    back_button = back_button or ButtonConfig(
+        text=ButtonMessages.BACK_EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+    )
+    keyboard = [[back_button]]
+
+    if extra_buttons:
+        keyboard[:0] = extra_buttons
+
+    return MitupView(message, keyboard=keyboard)

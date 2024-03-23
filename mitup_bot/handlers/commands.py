@@ -2,10 +2,11 @@ from enum import auto
 
 from sqlmodel import Session
 from telegram import Update
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ConversationHandler
 
 from mitup_bot.api import send_message
 from mitup_bot.callback_id import CallbackId
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import SettingsMessages
@@ -27,7 +28,7 @@ class CommandsId(CallbackId):
     CommandsId.COMMAND_START_WITH_NO_USER, command="start", filters=~UserExistFilter(), bindable=False
 )
 @with_async_session
-async def command_start_with_new_user(session: Session, update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def command_start_with_new_user(session: Session, update: Update, context: MitupContext):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
@@ -52,7 +53,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
     command="start",
     filters=UserExistFilter(),
 )
-async def command_start_with_existing_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def command_start_with_existing_user(update: Update, context: MitupContext):
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
@@ -63,12 +64,12 @@ async def command_start_with_existing_user(update: Update, context: ContextTypes
 
 
 @HandlersRegistry.register_command(CommandsId.COMMAND_MAIN_MENU, command="main_menu")
-async def command_go_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def command_go_to_main_menu(update: Update, context: MitupContext):
     await command_start_with_existing_user(update, context)
 
 
 @HandlersRegistry.register_command(CommandsId.COMMAND_CANCEL, command="cancel", bindable=False)
-async def command_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def command_cancel(update: Update, context: MitupContext):
     await command_start_with_existing_user(update, context)
 
     return ConversationHandler.END

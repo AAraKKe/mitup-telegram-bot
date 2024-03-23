@@ -3,10 +3,12 @@ import inspect
 from unittest import mock
 
 import pytest
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from mitup_bot import db
 from mitup_bot.config import DbConfig
+from mitup_bot.models import Meetup, MeetupLocation
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -17,6 +19,18 @@ def reset_db():
     db.__sessionmaker = None  # type: ignore
 
 
+@pytest.fixture(
+    params=(
+        MeetupLocation(name="Test", coordinates=(123.1, 321.1)),
+        MeetupLocation(name="Test"),
+        MeetupLocation(coordinates=(123.1, 321.1)),
+    ),
+    ids=("full_location", "only_name_location", "only_coordinates_location"),
+)
+def serializable_model(request: pytest.FixtureRequest):
+    return request.param
+
+
 def test_db_initilization(db_config: DbConfig):
     with (
         mock.patch("mitup_bot.db.sessionmaker") as mock_maker,
@@ -25,7 +39,12 @@ def test_db_initilization(db_config: DbConfig):
         db.configure_db(db_config)
 
     mock_maker.assert_called_once()
-    mock_engine.assert_called_once_with(db_config.full_url, echo=db_config.engine_echo)
+    mock_engine.assert_called_once_with(
+        db_config.full_url,
+        echo=db_config.engine_echo,
+        json_serializer=db.serialize_pydantic_model,
+        json_deserializer=db.deserialize_pydantic_model,
+    )
 
 
 def test_db_cannot_be_configured_twice(db_config: DbConfig):
@@ -39,7 +58,12 @@ def test_db_cannot_be_configured_twice(db_config: DbConfig):
             db.configure_db(db_config)
 
     mock_maker.assert_called_once()
-    mock_engine.assert_called_once_with(db_config.full_url, echo=db_config.engine_echo)
+    mock_engine.assert_called_once_with(
+        db_config.full_url,
+        echo=db_config.engine_echo,
+        json_serializer=db.serialize_pydantic_model,
+        json_deserializer=db.deserialize_pydantic_model,
+    )
 
 
 def test_cannot_get_transaction_without_configuring_db():
@@ -68,3 +92,19 @@ def test_decorator_with_method(mock_session: mock.MagicMock):
     assert not inspect.iscoroutine(wrapped)
 
     assert wrapped == 1
+
+
+def test_engine_json_serializer(meeting: Meetup):
+    serialized = db.serialize_pydantic_model(meeting)
+
+    assert serialized == meeting.model_dump_json()
+
+
+def test_engine_json_deserializer(serializable_model: BaseModel):
+    deserialized = db.deserialize_pydantic_model(serializable_model.model_dump_json())
+
+    assert deserialized == serializable_model
+
+
+def test_json_deserializer_with_non_serializable_model():
+    assert db.deserialize_pydantic_model('{"something": "Test"}') is None

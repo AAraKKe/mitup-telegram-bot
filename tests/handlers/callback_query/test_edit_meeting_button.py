@@ -7,7 +7,7 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.handlers.callback_query import callback_query_edit_meeting
+from mitup_bot.handlers.edit_meeting.entry import callback_query_edit_meeting
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import MockApi, UpdateRequest, add_user_to_session

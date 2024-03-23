@@ -4,10 +4,11 @@ from unittest.mock import MagicMock
 
 import pytest
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import CommandHandler
 from telegram.ext.filters import CAPTION, PHOTO
 
 from mitup_bot.callback_id import CallbackId
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.handlers import ConversationSettingsState, HandlersRegistry
 from mitup_bot.handlers.commands import (
@@ -32,7 +33,7 @@ class CommandsTestId(CallbackId):
 
 async def test_command_registry_can_register_command_handlers():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_EXAMPLE)
-    async def command_my_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_my_command(update: Update, context: MitupContext):
         return "Done!"
 
     assert CommandsTestId.COMMAND_EXAMPLE in HandlersRegistry.handlers
@@ -47,7 +48,7 @@ async def test_command_registry_can_register_command_handlers():
 
 async def test_register_command_with_custom_name():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_CUSTOM_NAME, command="my_custom_command")
-    async def command_my_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_my_command(update: Update, context: MitupContext):
         return "Done!"
 
     assert CommandsTestId.COMMAND_CUSTOM_NAME in HandlersRegistry.handlers
@@ -55,7 +56,7 @@ async def test_register_command_with_custom_name():
 
 async def test_register_command_with_filters():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_WITH_FILTERS, filters=CAPTION & PHOTO)
-    async def command_with_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_with_filters(update: Update, context: MitupContext):
         return "Done!"
 
     assert CommandsTestId.COMMAND_WITH_FILTERS in HandlersRegistry.handlers
@@ -67,29 +68,29 @@ def test_registry_raises_if_command_name_is_not_correct():
     with pytest.raises(WrongCommandNameError):
 
         @HandlersRegistry.register_command(CommandsTestId.COMMAND_WRONG_NAME)
-        async def my_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def my_command(update: Update, context: MitupContext):
             return "Done!"
 
 
 def test_registry_raises_if_hander_already_registered():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_EXIST_NAME)
-    async def command_my_new_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_my_new_command(update: Update, context: MitupContext):
         return "Done!"
 
     with pytest.raises(HandlerRegisteredError):
 
         @HandlersRegistry.register_command(CommandsTestId.COMMAND_EXIST_NAME)
-        async def command_existing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def command_existing_command(update: Update, context: MitupContext):
             return "Done!"
 
 
 def test_multiple_commands_can_be_registered_with_different_names():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_CUSTOM_NAME_2)
-    async def command_custom_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_custom_new(update: Update, context: MitupContext):
         return "Done!"
 
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_CUSTOM_NAME_3, command="custom_new", filters=CAPTION)
-    async def command_another_custom_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_another_custom_new(update: Update, context: MitupContext):
         return "Done!"
 
     assert CommandsTestId.COMMAND_CUSTOM_NAME_2 in HandlersRegistry.handlers

@@ -1,7 +1,9 @@
 import datetime as dt
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Literal, Self, overload
 
 from sqlmodel import Field, Relationship, Session, SQLModel, select
+
+from mitup_bot.exceptions import UserNotFound
 
 from . import Meetup
 
@@ -23,11 +25,22 @@ class User(SQLModel, table=True):
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
     meetups: list["Meetup"] = Relationship(back_populates="owner")
 
+    @overload
     @classmethod
-    def by_tg_user_id(cls, session: Session, tg_user_id: int) -> Self | None:
+    def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: Literal[True]) -> Self: ...
+
+    @overload
+    @classmethod
+    def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: bool = ...) -> Self | None: ...
+
+    @classmethod
+    def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: bool = False) -> Self | None:
         statement = select(cls).where(cls.tg_user_id == tg_user_id)
         if (found_user := session.exec(statement).first()) is not None:
             return found_user
+
+        if must_exist:
+            raise UserNotFound(tg_user_id)
 
         return None
 

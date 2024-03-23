@@ -2,11 +2,12 @@ from enum import Enum, auto
 
 import pytest
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerRegisteredError
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.registry import HandlerWrapper
@@ -52,11 +53,11 @@ def test_handlers_registered_when_bound_to_app():
 
 def test_only_bindable_handlers_are_registered():
     @ClearableRegistry.register_command(HandlerTestId.NOT_BINDABLE, bindable=False)
-    async def command_not_bindable(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_not_bindable(update: Update, context: MitupContext):
         return "Done!"
 
     @ClearableRegistry.register_command(HandlerTestId.BINDABLE, bindable=True)
-    async def command_bindable(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_bindable(update: Update, context: MitupContext):
         return "Done!"
 
     app = ApplicationBuilder().token("AAA").build()
@@ -82,13 +83,13 @@ def test_only_bindable_handlers_are_registered():
 )
 def test_cannot_register_same_command_twice(command_names: tuple[str, str]):
     @ClearableRegistry.register_command(HandlerTestId.BINDABLE, bindable=True, command=command_names[0])
-    async def command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command(update: Update, context: MitupContext):
         return "Done!"
 
     with pytest.raises(HandlerRegisteredError):
 
         @ClearableRegistry.register_command(HandlerTestId.BINDABLE, bindable=True, command=command_names[1])
-        async def another_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def another_command(update: Update, context: MitupContext):
             return "Done!"
 
     ClearableRegistry.clear()
@@ -101,13 +102,13 @@ def test_cannot_register_same_command_twice(command_names: tuple[str, str]):
 )
 def test_cannot_register_same_message_twice(filters: tuple[BaseFilter, BaseFilter]):
     @ClearableRegistry.register_message(HandlerTestId.BINDABLE, filters=filters[0])
-    async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def message(update: Update, context: MitupContext):
         return "Done!"
 
     with pytest.raises(HandlerRegisteredError):
 
         @ClearableRegistry.register_message(HandlerTestId.BINDABLE, bindable=True, filters=filters[1])
-        async def another_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def another_message(update: Update, context: MitupContext):
             return "Done!"
 
     ClearableRegistry.clear()
@@ -120,13 +121,13 @@ def test_cannot_register_same_message_twice(filters: tuple[BaseFilter, BaseFilte
 )
 def test_cannot_register_same_callback_query_twice(cbs: tuple[CallbackData, CallbackData]):
     @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, callback_data=cbs[0])
-    async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def message(update: Update, context: MitupContext):
         return "Done!"
 
     with pytest.raises(HandlerRegisteredError):
 
         @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, callback_data=cbs[1])
-        async def another_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        async def another_message(update: Update, context: MitupContext):
             return "Done!"
 
     ClearableRegistry.clear()
@@ -134,7 +135,7 @@ def test_cannot_register_same_callback_query_twice(cbs: tuple[CallbackData, Call
 
 def test_cannot_register_same_conversation_twice():
     @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND)
-    async def command_something(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_something(update: Update, context: MitupContext):
         pass
 
     ClearableRegistry.register_conversation_handler(

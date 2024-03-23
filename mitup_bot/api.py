@@ -1,11 +1,11 @@
 from telegram import Message, Update
-from telegram.ext import ContextTypes
 
 from mitup_bot import guards
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.views import MitupView
 
 
-async def send_message(context: ContextTypes.DEFAULT_TYPE, update: Update, view: MitupView | str) -> Message:
+async def send_message(context: MitupContext, update: Update, view: MitupView | str) -> Message:
     chat_id = guards.chat(update).id
 
     if isinstance(view, str):
@@ -18,7 +18,7 @@ async def send_message(context: ContextTypes.DEFAULT_TYPE, update: Update, view:
     return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
-async def edit_message(context: ContextTypes.DEFAULT_TYPE, update: Update, view: MitupView | str) -> Message | bool:
+async def edit_message(context: MitupContext, update: Update, view: MitupView | str) -> Message | bool:
     tg_message = guards.message(update)
 
     if isinstance(view, str):

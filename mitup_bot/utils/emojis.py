@@ -50,6 +50,8 @@ class Emojis(Enum):
     SHIELD = "🛡️"
     FRIEND = "😄"
     GLASSES = "🕶"
+    CLIP = "📎"
+    PHONE = "📱"
 
     def __str__(self):
         return self.value

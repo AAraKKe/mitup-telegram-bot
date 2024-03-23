@@ -1,8 +1,8 @@
 import pytest
 from telegram import Update
-from telegram.ext import ContextTypes
 
 from mitup_bot.callback_id import CallbackId
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.conversations_states import ConversationSettingsState
@@ -21,7 +21,7 @@ class ConversationsTestId(CallbackId):
 
 def test_conversation_fails_without_existing_handler():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_REGISTERED)
-    async def command_custom_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_custom_new(update: Update, context: MitupContext):
         return "Done!"
 
     with pytest.raises(HandlerNotRegistered):
@@ -37,7 +37,7 @@ def test_conversation_fails_without_existing_handler():
 
 def test_conversation_handler_can_be_registered():
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_REGISTERED_2)
-    async def command_conversation_registered(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def command_conversation_registered(update: Update, context: MitupContext):
         return "Done!"
 
     HandlersRegistry.register_conversation_handler(

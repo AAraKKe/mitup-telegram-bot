@@ -45,9 +45,28 @@ class EffectiveMessageNotSet(RuntimeError):
 
 class UserNotFound(RuntimeError):
     def __init__(self, tg_user_id: int):
-        super().__init__(f"User with Telegram id {id} not found in database")
+        super().__init__(f"User with Telegram id {tg_user_id} not found in database")
 
 
 class CallbackQueryNotSet(RuntimeError):
     def __init__(self, update: Update):
         super().__init__(f"Expected callback data in Telegram Update not available: {update.to_json()}")
+
+
+class InvalidUserData(RuntimeError): ...
+
+
+class MeetingIdNotSetError(ValueError): ...
+
+
+class ContextPropertyConversionError(ValueError):
+    def __init__(self, context: str, property: str, value: str):
+        super().__init__(
+            f"Failed to convert property {property!r} in context {context!r} to the expected type. "
+            f"Value received: {value!r}"
+        )
+
+
+class MeetupNotFound(IOError):
+    def __init__(self, meetup_id: int):
+        super().__init__(f"Meetup with id {meetup_id} not found in database.")

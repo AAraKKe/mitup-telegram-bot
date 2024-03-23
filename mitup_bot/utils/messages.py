@@ -58,6 +58,20 @@ class MeetingMessages(MessageBase):
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
     PARTICIPANTS_NOT_SET = "Empty"
     ACTIVE = "These are all your active meetings."
+    EDIT_MEETING_LOCATION = (
+        "A meeting can have a location associated. "
+        "You can just set the name of the place or you can also attach the location. "
+        "Choose any of the two options."
+    )
+    EDIT_MEETING_LOCATION_NAME = "Send me the name of the place."
+    EDIT_MEETING_LOCATION_COORDINATES = (
+        f"_Only from the phone {Emojis.PHONE}_\n\n"
+        f"Send the location of the meeting. Touch on the {Emojis.CLIP} icon and then choose location. "
+        "You can send whatever location you want, not just your current location."
+    )
+    LOCATION_NAME_SET_SUCCESS = "The name of the location has been set to: *$name*"
+    LOCATION_COORDINATES_SUCCESS = "The location has been saved successfuly"
+    LOCATION_COORDINATES_WRONG = "Send me the location again. Remember to touch on the clip icon and choose location."
 
 
 class ButtonMessages(MessageBase):
@@ -92,3 +106,6 @@ class ButtonMessages(MessageBase):
     CHAT = f"{Emojis.CHAT} Chat"
     GO_BACK = "≪"
     GO_FORWARD = "≫"
+    BACK_EDIT = f"{GO_BACK} Edit"
+    MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
+    MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"

@@ -6,11 +6,12 @@ import pytest
 from pydantic import SecretStr
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
-from telegram.ext import CallbackContext
+from telegram.ext import ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot import db
 from mitup_bot.config import DbConfig
-from mitup_bot.models import Meetup
+from mitup_bot.custom_context import MitupContext, MitupUserData
+from mitup_bot.models import Meetup, MeetupLocation
 from mitup_bot.models import User as UserModel
 from tests.helpers import UpdateRequest
 
@@ -56,6 +57,18 @@ def user() -> UserModel:
         first_name="John",
         tg_user_id=123,
         meetups=[Meetup(id=1, title="Test Meeting 1"), Meetup(id=2, title="Test Meeting 2")],
+    )
+
+
+@pytest.fixture(scope="session")
+def meeting(user: UserModel) -> Meetup:
+    return Meetup(
+        id=123,
+        title="Test Meeting",
+        description="Test Description",
+        date=dt.date.today(),
+        location=MeetupLocation(name="Test Location", coordinates=(123.1, 321.1)),
+        owner=user,
     )
 
 
@@ -117,8 +130,11 @@ def tg_update(
 
 
 @pytest.fixture
-def tg_context() -> mock.MagicMock:
-    mock_context = mock.MagicMock(spec=CallbackContext)
-    mock_context.bot.send_message = mock.AsyncMock()
-    mock_context.bot.edit_message_text = mock.AsyncMock()
-    return mock_context
+def tg_context() -> MitupContext:
+    bot = mock.MagicMock(spec=ExtBot)
+
+    builder = ApplicationBuilder()
+    builder.bot(bot)
+    builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
+
+    return MitupContext(builder.build())
