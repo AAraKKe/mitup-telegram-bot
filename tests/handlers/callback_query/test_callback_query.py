@@ -1,6 +1,5 @@
 import logging
 import re
-from unittest import mock
 
 import pytest
 from telegram import Update
@@ -24,7 +23,8 @@ from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
-from tests.helpers import MockApi, UpdateRequest, add_user_to_session
+from tests.helpers import MockApi, UpdateRequest
+from tests.stub_db import MockDbSession
 
 
 def create_meetup(
@@ -46,9 +46,9 @@ async def test_callback_query_settings_is_called_with_settings_view(
 
 @pytest.mark.asyncio
 async def test_callback_query_timezone_with_correct_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: MitupContext, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession, tg_update: Update, tg_context: MitupContext, api: MockApi, user_with_settings: User
 ):
-    add_user_to_session(mock_session, user_with_settings)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     result = await callback_query_timezone(tg_update, tg_context)
 
@@ -62,10 +62,8 @@ async def test_callback_query_timezone_with_correct_view(
 
 @pytest.mark.asyncio
 async def test_callback_query_timezone_without_found_user(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: MitupContext
+    mock_session: MockDbSession, tg_update: Update, tg_context: MitupContext
 ):
-    mock_session.exec.return_value.first.return_value = None
-
     with pytest.raises(RuntimeError):
         await callback_query_timezone(tg_update, tg_context)
 
@@ -123,7 +121,7 @@ async def test_callback_query_create_meeting_return_the_correct_state(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tg_update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is_set(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     tg_context: MitupContext,
     user: User,
@@ -133,7 +131,7 @@ async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is
     assert match is not None
 
     tg_context.matches = [match]
-    add_user_to_session(mock_session, user)
+    mock_session.add_object(user, "tg_user_id")
 
     await callback_query_show_meeting(tg_update, tg_context)
 
@@ -143,7 +141,7 @@ async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is
 
 @pytest.mark.asyncio
 async def test_show__meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     tg_context: MitupContext,
     caplog: pytest.LogCaptureFixture,
@@ -155,7 +153,7 @@ async def test_show__meeting_does_nothing_for_meeting_not_owned_and_logs_warning
     assert match is not None
 
     tg_context.matches = [match]
-    add_user_to_session(mock_session, user)
+    mock_session.add_object(user, "tg_user_id")
 
     await callback_query_show_meeting(tg_update, tg_context)
 
@@ -173,7 +171,7 @@ async def test_show__meeting_does_nothing_for_meeting_not_owned_and_logs_warning
     ids=["SHOW_MEETING", "SHOW_ACTIVE_MEETING_PAGE"],
 )
 async def test_callback_query_show_meeting_fails_without_callback_query_data(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     tg_context: MitupContext,
     method,
@@ -190,13 +188,13 @@ async def test_callback_query_show_meeting_fails_without_callback_query_data(
 
 @pytest.mark.asyncio
 async def test_callback_query_show_meetings_use_correct_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: MitupContext, user: User, api: MockApi
+    mock_session: MockDbSession, tg_update: Update, tg_context: MitupContext, user: User, api: MockApi
 ):
     match = re.match(cb.SHOW_ACTIVE_MEETING_PAGE.pattern, "show;active_meeting_page:1")
     assert match is not None
 
     tg_context.matches = [match]
-    add_user_to_session(mock_session, user)
+    mock_session.add_object(user, "tg_user_id")
     user.meetups += [create_meetup(10), create_meetup(11), create_meetup(12), create_meetup(13)]
 
     await callback_query_show_meetings(tg_update, tg_context)

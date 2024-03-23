@@ -9,6 +9,7 @@ from sqlmodel import Session
 from mitup_bot import db
 from mitup_bot.config import DbConfig
 from mitup_bot.models import Meetup, MeetupLocation
+from tests.stub_db import MockDbSession
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -72,7 +73,7 @@ def test_cannot_get_transaction_without_configuring_db():
             pass
 
 
-def test_decorator_with_async(mock_session: mock.MagicMock):
+def test_decorator_with_async(mock_session: MockDbSession):
     async def f(s: Session) -> int:
         return 1
 
@@ -83,7 +84,7 @@ def test_decorator_with_async(mock_session: mock.MagicMock):
     assert asyncio.run(wrapped) == 1
 
 
-def test_decorator_with_method(mock_session: mock.MagicMock):
+def test_decorator_with_method(mock_session: MockDbSession):
     def f(s: Session) -> int:
         return 1
 

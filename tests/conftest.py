@@ -14,10 +14,11 @@ from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from tests.helpers import UpdateRequest
+from tests.stub_db import MockDbSession
 
 
 @pytest.fixture
-def mock_session(db_config: DbConfig) -> Generator[mock.MagicMock, None, None]:
+def mock_session(db_config: DbConfig) -> Generator[MockDbSession, None, None]:
     """
     This fixture is used to patch the interaction with the database by
     patching the Session object and yielding the patch to later be configured in
@@ -27,7 +28,7 @@ def mock_session(db_config: DbConfig) -> Generator[mock.MagicMock, None, None]:
     patch Session there without having to worry it being instantiated anywhere else
     """
     with mock.patch("mitup_bot.db.sessionmaker") as maker_patch:
-        mocked_session = mock.MagicMock(spec=Session, name="MitupMockedSession")
+        mocked_session = MockDbSession()
         # Setup a factory that returns our mocked_session
         maker_patch.return_value = lambda: mocked_session
 

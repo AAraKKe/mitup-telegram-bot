@@ -1,6 +1,5 @@
 import logging
 import re
-from unittest import mock
 
 import pytest
 from telegram import Update
@@ -18,7 +17,7 @@ from tests.helpers import MockApi, add_user_to_session
 
 @pytest.mark.asyncio
 async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store_meeting_id(
-    mock_session: mock.MagicMock, tg_update: Update, context: MitupContext, api: MockApi, user: User
+    mock_session: MockDbSession, tg_update: Update, context: MitupContext, api: MockApi, user: User
 ):
     assert context.user_data is not None
 
@@ -50,7 +49,7 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
 
 @pytest.mark.asyncio
 async def test_callback_query_edit_meeting_description_fails_without_callback_query_data(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     context: MitupContext,
 ):
@@ -65,7 +64,7 @@ async def test_callback_query_edit_meeting_description_fails_without_callback_qu
 
 @pytest.mark.asyncio
 async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_logs_warning(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     context: MitupContext,
     caplog: pytest.LogCaptureFixture,

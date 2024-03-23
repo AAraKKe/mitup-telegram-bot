@@ -1,5 +1,3 @@
-from unittest import mock
-
 import pytest
 from sqlmodel import Session
 from telegram import Chat, Message, Update
@@ -8,6 +6,7 @@ from mitup_bot.exceptions import EffectiveChatNotSet, EffectiveMessageNotSet, Ef
 from mitup_bot.guards import chat, current_user, message
 from mitup_bot.models import User
 from tests.helpers import UpdateRequest, add_user_to_session
+from tests.stub_db import MockDbSession
 
 
 @pytest.mark.parametrize("tg_update", [UpdateRequest(user=False)], indirect=True)
@@ -16,14 +15,14 @@ def test_current_user_fails_without_effective_user(mock_session: Session, tg_upd
         current_user(tg_update, mock_session)
 
 
-def test_current_user_fails_if_user_not_in_db(mock_session: mock.MagicMock, tg_update: Update):
+def test_current_user_fails_if_user_not_in_db(mock_session: MockDbSession, tg_update: Update):
     add_user_to_session(mock_session, None, 123)
 
     with pytest.raises(UserNotFound):
         current_user(tg_update, mock_session)
 
 
-def test_current_user_succeeds(mock_session: mock.MagicMock, tg_update: Update, user_with_settings: User):
+def test_current_user_succeeds(mock_session: MockDbSession, tg_update: Update, user_with_settings: User):
     add_user_to_session(mock_session, user_with_settings)
 
     assert user_with_settings == current_user(tg_update, mock_session)

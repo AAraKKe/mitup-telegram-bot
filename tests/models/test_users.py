@@ -1,9 +1,7 @@
-from unittest import mock
-
 import pytest
 
 from mitup_bot.models import Meetup, User
-from tests.helpers import get_querys_from_session
+from tests.stub_db import MockDbSession
 
 
 def create_meetup(
@@ -14,26 +12,17 @@ def create_meetup(
     return Meetup(id=id, title=title, description=description)
 
 
-def test_user_does_not_exist(mock_session: mock.MagicMock):
-    mock_session.exec.return_value.first.return_value = None
+def test_user_does_not_exist(mock_session: MockDbSession):
     user = User.by_tg_user_id(mock_session, 1)
-
-    expected_query = get_querys_from_session(mock_session)[0]
-
-    assert "WHERE users.tg_user_id = 1" in expected_query
 
     assert user is None
 
 
-def test_user_exist(mock_session: mock.MagicMock):
-    mock_user = mock.sentinel.user
-    mock_session.exec.return_value.first.return_value = mock.sentinel.user
+def test_user_exist(mock_session: MockDbSession, user: User):
+    mock_session.add_object(user, "tg_user_id")
 
-    user = User.by_tg_user_id(mock_session, 1)
-    expected_query = get_querys_from_session(mock_session)[0]
-
-    assert "WHERE users.tg_user_id = 1" in expected_query
-    assert user == mock_user
+    result = User.by_tg_user_id(mock_session, user.tg_user_id)
+    assert result == user
 
 
 @pytest.mark.parametrize(

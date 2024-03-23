@@ -18,14 +18,21 @@ from mitup_bot.handlers.messages import (
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, UpdateRequest, add_meeting_to_session, add_user_to_session
+from tests.helpers import MockApi, UpdateRequest
+from tests.stub_db import MockDbSession
+
+
+@pytest.fixture
+def api():
+    with MockApi.start("mitup_bot.handlers.messages") as api:
+        yield api
 
 
 @pytest.mark.asyncio
 async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
 ):
-    add_user_to_session(mock_session, user_with_settings)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     assert user_with_settings.settings.timezone != cast(Message, tg_update.effective_message).text
 
@@ -35,17 +42,18 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
         SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=cast(Message, tg_update.effective_message).text)
     )
 
-    mock_session.add.assert_called_once_with(user_with_settings)
-    mock_session.flush.assert_called_once()
+    mock_session.assert_added(user_with_settings)
+    mock_session.assert_flushed()
+
     assert user_with_settings.settings.timezone == cast(Message, tg_update.effective_message).text
     api.assert_send_message_called(tg_context, tg_update, view)
 
 
 @pytest.mark.asyncio
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
 ):
-    add_user_to_session(mock_session, user_with_settings)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     assert tg_update.effective_message is not None
     assert user_with_settings.settings.timezone != tg_update.effective_message.text
@@ -56,8 +64,8 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
         SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=tg_update.effective_message.text)
     )
 
-    mock_session.add.assert_called_once_with(user_with_settings)
-    mock_session.flush.assert_called_once()
+    mock_session.assert_added(user_with_settings)
+    mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == tg_update.effective_message.text
     api.assert_send_message_called(tg_context, tg_update, view)
 
@@ -84,9 +92,9 @@ async def test_ask_again_about_the_timezone_handler_with_correct_message(
 
 @pytest.mark.asyncio
 async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_correct_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, user: User, api: MockApi
+    mock_session: MockDbSession, tg_update: Update, tg_context: mock.MagicMock, user: User, api: MockApi
 ):
-    add_user_to_session(mock_session, user)
+    mock_session.add_object(user, "tg_user_id")
     assert len(user.meetups) == 2
 
     def flush():
@@ -102,8 +110,8 @@ async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_cor
     assert len(user.meetups) == 3
 
     new_meeting = user.meetups[2]
-    mock_session.add.assert_called_once_with(new_meeting)
-    mock_session.flush.assert_called_once()
+    mock_session.assert_added(new_meeting)
+    mock_session.assert_flushed()
 
     message = MeetingMessages.CREATED_SUCCESS.get(title=cast(Message, tg_update.effective_message).text)
     api.assert_send_message_called(tg_context, tg_update, new_meeting.edit_view.with_context(message))
@@ -112,13 +120,13 @@ async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_cor
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tg_update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_edit_title_message_handler_update_the_title_and_send_correct_view(
-    mock_session: mock.MagicMock, tg_update: Update, context: mock.MagicMock, api: MockApi, user: User
+    mock_session: MockDbSession, tg_update: Update, context: mock.MagicMock, api: MockApi, user: User
 ):
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
 
     meeting = user.meetups[0]
-    add_meeting_to_session(mock_session, meeting)
+    mock_session.add_object(meeting, "id")
 
     assert tg_update.effective_message is not None
     assert meeting.description != tg_update.effective_message.text
@@ -127,8 +135,8 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
 
     assert ContextId.EDIT_MEETING_TITLE not in context.user_data.registry
 
-    mock_session.add.assert_called_once_with(meeting)
-    mock_session.flush.assert_called_once()
+    mock_session.assert_added(meeting)
+    mock_session.assert_flushed()
 
     view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=tg_update.effective_message.text))
     api.assert_send_message_called(context, tg_update, view)
@@ -137,13 +145,13 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tg_update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_edit_description_message_handler_update_the_description_and_send_correct_view(
-    mock_session: mock.MagicMock, tg_update: Update, context: MitupContext, api: MockApi, user: User
+    mock_session: MockDbSession, tg_update: Update, context: MitupContext, api: MockApi, user: User
 ):
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, 1)
 
     meeting = user.meetups[0]
-    add_meeting_to_session(mock_session, meeting)
+    mock_session.add_object(meeting, "id")
 
     assert tg_update.effective_message is not None
     assert meeting.description != tg_update.effective_message.text
@@ -152,8 +160,8 @@ async def test_edit_description_message_handler_update_the_description_and_send_
 
     assert ContextId.EDIT_MEETING_DESCRIPTION not in context.user_data.registry
 
-    mock_session.add.assert_called_once_with(meeting)
-    mock_session.flush.assert_called_once()
+    mock_session.assert_added(meeting)
+    mock_session.assert_flushed()
 
     view = meeting.edit_view.with_context(
         MeetingMessages.DESCRIPTION_SET_SUCCESS.get(description=tg_update.effective_message.text)

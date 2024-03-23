@@ -7,7 +7,7 @@ from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.models import Meetup, MeetupLocation, Settings, User
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import MeetingMessages
-from tests.helpers import get_querys_from_session
+from tests.stub_db import MockDbSession
 
 EXAMPLE_MEETING = Meetup(
     id=123,
@@ -49,20 +49,18 @@ def expected_message(
 
 
 @pytest.mark.parametrize("mock_meeting", [EXAMPLE_MEETING, None], ids=["meeting_exist", "meeting_does_not_exist"])
-def test_meeting_does_not_exist(mock_session: mock.MagicMock, mock_meeting: mock.MagicMock):
-    mock_session.exec.return_value.first.return_value = mock_meeting
-    meeting = Meetup.by_id(mock_session, 1, must_exist=False)
+def test_meeting_does_not_exist(mock_session: MockDbSession, mock_meeting: mock.MagicMock):
+    mock_session.add_object(mock_meeting)
+    meeting = Meetup.by_id(mock_session, 123, must_exist=False)
 
-    expected_query = get_querys_from_session(mock_session)[0]
+    expected_query = mock_session.queries_executed[0]
 
     assert "WHERE meetups.id = 1" in expected_query
 
     assert meeting == mock_meeting
 
 
-def test_meeting_does_not_exist_fail_when_must_exist(mock_session: mock.MagicMock):
-    mock_session.exec.return_value.first.return_value = None
-
+def test_meeting_does_not_exist_fail_when_must_exist(mock_session: MockDbSession):
     with pytest.raises(MeetupNotFound):
         Meetup.by_id(mock_session, 1, must_exist=True)
 

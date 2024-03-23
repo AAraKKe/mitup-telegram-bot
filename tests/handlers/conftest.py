@@ -48,9 +48,3 @@ def callback_query_list(request):
 )
 def message_list(request):
     return request.param
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.callback_query") as api:
-        yield api

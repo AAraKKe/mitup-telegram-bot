@@ -4,8 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import views
-from mitup_bot.api import send_message
+from mitup_bot import api, views
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
@@ -43,7 +42,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
         session.add(user)
         message = SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=user.first_name)
 
-        await send_message(context, update, message)
+        await api.send_message(context, update, message)
 
         return ConversationSettingsState.TIMEZONE
 
@@ -60,7 +59,7 @@ async def command_start_with_existing_user(update: Update, context: MitupContext
     view = views.factory.main_menu_view()
 
     if update.effective_message is not None and update.effective_user is not None:
-        await send_message(context, update, view)
+        await api.send_message(context, update, view)
 
 
 @HandlersRegistry.register_command(CommandsId.COMMAND_MAIN_MENU, command="main_menu")

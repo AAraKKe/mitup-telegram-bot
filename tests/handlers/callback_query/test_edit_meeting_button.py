@@ -30,7 +30,7 @@ async def test_edit_meeting_callback_fails_on_malformed_data(
 @pytest.mark.parametrize("tg_update", ([UpdateRequest(callback_query=True)]), indirect=True)
 @pytest.mark.asyncio
 async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     tg_context: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
@@ -53,7 +53,7 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
 @pytest.mark.parametrize("tg_update", ([UpdateRequest(callback_query=True)]), indirect=True)
 @pytest.mark.asyncio
 async def test_edit_meeting_works_as_expected(
-    mock_session: mock.MagicMock,
+    mock_session: MockDbSession,
     tg_update: Update,
     tg_context: mock.MagicMock,
     user: User,
