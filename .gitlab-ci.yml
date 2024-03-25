@@ -95,6 +95,14 @@ validate-migrations:
   script: hatch run dev:validate-migrations
   needs: [preparation]
 
+sourcery-review:
+  stage: test
+  script:
+      - hatch run dev:mr-sourcery
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+
 # --------------------
 # Docker build and push images
 # ---------------------
