@@ -131,7 +131,7 @@ Enviroment to be used for bot testing
 dependencies = [
     "pytest~=8.0",
     "pytest-asyncio~=0.21",
-    "pytest-cov~=4.1",
+    "pytest-cov~=5.0",
     "pytest-xdist~=3.5",
     "pytest-asyncio",
     "pyright~=1.0",
