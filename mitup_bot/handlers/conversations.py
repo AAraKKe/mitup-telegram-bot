@@ -13,6 +13,8 @@ class ConversationId(CallbackId):
     NEW_USER_START = auto()
     SETTINGS_UPDATE_TIMEZONE = auto()
     CREATE_MEETING = auto()
+    UPDATE_MEETING_TITLE = auto()
+    UPDATE_MEETING_DESCRIPTION = auto()
 
 
 HandlersRegistry.register_conversation_handler(

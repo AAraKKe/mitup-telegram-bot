@@ -1,0 +1,97 @@
+import logging
+
+from sqlmodel import Session
+from telegram import Update
+from telegram.ext import ConversationHandler, filters
+
+from mitup_bot import api, guards
+from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.db import with_async_session
+from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.models import Meetup
+from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import ButtonConfig, MitupView
+
+from .enums import ConversationMeetingState, EditMeetingHandlerId
+
+
+@HandlersRegistry.register_callback_query(
+    EditMeetingHandlerId.TITLE_CALLBACK, callback_data=cb.EDIT_MEETING_TITLE, bindable=False
+)
+@with_async_session
+async def callback_query_edit_meeting_title(session: Session, update: Update, context: MitupContext):
+    logging.info("Enter into callback_query_edit_title_meeting")
+
+    assert context.matches is not None
+
+    meeting_id = cb.EDIT_MEETING_TITLE.parse(context.matches[0]).id
+
+    if meeting_id is None:
+        raise MalformedCallbackData(EditMeetingHandlerId.TITLE_CALLBACK, cb.EDIT_MEETING_TITLE)
+
+    user = guards.current_user(update, session)
+    meeting = user.own_meeting(meeting_id)
+
+    if meeting is not None:
+        assert meeting.id is not None and meeting.title is not None
+
+        context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
+
+        await api.edit_message(
+            context,
+            update,
+            MitupView(
+                description=MeetingMessages.EDIT_MEETING_TITLE.get(title=meeting.title),
+                keyboard=[
+                    [
+                        ButtonConfig(
+                            text=ButtonMessages.CANCEL.get(),
+                            callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
+                        )
+                    ]
+                ],
+            ),
+        )
+    else:
+        logging.warning(
+            "User tried editing the meeting title that does not belong to him. "
+            f"Meeting id: {meeting_id}, user id: {user.id}"
+        )
+
+    return ConversationMeetingState.EDIT_TITLE
+
+
+@HandlersRegistry.register_message(EditMeetingHandlerId.TITLE_MESSAGE, filters.TEXT, bindable=False)
+@with_async_session
+async def edit_title_meeting_message_handler(session: Session, update: Update, context: MitupContext):
+    logging.info("Enter into edit_title_meeting_message_handler")
+
+    assert update.effective_message is not None
+
+    with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:
+        meeting = Meetup.by_id(session, meeting_id, must_exist=True)
+        meeting.title = update.effective_message.text
+
+        session.add(meeting)
+        session.flush()
+
+        view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=meeting.title))
+        await api.send_message(context, update, view)
+
+        return ConversationHandler.END
+
+
+HandlersRegistry.register_conversation_handler(
+    EditMeetingHandlerId.TITLE_CONVERSATION,
+    entry_points_handler_names=[EditMeetingHandlerId.TITLE_CALLBACK],
+    states={
+        ConversationMeetingState.EDIT_TITLE: [
+            EditMeetingHandlerId.TITLE_MESSAGE,
+            EditMeetingHandlerId.CANCEL,
+        ],
+    },
+    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
+)

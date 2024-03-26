@@ -1,5 +1,4 @@
 import logging
-from enum import Enum, auto
 
 from sqlmodel import Session
 from telegram import Update
@@ -16,18 +15,12 @@ from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView
 
-from .enums import EditMeetinHandlerId
+from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_location_view
 
 
-class ConversationMeetingState(Enum):
-    TITLE = auto()
-    EDIT_LOCATION_NAME = auto()
-    EDIT_LOCATION_COORDIANTES = auto()
-
-
 @HandlersRegistry.register_callback_query(
-    EditMeetinHandlerId.LOCATION_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION, bindable=True
+    EditMeetingHandlerId.LOCATION_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION, bindable=True
 )
 @with_async_session
 async def callback_edit_meeting_location(session: Session, update: Update, context: MitupContext):
@@ -35,12 +28,12 @@ async def callback_edit_meeting_location(session: Session, update: Update, conte
     assert context.matches is not None
 
     user = guards.current_user(update, session)
-    callback_data = cb.EDIT_MEETING_LOCATION.parse(context.matches[0])
+    meeting_id = cb.EDIT_MEETING_LOCATION.parse(context.matches[0]).id
 
-    if callback_data.id is None:
-        raise MalformedCallbackData(EditMeetinHandlerId.LOCATION_CALLBACK, callback_data)
+    if meeting_id is None:
+        raise MalformedCallbackData(EditMeetingHandlerId.LOCATION_CALLBACK, cb.EDIT_MEETING_LOCATION)
 
-    meeting = user.own_meeting(callback_data.id)
+    meeting = user.own_meeting(meeting_id)
 
     if meeting is not None:
         assert meeting.id is not None
@@ -51,14 +44,13 @@ async def callback_edit_meeting_location(session: Session, update: Update, conte
             edit_location_view(meeting),
         )
     else:
-        logging.warn(
-            "User tried editing meeting that does not belong to them. "
-            f"Meeting id: {callback_data.id}, user id: {user.id}"
+        logging.warning(
+            "User tried editing meeting that does not belong to them. " f"Meeting id: {meeting_id}, user id: {user.id}"
         )
 
 
 @HandlersRegistry.register_callback_query(
-    EditMeetinHandlerId.LOCATION_NAME_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION_NAME, bindable=False
+    EditMeetingHandlerId.LOCATION_NAME_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION_NAME, bindable=False
 )
 async def callback_edit_meeting_location_name(update: Update, context: MitupContext):
     assert context.matches is not None
@@ -89,7 +81,7 @@ async def callback_edit_meeting_location_name(update: Update, context: MitupCont
 
 
 @HandlersRegistry.register_callback_query(
-    EditMeetinHandlerId.LOCATION_COORDINATES_CALLBACK,
+    EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK,
     callback_data=cb.EDIT_MEETING_LOCATION_COORDINATES,
     bindable=False,
 )
@@ -122,7 +114,7 @@ async def callback_edit_meeting_location_coordinates(update: Update, context: Mi
 
 
 @HandlersRegistry.register_message(
-    EditMeetinHandlerId.LOCATION_NAME_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
+    EditMeetingHandlerId.LOCATION_NAME_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
 )
 @with_async_session
 async def edit_meeting_location_name(session: Session, update: Update, context: MitupContext):
@@ -143,7 +135,7 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
         return ConversationHandler.END
 
 
-@HandlersRegistry.register_message(EditMeetinHandlerId.LOCATION_COORDINATES_MESSAGE, filters.LOCATION, bindable=False)
+@HandlersRegistry.register_message(EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE, filters.LOCATION, bindable=False)
 @with_async_session
 async def edit_meeting_location_coordinates(session: Session, update: Update, context: MitupContext):
     assert update.effective_message is not None
@@ -166,7 +158,7 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
 
 
 @HandlersRegistry.register_message(
-    EditMeetinHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE, ~filters.LOCATION, bindable=False
+    EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE, ~filters.LOCATION, bindable=False
 )
 async def edit_coordinates_without_location(update: Update, context: MitupContext):
     with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, ensure_clean=False) as meeting_id:
@@ -186,12 +178,12 @@ async def edit_coordinates_without_location(update: Update, context: MitupContex
 
 
 HandlersRegistry.register_conversation_handler(
-    EditMeetinHandlerId.LOCATION_NAME_CONVERSATION,
-    entry_points_handler_names=[EditMeetinHandlerId.LOCATION_NAME_CALLBACK],
+    EditMeetingHandlerId.LOCATION_NAME_CONVERSATION,
+    entry_points_handler_names=[EditMeetingHandlerId.LOCATION_NAME_CALLBACK],
     states={
         ConversationMeetingState.EDIT_LOCATION_NAME: [
-            EditMeetinHandlerId.LOCATION_NAME_MESSAGE,
-            EditMeetinHandlerId.CANCEL,
+            EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
+            EditMeetingHandlerId.CANCEL,
         ],
     },
     fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
@@ -199,13 +191,13 @@ HandlersRegistry.register_conversation_handler(
 
 
 HandlersRegistry.register_conversation_handler(
-    EditMeetinHandlerId.LOCATION_COORDINATES_CONVERSATION,
-    entry_points_handler_names=[EditMeetinHandlerId.LOCATION_COORDINATES_CALLBACK],
+    EditMeetingHandlerId.LOCATION_COORDINATES_CONVERSATION,
+    entry_points_handler_names=[EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK],
     states={
         ConversationMeetingState.EDIT_LOCATION_COORDIANTES: [
-            EditMeetinHandlerId.LOCATION_COORDINATES_MESSAGE,
-            EditMeetinHandlerId.CANCEL,
+            EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
+            EditMeetingHandlerId.CANCEL,
         ],
     },
-    fallbacks=[EditMeetinHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE],
+    fallbacks=[EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE],
 )

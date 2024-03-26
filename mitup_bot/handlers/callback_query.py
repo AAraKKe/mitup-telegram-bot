@@ -13,6 +13,7 @@ from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import ButtonConfig, PaginatedMitupView
 
 from .conversations_states import ConversationMeetingState, ConversationSettingsState
 from .registry import HandlersRegistry
@@ -27,6 +28,7 @@ class CallbackQueryId(CallbackId):
     CREATE_MEETING = auto()
     SHOW_MEETING = auto()
     SHOW_MEETINGS = auto()
+    EDIT_MEETING = auto()
     NAVEGATE_MEETINGS = auto()
 
 
@@ -89,34 +91,36 @@ async def callback_query_create_meeting(update: Update, context: MitupContext):
 async def callback_query_show_meeting(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_query_show_meeting")
 
-    if matches := context.matches:
-        callback_data = cb.SHOW_MEETING.parse(matches[0])
-        logging.info(f"callback: {callback_data}")
+    assert context.matches is not None
 
-        if callback_data.id is None:
-            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETING, callback_data)
+    callback_data = cb.SHOW_MEETING.parse(context.matches[0])
 
-        meeting_id = callback_data.id
-        logging.info(f"meeting id: {meeting_id}")
+    if callback_data.id is None:
+        raise MalformedCallbackData(CallbackQueryId.SHOW_MEETING, callback_data)
 
-        user = guards.current_user(update, session)
-        meeting = user.own_meeting(meeting_id)
+    meeting_id = callback_data.id
+    logging.info(f"meeting id: {meeting_id}")
 
-        if meeting is not None:
-            view = meeting.main_view
+    user = guards.current_user(update, session)
+    meeting = user.own_meeting(meeting_id)
 
-            await api.edit_message(context, update, view)
-        else:
-            logging.warning(
-                "User tried opening meeting that does not belong to them. "
-                f"Meeting id: {callback_data.id}, user id: {user.id}"
-            )
+    if meeting is not None:
+        view = meeting.main_view
+
+        await api.edit_message(context, update, view)
+    else:
+        logging.warning(
+            "User tried opening meeting that does not belong to him. "
+            f"Meeting id: {callback_data.id}, user id: {user.id}"
+        )
 
 
 @HandlersRegistry.register_callback_query(
     CallbackQueryId.CANCEL_MEETING, callback_data=cb.CANCEL_MEETING, bindable=False
 )
 async def callback_query_cancel_meeting(update: Update, context: MitupContext):
+    logging.info("Enter into callback_query_cancel_meeting")
+
     await callback_query_main_menu(update, context)
 
     return ConversationHandler.END
@@ -125,6 +129,8 @@ async def callback_query_cancel_meeting(update: Update, context: MitupContext):
 @HandlersRegistry.register_callback_query(CallbackQueryId.MAIN_MENU, callback_data=cb.MAIN_MENU, bindable=True)
 async def callback_query_main_menu(update: Update, context: MitupContext):
     logging.info("Enter into callback_query_main_menu")
+
+    context.clean_all_user_data()
 
     view = views.factory.main_menu_view()
 
@@ -138,25 +144,25 @@ async def callback_query_main_menu(update: Update, context: MitupContext):
 async def callback_query_show_meetings(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_query_show_meetings")
 
-    if matches := context.matches:
-        callback_data = cb.SHOW_ACTIVE_MEETING_PAGE.parse(matches[0])
-        logging.info(f"callback: {callback_data}")
+    assert context.matches is not None
 
-        if callback_data.id is None:
-            raise MalformedCallbackData(CallbackQueryId.SHOW_MEETINGS, callback_data)
+    callback_data = cb.SHOW_ACTIVE_MEETING_PAGE.parse(context.matches[0])
 
-        owner_user = guards.current_user(update, session)
-        user_meetings = owner_user.meetups
+    if callback_data.id is None:
+        raise MalformedCallbackData(CallbackQueryId.SHOW_MEETINGS, callback_data)
 
-        user_meetings_buttons: list[views.ButtonConfig] = [
-            views.ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)))
-            for meeting in user_meetings
-        ]
+    owner_user = guards.current_user(update, session)
+    user_meetings = sorted(owner_user.meetups, key=lambda meeting_id: cast(int, meeting_id.id))
 
-        view = views.PaginatedMitupView(
-            description=MeetingMessages.ACTIVE.get(),
-            buttons=user_meetings_buttons,
-            page_number=callback_data.id,
-        )
+    user_meetings_buttons: list[ButtonConfig] = [
+        ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)))
+        for meeting in user_meetings
+    ]
 
-        await api.edit_message(context, update, view)
+    view = PaginatedMitupView(
+        description=MeetingMessages.ACTIVE.get(),
+        buttons=user_meetings_buttons,
+        page_number=callback_data.id,
+    )
+
+    await api.edit_message(context, update, view)

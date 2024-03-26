@@ -1,10 +1,21 @@
-from enum import auto
+from enum import Enum, auto
 
 from mitup_bot.callback_id import CallbackId
 
 
-class EditMeetinHandlerId(CallbackId):
+class EditMeetingHandlerId(CallbackId):
     EDIT = auto()
+
+    # Edit meeting title
+    TITLE_CALLBACK = auto()
+    TITLE_MESSAGE = auto()
+    TITLE_CONVERSATION = auto()
+
+    # Edit meeting description
+    DESCRIPTION_CALLBACK = auto()
+    DESCRIPTION_MESSAGE = auto()
+    DESCRIPTION_CONVERSATION = auto()
+
     # Edit meeting location
     LOCATION_CALLBACK = auto()
     LOCATION_NAME_CALLBACK = auto()
@@ -15,3 +26,10 @@ class EditMeetinHandlerId(CallbackId):
     LOCATION_COORDINATES_MESSAGE = auto()
     LOCATION_COORDINATES_WRONG_MESSAGE = auto()
     CANCEL = auto()
+
+
+class ConversationMeetingState(Enum):
+    EDIT_TITLE = auto()
+    EDIT_DESCRIPTION = auto()
+    EDIT_LOCATION_NAME = auto()
+    EDIT_LOCATION_COORDIANTES = auto()

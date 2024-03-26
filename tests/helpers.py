@@ -9,7 +9,7 @@ from sqlmodel import select
 from telegram import Update
 from telegram.ext import CallbackContext
 
-from mitup_bot.models import User
+from mitup_bot.models import Meetup, User
 from mitup_bot.views import MitupView
 
 
@@ -34,6 +34,18 @@ def add_user_to_session(session: mock.MagicMock, user: User | None, user_id: int
     statement = select(User).where(User.tg_user_id == user_id)
     exec_result = mock.Mock()
     exec_result.first.return_value = user
+
+    session.exec.side_effect = lambda stmt: exec_result if equal_statements(stmt, statement) else mock.MagicMock()
+
+
+def add_meeting_to_session(session: mock.MagicMock, meeting: Meetup | None, meeting_id: int | None = None):
+    assert meeting is not None or meeting_id is not None, "Both meeting and id cannot be None"
+
+    meeting_id = meeting.id if meeting is not None else meeting_id
+
+    statement = select(Meetup).where(Meetup.id == meeting_id)
+    exec_result = mock.Mock()
+    exec_result.first.return_value = meeting
 
     session.exec.side_effect = lambda stmt: exec_result if equal_statements(stmt, statement) else mock.MagicMock()
 

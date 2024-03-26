@@ -8,3 +8,4 @@ class ConversationSettingsState(Enum):
 
 class ConversationMeetingState(Enum):
     TITLE = auto()
+    DESCRIPTION = auto()

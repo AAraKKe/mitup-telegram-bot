@@ -11,7 +11,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, ExtBot
 from mitup_bot import db
 from mitup_bot.config import DbConfig
 from mitup_bot.custom_context import MitupContext, MitupUserData
-from mitup_bot.models import Meetup, MeetupLocation
+from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from tests.helpers import UpdateRequest
 
@@ -50,17 +50,21 @@ def db_config() -> DbConfig:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def user() -> UserModel:
     return UserModel(
         id=1,
         first_name="John",
         tg_user_id=123,
-        meetups=[Meetup(id=1, title="Test Meeting 1"), Meetup(id=2, title="Test Meeting 2")],
+        settings=Settings(timezone="America/New_York"),
+        meetups=[
+            Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations!"),
+            Meetup(id=2, title="Test Meeting 2"),
+        ],
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def meeting(user: UserModel) -> Meetup:
     return Meetup(
         id=123,
@@ -89,7 +93,7 @@ def tg_inline_query(tg_user: User) -> InlineQuery:
 
 @pytest.fixture(scope="session")
 def tg_message(tg_user: User, tg_chat: Chat) -> Message:
-    return Message(123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user)
+    return Message(123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user, text="some text")
 
 
 @pytest.fixture(scope="session")
@@ -138,3 +142,8 @@ def tg_context() -> MitupContext:
     builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
 
     return MitupContext(builder.build())
+
+
+@pytest.fixture()
+def context(tg_update: Update, tg_context: MitupContext):
+    return tg_context.from_update(tg_update, tg_context.application)

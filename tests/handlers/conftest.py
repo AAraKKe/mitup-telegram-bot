@@ -19,6 +19,7 @@ from mitup_bot.handlers.messages import (
     registration_timezone_message_handler,
     settings_timezone_message_handler,
 )
+from tests.helpers import MockApi
 
 
 @pytest.fixture(
@@ -47,3 +48,9 @@ def callback_query_list(request):
 )
 def message_list(request):
     return request.param
+
+
+@pytest.fixture
+def api():
+    with MockApi.start("mitup_bot.handlers.callback_query") as api:
+        yield api

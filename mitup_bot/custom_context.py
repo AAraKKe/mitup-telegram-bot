@@ -10,6 +10,8 @@ from mitup_bot.exceptions import ContextPropertyConversionError, InvalidUserData
 
 
 class ContextId(Enum):
+    EDIT_MEETING_TITLE = auto()
+    EDIT_MEETING_DESCRIPTION = auto()
     EDIT_MEETING_LOCATION_NAME = auto()
     EDIT_MEETING_LOCATION_COORDINATES = auto()
 
@@ -86,3 +88,10 @@ class MitupContext(CallbackContext[ExtBot, MitupUserData, dict, dict]):
 
         for context in contexts:
             self.user_data.remove_context(context)
+
+    def clean_all_user_data(self):
+        if self.user_data is None:
+            logging.warning("User data requested but not set when trying to clean all user data. Not doing anything.")
+            return
+
+        self.user_data.registry.clear()

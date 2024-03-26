@@ -77,6 +77,8 @@ class Meetup(SQLModel, table=True):
             participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
         )
 
+        assert self.id is not None, "View cannot be generated without id"
+
         return MitupView(
             features_message,
             [

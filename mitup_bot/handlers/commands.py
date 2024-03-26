@@ -4,13 +4,13 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot import views
 from mitup_bot.api import send_message
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import SettingsMessages
-from mitup_bot.views.factory import main_menu_view
 
 from .conversations_states import ConversationSettingsState
 from .personal_filters import UserExistFilter
@@ -57,7 +57,7 @@ async def command_start_with_existing_user(update: Update, context: MitupContext
     if update.effective_chat is None:
         raise RuntimeError("Effective chat not set")
 
-    view = main_menu_view()
+    view = views.factory.main_menu_view()
 
     if update.effective_message is not None and update.effective_user is not None:
         await send_message(context, update, view)

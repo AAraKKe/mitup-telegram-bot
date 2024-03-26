@@ -57,6 +57,11 @@ class MeetingMessages(MessageBase):
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
     PARTICIPANTS_NOT_SET = "Empty"
+    EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*$title*\n\n Send me the new one"
+    EDIT_MEETING_DESCRIPTION = "This is the current description of your meeting:\n$description\n\n Send me the new one"
+    MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
+    TITLE_SET_SUCCESS = "The title has been properly set to: *$title*"
+    DESCRIPTION_SET_SUCCESS = "The description has been properly set to: *$description*"
     ACTIVE = "These are all your active meetings."
     EDIT_MEETING_LOCATION = (
         "A meeting can have a location associated. "
