@@ -1,5 +1,6 @@
 import datetime as dt
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
+from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
 from sqlalchemy import JSON, Column
@@ -25,16 +26,22 @@ class MeetupLocation(MutableModel):
     # since both name and coordinates are optional
     model_config: ClassVar[ConfigDict] = {"extra": "forbid"}
 
-    def __str__(self) -> str:
-        clean_name = None if self.name is None else None if len(self.name.strip()) == 0 else self.name
+    @property
+    def coerced_name(self) -> str | None:
+        """Provides a name coercing to None if it is an empty string"""
+        if self.name is None:
+            return None
 
-        match clean_name, self.coordinates:
+        return None if len(self.name.strip()) == 0 else self.name
+
+    def __str__(self) -> str:
+        match self.coerced_name, self.coordinates:
             case (None, None):
                 return MeetingMessages.LOCATION_NOT_SET.get()
             case _:
-                result = f"{clean_name} " if clean_name else ""
-                result += f"[{Emojis.PIN}]" if self.coordinates else ""
-                return result
+                name_section = f"{self.coerced_name}" if self.coerced_name else ""
+                coordinates_section = f"[{Emojis.PIN}]" if self.coordinates else ""
+                return f"{name_section} {coordinates_section}".strip()
 
 
 class Meetup(SQLModel, table=True):
@@ -67,20 +74,36 @@ class Meetup(SQLModel, table=True):
         return False
 
     @property
-    def main_view(self) -> MitupView:
-        features_message = MeetingMessages.FEATURES.get(
+    def sanitized_date(self) -> dt.datetime | None:
+        if self.date and self.time:
+            return dt.datetime.combine(self.date, self.time, tzinfo=dt.UTC)
+        return None
+
+    @property
+    def timezone(self) -> ZoneInfo:
+        return self.owner.settings.tz
+
+    @property
+    def str_date(self) -> str:
+        if self.sanitized_date:
+            return f"{self.sanitized_date.astimezone(self.timezone):%Y-%m-%d %H:%M} ({self.timezone.key})"
+        return MeetingMessages.DATE_NOT_SET.get()
+
+    @property
+    def message(self) -> str:
+        return MeetingMessages.FEATURES.get(
             title=self.title,
-            owner=self.owner.username,
+            owner=self.owner.username or self.owner.first_name,
             description=self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(),
-            date=self.date or MeetingMessages.DATE_NOT_SET.get(),
-            location=self.location or MeetingMessages.LOCATION_NOT_SET.get(),
+            date=self.str_date,
+            location=str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(),
             participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
         )
 
-        assert self.id is not None, "View cannot be generated without id"
-
+    @property
+    def main_view(self) -> MitupView:
         return MitupView(
-            features_message,
+            self.message,
             [
                 [
                     ButtonConfig(text=ButtonMessages.JOIN.get(), callback_data=cb.JOIN),
@@ -105,19 +128,10 @@ class Meetup(SQLModel, table=True):
 
     @property
     def edit_view(self) -> MitupView:
-        features_message = MeetingMessages.FEATURES.get(
-            title=self.title,
-            owner=self.owner.username,
-            description=self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(),
-            date=self.date or MeetingMessages.DATE_NOT_SET.get(),
-            location=self.location or MeetingMessages.LOCATION_NOT_SET.get(),
-            participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
-        )
-
         assert self.id is not None, "View cannot be generated without id"
 
         return MitupView(
-            features_message,
+            self.message,
             [
                 [
                     ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data=cb.EDIT_MEETING_TITLE.with_id(self.id)),

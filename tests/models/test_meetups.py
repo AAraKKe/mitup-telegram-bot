@@ -1,10 +1,10 @@
-from datetime import date
+from datetime import date, time
 from unittest import mock
 
 import pytest
 
 from mitup_bot.exceptions import MeetupNotFound
-from mitup_bot.models import Meetup, MeetupLocation
+from mitup_bot.models import Meetup, MeetupLocation, Settings, User
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import MeetingMessages
 from tests.helpers import get_querys_from_session
@@ -17,6 +17,35 @@ EXAMPLE_MEETING = Meetup(
     date=date(2001, 1, 1),
 )
 COORDINATES = (123.1, -321.1)
+
+
+def expected_location_name(expected_name, expected_coordinates):
+    return (
+        MeetingMessages.LOCATION_NOT_SET.get()
+        if expected_coordinates is None and expected_name is None
+        else f"{expected_name or ''} {expected_coordinates or ''}".strip()
+    )
+
+
+def expected_message(
+    description: bool,
+    date: bool,
+    username: bool,
+    location_name: bool,
+    coordinates: bool,
+) -> str:
+    str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get()
+    str_date = "1987-07-17 01:59 (Europe/Madrid)" if date else MeetingMessages.DATE_NOT_SET.get()
+    owner = "john_doe" if username else "John"
+    location = expected_location_name("Test Location" if location_name else None, "[📍]" if coordinates else None)
+    return MeetingMessages.FEATURES.get(
+        title="Test Meeting",
+        owner=owner,
+        description=str_description,
+        date=str_date,
+        location=location,
+        participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
+    )
 
 
 @pytest.mark.parametrize("mock_meeting", [EXAMPLE_MEETING, None], ids=["meeting_exist", "meeting_does_not_exist"])
@@ -42,7 +71,7 @@ def test_meeting_does_not_exist_fail_when_must_exist(mock_session: mock.MagicMoc
     "name, expected_name",
     [
         (None, None),
-        ("Central Park", "Central Park "),
+        ("Central Park", "Central Park"),
         ("", None),
         (" ", None),
     ],
@@ -64,9 +93,75 @@ def test_meetup_location_string_conversion(
 ):
     location = MeetupLocation(name=name, coordinates=coordinates)
 
-    if expected_coordinates is None and expected_name is None:
-        expected = MeetingMessages.LOCATION_NOT_SET.get()
-    else:
-        expected = f"{expected_name or ''}{expected_coordinates or ''}"
+    expected = expected_location_name(expected_name, expected_coordinates)
 
     assert expected == str(location)
+
+
+@pytest.mark.parametrize(
+    "description, meetup_date, username, location_name, location_coordinates",
+    [
+        (False, True, True, True, True),
+        (True, False, True, True, True),
+        (True, True, False, True, True),
+        (True, True, True, False, False),
+        (True, True, True, False, True),
+        (True, True, True, True, False),
+        (True, True, True, True, True),
+    ],
+    ids=[
+        "no_description",
+        "no_date",
+        "no_username",
+        "no_location",
+        "with_location_coordinates",
+        "with_location_name",
+        "all_fields",
+    ],
+)
+def test_meetup_features_message(
+    settings: Settings,
+    description: bool,
+    meetup_date: bool,
+    username: bool,
+    location_name: bool,
+    location_coordinates: bool,
+):
+    location = MeetupLocation(
+        name="Test Location" if location_name else None,
+        coordinates=COORDINATES if location_coordinates else None,
+    )
+    meeting = Meetup(
+        title="Test Meeting",
+        description="Test Description" if description else None,
+        date=date(1987, 7, 16) if meetup_date else None,
+        time=time(23, 59) if meetup_date else None,
+        location=location,
+        owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
+    )
+
+    expected = expected_message(description, meetup_date, username, location_name, location_coordinates)
+
+    assert expected == meeting.message
+
+
+def test_time_properly_converted_for_timezone(settings: Settings):
+    meeting = Meetup(
+        title="Test Meeting",
+        description="Test Description",
+        date=date(2024, 1, 12),
+        time=time(12, 30),
+        owner=User(first_name="John", username="john_doe", tg_user_id=1, settings=settings),
+    )
+
+    # Expected time is 1 hour ahead of the one in the meeting (in UTC) assuming converstion to settings.tz
+    # Europe/Madrid
+    expected_time = "2024-01-12 13:30 (Europe/Madrid)"
+
+    assert expected_time == meeting.str_date
+
+    # Updatingt he timezone to Europe/Dublin in January the date should be the same but the time should be 12:30
+    # since Dublin is in the same timezone as UTC
+    settings.timezone = "Europe/Dublin"
+    expected_time = "2024-01-12 12:30 (Europe/Dublin)"
+    assert expected_time == meeting.str_date

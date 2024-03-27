@@ -23,10 +23,10 @@ def test_current_user_fails_if_user_not_in_db(mock_session: mock.MagicMock, tg_u
         current_user(tg_update, mock_session)
 
 
-def test_current_user_succeeds(mock_session: mock.MagicMock, tg_update: Update, user: User):
-    add_user_to_session(mock_session, user)
+def test_current_user_succeeds(mock_session: mock.MagicMock, tg_update: Update, user_with_settings: User):
+    add_user_to_session(mock_session, user_with_settings)
 
-    assert user == current_user(tg_update, mock_session)
+    assert user_with_settings == current_user(tg_update, mock_session)
 
 
 @pytest.mark.parametrize("tg_update", [UpdateRequest(chat=False)], indirect=True)

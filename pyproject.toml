@@ -25,6 +25,7 @@ dependencies = [
     "pydantic~=2.6.0",
     "alembic~=1.6",
     "rich~=13.0",
+    "tzdata~=2024.1",
 ]
 
 [project.urls]

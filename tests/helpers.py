@@ -27,7 +27,7 @@ def equal_statements(a: SelectBase, b: SelectBase) -> bool:
 
 
 def add_user_to_session(session: mock.MagicMock, user: User | None, user_id: int | None = None):
-    assert user is not None or id is not None, "Both user and id cannot be None"
+    assert user is not None or user_id is not None, "Both user and user_id cannot be None"
 
     user_id = user.tg_user_id if user is not None else user_id
 

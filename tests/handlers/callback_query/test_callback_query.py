@@ -46,13 +46,15 @@ async def test_callback_query_settings_is_called_with_settings_view(
 
 @pytest.mark.asyncio
 async def test_callback_query_timezone_with_correct_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: MitupContext, api: MockApi, user: User
+    mock_session: mock.MagicMock, tg_update: Update, tg_context: MitupContext, api: MockApi, user_with_settings: User
 ):
-    add_user_to_session(mock_session, user)
+    add_user_to_session(mock_session, user_with_settings)
 
     result = await callback_query_timezone(tg_update, tg_context)
 
-    view = factory.change_settings_element_view(SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone="America/New_York"))
+    view = factory.change_settings_element_view(
+        SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone=user_with_settings.settings.timezone)
+    )
 
     api.assert_send_message_called(tg_context, tg_update, view)
     assert result == ConversationSettingsState.TIMEZONE

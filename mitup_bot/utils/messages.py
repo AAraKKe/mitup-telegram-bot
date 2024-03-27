@@ -1,6 +1,5 @@
 from enum import StrEnum
 from string import Template
-from typing import Any
 
 from mitup_bot.utils import Emojis
 
@@ -8,16 +7,25 @@ from mitup_bot.utils import Emojis
 # Keep here only cahracters that we can use in normal text but not markdown
 # Do not add any character we normally use to format markdown text.
 CHARACTERS_TO_SCAPE = ["~", ">", "#", "+", "-", "=", "|", ".", "!"]
+# Include all reserved characters to scape in user input
+USER_INPUT_CHARACTERS_TO_SCAPE = CHARACTERS_TO_SCAPE + ["*", "_", "[", "]", "(", ")", "`", "{", "}"]
 
 
-def _sanitize(message: str) -> str:
-    for character in CHARACTERS_TO_SCAPE:
+MessageParams = str | int | float | None
+
+
+def _sanitize(message: str, full=False) -> str:
+    to_scape = USER_INPUT_CHARACTERS_TO_SCAPE if full else CHARACTERS_TO_SCAPE
+    for character in to_scape:
         message = message.replace(character, f"\\{character}")
     return message
 
 
 class MessageBase(StrEnum):
-    def get(self, **kwargs: Any) -> str:
+    def get(self, **kwargs: MessageParams) -> str:
+        for key, value in kwargs.items():
+            assert value is not None, "Message parameter cannot be None!"
+            kwargs[key] = _sanitize(str(value), full=True)
         return _sanitize(Template(self.value).substitute(**kwargs))
 
 

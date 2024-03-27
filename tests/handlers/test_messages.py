@@ -23,11 +23,11 @@ from tests.helpers import MockApi, UpdateRequest, add_meeting_to_session, add_us
 
 @pytest.mark.asyncio
 async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user: User
+    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
 ):
-    add_user_to_session(mock_session, user)
+    add_user_to_session(mock_session, user_with_settings)
 
-    assert user.settings.timezone != cast(Message, tg_update.effective_message).text
+    assert user_with_settings.settings.timezone != cast(Message, tg_update.effective_message).text
 
     await registration_timezone_message_handler(tg_update, tg_context)
 
@@ -35,20 +35,20 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
         SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=cast(Message, tg_update.effective_message).text)
     )
 
-    mock_session.add.assert_called_once_with(user)
+    mock_session.add.assert_called_once_with(user_with_settings)
     mock_session.flush.assert_called_once()
-    assert user.settings.timezone == cast(Message, tg_update.effective_message).text
+    assert user_with_settings.settings.timezone == cast(Message, tg_update.effective_message).text
     api.assert_send_message_called(tg_context, tg_update, view)
 
 
 @pytest.mark.asyncio
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user: User
+    mock_session: mock.MagicMock, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
 ):
-    add_user_to_session(mock_session, user)
+    add_user_to_session(mock_session, user_with_settings)
 
     assert tg_update.effective_message is not None
-    assert user.settings.timezone != tg_update.effective_message.text
+    assert user_with_settings.settings.timezone != tg_update.effective_message.text
 
     await settings_timezone_message_handler(tg_update, tg_context)
 
@@ -56,9 +56,9 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
         SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=tg_update.effective_message.text)
     )
 
-    mock_session.add.assert_called_once_with(user)
+    mock_session.add.assert_called_once_with(user_with_settings)
     mock_session.flush.assert_called_once()
-    assert user.settings.timezone == tg_update.effective_message.text
+    assert user_with_settings.settings.timezone == tg_update.effective_message.text
     api.assert_send_message_called(tg_context, tg_update, view)
 
 

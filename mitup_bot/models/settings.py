@@ -1,9 +1,11 @@
 import datetime as dt
+import logging
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Field, Relationship, SQLModel
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from .users import User
 
 
@@ -26,3 +28,13 @@ class Settings(SQLModel, table=True):
     default_show_timezone: bool = True
 
     user: "User" = Relationship(back_populates="settings")
+
+    @property
+    def tz(self) -> ZoneInfo:
+        try:
+            return ZoneInfo(self.timezone)
+        except ZoneInfoNotFoundError:
+            # While we implement proper timezone handling, users can set random timezones.
+            # We should log this and use UTC instead.
+            logging.warning(f"Invalid timezone {self.timezone} by user {self.user_id}. Using UTC instead.")
+            return ZoneInfo("UTC")

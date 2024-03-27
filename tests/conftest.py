@@ -50,13 +50,22 @@ def db_config() -> DbConfig:
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
+def settings(user: User) -> Settings:
+    return Settings(
+        id=1,
+        timezone="Europe/Madrid",
+        user=user,
+        user_id=user.id,
+    )
+
+
+@pytest.fixture
 def user() -> UserModel:
     return UserModel(
         id=1,
         first_name="John",
         tg_user_id=123,
-        settings=Settings(timezone="America/New_York"),
         meetups=[
             Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations!"),
             Meetup(id=2, title="Test Meeting 2"),
@@ -64,13 +73,25 @@ def user() -> UserModel:
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
+def user_with_settings(settings: Settings) -> UserModel:
+    return UserModel(
+        id=1,
+        first_name="John",
+        tg_user_id=123,
+        meetups=[Meetup(id=1, title="Test Meeting 1"), Meetup(id=2, title="Test Meeting 2")],
+        settings=settings,
+    )
+
+
+@pytest.fixture
 def meeting(user: UserModel) -> Meetup:
     return Meetup(
         id=123,
         title="Test Meeting",
         description="Test Description",
-        date=dt.date.today(),
+        date=dt.date(1987, 7, 16),
+        time=dt.time(23, 59),
         location=MeetupLocation(name="Test Location", coordinates=(123.1, 321.1)),
         owner=user,
     )
