@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol, TypeVar, overload
+from typing import overload
 from unittest import mock
 
 from sqlalchemy.dialects import postgresql
@@ -8,13 +8,6 @@ from sqlmodel import Session, SQLModel, select
 from telegram import Update
 
 from mitup_bot.models import User
-
-
-class ModelType(Protocol):
-    id: int
-
-
-TM = TypeVar("TM", bound=ModelType)
 
 
 @dataclass
