@@ -1,6 +1,5 @@
 from typing import cast
 from unittest import mock
-from unittest.mock import MagicMock
 
 import pytest
 from telegram import Update
@@ -18,10 +17,9 @@ from mitup_bot.handlers.commands import (
     command_start_with_new_user,
 )
 from mitup_bot.utils import SettingsMessages
-from tests.helpers import MockApi
-from tests.stub_db import MockDbSession
 from mitup_bot.views.factory import main_menu_view
-from tests.helpers import UpdateRequest
+from tests.helpers import MockApi, UpdateRequest
+from tests.stub_db import MockDbSession
 
 
 @pytest.fixture
@@ -123,7 +121,7 @@ def test_registry_fails_to_get_handler_that_does_not_exist():
 async def test_command_start_with_new_user(
     mock_session: MockDbSession,
     tg_update: Update,
-    tg_context: MitupContext,
+    tg_context: MitupContext[mock.MagicMock],
     api: MockApi,
 ):
     result = await command_start_with_new_user(tg_update, tg_context)
@@ -141,7 +139,9 @@ async def test_command_start_with_new_user(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("command_list", [command_start_with_existing_user, command_go_to_main_menu])
-async def test_commands_to_show_main_menu(command_list, tg_update: Update, tg_context: MitupContext, api: MockApi):
+async def test_commands_to_show_main_menu(
+    command_list, tg_update: Update, tg_context: MitupContext[mock.MagicMock], api: MockApi
+):
     await command_start_with_existing_user(tg_update, tg_context)
 
     expected_view = main_menu_view()
@@ -149,7 +149,7 @@ async def test_commands_to_show_main_menu(command_list, tg_update: Update, tg_co
 
 
 @pytest.mark.asyncio
-async def test_command_cancel(tg_update: Update, tg_context: MitupContext, api: MockApi):
+async def test_command_cancel(tg_update: Update, tg_context: MitupContext[mock.MagicMock], api: MockApi):
     await command_cancel(tg_update, tg_context)
 
     expected_view = main_menu_view()
@@ -158,6 +158,8 @@ async def test_command_cancel(tg_update: Update, tg_context: MitupContext, api: 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tg_update", [UpdateRequest(chat=False)], indirect=True)
-async def test_any_command_fails_without_effective_chat(command_list, tg_update: Update, tg_context: MitupContext):
+async def test_any_command_fails_without_effective_chat(
+    command_list, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
+):
     with pytest.raises(RuntimeError):
         await command_list(tg_update, tg_context)

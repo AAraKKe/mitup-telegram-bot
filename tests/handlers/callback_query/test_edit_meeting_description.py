@@ -12,7 +12,8 @@ from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import MockApi, add_user_to_session
+from tests.helpers import MockApi
+from tests.stub_db import MockDbSession
 
 
 @pytest.mark.asyncio
@@ -25,7 +26,7 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     assert match is not None
 
     context.matches = [match]
-    add_user_to_session(mock_session, user)
+    mock_session.add_object(user, "tg_user_id")
 
     state = await callback_query_edit_meeting_description(tg_update, context)
 
@@ -76,7 +77,7 @@ async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_lo
     assert match is not None
 
     context.matches = [match]
-    add_user_to_session(mock_session, user)
+    mock_session.add_object(user, "tg_user_id")
 
     await callback_query_edit_meeting_description(tg_update, context)
 

@@ -4,7 +4,6 @@ from unittest import mock
 
 import pytest
 from pydantic import SecretStr
-from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import ApplicationBuilder, ContextTypes, ExtBot
 
@@ -167,5 +166,5 @@ def tg_context() -> MitupContext:
 
 
 @pytest.fixture()
-def context(tg_update: Update, tg_context: MitupContext):
+def context(tg_update: Update, tg_context: MitupContext[mock.MagicMock]):
     return tg_context.from_update(tg_update, tg_context.application)

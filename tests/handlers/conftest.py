@@ -19,7 +19,6 @@ from mitup_bot.handlers.messages import (
     registration_timezone_message_handler,
     settings_timezone_message_handler,
 )
-from tests.helpers import MockApi
 
 
 @pytest.fixture(

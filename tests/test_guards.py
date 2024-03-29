@@ -5,7 +5,7 @@ from telegram import Chat, Message, Update
 from mitup_bot.exceptions import EffectiveChatNotSet, EffectiveMessageNotSet, EffectiveUserNotSet, UserNotFound
 from mitup_bot.guards import chat, current_user, message
 from mitup_bot.models import User
-from tests.helpers import UpdateRequest, add_user_to_session
+from tests.helpers import UpdateRequest
 from tests.stub_db import MockDbSession
 
 
@@ -16,14 +16,12 @@ def test_current_user_fails_without_effective_user(mock_session: Session, tg_upd
 
 
 def test_current_user_fails_if_user_not_in_db(mock_session: MockDbSession, tg_update: Update):
-    add_user_to_session(mock_session, None, 123)
-
     with pytest.raises(UserNotFound):
         current_user(tg_update, mock_session)
 
 
 def test_current_user_succeeds(mock_session: MockDbSession, tg_update: Update, user_with_settings: User):
-    add_user_to_session(mock_session, user_with_settings)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     assert user_with_settings == current_user(tg_update, mock_session)
 

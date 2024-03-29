@@ -4,6 +4,7 @@ import pytest
 from telegram import Update
 
 from mitup_bot.api import edit_message, send_message
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import EffectiveChatNotSet, EffectiveMessageNotSet
 from mitup_bot.views import MitupView
 from tests.helpers import UpdateRequest
@@ -48,7 +49,9 @@ async def test_send_message_without_view():
 
 
 @pytest.mark.asyncio
-async def test_edit_message_with_a_view(default_view: MitupView, tg_update: Update, tg_context: mock.MagicMock):
+async def test_edit_message_with_a_view(
+    default_view: MitupView, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
+):
     assert tg_update.effective_message is not None
 
     await edit_message(tg_context, tg_update, default_view)
@@ -59,7 +62,7 @@ async def test_edit_message_with_a_view(default_view: MitupView, tg_update: Upda
 
 
 @pytest.mark.asyncio
-async def test_edit_message_without_view(tg_update: Update, tg_context: mock.MagicMock):
+async def test_edit_message_without_view(tg_update: Update, tg_context: MitupContext[mock.MagicMock]):
     await edit_message(tg_context, tg_update, "Hello, World")
 
     tg_context.bot.edit_message_text.assert_called_once_with("Hello, World", 123, message_id=123, reply_markup=None)
@@ -68,7 +71,7 @@ async def test_edit_message_without_view(tg_update: Update, tg_context: mock.Mag
 @pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)
 @pytest.mark.asyncio
 async def test_edit_message_fails_without_effective_message(
-    default_view: MitupView, tg_update: Update, tg_context: mock.MagicMock
+    default_view: MitupView, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
 ):
     with pytest.raises(EffectiveMessageNotSet):
         await edit_message(tg_context, tg_update, default_view)
@@ -77,7 +80,7 @@ async def test_edit_message_fails_without_effective_message(
 @pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)
 @pytest.mark.asyncio
 async def test_send_message_fails_without_effective_chat(
-    default_view: MitupView, tg_update: Update, tg_context: mock.MagicMock
+    default_view: MitupView, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
 ):
     with pytest.raises(EffectiveChatNotSet):
         await send_message(tg_context, tg_update, default_view)

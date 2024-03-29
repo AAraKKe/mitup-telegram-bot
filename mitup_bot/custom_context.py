@@ -35,7 +35,7 @@ class MitupUserData:
         self.registry[context].meeting_id = None
 
 
-class MitupContext(CallbackContext[ExtBot, MitupUserData, dict, dict]):
+class MitupContext[TB: ExtBot](CallbackContext[TB, MitupUserData, dict, dict]):
     """
     Custom context for the Mitup bot that includes a user data registry. Access to the registry
     is provided through context managers that ensure that the data is removed once out of scope.

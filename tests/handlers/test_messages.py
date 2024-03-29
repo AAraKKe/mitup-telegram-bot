@@ -30,7 +30,11 @@ def api():
 
 @pytest.mark.asyncio
 async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: MockDbSession, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession,
+    tg_update: Update,
+    tg_context: MitupContext[mock.MagicMock],
+    api: MockApi,
+    user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
@@ -51,7 +55,11 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
 
 @pytest.mark.asyncio
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: MockDbSession, tg_update: Update, tg_context: mock.MagicMock, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession,
+    tg_update: Update,
+    tg_context: MitupContext[mock.MagicMock],
+    api: MockApi,
+    user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
@@ -72,7 +80,7 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
 
 @pytest.mark.asyncio
 async def test_filter_messages_without_text_handler_with_correct_view(
-    tg_update: Update, tg_context: mock.MagicMock, api: MockApi
+    tg_update: Update, tg_context: MitupContext[mock.MagicMock], api: MockApi
 ):
     result = await filter_messages_without_text(tg_update, tg_context)
 
@@ -82,7 +90,7 @@ async def test_filter_messages_without_text_handler_with_correct_view(
 
 @pytest.mark.asyncio
 async def test_ask_again_about_the_timezone_handler_with_correct_message(
-    tg_update: Update, tg_context: mock.MagicMock, api: MockApi
+    tg_update: Update, tg_context: MitupContext[mock.MagicMock], api: MockApi
 ):
     result = await ask_again_about_the_timezone(tg_update, tg_context)
 
@@ -92,7 +100,7 @@ async def test_ask_again_about_the_timezone_handler_with_correct_message(
 
 @pytest.mark.asyncio
 async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_correct_view(
-    mock_session: MockDbSession, tg_update: Update, tg_context: mock.MagicMock, user: User, api: MockApi
+    mock_session: MockDbSession, tg_update: Update, tg_context: MitupContext[mock.MagicMock], user: User, api: MockApi
 ):
     mock_session.add_object(user, "tg_user_id")
     assert len(user.meetups) == 2

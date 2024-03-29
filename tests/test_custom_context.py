@@ -1,3 +1,5 @@
+from unittest import mock
+
 import pytest
 from telegram import Update
 
@@ -10,7 +12,7 @@ from mitup_bot.exceptions import ContextPropertyConversionError, MeetingIdNotSet
 
 
 @pytest.fixture()
-def context(tg_update: Update, tg_context: MitupContext):
+def context(tg_update: Update, tg_context: MitupContext[mock.MagicMock]):
     return tg_context.from_update(tg_update, tg_context.application)
 
 

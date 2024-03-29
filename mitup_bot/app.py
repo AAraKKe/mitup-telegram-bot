@@ -1,7 +1,7 @@
 import logging
 
 from telegram import constants
-from telegram.ext import Application, ContextTypes, Defaults
+from telegram.ext import Application, ContextTypes, Defaults, ExtBot
 
 from mitup_bot import db
 from mitup_bot.cli.options import Env
@@ -47,7 +47,7 @@ class MitupRuntime:
         builder.defaults(Defaults(parse_mode=constants.ParseMode.MARKDOWN_V2))
 
         # Set custom context type
-        builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
+        builder.context_types(ContextTypes(context=MitupContext[ExtBot], user_data=MitupUserData))
 
         app = builder.build()
 
