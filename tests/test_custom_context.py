@@ -12,8 +12,8 @@ from mitup_bot.exceptions import ContextPropertyConversionError, MeetingIdNotSet
 
 
 @pytest.fixture()
-def context(tg_update: Update, tg_context: MitupContext[mock.MagicMock]):
-    return tg_context.from_update(tg_update, tg_context.application)
+def context(update: Update, context: MitupContext[mock.MagicMock]):
+    return context.from_update(update, context.application)
 
 
 def test_add_and_remove_context(context: MitupContext):

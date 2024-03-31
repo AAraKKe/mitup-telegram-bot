@@ -120,19 +120,19 @@ def test_registry_fails_to_get_handler_that_does_not_exist():
 @pytest.mark.asyncio
 async def test_command_start_with_new_user(
     mock_session: MockDbSession,
-    tg_update: Update,
-    tg_context: MitupContext[mock.MagicMock],
+    update: Update,
+    context: MitupContext[mock.MagicMock],
     api: MockApi,
 ):
-    result = await command_start_with_new_user(tg_update, tg_context)
+    result = await command_start_with_new_user(update, context)
 
-    assert tg_update.effective_user is not None
+    assert update.effective_user is not None
 
     mock_session.assert_added()
     api.assert_send_message_called(
-        tg_context,
-        tg_update,
-        SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=tg_update.effective_user.first_name),
+        context,
+        update,
+        SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=update.effective_user.first_name),
     )
     assert result == ConversationSettingsState.TIMEZONE
 
@@ -140,26 +140,26 @@ async def test_command_start_with_new_user(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("command_list", [command_start_with_existing_user, command_go_to_main_menu])
 async def test_commands_to_show_main_menu(
-    command_list, tg_update: Update, tg_context: MitupContext[mock.MagicMock], api: MockApi
+    command_list, update: Update, context: MitupContext[mock.MagicMock], api: MockApi
 ):
-    await command_start_with_existing_user(tg_update, tg_context)
+    await command_start_with_existing_user(update, context)
 
     expected_view = main_menu_view()
-    api.assert_send_message_called(tg_context, tg_update, expected_view)
+    api.assert_send_message_called(context, update, expected_view)
 
 
 @pytest.mark.asyncio
-async def test_command_cancel(tg_update: Update, tg_context: MitupContext[mock.MagicMock], api: MockApi):
-    await command_cancel(tg_update, tg_context)
+async def test_command_cancel(update: Update, context: MitupContext[mock.MagicMock], api: MockApi):
+    await command_cancel(update, context)
 
     expected_view = main_menu_view()
-    api.assert_send_message_called(tg_context, tg_update, expected_view)
+    api.assert_send_message_called(context, update, expected_view)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("tg_update", [UpdateRequest(chat=False)], indirect=True)
+@pytest.mark.parametrize("update", [UpdateRequest(chat=False)], indirect=True)
 async def test_any_command_fails_without_effective_chat(
-    command_list, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
+    command_list, update: Update, context: MitupContext[mock.MagicMock]
 ):
     with pytest.raises(RuntimeError):
-        await command_list(tg_update, tg_context)
+        await command_list(update, context)

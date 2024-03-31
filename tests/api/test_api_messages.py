@@ -49,38 +49,36 @@ async def test_send_message_without_view():
 
 
 @pytest.mark.asyncio
-async def test_edit_message_with_a_view(
-    default_view: MitupView, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
-):
-    assert tg_update.effective_message is not None
+async def test_edit_message_with_a_view(default_view: MitupView, update: Update, context: MitupContext[mock.MagicMock]):
+    assert update.effective_message is not None
 
-    await edit_message(tg_context, tg_update, default_view)
+    await edit_message(context, update, default_view)
 
-    tg_context.bot.edit_message_text.assert_called_once_with(
+    context.bot.edit_message_text.assert_called_once_with(
         default_view.description, 123, message_id=123, reply_markup=default_view.markup
     )
 
 
 @pytest.mark.asyncio
-async def test_edit_message_without_view(tg_update: Update, tg_context: MitupContext[mock.MagicMock]):
-    await edit_message(tg_context, tg_update, "Hello, World")
+async def test_edit_message_without_view(update: Update, context: MitupContext[mock.MagicMock]):
+    await edit_message(context, update, "Hello, World")
 
-    tg_context.bot.edit_message_text.assert_called_once_with("Hello, World", 123, message_id=123, reply_markup=None)
+    context.bot.edit_message_text.assert_called_once_with("Hello, World", 123, message_id=123, reply_markup=None)
 
 
-@pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)
+@pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
 @pytest.mark.asyncio
 async def test_edit_message_fails_without_effective_message(
-    default_view: MitupView, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
+    default_view: MitupView, update: Update, context: MitupContext[mock.MagicMock]
 ):
     with pytest.raises(EffectiveMessageNotSet):
-        await edit_message(tg_context, tg_update, default_view)
+        await edit_message(context, update, default_view)
 
 
-@pytest.mark.parametrize("tg_update", [UpdateRequest(message=False)], indirect=True)
+@pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
 @pytest.mark.asyncio
 async def test_send_message_fails_without_effective_chat(
-    default_view: MitupView, tg_update: Update, tg_context: MitupContext[mock.MagicMock]
+    default_view: MitupView, update: Update, context: MitupContext[mock.MagicMock]
 ):
     with pytest.raises(EffectiveChatNotSet):
-        await send_message(tg_context, tg_update, default_view)
+        await send_message(context, update, default_view)

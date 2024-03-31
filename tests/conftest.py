@@ -5,9 +5,10 @@ from unittest import mock
 import pytest
 from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
-from telegram.ext import ApplicationBuilder, ContextTypes, ExtBot
+from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot import db
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import DbConfig
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
@@ -122,8 +123,12 @@ def tg_callback_query(tg_user: User, tg_message: Message) -> CallbackQuery:
     return CallbackQuery(id="123", from_user=tg_user, message=tg_message, chat_instance="someinstance")
 
 
+def callback_query_from_callback_data(data: CallbackData, user: User) -> CallbackQuery:
+    return CallbackQuery(id="123", from_user=user, data=str(data), chat_instance="someinstance")
+
+
 @pytest.fixture
-def tg_update(
+def update(
     tg_chat: Chat,
     tg_user: User,
     tg_inline_query: InlineQuery,
@@ -139,7 +144,12 @@ def tg_update(
         return Update(123, message=tg_message)
 
     if data.callback_query:
-        return Update(123, callback_query=tg_callback_query)
+        query = (
+            callback_query_from_callback_data(data.callback_query, tg_user)
+            if isinstance(data.callback_query, CallbackData)
+            else tg_callback_query
+        )
+        return Update(123, callback_query=query)
     if data.inline_query:
         return Update(123, inline_query=tg_inline_query)
     if not (data.user and data.message and data.chat):
@@ -155,16 +165,13 @@ def tg_update(
 
 
 @pytest.fixture
-def tg_context() -> MitupContext:
-    bot = mock.MagicMock(spec=ExtBot)
-
+def app() -> Application:
     builder = ApplicationBuilder()
-    builder.bot(bot)
+    builder.bot(mock.MagicMock(spec=ExtBot))
     builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
+    return builder.build()
 
-    return MitupContext(builder.build())
 
-
-@pytest.fixture()
-def context(tg_update: Update, tg_context: MitupContext[mock.MagicMock]):
-    return tg_context.from_update(tg_update, tg_context.application)
+@pytest.fixture
+def context(app: Application, update: Update) -> MitupContext:
+    return MitupContext.from_update(update, app)

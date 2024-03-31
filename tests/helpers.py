@@ -3,10 +3,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from unittest import mock
 
-from telegram import Update
+from telegram import Update, CallbackQuery
 from telegram.ext import CallbackContext
 
 from mitup_bot.views import MitupView
+from mitup_bot.callback_data import CallbackData
 
 
 @dataclass
@@ -21,15 +22,16 @@ class UpdateRequest:
         user (bool, optional): Whether to include user information in the update request. Defaults to True.
         chat (bool, optional): Whether to include chat information in the update request. Defaults to True.
         message (bool, optional): Whether to include message information in the update request. Defaults to True.
-        callback_query (bool, optional): Whether to include callback query information in the update request.
-            Defaults to False.
+        callback_data (CallbackData | bool, optional): Defines whether or not the update should include callback data.
+            If True, a default CallbackQuery will be added. If a CallbackData object is provided, it will be used to
+            generate the CallbackQuery. Defaults to False.
         inline_query (str, optional): The inline query string. Defaults to "".
     """
 
     user: bool = True
     chat: bool = True
     message: bool = True
-    callback_query: bool = False
+    callback_query: CallbackData | bool = False
     inline_query: str = ""
 
 

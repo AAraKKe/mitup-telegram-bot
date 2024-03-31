@@ -81,12 +81,16 @@ class MockDbSession(mock.MagicMock):
         Asserts that the given objects have been deleted.
 
         Args:
-            *objs: Variable number of SQLModel objects to be checked for deletion.
+            *objs: Variable number of SQLModel objects to be checked. If none are provided, it asserts that the `delete`
+            method was called at least once.
         """
-        if len(objs) > 1:
-            self.delete.assert_has_calls([mock.call(obj) for obj in objs], any_order=True)
-        else:
-            self.delete.assert_called_once_with(objs[0])
+        match len(objs):
+            case 0:
+                self.delete.assert_called()
+            case 1:
+                self.delete.assert_called_once_with(objs[0])
+            case _:
+                self.delete.assert_has_calls([mock.call(obj) for obj in objs], any_order=True)
 
     def assert_not_deleted(self):
         """

@@ -18,7 +18,7 @@ from tests.stub_db import MockDbSession
 
 @pytest.mark.asyncio
 async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store_meeting_id(
-    mock_session: MockDbSession, tg_update: Update, context: MitupContext, api: MockApi, user: User
+    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user: User
 ):
     assert context.user_data is not None
 
@@ -28,7 +28,7 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     context.matches = [match]
     mock_session.add_object(user, "tg_user_id")
 
-    state = await callback_query_edit_meeting_description(tg_update, context)
+    state = await callback_query_edit_meeting_description(update, context)
 
     assert context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id == 1
 
@@ -44,14 +44,14 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
         ],
     )
 
-    api.assert_edit_message_called(context, tg_update, view)
+    api.assert_edit_message_called(context, update, view)
     assert state == ConversationMeetingState.EDIT_DESCRIPTION
 
 
 @pytest.mark.asyncio
 async def test_callback_query_edit_meeting_description_fails_without_callback_query_data(
     mock_session: MockDbSession,
-    tg_update: Update,
+    update: Update,
     context: MitupContext,
 ):
     match = re.match(cb.EDIT_MEETING_DESCRIPTION.pattern, "edit;meet_desc:")
@@ -60,13 +60,13 @@ async def test_callback_query_edit_meeting_description_fails_without_callback_qu
     context.matches = [match]
 
     with pytest.raises(MalformedCallbackData):
-        await callback_query_edit_meeting_description(tg_update, context)
+        await callback_query_edit_meeting_description(update, context)
 
 
 @pytest.mark.asyncio
 async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
-    tg_update: Update,
+    update: Update,
     context: MitupContext,
     caplog: pytest.LogCaptureFixture,
     user: User,
@@ -79,7 +79,7 @@ async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_lo
     context.matches = [match]
     mock_session.add_object(user, "tg_user_id")
 
-    await callback_query_edit_meeting_description(tg_update, context)
+    await callback_query_edit_meeting_description(update, context)
 
     assert "User tried editing the meeting description that does not belong to him" in caplog.text
     assert "user id: 1" in caplog.text

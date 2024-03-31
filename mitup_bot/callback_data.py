@@ -32,5 +32,10 @@ class CallbackData(BaseModel):
         """Creates a CallbackData with the same information but different ID"""
         return CallbackData(entity=self.entity, action=self.action, id=id)
 
+    def match(self) -> re.Match:
+        re_match = re.match(self.pattern, str(self))
+        assert re_match is not None, f"CallbackData.match should always match the pattern: {self.pattern!r}"
+        return re_match
+
     def __eq__(self, other: Self) -> bool:
         return self.id == other.id and self.entity == other.entity and self.action == other.action
