@@ -3,11 +3,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from unittest import mock
 
-from telegram import Update, CallbackQuery
+from telegram import Update
 from telegram.ext import CallbackContext
 
-from mitup_bot.views import MitupView
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.views import MitupView
 
 
 @dataclass
