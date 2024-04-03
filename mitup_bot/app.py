@@ -3,14 +3,9 @@ import logging
 from telegram import constants
 from telegram.ext import Application, ContextTypes, Defaults
 
-from mitup_bot import db
+from mitup_bot import db, timezone_api
 from mitup_bot.cli.options import Env
-from mitup_bot.config import (
-    Config,
-    EnvVariablesConfigProvider,
-    RunModes,
-    TomlConfigProvider,
-)
+from mitup_bot.config import Config, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
 
@@ -34,9 +29,13 @@ class MitupRuntime:
         )
         self.app = self.__build_application()
         self.__setup_db()
+        self.__setup_timezone_api()
 
     def __setup_db(self):
         db.configure_db(self.config.db)
+
+    def __setup_timezone_api(self):
+        timezone_api.configure(self.config.google_api)
 
     def __build_application(self) -> Application:
         builder = Application.builder()

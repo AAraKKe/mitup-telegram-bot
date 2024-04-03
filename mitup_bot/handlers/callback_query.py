@@ -11,65 +11,20 @@ from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.utils import MeetingMessages, SettingsMessages
+from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, PaginatedMitupView
 
-from .conversations_states import ConversationMeetingState, ConversationSettingsState
+from .conversations_states import ConversationMeetingState
 from .registry import HandlersRegistry
 
 
 class CallbackQueryId(CallbackId):
-    SETTINGS = auto()
-    SETTINGS_TIMEZONE = auto()
-    CANCEL_SETTINGS = auto()
     CANCEL_MEETING = auto()
     MAIN_MENU = auto()
     CREATE_MEETING = auto()
     SHOW_MEETING = auto()
     SHOW_MEETINGS = auto()
-    EDIT_MEETING = auto()
-    NAVEGATE_MEETINGS = auto()
-
-
-@HandlersRegistry.register_callback_query(CallbackQueryId.SETTINGS, callback_data=cb.SETTINGS, bindable=True)
-async def callback_query_settings(update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_settings")
-
-    view = views.factory.settings_view()
-
-    await api.edit_message(context, update, view)
-
-
-@HandlersRegistry.register_callback_query(
-    CallbackQueryId.SETTINGS_TIMEZONE, callback_data=cb.EDIT_TIEMZONE, bindable=False
-)
-@with_async_session
-async def callback_query_timezone(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_settings_timezone")
-
-    user = guards.current_user(update, session)
-    message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone=user.settings.timezone)
-
-    view = views.factory.change_settings_element_view(message)
-
-    await api.send_message(context, update, view)
-
-    return ConversationSettingsState.TIMEZONE
-
-
-@HandlersRegistry.register_callback_query(
-    CallbackQueryId.CANCEL_SETTINGS, callback_data=cb.CANCEL_SETTINGS, bindable=False
-)
-async def callback_query_cancel_settings(update: Update, context: MitupContext):
-    if update.effective_chat is None:
-        raise RuntimeError("Effective chat not set")
-
-    view = views.factory.settings_view()
-
-    await api.send_message(context, update, view)
-
-    return ConversationHandler.END
 
 
 @HandlersRegistry.register_callback_query(

@@ -128,6 +128,11 @@ class BotConfig(BaseModel):
     token: SecretStr
 
 
+class GoogleApiConfig(BaseModel):
+    gmaps_geocode_key: SecretStr
+    gmaps_timezone_key: SecretStr
+
+
 class Config(BaseModel):
     """
     MitupRuntime configuration.
@@ -147,6 +152,7 @@ class Config(BaseModel):
 
     db: DbConfig
     bot: BotConfig
+    google_api: GoogleApiConfig
     app: AppConfig
 
     @staticmethod

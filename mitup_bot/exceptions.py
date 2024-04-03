@@ -70,3 +70,43 @@ class ContextPropertyConversionError(ValueError):
 class MeetupNotFound(IOError):
     def __init__(self, meetup_id: int):
         super().__init__(f"Meetup with id {meetup_id} not found in database.")
+
+
+class GeocodeClientAlreadyInitializedError(RuntimeError):
+    def __init__(self):
+        super().__init__("The geocode client has already been configured.")
+
+
+class TimezoneClientAlreadyInitializedError(RuntimeError):
+    def __init__(self):
+        super().__init__("The timezone client has already been configured.")
+
+
+class IncorrectKeyError(ValueError):
+    def __init__(self):
+        super().__init__("The key is not correct.")
+
+
+class IncorrectGeocodeKeyError(RuntimeError):
+    def __init__(self):
+        super().__init__("Geocode key is not set correctly.")
+
+
+class IncorrectTimezoneKeyError(RuntimeError):
+    def __init__(self):
+        super().__init__("Timezone key is not set correctly.")
+
+
+class IncorrectCoordinatesError(ValueError):
+    def __init__(self):
+        super().__init__("The latitude and longitude are not set correctly")
+
+
+class GeocodeClientNotConfiguredError(RuntimeError):
+    def __init__(self):
+        super().__init__("The geocode client must be configured before using it.")
+
+
+class TimezoneClientNotConfiguredError(RuntimeError):
+    def __init__(self):
+        super().__init__("The timezone client must be configured before using it.")

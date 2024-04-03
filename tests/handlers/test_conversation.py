@@ -5,7 +5,7 @@ from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.handlers.conversations_states import ConversationSettingsState
+from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 
 
 class CommandsTestId(CallbackId):

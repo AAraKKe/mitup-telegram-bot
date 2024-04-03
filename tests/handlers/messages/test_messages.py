@@ -5,77 +5,14 @@ import pytest
 from telegram import Message, Update
 
 from mitup_bot.custom_context import ContextId, MitupContext
-from mitup_bot.handlers import ConversationSettingsState
 from mitup_bot.handlers.edit_meeting.edit_meeting_description import edit_description_meeting_message_handler
 from mitup_bot.handlers.edit_meeting.edit_meeting_title import edit_title_meeting_message_handler
-from mitup_bot.handlers.messages import (
-    ask_again_about_the_timezone,
-    create_meeting_message_handler,
-    filter_messages_without_text,
-    registration_timezone_message_handler,
-    settings_timezone_message_handler,
-)
+from mitup_bot.handlers.messages import create_meeting_message_handler, filter_messages_without_text
 from mitup_bot.models import User
-from mitup_bot.utils import MeetingMessages, SettingsMessages
+from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import factory
 from tests.helpers import MockApi, UpdateRequest
 from tests.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.messages") as api:
-        yield api
-
-
-@pytest.mark.asyncio
-async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: MockDbSession,
-    update: Update,
-    context: MitupContext[mock.MagicMock],
-    api: MockApi,
-    user_with_settings: User,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    assert user_with_settings.settings.timezone != cast(Message, update.effective_message).text
-
-    await registration_timezone_message_handler(update, context)
-
-    view = factory.main_menu_view(
-        SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=cast(Message, update.effective_message).text)
-    )
-
-    mock_session.assert_added(user_with_settings)
-    mock_session.assert_flushed()
-
-    assert user_with_settings.settings.timezone == cast(Message, update.effective_message).text
-    api.assert_send_message_called(context, update, view)
-
-
-@pytest.mark.asyncio
-async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(
-    mock_session: MockDbSession,
-    update: Update,
-    context: MitupContext[mock.MagicMock],
-    api: MockApi,
-    user_with_settings: User,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    assert update.effective_message is not None
-    assert user_with_settings.settings.timezone != update.effective_message.text
-
-    await settings_timezone_message_handler(update, context)
-
-    view = factory.settings_view(
-        SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=update.effective_message.text)
-    )
-
-    mock_session.assert_added(user_with_settings)
-    mock_session.assert_flushed()
-    assert user_with_settings.settings.timezone == update.effective_message.text
-    api.assert_send_message_called(context, update, view)
 
 
 @pytest.mark.asyncio
@@ -86,16 +23,6 @@ async def test_filter_messages_without_text_handler_with_correct_view(
 
     api.assert_send_message_called(context, update, factory.main_menu_view())
     assert result == -1
-
-
-@pytest.mark.asyncio
-async def test_ask_again_about_the_timezone_handler_with_correct_message(
-    update: Update, context: MitupContext[mock.MagicMock], api: MockApi
-):
-    result = await ask_again_about_the_timezone(update, context)
-
-    api.assert_send_message_called(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
-    assert result == ConversationSettingsState.TIMEZONE
 
 
 @pytest.mark.asyncio

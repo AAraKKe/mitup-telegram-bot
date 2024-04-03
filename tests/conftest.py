@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 from pydantic import SecretStr
-from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
+from telegram import CallbackQuery, Chat, InlineQuery, Location, Message, Update, User
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot import db
@@ -115,7 +115,9 @@ def tg_inline_query(tg_user: User) -> InlineQuery:
 
 @pytest.fixture(scope="session")
 def tg_message(tg_user: User, tg_chat: Chat) -> Message:
-    return Message(123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user, text="some text")
+    return Message(
+        123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user, text="some text", location=Location(123.6, 103.5)
+    )
 
 
 @pytest.fixture(scope="session")

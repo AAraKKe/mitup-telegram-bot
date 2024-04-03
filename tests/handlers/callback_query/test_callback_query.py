@@ -9,15 +9,15 @@ from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.callback_query import (
     callback_query_cancel_meeting,
-    callback_query_cancel_settings,
     callback_query_create_meeting,
     callback_query_main_menu,
-    callback_query_settings,
     callback_query_show_meeting,
     callback_query_show_meetings,
-    callback_query_timezone,
 )
-from mitup_bot.handlers.conversations_states import ConversationMeetingState, ConversationSettingsState
+from mitup_bot.handlers.conversations_states import ConversationMeetingState
+from mitup_bot.handlers.edit_settings.edit_timezone import callback_query_timezone
+from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
+from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils import MeetingMessages, SettingsMessages

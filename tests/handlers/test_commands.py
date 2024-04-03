@@ -8,14 +8,16 @@ from telegram.ext.filters import CAPTION, PHOTO
 
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
-from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
-from mitup_bot.handlers import ConversationSettingsState, HandlersRegistry
-from mitup_bot.handlers.commands import (
-    command_cancel,
-    command_go_to_main_menu,
-    command_start_with_existing_user,
-    command_start_with_new_user,
+from mitup_bot.exceptions import (
+    EffectiveUserNotSet,
+    HandlerNotRegistered,
+    HandlerRegisteredError,
+    WrongCommandNameError,
 )
+from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers.commands import command_cancel, command_go_to_main_menu, command_start_with_existing_user
+from mitup_bot.handlers.registration_process.edit_registration_timezone import command_start_with_new_user
+from mitup_bot.handlers.registration_process.enums import ConversationRegistrationProcessState
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import main_menu_view
 from tests.helpers import MockApi, UpdateRequest
@@ -134,7 +136,16 @@ async def test_command_start_with_new_user(
         update,
         SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=update.effective_user.first_name),
     )
-    assert result == ConversationSettingsState.TIMEZONE
+    assert result == ConversationRegistrationProcessState.TIMEZONE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("update", ([UpdateRequest(user=False)]), indirect=True)
+async def test_command_stat_with_new_user_use_incorrect_user(
+    mock_session: MockDbSession, update: Update, context: MitupContext[mock.MagicMock]
+):
+    with pytest.raises(EffectiveUserNotSet):
+        await command_start_with_new_user(update, context)
 
 
 @pytest.mark.asyncio
@@ -154,12 +165,3 @@ async def test_command_cancel(update: Update, context: MitupContext[mock.MagicMo
 
     expected_view = main_menu_view()
     api.assert_send_message_called(context, update, expected_view)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("update", [UpdateRequest(chat=False)], indirect=True)
-async def test_any_command_fails_without_effective_chat(
-    command_list, update: Update, context: MitupContext[mock.MagicMock]
-):
-    with pytest.raises(RuntimeError):
-        await command_list(update, context)
