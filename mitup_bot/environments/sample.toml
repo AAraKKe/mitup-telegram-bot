@@ -32,3 +32,8 @@ url = "postgres"
 #               the supplied tocken belongs needs to have a webhook properly
 #               configured.
 run_mode = "polling"
+
+[google_api]
+# Google API configuration
+gmaps_geocode_key = "key_to_use_geocode_api"
+gmaps_timezone_key = "key_to_use_timezone_api"

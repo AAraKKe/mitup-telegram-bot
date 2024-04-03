@@ -49,12 +49,6 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
             Payload=json.dumps(payload),
         )
 
-        if response["StatusCode"] != 200:
-            function_error = response["FunctionError"]
-            error(f"Error invoking lambda {name}: {function_error}")
-            raise click.Abort()
-
-        success(f"Lambda {name} finished successfully")
         console.rule("[bold]Log[/bold]")
         result = base64.b64decode(response["LogResult"]).decode().splitlines()
         for line in result:
@@ -68,10 +62,23 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
                 # Cannot parse as json, i.e. it is just a line
                 console.print(line)
             else:
-                if json_event["type"] == "platform.report":
+                if "log_level" in json_event and json_event["log_level"] == "ERROR":
+                    # Error log
+                    console.print(f"[bold red]Lambda failed execution: {json_event['errorMessage']}[/]")
+                    console.print("Stack trace:")
+                    for stack_line in json_event["stackTrace"]:
+                        console.print(stack_line)
+                if "type" in json_event and json_event["type"] == "platform.report":
                     exec_time = json_event["record"]["metrics"]["durationMs"]
                     # Report execution, can get ifnormation about time
                     console.rule(f"[bold]Lambda {name} run in {exec_time} ms")
+
+        if response["StatusCode"] != 200 or "FunctionError" in response:
+            function_error = response["FunctionError"]
+            error(f"Error invoking lambda {name}: {function_error}")
+            raise click.Abort()
+
+        success(f"Lambda {name} finished successfully")
 
 
 def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> str:

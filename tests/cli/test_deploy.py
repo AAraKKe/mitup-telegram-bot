@@ -183,9 +183,7 @@ def test_invoke_lambda_succeeds():
         "type": "platform.report",
         "record": {"metrics": {"durationMs": 123.123}},
     }
-    log_result = (
-        f"{json.dumps(start_json)}\n" "This is a log line\n\n\nAnd this is another\n" f"{json.dumps(duration_json)}"
-    )
+    log_result = f"{json.dumps(start_json)}\nThis is a log line\n\n\nAnd this is another\n{json.dumps(duration_json)}"
 
     # Lambda payload
     expected_payload = json.dumps({"action": "upgrade", "revision": "head"})
@@ -215,11 +213,11 @@ def test_invoke_lambda_succeeds():
     expected_output = (
         "\n".join(
             [
-                "✔︎ Lambda MyLambda finished successfully",
                 expected_rule("Log"),
                 "This is a log line",
                 "And this is another",
                 expected_rule("Lambda MyLambda run in 123.123 ms"),
+                "✔︎ Lambda MyLambda finished successfully",
             ]
         )
         + "\n"
@@ -227,14 +225,16 @@ def test_invoke_lambda_succeeds():
     assert expected_output == capture.get()
 
 
-def test_invoke_lambda_fails():
+@pytest.mark.parametrize("error_code", [400, 200], ids=["failure_400", "200_with_function_error"])
+def test_invoke_lambda_fails(error_code: int):
     payload = json.dumps({"action": "upgrade", "revision": "head"})
 
     context = DeploymentContext(
         invoke_lambda_responses=[
             {
-                "StatusCode": 404,
+                "StatusCode": error_code,
                 "FunctionError": "FunctionIsBroken",
+                "LogResult": base64.b64encode(b"Some log result"),
             }
         ]
     )
@@ -250,6 +250,45 @@ def test_invoke_lambda_fails():
         Payload=payload,
     )
 
+    assert "✘ Error invoking lambda MyLambda: FunctionIsBroken" in capture.get()
+
+
+def test_invoke_lambda_fails_on_execution_and_error_is_logged():
+    start_json = {"type": "platform.start"}
+    error_log = {
+        "log_level": "ERROR",
+        "errorMessage": "This thing is broken!",
+        "stackTrace": ["line1", "line2"],
+    }
+    log_result = f"{json.dumps(start_json)}\nThis is a log line\n\n\nAnd this is another\n{json.dumps(error_log)}"
+
+    payload = json.dumps({"action": "upgrade", "revision": "head"})
+
+    context = DeploymentContext(
+        invoke_lambda_responses=[
+            {
+                "StatusCode": 500,
+                "FunctionError": "FunctionIsBroken",
+                "LogResult": base64.b64encode(
+                    bytes(log_result, encoding="utf-8"),
+                ),
+            }
+        ]
+    )
+
+    with context.setup_mock() as (function, ecs, capture):
+        with pytest.raises(click.Abort):
+            deploy.invoke_lambda(function, "MyLambda")
+
+    context.assert_lambda_called(
+        "invoke",
+        FunctionName="MyLambda",
+        LogType="Tail",
+        Payload=payload,
+    )
+
+    assert "Lambda failed execution: This thing is broken!" in capture.get()
+    assert "Stack trace:\nline1\nline2\n" in capture.get()
     assert "✘ Error invoking lambda MyLambda: FunctionIsBroken" in capture.get()
 
 
