@@ -45,3 +45,9 @@ def test_callback_data_pattern_recognizes_inputs(action: str | None, entity: str
     from_match = CallbackData.parse(pattern.match(data))
 
     assert expected_callback_data == from_match
+
+
+def test_callback_data_match():
+    callback_data = CallbackData(entity="meeting", action="edit", id=21)
+
+    assert callback_data.match().groupdict() == {"action": "edit", "entity": "meeting", "id": "21"}

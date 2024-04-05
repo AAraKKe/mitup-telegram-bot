@@ -1,6 +1,11 @@
+import logging
+
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, Message, Update
+from telegram.ext import ExtBot
 
+from mitup_bot import api
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -8,7 +13,8 @@ from mitup_bot.exceptions import (
     EffectiveUserNotSet,
     UserNotFound,
 )
-from mitup_bot.models import User
+from mitup_bot.models import Meetup, User
+from mitup_bot.views import factory
 
 
 def current_user(update: Update, session: Session) -> User:
@@ -41,3 +47,23 @@ def callback_query(update: Update) -> CallbackQuery:
         raise CallbackQueryNotSet(update)
 
     return update.callback_query
+
+
+async def user_owns_meeting(
+    user: User, meeting_id: int, action: str, update: Update, context: MitupContext[ExtBot]
+) -> Meetup | None:
+    """
+    Check if the user owns the meeting.
+    If the user does, the meeting is returned.
+    If not, warn and send the user to the main menu and None is returned.
+    """
+    if meeting := user.own_meeting(meeting_id):
+        return meeting
+
+    message = (
+        f"User tried {action!r} with a meeting that does not belong to them. "
+        f"Meeting id: {meeting_id}, user id: {user.id}"
+    )
+    logging.warning(message)
+    await api.edit_message(context, update, factory.main_menu_view())
+    return None

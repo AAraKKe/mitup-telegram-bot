@@ -1,13 +1,40 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum
+from typing import cast
 from unittest import mock
 
-from telegram import Update
+from telegram import Location, Update
 from telegram.ext import CallbackContext
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_id import CallbackId
+from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import MitupView
+
+
+async def call_handler(
+    update: Update,
+    app: StubMitupApp,
+    handler_id: CallbackId,
+    with_meeting_id: tuple[ContextId, int] | None = None,
+) -> tuple[MitupContext[mock.MagicMock], Enum | None]:
+    context = MitupContext.from_update(update, app)
+
+    if with_meeting_id is not None:
+        context.store_meeting_id(with_meeting_id[0], with_meeting_id[1])
+
+    handler = HandlersRegistry.get_handler(handler_id)
+
+    # Allow natural handling of the request data provided on the update
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False, "This update would not be processed by the handler!"
+
+    handler.collect_additional_context(context, update, app, check_result)
+    return context, cast(Enum | None, await handler.callback(update, context))
 
 
 @dataclass
@@ -30,7 +57,8 @@ class UpdateRequest:
 
     user: bool = True
     chat: bool = True
-    message: bool = True
+    message: str | bool = True
+    location: Location | None = None
     callback_query: CallbackData | bool = False
     inline_query: str = ""
 

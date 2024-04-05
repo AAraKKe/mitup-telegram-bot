@@ -6,7 +6,7 @@ from enum import Enum, auto
 
 from telegram.ext import CallbackContext, ExtBot
 
-from mitup_bot.exceptions import ContextPropertyConversionError, InvalidUserData, MeetingIdNotSetError
+from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError, InvalidUserData
 
 
 class ContextId(Enum):
@@ -31,8 +31,8 @@ class MitupUserData:
     def store_meeting_id(self, context: ContextId, meeting_id: int):
         self.registry.setdefault(context, ContextData()).meeting_id = meeting_id
 
-    def clean_meeting_id(self, context: ContextId):
-        self.registry[context].meeting_id = None
+    def has_meeting_id(self, context: ContextId) -> bool:
+        return context in self.registry and self.registry[context].meeting_id is not None
 
 
 class MitupContext[TB: ExtBot](CallbackContext[TB, MitupUserData, dict, dict]):
@@ -50,10 +50,12 @@ class MitupContext[TB: ExtBot](CallbackContext[TB, MitupUserData, dict, dict]):
         ):  # pragma: no cover, the app does not allow us to set user_data in tests and this should never happen
             raise InvalidUserData("User data requested but not set")
 
-        value = getattr(self.user_data.registry[context], property)
+        entry = self.user_data.registry.get(context)
 
-        if value is None:
-            raise MeetingIdNotSetError(f"User data {property!r} requested but not set. User data: {self.user_data!r}")
+        if entry is None or (value := getattr(entry, property)) is None:
+            raise ContextPropertyNotSetError(
+                f"User data {property!r} requested but not set. User data: {self.user_data!r}"
+            )
 
         try:
             value = type(value)
@@ -75,6 +77,11 @@ class MitupContext[TB: ExtBot](CallbackContext[TB, MitupUserData, dict, dict]):
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""
         yield from self.__get_user_data_property(context, "meeting_id", int, ensure_clean=ensure_clean)
 
+    def has_meeting_id(self, context: ContextId) -> bool:
+        if self.user_data is None:  # pragma: no cover
+            return False
+        return self.user_data.has_meeting_id(context)
+
     def store_meeting_id(self, context: ContextId, meeting_id: int):
         if self.user_data is None:  # pragma: no cover
             raise InvalidUserData("User data requested but not set")
@@ -90,7 +97,7 @@ class MitupContext[TB: ExtBot](CallbackContext[TB, MitupUserData, dict, dict]):
             self.user_data.remove_context(context)
 
     def clean_all_user_data(self):
-        if self.user_data is None:
+        if self.user_data is None:  # pragma: no cover
             logging.warning("User data requested but not set when trying to clean all user data. Not doing anything.")
             return
 

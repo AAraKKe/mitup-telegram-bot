@@ -3,7 +3,7 @@ from typing import cast
 from unittest import mock
 
 import pytest
-from telegram import Message, Update
+from telegram import Location, Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import MitupContext
@@ -16,7 +16,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import MockApi
+from tests.helpers import MockApi, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
@@ -86,6 +86,7 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
 async def test_edit_timezone_with_location_update_correctly(
     mock_session: MockDbSession,
     update: Update,
@@ -113,6 +114,7 @@ async def test_edit_timezone_with_location_update_correctly(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
 async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
     mock_session: MockDbSession,
     update: Update,

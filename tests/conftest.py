@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 from pydantic import SecretStr
-from telegram import CallbackQuery, Chat, InlineQuery, Location, Message, Update, User
+from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot import db
@@ -15,6 +15,15 @@ from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from tests.helpers import UpdateRequest
 from tests.stub_db import MockDbSession
+
+
+@pytest.fixture
+def none():
+    """
+    Simple drop-in fixture to get None.
+    Specially in places where pytest getfixture value is used to dinamically load fixtures
+    """
+    return None
 
 
 @pytest.fixture
@@ -86,7 +95,7 @@ def user_with_settings(settings: Settings) -> UserModel:
 
 
 @pytest.fixture
-def meeting(user: UserModel) -> Meetup:
+def meeting(user_with_settings: UserModel) -> Meetup:
     return Meetup(
         id=123,
         title="Test Meeting",
@@ -94,7 +103,7 @@ def meeting(user: UserModel) -> Meetup:
         date=dt.date(1987, 7, 16),
         time=dt.time(23, 59),
         location=MeetupLocation(name="Test Location", coordinates=(123.1, 321.1)),
-        owner=user,
+        owner=user_with_settings,
     )
 
 
@@ -115,9 +124,7 @@ def tg_inline_query(tg_user: User) -> InlineQuery:
 
 @pytest.fixture(scope="session")
 def tg_message(tg_user: User, tg_chat: Chat) -> Message:
-    return Message(
-        123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user, text="some text", location=Location(123.6, 103.5)
-    )
+    return Message(123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user, text="some text")
 
 
 @pytest.fixture(scope="session")
@@ -125,8 +132,8 @@ def tg_callback_query(tg_user: User, tg_message: Message) -> CallbackQuery:
     return CallbackQuery(id="123", from_user=tg_user, message=tg_message, chat_instance="someinstance")
 
 
-def callback_query_from_callback_data(data: CallbackData, user: User) -> CallbackQuery:
-    return CallbackQuery(id="123", from_user=user, data=str(data), chat_instance="someinstance")
+def callback_query_from_callback_data(data: CallbackData, user: User, message: Message) -> CallbackQuery:
+    return CallbackQuery(id="123", from_user=user, data=str(data), chat_instance="someinstance", message=message)
 
 
 @pytest.fixture
@@ -147,7 +154,7 @@ def update(
 
     if data.callback_query:
         query = (
-            callback_query_from_callback_data(data.callback_query, tg_user)
+            callback_query_from_callback_data(data.callback_query, tg_user, tg_message)
             if isinstance(data.callback_query, CallbackData)
             else tg_callback_query
         )
@@ -161,9 +168,21 @@ def update(
         # - Inlinequery
         # If we want to validate that the update doesn't have an user we need to provide an empty update
         return Update(123)
+
     # If we have a message we will al ways have a chat and a user
     # We are not dealing yet with types of updates that can have a chat without a message
-    return Update(123, Message(123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user))
+    message_text = data.message if isinstance(data.message, str) else "some text"
+    return Update(
+        123,
+        Message(
+            123,
+            date=dt.datetime.now(),
+            chat=tg_chat,
+            from_user=tg_user,
+            text=message_text,
+            location=data.location,
+        ),
+    )
 
 
 @pytest.fixture

@@ -1,9 +1,8 @@
 import logging
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Any
 from warnings import filterwarnings
 
 from telegram import Update
@@ -22,8 +21,9 @@ from telegram.warnings import PTBUserWarning
 from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
-from mitup_bot.utils.types import CCT, HandlerCallback
+from mitup_bot.utils.types import HandlerCallback
 
 # Remove the warning that is sent when using the per_message option in the registry.
 # We have a case in which the user can interact with a simialr message in different palces
@@ -36,7 +36,7 @@ filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBU
 
 @dataclass
 class HandlerWrapper:
-    handler: BaseHandler
+    handler: BaseHandler[Update, MitupContext]
     bindable: bool
     group: int = 0
 
@@ -123,10 +123,7 @@ class HandlersRegistry:
         bindable: bool = True,
         group: int = 0,
         block: bool = True,
-    ) -> Callable[
-        [Callable[[Update, CCT], Any]],
-        Callable[[Update, CCT], Coroutine[Any, Any, Any]],
-    ]:
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a MessageHandler.
 
@@ -136,8 +133,8 @@ class HandlersRegistry:
         """  # noqa: E501
 
         def wrapper(
-            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
-        ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
             if callback_id in cls.handlers:
                 raise HandlerRegisteredError(callback_id)
 
@@ -159,10 +156,7 @@ class HandlersRegistry:
         group: int = 0,
         callback_data: CallbackData | None = None,
         block: bool = True,
-    ) -> Callable[
-        [Callable[[Update, CCT], Any]],
-        Callable[[Update, CCT], Coroutine[Any, Any, Any]],
-    ]:
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a CallbackQueryHandler. Set auto_answer to False if you want to answer
         the callback query from the callback itself. Otherwise, a dummy answer will be sent to Telegram once the
@@ -174,12 +168,12 @@ class HandlersRegistry:
         """
 
         def wrapper(
-            callback: Callable[[Update, CCT], Coroutine[Any, Any, Any]],
-        ) -> Callable[[Update, CCT], Coroutine[Any, Any, Any]]:
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
             if callback_id in cls.handlers:
                 raise HandlerRegisteredError(callback_id)
 
-            async def inner_wrapper(update: Update, context: CCT):
+            async def inner_wrapper(update: Update, context: MitupContext):
                 result = await callback(update, context)
                 if auto_answer:
                     assert update.callback_query is not None
@@ -216,7 +210,7 @@ class HandlersRegistry:
         app.add_handler(CallbackQueryHandler(callback=callback_query_fallback))
 
     @classmethod
-    def get_handler(cls, key: CallbackId) -> BaseHandler:
+    def get_handler(cls, key: CallbackId) -> BaseHandler[Update, MitupContext]:
         if key not in cls.handlers:
             raise HandlerNotRegistered(key)
         return cls.handlers[key].handler

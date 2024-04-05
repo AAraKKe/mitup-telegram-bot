@@ -1,19 +1,11 @@
-from unittest import mock
-
 import pytest
-from telegram import Update
 
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
     MitupContext,
 )
-from mitup_bot.exceptions import ContextPropertyConversionError, MeetingIdNotSetError
-
-
-@pytest.fixture()
-def context(update: Update, context: MitupContext[mock.MagicMock]):
-    return context.from_update(update, context.application)
+from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
 
 
 def test_add_and_remove_context(context: MitupContext):
@@ -56,7 +48,7 @@ def test_error_raised_if_property_requested_but_not_set(context: MitupContext):
 
     context.user_data.registry[ContextId.EDIT_MEETING_LOCATION_NAME] = ContextData()
 
-    with pytest.raises(MeetingIdNotSetError):
+    with pytest.raises(ContextPropertyNotSetError):
         with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME):
             pass
 
@@ -91,3 +83,30 @@ def test_context_manager_error_does_not_clean_data_if_requested(context: MitupCo
 
     # The context has been removed from the registry
     assert ContextId.EDIT_MEETING_LOCATION_NAME in context.user_data.registry
+
+
+def test_context_manager_error_does_not_clean_data_if_not_requested(context: MitupContext):
+    assert context.user_data is not None
+
+    # Set values before context manager
+    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, 123)
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
+
+    # Read from within the context manager
+    with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, ensure_clean=False) as meeting_id:
+        assert meeting_id == 123
+
+    # Meeting Id has not been removed from the registry
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
+
+
+def test_context_has_meeting_id(context: MitupContext):
+    assert context.user_data is not None
+
+    assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
+
+    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, 123)
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
+
+    context.clean_all_user_data()
+    assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)

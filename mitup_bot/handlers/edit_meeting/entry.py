@@ -11,8 +11,20 @@ from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import factory
 
 from .enums import EditMeetingHandlerId
+
+
+def cleanup_states(context: MitupContext):
+    context.clean_user_data(
+        [
+            ContextId.EDIT_MEETING_TITLE,
+            ContextId.EDIT_MEETING_DESCRIPTION,
+            ContextId.EDIT_MEETING_LOCATION_NAME,
+            ContextId.EDIT_MEETING_LOCATION_COORDINATES,
+        ]
+    )
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.EDIT, callback_data=cb.EDIT_MEETING, bindable=True)
@@ -27,15 +39,13 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
     if callback_data.id is None:
         raise MalformedCallbackData(EditMeetingHandlerId.EDIT, callback_data)
 
-    meeting = user.own_meeting(callback_data.id)
-    if meeting is not None:
-        # Only allow editing the meeting if the meeting belongs to the user
-        await api.edit_message(context, update, meeting.edit_view)
-    else:
-        logging.warning(
-            "User tried editing meeting that does not belong to them. "
-            f"Meeting id: {callback_data.id}, user id: {user.id}"
-        )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Edit meeting", update, context)
+
+    if meeting is None:
+        return
+
+    # Only allow editing the meeting if the meeting belongs to the user
+    await api.edit_message(context, update, meeting.edit_view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -49,7 +59,12 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
     meeting_id = cb.EDIT_MEETING_CANCEL.parse(context.matches[0]).id
 
     if meeting_id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.CANCEL, cb.EDIT_MEETING_CANCEL)
+        # If we cannot get a meeting_id from callback soemthing went wrong.
+        # Cleanup, log error and end possible conversation
+        cleanup_states(context)
+        logging.error(MalformedCallbackData(EditMeetingHandlerId.CANCEL, cb.EDIT_MEETING_CANCEL))
+        await api.edit_message(context, update, factory.main_menu_view())
+        return ConversationHandler.END
 
     logging.info(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
 
@@ -58,13 +73,6 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
     await api.edit_message(context, update, meetup.edit_view)
 
     # Cleanup any possible state set by any handler related with editing the meeting
-    context.clean_user_data(
-        [
-            ContextId.EDIT_MEETING_TITLE,
-            ContextId.EDIT_MEETING_DESCRIPTION,
-            ContextId.EDIT_MEETING_LOCATION_NAME,
-            ContextId.EDIT_MEETING_LOCATION_COORDINATES,
-        ]
-    )
+    cleanup_states(context)
 
     return ConversationHandler.END

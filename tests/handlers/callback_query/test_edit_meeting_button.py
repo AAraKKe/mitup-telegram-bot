@@ -53,7 +53,7 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
 
     await callback_query_edit_meeting(update, context)
 
-    assert "User tried editing meeting that does not belong to them" in caplog.text
+    assert "User tried 'Edit meeting' with a meeting that does not belong to them. " in caplog.text
     assert "Meeting id: 9, user id: 1" in caplog.text
 
 

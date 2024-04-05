@@ -52,7 +52,7 @@ async def test_command_registry_can_register_command_handlers():
     assert handler.has_args is None
     assert "my_command" in handler.commands
 
-    callback_return = await handler.callback(Update(0), None)
+    callback_return = await handler.callback(Update(0), MitupContext(mock.MagicMock()))
     assert callback_return == "Done!"
 
 
