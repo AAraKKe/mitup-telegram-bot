@@ -33,6 +33,7 @@ EDIT_MEETING_LOCATION_COORDINATES = CallbackData(action="edit", entity="meet_loc
 EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
 EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
 EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
+CANCEL_EDIT_MEETING_LOCATION = CallbackData(action="cancel", entity="meet_loc")
 CANCEL_EDIT_MEETING_PARTICIPANS = CallbackData(action="cancel", entity="meet_part")
 
 # Main menu callbacks

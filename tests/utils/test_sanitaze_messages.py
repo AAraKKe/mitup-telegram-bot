@@ -17,5 +17,7 @@ def test_sanitize_user_input():
         TEST = "Hello, **$name!**. _This is cursive_"
 
     message = TestMessage.TEST.get(name="**New_World**")
+    message_without_full_scape = TestMessage.TEST.get(full=False, name="_My World_")
 
     assert message == "Hello, **\\*\\*New\\_World\\*\\*\\!**\\. _This is cursive_"
+    assert message_without_full_scape == "Hello, **_My World_\\!**\\. _This is cursive_"

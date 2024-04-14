@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import cast
 
 import pytest
 from telegram import Update
@@ -7,45 +8,59 @@ from telegram import Update
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.edit_meeting.edit_meeting_description import callback_query_edit_meeting_description
-from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState
+from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import MockApi
+from tests.helpers import MockApi, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
 
 
+@pytest.mark.parametrize(
+    "update, expected_description",
+    [
+        (
+            UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(1)),
+            "What a cool description. Congratulations",
+        ),
+        (UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(2)), "_This meeting has no description yet_"),
+    ],
+    ids=["meeting_with_a_previous_description", "meeting_without_a_previous_description"],
+    indirect=["update"],
+)
 @pytest.mark.asyncio
-async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store_meeting_id(
-    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user: User
+async def test_callback_query_edit_meeting_description_works(
+    mock_session: MockDbSession,
+    update: Update,
+    expected_description: str,
+    user: User,
+    api: MockApi,
+    app: StubMitupApp,
 ):
-    assert context.user_data is not None
-
-    match = re.match(cb.EDIT_MEETING_DESCRIPTION.pattern, "edit;meet_desc:1")
-    assert match is not None
-
-    context.matches = [match]
     mock_session.add_object(user, "tg_user_id")
+    context, result = await call_handler(update, app, EditMeetingHandlerId.DESCRIPTION_CALLBACK)
 
-    state = await callback_query_edit_meeting_description(update, context)
+    assert context.user_data is not None
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION)
 
-    assert context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id == 1
+    meeting_id = context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id
 
     view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(description=user.meetups[0].description),
+        description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(full=False, description=expected_description),
         keyboard=[
             [
                 ButtonConfig(
                     text=ButtonMessages.CANCEL.get(),
-                    callback_data=cb.EDIT_MEETING_CANCEL.with_id(1),
+                    callback_data=cb.EDIT_MEETING_CANCEL.with_id(cast(int, meeting_id)),
                 )
             ]
         ],
     )
 
     api.assert_edit_message_called(context, update, view)
-    assert state == ConversationMeetingState.EDIT_DESCRIPTION
+    assert result == ConversationMeetingState.EDIT_DESCRIPTION
 
 
 @pytest.mark.asyncio

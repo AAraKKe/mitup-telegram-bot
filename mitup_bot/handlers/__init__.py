@@ -9,14 +9,14 @@ __all__ = (
     "PositiveNumberFilter",
     "edit_meeting",
     "edit_settings",
+    "registration_process",
 )
 
 # First lets expose the registry
 from .registry import HandlersRegistry
 
 # Then subpackages
-from . import edit_meeting
-from . import edit_settings
+from . import registration_process, edit_meeting, edit_settings
 
 # Now we can import the rest of modules
 from . import callback_query, commands, conversations, messages

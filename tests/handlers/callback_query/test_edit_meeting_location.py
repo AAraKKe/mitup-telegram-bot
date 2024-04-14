@@ -137,7 +137,7 @@ async def test_callback_edit_location_name_works(
             [
                 ButtonConfig(
                     text=ButtonMessages.CANCEL.get(),
-                    callback_data=cb.EDIT_MEETING_LOCATION.with_id(1),
+                    callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
         ],
@@ -203,7 +203,7 @@ async def test_callback_edit_location_coordinates_works(
             [
                 ButtonConfig(
                     text=ButtonMessages.CANCEL.get(),
-                    callback_data=cb.EDIT_MEETING_LOCATION.with_id(1),
+                    callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
         ],
@@ -378,12 +378,13 @@ async def test_edit_location_coordinates_message_with_wrong_message(
             [
                 ButtonConfig(
                     text=ButtonMessages.CANCEL.get(),
-                    callback_data=cb.EDIT_MEETING_LOCATION.with_id(1),
+                    callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
         ],
     )
 
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
     assert result is ConversationMeetingState.EDIT_LOCATION_COORDIANTES
     api.assert_send_message_called(context, update, expected_view)
 
@@ -407,3 +408,22 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
 
     assert result is ConversationHandler.END
     api.assert_edit_message_called(context, update, factory.main_menu_view())
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1))], indirect=True
+)
+@pytest.mark.asyncio
+async def test_callback_cancel_edit_meeting_location_property_works(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    api: MockApi,
+    app: StubMitupApp,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK)
+
+    api.assert_edit_message_called(context, update, edit_location_view(user_with_settings.meetups[0]))
+    assert result is ConversationHandler.END

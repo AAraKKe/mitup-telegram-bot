@@ -22,10 +22,10 @@ def _sanitize(message: str, full=False) -> str:
 
 
 class MessageBase(StrEnum):
-    def get(self, **kwargs: MessageParams) -> str:
+    def get(self, full: bool = True, **kwargs: MessageParams) -> str:
         for key, value in kwargs.items():
             assert value is not None, "Message parameter cannot be None!"
-            kwargs[key] = _sanitize(str(value), full=True)
+            kwargs[key] = _sanitize(str(value), full=full)
         return _sanitize(Template(self.value).substitute(**kwargs))
 
 
@@ -69,6 +69,7 @@ class MeetingMessages(MessageBase):
     EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*$title*\n\n Send me the new one"
     EDIT_MEETING_DESCRIPTION = "This is the current description of your meeting:\n$description\n\n Send me the new one"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
+    NO_MEETINGS_FOUND = "_You don't have any meetings yet. Click on New meeting in the main menu to create one._"
     TITLE_SET_SUCCESS = "The title has been properly set to: *$title*"
     DESCRIPTION_SET_SUCCESS = "The description has been properly set to: *$description*"
     ACTIVE = "These are all your active meetings."

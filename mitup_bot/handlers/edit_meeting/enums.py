@@ -28,6 +28,7 @@ class EditMeetingHandlerId(CallbackId):
     # Edit meeting location
     LOCATION_CALLBACK = auto()
     LOCATION_NAME_CALLBACK = auto()
+    LOCATION_CANCEL_CALLBACK = auto()
     LOCATION_NAME_CONVERSATION = auto()
     LOCATION_NAME_MESSAGE = auto()
     LOCATION_COORDINATES_CALLBACK = auto()

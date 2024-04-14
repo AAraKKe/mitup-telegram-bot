@@ -86,7 +86,7 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
                 [
                     ButtonConfig(
                         text=ButtonMessages.CANCEL.get(),
-                        callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting_id),
+                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
                     )
                 ]
             ],
@@ -94,6 +94,20 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
     )
 
     return ConversationMeetingState.EDIT_LOCATION_NAME
+
+
+@HandlersRegistry.register_callback_query(
+    EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK,
+    callback_data=cb.CANCEL_EDIT_MEETING_LOCATION,
+    bindable=False,
+)
+@with_async_session
+async def callback_cancel_edit_meeting_location_property(session: Session, update: Update, context: MitupContext):
+    logging.info("Enter into callback_cancel_edit_meeting_location_property")
+
+    await callback_edit_meeting_location(update, context)
+
+    return ConversationHandler.END
 
 
 @HandlersRegistry.register_callback_query(
@@ -135,7 +149,7 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
                 [
                     ButtonConfig(
                         text=ButtonMessages.CANCEL.get(),
-                        callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting_id),
+                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
                     )
                 ]
             ],
@@ -205,14 +219,14 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
 )
 async def edit_coordinates_without_location(update: Update, context: MitupContext):
     try:
-        with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES) as meeting_id:
+        with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, ensure_clean=False) as meeting_id:
             view = MitupView(
                 description=MeetingMessages.LOCATION_COORDINATES_WRONG.get(),
                 keyboard=[
                     [
                         ButtonConfig(
                             text=ButtonMessages.CANCEL.get(),
-                            callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting_id),
+                            callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
                         )
                     ]
                 ],
@@ -233,7 +247,7 @@ HandlersRegistry.register_conversation_handler(
     states={
         ConversationMeetingState.EDIT_LOCATION_NAME: [
             EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
-            EditMeetingHandlerId.CANCEL,
+            EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK,
         ],
     },
     fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
@@ -246,7 +260,7 @@ HandlersRegistry.register_conversation_handler(
     states={
         ConversationMeetingState.EDIT_LOCATION_COORDIANTES: [
             EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
-            EditMeetingHandlerId.CANCEL,
+            EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK,
         ],
     },
     fallbacks=[EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE],

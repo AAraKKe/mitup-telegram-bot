@@ -44,8 +44,10 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
             context,
             update,
             MitupView(
-                MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
-                    description=meeting.description or MeetingMessages.MEETING_WITHOUT_DESCRIPTION.get()
+                MeetingMessages.EDIT_MEETING_DESCRIPTION.get(description=meeting.description)
+                if meeting.description
+                else MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
+                    full=False, description=MeetingMessages.MEETING_WITHOUT_DESCRIPTION
                 ),
                 keyboard=[
                     [

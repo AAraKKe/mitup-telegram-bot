@@ -11,9 +11,9 @@ from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, PaginatedMitupView
+from mitup_bot.views import ButtonConfig, MitupView, PaginatedMitupView
 
 from .conversations_states import ConversationMeetingState
 from .registry import HandlersRegistry
@@ -31,8 +31,7 @@ class CallbackQueryId(CallbackId):
     CallbackQueryId.CREATE_MEETING, callback_data=cb.CREATE_MEETING, bindable=False
 )
 async def callback_query_create_meeting(update: Update, context: MitupContext):
-    if update.effective_chat is None:
-        raise RuntimeError("Effective chat not set")
+    logging.info("Enter into callback_query_create_meeting")
 
     view = views.factory.create_meeting_view()
 
@@ -109,15 +108,23 @@ async def callback_query_show_meetings(session: Session, update: Update, context
     owner_user = guards.current_user(update, session)
     user_meetings = sorted(owner_user.meetups, key=lambda meeting_id: cast(int, meeting_id.id))
 
-    user_meetings_buttons: list[ButtonConfig] = [
-        ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)))
+    if user_meetings_buttons := [
+        ButtonConfig(
+            text=str(meeting.title),
+            callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)),
+        )
         for meeting in user_meetings
-    ]
+    ]:
+        view = PaginatedMitupView(
+            description=MeetingMessages.ACTIVE.get(),
+            buttons=user_meetings_buttons,
+            page_number=callback_data.id,
+        )
 
-    view = PaginatedMitupView(
-        description=MeetingMessages.ACTIVE.get(),
-        buttons=user_meetings_buttons,
-        page_number=callback_data.id,
-    )
+    else:
+        view = MitupView(
+            description=MeetingMessages.NO_MEETINGS_FOUND.get(),
+            keyboard=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+        )
 
     await api.edit_message(context, update, view)

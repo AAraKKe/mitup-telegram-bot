@@ -8,6 +8,7 @@ from telegram import Update
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.callback_query import (
+    CallbackQueryId,
     callback_query_cancel_meeting,
     callback_query_create_meeting,
     callback_query_main_menu,
@@ -22,9 +23,11 @@ from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import ButtonMessages
+from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import factory
-from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
-from tests.helpers import MockApi, UpdateRequest
+from mitup_bot.views.mitup_view import ButtonConfig, MitupView, PaginatedMitupView
+from tests.helpers import MockApi, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
 
 
@@ -216,6 +219,26 @@ async def test_callback_query_show_meetings_use_correct_view(
         column_size=2,
         row_size=2,
     )
+    api.assert_edit_message_called(context, update, expected_view)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1))], indirect=True
+)
+@pytest.mark.asyncio
+async def test_callback_query_show_meetings_without_meetings_to_show_works(
+    mock_session: MockDbSession, update: Update, app: StubMitupApp, user: User, api: MockApi
+):
+    mock_session.add_object(user, "tg_user_id")
+    user.meetups = []
+
+    context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETINGS)
+
+    expected_view = MitupView(
+        description=MeetingMessages.NO_MEETINGS_FOUND.get(),
+        keyboard=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+    )
+
     api.assert_edit_message_called(context, update, expected_view)
 
 

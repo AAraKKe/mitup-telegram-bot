@@ -77,7 +77,7 @@ def user() -> UserModel:
         first_name="John",
         tg_user_id=123,
         meetups=[
-            Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations!"),
+            Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations"),
             Meetup(id=2, title="Test Meeting 2"),
         ],
     )
