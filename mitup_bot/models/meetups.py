@@ -90,6 +90,18 @@ class Meetup(SQLModel, table=True):
         return MeetingMessages.DATE_NOT_SET.get()
 
     @property
+    def participants_text(self) -> str:
+        # For now, we have not created the members field that represents the
+        # users that joined a given Meeting. This is an "empty" string for now until we can
+        # properly determine whether it has participants or not.
+        total_participants = MeetingMessages.EMPTY.get()
+        max_participants = (
+            MeetingMessages.MAX_PARTICIPANTS.get(max_participants=self.max_members) if self.max_members else ""
+        )
+
+        return f"{total_participants} {max_participants}"
+
+    @property
     def message(self) -> str:
         return MeetingMessages.FEATURES.get(
             title=self.title,
@@ -97,7 +109,7 @@ class Meetup(SQLModel, table=True):
             description=self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(),
             date=self.str_date,
             location=str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(),
-            participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
+            participants=self.participants_text,
         )
 
     @property

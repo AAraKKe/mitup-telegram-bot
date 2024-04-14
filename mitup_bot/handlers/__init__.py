@@ -6,6 +6,7 @@ __all__ = (
     "callback_query",
     "conversations",
     "UserExistFilter",
+    "PositiveNumberFilter",
     "edit_meeting",
     "edit_settings",
 )
@@ -19,4 +20,4 @@ from . import edit_settings
 
 # Now we can import the rest of modules
 from . import callback_query, commands, conversations, messages
-from .personal_filters import UserExistFilter
+from .personal_filters import UserExistFilter, PositiveNumberFilter

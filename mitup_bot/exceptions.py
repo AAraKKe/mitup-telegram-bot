@@ -110,3 +110,8 @@ class GeocodeClientNotConfiguredError(RuntimeError):
 class TimezoneClientNotConfiguredError(RuntimeError):
     def __init__(self):
         super().__init__("The timezone client must be configured before using it.")
+
+
+class PositiveNumberFilterError(RuntimeError):
+    def __init__(self):
+        super().__init__("The input must be a positive number.")

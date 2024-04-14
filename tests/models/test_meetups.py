@@ -27,24 +27,33 @@ def expected_location_name(expected_name, expected_coordinates):
     )
 
 
+def expected_participants_message(max_participants: bool) -> str:
+    total_participants = MeetingMessages.EMPTY.get()
+    max_participants_text = "(Max: 5)" if max_participants else ""
+
+    return f"{total_participants} {max_participants_text}"
+
+
 def expected_message(
     description: bool,
     date: bool,
     username: bool,
     location_name: bool,
     coordinates: bool,
+    max_participants: bool,
 ) -> str:
     str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get()
     str_date = "1987-07-17 01:59 (Europe/Madrid)" if date else MeetingMessages.DATE_NOT_SET.get()
     owner = "john_doe" if username else "John"
     location = expected_location_name("Test Location" if location_name else None, "[📍]" if coordinates else None)
+    str_participants = expected_participants_message(max_participants)
     return MeetingMessages.FEATURES.get(
         title="Test Meeting",
         owner=owner,
         description=str_description,
         date=str_date,
         location=location,
-        participants=MeetingMessages.PARTICIPANTS_NOT_SET.get(),
+        participants=str_participants,
     )
 
 
@@ -97,21 +106,23 @@ def test_meetup_location_string_conversion(
 
 
 @pytest.mark.parametrize(
-    "description, meetup_date, username, location_name, location_coordinates",
+    "description, meetup_date, username, location_name, location_coordinates, max_participants",
     [
-        (False, True, True, True, True),
-        (True, False, True, True, True),
-        (True, True, False, True, True),
-        (True, True, True, False, False),
-        (True, True, True, False, True),
-        (True, True, True, True, False),
-        (True, True, True, True, True),
+        (False, True, True, True, True, True),
+        (True, False, True, True, True, True),
+        (True, True, False, True, True, True),
+        (True, True, True, False, False, True),
+        (True, True, True, True, True, False),
+        (True, True, True, False, True, True),
+        (True, True, True, True, False, True),
+        (True, True, True, True, True, True),
     ],
     ids=[
         "no_description",
         "no_date",
         "no_username",
         "no_location",
+        "no_max_members",
         "with_location_coordinates",
         "with_location_name",
         "all_fields",
@@ -124,6 +135,7 @@ def test_meetup_features_message(
     username: bool,
     location_name: bool,
     location_coordinates: bool,
+    max_participants: bool,
 ):
     location = MeetupLocation(
         name="Test Location" if location_name else None,
@@ -135,10 +147,13 @@ def test_meetup_features_message(
         date=date(1987, 7, 16) if meetup_date else None,
         time=time(23, 59) if meetup_date else None,
         location=location,
+        max_members=5 if max_participants else None,
         owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
     )
 
-    expected = expected_message(description, meetup_date, username, location_name, location_coordinates)
+    expected = expected_message(
+        description, meetup_date, username, location_name, location_coordinates, max_participants
+    )
 
     assert expected == meeting.message
 

@@ -64,7 +64,8 @@ class MeetingMessages(MessageBase):
     DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
-    PARTICIPANTS_NOT_SET = "Empty"
+    EMPTY = "Empty"
+    MAX_PARTICIPANTS = "(Max: $max_participants)"
     EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*$title*\n\n Send me the new one"
     EDIT_MEETING_DESCRIPTION = "This is the current description of your meeting:\n$description\n\n Send me the new one"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
@@ -85,6 +86,22 @@ class MeetingMessages(MessageBase):
     LOCATION_NAME_SET_SUCCESS = "The name of the location has been set to: *$name*"
     LOCATION_COORDINATES_SUCCESS = "The location has been saved successfuly"
     LOCATION_COORDINATES_WRONG = "Send me the location again. Remember to touch on the clip icon and choose location."
+    EDIT_MEETING_PARTICIPANTS = (
+        "Here you will be able to manage the participants of the meeting: you can set the "
+        "maximum number of people that can attend the meeting as well as kick out any of the "
+        "participants that joined the meeting."
+    )
+    EDIT_MEETING_MAX_PARTICIPANTS = (
+        "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) "
+        "or press in _No limit_ to allow an unlimited number of participants."
+    )
+    MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *$max_participants*"
+    NO_LIMIT_PARTICIPANTS = "No limit"
+    MAX_PARTICIPANTS_SET_FAIL = (
+        "The maximum number of participants must be a number greater than 0. Please, try again\n"
+    )
+    EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
+    MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
 
 
 class ButtonMessages(MessageBase):
@@ -122,3 +139,6 @@ class ButtonMessages(MessageBase):
     BACK_EDIT = f"{GO_BACK} Edit"
     MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
     MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"
+    MEETING_MAX_PARTICIPANTS = "Max participants"
+    MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
+    MEETING_KICK_OUT = "Kick out"

@@ -16,6 +16,15 @@ class EditMeetingHandlerId(CallbackId):
     DESCRIPTION_MESSAGE = auto()
     DESCRIPTION_CONVERSATION = auto()
 
+    # Edit meeting participants
+    PARTICIPANTS_CALLBACK = auto()
+    PARTICIPANTS_MAXIMUM_CALLBACK = auto()
+    PARTICIPANTS_NO_LIMIT_CALLBACK = auto()
+    PARTICIPANTS_CANCEL_CALLBACK = auto()
+    PARTICIPANTS_MAXIMUM_MESSAGE = auto()
+    PARTICIPANTS_MAXIMUM_CONVERSATION = auto()
+    PARTICIPANTS_MAXIMUM_WRONG_MESSAGE = auto()
+
     # Edit meeting location
     LOCATION_CALLBACK = auto()
     LOCATION_NAME_CALLBACK = auto()
@@ -31,5 +40,6 @@ class EditMeetingHandlerId(CallbackId):
 class ConversationMeetingState(Enum):
     EDIT_TITLE = auto()
     EDIT_DESCRIPTION = auto()
+    EDIT_MAX_PARTICIPANTS = auto()
     EDIT_LOCATION_NAME = auto()
     EDIT_LOCATION_COORDIANTES = auto()
