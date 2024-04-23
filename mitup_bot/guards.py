@@ -14,7 +14,10 @@ from mitup_bot.exceptions import (
     UserNotFound,
 )
 from mitup_bot.models import Meetup, User
+from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
+from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 
 
 def current_user(update: Update, session: Session) -> User:
@@ -66,4 +69,32 @@ async def user_owns_meeting(
     )
     logging.warning(message)
     await api.edit_message(context, update, factory.main_menu_view())
+    return None
+
+
+async def meeting_accessible(
+    session: Session,
+    user: User,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    context: MitupContext,
+    custom_keyboard: Keyboard | None = None,
+) -> Meetup | None:
+    if Meetup.by_id(session, meeting_id):
+        return await user_owns_meeting(user, meeting_id, action, update, context)
+
+    message = (
+        f"User tried {action!r} with a meeting that does not exist. " f"Meeting id: {meeting_id}, user id: {user.id}"
+    )
+    logging.warning(message)
+    await api.edit_message(
+        context,
+        update,
+        MitupView(
+            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(),
+            keyboard=custom_keyboard
+            or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+        ),
+    )
     return None

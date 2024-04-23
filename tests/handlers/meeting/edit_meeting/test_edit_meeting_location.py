@@ -17,7 +17,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import MockApi, UpdateRequest, call_handler
+from tests.helpers import MockApi, UpdateRequest, call_handler, create_meetup
 from tests.stub_db import MockDbSession
 
 
@@ -83,6 +83,7 @@ async def test_callback_edit_location_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
 
@@ -107,6 +108,8 @@ async def test_callback_edit_location_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
+    # For the test case where we give a meeting that does not belong to the user
+    mock_session.add_object(create_meetup(999))
 
     with expectation:
         with caplog.at_level(logging.WARNING):
@@ -422,6 +425,7 @@ async def test_callback_cancel_edit_meeting_location_property_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK)
 

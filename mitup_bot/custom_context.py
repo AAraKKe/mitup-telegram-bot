@@ -43,7 +43,7 @@ class MitupContext[TB: ExtBot](CallbackContext[TB, MitupUserData, dict, dict]):
     is provided through context managers that ensure that the data is removed once out of scope.
     """
 
-    def __get_user_data_property[T](
+    def __get_user_data_property[T: int | str | bool](
         self, context: ContextId, property: str, type: type[T], ensure_clean: bool
     ) -> Generator[T, None, None]:
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""

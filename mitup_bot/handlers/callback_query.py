@@ -25,6 +25,9 @@ class CallbackQueryId(CallbackId):
     CREATE_MEETING = auto()
     SHOW_MEETING = auto()
     SHOW_MEETINGS = auto()
+    DELETE_MEETING = auto()
+    CONFIRM_DELETE_MEETING = auto()
+    DECLINE_DELETE_MEETING = auto()
 
 
 @HandlersRegistry.register_callback_query(
@@ -53,20 +56,27 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
         raise MalformedCallbackData(CallbackQueryId.SHOW_MEETING, callback_data)
 
     meeting_id = callback_data.id
-    logging.info(f"meeting id: {meeting_id}")
 
     user = guards.current_user(update, session)
-    meeting = user.own_meeting(meeting_id)
+    meeting = await guards.meeting_accessible(
+        session,
+        user,
+        meeting_id,
+        "Show meeting",
+        update,
+        context,
+        custom_keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(), callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1)
+                ),
+            ]
+        ],
+    )
+    if meeting is None:
+        return
 
-    if meeting is not None:
-        view = meeting.main_view
-
-        await api.edit_message(context, update, view)
-    else:
-        logging.warning(
-            "User tried opening meeting that does not belong to him. "
-            f"Meeting id: {callback_data.id}, user id: {user.id}"
-        )
+    await api.edit_message(context, update, meeting.main_view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -128,3 +138,123 @@ async def callback_query_show_meetings(session: Session, update: Update, context
         )
 
     await api.edit_message(context, update, view)
+
+
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.DELETE_MEETING, callback_data=cb.DELETE_MEETING, bindable=True
+)
+@with_async_session
+async def callback_query_delete_meeting(session: Session, update: Update, context: MitupContext):
+    logging.info("Enter into callback_query_delete_meeting")
+
+    assert context.matches is not None
+
+    user = guards.current_user(update, session)
+    meeting_id = cb.DELETE_MEETING.parse(context.matches[0]).id
+
+    if meeting_id is None:
+        raise MalformedCallbackData(CallbackQueryId.DELETE_MEETING, cb.DELETE_MEETING)
+
+    meeting = await guards.meeting_accessible(
+        session,
+        user,
+        meeting_id,
+        "Delete meeting",
+        update,
+        context,
+    )
+    if meeting is None:
+        return
+
+    await api.send_message(
+        context,
+        update,
+        MitupView(
+            description=MeetingMessages.DELETE_MEETING.get(),
+            keyboard=[
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.CONFIRM.get(),
+                        callback_data=cb.CONFIRM_DELETE_MEETING.with_id(meeting_id),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.DECLINE.get(),
+                        callback_data=cb.DECLINE_DELETE_MEETING.with_id(meeting_id),
+                    ),
+                ]
+            ],
+        ),
+    )
+
+
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.CONFIRM_DELETE_MEETING, callback_data=cb.CONFIRM_DELETE_MEETING, bindable=True
+)
+@with_async_session
+async def callback_query_confirm_delete_meeting(session: Session, update: Update, context: MitupContext):
+    logging.info("Enter into callback_query_confirm_delete_meeting")
+
+    assert context.matches is not None
+
+    user = guards.current_user(update, session)
+    meeting_id = cb.CONFIRM_DELETE_MEETING.parse(context.matches[0]).id
+
+    if meeting_id is None:
+        raise MalformedCallbackData(CallbackQueryId.CONFIRM_DELETE_MEETING, cb.CONFIRM_DELETE_MEETING)
+
+    meeting = await guards.meeting_accessible(
+        session,
+        user,
+        meeting_id,
+        "Confirm delete meeting",
+        update,
+        context,
+    )
+    if meeting is None:
+        return
+
+    session.delete(meeting)
+
+    view = MitupView(
+        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.get(),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ],
+    )
+    await api.send_message(context, update, view)
+
+
+@HandlersRegistry.register_callback_query(
+    CallbackQueryId.DECLINE_DELETE_MEETING, callback_data=cb.DECLINE_DELETE_MEETING, bindable=True
+)
+@with_async_session
+async def callback_query_decline_delete_meeting(session: Session, update: Update, context: MitupContext):
+    logging.info("Enter into callback_query_decline_delete_meeting")
+
+    assert context.matches is not None
+
+    user = guards.current_user(update, session)
+    meeting_id = cb.DECLINE_DELETE_MEETING.parse(context.matches[0]).id
+
+    if meeting_id is None:
+        raise MalformedCallbackData(CallbackQueryId.CONFIRM_DELETE_MEETING, cb.DECLINE_DELETE_MEETING)
+
+    meeting = await guards.meeting_accessible(
+        session,
+        user,
+        meeting_id,
+        "Decline delete meeting",
+        update,
+        context,
+    )
+    if meeting is None:
+        return
+
+    await api.edit_message(
+        context, update, meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get())
+    )

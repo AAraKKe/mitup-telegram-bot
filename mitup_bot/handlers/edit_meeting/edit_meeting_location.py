@@ -33,7 +33,8 @@ async def callback_edit_meeting_location(session: Session, update: Update, conte
     if meeting_id is None:
         raise MalformedCallbackData(EditMeetingHandlerId.LOCATION_CALLBACK, cb.EDIT_MEETING_LOCATION)
 
-    meeting = await guards.user_owns_meeting(
+    meeting = await guards.meeting_accessible(
+        session,
         user,
         meeting_id,
         "Edit location",

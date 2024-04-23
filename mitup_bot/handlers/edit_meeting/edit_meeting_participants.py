@@ -34,7 +34,8 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
     if meeting_id is None:
         raise MalformedCallbackData(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, cb.EDIT_MEETING_PARTICIPANTS)
 
-    meeting = await guards.user_owns_meeting(
+    meeting = await guards.meeting_accessible(
+        session,
         user,
         meeting_id,
         "Edit participants",
@@ -61,7 +62,8 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
     if meeting_id is None:
         raise MalformedCallbackData(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, cb.EDIT_MEETING_PARTICIPANTS)
 
-    meeting = await guards.user_owns_meeting(
+    meeting = await guards.meeting_accessible(
+        session,
         user,
         meeting_id,
         "Edit max participants",
@@ -97,7 +99,8 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
             EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS
         )
 
-    meeting = await guards.user_owns_meeting(
+    meeting = await guards.meeting_accessible(
+        session,
         user,
         meeting_id,
         "Edit no limit participants",

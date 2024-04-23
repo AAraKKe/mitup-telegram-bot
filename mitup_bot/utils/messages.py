@@ -103,6 +103,10 @@ class MeetingMessages(MessageBase):
     )
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
+    DELETE_MEETING = "Are you sure you want to delete this meeting?"
+    DELETE_MEETING_SUCCESS = "The meeting has been deleted successfully"
+    DELETE_MEETING_DECLINE = "The meeting won't be deleted"
+    ACCESS_TO_DELETED_MEETING = "This meeting has been deleted"
 
 
 class ButtonMessages(MessageBase):
@@ -143,3 +147,5 @@ class ButtonMessages(MessageBase):
     MEETING_MAX_PARTICIPANTS = "Max participants"
     MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
     MEETING_KICK_OUT = "Kick out"
+    CONFIRM = f"{Emojis.CHECK} Confirm"
+    DECLINE = f"{Emojis.CANCEL} Decline"

@@ -16,6 +16,8 @@ INVITE = CallbackData(action="invite", entity="meeting")
 LEAVE = CallbackData(action="leave", entity="meeting")
 CHAT = CallbackData(action="chat", entity="meeting")
 DELETE_MEETING = CallbackData(action="delete", entity="meeting")
+CONFIRM_DELETE_MEETING = CallbackData(action="confirm_delete", entity="meeting")
+DECLINE_DELETE_MEETING = CallbackData(action="decline_delete", entity="meeting")
 SHARE = CallbackData(action="share", entity="meeting")
 
 # Edit meeting callbacks

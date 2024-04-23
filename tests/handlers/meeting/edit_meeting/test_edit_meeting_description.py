@@ -3,19 +3,25 @@ import re
 from typing import cast
 
 import pytest
-from telegram import Update
+from telegram import CallbackQuery, Update
 
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.edit_meeting.edit_meeting_description import callback_query_edit_meeting_description
 from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
-from mitup_bot.models.users import User
+from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
 from tests.helpers import MockApi, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
+
+
+@pytest.fixture
+def api():
+    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_description") as api:
+        yield api
 
 
 @pytest.mark.parametrize(
@@ -40,6 +46,12 @@ async def test_callback_query_edit_meeting_description_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user, "tg_user_id")
+
+    callback_query = cast(CallbackQuery, update.callback_query)
+    meeting_id = cast(str, callback_query.data).split(":")[1]
+
+    mock_session.add_object(user.meetups[int(meeting_id) - 1])
+
     context, result = await call_handler(update, app, EditMeetingHandlerId.DESCRIPTION_CALLBACK)
 
     assert context.user_data is not None
@@ -85,10 +97,11 @@ async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_lo
     context: MitupContext,
     caplog: pytest.LogCaptureFixture,
     user: User,
+    meeting: Meetup,
 ):
     caplog.set_level(logging.WARNING)
 
-    match = re.match(cb.EDIT_MEETING_DESCRIPTION.pattern, "edit;meet_desc:4")
+    match = re.match(cb.EDIT_MEETING_DESCRIPTION.pattern, "edit;meet_desc:123")
     assert match is not None
 
     context.matches = [match]
@@ -96,5 +109,5 @@ async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_lo
 
     await callback_query_edit_meeting_description(update, context)
 
-    assert "User tried editing the meeting description that does not belong to him" in caplog.text
-    assert "user id: 1" in caplog.text
+    assert "User tried 'Edit description' with a meeting that does not exist." in caplog.text
+    assert " Meeting id: 123, user id: 1" in caplog.text

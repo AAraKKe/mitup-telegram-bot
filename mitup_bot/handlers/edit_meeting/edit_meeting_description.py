@@ -33,37 +33,39 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
         raise MalformedCallbackData(EditMeetingHandlerId.DESCRIPTION_CALLBACK, cb.EDIT_MEETING_DESCRIPTION)
 
     user = guards.current_user(update, session)
-    meeting = user.own_meeting(meeting_id)
+    meeting = await guards.meeting_accessible(
+        session,
+        user,
+        meeting_id,
+        "Edit description",
+        update,
+        context,
+    )
 
-    if meeting is not None:
-        assert meeting.id is not None
+    if meeting is None:
+        return ConversationHandler.END
 
-        context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, meeting_id)
+    context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, meeting_id)
 
-        await api.edit_message(
-            context,
-            update,
-            MitupView(
-                MeetingMessages.EDIT_MEETING_DESCRIPTION.get(description=meeting.description)
-                if meeting.description
-                else MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
-                    full=False, description=MeetingMessages.MEETING_WITHOUT_DESCRIPTION
-                ),
-                keyboard=[
-                    [
-                        ButtonConfig(
-                            text=ButtonMessages.CANCEL.get(),
-                            callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
-                        )
-                    ]
-                ],
+    await api.edit_message(
+        context,
+        update,
+        MitupView(
+            MeetingMessages.EDIT_MEETING_DESCRIPTION.get(description=meeting.description)
+            if meeting.description
+            else MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
+                full=False, description=MeetingMessages.MEETING_WITHOUT_DESCRIPTION
             ),
-        )
-    else:
-        logging.warning(
-            "User tried editing the meeting description that does not belong to him"
-            f"Meeting id: {meeting_id}, user id: {user.id}"
-        )
+            keyboard=[
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.CANCEL.get(),
+                        callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
+                    )
+                ]
+            ],
+        ),
+    )
 
     return ConversationMeetingState.EDIT_DESCRIPTION
 

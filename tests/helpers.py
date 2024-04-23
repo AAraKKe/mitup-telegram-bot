@@ -12,8 +12,17 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import MitupView
+
+
+def create_meetup(
+    id: int,
+    title: str = "Default title",
+    description="Default description",
+) -> Meetup:
+    return Meetup(id=id, title=title, description=description)
 
 
 async def call_handler(
@@ -98,6 +107,12 @@ class MockApi:
         self, context: mock.MagicMock | CallbackContext, update: Update, view: MitupView | str, times: int = 1
     ):
         self.assert_method_called(self.edit_message_mock, context, update, view, times)
+
+    def assert_send_message_not_called(self):
+        self.send_message_mock.assert_not_called()
+
+    def assert_edit_message_not_called(self):
+        self.edit_message_mock.assert_not_called()
 
     def assert_method_called(
         self,

@@ -17,7 +17,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import factory
-from tests.helpers import MockApi, UpdateRequest, call_handler
+from tests.helpers import MockApi, UpdateRequest, call_handler, create_meetup
 from tests.stub_db import MockDbSession
 
 
@@ -59,6 +59,8 @@ async def test_callback_edit_meeting_participants_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[1])
+
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
 
     api.assert_edit_message_called(context, update, edit_participants_view(2))
@@ -82,6 +84,7 @@ async def test_callback_edit_meeting_participants_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(create_meetup(999))
 
     with expectation:
         with caplog.at_level(logging.WARNING):
@@ -103,6 +106,7 @@ async def test_callback_edit_meeting_max_participants_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
 
@@ -131,6 +135,7 @@ async def test_callback_edit_meeting_max_participants_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(create_meetup(999))
 
     with expectation:
         with MockApi.start("mitup_bot.guards") as _api:
@@ -155,6 +160,8 @@ async def test_callback_edit_meeting_no_limit_participants_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
     meeting = user_with_settings.meetups[0]
 
     # Default value to assert that it has been changed
@@ -189,6 +196,7 @@ async def test_callback_edit_meeting_no_limit_participants_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(create_meetup(999))
 
     with expectation:
         with MockApi.start("mitup_bot.guards") as _api:
@@ -215,6 +223,8 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[1])
+
     context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK)
 
     api.assert_edit_message_called(context, update, edit_participants_view(2))

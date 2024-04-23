@@ -20,23 +20,14 @@ from mitup_bot.handlers.edit_settings.edit_timezone import callback_query_timezo
 from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
-from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView, PaginatedMitupView
-from tests.helpers import MockApi, UpdateRequest, call_handler
+from tests.helpers import MockApi, UpdateRequest, call_handler, create_meetup
 from tests.stub_db import MockDbSession
-
-
-def create_meetup(
-    id: int,
-    title: str = "Default title",
-    description="Default description",
-) -> Meetup:
-    return Meetup(id=id, title=title, description=description)
 
 
 @pytest.mark.asyncio
@@ -127,28 +118,25 @@ async def test_callback_query_create_meeting_return_the_correct_state(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
+@pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1))]), indirect=True)
 async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    app: StubMitupApp,
     user: User,
     api: MockApi,
 ):
-    match = re.match(cb.SHOW_MEETING.pattern, str(cb.SHOW_MEETING.with_id(1)))
-    assert match is not None
-
-    context.matches = [match]
     mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user.meetups[0])
 
-    await callback_query_show_meeting(update, context)
+    context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETING)
 
     expected_view = user.meetups[0].main_view
     api.assert_edit_message_called(context, update, expected_view)
 
 
 @pytest.mark.asyncio
-async def test_show__meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
+async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
     context: MitupContext[mock.MagicMock],
@@ -162,11 +150,14 @@ async def test_show__meeting_does_nothing_for_meeting_not_owned_and_logs_warning
 
     context.matches = [match]
     mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(create_meetup(4))
 
     await callback_query_show_meeting(update, context)
 
-    assert "User tried opening meeting that does not belong to him." in caplog.text
-    assert "user id: 1" in caplog.text
+    assert (
+        "User tried 'Show meeting' with a meeting that does not belong to them. Meeting id: 4, user id: 1"
+        in caplog.text
+    )
 
 
 @pytest.mark.asyncio

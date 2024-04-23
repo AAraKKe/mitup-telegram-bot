@@ -39,7 +39,7 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
     if callback_data.id is None:
         raise MalformedCallbackData(EditMeetingHandlerId.EDIT, callback_data)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Edit meeting", update, context)
+    meeting = await guards.meeting_accessible(session, user, callback_data.id, "Edit meeting", update, context)
 
     if meeting is None:
         return

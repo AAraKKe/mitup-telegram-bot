@@ -33,33 +33,35 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
         raise MalformedCallbackData(EditMeetingHandlerId.TITLE_CALLBACK, cb.EDIT_MEETING_TITLE)
 
     user = guards.current_user(update, session)
-    meeting = user.own_meeting(meeting_id)
+    meeting = await guards.meeting_accessible(
+        session,
+        user,
+        meeting_id,
+        "Edit title",
+        update,
+        context,
+    )
 
-    if meeting is not None:
-        assert meeting.id is not None and meeting.title is not None
+    if meeting is None:
+        return ConversationHandler.END
 
-        context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
+    context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
 
-        await api.edit_message(
-            context,
-            update,
-            MitupView(
-                description=MeetingMessages.EDIT_MEETING_TITLE.get(title=meeting.title),
-                keyboard=[
-                    [
-                        ButtonConfig(
-                            text=ButtonMessages.CANCEL.get(),
-                            callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
-                        )
-                    ]
-                ],
-            ),
-        )
-    else:
-        logging.warning(
-            "User tried editing the meeting title that does not belong to him. "
-            f"Meeting id: {meeting_id}, user id: {user.id}"
-        )
+    await api.edit_message(
+        context,
+        update,
+        MitupView(
+            description=MeetingMessages.EDIT_MEETING_TITLE.get(title=meeting.title),
+            keyboard=[
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.CANCEL.get(),
+                        callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
+                    )
+                ]
+            ],
+        ),
+    )
 
     return ConversationMeetingState.EDIT_TITLE
 
