@@ -22,11 +22,16 @@ def _sanitize(message: str, full=False) -> str:
 
 
 class MessageBase(StrEnum):
-    def get(self, full: bool = True, **kwargs: MessageParams) -> str:
+    def get(self, full: bool = True, lang: str = "en", **kwargs: MessageParams) -> str:
         for key, value in kwargs.items():
             assert value is not None, "Message parameter cannot be None!"
             kwargs[key] = _sanitize(str(value), full=full)
-        return _sanitize(Template(self.value).substitute(**kwargs))
+        return _sanitize(Template(self.to_lang(lang)).substitute(**kwargs))
+
+    def to_lang(self, lang: str) -> str:
+        """Given a message, return the translation in the given language."""
+        # For now we are not yet translating messages but here is where we should implement it
+        return self.value
 
 
 class Messages(MessageBase):
@@ -149,3 +154,73 @@ class ButtonMessages(MessageBase):
     MEETING_KICK_OUT = "Kick out"
     CONFIRM = f"{Emojis.CHECK} Confirm"
     DECLINE = f"{Emojis.CANCEL} Decline"
+
+
+class Weekday(MessageBase):
+    MONDAY = "Mon"
+    TUESDAY = "Tue"
+    WEDNESDAY = "Wed"
+    THURSDAY = "Thu"
+    FRIDAY = "Fri"
+    SATURDAY = "Sat"
+    SUNDAY = "Sun"
+
+
+class Month(MessageBase):
+    JANUARY = "January"
+    FEBRUARY = "February"
+    MARCH = "March"
+    APRIL = "April"
+    MAY = "May"
+    JUNE = "June"
+    JULY = "July"
+    AUGUST = "August"
+    SEPTEMBER = "September"
+    OCTOBER = "October"
+    NOVEMBER = "November"
+    DECEMBER = "December"
+
+
+class MonthShort(MessageBase):
+    JANUARY = "Jan"
+    FEBRUARY = "Feb"
+    MARCH = "Mar"
+    APRIL = "Apr"
+    MAY = "May"
+    JUNE = "Jun"
+    JULY = "Jul"
+    AUGUST = "Aug"
+    SEPTEMBER = "Sep"
+    OCTOBER = "Oct"
+    NOVEMBER = "Nov"
+    DECEMBER = "Dec"
+
+
+MonthList = [
+    Month.JANUARY,
+    Month.FEBRUARY,
+    Month.MARCH,
+    Month.APRIL,
+    Month.MAY,
+    Month.JUNE,
+    Month.JULY,
+    Month.AUGUST,
+    Month.SEPTEMBER,
+    Month.OCTOBER,
+    Month.NOVEMBER,
+    Month.DECEMBER,
+]
+MonthShortList = [
+    MonthShort.JANUARY,
+    MonthShort.FEBRUARY,
+    MonthShort.MARCH,
+    MonthShort.APRIL,
+    MonthShort.MAY,
+    MonthShort.JUNE,
+    MonthShort.JULY,
+    MonthShort.AUGUST,
+    MonthShort.SEPTEMBER,
+    MonthShort.OCTOBER,
+    MonthShort.NOVEMBER,
+    MonthShort.DECEMBER,
+]

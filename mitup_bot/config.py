@@ -20,6 +20,14 @@ from . import environments
 ConfigMap = dict[str, dict[str, str | int | bool | float]]
 
 
+class MetricsEnv(StrEnum):
+    # The values are obtained from the EMF configuration. We are using CLOUDWATCH and STDOUT to make it clear
+    # what are we using but they are referred to as default and local
+    # See: https://drp.li/SZQCc
+    CLOUDWATCH = "default"
+    STDOUT = "local"
+
+
 class RunModes(StrEnum):
     POLLING = auto()
     WEBHOOK = auto()
@@ -126,11 +134,26 @@ class AppConfig(BaseModel):
 
 class BotConfig(BaseModel):
     token: SecretStr
+    # These properties are needed when running with webhook
+    domain: str | None = None
+    # Port where Telegram should connect to. This is not the port in the host
+    # where the bot listens
+    port: int = 443
+    # Secret token provided to Telegram to validate connections
+    secret_token: SecretStr | None = None
+    max_connections: int = 100
 
 
 class GoogleApiConfig(BaseModel):
     gmaps_geocode_key: SecretStr
     gmaps_timezone_key: SecretStr
+
+
+class MetricsConfig(BaseModel):
+    # Even though EMF configuration can be done through environment variables, we are
+    # keeping it here for clarity and managing it ourselves
+    namespace: str
+    environment: MetricsEnv
 
 
 class Config(BaseModel):
@@ -154,6 +177,7 @@ class Config(BaseModel):
     bot: BotConfig
     google_api: GoogleApiConfig
     app: AppConfig
+    metrics: MetricsConfig
 
     @staticmethod
     def from_providers(*providers: ConfigProvider) -> Config:

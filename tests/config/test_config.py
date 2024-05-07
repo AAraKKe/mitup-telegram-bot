@@ -17,6 +17,11 @@ port     = 12
 
 [app]
 run_mode = "polling"
+
+[metrics]
+namespace = "MitupBot"
+environment = "local"
+log_group = "LogGroup"
 """
 
 CONFIG_FROM_ENV = {
@@ -46,6 +51,10 @@ token = "123123123"
 
 [google_api]
 gmaps_geocode_key = "1a2b3c45d6e7f8g"
+
+[metrics]
+environment = "broken"
+namespace = "MitupBot"
 """
 
 
@@ -53,6 +62,7 @@ gmaps_geocode_key = "1a2b3c45d6e7f8g"
     "mock_toml_config,mock_env_config",
     ([TOML_CONTENT, CONFIG_FROM_ENV],),
     indirect=True,
+    ids=["working_config"],
 )
 def test_config_properly_setup(
     mock_toml_config: tuple[mock.Mock],
@@ -72,7 +82,7 @@ def test_config_properly_setup(
     assert RunModes.POLLING is config.app.run_mode
 
 
-@pytest.mark.parametrize("mock_toml_config", (BROKEN_TOML_CONTENT,), indirect=True)
+@pytest.mark.parametrize("mock_toml_config", (BROKEN_TOML_CONTENT,), indirect=True, ids=["broken_config"])
 def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
     # We are just supplying a broken toml where the information for db is not complete.
     # A validation error should be raised
@@ -80,12 +90,14 @@ def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
         Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
     # Assert that there are 2 errors for the missing pieces of db
-    assert len(exc_info.value.errors()) == 3
+    assert len(exc_info.value.errors()) == 4
     assert exc_info.value.errors()[0]["type"] == "missing"
     assert exc_info.value.errors()[1]["type"] == "missing"
     assert exc_info.value.errors()[2]["type"] == "missing"
+    assert exc_info.value.errors()[3]["type"] == "enum"
     assert exc_info.value.errors()[0]["loc"] == ("db", "username")
     assert exc_info.value.errors()[1]["loc"] == ("db", "password")
     assert exc_info.value.errors()[2]["loc"] == ("google_api", "gmaps_timezone_key")
+    assert exc_info.value.errors()[3]["loc"] == ("metrics", "environment")
 
     assert exc_info.value.title == "Config"

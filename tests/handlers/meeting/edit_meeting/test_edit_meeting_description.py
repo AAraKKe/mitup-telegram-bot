@@ -12,9 +12,8 @@ from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, Edit
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
-from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import MockApi, UpdateRequest, call_handler
+from tests.helpers import MockApi, StubMitupApp, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
 
 

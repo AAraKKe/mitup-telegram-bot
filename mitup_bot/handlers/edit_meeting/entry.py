@@ -59,7 +59,7 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
     meeting_id = cb.EDIT_MEETING_CANCEL.parse(context.matches[0]).id
 
     if meeting_id is None:
-        # If we cannot get a meeting_id from callback soemthing went wrong.
+        # If we cannot get a meeting_id from callback something went wrong.
         # Cleanup, log error and end possible conversation
         cleanup_states(context)
         logging.error(MalformedCallbackData(EditMeetingHandlerId.CANCEL, cb.EDIT_MEETING_CANCEL))

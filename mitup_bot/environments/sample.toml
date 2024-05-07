@@ -37,3 +37,7 @@ run_mode = "polling"
 # Google API configuration
 gmaps_geocode_key = "key_to_use_geocode_api"
 gmaps_timezone_key = "key_to_use_timezone_api"
+
+[metrics]
+namespace = "MitupBot"
+environment = "local"

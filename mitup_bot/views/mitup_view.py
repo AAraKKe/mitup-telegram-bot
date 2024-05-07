@@ -33,7 +33,7 @@ class ButtonConfig(BaseModel):
     @property
     def button(self) -> InlineKeyboardButton:
         return InlineKeyboardButton(
-            self.text,
+            text=self.text,
             callback_data=str(self.callback_data) if self.callback_data else None,
             switch_inline_query=self.switch_inline_query,
         )

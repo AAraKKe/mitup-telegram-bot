@@ -6,7 +6,6 @@ import pytest
 from telegram import Location, Message, Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.handlers.edit_settings.edit_timezone import (
     settings_timezone_location_message_handler,
     settings_timezone_text_message_handler,
@@ -16,7 +15,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import MockApi, UpdateRequest
+from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
@@ -24,7 +23,7 @@ from tests.stub_db import MockDbSession
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     get_timezone_from_api: mock.MagicMock,
     user_with_settings: User,
@@ -51,7 +50,7 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
 async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     get_timezone_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
@@ -90,7 +89,7 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
 async def test_edit_timezone_with_location_update_correctly(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     get_location_from_api: mock.MagicMock,
     user_with_settings: User,
@@ -118,7 +117,7 @@ async def test_edit_timezone_with_location_update_correctly(
 async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     get_location_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,

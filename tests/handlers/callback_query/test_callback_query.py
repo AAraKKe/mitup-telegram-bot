@@ -1,6 +1,5 @@
 import logging
 import re
-from unittest import mock
 
 import pytest
 from telegram import Update
@@ -20,19 +19,19 @@ from mitup_bot.handlers.edit_settings.edit_timezone import callback_query_timezo
 from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
-from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView, PaginatedMitupView
-from tests.helpers import MockApi, UpdateRequest, call_handler, create_meetup
+from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.stub_db import MockDbSession
 
 
 @pytest.mark.asyncio
 async def test_callback_query_settings_is_called_with_settings_view(
-    update: Update, context: MitupContext[mock.MagicMock], api: MockApi
+    update: Update, context: StubMitupContext, api: MockApi
 ):
     await callback_query_settings(update, context)
 
@@ -43,7 +42,7 @@ async def test_callback_query_settings_is_called_with_settings_view(
 async def test_callback_query_timezone_with_correct_view(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     user_with_settings: User,
 ):
@@ -61,23 +60,23 @@ async def test_callback_query_timezone_with_correct_view(
 
 @pytest.mark.asyncio
 async def test_callback_query_timezone_without_found_user(
-    mock_session: MockDbSession, update: Update, context: MitupContext[mock.MagicMock]
+    mock_session: MockDbSession, update: Update, context: StubMitupContext
 ):
     with pytest.raises(RuntimeError):
         await callback_query_timezone(update, context)
 
 
 @pytest.mark.asyncio
-async def test_callback_query_show_main_menu(update: Update, context: MitupContext[mock.MagicMock], api: MockApi):
+async def test_callback_query_show_main_menu(update: Update, context: StubMitupContext, api: MockApi):
     await callback_query_main_menu(update, context)
 
     api.assert_edit_message_called(context, update, factory.main_menu_view())
 
 
 @pytest.mark.asyncio
-async def test_callback_query_cancel_meeting_calls_to_corrent_view(
+async def test_callback_query_cancel_meeting_calls_to_current_view(
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
 ):
     match = re.match(cb.CANCEL_MEETING.pattern, str(cb.CANCEL_MEETING))
@@ -88,11 +87,18 @@ async def test_callback_query_cancel_meeting_calls_to_corrent_view(
     await callback_query_cancel_meeting(update, context)
 
     api.assert_edit_message_called(context, update, factory.main_menu_view())
+    context.metrics.assert_metrics_emited(
+        names=["Cancel"],
+        values=[1],
+        dimensions={"Feature": Feature.CREATE_MEETING},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
 
 
 @pytest.mark.asyncio
 async def test_callback_query_cancel_setting_calls_to_settings_view(
-    update: Update, context: MitupContext[mock.MagicMock], api: MockApi
+    update: Update, context: StubMitupContext, api: MockApi
 ):
     await callback_query_cancel_settings(update, context)
 
@@ -101,7 +107,7 @@ async def test_callback_query_cancel_setting_calls_to_settings_view(
 
 @pytest.mark.asyncio
 async def test_callback_query_create_meeting_calls_to_create_meeting_view(
-    update: Update, context: MitupContext[mock.MagicMock], api: MockApi
+    update: Update, context: StubMitupContext, api: MockApi
 ):
     await callback_query_create_meeting(update, context)
 
@@ -110,7 +116,7 @@ async def test_callback_query_create_meeting_calls_to_create_meeting_view(
 
 @pytest.mark.asyncio
 async def test_callback_query_create_meeting_return_the_correct_state(
-    update: Update, context: MitupContext[mock.MagicMock], api: MockApi
+    update: Update, context: StubMitupContext, api: MockApi
 ):
     result = await callback_query_create_meeting(update, context)
 
@@ -139,7 +145,7 @@ async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is
 async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
     user: User,
 ):
@@ -172,7 +178,7 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
 async def test_callback_query_show_meeting_fails_without_callback_query_data(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     method,
     callback_data_pattern: str,
     expected: str,
@@ -187,7 +193,11 @@ async def test_callback_query_show_meeting_fails_without_callback_query_data(
 
 @pytest.mark.asyncio
 async def test_callback_query_show_meetings_use_correct_view(
-    mock_session: MockDbSession, update: Update, context: MitupContext[mock.MagicMock], user: User, api: MockApi
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user: User,
+    api: MockApi,
 ):
     match = re.match(cb.SHOW_ACTIVE_MEETING_PAGE.pattern, "show;active_meeting_page:1")
     assert match is not None

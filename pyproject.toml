@@ -16,17 +16,18 @@ classifiers = [
     "Topic :: Communications :: Chat"
 ]
 dependencies = [
-    "python-telegram-bot~=21.0",
+    "python-telegram-bot[ext]~=21.0",
     "click~=8.0",
     "python-dateutil",
     "sqlalchemy~=2.0.25",
     "psycopg2~=2.9",
     "sqlmodel~=0.0.14",
-    "pydantic~=2.6.0",
+    "pydantic~=2.7.0",
     "alembic~=1.6",
     "rich~=13.0",
     "tzdata~=2024.1",
     "googlemaps~=4.10.0",
+    "aws-embedded-metrics~=3.2.0",
 ]
 
 [project.urls]
@@ -137,7 +138,7 @@ dependencies = [
     "pytest-xdist~=3.5",
     "pytest-asyncio",
     "pytest-json-report",
-    "pyright~=1.0",
+    "pyright~=1.1.0",
     "freezegun",
     "ruff~=0.2",
     "boto3~=1.34",

@@ -1,5 +1,6 @@
+import datetime as dt
 import re
-from typing import Self
+from typing import Self, override
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -12,10 +13,10 @@ class CallbackData(BaseModel):
     def __str__(self):
         return f"{self.action};{self.entity}:{self.id or ''}"
 
-    @staticmethod
-    def parse(match: re.Match | None) -> "CallbackData":
+    @classmethod
+    def parse[T: BaseModel](cls: type[T], match: re.Match | None) -> T:
         assert match is not None, "CallbackData.parse should be called only when a match is ensured!"
-        return CallbackData.model_validate(match.groupdict())
+        return cls.model_validate(match.groupdict())
 
     @field_validator("id", mode="before")
     @classmethod
@@ -28,14 +29,37 @@ class CallbackData(BaseModel):
     def pattern(self) -> str:
         return f"^(?P<action>{self.action});(?P<entity>{self.entity}):(?P<id>\\d*)$"
 
-    def with_id(self, id: int) -> "CallbackData":
+    def with_id(self, id: int) -> Self:
         """Creates a CallbackData with the same information but different ID"""
-        return CallbackData(entity=self.entity, action=self.action, id=id)
+        return self.__class__(entity=self.entity, action=self.action, id=id)
 
     def match(self) -> re.Match:
         re_match = re.match(self.pattern, str(self))
         assert re_match is not None, f"CallbackData.match should always match the pattern: {self.pattern!r}"
         return re_match
 
-    def __eq__(self, other: Self) -> bool:
+    @override
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, CallbackData):
+            return False
         return self.id == other.id and self.entity == other.entity and self.action == other.action
+
+
+class DateCallbackData(CallbackData):
+    """
+    A CallbackData that appends ';date:YYYY-MM-DD' to the end of the callback data
+    and handles the pattern accordingly
+    """
+
+    date: dt.date | None = None
+
+    def __str__(self) -> str:
+        return f"{super().__str__()};date:{self.date:%Y-%m-%d}"
+
+    @property
+    def pattern(self) -> str:
+        own_pattern = r";date:(?P<date>\d{4}-\d{2}-\d{2})$"
+        return f"{super().pattern[:-1]}{own_pattern}"
+
+    def with_date(self, date: dt.date) -> Self:
+        return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)

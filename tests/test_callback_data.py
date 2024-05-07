@@ -1,8 +1,9 @@
+import datetime as dt
 import re
 
 import pytest
 
-from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_data import CallbackData, DateCallbackData
 
 
 @pytest.mark.parametrize(
@@ -51,3 +52,22 @@ def test_callback_data_match():
     callback_data = CallbackData(entity="meeting", action="edit", id=21)
 
     assert callback_data.match().groupdict() == {"action": "edit", "entity": "meeting", "id": "21"}
+
+
+def test_date_callback_data_pattern():
+    cb = DateCallbackData(entity="meeting", action="edit", id=21)
+    assert cb.pattern == r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*);date:(?P<date>\d{4}-\d{2}-\d{2})$"
+
+
+def test_date_callback_data_matches():
+    input_str = "edit;meeting:21;date:2024-07-15"
+    # Should behave as a normal cb data adding the id later
+    cb = DateCallbackData(entity="meeting", action="edit").with_id(21)
+    match = re.match(cb.pattern, input_str)
+
+    assert cb.parse(match).date == dt.date(2024, 7, 15)
+
+
+def test_date_callback_data_with_date():
+    cb = DateCallbackData(entity="meeting", action="edit", id=21).with_date(dt.date(2024, 7, 15))
+    assert str(cb) == "edit;meeting:21;date:2024-07-15"

@@ -4,16 +4,17 @@ from unittest import mock
 
 import pytest
 from pydantic import SecretStr
-from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
+from telegram import CallbackQuery, Chat, InlineQuery, Message, MessageEntity, Update, User
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot import db
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.config import DbConfig
+from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
-from tests.helpers import UpdateRequest
+from mitup_bot.monitoring import configure_metrics
+from tests.helpers import UpdateRequest, build_context, build_metrics
 from tests.stub_db import MockDbSession
 
 
@@ -61,7 +62,7 @@ def db_config() -> DbConfig:
 
 
 @pytest.fixture
-def settings(user: User) -> Settings:
+def settings(user: UserModel) -> Settings:
     return Settings(
         id=1,
         timezone="Europe/Madrid",
@@ -152,6 +153,20 @@ def update(
         # If we are not passing a parameter to the fixture lets return a message update
         return Update(123, message=tg_message)
 
+    if data.command:
+        bot_command = data.command if isinstance(data.command, str) else "test_command"
+        message = Message(
+            123,
+            date=dt.datetime.now(),
+            chat=tg_chat,
+            from_user=tg_user,
+            entities=[
+                MessageEntity(type=MessageEntity.BOT_COMMAND, offset=0, length=len(bot_command) + 1, user=tg_user)
+            ],
+            text=f"/{bot_command}",
+        )
+        return Update(123, message=message)
+
     if data.callback_query:
         query = (
             callback_query_from_callback_data(data.callback_query, tg_user, tg_message)
@@ -188,11 +203,29 @@ def update(
 @pytest.fixture
 def app() -> Application:
     builder = ApplicationBuilder()
-    builder.bot(mock.MagicMock(spec=ExtBot))
+    # The bot needs to be set but we canont allow it to have defaults or
+    # extra configurations will be set for the scheduler. Lets force it to not
+    # have any configuration to make sure the schedulers use default values.
+    bot = mock.MagicMock(spec=ExtBot)
+    bot.defaults = None
+    builder.bot(bot)
     builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
     return builder.build()
 
 
 @pytest.fixture
 def context(app: Application, update: Update) -> MitupContext:
-    return MitupContext.from_update(update, app)
+    context = build_context(update, app)
+
+    # Allow the StubMetrics to access the context it was built for
+    context.metrics.parent_context = context
+    return context
+
+
+@pytest.fixture(autouse=True, scope="session")
+def configure_test_metrics():
+    """Make sure metrics are always configured during test session"""
+    configure_metrics(
+        MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT),
+        factory=build_metrics,
+    )

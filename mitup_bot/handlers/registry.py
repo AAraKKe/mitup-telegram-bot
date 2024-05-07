@@ -3,8 +3,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
+from time import perf_counter
 from warnings import filterwarnings
 
+from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
+from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -13,6 +16,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ConversationHandler,
+    ExtBot,
     MessageHandler,
 )
 from telegram.ext.filters import BaseFilter
@@ -23,7 +27,10 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
+from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.types import HandlerCallback
+
+from .error_handler import handler as error_handler
 
 # Remove the warning that is sent when using the per_message option in the registry.
 # We have a case in which the user can interact with a simialr message in different palces
@@ -32,6 +39,37 @@ from mitup_bot.utils.types import HandlerCallback
 # For more information:
 # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do
 filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
+
+
+def callback_with_metrics(callback_id: CallbackId, handler_type: str, callback: HandlerCallback) -> HandlerCallback:
+    async def inner_callback(update: Update, context: MitupContext[ExtBot, MetricsLogger]):
+        if context.metrics is None:
+            # If metrics has not been set just run the callback
+            return await callback(update, context)
+
+        # Set Handler as dimensions for every metric emission from within a callback
+        # Setting them as default dimensions so any flush does not remove them and we also
+        # override aws default dimensions we are not interested in.
+        context.prepare_handler_metrics({"Handler": callback_id.dimension, "HandlerType": handler_type})
+        start = perf_counter()
+        return_value = None
+        try:
+            return_value = await callback(update, context)
+        except Exception as e:
+            # Relying on error handlers by the application will result in the creation of a
+            # separate context. Lets handle errors here where we still have the context
+            # of the handler that was executed including metrics context.
+            error_handler(context, e)
+        else:
+            context.put_metric(MetricKey.FAULT, 0)
+        finally:
+            context.put_metric(MetricKey.TIME, (perf_counter() - start) * 1000, Unit.MILLISECONDS)
+
+            # Make sure we flush the metrics after every callback to drain any buffered metrics
+            await context.flush_metrics()
+        return return_value
+
+    return inner_callback
 
 
 @dataclass
@@ -103,7 +141,7 @@ class HandlersRegistry:
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CommandHandler(
                     command_name,
-                    callback=callback,
+                    callback=callback_with_metrics(callback_id, "Command", callback),
                     filters=filters,
                     block=block,
                     has_args=has_args,
@@ -139,7 +177,9 @@ class HandlersRegistry:
                 raise HandlerRegisteredError(callback_id)
 
             cls.handlers[callback_id] = HandlerWrapper(
-                handler=MessageHandler(filters=filters, callback=callback, block=block),
+                handler=MessageHandler(
+                    filters=filters, callback=callback_with_metrics(callback_id, "Message", callback), block=block
+                ),
                 bindable=bindable,
                 group=group,
             )
@@ -183,7 +223,7 @@ class HandlersRegistry:
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
                     pattern=callback_data.pattern if callback_data else None,
-                    callback=inner_wrapper,
+                    callback=callback_with_metrics(callback_id, "Callback", inner_wrapper),
                     block=block,
                 ),
                 bindable=bindable,

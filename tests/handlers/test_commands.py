@@ -17,10 +17,14 @@ from mitup_bot.exceptions import (
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.commands import command_cancel, command_go_to_main_menu, command_start_with_existing_user
 from mitup_bot.handlers.registration_process.edit_registration_timezone import command_start_with_new_user
-from mitup_bot.handlers.registration_process.enums import ConversationRegistrationProcessState
+from mitup_bot.handlers.registration_process.enums import (
+    ConversationRegistrationProcessState,
+    RegistrationProcessHandlerId,
+)
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import main_menu_view
-from tests.helpers import MockApi, UpdateRequest
+from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, build_metrics, call_handler
 from tests.stub_db import MockDbSession
 
 
@@ -52,7 +56,9 @@ async def test_command_registry_can_register_command_handlers():
     assert handler.has_args is None
     assert "my_command" in handler.commands
 
-    callback_return = await handler.callback(Update(0), MitupContext(mock.MagicMock()))
+    callback_return = await handler.callback(
+        Update(0), MitupContext(mock.MagicMock(), mock.MagicMock(), build_metrics())
+    )
     assert callback_return == "Done!"
 
 
@@ -119,14 +125,15 @@ def test_registry_fails_to_get_handler_that_does_not_exist():
         HandlersRegistry.get_handler(CommandsTestId.COMMAND_NOT_REGISTERED)
 
 
+@pytest.mark.parametrize("update", ([UpdateRequest(command="start")]), indirect=True)
 @pytest.mark.asyncio
 async def test_command_start_with_new_user(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    app: StubMitupApp,
     api: MockApi,
 ):
-    result = await command_start_with_new_user(update, context)
+    context, result = await call_handler(update, app, RegistrationProcessHandlerId.TIMEZONE_COMMAND)
 
     assert update.effective_user is not None
 
@@ -138,21 +145,31 @@ async def test_command_start_with_new_user(
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
+    context.metrics.assert_metrics_emited(
+        names=[MetricKey.COUNT],
+        values=[1],
+        dimensions={"Feature": Feature.NEW_LANDING},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(user=False)]), indirect=True)
 async def test_command_stat_with_new_user_use_incorrect_user(
-    mock_session: MockDbSession, update: Update, context: MitupContext[mock.MagicMock]
+    mock_session: MockDbSession, update: Update, context: StubMitupContext
 ):
     with pytest.raises(EffectiveUserNotSet):
         await command_start_with_new_user(update, context)
 
+    context.metrics.assert_metrics_not_emited(
+        names=[MetricKey.COUNT], values=[1], dimensions={"Feature": Feature.NEW_LANDING}
+    )
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("command_list", [command_start_with_existing_user, command_go_to_main_menu])
-async def test_commands_to_show_main_menu(
-    command_list, update: Update, context: MitupContext[mock.MagicMock], api: MockApi
-):
+async def test_commands_to_show_main_menu(command_list, update: Update, context: StubMitupContext, api: MockApi):
     await command_start_with_existing_user(update, context)
 
     expected_view = main_menu_view()
@@ -160,7 +177,7 @@ async def test_commands_to_show_main_menu(
 
 
 @pytest.mark.asyncio
-async def test_command_cancel(update: Update, context: MitupContext[mock.MagicMock], api: MockApi):
+async def test_command_cancel(update: Update, context: StubMitupContext, api: MockApi):
     await command_cancel(update, context)
 
     expected_view = main_menu_view()

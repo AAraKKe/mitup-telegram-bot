@@ -98,10 +98,9 @@ validate-migrations:
 sourcery-review:
   stage: test
   script:
-      - hatch run dev:mr-sourcery
+    - hatch run dev:mr-sourcery
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_EVENT_TYPE != 'merge_train'
 
 # --------------------
 # Docker build and push images
@@ -159,6 +158,7 @@ build-docker-ci:
 
 config-staging:
   <<: *aws-env-config
+  resource_group: staging
   environment:
     name: staging
   rules:
@@ -180,6 +180,7 @@ config-prod:
 ## ------------- Push to staging --------------
 push-bot-tagged-staging:
   <<: *push-ecr
+  resource_group: staging
   environment:
     name: staging
   variables:
@@ -208,6 +209,7 @@ push-migrations-latest-staging:
 push-bot-tagged-prod:
   # We can reuse the one for staging and change the environment
   extends: push-bot-tagged-staging
+  resource_group: production
   environment:
     name: production
   rules:
@@ -246,6 +248,7 @@ push-migrations-latest-prod:
 deploy-staging:
   # This job will first run the migrations on the database and the update ECS
   <<: *deploy
+  resource_group: staging
   environment:
     name: staging
   rules:
@@ -255,6 +258,7 @@ deploy-staging:
 deploy-production:
   # This job will first run the migrations on the database and the update ECS
   <<: *deploy
+  resource_group: staging
   environment:
     name: production
   rules:

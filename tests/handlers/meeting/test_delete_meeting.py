@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from _pytest.python_api import RaisesContext
+from aws_embedded_metrics.unit import Unit
 from telegram import Update
 
 from mitup_bot.callback_data import CallbackData
@@ -9,11 +9,11 @@ from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.callback_query import CallbackQueryId
 from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
+from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
-from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import MockApi, UpdateRequest, call_handler
+from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
 
 
@@ -28,14 +28,31 @@ def failure_cases(callback_data: CallbackData):
         (
             UpdateRequest(callback_query=callback_data),
             "user_with_settings",
-            pytest.raises(MalformedCallbackData),
+            MalformedCallbackData,
         ),
         (
             UpdateRequest(callback_query=callback_data.with_id(1)),
             "none",
-            pytest.raises(UserNotFound),
+            UserNotFound,
         ),
     ]
+
+
+def assert_metrics_for_failure(error_count: int, error_type: type[Exception], context: StubMitupContext):
+    expected_metric_names: list[str | MetricKey] = [
+        MetricKey.FAULT.with_prefix(error_type.__name__),
+        MetricKey.FAULT,
+        MetricKey.TIME,
+    ]
+    expected_metric_values = [error_count, error_count, AnyFloat()]
+    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+
+    context.metrics.assert_handler_metrics_emitted(
+        expected_metric_names,
+        expected_metric_values,
+        units=expected_metric_units,
+        exception=error_type,
+    )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(1))], indirect=True)
@@ -212,7 +229,6 @@ async def test_decline_delete_meeting_works(
     user_with_settings: User,
     app: StubMitupApp,
     api: MockApi,
-    caplog: pytest.LogCaptureFixture,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -228,7 +244,7 @@ async def test_decline_delete_meeting_works(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, expectation",
+    "update, user_fixture, error_type",
     failure_cases(cb.DELETE_MEETING),
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
@@ -239,18 +255,19 @@ async def test_delete_meeting_failures(
     mock_session: MockDbSession,
     update: Update,
     user_fixture: str,
-    expectation: RaisesContext,
+    error_type: type[Exception],
     app: StubMitupApp,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    with expectation:
-        context, _ = await call_handler(update, app, CallbackQueryId.DELETE_MEETING)
+    context, _ = await call_handler(update, app, CallbackQueryId.DELETE_MEETING)
+
+    assert_metrics_for_failure(1, error_type, context)
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, expectation",
+    "update, user_fixture, error_type",
     failure_cases(cb.CONFIRM_DELETE_MEETING),
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
@@ -261,18 +278,19 @@ async def test_confirm_delete_meeting_failures(
     mock_session: MockDbSession,
     update: Update,
     user_fixture: str,
-    expectation: RaisesContext,
+    error_type: type[Exception],
     app: StubMitupApp,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    with expectation:
-        ontext, _ = await call_handler(update, app, CallbackQueryId.CONFIRM_DELETE_MEETING)
+    context, _ = await call_handler(update, app, CallbackQueryId.CONFIRM_DELETE_MEETING)
+
+    assert_metrics_for_failure(1, error_type, context)
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, expectation",
+    "update, user_fixture, error_type",
     failure_cases(cb.DECLINE_DELETE_MEETING),
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
@@ -283,11 +301,12 @@ async def test_decline_delete_meeting_failures(
     mock_session: MockDbSession,
     update: Update,
     user_fixture: str,
-    expectation: RaisesContext,
+    error_type: type[Exception],
     app: StubMitupApp,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    with expectation:
-        context, _ = await call_handler(update, app, CallbackQueryId.DECLINE_DELETE_MEETING)
+    context, _ = await call_handler(update, app, CallbackQueryId.DECLINE_DELETE_MEETING)
+
+    assert_metrics_for_failure(1, error_type, context)

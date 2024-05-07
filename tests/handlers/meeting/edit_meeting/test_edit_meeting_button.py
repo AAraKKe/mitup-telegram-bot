@@ -1,17 +1,15 @@
 import logging
 import re
-from unittest import mock
 
 import pytest
 from telegram import Update
 
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.edit_meeting.entry import callback_query_edit_meeting
 from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import MockApi, UpdateRequest
+from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
@@ -24,7 +22,7 @@ def api():
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
 @pytest.mark.asyncio
 async def test_edit_meeting_callback_fails_on_malformed_data(
-    mock_session: MockDbSession, update: Update, context: MitupContext[mock.MagicMock]
+    mock_session: MockDbSession, update: Update, context: StubMitupContext
 ):
     match = re.match(cb.EDIT_MEETING.pattern, "edit;meeting:")
     assert match is not None
@@ -46,7 +44,7 @@ async def test_edit_meeting_callback_fails_on_malformed_data(
 async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
     user: User,
     meeting: Meetup,
@@ -71,7 +69,7 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
 async def test_edit_meeting_works_as_expected(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     user: User,
     api: MockApi,
 ):

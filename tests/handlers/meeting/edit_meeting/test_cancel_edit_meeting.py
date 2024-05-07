@@ -8,9 +8,8 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import factory
-from tests.helpers import MockApi, UpdateRequest, call_handler
+from tests.helpers import MockApi, StubMitupApp, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
 
 

@@ -2,8 +2,8 @@
 
 from collections.abc import Callable, Collection, Coroutine
 from typing import Any, Protocol, TypeVar, Union
-from unittest import mock
 
+from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 from telegram.ext._utils.types import JQ
@@ -28,11 +28,8 @@ HandlerCallback = Callable[[Update, MitupContext], Coroutine[Any, Any, RT]]
 """Type to define the callback of a given handler"""
 
 
-MitupApp = Application[ExtBot, MitupContext[ExtBot], MitupUserData, dict, dict, JQ]
+MitupApp = Application[ExtBot, MitupContext[ExtBot, MetricsLogger], MitupUserData, dict, dict, JQ]
 """Standard application type for the MitupBot"""
-
-StubMitupApp = Application[mock.MagicMock, MitupContext[mock.MagicMock], MitupUserData, dict, dict, JQ]
-"""Application type for testing purposes"""
 
 
 class ContextManager[T](Protocol):

@@ -56,6 +56,11 @@ class CallbackQueryNotSet(RuntimeError):
 class InvalidUserData(RuntimeError): ...
 
 
+class UpdateNotDefined(ValueError):
+    def __init__(self):
+        super().__init__("MitupContext Update was requested but it is not defined.")
+
+
 class ContextPropertyNotSetError(ValueError): ...
 
 
@@ -115,3 +120,7 @@ class TimezoneClientNotConfiguredError(RuntimeError):
 class PositiveNumberFilterError(RuntimeError):
     def __init__(self):
         super().__init__("The input must be a positive number.")
+
+
+class MetricsNotSetError(ValueError):
+    pass

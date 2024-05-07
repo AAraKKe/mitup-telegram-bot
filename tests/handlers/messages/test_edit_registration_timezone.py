@@ -6,24 +6,27 @@ import pytest
 from telegram import Location, Message, Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.handlers.registration_process.edit_registration_timezone import (
     registration_timezone_location_message_handler,
-    registration_timezone_text_message_handler,
 )
-from mitup_bot.handlers.registration_process.enums import ConversationRegistrationProcessState
+from mitup_bot.handlers.registration_process.enums import (
+    ConversationRegistrationProcessState,
+    RegistrationProcessHandlerId,
+)
 from mitup_bot.models import User
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, UpdateRequest
+from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
 from tests.stub_db import MockDbSession
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("update", ([UpdateRequest(message=True)]), indirect=True)
 async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    app: StubMitupApp,
     api: MockApi,
     get_timezone_from_api: mock.MagicMock,
     user_with_settings: User,
@@ -33,7 +36,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
 
     assert user_with_settings.settings.timezone != cast(Message, update.effective_message).text
 
-    result = await registration_timezone_text_message_handler(update, context)
+    context, result = await call_handler(update, app, RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT)
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(
         timezone=cast(Message, update.effective_message).text
@@ -46,14 +49,36 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     assert user_with_settings.settings.timezone == cast(Message, update.effective_message).text
     api.assert_send_message_called(context, update, view)
     assert result == ConversationHandler.END
+    context.metrics.assert_metrics_emited(
+        names=[MetricKey.COUNT],
+        values=[1],
+        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
+    context.metrics.assert_metrics_emited(
+        names=[MetricKey.ERROR],
+        values=[0],
+        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
+    context.metrics.assert_metrics_emited(
+        names=[MetricKey.COUNT],
+        values=[1],
+        dimensions={"Feature": Feature.NEW_USER_REGISTERED},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("update", ([UpdateRequest(message=True)]), indirect=True)
 async def test_registration_timezone_message_handler_log_with_incorrect_timezone(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
     api: MockApi,
+    app: StubMitupApp,
     get_timezone_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
@@ -64,7 +89,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
 
     assert update.effective_message is not None
 
-    result = await registration_timezone_text_message_handler(update, context)
+    context, result = await call_handler(update, app, RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT)
 
     assert (
         f"The user {user_with_settings.id} tried to set a timezone some text that is not correct. Trying again"
@@ -73,6 +98,27 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
 
     api.assert_send_message_called(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
     assert result == ConversationRegistrationProcessState.TIMEZONE
+    context.metrics.assert_metrics_emited(
+        names=[MetricKey.COUNT],
+        values=[1],
+        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
+    context.metrics.assert_metrics_not_emited(
+        names=[MetricKey.COUNT],
+        values=[1],
+        dimensions={"Feature": Feature.NEW_USER_REGISTERED},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
+    context.metrics.assert_metrics_emited(
+        names=[MetricKey.ERROR],
+        values=[1],
+        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
 
 
 @pytest.mark.asyncio
@@ -80,7 +126,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
 async def test_registration_timezone_with_location_update_correctly(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     get_location_from_api: mock.MagicMock,
     user_with_settings: User,
@@ -110,7 +156,7 @@ async def test_registration_timezone_with_location_update_correctly(
 async def test_registration_timezone_message_handler_log_with_incorrect_coordinates(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext[mock.MagicMock],
+    context: StubMitupContext,
     api: MockApi,
     get_location_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,

@@ -1,5 +1,7 @@
 import logging
 
+from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
+from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, Message, Update
 from telegram.ext import ExtBot
@@ -14,6 +16,7 @@ from mitup_bot.exceptions import (
     UserNotFound,
 )
 from mitup_bot.models import Meetup, User
+from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
@@ -53,7 +56,7 @@ def callback_query(update: Update) -> CallbackQuery:
 
 
 async def user_owns_meeting(
-    user: User, meeting_id: int, action: str, update: Update, context: MitupContext[ExtBot]
+    user: User, meeting_id: int, action: str, update: Update, context: MitupContext[ExtBot, MetricsLogger]
 ) -> Meetup | None:
     """
     Check if the user owns the meeting.
@@ -61,6 +64,7 @@ async def user_owns_meeting(
     If not, warn and send the user to the main menu and None is returned.
     """
     if meeting := user.own_meeting(meeting_id):
+        context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=Unit.COUNT)
         return meeting
 
     message = (
@@ -68,6 +72,7 @@ async def user_owns_meeting(
         f"Meeting id: {meeting_id}, user id: {user.id}"
     )
     logging.warning(message)
+    context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
     await api.edit_message(context, update, factory.main_menu_view())
     return None
 
@@ -97,4 +102,5 @@ async def meeting_accessible(
             or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
         ),
     )
+    context.put_metric("InteractWithMeetingNotFound", 1, unit=Unit.COUNT)
     return None

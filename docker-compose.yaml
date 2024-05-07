@@ -44,6 +44,9 @@ services:
       - postgres
     build:
       dockerfile: ./dev/docker/Dockerfile.dev
+    environment:
+      - MITUPBOT__METRICS__ENVIRONMENT=local
+      - MITUPBOT__METRICS__NAMESPACE=MitupDocker
     volumes:
       - .:/bot
       - ./.docker_hatch:/.docker_hatch

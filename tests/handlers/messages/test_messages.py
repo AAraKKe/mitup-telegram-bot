@@ -11,13 +11,13 @@ from mitup_bot.handlers.messages import create_meeting_message_handler, filter_m
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, UpdateRequest
+from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
 @pytest.mark.asyncio
 async def test_filter_messages_without_text_handler_with_correct_view(
-    update: Update, context: MitupContext[mock.MagicMock], api: MockApi
+    update: Update, context: StubMitupContext, api: MockApi
 ):
     result = await filter_messages_without_text(update, context)
 
@@ -27,7 +27,11 @@ async def test_filter_messages_without_text_handler_with_correct_view(
 
 @pytest.mark.asyncio
 async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_correct_view(
-    mock_session: MockDbSession, update: Update, context: MitupContext[mock.MagicMock], user: User, api: MockApi
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user: User,
+    api: MockApi,
 ):
     mock_session.add_object(user, "tg_user_id")
     assert len(user.meetups) == 2

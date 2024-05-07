@@ -176,6 +176,24 @@ def test_update_lambda_code_fails_aborting_command():
     assert "✘ Failed updating code for lambda MyLambda for the following reason:\nSomeReason" in capture.get()
 
 
+@pytest.mark.parametrize(
+    "responses",
+    [
+        # Missing on first call
+        [{"Configuration": {}}],
+        # Missing on later calls
+        [{"Configuration": {"LastUpdateStatus": "InProgress"}}, {"Configuration": {}}],
+    ],
+    ids=["missing_on_first_call", "missing_on_later_calls"],
+)
+def test_update_lambda_code_fails_without_update_status(responses: list[dict[str, Any]]):
+    context = DeploymentContext(get_function_responses=responses)
+
+    with context.setup_mock() as (function, _, capture):
+        with pytest.raises(click.Abort):
+            deploy.update_lambda_code(function, "MyLambda", "MyImage")
+
+
 def test_invoke_lambda_succeeds():
     # Setup the log generate by the lambda on invocation
     start_json = {"type": "platform.start"}
@@ -381,6 +399,72 @@ def test_register_task_definition_when_failing():
     assert expected_output in capture.get()
 
 
+def task_definition_response_factory(container_definitions=True, execution_role=True):
+    response = {"taskDefinition": {}}
+    if container_definitions:
+        response["taskDefinition"]["containerDefinitions"] = [{"image": "MyNewImage"}]
+    if execution_role:
+        response["taskDefinition"]["executionRoleArn"] = "role"
+
+    return response
+
+
+def register_task_response_factory(status_code=True, revision=True, arn=True):
+    response = {"ResponseMetadata": {}, "taskDefinition": {}}
+    if status_code:
+        response["ResponseMetadata"]["HTTPStatusCode"] = 200
+    if revision:
+        response["taskDefinition"]["revision"] = 20
+    if arn:
+        response["taskDefinition"]["taskDefinitionArn"] = "arn"
+
+    return response
+
+
+@pytest.mark.parametrize(
+    "responses",
+    [
+        {
+            "describe_task_responses": [task_definition_response_factory(container_definitions=False)],
+            "register_task_responses": [register_task_response_factory()],
+        },
+        {
+            "describe_task_responses": [task_definition_response_factory(execution_role=False)],
+            "register_task_responses": [register_task_response_factory()],
+        },
+        {
+            "describe_task_responses": [task_definition_response_factory()],
+            "register_task_responses": [register_task_response_factory(status_code=False)],
+        },
+        {
+            "describe_task_responses": [task_definition_response_factory()],
+            "register_task_responses": [register_task_response_factory(revision=False)],
+        },
+        {
+            "describe_task_responses": [task_definition_response_factory()],
+            "register_task_responses": [register_task_response_factory(arn=False)],
+        },
+    ],
+    ids=[
+        "missing_container_definitions",
+        "missing_execution_role",
+        "missing_status_code",
+        "missing_revision",
+        "missing_arn",
+    ],
+)
+def test_register_task_definition_fails_with_missing_response_data(responses: dict[str, list[dict[str, Any]]]):
+    # Setup parameters
+    family = "MyTask"
+    image = "MyNewImage"
+
+    context = DeploymentContext(**responses)
+
+    with context.setup_mock() as (function, ecs, capture):
+        with pytest.raises(click.Abort):
+            deploy.register_task_definition(ecs, family, image)
+
+
 def create_service_description(
     desired: int, running: int, pending: int, arn: str, n_tasks: int, state="IN_PROGRESS", reason="All Good"
 ) -> dict[str, Any]:
@@ -482,6 +566,37 @@ def test_deployment_succeeds_after_waiting():
 
     context.assert_ecs_called("describe_services", services=["MyService"], cluster="MyCluster", n=3)
     assert "ECS service 'MyService' successfuly deployed!" in capture.get()
+
+
+def service_from_state_with_missing_data(rollout_state=True, rollout_state_reason=True) -> dict[str, Any]:
+    service = service_from_state("IN_PROGRESS", "All good")
+    if not rollout_state:
+        service["services"][0]["deployments"][0].pop("rolloutState")
+    if not rollout_state_reason:
+        service = service_from_state("FAILED", "Nah")
+        service["services"][0]["deployments"][0].pop("rolloutStateReason")
+
+    return service
+
+
+@pytest.mark.parametrize(
+    "responses",
+    [
+        # Missing rollout state in the first call
+        [service_from_state_with_missing_data(rollout_state=False)],
+        # Missing rollout state in the second call
+        [service_from_state("IN_PROGRESS", "All good"), service_from_state_with_missing_data(rollout_state=False)],
+        # Missing rollout state reason
+        [service_from_state_with_missing_data(rollout_state_reason=False)],
+    ],
+    ids=["missing_rollout_state_first_call", "missing_rollout_state_second_call", "missing_failed_reason"],
+)
+def test_deployment_fails_when_missing_response_data(responses: list[dict[str, Any]]):
+    context = DeploymentContext(describe_services_responses=responses)
+
+    with context.setup_mock() as (function, ecs, capture):
+        with pytest.raises(click.Abort):
+            deploy.waiting_for_deployment_to_finish(ecs, "MyCluster", "MyService", "MyTask")
 
 
 @pytest.mark.parametrize(

@@ -1,4 +1,7 @@
+from typing import Any
+
 import pytest
+from aws_embedded_metrics.unit import Unit
 
 from mitup_bot.custom_context import (
     ContextData,
@@ -6,6 +9,7 @@ from mitup_bot.custom_context import (
     MitupContext,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
+from tests.helpers import StubMitupContext
 
 
 def test_add_and_remove_context(context: MitupContext):
@@ -110,3 +114,100 @@ def test_context_has_meeting_id(context: MitupContext):
 
     context.clean_all_user_data()
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
+
+
+@pytest.mark.parametrize(
+    "properties", [None, {"PropName1": "PropValue1", "PropName2": 123}], ids=["no_properties", "with_properties"]
+)
+@pytest.mark.parametrize(
+    "dimensions", [None, {"DimName1": "DimValue1", "DimName2": "DimValue2"}], ids=["no_dimensions", "with_dimensions"]
+)
+@pytest.mark.parametrize(
+    "with_update_properties", [True, False], ids=["with_context_properties", "without_context_properties"]
+)
+@pytest.mark.parametrize(
+    "with_handler_dimensions", [True, False], ids=["with_handler_dimensions", "without_handler_dimensions"]
+)
+@pytest.mark.asyncio
+async def test_metrics_emitted(
+    context: StubMitupContext,
+    dimensions: None | dict[str, str],
+    properties: None | dict[str, Any],
+    with_update_properties: bool,
+    with_handler_dimensions: bool,
+):
+    await context.emit_metric(
+        "test_metric",
+        value=123,
+        dimensions=dimensions,
+        properties=properties,
+        with_handler_dimensions=with_handler_dimensions,
+        with_update_properties=with_update_properties,
+    )
+
+    context.metrics.assert_metrics_emited(
+        ["test_metric"],
+        [123],
+        dimensions=dimensions,
+        properties=properties or {},
+        add_update_properties=with_update_properties,
+        add_handler_dimensions=with_handler_dimensions,
+    )
+
+
+@pytest.mark.asyncio
+async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupContext):
+    await context.emit_feature_metric(
+        "TestFeature",
+        name="MyMetric",
+        value=123,
+        dimensions={"DimeName": "DimeValue"},
+        properties={"PropName": "PropValue"},
+    )
+
+    context.metrics.assert_metrics_emited(
+        ["MyMetric"],
+        [123],
+        dimensions={"DimeName": "DimeValue", "Feature": "TestFeature"},
+        properties={"PropName": "PropValue"},
+        add_update_properties=False,
+        add_handler_dimensions=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_flush_metrics_does_not_flush_without_metrics(context: StubMitupContext):
+    # Metrics context already includes context information
+    assert len(context.metrics.context.properties) > 0
+
+    # When we add dimensions but no metrics
+    context.metrics.put_dimensions({"DimName": "DimValue"})
+
+    # Flushing the metrics does not emit anything
+    await context.flush_metrics()
+
+    assert context.metrics.metrics_container == []
+
+    # But adding a metric emitts it
+    context.put_metric("MyMetric", 123, unit=Unit.MILLISECONDS)
+    await context.flush_metrics()
+    assert context.metrics.metrics_container != []
+
+
+@pytest.mark.asyncio
+async def test_put_metrics_does_not_flush(context: StubMitupContext):
+    context.put_metric(
+        name="MyMetric",
+        value=123,
+        unit=Unit.MILLISECONDS,
+    )
+
+    # Just calling put does not emit the metric
+    context.metrics.assert_metrics_not_emited(["MyMetric"], [123])
+
+    # But it is part of the context
+    # The first context is the MitupContext and the second context is the MetricsContext ;)
+    assert "MyMetric" in context.metrics.context.metrics
+    metric_in_context = context.metrics.context.metrics["MyMetric"]
+    assert Unit.MILLISECONDS.value == metric_in_context.unit
+    assert [123] == metric_in_context.values

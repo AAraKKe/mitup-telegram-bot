@@ -1,9 +1,9 @@
 import logging
-from contextlib import nullcontext
 from typing import cast
 
 import pytest
 from _pytest.python_api import RaisesContext
+from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import ConversationHandler
 
@@ -13,11 +13,11 @@ from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.edit_meeting.views import edit_max_participants_view, edit_participants_view
 from mitup_bot.models import User
+from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
-from mitup_bot.utils.types import StubMitupApp
 from mitup_bot.views import factory
-from tests.helpers import MockApi, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.stub_db import MockDbSession
 
 
@@ -32,26 +32,40 @@ def failure_cases(callback_data: CallbackData):
         (
             UpdateRequest(callback_query=callback_data),
             "user_with_settings",
-            pytest.raises(MalformedCallbackData),
+            MalformedCallbackData,
+            1,
         ),
         (
             UpdateRequest(callback_query=callback_data.with_id(1)),
             "none",
-            pytest.raises(UserNotFound),
-        ),
-        (
-            UpdateRequest(callback_query=callback_data.with_id(999)),
-            "user_with_settings",
-            nullcontext(),
+            UserNotFound,
+            1,
         ),
     ]
+
+
+def assert_metrics_for_failure(error_count: int, error_type: type[Exception], context: StubMitupContext):
+    expected_metric_names: list[str | MetricKey] = [
+        MetricKey.FAULT.with_prefix(error_type.__name__),
+        MetricKey.FAULT,
+        MetricKey.TIME,
+    ]
+    expected_metric_values = [error_count, error_count, AnyFloat()]
+    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+
+    context.metrics.assert_handler_metrics_emitted(
+        expected_metric_names,
+        expected_metric_values,
+        units=expected_metric_units,
+        exception=error_type,
+    )
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_PARTICIPANTS.with_id(2))], indirect=True
 )
 @pytest.mark.asyncio
-async def test_callback_edit_meeting_participants_works(
+async def test_edit_meeting_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -67,18 +81,49 @@ async def test_callback_edit_meeting_participants_works(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, expectation",
-    failure_cases(cb.EDIT_MEETING_PARTICIPANTS),
-    indirect=["update"],
-    ids=["no_meeting_id", "user_not_found", "user_does_not_own_meeting"],
+    "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_PARTICIPANTS.with_id(999))], indirect=True
 )
 @pytest.mark.asyncio
-async def test_callback_edit_meeting_participants_failures(
+async def test_edit_meeting_participants_meeting_not_owned(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(999))
+
+    with caplog.at_level(logging.WARNING):
+        with MockApi.start("mitup_bot.guards") as _api:
+            context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+
+            assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
+            _api.assert_edit_message_called(context, update, factory.main_menu_view())
+
+    context.metrics.assert_metrics_emited(
+        [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
+        [1, 0, AnyFloat()],
+        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        add_handler_dimensions=True,
+        add_update_properties=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update, user_fixture, error_type, error_count",
+    failure_cases(cb.EDIT_MEETING_PARTICIPANTS),
+    indirect=["update"],
+    ids=["no_meeting_id", "user_not_found"],
+)
+@pytest.mark.asyncio
+async def test_edit_meeting_participants_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
     update: Update,
     user_fixture: str,
-    expectation: RaisesContext,
+    error_type: type[Exception],
+    error_count: int,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -86,19 +131,21 @@ async def test_callback_edit_meeting_participants_failures(
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
-    with expectation:
-        with caplog.at_level(logging.WARNING):
-            with MockApi.start("mitup_bot.guards") as _api:
-                context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+    with caplog.at_level(logging.WARNING):
+        with MockApi.start("mitup_bot.guards") as _api:
+            context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+            if error_type is None:
                 assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
                 _api.assert_edit_message_called(context, update, factory.main_menu_view())
+
+    assert_metrics_for_failure(error_count, error_type, context)
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(1))], indirect=True
 )
 @pytest.mark.asyncio
-async def test_callback_edit_meeting_max_participants_works(
+async def test_edit_meeting_max_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -118,18 +165,19 @@ async def test_callback_edit_meeting_max_participants_works(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, expectation",
+    "update, user_fixture, error_type, error_count",
     failure_cases(cb.EDIT_MEETING_MAX_PARTICIPANTS),
     indirect=["update"],
-    ids=["no_meeting_id", "user_not_found", "user_does_not_own_meeting"],
+    ids=["no_meeting_id", "user_not_found"],
 )
 @pytest.mark.asyncio
-async def test_callback_edit_meeting_max_participants_failures(
+async def test_edit_meeting_max_participants_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
     update: Update,
     user_fixture: str,
-    expectation: RaisesContext,
+    error_type: type[Exception],
+    error_count: int,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -137,22 +185,50 @@ async def test_callback_edit_meeting_max_participants_failures(
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
-    with expectation:
+    with MockApi.start("mitup_bot.guards") as _api:
+        with caplog.at_level(logging.WARNING):
+            context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+
+    assert_metrics_for_failure(error_count, error_type, context)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(999))], indirect=True
+)
+@pytest.mark.asyncio
+async def test_edit_meeting_max_participants_meeting_not_owned(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(999))
+
+    with caplog.at_level(logging.WARNING):
         with MockApi.start("mitup_bot.guards") as _api:
-            with caplog.at_level(logging.WARNING):
-                context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+            context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
 
-                assert result is ConversationHandler.END
-                assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
-                _api.assert_edit_message_called(context, update, factory.main_menu_view())
+            assert result is ConversationHandler.END
+            assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
+            _api.assert_edit_message_called(context, update, factory.main_menu_view())
 
-                assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+            assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+
+    context.metrics.assert_metrics_emited(
+        [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
+        [1, 0, AnyFloat()],
+        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        add_handler_dimensions=True,
+        add_update_properties=True,
+    )
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1))], indirect=True
 )
-async def test_callback_edit_meeting_no_limit_participants_works(
+async def test_edit_meeting_no_limit_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -180,17 +256,18 @@ async def test_callback_edit_meeting_no_limit_participants_works(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, expectation",
+    "update, user_fixture, error_type, error_count",
     failure_cases(cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS),
     indirect=["update"],
-    ids=["no_meeting_id", "user_not_found", "user_does_not_own_meeting"],
+    ids=["no_meeting_id", "user_not_found"],
 )
-async def test_callback_edit_meeting_no_limit_participants_failures(
+async def test_edit_meeting_no_limit_participants_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
     update: Update,
     user_fixture: str,
-    expectation: RaisesContext,
+    error_type: type[Exception],
+    error_count: int,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -198,17 +275,50 @@ async def test_callback_edit_meeting_no_limit_participants_failures(
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
-    with expectation:
-        with MockApi.start("mitup_bot.guards") as _api:
-            with caplog.at_level(logging.WARNING):
-                context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+    with MockApi.start("mitup_bot.guards") as _api:
+        with caplog.at_level(logging.WARNING):
+            context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
 
+            if error_type is None:
                 assert result is ConversationHandler.END
                 assert (
                     "User tried 'Edit no limit participants' with a meeting that does not belong to them."
                     in caplog.text
                 )
                 _api.assert_edit_message_called(context, update, factory.main_menu_view())
+
+    assert_metrics_for_failure(error_count, error_type, context)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(999))], indirect=True
+)
+@pytest.mark.asyncio
+async def test_edit_meeting_no_limit_participants_meeting_not_owned(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(999))
+
+    with caplog.at_level(logging.WARNING):
+        with MockApi.start("mitup_bot.guards") as _api:
+            context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+
+            assert result is ConversationHandler.END
+            assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
+            _api.assert_edit_message_called(context, update, factory.main_menu_view())
+
+    context.metrics.assert_metrics_emited(
+        [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
+        [1, 0, AnyFloat()],
+        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        add_handler_dimensions=True,
+        add_update_properties=True,
+    )
 
 
 @pytest.mark.parametrize(

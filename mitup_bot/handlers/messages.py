@@ -9,6 +9,7 @@ from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Meetup
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import factory
 
@@ -36,6 +37,8 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
         view = meetup.edit_view.with_context(message)
 
         await api.send_message(context, update, view)
+
+        await context.emit_feature_metric(Feature.CREATE_MEETING)
 
     return ConversationHandler.END
 

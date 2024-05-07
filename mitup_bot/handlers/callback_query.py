@@ -11,6 +11,7 @@ from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView, PaginatedMitupView
@@ -87,6 +88,7 @@ async def callback_query_cancel_meeting(update: Update, context: MitupContext):
 
     await callback_query_main_menu(update, context)
 
+    await context.emit_feature_metric(Feature.CREATE_MEETING, name="Cancel")
     return ConversationHandler.END
 
 

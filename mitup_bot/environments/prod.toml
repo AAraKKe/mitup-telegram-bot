@@ -1,0 +1,3 @@
+[metrics]
+namespace = "MitupBot"
+environment = "local"

@@ -5,6 +5,10 @@ instances throughout the entire bot.
 
 from mitup_bot.callback_data import CallbackData
 
+# Empty callback data. Inline keyboards are forced to include some callback data but sometimes
+# we just need a button for display purposes (i.e. CalendarKeyboard)
+EMPTY = CallbackData(action="empty", entity="empty", id=0)
+
 # Meeting callbacks
 SHOW_MEETING = CallbackData(action="show", entity="meeting")
 SHOW_ACTIVE_MEETING_PAGE = CallbackData(action="show", entity="active_meeting_page")
