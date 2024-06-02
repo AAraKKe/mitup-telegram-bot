@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import UTC, datetime
 from unittest import mock
 
 import pytest
@@ -14,7 +14,7 @@ EXAMPLE_MEETING = Meetup(
     owner_id=1,
     title="Test Meeting",
     description="Test Description",
-    date=date(2001, 1, 1),
+    datetime=datetime(2001, 1, 1, 12, 12),
 )
 COORDINATES = (123.1, -321.1)
 
@@ -36,14 +36,14 @@ def expected_participants_message(max_participants: bool) -> str:
 
 def expected_message(
     description: bool,
-    date: bool,
+    datetime: bool,
     username: bool,
     location_name: bool,
     coordinates: bool,
     max_participants: bool,
 ) -> str:
     str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get()
-    str_date = "1987-07-17 01:59 (Europe/Madrid)" if date else MeetingMessages.DATE_NOT_SET.get()
+    str_date = "1987-07-17 01:59 (Europe/Madrid)" if datetime else MeetingMessages.DATE_NOT_SET.get()
     owner = "john_doe" if username else "John"
     location = expected_location_name("Test Location" if location_name else None, "[📍]" if coordinates else None)
     str_participants = expected_participants_message(max_participants)
@@ -51,7 +51,7 @@ def expected_message(
         title="Test Meeting",
         owner=owner,
         description=str_description,
-        date=str_date,
+        datetime=str_date,
         location=location,
         participants=str_participants,
     )
@@ -106,7 +106,7 @@ def test_meetup_location_string_conversion(
 
 
 @pytest.mark.parametrize(
-    "description, meetup_date, username, location_name, location_coordinates, max_participants",
+    "description, meetup_datetime, username, location_name, location_coordinates, max_participants",
     [
         (False, True, True, True, True, True),
         (True, False, True, True, True, True),
@@ -131,7 +131,7 @@ def test_meetup_location_string_conversion(
 def test_meetup_features_message(
     settings: Settings,
     description: bool,
-    meetup_date: bool,
+    meetup_datetime: bool,
     username: bool,
     location_name: bool,
     location_coordinates: bool,
@@ -144,15 +144,14 @@ def test_meetup_features_message(
     meeting = Meetup(
         title="Test Meeting",
         description="Test Description" if description else None,
-        date=date(1987, 7, 16) if meetup_date else None,
-        time=time(23, 59) if meetup_date else None,
+        datetime=datetime(1987, 7, 16, 23, 59, tzinfo=UTC) if meetup_datetime else None,
         location=location,
         max_members=5 if max_participants else None,
         owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
     )
 
     expected = expected_message(
-        description, meetup_date, username, location_name, location_coordinates, max_participants
+        description, meetup_datetime, username, location_name, location_coordinates, max_participants
     )
 
     assert expected == meeting.message
@@ -162,8 +161,7 @@ def test_time_properly_converted_for_timezone(settings: Settings):
     meeting = Meetup(
         title="Test Meeting",
         description="Test Description",
-        date=date(2024, 1, 12),
-        time=time(12, 30),
+        datetime=datetime(2024, 1, 12, 12, 30),
         owner=User(first_name="John", username="john_doe", tg_user_id=1, settings=settings),
     )
 
@@ -171,10 +169,10 @@ def test_time_properly_converted_for_timezone(settings: Settings):
     # Europe/Madrid
     expected_time = "2024-01-12 13:30 (Europe/Madrid)"
 
-    assert expected_time == meeting.str_date
+    assert expected_time == meeting.str_datetime
 
     # Updatingt he timezone to Europe/Dublin in January the date should be the same but the time should be 12:30
     # since Dublin is in the same timezone as UTC
     settings.timezone = "Europe/Dublin"
     expected_time = "2024-01-12 12:30 (Europe/Dublin)"
-    assert expected_time == meeting.str_date
+    assert expected_time == meeting.str_datetime

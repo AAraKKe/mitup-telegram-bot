@@ -46,3 +46,9 @@ class User(SQLModel, table=True):
 
     def own_meeting(self, meeting_id: int) -> Meetup | None:  # type: ignore
         return next((meetup for meetup in self.meetups if meetup.id == meeting_id), None)
+
+    def datetime_in_tz(self, datetime: dt.datetime) -> dt.datetime:
+        return datetime.astimezone(self.settings.tz)
+
+    def now_in_tz(self) -> dt.datetime:
+        return self.datetime_in_tz(dt.datetime.now(dt.UTC))

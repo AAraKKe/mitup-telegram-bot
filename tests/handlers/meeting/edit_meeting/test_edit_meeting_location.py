@@ -85,7 +85,6 @@ def test_edit_location_view(meeting: Meetup):
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(1))], indirect=True)
-@pytest.mark.asyncio
 async def test_edit_location_works(
     mock_session: MockDbSession,
     update: Update,
@@ -102,7 +101,6 @@ async def test_edit_location_works(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(999))], indirect=True)
-@pytest.mark.asyncio
 async def test_edit_location_meeting_not_owned(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
@@ -137,7 +135,6 @@ async def test_edit_location_meeting_not_owned(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_edit_location_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
@@ -162,7 +159,6 @@ async def test_edit_location_failures(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION_NAME.with_id(1))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_location_name_works(
     mock_session: MockDbSession,
     update: Update,
@@ -194,7 +190,6 @@ async def test_edit_location_name_works(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION_NAME.with_id(999))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_location_name_not_owned(
     mock_session: MockDbSession,
     update: Update,
@@ -231,7 +226,6 @@ async def test_edit_location_name_not_owned(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_edit_location_name_failures(
     request: pytest.FixtureRequest,
     caplog: pytest.LogCaptureFixture,
@@ -257,7 +251,6 @@ async def test_edit_location_name_failures(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(1))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_location_coordinates_works(
     mock_session: MockDbSession,
     update: Update,
@@ -289,7 +282,6 @@ async def test_edit_location_coordinates_works(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(999))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_location_coordinates_not_owned(
     mock_session: MockDbSession,
     update: Update,
@@ -327,7 +319,6 @@ async def test_edit_location_coordinates_not_owned(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_edit_location_coordinates_failures(
     request: pytest.FixtureRequest,
     caplog: pytest.LogCaptureFixture,
@@ -349,8 +340,7 @@ async def test_edit_location_coordinates_failures(
     assert_metrics_for_failure(1, error_type, context)
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="My Location")], indirect=True)
-@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="My Location")], indirect=True)
 async def test_edit_location_name_message_works(
     mock_session: MockDbSession,
     update: Update,
@@ -365,7 +355,7 @@ async def test_edit_location_name_message_works(
         update,
         app,
         EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
-        with_meeting_id=(ContextId.EDIT_MEETING_LOCATION_NAME, 1),
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 1},
     )
     expected_view = edit_location_view(meeting).with_context(
         MeetingMessages.LOCATION_NAME_SET_SUCCESS.get(name=meeting.location.name)
@@ -379,8 +369,7 @@ async def test_edit_location_name_message_works(
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="My Location")], indirect=True)
-@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="My Location")], indirect=True)
 async def test_edit_location_name_message_fails_if_context_not_saved(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
@@ -403,7 +392,6 @@ async def test_edit_location_name_message_fails_if_context_not_saved(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)
-@pytest.mark.asyncio
 async def test_edit_location_coordinates_message_works(
     mock_session: MockDbSession,
     update: Update,
@@ -418,7 +406,7 @@ async def test_edit_location_coordinates_message_works(
         update,
         app,
         EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
-        with_meeting_id=(ContextId.EDIT_MEETING_LOCATION_COORDINATES, 1),
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
     expected_view = edit_location_view(meeting).with_context(MeetingMessages.LOCATION_COORDINATES_SUCCESS.get())
 
@@ -431,7 +419,6 @@ async def test_edit_location_coordinates_message_works(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)
-@pytest.mark.asyncio
 async def test_edit_location_coordinates_message_fails_if_context_not_saved(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
@@ -453,8 +440,7 @@ async def test_edit_location_coordinates_message_fails_if_context_not_saved(
     api.assert_edit_message_called(context, update, factory.main_menu_view())
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="Message instead of coordinates")], indirect=True)
-@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="Message instead of coordinates")], indirect=True)
 async def test_edit_location_coordinates_message_with_wrong_message(
     mock_session: MockDbSession,
     update: Update,
@@ -469,7 +455,7 @@ async def test_edit_location_coordinates_message_with_wrong_message(
         update,
         app,
         EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE,
-        with_meeting_id=(ContextId.EDIT_MEETING_LOCATION_COORDINATES, 1),
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
 
     expected_view = MitupView(
@@ -489,8 +475,7 @@ async def test_edit_location_coordinates_message_with_wrong_message(
     api.assert_send_message_called(context, update, expected_view)
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="Message instead of coordinates")], indirect=True)
-@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="Message instead of coordinates")], indirect=True)
 async def test_edit_location_coordinates_message_with_wrong_message_fails_without_context(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
@@ -513,7 +498,6 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_cancel_edit_meeting_location_property_works(
     mock_session: MockDbSession,
     update: Update,

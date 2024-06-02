@@ -3,13 +3,16 @@ While custom CallbackData classes can be crated, it is common to use the same se
 instances throughout the entire bot.
 """
 
-from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_data import CallbackData, DateCallbackData
 
 # Empty callback data. Inline keyboards are forced to include some callback data but sometimes
 # we just need a button for display purposes (i.e. CalendarKeyboard)
 EMPTY = CallbackData(action="empty", entity="empty", id=0)
 
+# ----------------------------------------
 # Meeting callbacks
+# These are callbacks for the meeting and edit meeting views
+# ----------------------------------------
 SHOW_MEETING = CallbackData(action="show", entity="meeting")
 SHOW_ACTIVE_MEETING_PAGE = CallbackData(action="show", entity="active_meeting_page")
 EDIT_MEETING = CallbackData(action="edit", entity="meeting")
@@ -24,25 +27,41 @@ CONFIRM_DELETE_MEETING = CallbackData(action="confirm_delete", entity="meeting")
 DECLINE_DELETE_MEETING = CallbackData(action="decline_delete", entity="meeting")
 SHARE = CallbackData(action="share", entity="meeting")
 
+# ----------------------------------------
 # Edit meeting callbacks
+# These are callbacks for the edit meeting actions
+# ----------------------------------------
+# ---- Title and description
 EDIT_MEETING_DESCRIPTION = CallbackData(action="edit", entity="meet_desc")
 EDIT_MEETING_TITLE = CallbackData(action="edit", entity="meet_title")
-EDIT_MEETING_DATE = CallbackData(action="edit", entity="meet_date")
+# ---- Datetime
+EDIT_MEETING_DATE = DateCallbackData(action="edit", entity="meet_date")
+# This callback is part of the calendar view, the one above is part of the menu
+SET_MEETING_DATE = DateCallbackData(action="set", entity="md")
+DELETE_MEETING_DATE = CallbackData(action="delete", entity="meet_date")
 EDIT_MEETING_TIME = CallbackData(action="edit", entity="meet_time")
+# ---- Participants
 EDIT_MEETING_PARTICIPANTS = CallbackData(action="edit", entity="meet_part")
 EDIT_MEETING_MAX_PARTICIPANTS = CallbackData(action="edit", entity="meet_max_part")
 EDIT_MEETING_NO_LIMIT_PARTICIPANTS = CallbackData(action="edit", entity="meet_nl_part")
 EDIT_MEETING_KICK_OUT_PARTICIPANS = CallbackData(action="edit", entity="meet_ko_part")
+CANCEL_EDIT_MEETING_PARTICIPANS = CallbackData(action="cancel", entity="meet_part")
+# ---- Location
 EDIT_MEETING_LOCATION = CallbackData(action="edit", entity="meet_loc")
 EDIT_MEETING_LOCATION_NAME = CallbackData(action="edit", entity="meet_loc_name")
 EDIT_MEETING_LOCATION_COORDINATES = CallbackData(action="edit", entity="meet_loc_coords")
-EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
-EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
-EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 CANCEL_EDIT_MEETING_LOCATION = CallbackData(action="cancel", entity="meet_loc")
-CANCEL_EDIT_MEETING_PARTICIPANS = CallbackData(action="cancel", entity="meet_part")
+# ---- Language
+EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
+# ---- Settings
+EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
+# ---- General
+EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 
+# ----------------------------------------
 # Main menu callbacks
+# These are callbacks for the main menu actions
+# ----------------------------------------
 MAIN_MENU = CallbackData(entity="main_menu")
 ACTIVE_MEETINGS = CallbackData(entity="meetings")
 PAST_MEETINGS = CallbackData(entity="past_meetings")
@@ -51,7 +70,10 @@ SETTINGS = CallbackData(entity="settings")
 HELP = CallbackData(entity="help")
 COLLABORATE = CallbackData(entity="collaborate")
 
+# ----------------------------------------
 # Settings callbacks
+# These are callbacks for the user settings actions
+# ----------------------------------------
 CANCEL_SETTINGS = CallbackData(action="cancel", entity="settings")
 EDIT_LANGUAGE = CallbackData(action="edit", entity="lang")
 EDIT_TIMEOUT = CallbackData(action="edit", entity="timeout")

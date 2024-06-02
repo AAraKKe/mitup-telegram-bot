@@ -26,6 +26,7 @@ class MetricsEnv(StrEnum):
     # See: https://drp.li/SZQCc
     CLOUDWATCH = "default"
     STDOUT = "local"
+    RICH = "rich"
 
 
 class RunModes(StrEnum):

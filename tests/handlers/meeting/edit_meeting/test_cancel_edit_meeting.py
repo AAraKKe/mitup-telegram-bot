@@ -20,14 +20,13 @@ def api():
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(123))]), indirect=True)
-@pytest.mark.asyncio
 async def test_cancel_edit_meeting_works(
     mock_session: MockDbSession, update: Update, meeting: Meetup, app: StubMitupApp, api: MockApi
 ):
     mock_session.add_object(meeting)
 
     context, result = await call_handler(
-        update, app, EditMeetingHandlerId.CANCEL, with_meeting_id=(ContextId.EDIT_MEETING_LOCATION_NAME, 123)
+        update, app, EditMeetingHandlerId.CANCEL, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
     )
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -36,7 +35,6 @@ async def test_cancel_edit_meeting_works(
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL)]), indirect=True)
-@pytest.mark.asyncio
 async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
     mock_session: MockDbSession,
     caplog: pytest.LogCaptureFixture,
@@ -47,7 +45,7 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
 ):
     with caplog.at_level(logging.ERROR):
         context, result = await call_handler(
-            update, app, EditMeetingHandlerId.CANCEL, with_meeting_id=(ContextId.EDIT_MEETING_LOCATION_NAME, 123)
+            update, app, EditMeetingHandlerId.CANCEL, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
         )
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)

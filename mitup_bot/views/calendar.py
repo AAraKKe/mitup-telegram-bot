@@ -1,7 +1,7 @@
 import calendar
 import datetime as dt
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, assert_never
 
 from mitup_bot.callback_data import CallbackData, DateCallbackData
 from mitup_bot.utils import ButtonMessages, Emojis, MonthList, Weekday
@@ -77,8 +77,21 @@ class CalendarKeyboard:
         ]
 
     def __navigation_back_buttons(self, by: Literal["month", "year"]) -> ButtonConfig:
-        month = self.current_date.month - 1 if by == "month" else self.current_date.month
-        year = self.current_date.year - 1 if by == "year" else self.current_date.year
+        month = self.current_date.month
+        year = self.current_date.year
+
+        match (month, year, by):
+            case (1, _, "month"):
+                # If we are in January, we go back to December of the previous year
+                month = 12
+                year -= 1
+            case (_, _, "month"):
+                month -= 1
+            case (_, _, "year"):
+                year -= 1
+            case (_, _, _) as unreachable:
+                assert_never(unreachable)
+
         date_back = dt.date(year, month, self.anchor_date.day)
         return ButtonConfig(
             text=str(ButtonMessages.GO_BACK),
@@ -86,8 +99,21 @@ class CalendarKeyboard:
         )
 
     def __navigation_forward_buttons(self, by: Literal["month", "year"]) -> ButtonConfig:
-        month = self.current_date.month + 1 if by == "month" else self.current_date.month
-        year = self.current_date.year + 1 if by == "year" else self.current_date.year
+        month = self.current_date.month
+        year = self.current_date.year
+
+        match (month, year, by):
+            case (12, _, "month"):
+                # If we are in December, we go forward to January of the next year
+                month = 1
+                year += 1
+            case (_, _, "year"):
+                year += 1
+            case (_, _, "month"):
+                month += 1
+            case (_, _, _) as unreachable:
+                assert_never(unreachable)
+
         date_forward = dt.date(year, month, self.anchor_date.day)
         return ButtonConfig(
             text=str(ButtonMessages.GO_FORWARD),
@@ -99,10 +125,10 @@ class CalendarKeyboard:
         row = []
 
         # For the back button, the rule is:
-        # - Add month back button if the current month/year are greater than the anchor month/year
-        # - Only add year back button if the current year is greater than the anchor year
-        add_back_button = self.current_date.year > self.anchor_date.year or (
-            self.current_date.month > self.anchor_date.month and by == "month"
+        # - Add month back button if the current month/year are greater than the real, today month/year
+        # - Only add year back button if the current year is greater than the real, today year
+        add_back_button = self.current_date.year > dt.date.today().year or (
+            self.current_date.month > dt.date.today().month and by == "month"
         )
 
         if add_back_button:

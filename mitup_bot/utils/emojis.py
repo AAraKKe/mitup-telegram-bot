@@ -52,6 +52,9 @@ class Emojis(Enum):
     GLASSES = "🕶"
     CLIP = "📎"
     PHONE = "📱"
+    THINK = "🤔"
+    UFO = "🛸"
+    BRAIN = "🧠"
 
     def __str__(self):
         return self.value

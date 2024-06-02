@@ -9,7 +9,6 @@ from mitup_bot.views import MitupView
 from tests.helpers import StubMitupContext, UpdateRequest
 
 
-@pytest.mark.asyncio
 async def test_edit_message_without_effective_message():
     context = mock.AsyncMock()
     update = mock.MagicMock()
@@ -21,7 +20,6 @@ async def test_edit_message_without_effective_message():
         await edit_message(context, update, message)
 
 
-@pytest.mark.asyncio
 async def test_send_message_with_a_view(default_view: MitupView):
     context = mock.AsyncMock()
     update = mock.MagicMock()
@@ -35,7 +33,6 @@ async def test_send_message_with_a_view(default_view: MitupView):
     )
 
 
-@pytest.mark.asyncio
 async def test_send_message_without_view():
     context = mock.AsyncMock()
     update = mock.MagicMock()
@@ -47,7 +44,6 @@ async def test_send_message_without_view():
     context.bot.send_message.assert_called_once_with(chat_id=123456789, text="Hello, World", reply_markup=None)
 
 
-@pytest.mark.asyncio
 async def test_edit_message_with_a_view(default_view: MitupView, update: Update, context: StubMitupContext):
     assert update.effective_message is not None
 
@@ -58,7 +54,6 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
     )
 
 
-@pytest.mark.asyncio
 async def test_edit_message_without_view(update: Update, context: StubMitupContext):
     await edit_message(context, update, "Hello, World")
 
@@ -66,7 +61,6 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
-@pytest.mark.asyncio
 async def test_edit_message_fails_without_effective_message(
     default_view: MitupView, update: Update, context: StubMitupContext
 ):
@@ -75,7 +69,6 @@ async def test_edit_message_fails_without_effective_message(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
-@pytest.mark.asyncio
 async def test_send_message_fails_without_effective_chat(
     default_view: MitupView, update: Update, context: StubMitupContext
 ):

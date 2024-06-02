@@ -1,5 +1,6 @@
 __all__ = [
     "async_metrics_context",
+    "CamelCaseStrEnum",
     "configure_metrics",
     "create_metrics_from_update",
     "Feature",
@@ -17,5 +18,5 @@ from .metrics import (
     create_metrics_from_update,
     properties_from_update,
 )
-from .metric_keys import MetricKey, Feature
+from .metric_keys import MetricKey, Feature, CamelCaseStrEnum
 from aws_embedded_metrics.unit import Unit

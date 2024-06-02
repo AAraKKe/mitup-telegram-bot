@@ -1,5 +1,11 @@
 import logging
 
+import click
+import sqlalchemy
+import telegram
+import telegram.ext
+from rich.console import Console
+from rich.logging import RichHandler
 from telegram import constants
 from telegram.ext import Application, ContextTypes, Defaults
 
@@ -20,10 +26,9 @@ class MitupRuntime:
     """
 
     def __init__(self, env: Env):
-        logging.basicConfig(
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-        )
+        self.env = env
+        self.__configure_logging()
+        HandlersRegistry.env = env
         self.config = Config.from_providers(
             EnvVariablesConfigProvider(),
             TomlConfigProvider(env=env),
@@ -32,6 +37,25 @@ class MitupRuntime:
         self.__setup_db()
         self.__setup_timezone_api()
         self.__configure_metrics()
+
+    def __configure_logging(self):
+        # Configure logging with RichHandler for better output when debugging locally
+        handlers = (
+            [
+                RichHandler(
+                    level=logging.DEBUG,
+                    rich_tracebacks=True,
+                    tracebacks_suppress=[telegram.ext, telegram, sqlalchemy, click],
+                    console=Console(soft_wrap=True, force_terminal=True, width=250),
+                )
+            ]
+            if self.env is Env.DEV
+            else None
+        )
+
+        logging.basicConfig(
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO, handlers=handlers
+        )
 
     def __setup_db(self):
         db.configure_db(self.config.db)

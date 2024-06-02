@@ -23,6 +23,7 @@ def cleanup_states(context: MitupContext):
             ContextId.EDIT_MEETING_DESCRIPTION,
             ContextId.EDIT_MEETING_LOCATION_NAME,
             ContextId.EDIT_MEETING_LOCATION_COORDINATES,
+            ContextId.EDIT_MEETING_TIME,
         ]
     )
 
@@ -49,7 +50,7 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
 
 
 @HandlersRegistry.register_callback_query(
-    EditMeetingHandlerId.CANCEL, callback_data=cb.EDIT_MEETING_CANCEL, bindable=False
+    EditMeetingHandlerId.CANCEL, callback_data=cb.EDIT_MEETING_CANCEL, bindable=True
 )
 @with_async_session
 async def cancel_edit_meeting(session: Session, update: Update, context: MitupContext):

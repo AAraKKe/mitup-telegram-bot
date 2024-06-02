@@ -18,11 +18,11 @@ def test_user_does_not_exist(mock_session: MockDbSession):
     assert user is None
 
 
-def test_user_exist(mock_session: MockDbSession, user: User):
-    mock_session.add_object(user, "tg_user_id")
+def test_user_exist(mock_session: MockDbSession, user_with_settings: User):
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
-    result = User.by_tg_user_id(mock_session, user.tg_user_id)
-    assert result == user
+    result = User.by_tg_user_id(mock_session, user_with_settings.tg_user_id)
+    assert result == user_with_settings
 
 
 @pytest.mark.parametrize(

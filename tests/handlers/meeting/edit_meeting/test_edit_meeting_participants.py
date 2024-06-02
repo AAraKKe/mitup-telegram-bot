@@ -64,7 +64,6 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_PARTICIPANTS.with_id(2))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_participants_works(
     mock_session: MockDbSession,
     update: Update,
@@ -83,7 +82,6 @@ async def test_edit_meeting_participants_works(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_PARTICIPANTS.with_id(999))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_participants_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
@@ -116,7 +114,6 @@ async def test_edit_meeting_participants_meeting_not_owned(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_participants_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
@@ -144,7 +141,6 @@ async def test_edit_meeting_participants_failures(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(1))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_max_participants_works(
     mock_session: MockDbSession,
     update: Update,
@@ -170,7 +166,6 @@ async def test_edit_meeting_max_participants_works(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_max_participants_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
@@ -195,7 +190,6 @@ async def test_edit_meeting_max_participants_failures(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(999))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_max_participants_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
@@ -293,7 +287,6 @@ async def test_edit_meeting_no_limit_participants_failures(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(999))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_no_limit_participants_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
@@ -324,7 +317,6 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(2))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_callback_cancel_edit_meeting_participants_property_works(
     mock_session: MockDbSession,
     update: Update,
@@ -344,9 +336,9 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
 @pytest.mark.parametrize(
     "update, expectation",
     [
-        (UpdateRequest(message="0"), pytest.raises(AssertionError)),
-        (UpdateRequest(message="-3"), pytest.raises(AssertionError)),
-        (UpdateRequest(message="not a number"), pytest.raises(AssertionError)),
+        (UpdateRequest(message_text="0"), pytest.raises(AssertionError)),
+        (UpdateRequest(message_text="-3"), pytest.raises(AssertionError)),
+        (UpdateRequest(message_text="not a number"), pytest.raises(AssertionError)),
     ],
     indirect=["update"],
     ids=["zero_participants", "negative_participants", "not_a_number"],
@@ -370,7 +362,7 @@ async def test_positive_filter_works(
             assert "This update would not be processed by the handler!" in caplog.text
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="4")], indirect=True)
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="4")], indirect=True)
 async def test_edit_meeting_max_participants_message_works(
     mock_session: MockDbSession,
     update: Update,
@@ -388,7 +380,7 @@ async def test_edit_meeting_max_participants_message_works(
         update,
         app,
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
-        with_meeting_id=(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, 1),
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
     expected_view = edit_participants_view(cast(int, meeting.id)).with_context(
@@ -403,8 +395,7 @@ async def test_edit_meeting_max_participants_message_works(
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="420")], indirect=True)
-@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="420")], indirect=True)
 async def test_edit_max_participants_message_fails_if_context_not_saved(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
@@ -428,11 +419,14 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
 
 @pytest.mark.parametrize(
     "update",
-    [(UpdateRequest(message="0")), (UpdateRequest(message="-3")), (UpdateRequest(message="not a number"))],
+    [
+        (UpdateRequest(message_text="0")),
+        (UpdateRequest(message_text="-3")),
+        (UpdateRequest(message_text="not a number")),
+    ],
     indirect=["update"],
     ids=["zero_participants", "negative_participants", "not_a_number"],
 )
-@pytest.mark.asyncio
 async def test_edit_meeting_wrong_max_participants_works(
     mock_session: MockDbSession,
     update: Update,
@@ -444,7 +438,7 @@ async def test_edit_meeting_wrong_max_participants_works(
         update,
         app,
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
-        with_meeting_id=(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, 1),
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
     response_view = edit_max_participants_view(1, fail=True)
 
@@ -452,8 +446,7 @@ async def test_edit_meeting_wrong_max_participants_works(
     api.assert_send_message_called(context, update, response_view)
 
 
-@pytest.mark.parametrize("update", [(UpdateRequest(message="no number today"))], indirect=True)
-@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [(UpdateRequest(message_text="no number today"))], indirect=True)
 async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,

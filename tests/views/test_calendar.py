@@ -1,6 +1,7 @@
 import calendar
 import datetime as dt
 
+import freezegun
 import pytest
 
 from mitup_bot.callback_data import DateCallbackData
@@ -26,12 +27,12 @@ def test_full_calendar_markup():
     "current_date, expected_text",
     [
         (
-            dt.date(2024, 6, 22),
-            [[Month.JUNE.get(), ButtonMessages.GO_FORWARD.get()], ["2024", ButtonMessages.GO_FORWARD.get()]],
+            dt.date(2024, 4, 22),
+            [[Month.APRIL.get(), ButtonMessages.GO_FORWARD.get()], ["2024", ButtonMessages.GO_FORWARD.get()]],
         ),
         (
-            dt.date(2024, 6, 7),
-            [[Month.JUNE.get(), ButtonMessages.GO_FORWARD.get()], ["2024", ButtonMessages.GO_FORWARD.get()]],
+            dt.date(2024, 4, 7),
+            [[Month.APRIL.get(), ButtonMessages.GO_FORWARD.get()], ["2024", ButtonMessages.GO_FORWARD.get()]],
         ),
         (
             dt.date(2024, 7, 22),
@@ -41,8 +42,8 @@ def test_full_calendar_markup():
             ],
         ),
         (
-            dt.date(2024, 5, 12),
-            [[Month.MAY.get(), ButtonMessages.GO_FORWARD.get()], ["2024", ButtonMessages.GO_FORWARD.get()]],
+            dt.date(2024, 3, 12),
+            [[Month.MARCH.get(), ButtonMessages.GO_FORWARD.get()], ["2024", ButtonMessages.GO_FORWARD.get()]],
         ),
         (
             dt.date(2025, 5, 12),
@@ -65,6 +66,27 @@ def test_full_calendar_markup():
                 [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
+        (
+            dt.date(2024, 12, 12),
+            [
+                [ButtonMessages.GO_BACK.get(), Month.DECEMBER.get(), ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
+            ],
+        ),
+        (
+            dt.date(2025, 1, 12),
+            [
+                [ButtonMessages.GO_BACK.get(), Month.JANUARY.get(), ButtonMessages.GO_FORWARD.get()],
+                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
+            ],
+        ),
+        (
+            dt.date(2024, 7, 12),
+            [
+                [ButtonMessages.GO_BACK.get(), Month.JULY.get(), ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
+            ],
+        ),
     ],
     ids=[
         "future_day_current_month",
@@ -74,8 +96,12 @@ def test_full_calendar_markup():
         "previous_month_next_year",
         "same_month_next_year",
         "next_month_next_year",
+        "last_month_of_the_year",
+        "first_month_of_the_year",
+        "anchor_and_current_in_the_future",
     ],
 )
+@freezegun.freeze_time("2024-04-12", tz_offset=0)
 def test_calendar_navigation_buttons(current_date: dt.date, expected_text: str):
     # Given taht the anchor date is 2024-06-12
     cal = CalendarKeyboard(

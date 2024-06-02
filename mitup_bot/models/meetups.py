@@ -53,10 +53,9 @@ class Meetup(SQLModel, table=True):
     description: str | None = None
     created_time: dt.datetime | None = None
     updated_time: dt.datetime | None = None
-    date: dt.date | None = None
-    time: dt.time | None = None
+    datetime: dt.datetime | None = None
     max_members: int | None = None
-    language: str = "en"
+    language: str | None = None
     location: MeetupLocation = Field(
         default=MeetupLocation(),
         sa_column=Column(type_=MeetupLocation.as_mutable(JSON(none_as_null=True)), nullable=True),
@@ -74,19 +73,17 @@ class Meetup(SQLModel, table=True):
         return False
 
     @property
-    def sanitized_date(self) -> dt.datetime | None:
-        if self.date and self.time:
-            return dt.datetime.combine(self.date, self.time, tzinfo=dt.UTC)
-        return None
-
-    @property
     def timezone(self) -> ZoneInfo:
         return self.owner.settings.tz
 
     @property
-    def str_date(self) -> str:
-        if self.sanitized_date:
-            return f"{self.sanitized_date.astimezone(self.timezone):%Y-%m-%d %H:%M} ({self.timezone.key})"
+    def datetime_in_tz(self) -> dt.datetime | None:
+        return self.owner.datetime_in_tz(self.datetime) if self.datetime else None
+
+    @property
+    def str_datetime(self) -> str:
+        if self.datetime:
+            return f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})"
         return MeetingMessages.DATE_NOT_SET.get()
 
     @property
@@ -105,37 +102,45 @@ class Meetup(SQLModel, table=True):
     def message(self) -> str:
         return MeetingMessages.FEATURES.get(
             title=self.title,
+            lang=self.lang,
             owner=self.owner.username or self.owner.first_name,
-            description=self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(),
-            date=self.str_date,
-            location=str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(),
+            description=self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang),
+            datetime=self.str_datetime,
+            location=str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(lang=self.lang),
             participants=self.participants_text,
         )
 
     @property
     def main_view(self) -> MitupView:
+        # TODO: when we can share the meetings there must be several views of the meeting, one for editting,
+        # one for sharing, etc.
+        # the view for sharing should be transalted to the meeting language and not the user language.
         return MitupView(
             self.message,
             [
                 [
-                    ButtonConfig(text=ButtonMessages.JOIN.get(), callback_data=cb.JOIN),
-                    ButtonConfig(text=ButtonMessages.INVITE.get(), callback_data=cb.INVITE),
-                    ButtonConfig(text=ButtonMessages.LEAVE.get(), callback_data=cb.LEAVE),
+                    ButtonConfig(text=ButtonMessages.JOIN.get(lang=self.user_language), callback_data=cb.JOIN),
+                    ButtonConfig(text=ButtonMessages.INVITE.get(lang=self.user_language), callback_data=cb.INVITE),
+                    ButtonConfig(text=ButtonMessages.LEAVE.get(lang=self.user_language), callback_data=cb.LEAVE),
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(cast(int, self.id))
+                        text=ButtonMessages.EDIT.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING.with_id(cast(int, self.id)),
                     ),
-                    ButtonConfig(text=ButtonMessages.CHAT.get(), callback_data=cb.CHAT),
+                    ButtonConfig(text=ButtonMessages.CHAT.get(lang=self.user_language), callback_data=cb.CHAT),
                     ButtonConfig(
-                        text=ButtonMessages.DELETE.get(), callback_data=cb.DELETE_MEETING.with_id(cast(int, self.id))
+                        text=ButtonMessages.DELETE.get(lang=self.user_language),
+                        callback_data=cb.DELETE_MEETING.with_id(cast(int, self.id)),
                     ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.SHARE.get(), callback_data=cb.SHARE),
+                    ButtonConfig(text=ButtonMessages.SHARE.get(lang=self.user_language), callback_data=cb.SHARE),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU),
+                    ButtonConfig(
+                        text=ButtonMessages.MAIN_MENU.get(lang=self.user_language), callback_data=cb.MAIN_MENU
+                    ),
                 ],
             ],
         )
@@ -144,42 +149,61 @@ class Meetup(SQLModel, table=True):
     def edit_view(self) -> MitupView:
         assert self.id is not None, "View cannot be generated without id"
 
+        now_in_tz: dt.datetime = self.datetime_in_tz or self.owner.now_in_tz()
+
         return MitupView(
             self.message,
             [
                 [
-                    ButtonConfig(text=ButtonMessages.TITLE.get(), callback_data=cb.EDIT_MEETING_TITLE.with_id(self.id)),
                     ButtonConfig(
-                        text=ButtonMessages.DESCRIPTION.get(),
+                        text=ButtonMessages.TITLE.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING_TITLE.with_id(self.id),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.DESCRIPTION.get(lang=self.user_language),
                         callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(self.id),
                     ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.DATE.get(), callback_data=cb.EDIT_MEETING_DATE.with_id(self.id)),
-                    ButtonConfig(text=ButtonMessages.CLOCK.get(), callback_data=cb.EDIT_MEETING_TIME.with_id(self.id)),
+                    ButtonConfig(
+                        text=ButtonMessages.DATE.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING_DATE.with_id(self.id).with_date(now_in_tz.date()),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.CLOCK.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING_TIME.with_id(self.id),
+                    ),
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.PARTICIPANTS.get(),
+                        text=ButtonMessages.PARTICIPANTS.get(lang=self.user_language),
                         callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(self.id),
                     ),
                     ButtonConfig(
-                        text=ButtonMessages.LOCATION.get(), callback_data=cb.EDIT_MEETING_LOCATION.with_id(self.id)
+                        text=ButtonMessages.LOCATION.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING_LOCATION.with_id(self.id),
                     ),
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.LANGUAGE.get(), callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(self.id)
+                        text=ButtonMessages.LANGUAGE.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(self.id),
                     ),
                     ButtonConfig(
-                        text=ButtonMessages.SETTINGS.get(), callback_data=cb.EDIT_MEETING_SETTINGS.with_id(self.id)
+                        text=ButtonMessages.SETTINGS.get(lang=self.user_language),
+                        callback_data=cb.EDIT_MEETING_SETTINGS.with_id(self.id),
                     ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.DONE.get(), callback_data=cb.SHOW_MEETING.with_id(self.id)),
+                    ButtonConfig(
+                        text=ButtonMessages.DONE.get(lang=self.user_language),
+                        callback_data=cb.SHOW_MEETING.with_id(self.id),
+                    ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU),
+                    ButtonConfig(
+                        text=ButtonMessages.MAIN_MENU.get(lang=self.user_language), callback_data=cb.MAIN_MENU
+                    ),
                 ],
             ],
         )
@@ -202,3 +226,12 @@ class Meetup(SQLModel, table=True):
             raise MeetupNotFound(meetup_id)
 
         return None
+
+    @property
+    def user_language(self) -> str:
+        return self.owner.settings.language
+
+    @property
+    def lang(self) -> str:
+        """Safe way of getting the langauge of the meeting. If it is not set, it will default to the user's language."""
+        return self.language or self.user_language

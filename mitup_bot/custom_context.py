@@ -1,8 +1,9 @@
 import logging
+import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import auto
 from typing import Any, override
 
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
@@ -16,6 +17,7 @@ from mitup_bot.exceptions import (
     InvalidUserData,
 )
 from mitup_bot.monitoring import (
+    CamelCaseStrEnum,
     Feature,
     MetricKey,
     create_metrics_from_update,
@@ -23,13 +25,14 @@ from mitup_bot.monitoring import (
 )
 
 
-class ContextId(Enum):
+class ContextId(CamelCaseStrEnum):
     EDIT_MEETING_TITLE = auto()
     EDIT_MEETING_DESCRIPTION = auto()
     EDIT_MEETING_LOCATION_NAME = auto()
     EDIT_MEETING_LOCATION_COORDINATES = auto()
     EDIT_MEETING_MAX_PARTICIPANTS = auto()
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = auto()
+    EDIT_MEETING_TIME = auto()
 
 
 @dataclass
@@ -75,6 +78,8 @@ class MitupContext[TB: ExtBot, TM: MetricsLogger](CallbackContext[TB, MitupUserD
         self, context: ContextId, property: str, property_type: type[T], ensure_clean: bool
     ) -> Generator[T, None, None]:
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""
+        self.metrics.set_property("ContextId", context.value)
+
         if (
             self.user_data is None
         ):  # pragma: no cover, the app does not allow us to set user_data in tests and this should never happen
@@ -97,10 +102,12 @@ class MitupContext[TB: ExtBot, TM: MetricsLogger](CallbackContext[TB, MitupUserD
         except Exception:
             if ensure_clean:
                 self.user_data.remove_context(context)
+                self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
             raise
 
         if ensure_clean:
             self.user_data.remove_context(context)
+            self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
 
     @contextmanager
     def meeting_id(self, context: ContextId, ensure_clean=True) -> Generator[int, None, None]:
@@ -117,6 +124,8 @@ class MitupContext[TB: ExtBot, TM: MetricsLogger](CallbackContext[TB, MitupUserD
             raise InvalidUserData("User data requested but not set")
 
         self.user_data.store_meeting_id(context, meeting_id)
+        self.metrics.set_property("ContextId", context.value)
+        self.put_metric("StoredMeetingId", 1, unit=Unit.COUNT)
 
     def clean_user_data(self, contexts: list[ContextId]):
         if self.user_data is None:  # pragma: no cover
@@ -125,6 +134,8 @@ class MitupContext[TB: ExtBot, TM: MetricsLogger](CallbackContext[TB, MitupUserD
 
         for context in contexts:
             self.user_data.remove_context(context)
+            self.metrics.set_property("ContextId", context.value)
+            self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
 
     def clean_all_user_data(self):
         if self.user_data is None:  # pragma: no cover
@@ -194,7 +205,7 @@ class MitupContext[TB: ExtBot, TM: MetricsLogger](CallbackContext[TB, MitupUserD
             metrics.set_property(k, v)
 
         metrics.put_metric(str(name), value, unit.value)
-        await metrics.flush()
+        await self.flush_metrics(metrics)
 
     async def emit_feature_metric(
         self,
@@ -223,10 +234,16 @@ class MitupContext[TB: ExtBot, TM: MetricsLogger](CallbackContext[TB, MitupUserD
             name, value, unit, dimensions, properties, with_handler_dimensions, with_update_properties
         )
 
-    async def flush_metrics(self):
-        # If there are any metrics in the metrics context, flush them
-        if self.metrics.context.metrics:
+    async def flush_metrics(self, logger: MetricsLogger | None = None):
+        # If we are requesting to flush a stand alone metrics logger, flush it
+        if logger:
+            await logger.flush()
+        elif self.metrics.context.metrics:
+            # Otherwise, if there are any metrics in the metrics context, flush them
             await self.metrics.flush()
+
+        # Force instant flush of the metrics logger to avoid logs delays
+        sys.stdout.flush()
 
     @classmethod
     @override

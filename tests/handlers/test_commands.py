@@ -126,7 +126,6 @@ def test_registry_fails_to_get_handler_that_does_not_exist():
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(command="start")]), indirect=True)
-@pytest.mark.asyncio
 async def test_command_start_with_new_user(
     mock_session: MockDbSession,
     update: Update,
@@ -154,7 +153,6 @@ async def test_command_start_with_new_user(
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(user=False)]), indirect=True)
 async def test_command_stat_with_new_user_use_incorrect_user(
     mock_session: MockDbSession, update: Update, context: StubMitupContext
@@ -167,7 +165,6 @@ async def test_command_stat_with_new_user_use_incorrect_user(
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("command_list", [command_start_with_existing_user, command_go_to_main_menu])
 async def test_commands_to_show_main_menu(command_list, update: Update, context: StubMitupContext, api: MockApi):
     await command_start_with_existing_user(update, context)
@@ -176,7 +173,6 @@ async def test_commands_to_show_main_menu(command_list, update: Update, context:
     api.assert_send_message_called(context, update, expected_view)
 
 
-@pytest.mark.asyncio
 async def test_command_cancel(update: Update, context: StubMitupContext, api: MockApi):
     await command_cancel(update, context)
 

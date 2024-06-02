@@ -25,6 +25,7 @@ from telegram.warnings import PTBUserWarning
 from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
+from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.monitoring import MetricKey
@@ -41,7 +42,9 @@ from .error_handler import handler as error_handler
 filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
 
-def callback_with_metrics(callback_id: CallbackId, handler_type: str, callback: HandlerCallback) -> HandlerCallback:
+def callback_with_metrics(
+    callback_id: CallbackId, handler_type: str, callback: HandlerCallback, env: Env
+) -> HandlerCallback:
     async def inner_callback(update: Update, context: MitupContext[ExtBot, MetricsLogger]):
         if context.metrics is None:
             # If metrics has not been set just run the callback
@@ -59,7 +62,7 @@ def callback_with_metrics(callback_id: CallbackId, handler_type: str, callback: 
             # Relying on error handlers by the application will result in the creation of a
             # separate context. Lets handle errors here where we still have the context
             # of the handler that was executed including metrics context.
-            error_handler(context, e)
+            error_handler(context, e, env)
         else:
             context.put_metric(MetricKey.FAULT, 0)
         finally:
@@ -77,6 +80,7 @@ class HandlerWrapper:
     handler: BaseHandler[Update, MitupContext]
     bindable: bool
     group: int = 0
+    env: Env | None = None
 
     def is_conversation(self) -> bool:
         return isinstance(self.handler, ConversationHandler)
@@ -102,6 +106,7 @@ class HandlersRegistry:
     as callbacks for different handlers.
     """
 
+    env: Env = Env.DEV
     handlers: dict[CallbackId, HandlerWrapper] = {}
 
     @classmethod
@@ -141,7 +146,7 @@ class HandlersRegistry:
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CommandHandler(
                     command_name,
-                    callback=callback_with_metrics(callback_id, "Command", callback),
+                    callback=callback_with_metrics(callback_id, "Command", callback, cls.env),
                     filters=filters,
                     block=block,
                     has_args=has_args,
@@ -178,7 +183,9 @@ class HandlersRegistry:
 
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=MessageHandler(
-                    filters=filters, callback=callback_with_metrics(callback_id, "Message", callback), block=block
+                    filters=filters,
+                    callback=callback_with_metrics(callback_id, "Message", callback, cls.env),
+                    block=block,
                 ),
                 bindable=bindable,
                 group=group,
@@ -223,7 +230,7 @@ class HandlersRegistry:
             cls.handlers[callback_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
                     pattern=callback_data.pattern if callback_data else None,
-                    callback=callback_with_metrics(callback_id, "Callback", inner_wrapper),
+                    callback=callback_with_metrics(callback_id, "Callback", inner_wrapper, cls.env),
                     block=block,
                 ),
                 bindable=bindable,

@@ -86,13 +86,16 @@ def user() -> UserModel:
 
 @pytest.fixture
 def user_with_settings(settings: Settings) -> UserModel:
-    return UserModel(
+    user = UserModel(
         id=1,
         first_name="John",
         tg_user_id=123,
         meetups=[Meetup(id=1, title="Test Meeting 1"), Meetup(id=2, title="Test Meeting 2")],
-        settings=settings,
     )
+    settings.user = user
+    settings.user_id = user.id
+    user.settings = settings
+    return user
 
 
 @pytest.fixture
@@ -101,8 +104,7 @@ def meeting(user_with_settings: UserModel) -> Meetup:
         id=123,
         title="Test Meeting",
         description="Test Description",
-        date=dt.date(1987, 7, 16),
-        time=dt.time(23, 59),
+        datetime=dt.datetime(1987, 7, 16, 23, 59, tzinfo=dt.UTC),
         location=MeetupLocation(name="Test Location", coordinates=(123.1, 321.1)),
         owner=user_with_settings,
     )
@@ -181,12 +183,12 @@ def update(
         # - CallbackQuery
         # - Message
         # - Inlinequery
+        # - Location
         # If we want to validate that the update doesn't have an user we need to provide an empty update
         return Update(123)
 
     # If we have a message we will al ways have a chat and a user
     # We are not dealing yet with types of updates that can have a chat without a message
-    message_text = data.message if isinstance(data.message, str) else "some text"
     return Update(
         123,
         Message(
@@ -194,7 +196,7 @@ def update(
             date=dt.datetime.now(),
             chat=tg_chat,
             from_user=tg_user,
-            text=message_text,
+            text=data.message_text,
             location=data.location,
         ),
     )

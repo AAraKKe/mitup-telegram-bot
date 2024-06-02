@@ -1,6 +1,8 @@
+import datetime as dt
+
 from mitup_bot.utils import ButtonMessages, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView
 
 
 def main_menu_view(message: str = Messages.DEFAULT_MAIN_MENU_DESCRIPTION.get()) -> MitupView:
@@ -88,3 +90,36 @@ def edit_meeting_property_view(
         keyboard[:0] = extra_buttons
 
     return MitupView(message, keyboard=keyboard)
+
+
+def __edit_meeting_date_final_row(meeting_id: int, new: bool) -> list[list[ButtonConfig]]:
+    final_rows = [
+        [ButtonConfig(text=ButtonMessages.BACK_EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
+    ]
+
+    if not new:
+        # Allow deleting the date if date is already set
+        final_rows.append(
+            [
+                ButtonConfig(
+                    text=ButtonMessages.DELETE_DATE.get(), callback_data=cb.DELETE_MEETING_DATE.with_id(meeting_id)
+                )
+            ],
+        )
+
+    return final_rows
+
+
+def edit_meeting_date_view(meeting_id: int, anchor_date: dt.date, current_date: dt.date, new: bool) -> MitupView:
+    message = MeetingMessages.ADD_DATE.get() if new else MeetingMessages.EDIT_DATE.get()
+    calendar_keyboard = CalendarKeyboard(
+        anchor_date,
+        current_date,
+        cb.SET_MEETING_DATE.with_id(meeting_id),
+        cb.EDIT_MEETING_DATE.with_id(meeting_id),
+    ).keyboard
+
+    # Final row includes the back button and the delete date button when the date is set
+    calendar_keyboard.extend(__edit_meeting_date_final_row(meeting_id, new))
+
+    return MitupView(description=message, keyboard=calendar_keyboard)

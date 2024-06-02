@@ -29,7 +29,6 @@ from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
-@pytest.mark.asyncio
 async def test_callback_query_settings_is_called_with_settings_view(
     update: Update, context: StubMitupContext, api: MockApi
 ):
@@ -38,7 +37,6 @@ async def test_callback_query_settings_is_called_with_settings_view(
     api.assert_edit_message_called(context, update, factory.settings_view())
 
 
-@pytest.mark.asyncio
 async def test_callback_query_timezone_with_correct_view(
     mock_session: MockDbSession,
     update: Update,
@@ -58,7 +56,6 @@ async def test_callback_query_timezone_with_correct_view(
     assert result == ConversationSettingsState.TIMEZONE
 
 
-@pytest.mark.asyncio
 async def test_callback_query_timezone_without_found_user(
     mock_session: MockDbSession, update: Update, context: StubMitupContext
 ):
@@ -66,14 +63,12 @@ async def test_callback_query_timezone_without_found_user(
         await callback_query_timezone(update, context)
 
 
-@pytest.mark.asyncio
 async def test_callback_query_show_main_menu(update: Update, context: StubMitupContext, api: MockApi):
     await callback_query_main_menu(update, context)
 
     api.assert_edit_message_called(context, update, factory.main_menu_view())
 
 
-@pytest.mark.asyncio
 async def test_callback_query_cancel_meeting_calls_to_current_view(
     update: Update,
     context: StubMitupContext,
@@ -96,7 +91,6 @@ async def test_callback_query_cancel_meeting_calls_to_current_view(
     )
 
 
-@pytest.mark.asyncio
 async def test_callback_query_cancel_setting_calls_to_settings_view(
     update: Update, context: StubMitupContext, api: MockApi
 ):
@@ -105,7 +99,6 @@ async def test_callback_query_cancel_setting_calls_to_settings_view(
     api.assert_send_message_called(context, update, factory.settings_view())
 
 
-@pytest.mark.asyncio
 async def test_callback_query_create_meeting_calls_to_create_meeting_view(
     update: Update, context: StubMitupContext, api: MockApi
 ):
@@ -114,7 +107,6 @@ async def test_callback_query_create_meeting_calls_to_create_meeting_view(
     api.assert_edit_message_called(context, update, factory.create_meeting_view())
 
 
-@pytest.mark.asyncio
 async def test_callback_query_create_meeting_return_the_correct_state(
     update: Update, context: StubMitupContext, api: MockApi
 ):
@@ -123,31 +115,29 @@ async def test_callback_query_create_meeting_return_the_correct_state(
     assert result == ConversationMeetingState.TITLE
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1))]), indirect=True)
 async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     mock_session: MockDbSession,
     update: Update,
     app: StubMitupApp,
-    user: User,
+    user_with_settings: User,
     api: MockApi,
 ):
-    mock_session.add_object(user, "tg_user_id")
-    mock_session.add_object(user.meetups[0])
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETING)
 
-    expected_view = user.meetups[0].main_view
+    expected_view = user_with_settings.meetups[0].main_view
     api.assert_edit_message_called(context, update, expected_view)
 
 
-@pytest.mark.asyncio
 async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
-    user: User,
+    user_with_settings: User,
 ):
     caplog.set_level(logging.WARNING)
 
@@ -155,7 +145,7 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(4))
 
     await callback_query_show_meeting(update, context)
@@ -166,7 +156,6 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "method, callback_data_pattern, expected",
     [
@@ -191,26 +180,25 @@ async def test_callback_query_show_meeting_fails_without_callback_query_data(
         await method(update, context)
 
 
-@pytest.mark.asyncio
 async def test_callback_query_show_meetings_use_correct_view(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    user: User,
+    user_with_settings: User,
     api: MockApi,
 ):
     match = re.match(cb.SHOW_ACTIVE_MEETING_PAGE.pattern, "show;active_meeting_page:1")
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
-    user.meetups += [create_meetup(10), create_meetup(11), create_meetup(12), create_meetup(13)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    user_with_settings.meetups += [create_meetup(10), create_meetup(11), create_meetup(12), create_meetup(13)]
 
     await callback_query_show_meetings(update, context)
 
     user_meetings_buttons: list[ButtonConfig] = [
         ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(int(meeting.id)))  # type: ignore
-        for meeting in user.meetups
+        for meeting in user_with_settings.meetups
     ]
 
     expected_view = PaginatedMitupView(
@@ -226,12 +214,11 @@ async def test_callback_query_show_meetings_use_correct_view(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1))], indirect=True
 )
-@pytest.mark.asyncio
 async def test_callback_query_show_meetings_without_meetings_to_show_works(
-    mock_session: MockDbSession, update: Update, app: StubMitupApp, user: User, api: MockApi
+    mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User, api: MockApi
 ):
-    mock_session.add_object(user, "tg_user_id")
-    user.meetups = []
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    user_with_settings.meetups = []
 
     context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETINGS)
 
@@ -243,7 +230,6 @@ async def test_callback_query_show_meetings_without_meetings_to_show_works(
     api.assert_edit_message_called(context, update, expected_view)
 
 
-@pytest.mark.asyncio
 async def test_callback_query_main_menu_delete_user_data_related_with_edit_meetings(
     update: Update, context: MitupContext
 ):

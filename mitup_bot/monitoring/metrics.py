@@ -1,17 +1,44 @@
 import asyncio
 import logging
+import sys
 from collections.abc import Callable
 from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 
 from aws_embedded_metrics.config import get_config
+from aws_embedded_metrics.environment.environment_detector import EnvironmentCache
+from aws_embedded_metrics.environment.local_environment import LocalEnvironment
+from aws_embedded_metrics.logger.metrics_context import MetricsContext
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.logger.metrics_logger_factory import create_metrics_logger
+from aws_embedded_metrics.serializers.log_serializer import LogSerializer
+from aws_embedded_metrics.sinks import Sink
+from rich.console import Console
 from telegram import Update
 
-from mitup_bot.config import MetricsConfig
+from mitup_bot.config import MetricsConfig, MetricsEnv
 
 metrics_factory = create_metrics_logger
+
+
+class RichConsoleSink(Sink):
+    def __init__(self):
+        self.serializer = LogSerializer()
+        self.console = Console(force_terminal=True, width=250)
+
+    def accept(self, context: MetricsContext) -> None:
+        for serialized_content in self.serializer.serialize(context):
+            if serialized_content:
+                self.console.print_json(serialized_content, indent=2)
+
+    @staticmethod
+    def name() -> str:
+        return "RichConsoleSink"
+
+
+class RichEnvironment(LocalEnvironment):
+    def __init__(self):
+        self.sink = RichConsoleSink()
 
 
 def configure_metrics(config: MetricsConfig, factory: Callable[[], MetricsLogger] | None = None):
@@ -23,6 +50,12 @@ def configure_metrics(config: MetricsConfig, factory: Callable[[], MetricsLogger
     metrics_config = get_config()
 
     metrics_config.namespace = config.namespace
+
+    # If we have set the environment to Rich, lets use the Rich console as environment
+    if config.environment is MetricsEnv.RICH:
+        # Set the cached environment so the EMF library uses it
+        EnvironmentCache.environment = RichEnvironment()
+
     metrics_config.environment = config.environment.value
 
     if factory:  # pragma: no cover, this is only used for testing
@@ -58,6 +91,7 @@ def metrics_context(dimensions: dict[str, str] | None = None, properties: dict[s
     logger = __prepare_logger(dimensions=dimensions, properties=properties)
     yield logger
     asyncio.run(logger.flush())
+    sys.stdout.flush()
 
 
 @asynccontextmanager
@@ -71,6 +105,7 @@ async def async_metrics_context(dimensions: dict[str, str] | None = None, proper
     logger = __prepare_logger(dimensions=dimensions, properties=properties)
     yield logger
     await logger.flush()
+    sys.stdout.flush()
 
 
 def properties_from_update(update: Update) -> dict[str, Any]:

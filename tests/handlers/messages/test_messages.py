@@ -15,7 +15,6 @@ from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
-@pytest.mark.asyncio
 async def test_filter_messages_without_text_handler_with_correct_view(
     update: Update, context: StubMitupContext, api: MockApi
 ):
@@ -25,30 +24,29 @@ async def test_filter_messages_without_text_handler_with_correct_view(
     assert result == -1
 
 
-@pytest.mark.asyncio
 async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_correct_view(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    user: User,
+    user_with_settings: User,
     api: MockApi,
 ):
-    mock_session.add_object(user, "tg_user_id")
-    assert len(user.meetups) == 2
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    assert len(user_with_settings.meetups) == 2
 
     def flush():
         # We flush after having added the meetup
-        assert len(user.meetups) > 0, "Flush is being called without having adding a meeting first"
-        user.meetups[2].id = 3
+        assert len(user_with_settings.meetups) > 0, "Flush is being called without having adding a meeting first"
+        user_with_settings.meetups[2].id = 3
 
     # Mimic flush behaviour
     mock_session.flush.side_effect = flush
 
     await create_meeting_message_handler(update, context)
 
-    assert len(user.meetups) == 3
+    assert len(user_with_settings.meetups) == 3
 
-    new_meeting = user.meetups[2]
+    new_meeting = user_with_settings.meetups[2]
     mock_session.assert_added(new_meeting)
     mock_session.assert_flushed()
 
@@ -56,15 +54,14 @@ async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_cor
     api.assert_send_message_called(context, update, new_meeting.edit_view.with_context(message))
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_edit_title_message_handler_update_the_title_and_send_correct_view(
-    mock_session: MockDbSession, update: Update, context: mock.MagicMock, api: MockApi, user: User
+    mock_session: MockDbSession, update: Update, context: mock.MagicMock, api: MockApi, user_with_settings: User
 ):
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
 
-    meeting = user.meetups[0]
+    meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting, "id")
 
     assert update.effective_message is not None
@@ -81,15 +78,14 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
     api.assert_send_message_called(context, update, view)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_edit_description_message_handler_update_the_description_and_send_correct_view(
-    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user: User
+    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user_with_settings: User
 ):
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, 1)
 
-    meeting = user.meetups[0]
+    meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting, "id")
 
     assert update.effective_message is not None
@@ -108,7 +104,6 @@ async def test_edit_description_message_handler_update_the_description_and_send_
     api.assert_send_message_called(context, update, view)
 
 
-@pytest.mark.asyncio
 async def test_filter_messages_without_text_delete_user_data_related_with_edit_meetings(
     update: Update, context: MitupContext
 ):

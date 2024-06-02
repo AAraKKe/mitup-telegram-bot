@@ -35,6 +35,18 @@ class EditMeetingHandlerId(CallbackId):
     LOCATION_COORDINATES_CONVERSATION = auto()
     LOCATION_COORDINATES_MESSAGE = auto()
     LOCATION_COORDINATES_WRONG_MESSAGE = auto()
+
+    # Edit meeting date and time
+    DATE_CALLBACK = auto()
+    SET_DATE_CALLBACK = auto()
+    EDIT_TIME_CALLBACK = auto()
+    EDIT_TIME_CONVERSATION = auto()
+    SET_TIME_MESSAGE = auto()
+    WRONG_TIME_FORMAT = auto()
+    WRONG_TIME_MESSAGE = auto()
+    DELETE_DATE_TIME_CALLBACK = auto()
+
+    # Cancel button during edit
     CANCEL = auto()
 
 
@@ -44,3 +56,4 @@ class ConversationMeetingState(Enum):
     EDIT_MAX_PARTICIPANTS = auto()
     EDIT_LOCATION_NAME = auto()
     EDIT_LOCATION_COORDIANTES = auto()
+    EDIT_TIME = auto()

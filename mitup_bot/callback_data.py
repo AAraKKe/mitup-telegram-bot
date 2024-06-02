@@ -4,6 +4,8 @@ from typing import Self, override
 
 from pydantic import BaseModel, Field, field_validator
 
+UNKNOWN_ENTITY = "unknown"
+
 
 class CallbackData(BaseModel):
     entity: str
@@ -15,7 +17,8 @@ class CallbackData(BaseModel):
 
     @classmethod
     def parse[T: BaseModel](cls: type[T], match: re.Match | None) -> T:
-        assert match is not None, "CallbackData.parse should be called only when a match is ensured!"
+        if match is None:
+            return cls.model_validate({"entity": UNKNOWN_ENTITY})
         return cls.model_validate(match.groupdict())
 
     @field_validator("id", mode="before")
@@ -32,6 +35,9 @@ class CallbackData(BaseModel):
     def with_id(self, id: int) -> Self:
         """Creates a CallbackData with the same information but different ID"""
         return self.__class__(entity=self.entity, action=self.action, id=id)
+
+    def unknown(self) -> bool:
+        return self.entity == UNKNOWN_ENTITY
 
     def match(self) -> re.Match:
         re_match = re.match(self.pattern, str(self))

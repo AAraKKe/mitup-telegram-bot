@@ -22,7 +22,7 @@ class MetricKey(CamelCaseStrEnum):
     """This is a metric to be emitted when there is a processing error, user input error, etc."""
     FAULT = auto()
     """This is a metric to be emitted when there is a system fault, something that is not expected to happen."""
-    MEETING_NOT_OWNED = "MeetingNotOwned"
+    MEETING_NOT_OWNED = auto()
     """Metric to be emitted when the user tries to do an action with a meeting that does not belong to them."""
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:

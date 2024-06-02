@@ -35,7 +35,6 @@ def api():
     ids=["meeting_with_a_previous_description", "meeting_without_a_previous_description"],
     indirect=["update"],
 )
-@pytest.mark.asyncio
 async def test_callback_query_edit_meeting_description_works(
     mock_session: MockDbSession,
     update: Update,
@@ -74,7 +73,6 @@ async def test_callback_query_edit_meeting_description_works(
     assert result == ConversationMeetingState.EDIT_DESCRIPTION
 
 
-@pytest.mark.asyncio
 async def test_callback_query_edit_meeting_description_fails_without_callback_query_data(
     mock_session: MockDbSession,
     update: Update,
@@ -89,13 +87,12 @@ async def test_callback_query_edit_meeting_description_fails_without_callback_qu
         await callback_query_edit_meeting_description(update, context)
 
 
-@pytest.mark.asyncio
 async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
     context: MitupContext,
     caplog: pytest.LogCaptureFixture,
-    user: User,
+    user_with_settings: User,
     meeting: Meetup,
 ):
     caplog.set_level(logging.WARNING)
@@ -104,7 +101,7 @@ async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_lo
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     await callback_query_edit_meeting_description(update, context)
 

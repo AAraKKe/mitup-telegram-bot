@@ -1,10 +1,15 @@
 from typing import Any, cast
 
+import freezegun
 import pytest
+from aws_embedded_metrics.logger.metrics_logger_factory import create_metrics_logger
 from aws_embedded_metrics.unit import Unit
+from rich.console import Console
 from telegram import Update
 
 from mitup_bot import monitoring
+from mitup_bot.config import MetricsConfig, MetricsEnv
+from mitup_bot.monitoring.metrics import RichConsoleSink, RichEnvironment
 from tests.helpers import StubMetrics, UpdateRequest
 
 
@@ -57,7 +62,6 @@ def test_context_manager(properties: dict[str, Any] | None, dimensions: dict[str
     )
 
 
-@pytest.mark.asyncio
 async def test_async_context_manager():
     dimensions = {"Name1": "Value1", "Name2": "Value2"}
     properties = {"Name3": "Value3", "Name4": 123}
@@ -83,3 +87,43 @@ def test_metrics_key_preffix():
     key = monitoring.MetricKey.TIME
     assert key.with_prefix("MyPrefix") == "MyPrefix/Time"
     assert key.with_prefix("MyPrefix", separator=":") == "MyPrefix:Time"
+
+
+async def test_rich_environment():
+    monitoring.configure_metrics(
+        MetricsConfig(namespace="MyNamespace", environment=MetricsEnv.RICH), factory=create_metrics_logger
+    )
+
+    async with monitoring.async_metrics_context() as logger:
+        environment = cast(RichEnvironment, await logger.resolve_environment())
+        sink = cast(RichConsoleSink, environment.sink)
+        # Remove colors from terminal to test output
+        sink.console = Console(force_interactive=False, force_terminal=False)
+
+        with sink.console.capture() as capture, freezegun.freeze_time("2024-01-01 12:00:00"):
+            logger.put_metric("MyMetric", 1.0)
+            captured_timestamp = logger.context.meta["Timestamp"]
+            await logger.flush()
+
+        expected_formatted_text = (
+            "{\n"
+            '  "_aws": {\n'
+            f'    "Timestamp": {captured_timestamp},\n'
+            '    "CloudWatchMetrics": [\n'
+            "      {\n"
+            '        "Dimensions": [],\n'
+            '        "Metrics": [\n'
+            "          {\n"
+            '            "Name": "MyMetric",\n'
+            '            "Unit": "None"\n'
+            "          }\n"
+            "        ],\n"
+            '        "Namespace": "MyNamespace"\n'
+            "      }\n"
+            "    ]\n"
+            "  },\n"
+            '  "MyMetric": 1.0\n'
+            "}\n"
+        )
+
+        assert capture.get() == expected_formatted_text

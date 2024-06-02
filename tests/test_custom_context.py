@@ -128,7 +128,6 @@ def test_context_has_meeting_id(context: MitupContext):
 @pytest.mark.parametrize(
     "with_handler_dimensions", [True, False], ids=["with_handler_dimensions", "without_handler_dimensions"]
 )
-@pytest.mark.asyncio
 async def test_metrics_emitted(
     context: StubMitupContext,
     dimensions: None | dict[str, str],
@@ -155,7 +154,6 @@ async def test_metrics_emitted(
     )
 
 
-@pytest.mark.asyncio
 async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupContext):
     await context.emit_feature_metric(
         "TestFeature",
@@ -175,7 +173,6 @@ async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupCo
     )
 
 
-@pytest.mark.asyncio
 async def test_flush_metrics_does_not_flush_without_metrics(context: StubMitupContext):
     # Metrics context already includes context information
     assert len(context.metrics.context.properties) > 0
@@ -194,7 +191,6 @@ async def test_flush_metrics_does_not_flush_without_metrics(context: StubMitupCo
     assert context.metrics.metrics_container != []
 
 
-@pytest.mark.asyncio
 async def test_put_metrics_does_not_flush(context: StubMitupContext):
     context.put_metric(
         name="MyMetric",

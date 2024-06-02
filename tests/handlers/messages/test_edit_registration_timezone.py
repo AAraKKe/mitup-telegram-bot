@@ -21,8 +21,7 @@ from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("update", ([UpdateRequest(message=True)]), indirect=True)
+@pytest.mark.parametrize("update", ([UpdateRequest(message_text="Something")]), indirect=True)
 async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
     mock_session: MockDbSession,
     update: Update,
@@ -72,8 +71,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     )
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("update", ([UpdateRequest(message=True)]), indirect=True)
+@pytest.mark.parametrize("update", ([UpdateRequest(message_text="some text")]), indirect=True)
 async def test_registration_timezone_message_handler_log_with_incorrect_timezone(
     mock_session: MockDbSession,
     update: Update,
@@ -121,7 +119,6 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     )
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
 async def test_registration_timezone_with_location_update_correctly(
     mock_session: MockDbSession,
@@ -132,26 +129,23 @@ async def test_registration_timezone_with_location_update_correctly(
     user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_location_from_api.return_value = cast(Message, update.effective_message).text
+    get_location_from_api.return_value = "Europe/Dublin"
 
     assert update.effective_message is not None
-    assert user_with_settings.settings.timezone != update.effective_message.text
+    assert user_with_settings.settings.timezone != "Europe/Dublin"
 
     result = await registration_timezone_location_message_handler(update, context)
 
-    message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(
-        timezone=cast(Message, update.effective_message).text
-    )
+    message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone="Europe/Dublin")
     view = factory.main_menu_view().with_context(message)
 
     mock_session.assert_added(user_with_settings)
     mock_session.assert_flushed()
-    assert user_with_settings.settings.timezone == update.effective_message.text
+    assert user_with_settings.settings.timezone == "Europe/Dublin"
     api.assert_send_message_called(context, update, view)
     assert result == ConversationHandler.END
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
 async def test_registration_timezone_message_handler_log_with_incorrect_coordinates(
     mock_session: MockDbSession,

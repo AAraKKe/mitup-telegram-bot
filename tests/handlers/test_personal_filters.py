@@ -27,11 +27,11 @@ def test_user_exist_filter_with_effective_user_not_found(mock_session: MockDbSes
 @pytest.mark.parametrize(
     "update",
     [
-        UpdateRequest(message="-1"),
-        UpdateRequest(message="1e12"),
-        UpdateRequest(message="hinumber"),
+        UpdateRequest(message_text="-1"),
+        UpdateRequest(message_text="1e12"),
+        UpdateRequest(message_text="hinumber"),
         UpdateRequest(message=False),
-        UpdateRequest(message=""),
+        UpdateRequest(message_text=""),
     ],
     ids=["negative", "number_and_char", "text", "without_message", "without_text"],
     indirect=True,
@@ -40,6 +40,6 @@ def test_positive_number_filter_with_wrong_messages(update: Update):
     assert PositiveNumberFilter().filter(update) is False
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(message="1234")], indirect=True)
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="1234")], indirect=True)
 def test_positive_number_filter_with_positive_number(update: Update):
     assert PositiveNumberFilter().filter(update) is True

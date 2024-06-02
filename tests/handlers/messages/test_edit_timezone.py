@@ -19,7 +19,6 @@ from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession
 
 
-@pytest.mark.asyncio
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(
     mock_session: MockDbSession,
     update: Update,
@@ -46,7 +45,6 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
     assert result == ConversationHandler.END
 
 
-@pytest.mark.asyncio
 async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
     mock_session: MockDbSession,
     update: Update,
@@ -84,7 +82,6 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
     assert result == ConversationSettingsState.TIMEZONE
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
 async def test_edit_timezone_with_location_update_correctly(
     mock_session: MockDbSession,
@@ -95,24 +92,21 @@ async def test_edit_timezone_with_location_update_correctly(
     user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_location_from_api.return_value = cast(Message, update.effective_message).text
+    get_location_from_api.return_value = "Europe/Madrid"
 
     assert update.effective_message is not None
     assert user_with_settings.settings.timezone != update.effective_message.text
 
     result = await settings_timezone_location_message_handler(update, context)
 
-    view = factory.settings_view(
-        SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=update.effective_message.text)
-    )
+    view = factory.settings_view(SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone="Europe/Madrid"))
 
     mock_session.assert_flushed()
-    assert user_with_settings.settings.timezone == update.effective_message.text
+    assert user_with_settings.settings.timezone == "Europe/Madrid"
     api.assert_send_message_called(context, update, view)
     assert result == ConversationHandler.END
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
 async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
     mock_session: MockDbSession,

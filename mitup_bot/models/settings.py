@@ -16,7 +16,7 @@ class Settings(SQLModel, table=True):
     user_id: int | None = Field(default=None, foreign_key="users.id")
     created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
     updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
-    languaje: str = "en"
+    language: str = "en"
     timezone: str = "UTC"
     notification: bool = True
     notification_time: int = 5

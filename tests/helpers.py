@@ -1,6 +1,7 @@
+import datetime as dt
 import inspect
 import json
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -57,7 +58,8 @@ class UpdateRequest:
 
     user: bool = True
     chat: bool = True
-    message: str | bool = True
+    message: bool = True
+    message_text: str | None = None
     location: Location | None = None
     callback_query: CallbackData | bool = False
     command: str | bool = False
@@ -173,10 +175,10 @@ class StubMetrics(MetricsLogger):
 
     def __build_expected_body(
         self,
-        names: list[str | MetricKey],
+        names: Sequence[str | MetricKey],
         namespace: str,
-        values: list[float] | None = None,
-        units: list[Unit] | None = None,
+        values: Sequence[float] | None = None,
+        units: Sequence[Unit] | None = None,
         dimensions: list[dict[str, str]] | None = None,
         properties: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
@@ -198,6 +200,8 @@ class StubMetrics(MetricsLogger):
         }
         for index, unit in enumerate(units or [Unit.COUNT] * len(names)):
             cloudwatch["Metrics"][index]["Unit"] = unit.value
+        # Sort metrics to ensure consistent order
+        cloudwatch["Metrics"] = sorted(cloudwatch["Metrics"], key=lambda x: x["Name"])
 
         expected_dimensions = [list(dimension.keys())[0] for dimension in dimensions or []]
         cloudwatch["Dimensions"] = [sorted(expected_dimensions)] if expected_dimensions else [[]]
@@ -215,6 +219,10 @@ class StubMetrics(MetricsLogger):
             current["CloudWatchMetrics"][0]["Dimensions"] = [
                 sorted(sum(current["CloudWatchMetrics"][0]["Dimensions"], []))
             ]
+            # Sort metrics
+            current["CloudWatchMetrics"][0]["Metrics"] = sorted(
+                current["CloudWatchMetrics"][0]["Metrics"], key=lambda x: x["Name"]
+            )
             current.pop("_aws")
             # If we have an exception, lets remove the traceback and error message
             if "exception" in current:
@@ -226,9 +234,9 @@ class StubMetrics(MetricsLogger):
 
     def assert_metrics_emited(
         self,
-        names: list[str | MetricKey],
-        values: list[float] | None = None,
-        units: list[Unit] | None = None,
+        names: Sequence[str | MetricKey],
+        values: Sequence[float] | None = None,
+        units: Sequence[Unit] | None = None,
         namespace: str | None = None,
         dimensions: dict[str, str | Feature] | None = None,
         properties: dict[str, Any] | None = None,
@@ -303,9 +311,9 @@ class StubMetrics(MetricsLogger):
 
     def assert_handler_metrics_emitted(
         self,
-        names: list[str | MetricKey],
-        values: list[float] | None = None,
-        units: list[Unit] | None = None,
+        names: Sequence[str | MetricKey],
+        values: Sequence[float] | None = None,
+        units: Sequence[Unit] | None = None,
         exception: type[Exception] | str | None = None,
     ):
         """
@@ -409,7 +417,7 @@ class StubMetrics(MetricsLogger):
 def build_context(
     update: Update,
     app: StubMitupApp,
-    with_meeting_id: tuple[ContextId, int] | None = None,
+    with_meeting_id: dict[ContextId, int] | None = None,
 ) -> StubMitupContext:
     if update.effective_message:
         update.effective_message.set_bot(app.bot)
@@ -418,8 +426,9 @@ def build_context(
     # Allow the StubMetrics to access the context it was built for
     context.metrics.parent_context = context
 
-    if with_meeting_id is not None:
-        context.store_meeting_id(with_meeting_id[0], with_meeting_id[1])
+    for context_id, meeting_id in (with_meeting_id or {}).items():
+        assert context.user_data is not None
+        context.user_data.store_meeting_id(context_id, meeting_id)
 
     return context
 
@@ -432,7 +441,7 @@ async def call_handler(
     update: Update,
     app: StubMitupApp,
     handler_id: CallbackId,
-    with_meeting_id: tuple[ContextId, int] | None = None,
+    with_meeting_id: dict[ContextId, int] | None = None,
 ) -> tuple[StubMitupContext, Enum | None]:
     context = build_context(update, app, with_meeting_id)
 
@@ -440,15 +449,16 @@ async def call_handler(
 
     # Allow natural handling of the request data provided on the update
     check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False, "This update would not be processed by the handler!"
+    assert check_result is not None, "This update would not be processed by the handler!"
+    assert check_result is not False, "This update would not be processed by the handler!"
 
-    handler.collect_additional_context(context, update, app, check_result)
-    return context, cast(Enum | None, await handler.callback(update, context))
+    return context, await handler.handle_update(update, app, check_result, context)
 
 
 def create_meetup(
     id: int,
     title: str = "Default title",
-    description="Default description",
+    description: str = "Default description",
+    datetime: dt.datetime | None = None,
 ) -> Meetup:
-    return Meetup(id=id, title=title, description=description)
+    return Meetup(id=id, title=title, description=description, datetime=datetime)

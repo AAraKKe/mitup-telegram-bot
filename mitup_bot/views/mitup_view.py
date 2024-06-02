@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import batched
@@ -39,8 +38,8 @@ class ButtonConfig(BaseModel):
         )
 
 
-ButtonRow = Sequence[ButtonConfig]
-Keyboard = Sequence[ButtonRow]
+ButtonRow = list[ButtonConfig]
+Keyboard = list[ButtonRow]
 
 
 @dataclass
@@ -95,7 +94,7 @@ class PaginatedMitupView(MitupView):
         keyboard = self.__get_paginated_view()
         super().__init__(description, keyboard)
 
-    def __get_paginated_view(self) -> Sequence[ButtonRow]:
+    def __get_paginated_view(self) -> list[ButtonRow]:
         if self.page_number <= 0 or self.page_number > self.total_pages:
             raise ValueError("Invalid paginated position")
 
@@ -104,7 +103,7 @@ class PaginatedMitupView(MitupView):
 
         button_in_page = self.buttons[first_button:last_button]
         # keyboard = self.__match_action_buttons(button_in_page)
-        keyboard = list[ButtonRow](batched(button_in_page, self.row_size))
+        keyboard = [list(row) for row in batched(button_in_page, self.row_size)]
         keyboard += self.__match_navigation_button()
 
         return keyboard

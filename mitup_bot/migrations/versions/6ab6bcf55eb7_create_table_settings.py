@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.BigInteger, nullable=False),
         sa.Column("created_time", sa.TIMESTAMP, nullable=False, server_default=sa.func.now()),
         sa.Column("updated_time", sa.TIMESTAMP, nullable=False, server_default=sa.func.now()),
-        sa.Column("languaje", sa.String, nullable=False),
+        sa.Column("language", sa.String, nullable=False),
         sa.Column("timezone", sa.String, nullable=False),
         sa.Column("notification", sa.Boolean, nullable=False),
         sa.Column("notification_time", sa.Integer, nullable=False),

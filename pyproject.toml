@@ -66,7 +66,11 @@ omit = [
 ]
 exclude_also = [
     # Exclude protocol classes since they have no logic
-    "class .*\\bProtocol\\):"
+    'class .*\bProtocol\):',
+    # Exclude assert_nevers since we will never hit them and should be flagged by type checkers
+    '^ +assert_never\(.*?\)$',
+    # Case statements should be exhaustive
+    '^ +case .*? as unreachable:$',
 ]
 # --------------------------
 # Builds
@@ -150,9 +154,9 @@ dependencies = [
 [tool.hatch.envs.dev.scripts]
 test = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests"
 test-cov = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json"
-format = "ruff format ."
-format-check = "ruff format --check ."
-lint = "ruff check {args:} --unsafe-fixes ."
+format = "ruff format  ."
+format-check = "ruff format --diff --check ."
+lint = "ruff check {args:} --diff --unsafe-fixes ."
 fix-lint = "ruff check --fix --unsafe-fixes ."
 fix = ["format", "fix-lint"]
 type-check = "pyright --stats --warnings mitup_bot tests bin"

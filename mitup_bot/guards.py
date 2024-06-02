@@ -93,6 +93,7 @@ async def meeting_accessible(
         f"User tried {action!r} with a meeting that does not exist. " f"Meeting id: {meeting_id}, user id: {user.id}"
     )
     logging.warning(message)
+
     await api.edit_message(
         context,
         update,
@@ -102,5 +103,4 @@ async def meeting_accessible(
             or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
         ),
     )
-    context.put_metric("InteractWithMeetingNotFound", 1, unit=Unit.COUNT)
     return None

@@ -20,7 +20,6 @@ def api():
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
-@pytest.mark.asyncio
 async def test_edit_meeting_callback_fails_on_malformed_data(
     mock_session: MockDbSession, update: Update, context: StubMitupContext
 ):
@@ -40,7 +39,6 @@ async def test_edit_meeting_callback_fails_on_malformed_data(
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
-@pytest.mark.asyncio
 async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
@@ -65,22 +63,21 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
-@pytest.mark.asyncio
 async def test_edit_meeting_works_as_expected(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    user: User,
+    user_with_settings: User,
     api: MockApi,
 ):
     match = re.match(cb.EDIT_MEETING.pattern, "edit;meeting:1")
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
-    mock_session.add_object(user.meetups[0])
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
-    view = user.meetups[0].edit_view
+    view = user_with_settings.meetups[0].edit_view
 
     await callback_query_edit_meeting(update, context)
 

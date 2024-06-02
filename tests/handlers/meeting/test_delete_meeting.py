@@ -56,7 +56,6 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(1))], indirect=True)
-@pytest.mark.asyncio
 async def test_delete_meeting_works(
     mock_session: MockDbSession,
     update: Update,
@@ -113,7 +112,6 @@ async def test_delete_meeting_works(
     ids=["delete_meeting", "confirm_delete_meeting", "decline_delete_meeting"],
     indirect=["update"],
 )
-@pytest.mark.asyncio
 async def test_delete_meeting_buttons_fails_without_existing_meeting(
     mock_session: MockDbSession,
     update: Update,
@@ -164,7 +162,6 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     ids=["delete_meeting", "confirm_delete_meeting", "decline_delete_meeting"],
     indirect=["update"],
 )
-@pytest.mark.asyncio
 async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to_user(
     mock_session: MockDbSession,
     update: Update,
@@ -189,7 +186,6 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
-@pytest.mark.asyncio
 async def test_confirm_delete_meeting_works(
     mock_session: MockDbSession,
     update: Update,
@@ -222,7 +218,6 @@ async def test_confirm_delete_meeting_works(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(1))], indirect=True)
-@pytest.mark.asyncio
 async def test_decline_delete_meeting_works(
     mock_session: MockDbSession,
     update: Update,
@@ -249,7 +244,6 @@ async def test_decline_delete_meeting_works(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_delete_meeting_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
@@ -272,7 +266,6 @@ async def test_delete_meeting_failures(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_confirm_delete_meeting_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,
@@ -295,7 +288,6 @@ async def test_confirm_delete_meeting_failures(
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
 )
-@pytest.mark.asyncio
 async def test_decline_delete_meeting_failures(
     request: pytest.FixtureRequest,
     mock_session: MockDbSession,

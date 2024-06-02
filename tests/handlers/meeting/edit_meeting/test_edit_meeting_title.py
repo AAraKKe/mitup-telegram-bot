@@ -23,9 +23,8 @@ def api():
         yield api
 
 
-@pytest.mark.asyncio
 async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store_meeting_id(
-    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user: User
+    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user_with_settings: User
 ):
     assert context.user_data is not None
 
@@ -33,15 +32,15 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
-    mock_session.add_object(user.meetups[0])
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     state = await callback_query_edit_meeting_title(update, context)
 
     assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
 
     view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_TITLE.get(title=user.meetups[0].title),
+        description=MeetingMessages.EDIT_MEETING_TITLE.get(title=user_with_settings.meetups[0].title),
         keyboard=[
             [
                 ButtonConfig(
@@ -56,7 +55,6 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     assert state == ConversationMeetingState.EDIT_TITLE
 
 
-@pytest.mark.asyncio
 async def test_callback_query_edit_meeting_title_fails_without_callback_query_data(
     mock_session: MockDbSession,
     update: Update,
@@ -71,7 +69,6 @@ async def test_callback_query_edit_meeting_title_fails_without_callback_query_da
         await callback_query_edit_meeting_title(update, context)
 
 
-@pytest.mark.asyncio
 async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
