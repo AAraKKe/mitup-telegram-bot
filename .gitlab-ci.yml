@@ -50,6 +50,7 @@ stages:
   - prepare-deployment
   - push-ecr
   - deploy
+  - documentation
   - validate
 
 preparation:
@@ -171,6 +172,16 @@ config-prod:
   rules:
     - if: $CI_COMMIT_BRANCH == "release"
 
+build-docs:
+  stage: prepare-deployment
+  script:
+    - hatch run dev:build-docs
+  artifacts:
+    paths:
+      - site
+    expire_in: 1 day
+  needs: [preparation]
+
 .push-ecr: &push-ecr
   stage: push-ecr
   <<: *tokens
@@ -259,6 +270,39 @@ deploy-production:
   # This job will first run the migrations on the database and the update ECS
   <<: *deploy
   resource_group: staging
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == "release"
+
+
+## -------------- Documentation ---------------
+# Run after deploy to be sure that documentation is not updated until the bot has been updated
+.push-docs: &push-docs
+  image:
+    name: public.ecr.aws/aws-cli/aws-cli
+    entrypoint: [""] # Avoid loading the entry point that forces an AWS command
+  stage: documentation
+  dependencies:
+    # Get artifacts from build-docs job
+    - build-docs
+  <<: *tokens
+  before_script: *aws-prep
+  script:
+    # Sync the site folder to the S3 bucket deleting files that are not in the site directory
+    - aws s3 sync site s3://${BOT_DOMAIN}/ --delete
+
+push-docs-staging:
+  <<: *push-docs
+  resource_group: staging
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+push-docs-production:
+  <<: *push-docs
+  resource_group: production
   environment:
     name: production
   rules:

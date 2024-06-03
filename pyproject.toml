@@ -149,6 +149,8 @@ dependencies = [
     "boto3-stubs[essential,ecs]",
     "debugpy",
     "sourcery-nightly",
+    "mkdocs",
+    "mkdocs-material"
 ]
 
 [tool.hatch.envs.dev.scripts]
@@ -177,6 +179,8 @@ validate-migrations = "python -m mitup_bot.cli.run validate-migrations"
 ci-sourcery-login = "sourcery login --token $SOURCERY_TOKEN"
 ci-sourcery = "sourcery assistant review gitlab-merge-request --gitlab-token $SOURCERY_AI_BOT --project $CI_PROJECT_PATH --merge-request $CI_MERGE_REQUEST_IID --commit $CI_COMMIT_SHA"
 mr-sourcery = ["ci-sourcery-login", "ci-sourcery"]
+serve-docs = "mkdocs serve"
+build-docs = "mkdocs build --strict"
 
 
 # ----------------------

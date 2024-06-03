@@ -30,3 +30,6 @@ dist
 
 # Ignore any caching folders generated
 .*_cache
+
+# Ignore docs site
+site

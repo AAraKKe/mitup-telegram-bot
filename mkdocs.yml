@@ -1,0 +1,61 @@
+site_name: Mitup Telegram Bot
+site_url: https://mitup.social
+repo_url: https://gitlab.com/meetupbot/mitup-telegram-bot
+repo_name: MitupBot/mitup-telegram-bot
+exclude_docs: |
+  hooks
+nav:
+  - MitupBot: index.md
+  - How to use MitupBot?:
+    - Getting Started: usage/getting_started.md
+    - Main Menu: usage/main_menu.md
+    - Mitup Configuration: usage/configuration.md
+    - Meetings:
+      - Create a meeting: usage/create_meeting.md
+      - Lifecycle of a Meeting: usage/meeting_lifecycle.md
+  - FAQ:
+    - Privacy: faq/privacy.md
+  - Collaborate: collaborate.md
+theme:
+  name: material
+  custom_dir: docs/overrides
+  language: en
+  palette:
+    scheme: default
+    primary: indigo
+    accent: pink
+  icon:
+    repo: fontawesome/brands/gitlab
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.tabs
+    - navigation.path
+    - navigation.top
+    - content.code.annotate
+    - content.tooltips
+    - navigation.footer
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - abbr
+  - attr_list
+  - md_in_html
+  - pymdownx.betterem
+  - toc:
+      permalink: true
+      title: On this page
+      permalink_title: Link to this section
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+extra_css:
+  - assets/stylesheets/main.css
+extra:
+  social:
+    - icon: fontawesome/brands/telegram
+      name: Bot
+      link: https://t.me/mitupbot
+hooks:
+  - docs/hooks/hooks.py

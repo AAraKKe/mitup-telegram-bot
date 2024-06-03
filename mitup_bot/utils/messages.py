@@ -80,7 +80,7 @@ class ButtonMessages(MessageBase):
 
 class Messages(MessageBase):
     DEFAULT_MAIN_MENU_DESCRIPTION = "Welcome to Mitup Bot!\n" "Choose one of the following options:"
-    DEFAULT_SETTINGS_DESCRIPTION = "Configure MitUp\\."
+    DEFAULT_SETTINGS_DESCRIPTION = "Configure MitUp."
 
 
 class SettingsMessages(MessageBase):
@@ -90,7 +90,14 @@ class SettingsMessages(MessageBase):
         "timezone or touch in *Cancel* to go back."
     )
     TIMEZONE_SETTINGS_SET_SUCCESS = "Your timezone has been set to: *$timezone* "
-    SET_REGISTRATION_TIMEZONE = "Welcome to Mitup Bot $first_name! Please, tell me your timezone."
+    SET_REGISTRATION_TIMEZONE = (
+        "Welcome to Mitup Bot $first_name!\n\n"
+        "Let's start by setting your timezone. Send me the name of your city or, "
+        f"for a more accurate result, your location by pressing on {Emojis.CLIP} and "
+        "selecting Location.\n\n"
+        "**Important**: we do not store your location and this information is only used to "
+        "configure your timezone."
+    )
     REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is $timezone"
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
 
