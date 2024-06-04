@@ -132,17 +132,10 @@ build-docker-ci:
       allow_failure: true
 
 .aws-config: &aws-env-config
-  # This prepares the environment needed for deployment, the intention is
-  # to reduce the complexity of jobs interacting with AWS accounts. This job
-  # builds a dotenv file that contains all configuration needed later.
-  image:
-    name: public.ecr.aws/aws-cli/aws-cli
-    entrypoint: [""] # Avoid loading the entry point that forces an AWS command
   stage: prepare-deployment
   <<: *tokens
   before_script: *aws-prep
   script:
-    - yum install jq -y # Install jq not avilable in the aws-cli docker image
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
     - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
     - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
@@ -284,9 +277,6 @@ deploy-production:
 ## -------------- Documentation ---------------
 # Run after deploy to be sure that documentation is not updated until the bot has been updated
 .push-docs: &push-docs
-  image:
-    name: public.ecr.aws/aws-cli/aws-cli
-    entrypoint: [""] # Avoid loading the entry point that forces an AWS command
   stage: documentation
   dependencies:
     # Get artifacts from build-docs job
