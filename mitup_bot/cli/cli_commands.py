@@ -29,7 +29,7 @@ class MitupCliCommand(click.MultiCommand):
         return [
             file_to_command(command_file.stem)
             for command_file in commands_folder.glob("*.py")
-            if command_file.name != "__init__.py"
+            if command_file.name not in {"__init__.py"}
         ]
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:

@@ -7,18 +7,9 @@ import click
 from mypy_boto3_ecs import ECSClient
 from mypy_boto3_ecs.type_defs import DeploymentTypeDef, DescribeServicesResponseTypeDef
 from mypy_boto3_lambda import LambdaClient
-from rich.console import Console
 from rich.status import Status
 
-console = Console(width=90)
-
-
-def error(msg: str):
-    console.print(f"[bold red]✘ {msg}[/]")
-
-
-def success(msg: str):
-    console.print(f"[bold green]✔︎ {msg}[/]")
+from mitup_bot.cli.helpers import console, error, success
 
 
 def update_lambda_code(lambda_client: LambdaClient, name: str, image: str):

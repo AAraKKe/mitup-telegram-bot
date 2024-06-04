@@ -181,6 +181,11 @@ build-docs:
       - site
     expire_in: 1 day
   needs: [preparation]
+  rules:
+    # Only run if the doc files change
+    - changes:
+      - docs/**/*
+      - mkdocs.yml
 
 .push-ecr: &push-ecr
   stage: push-ecr
@@ -289,8 +294,7 @@ deploy-production:
   <<: *tokens
   before_script: *aws-prep
   script:
-    # Sync the site folder to the S3 bucket deleting files that are not in the site directory
-    - aws s3 sync site s3://${BOT_DOMAIN}/ --delete
+    - hatch run dev:push-docs
 
 push-docs-staging:
   <<: *push-docs
@@ -299,6 +303,10 @@ push-docs-staging:
     name: staging
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      # Only run if in the default branch and the doc files change
+      changes:
+        - docs/**/*
+        - mkdocs.yml
 
 push-docs-production:
   <<: *push-docs
@@ -307,3 +315,7 @@ push-docs-production:
     name: production
   rules:
     - if: $CI_COMMIT_BRANCH == "release"
+      # Only run if in the release branch and the doc files change
+      changes:
+        - docs/**/*
+        - mkdocs.yml

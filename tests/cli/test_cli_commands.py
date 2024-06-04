@@ -8,7 +8,7 @@ from mitup_bot.cli.cli_commands import MitupCliCommand, file_to_command
 
 def expected_command_names() -> list[str]:
     commands_path = Path(__file__).parent / "../../mitup_bot/cli/commands"
-    return [file_to_command(command.stem) for command in commands_path.glob("*.py") if command.stem != "__init__"]
+    return [file_to_command(command.stem) for command in commands_path.glob("*.py") if command.stem not in {"__init__"}]
 
 
 @pytest.fixture(scope="session")

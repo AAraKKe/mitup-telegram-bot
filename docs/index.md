@@ -20,7 +20,7 @@ We know how hard it can be to organize anything with friends in a Telegram group
     _If you are comming copy the message and add your name to the list!_
 
 ??? quote ":fontawesome-brands-meta:{.lg} **The group**"
-    _Hey guys! We have created this gropu for the event, please join!_
+    _Hey guys! We have created this group for the event, please join!_
 
 ??? quote ":detective: **The private event**"
     _For those of you that want to join the event, send me a private message so I can count you in_

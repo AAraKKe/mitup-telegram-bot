@@ -15,10 +15,14 @@ from mypy_boto3_lambda import LambdaClient
 from rich.console import Capture, Console
 from rich.status import Status
 
-from mitup_bot.cli.commands import deploy
+from mitup_bot.cli import helpers
 
 # Make console not export colors and styles for testing
-deploy.console = Console(force_interactive=False, force_terminal=False)
+# Override before importing the deploy module. This needs to be done
+# better but don't want to introduce a lot of complexity for testing
+helpers.console = Console(force_interactive=False, force_terminal=False)
+
+from mitup_bot.cli.commands import deploy  # noqa: E402
 
 
 @dataclass
