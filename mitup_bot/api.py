@@ -1,5 +1,4 @@
 from telegram import Message, Update
-
 from telegram.error import TelegramError
 
 from mitup_bot import guards
