@@ -135,7 +135,9 @@ class Meetup(SQLModel, table=True):
                     ),
                 ],
                 [
-                    ButtonConfig(text=ButtonMessages.SHARE.get(lang=self.user_language), callback_data=cb.SHARE),
+                    ButtonConfig(
+                        text=ButtonMessages.SHARE.get(lang=self.user_language), switch_inline_query=str(self.id)
+                    ),
                 ],
                 [
                     ButtonConfig(

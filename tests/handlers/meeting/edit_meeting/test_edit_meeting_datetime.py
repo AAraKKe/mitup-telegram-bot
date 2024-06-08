@@ -24,7 +24,11 @@ TEST_CURRENT_DATE = dt.date(2024, 11, 15)
 
 def set_new_date_view(meeting_id: int, datetime: str) -> MitupView:
     return MitupView(
-        description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(datetime=datetime),
+        description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
+            datetime=datetime,
+            back_edit_button=ButtonMessages.BACK_EDIT.get(),
+            set_time_button=ButtonMessages.SET_TIME.get(),
+        ),
         keyboard=[
             [
                 ButtonConfig(

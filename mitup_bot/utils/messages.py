@@ -180,8 +180,8 @@ class MeetingMessages(MessageBase):
     )
     ADD_DATE = "Select the date."
     NEW_DATE_SET_SUCCESS = (
-        f"The date has been set to: **$datetime**. To set the time press _{ButtonMessages.SET_TIME}_, "
-        f"othwerise press _{ButtonMessages.BACK_EDIT}_ to go back to editing the meeting."
+        "The date has been set to: **$datetime**. To set the time press _${set_time_button}_, "
+        "othwerise press _${back_edit_button}_ to go back to editing the meeting."
     )
     DATE_UPDATE_SUCCESS = "The date has been set to: **$datetime**"
     EDIT_TIME = "Send me the time of the meeting in the format _HH:MM_"
@@ -200,7 +200,9 @@ class MeetingMessages(MessageBase):
     # Show meeting list
     # TODO: this needs to be moved to a separate set of messages as it is not part of the meeting creation/editing
     # See https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/75
-    NO_MEETINGS_FOUND = "_You don't have any meetings yet. Click on New meeting in the main menu to create one._"
+    NO_MEETINGS_FOUND = (
+        "_You don't have any meetings yet.\n\n" "Click on _${new_meeting_button}_ in the main menu to create one._"
+    )
     ACTIVE = "These are all your active meetings."
 
 

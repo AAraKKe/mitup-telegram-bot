@@ -8,7 +8,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot import api, guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
-from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData
+from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
@@ -26,18 +26,17 @@ from .views import edit_max_participants_view, edit_participants_view
 @with_async_session
 async def callback_edit_meeting_participants(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_edit_meeting_participants")
-    assert context.matches is not None
+
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_CALLBACK
+    )
 
     user = guards.current_user(update, session)
-    meeting_id = cb.EDIT_MEETING_PARTICIPANTS.parse(context.matches[0]).id
-
-    if meeting_id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, cb.EDIT_MEETING_PARTICIPANTS)
 
     meeting = await guards.meeting_accessible(
         session,
         user,
-        meeting_id,
+        callback_data.id,
         "Edit participants",
         update,
         context,
@@ -45,7 +44,7 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
     if meeting is None:
         return
 
-    await api.edit_message(context, update, edit_participants_view(meeting_id))
+    await api.edit_message(context, update, edit_participants_view(callback_data.id))
 
 
 @HandlersRegistry.register_callback_query(
@@ -54,18 +53,17 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
 @with_async_session
 async def callback_edit_meeting_max_participants(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_edit_meeting_max_participants")
-    assert context.matches is not None
+
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_MAX_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK
+    )
 
     user = guards.current_user(update, session)
-    meeting_id = cb.EDIT_MEETING_PARTICIPANTS.parse(context.matches[0]).id
-
-    if meeting_id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, cb.EDIT_MEETING_PARTICIPANTS)
 
     meeting = await guards.meeting_accessible(
         session,
         user,
-        meeting_id,
+        callback_data.id,
         "Edit max participants",
         update,
         context,
@@ -74,9 +72,9 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
     if meeting is None:
         return ConversationHandler.END
 
-    context.store_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, meeting_id)
+    context.store_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, callback_data.id)
 
-    await api.send_message(context, update, edit_max_participants_view(meeting_id))
+    await api.send_message(context, update, edit_max_participants_view(callback_data.id))
 
     return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
 
@@ -89,20 +87,16 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
 @with_async_session
 async def callback_edit_meeting_no_limit_participants(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_edit_meeting_no_limit_participants")
-    assert context.matches is not None
 
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK
+    )
     user = guards.current_user(update, session)
-    meeting_id = cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.parse(context.matches[0]).id
-
-    if meeting_id is None:
-        raise MalformedCallbackData(
-            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS
-        )
 
     meeting = await guards.meeting_accessible(
         session,
         user,
-        meeting_id,
+        callback_data.id,
         "Edit no limit participants",
         update,
         context,
@@ -114,7 +108,7 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
     meeting.max_members = None
     session.flush()
 
-    response_view = edit_participants_view(meeting_id).with_context(
+    response_view = edit_participants_view(callback_data.id).with_context(
         MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=MeetingMessages.NO_LIMIT_PARTICIPANTS.get())
     )
 

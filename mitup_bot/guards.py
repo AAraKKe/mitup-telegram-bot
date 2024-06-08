@@ -7,12 +7,15 @@ from telegram import CallbackQuery, Chat, Message, Update
 from telegram.ext import ExtBot
 
 from mitup_bot import api
+from mitup_bot.callback_data import CallbackData, DateCallbackData, ValidCallbackData, ValidDateCallbackData
+from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
+    MalformedCallbackData,
     UserNotFound,
 )
 from mitup_bot.models import Meetup, User
@@ -32,6 +35,30 @@ def current_user(update: Update, session: Session) -> User:
         return user
     else:
         raise UserNotFound(update.effective_user.id)
+
+
+def valid_date_callback_data(cb: DateCallbackData, callback_id: CallbackId) -> ValidDateCallbackData:
+    """
+    Validates the callback `cb`. If an id or date cannot be set or the entity is unknown,
+    a MalformedCallbackData exception is raised scoped to the `callback_id` provided.
+
+    The output of the guard is a `ValidDateCallbackData`.
+    """
+    if cb.id is None or cb.date is None or cb.unknown():
+        raise MalformedCallbackData(callback_id, cb)
+    return ValidDateCallbackData(entity=cb.entity, action=cb.action, id=cb.id, date=cb.date)
+
+
+def valid_callback_data(cb: CallbackData, callback_id: CallbackId) -> ValidCallbackData:
+    """
+    Validates the callback `cb`. If an id cannot be set or the entity is unknown,
+    a MalformedCallbackData exception is raised scoped to the `callback_id` provided.
+
+    The output of the guard is a `ValidCallbackData`.
+    """
+    if cb.id is None or cb.unknown():
+        raise MalformedCallbackData(callback_id, cb)
+    return ValidCallbackData(entity=cb.entity, action=cb.action, id=cb.id)
 
 
 def chat(update: Update) -> Chat:

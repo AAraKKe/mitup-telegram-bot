@@ -7,6 +7,14 @@ from pydantic import BaseModel, Field, field_validator
 UNKNOWN_ENTITY = "unknown"
 
 
+class ValidCallbackData(BaseModel):
+    """This represents the same data as CallbackData but is not allowed to have id being None"""
+
+    entity: str
+    action: str
+    id: int
+
+
 class CallbackData(BaseModel):
     entity: str
     action: str = "show"
@@ -39,6 +47,10 @@ class CallbackData(BaseModel):
     def unknown(self) -> bool:
         return self.entity == UNKNOWN_ENTITY
 
+    def is_malformed(self) -> bool:
+        """This means that the callback data provided in the query is not usable as needed by the callback"""
+        return self.id is None or self.unknown()
+
     def match(self) -> re.Match:
         re_match = re.match(self.pattern, str(self))
         assert re_match is not None, f"CallbackData.match should always match the pattern: {self.pattern!r}"
@@ -49,6 +61,10 @@ class CallbackData(BaseModel):
         if not isinstance(other, CallbackData):
             return False
         return self.id == other.id and self.entity == other.entity and self.action == other.action
+
+
+class ValidDateCallbackData(ValidCallbackData):
+    date: dt.date
 
 
 class DateCallbackData(CallbackData):

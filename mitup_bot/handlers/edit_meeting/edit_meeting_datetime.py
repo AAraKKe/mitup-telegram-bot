@@ -10,7 +10,6 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import api, guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
-from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
@@ -31,10 +30,9 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
     logging.info("Enter into callback_edit_meeting_date")
     assert context.matches is not None
 
-    callback_data = cb.EDIT_MEETING_DATE.parse(context.match)
-
-    if callback_data.unknown() or callback_data.id is None or callback_data.date is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.DATE_CALLBACK, callback_data)
+    callback_data = guards.valid_date_callback_data(
+        cb.EDIT_MEETING_DATE.parse(context.match), EditMeetingHandlerId.DATE_CALLBACK
+    )
 
     user = guards.current_user(update, session)
     if (
@@ -80,10 +78,9 @@ async def callback_delete_date_time(session: Session, update: Update, context: M
     """
     logging.info("Enter into callback_delete_date_time")
 
-    callback_data = cb.DELETE_MEETING_DATE.parse(context.match)
-
-    if callback_data.unknown() or callback_data.id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, callback_data)
+    callback_data = guards.valid_callback_data(
+        cb.DELETE_MEETING_DATE.parse(context.match), EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK
+    )
 
     user = guards.current_user(update, session)
     if (
@@ -122,7 +119,10 @@ async def handle_first_datetime_set(
     ]
     view = MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
-            lang=meeting.owner.settings.language, datetime=meeting.str_datetime
+            lang=meeting.owner.settings.language,
+            datetime=meeting.str_datetime,
+            back_edit_button=ButtonMessages.BACK_EDIT.get(lang=meeting.owner.settings.language),
+            set_time_button=ButtonMessages.SET_TIME.get(lang=meeting.owner.settings.language),
         ),
         keyboard=[keyboard],
     )
@@ -158,10 +158,9 @@ async def callback_set_meeting_date(session: Session, update: Update, context: M
     """
     logging.info("Enter into callback_set_meeting_time")
 
-    callback_data = cb.SET_MEETING_DATE.parse(context.match)
-
-    if callback_data.unknown() or callback_data.id is None or callback_data.date is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.SET_DATE_CALLBACK, callback_data)
+    callback_data = guards.valid_date_callback_data(
+        cb.SET_MEETING_DATE.parse(context.match), EditMeetingHandlerId.SET_DATE_CALLBACK
+    )
 
     user = guards.current_user(update, session)
     if (
@@ -186,10 +185,9 @@ async def callback_set_meeting_time(session: Session, update: Update, context: M
     """
     logging.info("Enter into callback_edit_meeting_date")
 
-    callback_data = cb.EDIT_MEETING_TIME.parse(context.match)
-
-    if callback_data.unknown() or callback_data.id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.EDIT_TIME_CALLBACK, callback_data)
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_TIME.parse(context.match), EditMeetingHandlerId.EDIT_TIME_CALLBACK
+    )
 
     # Validate that the meeting is accessible before continuing with the operation
     meeting = await guards.meeting_accessible(

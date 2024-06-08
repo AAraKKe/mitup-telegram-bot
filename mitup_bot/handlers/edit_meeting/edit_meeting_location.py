@@ -7,7 +7,7 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import api, guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
-from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData
+from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
@@ -25,18 +25,17 @@ from .views import edit_location_view
 @with_async_session
 async def callback_edit_meeting_location(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_edit_meeting_location")
-    assert context.matches is not None
+
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_LOCATION.parse(context.match), EditMeetingHandlerId.LOCATION_CALLBACK
+    )
 
     user = guards.current_user(update, session)
-    meeting_id = cb.EDIT_MEETING_LOCATION.parse(context.matches[0]).id
-
-    if meeting_id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.LOCATION_CALLBACK, cb.EDIT_MEETING_LOCATION)
 
     meeting = await guards.meeting_accessible(
         session,
         user,
-        meeting_id,
+        callback_data.id,
         "Edit location",
         update,
         context,
@@ -57,16 +56,15 @@ async def callback_edit_meeting_location(session: Session, update: Update, conte
 )
 @with_async_session
 async def callback_edit_meeting_location_name(session: Session, update: Update, context: MitupContext):
-    assert context.matches is not None
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_LOCATION_NAME.parse(context.match), EditMeetingHandlerId.LOCATION_NAME_CALLBACK
+    )
 
     user = guards.current_user(update, session)
-    meeting_id = cb.EDIT_MEETING_LOCATION_NAME.parse(context.matches[0]).id
-    if meeting_id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, cb.EDIT_MEETING_LOCATION_NAME)
 
     meeting = await guards.user_owns_meeting(
         user,
-        meeting_id,
+        callback_data.id,
         "Edit location name",
         update,
         context,
@@ -76,7 +74,7 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
         return ConversationHandler.END
 
     # Lets keep track of the meeting we are asking the name of the location for
-    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, meeting_id)
+    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, callback_data.id)
 
     await api.send_message(
         context,
@@ -87,7 +85,7 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
                 [
                     ButtonConfig(
                         text=ButtonMessages.CANCEL.get(),
-                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
+                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
                     )
                 ]
             ],
@@ -118,18 +116,16 @@ async def callback_cancel_edit_meeting_location_property(session: Session, updat
 )
 @with_async_session
 async def callback_edit_meeting_location_coordinates(session: Session, update: Update, context: MitupContext):
-    assert context.matches is not None
+    callback_data = guards.valid_callback_data(
+        cb.EDIT_MEETING_LOCATION_COORDINATES.parse(context.match),
+        EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK,
+    )
 
     user = guards.current_user(update, session)
-    meeting_id = cb.EDIT_MEETING_LOCATION_COORDINATES.parse(context.matches[0]).id
-    if meeting_id is None:
-        raise MalformedCallbackData(
-            EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, cb.EDIT_MEETING_LOCATION_COORDINATES
-        )
 
     meeting = await guards.user_owns_meeting(
         user,
-        meeting_id,
+        callback_data.id,
         "Edit location coordinates",
         update,
         context,
@@ -139,7 +135,7 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
         return ConversationHandler.END
 
     # Lets keep track of the meeting we are asking the name of the location for
-    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, meeting_id)
+    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, callback_data.id)
 
     await api.send_message(
         context,
@@ -150,7 +146,7 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
                 [
                     ButtonConfig(
                         text=ButtonMessages.CANCEL.get(),
-                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
+                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
                     )
                 ]
             ],

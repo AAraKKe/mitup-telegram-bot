@@ -1,4 +1,5 @@
 import logging
+import re
 from contextlib import nullcontext
 
 import pytest
@@ -7,14 +8,24 @@ from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import Chat, Message, Update
 
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
+    MalformedCallbackData,
     UserNotFound,
 )
-from mitup_bot.guards import callback_query, chat, current_user, meeting_accessible, message
+from mitup_bot.guards import (
+    callback_query,
+    chat,
+    current_user,
+    meeting_accessible,
+    message,
+    valid_callback_data,
+)
+from mitup_bot.handlers.callback_query import CallbackQueryId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
@@ -172,3 +183,25 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
 
         api.assert_edit_message_called(context, update, factory.main_menu_view())
         context.metrics.assert_metrics_emited([MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT])
+
+
+@pytest.mark.parametrize(
+    "match", [re.match(cb.SHOW_MEETING.pattern, "show;meeting:"), None], ids=["no_id", "none_match"]
+)
+def test_valid_callback_data_failed_states(match: re.Match | None):
+    with pytest.raises(MalformedCallbackData):
+        valid_callback_data(CallbackData.parse(match), CallbackQueryId.MAIN_MENU)
+
+
+@pytest.mark.parametrize(
+    "match",
+    [
+        re.match(cb.EDIT_MEETING_DATE.pattern, "edit;meet_date:;date:2024-12-02"),
+        re.match(cb.EDIT_MEETING_DATE.pattern, "edit;meet_date:12;date:"),
+        None,
+    ],
+    ids=["no_id", "no_date", "none_match"],
+)
+def test_valid_date_callback_data_failed_states(match: re.Match | None):
+    with pytest.raises(MalformedCallbackData):
+        valid_callback_data(CallbackData.parse(match), CallbackQueryId.MAIN_MENU)

@@ -24,7 +24,7 @@ from mitup_bot.utils import MeetingMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
-from mitup_bot.views.mitup_view import ButtonConfig, MitupView, PaginatedMitupView
+from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.stub_db import MockDbSession
 
@@ -222,9 +222,8 @@ async def test_callback_query_show_meetings_without_meetings_to_show_works(
 
     context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETINGS)
 
-    expected_view = MitupView(
-        description=MeetingMessages.NO_MEETINGS_FOUND.get(),
-        keyboard=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+    expected_view = factory.main_menu_view(
+        MeetingMessages.NO_MEETINGS_FOUND.get(new_meeting_button=ButtonMessages.NEW_MEETING.get())
     )
 
     api.assert_edit_message_called(context, update, expected_view)

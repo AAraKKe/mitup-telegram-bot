@@ -32,13 +32,10 @@ def cleanup_states(context: MitupContext):
 @with_async_session
 async def callback_query_edit_meeting(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_query_edit_meeting")
-    assert context.matches is not None
+
+    callback_data = guards.valid_callback_data(cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.EDIT)
 
     user = guards.current_user(update, session)
-    callback_data = cb.EDIT_MEETING.parse(context.matches[0])
-
-    if callback_data.id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.EDIT, callback_data)
 
     meeting = await guards.meeting_accessible(session, user, callback_data.id, "Edit meeting", update, context)
 
@@ -55,15 +52,16 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
 @with_async_session
 async def cancel_edit_meeting(session: Session, update: Update, context: MitupContext):
     """If at any point the user clicks on Cancel we should get back to the Edit meeting view"""
-    assert context.matches is not None
 
-    meeting_id = cb.EDIT_MEETING_CANCEL.parse(context.matches[0]).id
-
-    if meeting_id is None:
+    try:
+        meeting_id = guards.valid_callback_data(
+            cb.EDIT_MEETING_CANCEL.parse(context.match), EditMeetingHandlerId.CANCEL
+        ).id
+    except MalformedCallbackData as exc:
         # If we cannot get a meeting_id from callback something went wrong.
         # Cleanup, log error and end possible conversation
         cleanup_states(context)
-        logging.error(MalformedCallbackData(EditMeetingHandlerId.CANCEL, cb.EDIT_MEETING_CANCEL))
+        logging.error(exc)
         await api.edit_message(context, update, factory.main_menu_view())
         return ConversationHandler.END
 

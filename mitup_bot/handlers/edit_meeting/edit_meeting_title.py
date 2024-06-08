@@ -7,7 +7,6 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import api, guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
-from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
@@ -25,12 +24,9 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
 async def callback_query_edit_meeting_title(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_query_edit_title_meeting")
 
-    assert context.matches is not None
-
-    meeting_id = cb.EDIT_MEETING_TITLE.parse(context.matches[0]).id
-
-    if meeting_id is None:
-        raise MalformedCallbackData(EditMeetingHandlerId.TITLE_CALLBACK, cb.EDIT_MEETING_TITLE)
+    meeting_id = guards.valid_callback_data(
+        cb.EDIT_MEETING_TITLE.parse(context.match), EditMeetingHandlerId.TITLE_CALLBACK
+    ).id
 
     user = guards.current_user(update, session)
     meeting = await guards.meeting_accessible(
