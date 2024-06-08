@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
@@ -9,6 +10,7 @@ from warnings import filterwarnings
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     BaseHandler,
@@ -93,7 +95,8 @@ async def callback_query_fallback(update: Update, context: CallbackContext):
     # No need to create a message for this as there will be no transaltions. Before translations
     # are added all features should be finished.
     message = "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀"
-    await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
+    with suppress(TelegramError):
+        await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
 
 
 class HandlersRegistry:
@@ -224,7 +227,8 @@ class HandlersRegistry:
                 result = await callback(update, context)
                 if auto_answer:
                     assert update.callback_query is not None
-                    await context.bot.answer_callback_query(update.callback_query.id)
+                    with suppress(TelegramError):
+                        await context.bot.answer_callback_query(update.callback_query.id)
                 return result
 
             cls.handlers[callback_id] = HandlerWrapper(
