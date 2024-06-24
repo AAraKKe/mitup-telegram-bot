@@ -58,6 +58,14 @@ class MitupView:
         return self
 
 
+@dataclass
+class MitupInlineView(MitupView):
+    """MitupView that represent an inline view with a title and an id."""
+
+    title: str
+    id: str
+
+
 class PaginatedViewPosition(Enum):
     UNIQUE = auto()
     FIRST = auto()

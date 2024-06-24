@@ -35,3 +35,4 @@ class Feature(CamelCaseStrEnum):
     NEW_USER_REGISTERED = auto()
     NEW_LANDING = auto()
     CREATE_MEETING = auto()
+    SHARE_MEETING = auto()

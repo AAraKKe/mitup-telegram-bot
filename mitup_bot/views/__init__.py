@@ -5,9 +5,10 @@ __all__ = (
     "factory",
     "Keyboard",
     "MitupView",
+    "MitupInlineView",
     "PaginatedMitupView",
 )
 
-from .mitup_view import MitupView, ButtonConfig, PaginatedMitupView, Keyboard, ButtonRow
+from .mitup_view import MitupView, MitupInlineView, ButtonConfig, PaginatedMitupView, Keyboard, ButtonRow
 from .calendar import CalendarKeyboard
 from . import factory

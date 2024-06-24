@@ -3,7 +3,7 @@ import logging
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
-from telegram import CallbackQuery, Chat, Message, Update
+from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 from telegram.ext import ExtBot
 
 from mitup_bot import api
@@ -15,6 +15,7 @@ from mitup_bot.exceptions import (
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
+    InlineQueryNotSetError,
     MalformedCallbackData,
     UserNotFound,
 )
@@ -35,6 +36,12 @@ def current_user(update: Update, session: Session) -> User:
         return user
     else:
         raise UserNotFound(update.effective_user.id)
+
+
+def valid_inline_query(update: Update) -> InlineQuery:
+    if update.inline_query is None:
+        raise InlineQueryNotSetError()
+    return update.inline_query
 
 
 def valid_date_callback_data(cb: DateCallbackData, callback_id: CallbackId) -> ValidDateCallbackData:
@@ -83,24 +90,31 @@ def callback_query(update: Update) -> CallbackQuery:
 
 
 async def user_owns_meeting(
-    user: User, meeting_id: int, action: str, update: Update, context: MitupContext[ExtBot, MetricsLogger]
+    user: User,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    context: MitupContext[ExtBot, MetricsLogger],
+    redirect=True,
 ) -> Meetup | None:
     """
     Check if the user owns the meeting.
     If the user does, the meeting is returned.
-    If not, warn and send the user to the main menu and None is returned.
+    If not, if the redirect flag is set to True, warn and send the user to the main menu and None is returned.
+    If the redirect flat is False, None is returned but no communication happens with the user.
     """
     if meeting := user.own_meeting(meeting_id):
         context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=Unit.COUNT)
         return meeting
 
-    message = (
-        f"User tried {action!r} with a meeting that does not belong to them. "
-        f"Meeting id: {meeting_id}, user id: {user.id}"
-    )
-    logging.warning(message)
-    context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
-    await api.edit_message(context, update, factory.main_menu_view())
+    if redirect:
+        message = (
+            f"User tried {action!r} with a meeting that does not belong to them. "
+            f"Meeting id: {meeting_id}, user id: {user.id}"
+        )
+        logging.warning(message)
+        context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
+        await api.edit_message(context, update, factory.main_menu_view())
     return None
 
 

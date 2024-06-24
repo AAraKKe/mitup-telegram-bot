@@ -19,6 +19,7 @@ from telegram.ext import (
     CommandHandler,
     ConversationHandler,
     ExtBot,
+    InlineQueryHandler,
     MessageHandler,
 )
 from telegram.ext.filters import BaseFilter
@@ -95,6 +96,7 @@ async def callback_query_fallback(update: Update, context: CallbackContext):
     # No need to create a message for this as there will be no transaltions. Before translations
     # are added all features should be finished.
     message = "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀"
+    logging.info(update)
     with suppress(TelegramError):
         await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
 
@@ -254,7 +256,7 @@ class HandlersRegistry:
         for key, wrapper in sorted_items:
             if wrapper.bindable:
                 logging.info(f"Binding {key} handler to application")
-                app.add_handler(wrapper.handler)
+                app.add_handler(handler=wrapper.handler, group=wrapper.group)
         # Add a fallback handler for any update that is not handled by any of the registered handlers
         # the intention is that the user gets a message saying that it is not implemented yet instead of
         # the bot not responding at all.
@@ -315,3 +317,34 @@ class HandlersRegistry:
             bindable=bindable,
             group=group,
         )
+
+    @classmethod
+    def register_inline_handler(
+        cls,
+        callback_id: CallbackId,
+        bindable: bool = True,
+        group: int = 0,
+        block: bool = True,
+        pattern: str | None = None,
+        chat_types: list[str] | None = None,
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
+        if callback_id in cls.handlers:
+            raise HandlerRegisteredError(callback_id)
+
+        def wrapper(
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
+            cls.handlers[callback_id] = HandlerWrapper(
+                handler=InlineQueryHandler(
+                    callback=callback_with_metrics(callback_id, "InlineQuery", callback, cls.env),
+                    pattern=pattern,
+                    chat_types=chat_types,
+                    block=block,
+                ),
+                bindable=bindable,
+                group=group,
+            )
+
+            return callback
+
+        return wrapper

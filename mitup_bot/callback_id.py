@@ -35,5 +35,5 @@ class CallbackId(Enum):
         """
         camel_case = f"{self.__class__.__name__}_{self.name.title().replace('_', '')}"
         # Order matters here
-        to_remove = ["CallbackId", "CallbackQueryId", "HandlerId", "Handler", "CommandsId", "_"]
+        to_remove = ["CallbackId", "InlineQueryId", "CallbackQueryId", "HandlerId", "Handler", "CommandsId", "_"]
         return reduce(lambda a, b: a.replace(b, ""), to_remove, camel_case)

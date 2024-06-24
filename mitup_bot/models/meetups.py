@@ -9,8 +9,8 @@ from sqlmodel import Field, Relationship, Session, SQLModel, select
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import MitupView
-from mitup_bot.views.mitup_view import ButtonConfig
+from mitup_bot.views import MitupInlineView, MitupView
+from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
 
 from .mutable_model import MutableModel
 
@@ -112,16 +112,22 @@ class Meetup(SQLModel, table=True):
 
     @property
     def main_view(self) -> MitupView:
-        # TODO: when we can share the meetings there must be several views of the meeting, one for editting,
-        # one for sharing, etc.
-        # the view for sharing should be transalted to the meeting language and not the user language.
         return MitupView(
             self.message,
             [
                 [
-                    ButtonConfig(text=ButtonMessages.JOIN.get(lang=self.user_language), callback_data=cb.JOIN),
-                    ButtonConfig(text=ButtonMessages.INVITE.get(lang=self.user_language), callback_data=cb.INVITE),
-                    ButtonConfig(text=ButtonMessages.LEAVE.get(lang=self.user_language), callback_data=cb.LEAVE),
+                    ButtonConfig(
+                        text=ButtonMessages.JOIN.get(lang=self.user_language),
+                        callback_data=cb.JOIN.with_id(cast(int, self.id)),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.INVITE.get(lang=self.user_language),
+                        callback_data=cb.INVITE.with_id(cast(int, self.id)),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.LEAVE.get(lang=self.user_language),
+                        callback_data=cb.LEAVE.with_id(cast(int, self.id)),
+                    ),
                 ],
                 [
                     ButtonConfig(
@@ -209,6 +215,29 @@ class Meetup(SQLModel, table=True):
                 ],
             ],
         )
+
+    @property
+    def inline_view(self) -> MitupInlineView:
+        return MitupInlineView(
+            self.message,
+            self.build_inline_keyboard(),
+            id=str(self.id),
+            title=str(self.title),
+        )
+
+    def build_inline_keyboard(self) -> Keyboard:
+        return [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.JOIN.get(lang=self.user_language),
+                    callback_data=cb.JOIN.with_id(cast(int, self.id)),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.LEAVE.get(lang=self.user_language),
+                    callback_data=cb.LEAVE.with_id(cast(int, self.id)),
+                ),
+            ],
+        ]
 
     @overload
     @classmethod

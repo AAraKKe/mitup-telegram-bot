@@ -124,3 +124,13 @@ class PositiveNumberFilterError(RuntimeError):
 
 class MetricsNotSetError(ValueError):
     pass
+
+
+class InlineQueryNotSetError(ValueError):
+    def __init__(self):
+        super().__init__("InlineQueryId is not set but expected.")
+
+
+class AnswerInlineQueryError(RuntimeError):
+    def __init__(self, query: str):
+        super().__init__(f"Error when answering inline query: {query}")

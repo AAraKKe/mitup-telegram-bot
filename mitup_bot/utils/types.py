@@ -1,7 +1,7 @@
 """This module contains custom types to be used through the project for type hinting"""
 
 from collections.abc import Callable, Collection, Coroutine
-from typing import Any, Protocol, TypeVar, Union
+from typing import Any, TypeVar, Union
 
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from telegram import Update
@@ -27,12 +27,8 @@ UT = TypeVar("UT", bound=Update)
 HandlerCallback = Callable[[Update, MitupContext], Coroutine[Any, Any, RT]]
 """Type to define the callback of a given handler"""
 
+TMitupContext = MitupContext[ExtBot, MetricsLogger]
+"""Standard type of MitupContext used through the project"""
 
-MitupApp = Application[ExtBot, MitupContext[ExtBot, MetricsLogger], MitupUserData, dict, dict, JQ]
+MitupApp = Application[ExtBot, TMitupContext, MitupUserData, dict, dict, JQ]
 """Standard application type for the MitupBot"""
-
-
-class ContextManager[T](Protocol):
-    def __enter__(self) -> T: ...
-
-    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None: ...

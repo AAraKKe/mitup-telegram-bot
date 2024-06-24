@@ -8,6 +8,7 @@ __all__ = (
     "UserExistFilter",
     "PositiveNumberFilter",
     "edit_meeting",
+    "inline_query",
     "edit_settings",
     "registration_process",
 )
@@ -16,7 +17,7 @@ __all__ = (
 from .registry import HandlersRegistry
 
 # Then subpackages
-from . import registration_process, edit_meeting, edit_settings
+from . import registration_process, edit_meeting, edit_settings, inline_query
 
 # Now we can import the rest of modules
 from . import callback_query, commands, conversations, messages
