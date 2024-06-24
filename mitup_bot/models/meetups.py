@@ -1,10 +1,12 @@
 import datetime as dt
+import logging
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, Session, SQLModel, select
+from telegram import Update
 
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
@@ -15,6 +17,8 @@ from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
 from .mutable_model import MutableModel
 
 if TYPE_CHECKING:  # pragma: no cover
+    from .joined_users import JoinedUsers
+    from .messages import Message
     from .users import User
 
 
@@ -63,13 +67,24 @@ class Meetup(SQLModel, table=True):
     active: bool = True
 
     owner: "User" = Relationship(back_populates="meetups")
+    messages: list["Message"] = Relationship(back_populates="meetups")
+    joined_links: list["JoinedUsers"] = Relationship(back_populates="meetup")
 
     @property
     def full(self) -> bool:
-        # For now, we have not created the members field that represents the
-        # users that joined a given Meeting. This is False for now until we can
-        # properly determine whether it is full or not.
-        # return self.max_members == len(self.members)
+        if self.max_members is None:
+            return False
+        return len([link for link in self.joined_links if not link.is_waiting_list]) >= self.max_members
+
+    def has_message(self, update: Update) -> bool:
+        logging.info("------- HAS MESSAGE -------")
+        if eff_message := update.effective_message:
+            logging.info(f"Checking message {eff_message.message_id!r} in {self.messages}")
+            return any(message.message_id == eff_message.message_id for message in self.messages)
+        if update.callback_query and update.callback_query.inline_message_id:
+            return any(
+                message.inline_message_id == update.callback_query.inline_message_id for message in self.messages
+            )
         return False
 
     @property
@@ -88,15 +103,23 @@ class Meetup(SQLModel, table=True):
 
     @property
     def participants_text(self) -> str:
-        # For now, we have not created the members field that represents the
-        # users that joined a given Meeting. This is an "empty" string for now until we can
-        # properly determine whether it has participants or not.
-        total_participants = MeetingMessages.EMPTY.get()
+        if len(self.joined_links) == 0:
+            total_participants = MeetingMessages.EMPTY.get(lang=self.lang)
+        elif len(self.joined_links) == 1:
+            total_participants = f"1 {MeetingMessages.PARTICIPANT.get(lang=self.lang)}"
+        else:
+            total_participants = f"{len(self.joined_links)} {MeetingMessages.PARTICIPANTS.get(lang=self.lang)}"
+
         max_participants = (
-            MeetingMessages.MAX_PARTICIPANTS.get(max_participants=self.max_members) if self.max_members else ""
+            MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
+            if self.max_members
+            else ""
         )
 
-        return f"{total_participants} {max_participants}"
+        participant_list = [link.user.inline_name for link in self.joined_links]
+        participants_message = f"\n{"\n\t".join(participant_list)}" if participant_list else ""
+
+        return f"{total_participants} {max_participants}{participants_message}"
 
     @property
     def message(self) -> str:
@@ -143,6 +166,34 @@ class Meetup(SQLModel, table=True):
                 [
                     ButtonConfig(
                         text=ButtonMessages.SHARE.get(lang=self.user_language), switch_inline_query=str(self.id)
+                    ),
+                ],
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.MAIN_MENU.get(lang=self.user_language), callback_data=cb.MAIN_MENU
+                    ),
+                ],
+            ],
+        )
+
+    @property
+    def external_view(self) -> MitupView:
+        """This is the view shown to users that do not own the meeting when checking through meetings I have joined"""
+        return MitupView(
+            self.message,
+            [
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.JOIN.get(lang=self.user_language),
+                        callback_data=cb.JOIN.with_id(cast(int, self.id)),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.INVITE.get(lang=self.user_language),
+                        callback_data=cb.INVITE.with_id(cast(int, self.id)),
+                    ),
+                    ButtonConfig(
+                        text=ButtonMessages.LEAVE.get(lang=self.user_language),
+                        callback_data=cb.LEAVE.with_id(cast(int, self.id)),
                     ),
                 ],
                 [

@@ -49,13 +49,17 @@ class MitupView:
 
     @property
     def markup(self):
-        inline_keyboard = [[button_config.button for button_config in row] for row in self.keyboard]
-        return InlineKeyboardMarkup(inline_keyboard)
+        return self.keyboard_to_markup(self.keyboard)
 
     def with_context(self, message: str) -> Self:
         self.description = f"{message}\n\n{self.description}"
 
         return self
+
+    @staticmethod
+    def keyboard_to_markup(keyboard: Keyboard) -> InlineKeyboardMarkup:
+        inline_keyboard = [[button_config.button for button_config in row] for row in keyboard]
+        return InlineKeyboardMarkup(inline_keyboard)
 
 
 @dataclass

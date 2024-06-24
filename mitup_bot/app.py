@@ -7,7 +7,7 @@ import telegram.ext
 from rich.console import Console
 from rich.logging import RichHandler
 from telegram import constants
-from telegram.ext import Application, ContextTypes, Defaults
+from telegram.ext import AIORateLimiter, Application, ContextTypes, Defaults
 
 from mitup_bot import db, timezone_api
 from mitup_bot.cli.options import Env
@@ -75,6 +75,9 @@ class MitupRuntime:
 
         # Set custom context type
         builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
+
+        # Set rate limiter
+        builder.rate_limiter(AIORateLimiter(max_retries=self.config.bot.retries_on_throttle))
 
         app = builder.build()
 

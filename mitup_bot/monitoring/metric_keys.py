@@ -36,3 +36,5 @@ class Feature(CamelCaseStrEnum):
     NEW_LANDING = auto()
     CREATE_MEETING = auto()
     SHARE_MEETING = auto()
+    JOIN_MEETING = auto()
+    LEAVE_MEETING = auto()

@@ -1,9 +1,12 @@
+import logging
+
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
-from telegram.error import TelegramError
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import CallbackContext
 
 from mitup_bot import guards
 from mitup_bot.exceptions import AnswerInlineQueryError
+from mitup_bot.models import Meetup
 from mitup_bot.views import MitupInlineView, MitupView
 
 
@@ -55,3 +58,26 @@ async def answer_inline_query(context: CallbackContext, update: Update, results:
     if await context.bot.answer_inline_query(query.id, results=inline_results):
         return
     raise AnswerInlineQueryError(query.query)
+
+
+async def update_meeting_messages(context: CallbackContext, meeting: Meetup):
+    inline_view = meeting.inline_view
+    for message in meeting.messages:
+        logging.info(f"Editing message {message.message_id} for meeting {meeting.id}")
+        logging.info(message)
+        logging.info(f"Buttons: {message.buttons}")
+
+        try:
+            await context.bot.edit_message_text(
+                inline_view.description,
+                message.chat_id,
+                message_id=message.message_id,
+                inline_message_id=message.inline_message_id,
+                reply_markup=MitupView.keyboard_to_markup(message.buttons.keyboard),
+            )
+        except BadRequest as e:
+            # Sometimes the message does not need to be updated but we don't know that in advance
+            # ignore the error when it happens
+            if "Message is not modified" in e.message:
+                continue
+            raise

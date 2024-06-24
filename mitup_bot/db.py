@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, create_engine
 
 from mitup_bot.config import DbConfig
-from mitup_bot.models import MeetupLocation
+from mitup_bot.models import MeetupLocation, MessageButtons
 
 __sessionmaker: sessionmaker[Session] | None = None
 
@@ -37,6 +37,8 @@ def deserialize_pydantic_model(data: str) -> BaseModel | None:
     # We would need to keep adding more of these if we add more models with JSON fields.
     with suppress(ValidationError):
         return MeetupLocation.model_validate_json(data)
+    with suppress(ValidationError):
+        return MessageButtons.model_validate_json(data)
     return None
 
 

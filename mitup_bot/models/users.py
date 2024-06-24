@@ -5,10 +5,10 @@ from sqlmodel import Field, Relationship, Session, SQLModel, select
 
 from mitup_bot.exceptions import UserNotFound
 
-from . import Meetup
+from . import JoinedUsers, Meetup
 
 if TYPE_CHECKING:
-    from . import Meetup, Settings
+    from . import JoinedUsers, Meetup, Settings
 
 
 class User(SQLModel, table=True):
@@ -24,6 +24,7 @@ class User(SQLModel, table=True):
     username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
     meetups: list["Meetup"] = Relationship(back_populates="owner")
+    joined_links: list["JoinedUsers"] = Relationship(back_populates="user")
 
     @overload
     @classmethod
@@ -44,7 +45,15 @@ class User(SQLModel, table=True):
 
         return None
 
-    def own_meeting(self, meeting_id: int) -> Meetup | None:  # type: ignore
+    @property
+    def inline_name(self) -> str:
+        return self.username or self.first_name
+
+    def joined_meeting(self, meeting_id: int) -> "JoinedUsers | None":
+        joined_links = [joined for joined in self.joined_links if joined.meetup_id == meeting_id]
+        return joined_links[0] if joined_links else None
+
+    def own_meeting(self, meeting_id: int) -> "Meetup | None":  # type: ignore
         return next((meetup for meetup in self.meetups if meetup.id == meeting_id), None)
 
     def datetime_in_tz(self, datetime: dt.datetime) -> dt.datetime:

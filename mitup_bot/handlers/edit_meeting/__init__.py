@@ -6,6 +6,7 @@ __all__ = [
     "edit_meeting_description",
     "edit_meeting_participants",
     "enums",
+    "join_leave",
 ]
 
 from . import (
@@ -16,4 +17,5 @@ from . import (
     edit_meeting_title,
     edit_meeting_datetime,
     enums,
+    join_leave,
 )

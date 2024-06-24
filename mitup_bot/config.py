@@ -143,6 +143,7 @@ class BotConfig(BaseModel):
     # Secret token provided to Telegram to validate connections
     secret_token: SecretStr | None = None
     max_connections: int = 100
+    retries_on_throttle: int = 3
 
 
 class GoogleApiConfig(BaseModel):

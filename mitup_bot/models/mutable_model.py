@@ -12,7 +12,7 @@ class MutableModel(BaseModel, Mutable):
 
     @classmethod
     def coerce(cls, key: str, value: Any) -> Self | None:
-        """Convert JSON to MeetupLocation object allowing for mutable behavior"""
+        """Convert JSON to model object allowing for mutable behavior"""
         if isinstance(value, cls) or value is None:
             return value
 

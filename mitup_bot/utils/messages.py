@@ -124,6 +124,8 @@ class MeetingMessages(MessageBase):
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
     EMPTY = "Empty"
+    PARTICIPANT = "Participant"
+    PARTICIPANTS = "Participants"
     MAX_PARTICIPANTS = "(Max: $max_participants)"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
