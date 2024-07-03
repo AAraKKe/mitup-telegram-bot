@@ -27,7 +27,7 @@ SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
             "source.organizeImports": True,
         },
     },
-    "search.exclude": {".hatch": True},
+    "search.exclude": {".hatch": True, "postgres-data": True},
 }
 
 
