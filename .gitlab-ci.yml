@@ -157,6 +157,8 @@ config-staging:
     name: staging
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 config-prod:
   <<: *aws-env-config
@@ -164,6 +166,8 @@ config-prod:
     name: production
   rules:
     - if: $CI_COMMIT_BRANCH == "release"
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 build-docs:
   stage: prepare-deployment
@@ -179,6 +183,8 @@ build-docs:
     - changes:
       - docs/**/*
       - mkdocs.yml
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 .push-ecr: &push-ecr
   stage: push-ecr
@@ -189,7 +195,7 @@ build-docs:
 ## ------------- Push to staging --------------
 push-bot-tagged-staging:
   <<: *push-ecr
-  resource_group: staging
+  resource_group: bot-tagged-staging
   environment:
     name: staging
   variables:
@@ -197,20 +203,25 @@ push-bot-tagged-staging:
     PUSH_DESTINATION: $BOT_IMAGE_TAG
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 push-bot-latest-staging:
   extends: push-bot-tagged-staging
+  resource_group: bot-latest-staging
   variables:
     PUSH_DESTINATION: "${ECR_MITUP_REPO_URI}:latest"
 
 push-migrations-lambda-staging:
   extends: push-bot-tagged-staging
+  resource_group: migrations-tagged-staging
   variables:
     DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-staging:
   extends: push-migrations-lambda-staging
+  resource_group: migrations-latest-staging
   variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
@@ -218,25 +229,30 @@ push-migrations-latest-staging:
 push-bot-tagged-prod:
   # We can reuse the one for staging and change the environment
   extends: push-bot-tagged-staging
-  resource_group: production
+  resource_group: bot-tagged-prod
   environment:
     name: production
   rules:
     - if: $CI_COMMIT_BRANCH == "release"
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 push-bot-latest-prod:
   extends: push-bot-tagged-prod
+  resource_group: bot-latest-prod
   variables:
     PUSH_DESTINATION: "${ECR_MITUP_REPO_URI}:latest"
 
 push-migrations-lambda-prod:
   extends: push-bot-tagged-prod
+  resource_group: migrations-tagged-prod
   variables:
     DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-prod:
   extends: push-migrations-lambda-prod
+  resource_group: migrations-latest-prod
   variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
@@ -257,21 +273,25 @@ push-migrations-latest-prod:
 deploy-staging:
   # This job will first run the migrations on the database and the update ECS
   <<: *deploy
-  resource_group: staging
+  resource_group: deploy-staging
   environment:
     name: staging
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 ## -------------- Deploy prod ---------------
 deploy-production:
   # This job will first run the migrations on the database and the update ECS
   <<: *deploy
-  resource_group: staging
+  resource_group: deploy-production
   environment:
     name: production
   rules:
     - if: $CI_COMMIT_BRANCH == "release"
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 
 ## -------------- Documentation ---------------
@@ -288,7 +308,7 @@ deploy-production:
 
 push-docs-staging:
   <<: *push-docs
-  resource_group: staging
+  resource_group: docs-staging
   environment:
     name: staging
   rules:
@@ -297,10 +317,12 @@ push-docs-staging:
       changes:
         - docs/**/*
         - mkdocs.yml
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
 
 push-docs-production:
   <<: *push-docs
-  resource_group: production
+  resource_group: docs-production
   environment:
     name: production
   rules:
@@ -309,3 +331,5 @@ push-docs-production:
       changes:
         - docs/**/*
         - mkdocs.yml
+    - if: $CI_COMMIT_MESSAGE =~ /\[no-deploy\]/
+      when: never
