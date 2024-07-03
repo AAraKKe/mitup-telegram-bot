@@ -12,6 +12,7 @@ from mitup_bot.views.calendar import CalendarKeyboard
 from tests.views.calendar_july_2024 import TEST_CALENDAR_MARKUP
 
 
+@freezegun.freeze_time("2024-06-12", tz_offset=0)
 def test_full_calendar_markup():
     cal = CalendarKeyboard(
         anchor_date=dt.date(2024, 6, 12),
