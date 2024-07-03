@@ -129,7 +129,7 @@ def test_callback_in_buttons():
     )
 
     # Weekdays should all be empty
-    assert [cb.EMPTY] * 7 == [button.callback_data for button in cal.keyboard[0]]
+    assert [button.callback_data for button in cal.keyboard[0]] == [cb.EMPTY] * 7
 
     # Days of the month should have the callback_data with the date
     # Add three empty callbacks to the first three days of the month and the last one

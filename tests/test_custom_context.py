@@ -206,4 +206,4 @@ async def test_put_metrics_does_not_flush(context: StubMitupContext):
     assert "MyMetric" in context.metrics.context.metrics
     metric_in_context = context.metrics.context.metrics["MyMetric"]
     assert Unit.MILLISECONDS.value == metric_in_context.unit
-    assert [123] == metric_in_context.values
+    assert metric_in_context.values == [123]

@@ -48,7 +48,9 @@ filterwarnings = [
     # Dateutil is using a deprecated version of utc timestamp we cannot do anything about.
     'ignore:datetime.datetime.utcfromtimestamp\(\) is deprecated:DeprecationWarning:dateutil.tz.tz',
     # Warning thrown by alembic on the test we break on purpose the revision graph
-    'ignore:.*Revision rev3.*Migration 4:UserWarning'
+    'ignore:.*Revision rev3.*Migration 4:UserWarning',
+    # Ignore warnings from PTB regarding ChatFullInfo since we do not use that information
+    'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*'
 ]
 
 [tool.pyright]

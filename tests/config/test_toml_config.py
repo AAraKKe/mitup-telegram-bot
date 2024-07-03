@@ -46,7 +46,7 @@ def test_empty_config_on_error(mock_toml_config: tuple[mock.Mock, mock.Mock]):
     config = provider.get_config()
 
     # Check the content is valid
-    assert {} == config
+    assert config == {}
 
     # Check he expected file has been read
     mock_toml_config[0].assert_called_with(environments)
