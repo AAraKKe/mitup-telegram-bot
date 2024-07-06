@@ -24,4 +24,3 @@ The different available actions are:
 !!! info "Meeting lifecycle"
 
     Once a meeting is created, Mitup tracks its existence until it is deleted either by the owner or automatically. To better understand when a meeting transitions from active to inactive or when it is definitely deleted, see [Meeting lifecycle](meeting_lifecycle.md).
-

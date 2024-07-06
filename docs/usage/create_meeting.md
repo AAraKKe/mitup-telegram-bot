@@ -1,3 +1,3 @@
 # Create your first meeting
 
-Once you are registered 
+Once you are registered
