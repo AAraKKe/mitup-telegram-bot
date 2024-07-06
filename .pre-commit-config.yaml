@@ -8,7 +8,9 @@ repos:
         args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
       - id: check-toml
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
         exclude: (^.gitlab-ci.yml$|^mkdocs.yml$)
       - id: check-added-large-files
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -17,7 +19,9 @@ repos:
     hooks:
       # Run the linter.
       - id: ruff
+        stages: [pre-commit]
       - id: ruff-format
+        stages: [pre-commit]
   - repo: https://github.com/AliYmn/conventional-commits-check
     rev: V2.0.0  # Use the latest release version
     hooks:
