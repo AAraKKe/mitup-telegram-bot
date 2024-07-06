@@ -109,7 +109,7 @@ class MeetingMessages(MessageBase):
         "A meeting has been created with the title: *$title*\n\n"
         "You can add more information to the meeting with the options below. "
         "The information which has not been added won't be shown when the meeting is shared.\n\n"
-        f"When finished click on {Emojis.CHECK}"
+        f"When finished click on {Emojis.CHECK} Done"
     )
 
     # Meeting information
