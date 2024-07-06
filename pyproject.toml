@@ -154,7 +154,7 @@ dependencies = [
     "mkdocs",
     "mkdocs-material",
     "pre-commit",
-    "conventional-commits-checker",
+    "conventional-commits-check",
 ]
 
 [tool.hatch.envs.dev.scripts]
