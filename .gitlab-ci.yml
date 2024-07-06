@@ -245,7 +245,6 @@ push-bot-tagged-prod:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
-      <<: *deploy-rules
 
 push-bot-latest-prod:
   extends: push-bot-tagged-prod
@@ -303,7 +302,6 @@ deploy-production:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
-      <<: *deploy-rules
 
 
 ## -------------- Documentation ---------------
@@ -341,7 +339,3 @@ push-docs-production:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
-      # Only run if in the release branch and the doc files change
-      changes:
-        - docs/**/*
-        - mkdocs.yml
