@@ -2,17 +2,16 @@ import logging
 
 import telegram
 import telegram.ext
-from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from rich.console import Console
 
 from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
 
 console = Console()
 
 
-def handler(context: MitupContext[telegram.ext.ExtBot, MetricsLogger], error: Exception, env: Env):
+def handler(context: MitupContext[telegram.ext.ExtBot, MitupMetricsLogger], error: Exception, env: Env):
     # This is the error handler that will receive every exception that is raised
 
     # Emit an error metric for the current update both including the error type and a general

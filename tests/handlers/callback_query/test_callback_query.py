@@ -80,6 +80,7 @@ async def test_callback_query_cancel_meeting_calls_to_current_view(
     context.matches = [match]
 
     await callback_query_cancel_meeting(update, context)
+    await context.flush_metrics()
 
     api.assert_edit_message_called(context, update, factory.main_menu_view())
     context.metrics.assert_metrics_emited(

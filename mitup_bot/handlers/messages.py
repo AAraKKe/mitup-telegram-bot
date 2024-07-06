@@ -38,7 +38,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
 
         await api.send_message(context, update, view)
 
-        await context.emit_feature_metric(Feature.CREATE_MEETING)
+        context.put_feature_metric(Feature.CREATE_MEETING)
 
     return ConversationHandler.END
 

@@ -1,24 +1,23 @@
 import asyncio
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager, contextmanager
-from typing import Any
+from typing import Any, Self
 
 from aws_embedded_metrics.config import get_config
-from aws_embedded_metrics.environment.environment_detector import EnvironmentCache
+from aws_embedded_metrics.environment import Environment
+from aws_embedded_metrics.environment.environment_detector import EnvironmentCache, resolve_environment
 from aws_embedded_metrics.environment.local_environment import LocalEnvironment
 from aws_embedded_metrics.logger.metrics_context import MetricsContext
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
-from aws_embedded_metrics.logger.metrics_logger_factory import create_metrics_logger
 from aws_embedded_metrics.serializers.log_serializer import LogSerializer
 from aws_embedded_metrics.sinks import Sink
+from aws_embedded_metrics.storage_resolution import StorageResolution
 from rich.console import Console
 from telegram import Update
 
 from mitup_bot.config import MetricsConfig, MetricsEnv
-
-metrics_factory = create_metrics_logger
 
 
 class RichConsoleSink(Sink):
@@ -41,13 +40,53 @@ class RichEnvironment(LocalEnvironment):
         self.sink = RichConsoleSink()
 
 
-def configure_metrics(config: MetricsConfig, factory: Callable[[], MetricsLogger] | None = None):
+class MitupMetricsLogger(MetricsLogger):
+    """Custom MetricsLogger for Mitup Bot that allows any custom behaviour we need to introduce"""
+
+    config: MetricsConfig | None = None
+
+    def __init__(self, resolve_environment: Callable[..., Awaitable[Environment]]):
+        context = MetricsContext.empty()
+        context.set_default_dimensions({})
+        super().__init__(resolve_environment, context)
+        self.flush_on_emission = self.config.flush_on_emission if self.config else False
+
+    def put_metric(
+        self,
+        key: str,
+        value: float,
+        unit: str = "None",
+        storage_resolution: StorageResolution = StorageResolution.STANDARD,
+    ) -> Self:
+        super().put_metric(key, value, unit, storage_resolution)
+        if self.flush_on_emission:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                asyncio.run(self.flush())
+            else:
+                flush_task = asyncio.create_task(self.flush())
+                asyncio.ensure_future(flush_task)
+        return self
+
+    async def flush(self):
+        await super().flush()
+        # Force stdout flush to ensure the logs are emitted
+        sys.stdout.flush()
+
+
+def metrics_factory() -> MitupMetricsLogger:
+    return MitupMetricsLogger(resolve_environment)
+
+
+def configure_metrics(config: MetricsConfig, factory: Callable[[], MitupMetricsLogger] | None = None):
     """Set the EMF configuration with the provided configuration.
 
     If `factory` is especified, it is called to create a metric logger. Useful for testing.
     If it is not defined, the `create_metrics_logger` from `aws_embedded_metrics` is used.
     """
     metrics_config = get_config()
+    MitupMetricsLogger.config = config
 
     metrics_config.namespace = config.namespace
 
@@ -67,10 +106,11 @@ def configure_metrics(config: MetricsConfig, factory: Callable[[], MetricsLogger
 
 def __prepare_logger(
     dimensions: dict[str, str] | None = None, properties: dict[str, Any] | None = None
-) -> MetricsLogger:
+) -> MitupMetricsLogger:
     logger = metrics_factory()
     # Always remove the default dimensions, we don't want to include dimensions we don't control
     logger.set_dimensions(use_default=False)
+    logger.context.set_default_dimensions({})
 
     if dimensions:
         logger.put_dimensions(dimensions)
@@ -91,7 +131,6 @@ def metrics_context(dimensions: dict[str, str] | None = None, properties: dict[s
     logger = __prepare_logger(dimensions=dimensions, properties=properties)
     yield logger
     asyncio.run(logger.flush())
-    sys.stdout.flush()
 
 
 @asynccontextmanager
@@ -105,7 +144,6 @@ async def async_metrics_context(dimensions: dict[str, str] | None = None, proper
     logger = __prepare_logger(dimensions=dimensions, properties=properties)
     yield logger
     await logger.flush()
-    sys.stdout.flush()
 
 
 def properties_from_update(update: Update) -> dict[str, Any]:
@@ -122,6 +160,8 @@ def properties_from_update(update: Update) -> dict[str, Any]:
     }
 
 
-def create_metrics_from_update(update: Update) -> MetricsLogger:
+def create_metrics_from_update(update: Update) -> MitupMetricsLogger:
     """Create a MetricsLogger with the provided Update."""
-    return __prepare_logger(properties=properties_from_update(update))
+    logger = __prepare_logger(properties=properties_from_update(update))
+    logger.flush_preserve_dimensions = True
+    return logger

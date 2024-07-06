@@ -82,7 +82,7 @@ async def callback_query_cancel_meeting(update: Update, context: MitupContext):
 
     await callback_query_main_menu(update, context)
 
-    await context.emit_feature_metric(Feature.CREATE_MEETING, name="Cancel")
+    context.put_feature_metric(Feature.CREATE_MEETING, name="Cancel")
     return ConversationHandler.END
 
 

@@ -3,12 +3,12 @@
 from collections.abc import Callable, Collection, Coroutine
 from typing import Any, TypeVar, Union
 
-from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 from telegram.ext._utils.types import JQ
 
 from mitup_bot.custom_context import MitupContext, MitupUserData
+from mitup_bot.monitoring import MitupMetricsLogger
 
 T = TypeVar("T")
 
@@ -27,7 +27,7 @@ UT = TypeVar("UT", bound=Update)
 HandlerCallback = Callable[[Update, MitupContext], Coroutine[Any, Any, RT]]
 """Type to define the callback of a given handler"""
 
-TMitupContext = MitupContext[ExtBot, MetricsLogger]
+TMitupContext = MitupContext[ExtBot, MitupMetricsLogger]
 """Standard type of MitupContext used through the project"""
 
 MitupApp = Application[ExtBot, TMitupContext, MitupUserData, dict, dict, JQ]

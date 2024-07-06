@@ -49,19 +49,13 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     api.assert_send_message_called(context, update, view)
     assert result == ConversationHandler.END
     context.metrics.assert_metrics_emited(
-        names=[MetricKey.COUNT],
-        values=[1],
+        names=[MetricKey.COUNT, MetricKey.ERROR],
+        values=[1, 0],
         dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
         add_update_properties=False,
         add_handler_dimensions=False,
     )
-    context.metrics.assert_metrics_emited(
-        names=[MetricKey.ERROR],
-        values=[0],
-        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
-        add_update_properties=False,
-        add_handler_dimensions=False,
-    )
+
     context.metrics.assert_metrics_emited(
         names=[MetricKey.COUNT],
         values=[1],
@@ -97,8 +91,8 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     api.assert_send_message_called(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
     assert result == ConversationRegistrationProcessState.TIMEZONE
     context.metrics.assert_metrics_emited(
-        names=[MetricKey.COUNT],
-        values=[1],
+        names=[MetricKey.COUNT, MetricKey.ERROR],
+        values=[1, 1],
         dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
         add_update_properties=False,
         add_handler_dimensions=False,
@@ -107,13 +101,6 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
         names=[MetricKey.COUNT],
         values=[1],
         dimensions={"Feature": Feature.NEW_USER_REGISTERED},
-        add_update_properties=False,
-        add_handler_dimensions=False,
-    )
-    context.metrics.assert_metrics_emited(
-        names=[MetricKey.ERROR],
-        values=[1],
-        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
         add_update_properties=False,
         add_handler_dimensions=False,
     )

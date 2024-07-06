@@ -1,10 +1,8 @@
 import logging
 
-from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
-from telegram.ext import ExtBot
 
 from mitup_bot import api
 from mitup_bot.callback_data import CallbackData, DateCallbackData, ValidCallbackData, ValidDateCallbackData
@@ -23,6 +21,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 
@@ -94,7 +93,7 @@ async def user_owns_meeting(
     meeting_id: int,
     action: str,
     update: Update,
-    context: MitupContext[ExtBot, MetricsLogger],
+    context: TMitupContext,
     redirect=True,
 ) -> Meetup | None:
     """

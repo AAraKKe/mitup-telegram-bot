@@ -2,14 +2,14 @@ from typing import Any, cast
 
 import freezegun
 import pytest
-from aws_embedded_metrics.logger.metrics_logger_factory import create_metrics_logger
+from aws_embedded_metrics.environment.environment_detector import resolve_environment
 from aws_embedded_metrics.unit import Unit
 from rich.console import Console
 from telegram import Update
 
 from mitup_bot import monitoring
 from mitup_bot.config import MetricsConfig, MetricsEnv
-from mitup_bot.monitoring.metrics import RichConsoleSink, RichEnvironment
+from mitup_bot.monitoring.metrics import MitupMetricsLogger, RichConsoleSink, RichEnvironment
 from tests.helpers import StubMetrics, UpdateRequest
 
 
@@ -90,8 +90,11 @@ def test_metrics_key_preffix():
 
 
 async def test_rich_environment():
+    # Need to convifugre monitoring with a custom logger to test the output and override the global test configuration
+    # from contest.py
     monitoring.configure_metrics(
-        MetricsConfig(namespace="MyNamespace", environment=MetricsEnv.RICH), factory=create_metrics_logger
+        MetricsConfig(namespace="MyNamespace", environment=MetricsEnv.RICH),
+        factory=lambda: MitupMetricsLogger(resolve_environment),
     )
 
     async with monitoring.async_metrics_context() as logger:

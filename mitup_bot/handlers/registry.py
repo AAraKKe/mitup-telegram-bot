@@ -7,7 +7,6 @@ from enum import Enum
 from time import perf_counter
 from warnings import filterwarnings
 
-from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.error import TelegramError
@@ -18,7 +17,6 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ConversationHandler,
-    ExtBot,
     InlineQueryHandler,
     MessageHandler,
 )
@@ -32,7 +30,7 @@ from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.types import HandlerCallback
+from mitup_bot.utils.types import HandlerCallback, TMitupContext
 
 from .error_handler import handler as error_handler
 
@@ -48,7 +46,7 @@ filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBU
 def callback_with_metrics(
     callback_id: CallbackId, handler_type: str, callback: HandlerCallback, env: Env
 ) -> HandlerCallback:
-    async def inner_callback(update: Update, context: MitupContext[ExtBot, MetricsLogger]):
+    async def inner_callback(update: Update, context: TMitupContext):
         if context.metrics is None:
             # If metrics has not been set just run the callback
             return await callback(update, context)

@@ -9,6 +9,7 @@ from mitup_bot.custom_context import (
     MitupContext,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
+from mitup_bot.monitoring import Feature
 from tests.helpers import StubMitupContext
 
 
@@ -135,7 +136,7 @@ async def test_metrics_emitted(
     with_update_properties: bool,
     with_handler_dimensions: bool,
 ):
-    await context.emit_metric(
+    context.put_custom_metric(
         "test_metric",
         value=123,
         dimensions=dimensions,
@@ -143,6 +144,8 @@ async def test_metrics_emitted(
         with_handler_dimensions=with_handler_dimensions,
         with_update_properties=with_update_properties,
     )
+
+    await context.flush_metrics()
 
     context.metrics.assert_metrics_emited(
         ["test_metric"],
@@ -155,18 +158,20 @@ async def test_metrics_emitted(
 
 
 async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupContext):
-    await context.emit_feature_metric(
-        "TestFeature",
+    context.put_feature_metric(
+        Feature.CREATE_MEETING,
         name="MyMetric",
         value=123,
         dimensions={"DimeName": "DimeValue"},
         properties={"PropName": "PropValue"},
     )
 
+    await context.flush_metrics()
+
     context.metrics.assert_metrics_emited(
         ["MyMetric"],
         [123],
-        dimensions={"DimeName": "DimeValue", "Feature": "TestFeature"},
+        dimensions={"DimeName": "DimeValue", "Feature": Feature.CREATE_MEETING.value},
         properties={"PropName": "PropValue"},
         add_update_properties=False,
         add_handler_dimensions=False,

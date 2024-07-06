@@ -7,6 +7,7 @@ __all__ = [
     "MetricKey",
     "metrics_context",
     "metrics",
+    "MitupMetricsLogger",
     "properties_from_update",
     "Unit",
 ]
@@ -17,6 +18,7 @@ from .metrics import (
     async_metrics_context,
     create_metrics_from_update,
     properties_from_update,
+    MitupMetricsLogger,
 )
 from .metric_keys import MetricKey, Feature, CamelCaseStrEnum
 from aws_embedded_metrics.unit import Unit

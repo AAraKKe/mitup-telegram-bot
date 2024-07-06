@@ -45,7 +45,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
 
     await api.send_message(context, update, message)
 
-    await context.emit_feature_metric(Feature.NEW_LANDING)
+    context.put_feature_metric(Feature.NEW_LANDING)
     return ConversationRegistrationProcessState.TIMEZONE
 
 
@@ -55,7 +55,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
 @with_async_session
 async def registration_timezone_text_message_handler(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into registration_timezone_text_message_handler")
-    await context.emit_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
+    context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
 
     user = guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
@@ -65,7 +65,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
 
         await api.send_message(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
 
-        await context.emit_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
+        context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
         return ConversationRegistrationProcessState.TIMEZONE
 
     print(f"\n\n\n {new_timezone} \n\n\n")
@@ -79,8 +79,8 @@ async def registration_timezone_text_message_handler(session: Session, update: U
 
     await api.send_message(context, update, view)
 
-    await context.emit_feature_metric(Feature.NEW_USER_REGISTERED)
-    await context.emit_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=0)
+    context.put_feature_metric(Feature.NEW_USER_REGISTERED)
+    context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=0)
     return ConversationHandler.END
 
 
@@ -90,7 +90,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
 @with_async_session
 async def registration_timezone_location_message_handler(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into registration_timezone_location_message_handler")
-    await context.emit_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
+    context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
 
     user = guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
@@ -100,7 +100,7 @@ async def registration_timezone_location_message_handler(session: Session, updat
 
         await api.send_message(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
 
-        await context.emit_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=1)
+        context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=1)
         return ConversationRegistrationProcessState.TIMEZONE
 
     user.settings.timezone = new_timezone
@@ -113,8 +113,8 @@ async def registration_timezone_location_message_handler(session: Session, updat
 
     await api.send_message(context, update, view)
 
-    await context.emit_feature_metric(Feature.NEW_USER_REGISTERED)
-    await context.emit_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=0)
+    context.put_feature_metric(Feature.NEW_USER_REGISTERED)
+    context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=0)
     return ConversationHandler.END
 
 

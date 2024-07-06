@@ -21,7 +21,7 @@ from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import ContextId, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models.meetups import Meetup
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MitupMetricsLogger
 from mitup_bot.views import MitupView
 
 StubMitupContext = MitupContext[mock.MagicMock, "StubMetrics"]
@@ -144,8 +144,8 @@ class InMemorySink(StdoutSink):
             self.container.append(json.loads(content))
 
 
-class StubMetrics(MetricsLogger):
-    def __init__(self, context: MetricsContext, container: list[dict[str, Any]] | None = None):
+class StubMetrics(MitupMetricsLogger):
+    def __init__(self, container: list[dict[str, Any]] | None = None):
         self.metrics_container: list[dict[str, Any]] = [] if container is None else container
         self.sink = InMemorySink(self.metrics_container)
         self._parent_context = None
@@ -155,7 +155,7 @@ class StubMetrics(MetricsLogger):
             env.sink = self.sink
             return env
 
-        super().__init__(build_env, context)
+        super().__init__(build_env)
 
     @override
     def new(self) -> MetricsLogger:
@@ -163,7 +163,7 @@ class StubMetrics(MetricsLogger):
         Creates a new StubMetrics object mainitaining the same in memory sink to be
         able to assert from a single entry point during testing.
         """
-        return StubMetrics(MetricsContext.empty(), self.metrics_container)
+        return StubMetrics(self.metrics_container)
 
     @property
     def parent_context(self) -> MitupContext | None:
@@ -434,7 +434,7 @@ def build_context(
 
 
 def build_metrics() -> StubMetrics:
-    return StubMetrics(MetricsContext.empty())
+    return StubMetrics()
 
 
 async def call_handler(

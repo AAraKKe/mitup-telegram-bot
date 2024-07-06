@@ -228,6 +228,6 @@ def context(app: Application, update: Update) -> MitupContext:
 def configure_test_metrics():
     """Make sure metrics are always configured during test session"""
     configure_metrics(
-        MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT),
+        MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False),
         factory=build_metrics,
     )

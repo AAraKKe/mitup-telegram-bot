@@ -41,7 +41,7 @@ async def join_meetup(session: Session, update: Update, context: TMitupContext):
             if not user.joined_meeting(data.id):
                 meeting.joined_links.append(JoinedUsers(user=user, meetup=meeting))
                 session.add(meeting)
-                await context.emit_feature_metric(Feature.JOIN_MEETING)
+                context.put_feature_metric(Feature.JOIN_MEETING)
 
             session.flush()
             session.refresh(meeting)
@@ -70,7 +70,7 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
             # Only leave if the user is already joined
             if joined_link := user.joined_meeting(data.id):
                 session.delete(joined_link)
-                await context.emit_feature_metric(Feature.LEAVE_MEETING)
+                context.put_feature_metric(Feature.LEAVE_MEETING)
 
             session.flush()
             session.refresh(meeting)
