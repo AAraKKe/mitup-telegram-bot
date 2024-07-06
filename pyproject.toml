@@ -153,8 +153,6 @@ dependencies = [
     "sourcery-nightly",
     "mkdocs",
     "mkdocs-material",
-    "pre-commit",
-    "conventional-commits-check",
 ]
 
 [tool.hatch.envs.dev.scripts]
