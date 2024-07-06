@@ -20,6 +20,12 @@ workflow:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_BRANCH == "release"
 
+.deploy-rules: &deploy-rules
+  changes:
+    - mitup_bot/**/*
+    - dev/Dockerfile
+    - pyproject.toml
+
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
   - |
@@ -159,6 +165,7 @@ config-staging:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      <<: *deploy-rules
 
 config-prod:
   <<: *aws-env-config
@@ -168,6 +175,7 @@ config-prod:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
+      <<: *deploy-rules
 
 build-docs:
   stage: prepare-deployment
@@ -205,6 +213,7 @@ push-bot-tagged-staging:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      <<: *deploy-rules
 
 push-bot-latest-staging:
   extends: push-bot-tagged-staging
@@ -236,6 +245,7 @@ push-bot-tagged-prod:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
+      <<: *deploy-rules
 
 push-bot-latest-prod:
   extends: push-bot-tagged-prod
@@ -280,6 +290,7 @@ deploy-staging:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      <<: *deploy-rules
 
 ## -------------- Deploy prod ---------------
 deploy-production:
@@ -292,6 +303,7 @@ deploy-production:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
+      <<: *deploy-rules
 
 
 ## -------------- Documentation ---------------
