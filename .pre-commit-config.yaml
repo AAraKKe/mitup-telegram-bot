@@ -29,8 +29,3 @@ repos:
     hooks:
       - id: conventional-commits-check
         stages: [commit-msg]
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.370
-    hooks:
-    - id: pyright
-      stages: [pre-push]
