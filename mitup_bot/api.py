@@ -1,16 +1,18 @@
 import logging
 
+from sqlmodel import Session
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
 from telegram.error import BadRequest
-from telegram.ext import CallbackContext
 
 from mitup_bot import guards
 from mitup_bot.exceptions import AnswerInlineQueryError
 from mitup_bot.models import Meetup
+from mitup_bot.monitoring import MetricKey
+from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
 
-async def send_message(context: CallbackContext, update: Update, view: MitupView | str) -> Message | None:
+async def send_message(context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
     chat_id = guards.chat(update).id
 
     if isinstance(view, str):
@@ -23,7 +25,7 @@ async def send_message(context: CallbackContext, update: Update, view: MitupView
     return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
-async def edit_message(context: CallbackContext, update: Update, view: MitupView | str) -> Message | bool:
+async def edit_message(context: TMitupContext, update: Update, view: MitupView | str) -> Message | bool:
     tg_message = guards.message(update)
 
     if isinstance(view, str):
@@ -38,7 +40,7 @@ async def edit_message(context: CallbackContext, update: Update, view: MitupView
     )
 
 
-async def answer_inline_query(context: CallbackContext, update: Update, results: list[MitupInlineView]):
+async def answer_inline_query(context: TMitupContext, update: Update, results: list[MitupInlineView]):
     query = guards.valid_inline_query(update)
     inline_results = [
         InlineQueryResultArticle(
@@ -55,17 +57,13 @@ async def answer_inline_query(context: CallbackContext, update: Update, results:
     raise AnswerInlineQueryError(query.query)
 
 
-async def update_meeting_messages(context: CallbackContext, meeting: Meetup):
+async def update_meeting_messages(session: Session, context: TMitupContext, meeting: Meetup):
     inline_view = meeting.inline_view
     for message in meeting.messages:
-        logging.info(f"Editing message {message.message_id} for meeting {meeting.id}")
-        logging.info(message)
-        logging.info(f"Buttons: {message.buttons}")
-
         try:
             await context.bot.edit_message_text(
-                inline_view.description,
-                message.chat_id,
+                text=inline_view.description,
+                chat_id=message.chat_id,
                 message_id=message.message_id,
                 inline_message_id=message.inline_message_id,
                 reply_markup=MitupView.keyboard_to_markup(message.buttons.keyboard),
@@ -74,5 +72,11 @@ async def update_meeting_messages(context: CallbackContext, meeting: Meetup):
             # Sometimes the message does not need to be updated but we don't know that in advance
             # ignore the error when it happens
             if "Message is not modified" in e.message:
+                continue
+            # If we get an error saying that the message is not found, we should delete the message
+            if "Message_id_invalid" in e.message:
+                logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
+                session.delete(message)
+                context.put_custom_metric(MetricKey.MESSAGE_DELETED)
                 continue
             raise

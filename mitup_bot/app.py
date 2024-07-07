@@ -86,6 +86,7 @@ class MitupRuntime:
         return app
 
     def run(self):
+        logging.info(f"Running Mitup for environment: {self.env}")
         if self.config.app.run_mode is RunModes.POLLING:
             self.app.run_polling()
         else:

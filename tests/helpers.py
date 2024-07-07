@@ -14,7 +14,7 @@ from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.sinks.stdout_sink import StdoutSink
 from aws_embedded_metrics.unit import Unit
 from telegram import Location, Update
-from telegram.ext import Application, CallbackContext
+from telegram.ext import Application
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
@@ -93,12 +93,12 @@ class MockApi:
             yield MockApi(send_message_mock=send_patch, edit_message_mock=edit_patch)
 
     def assert_send_message_called(
-        self, context: mock.MagicMock | CallbackContext, update: Update, view: MitupView | str, times: int = 1
+        self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
     ):
         self.assert_method_called(self.send_message_mock, context, update, view, times)
 
     def assert_edit_message_called(
-        self, context: mock.MagicMock | CallbackContext, update: Update, view: MitupView | str, times: int = 1
+        self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
     ):
         self.assert_method_called(self.edit_message_mock, context, update, view, times)
 
@@ -111,7 +111,7 @@ class MockApi:
     def assert_method_called(
         self,
         method: mock.AsyncMock,
-        context: mock.MagicMock | CallbackContext,
+        context: mock.MagicMock | MitupContext,
         update: Update,
         view: MitupView | str,
         times: int,

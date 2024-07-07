@@ -13,7 +13,6 @@ from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     BaseHandler,
-    CallbackContext,
     CallbackQueryHandler,
     CommandHandler,
     ConversationHandler,
@@ -87,7 +86,7 @@ class HandlerWrapper:
         return isinstance(self.handler, ConversationHandler)
 
 
-async def callback_query_fallback(update: Update, context: CallbackContext):
+async def callback_query_fallback(update: Update, context: TMitupContext):
     """Fallback callback query handler. This will be called when no other callback query handler is found."""
     callback_query = guards.callback_query(update)
 
