@@ -236,7 +236,7 @@ def build_inline_message(description: str | None, datetime: datetime | None, loc
         message += f"{Emojis.DESCRIPTION} {description}\n"
     message += f"{Emojis.JOINED} {MeetingMessages.EMPTY.get()}\n"
     if datetime:
-        message += f"{Emojis.CLOCK} 2024\\-01\\-12 13:30 \\(Europe/Madrid\\)"
+        message += f"{Emojis.CLOCK} 2024-01-12 13:30 (Europe/Madrid)"
         if location.name:
             message += f" {Emojis.PIN} {location.name}"
     elif location.name:

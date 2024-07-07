@@ -190,7 +190,8 @@ class Meetup(SQLModel, table=True):
 
         result.append(time_location.strip())
 
-        return sanitize("\n".join(result), full=True)
+        # No need to sanitize as this is the message shown in the inline result and markdown is not supported
+        return "\n".join(result)
 
     @property
     def main_view(self) -> MitupView:
