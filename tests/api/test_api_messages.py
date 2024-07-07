@@ -24,7 +24,7 @@ async def test_edit_message_without_effective_message():
     update.effective_message = None
 
     with pytest.raises(RuntimeError):
-        await edit_message(context, update, message)
+        await edit_message(context=context, update=update, view=message)
 
 
 async def test_send_message_with_a_view(default_view: MitupView):
@@ -33,7 +33,7 @@ async def test_send_message_with_a_view(default_view: MitupView):
 
     update.effective_chat.id = 123456789
 
-    await send_message(context, update, default_view)
+    await send_message(context=context, update=update, view=default_view)
 
     context.bot.send_message.assert_called_once_with(
         chat_id=123456789, text=default_view.description, reply_markup=default_view.markup
@@ -46,7 +46,7 @@ async def test_send_message_without_view():
 
     update.effective_chat.id = 123456789
 
-    await send_message(context, update, "Hello, World")
+    await send_message(context=context, update=update, view="Hello, World")
 
     context.bot.send_message.assert_called_once_with(chat_id=123456789, text="Hello, World", reply_markup=None)
 
@@ -54,7 +54,7 @@ async def test_send_message_without_view():
 async def test_edit_message_with_a_view(default_view: MitupView, update: Update, context: StubMitupContext):
     assert update.effective_message is not None
 
-    await edit_message(cast(TMitupContext, context), update, default_view)
+    await edit_message(context=cast(TMitupContext, context), update=update, view=default_view)
 
     context.bot.edit_message_text.assert_called_once_with(
         default_view.description, 123, message_id=123, reply_markup=default_view.markup
@@ -62,7 +62,7 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
 
 
 async def test_edit_message_without_view(update: Update, context: StubMitupContext):
-    await edit_message(cast(TMitupContext, context), update, "Hello, World")
+    await edit_message(context=cast(TMitupContext, context), update=update, view="Hello, World")
 
     context.bot.edit_message_text.assert_called_once_with("Hello, World", 123, message_id=123, reply_markup=None)
 
@@ -72,7 +72,7 @@ async def test_edit_message_fails_without_effective_message(
     default_view: MitupView, update: Update, context: StubMitupContext
 ):
     with pytest.raises(EffectiveMessageNotSet):
-        await edit_message(cast(TMitupContext, context), update, default_view)
+        await edit_message(context=cast(TMitupContext, context), update=update, view=default_view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
@@ -80,7 +80,7 @@ async def test_send_message_fails_without_effective_chat(
     default_view: MitupView, update: Update, context: StubMitupContext
 ):
     with pytest.raises(EffectiveChatNotSet):
-        await send_message(cast(TMitupContext, context), update, default_view)
+        await send_message(context=cast(TMitupContext, context), update=update, view=default_view)
 
 
 async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession):
@@ -95,7 +95,7 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
     # Message in the chat of someone who is not the owner
     meeting.messages.append(Message(id=456, message_id=123, chat_id=234, buttons=buttons))
 
-    await update_meeting_messages(mock_session, cast(TMitupContext, context), meeting)
+    await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
 
     edit: mock.MagicMock = context.bot.edit_message_text
     expected_call_params = {
@@ -152,7 +152,7 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 
     edit.side_effect = raise_error
 
-    await update_meeting_messages(mock_session, cast(TMitupContext, context), meeting)
+    await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
     # Since this is outside a callback, make sure we flush metrics
     await context.flush_metrics()
 
@@ -181,6 +181,6 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
 
     edit.side_effect = raise_error
 
-    await update_meeting_messages(mock_session, cast(TMitupContext, context), meeting)
+    await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
 
     assert edit.call_count == 2

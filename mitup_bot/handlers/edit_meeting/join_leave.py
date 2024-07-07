@@ -46,7 +46,7 @@ async def join_meetup(session: Session, update: Update, context: TMitupContext):
             session.flush()
             session.refresh(meeting)
             # Edit now all messages where the meeting has been shared
-            await update_meeting_messages(session, context, meeting)
+            await update_meeting_messages(session=session, context=context, meeting=meeting)
     except UserNotFound:
         join_non_registered_user(session, update, context)
 
@@ -74,7 +74,9 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
             session.flush()
             session.refresh(meeting)
             # Edit now all messages where the meeting has been shared
-            await update_meeting_messages(session, context, meeting, current_message=current_message)
+            await update_meeting_messages(
+                session=session, context=context, meeting=meeting, current_message=current_message
+            )
     except UserNotFound:
         leave_non_registered_user(session, update, context)
 

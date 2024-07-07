@@ -13,7 +13,7 @@ from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
 
-async def send_message(context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
+async def send_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
     chat_id = guards.chat(update).id
 
     if isinstance(view, str):
@@ -26,7 +26,7 @@ async def send_message(context: TMitupContext, update: Update, view: MitupView |
     return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
-async def edit_message(context: TMitupContext, update: Update, view: MitupView | str) -> Message | bool:
+async def edit_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | bool:
     tg_message = guards.message(update)
 
     if isinstance(view, str):
@@ -89,10 +89,26 @@ async def update_single_meeting_message(
 
 
 async def update_meeting_messages(
-    session: Session, context: TMitupContext, meeting: Meetup, current_message: MessageModel | None = None
+    *,
+    session: Session,
+    context: TMitupContext,
+    meeting: Meetup,
+    current_message: MessageModel | None = None,
+    skip_current=False,
 ):
+    """
+    Updates meeting messages with the current meeting view.
+
+    Args:
+        session: The database session.
+        context: The update context.
+        meeting: The Meetup object.
+        current_message: The current message model, if any. If provided, it will be edited before any other message.
+        skip_current: If set to True, the current message will be skipped. This is needed if the current message
+                      is being updated in a different way.
+    """
     # First lets update the current message for a better user experience
-    if current_message:
+    if current_message and not skip_current:
         await update_single_meeting_message(current_message, session, context, meeting)
     for message in meeting.messages:
         if message == current_message:

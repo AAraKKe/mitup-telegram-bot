@@ -29,7 +29,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
 
     view = views.factory.change_settings_element_view(message)
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     return ConversationSettingsState.TIMEZONE
 
@@ -56,7 +56,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
                 ]
             ],
         )
-        await api.send_message(context, update, view)
+        await api.send_message(context=context, update=update, view=view)
 
         return ConversationSettingsState.TIMEZONE
 
@@ -67,7 +67,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
     message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.settings_view(message)
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     return ConversationHandler.END
 
@@ -96,7 +96,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
                 ]
             ],
         )
-        await api.send_message(context, update, view)
+        await api.send_message(context=context, update=update, view=view)
 
         return ConversationSettingsState.TIMEZONE
 
@@ -107,7 +107,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
     message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.settings_view(message)
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     return ConversationHandler.END
 

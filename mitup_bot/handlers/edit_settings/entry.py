@@ -17,7 +17,7 @@ async def callback_query_settings(update: Update, context: MitupContext):
 
     view = views.factory.settings_view()
 
-    await api.edit_message(context, update, view)
+    await api.edit_message(context=context, update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -28,6 +28,6 @@ async def callback_query_cancel_settings(update: Update, context: MitupContext):
 
     view = views.factory.settings_view()
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     return ConversationHandler.END

@@ -20,9 +20,10 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import ContextId, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.models.meetups import Meetup
+from mitup_bot.models.meetups import Meetup, Message
 from mitup_bot.monitoring import Feature, MetricKey, MitupMetricsLogger
 from mitup_bot.views import MitupView
+from tests.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 StubMitupContext = MitupContext[mock.MagicMock, "StubMetrics"]
 """MitupContext type for testing purposes"""
@@ -83,6 +84,7 @@ class MockApi:
 
     send_message_mock: mock.AsyncMock
     edit_message_mock: mock.AsyncMock
+    update_meeting_messages_mock: mock.AsyncMock
 
     @classmethod
     @contextmanager
@@ -90,8 +92,13 @@ class MockApi:
         with (
             mock.patch(f"{module_path}.api.edit_message") as edit_patch,
             mock.patch(f"{module_path}.api.send_message") as send_patch,
+            mock.patch(f"{module_path}.api.update_meeting_messages") as update_meeting_messages_patch,
         ):
-            yield MockApi(send_message_mock=send_patch, edit_message_mock=edit_patch)
+            yield MockApi(
+                send_message_mock=send_patch,
+                edit_message_mock=edit_patch,
+                update_meeting_messages_mock=update_meeting_messages_patch,
+            )
 
     def assert_send_message_called(
         self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
@@ -102,6 +109,37 @@ class MockApi:
         self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
     ):
         self.assert_method_called(self.edit_message_mock, context, update, view, times)
+
+    def assert_update_meeting_messages_called(
+        self,
+        session: MockDbSession,
+        context: mock.MagicMock | MitupContext,
+        meeting: Meetup,
+        current_message: Message | None,
+        skip_current: bool,
+        times: int = 1,
+    ):
+        if times == 1:
+            self.update_meeting_messages_mock.assert_awaited_once_with(
+                session=session,
+                context=context,
+                meeting=meeting,
+                current_message=current_message,
+                skip_current=skip_current,
+            )
+        else:
+            call_count = self.update_meeting_messages_mock.call_count
+            assert call_count == times, f"Expected {times} call but found {call_count}"
+            expected_call = mock.call(
+                session=session,
+                context=context,
+                meeting=meeting,
+                current_message=current_message,
+                skip_current=skip_current,
+            )
+            assert any(
+                expected_call == call for call in self.update_meeting_messages_mock.await_args_list
+            ), f"Expected call {expected_call} not found in method"
 
     def assert_send_message_not_called(self):
         self.send_message_mock.assert_not_called()
@@ -122,12 +160,12 @@ class MockApi:
         assert update.effective_message is not None
 
         if times == 1:
-            method.assert_awaited_once_with(context, update, view)
+            method.assert_awaited_once_with(context=context, update=update, view=view)
         else:
             # If more than one time we need to assert that we have called it the amount of times requested
             # and at least one of them with the appropriate arguments
             assert len(method.call_args_list) == times, f"Expected {times} call but found {len(method.call_args_list)}"
-            expected_call = mock.call(context, update, view)
+            expected_call = mock.call(context=context, update=update, view=view)
             assert any(
                 expected_call == call for call in method.await_args_list
             ), f"Expected call {expected_call} not found in method"

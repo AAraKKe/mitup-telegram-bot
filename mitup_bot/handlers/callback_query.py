@@ -38,7 +38,7 @@ async def callback_query_create_meeting(update: Update, context: MitupContext):
 
     view = views.factory.create_meeting_view()
 
-    await api.edit_message(context, update, view)
+    await api.edit_message(context=context, update=update, view=view)
 
     return ConversationMeetingState.TITLE
 
@@ -71,7 +71,7 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
     if meeting is None:
         return
 
-    await api.edit_message(context, update, meeting.main_view)
+    await api.edit_message(context=context, update=update, view=meeting.main_view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -94,7 +94,7 @@ async def callback_query_main_menu(update: Update, context: MitupContext):
 
     view = views.factory.main_menu_view()
 
-    await api.edit_message(context, update, view)
+    await api.edit_message(context=context, update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -132,7 +132,7 @@ async def callback_query_show_meetings(session: Session, update: Update, context
             )
         )
 
-    await api.edit_message(context, update, view)
+    await api.edit_message(context=context, update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -158,9 +158,9 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
         return
 
     await api.send_message(
-        context,
-        update,
-        MitupView(
+        context=context,
+        update=update,
+        view=MitupView(
             description=MeetingMessages.DELETE_MEETING.get(),
             keyboard=[
                 [
@@ -216,7 +216,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
             ]
         ],
     )
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -244,5 +244,7 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
         return
 
     await api.edit_message(
-        context, update, meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get())
+        context=context,
+        update=update,
+        view=meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get()),
     )

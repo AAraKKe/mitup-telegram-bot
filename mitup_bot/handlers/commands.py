@@ -25,7 +25,7 @@ class CommandsId(CallbackId):
 async def command_start_with_existing_user(update: Update, context: MitupContext):
     view = views.factory.main_menu_view()
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
 
 @HandlersRegistry.register_command(CommandsId.MAIN_MENU, command="main_menu")

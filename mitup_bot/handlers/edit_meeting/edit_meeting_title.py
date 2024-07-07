@@ -44,9 +44,9 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
 
     await api.edit_message(
-        context,
-        update,
-        MitupView(
+        context=context,
+        update=update,
+        view=MitupView(
             description=MeetingMessages.EDIT_MEETING_TITLE.get(title=meeting.title),
             keyboard=[
                 [
@@ -77,7 +77,7 @@ async def edit_title_meeting_message_handler(session: Session, update: Update, c
         session.flush()
 
         view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=meeting.title))
-        await api.send_message(context, update, view)
+        await api.send_message(context=context, update=update, view=view)
 
         return ConversationHandler.END
 

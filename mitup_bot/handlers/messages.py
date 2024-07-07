@@ -36,7 +36,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
         message = MeetingMessages.CREATED_SUCCESS.get(title=meetup.title)
         view = meetup.edit_view.with_context(message)
 
-        await api.send_message(context, update, view)
+        await api.send_message(context=context, update=update, view=view)
 
         context.put_feature_metric(Feature.CREATE_MEETING)
 
@@ -49,6 +49,6 @@ async def filter_messages_without_text(update: Update, context: MitupContext):
 
     view = factory.main_menu_view()
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     return ConversationHandler.END

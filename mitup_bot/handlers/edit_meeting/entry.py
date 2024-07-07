@@ -43,7 +43,7 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
         return
 
     # Only allow editing the meeting if the meeting belongs to the user
-    await api.edit_message(context, update, meeting.edit_view)
+    await api.edit_message(context=context, update=update, view=meeting.edit_view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -62,14 +62,14 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
         # Cleanup, log error and end possible conversation
         cleanup_states(context)
         logging.error(exc)
-        await api.edit_message(context, update, factory.main_menu_view())
+        await api.edit_message(context=context, update=update, view=factory.main_menu_view())
         return ConversationHandler.END
 
     logging.info(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
 
     meetup = Meetup.by_id(session, meeting_id, must_exist=True)
 
-    await api.edit_message(context, update, meetup.edit_view)
+    await api.edit_message(context=context, update=update, view=meetup.edit_view)
 
     # Cleanup any possible state set by any handler related with editing the meeting
     cleanup_states(context)

@@ -113,7 +113,7 @@ async def user_owns_meeting(
         )
         logging.warning(message)
         context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
-        await api.edit_message(context, update, factory.main_menu_view())
+        await api.edit_message(context=context, update=update, view=factory.main_menu_view())
     return None
 
 
@@ -135,9 +135,9 @@ async def meeting_accessible(
     logging.warning(message)
 
     await api.edit_message(
-        context,
-        update,
-        MitupView(
+        context=context,
+        update=update,
+        view=MitupView(
             description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(),
             keyboard=custom_keyboard
             or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],

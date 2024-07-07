@@ -43,7 +43,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
     session.add(user)
     message = SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=user.first_name)
 
-    await api.send_message(context, update, message)
+    await api.send_message(context=context, update=update, view=message)
 
     context.put_feature_metric(Feature.NEW_LANDING)
     return ConversationRegistrationProcessState.TIMEZONE
@@ -63,7 +63,9 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     if (new_timezone := timezone_api.get_timezone_by_address(address)) is None:
         logging.warning(f"The user {user.id} tried to set a timezone {address} that is not correct. Trying again")
 
-        await api.send_message(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
+        await api.send_message(
+            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get()
+        )
 
         context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
         return ConversationRegistrationProcessState.TIMEZONE
@@ -77,7 +79,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.main_menu_view().with_context(message)
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     context.put_feature_metric(Feature.NEW_USER_REGISTERED)
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=0)
@@ -98,7 +100,9 @@ async def registration_timezone_location_message_handler(session: Session, updat
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude)) is None:
         logging.warning(f"The user {user.id} tried to set a location {location} that is not correct. Trying again")
 
-        await api.send_message(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
+        await api.send_message(
+            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get()
+        )
 
         context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=1)
         return ConversationRegistrationProcessState.TIMEZONE
@@ -111,7 +115,7 @@ async def registration_timezone_location_message_handler(session: Session, updat
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.main_menu_view().with_context(message)
 
-    await api.send_message(context, update, view)
+    await api.send_message(context=context, update=update, view=view)
 
     context.put_feature_metric(Feature.NEW_USER_REGISTERED)
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=0)

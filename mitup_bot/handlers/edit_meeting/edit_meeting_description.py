@@ -46,9 +46,9 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, callback_data.id)
 
     await api.edit_message(
-        context,
-        update,
-        MitupView(
+        context=context,
+        update=update,
+        view=MitupView(
             MeetingMessages.EDIT_MEETING_DESCRIPTION.get(description=meeting.description)
             if meeting.description
             else MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
@@ -85,7 +85,7 @@ async def edit_description_meeting_message_handler(session: Session, update: Upd
         view = meeting.edit_view.with_context(
             MeetingMessages.DESCRIPTION_SET_SUCCESS.get(description=meeting.description)
         )
-        await api.send_message(context, update, view)
+        await api.send_message(context=context, update=update, view=view)
 
         return ConversationHandler.END
 
