@@ -176,6 +176,7 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
         MeetingMessages.LOCATION_NAME_SET_SUCCESS.get(name=meeting.location.name)
     )
     await api.send_message(context=context, update=update, view=response_view)
+    await api.update_meeting_messages(session=session, context=context, meeting=meeting)
 
     return ConversationHandler.END
 
@@ -203,6 +204,7 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
 
     response_view = edit_location_view(meeting).with_context(MeetingMessages.LOCATION_COORDINATES_SUCCESS.get())
     await api.send_message(context=context, update=update, view=response_view)
+    await api.update_meeting_messages(session=session, context=context, meeting=meeting)
 
     return ConversationHandler.END
 

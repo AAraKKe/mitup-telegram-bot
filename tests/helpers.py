@@ -31,6 +31,9 @@ StubMitupContext = MitupContext[mock.MagicMock, "StubMetrics"]
 StubMitupApp = Application[mock.MagicMock, StubMitupContext, MitupUserData, dict, dict, None]
 """Application type for testing purposes"""
 
+DEFAULT_CURRENT_MESSAGE = Message(id=99999, inline_message_id="default_current_message")
+"""Used as default value for update_meeting_messages_mock assertions because it is possible that the message is None"""
+
 
 class AnyFloat(float):
     """Use this in assertions for metrics where the value is not important"""
@@ -115,28 +118,26 @@ class MockApi:
         session: MockDbSession,
         context: mock.MagicMock | MitupContext,
         meeting: Meetup,
-        current_message: Message | None,
-        skip_current: bool,
+        current_message: Message | None = DEFAULT_CURRENT_MESSAGE,
+        skip_current: bool = False,
         times: int = 1,
     ):
+        arguments = {
+            "session": session,
+            "context": context,
+            "meeting": meeting,
+        }
+        if current_message != DEFAULT_CURRENT_MESSAGE:
+            arguments["current_message"] = current_message
+        if skip_current:
+            arguments["skip_current"] = skip_current
+
         if times == 1:
-            self.update_meeting_messages_mock.assert_awaited_once_with(
-                session=session,
-                context=context,
-                meeting=meeting,
-                current_message=current_message,
-                skip_current=skip_current,
-            )
+            self.update_meeting_messages_mock.assert_awaited_once_with(**arguments)
         else:
             call_count = self.update_meeting_messages_mock.call_count
             assert call_count == times, f"Expected {times} call but found {call_count}"
-            expected_call = mock.call(
-                session=session,
-                context=context,
-                meeting=meeting,
-                current_message=current_message,
-                skip_current=skip_current,
-            )
+            expected_call = mock.call(**arguments)
             assert any(
                 expected_call == call for call in self.update_meeting_messages_mock.await_args_list
             ), f"Expected call {expected_call} not found in method"

@@ -158,6 +158,7 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
     )
 
     await api.send_message(context=context, update=update, view=response_view)
+    await api.update_meeting_messages(session=session, context=context, meeting=meeting)
 
     return ConversationHandler.END
 

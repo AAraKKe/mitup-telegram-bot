@@ -5,10 +5,11 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent, Message,
 from telegram.error import BadRequest
 
 from mitup_bot import guards
-from mitup_bot.exceptions import AnswerInlineQueryError
+from mitup_bot.exceptions import AnswerInlineQueryError, NoMessageAvailable
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
@@ -27,8 +28,6 @@ async def send_message(*, context: TMitupContext, update: Update, view: MitupVie
 
 
 async def edit_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | bool:
-    tg_message = guards.message(update)
-
     if isinstance(view, str):
         message = view
         reply_markup = None
@@ -36,8 +35,25 @@ async def edit_message(*, context: TMitupContext, update: Update, view: MitupVie
         message = view.description
         reply_markup = view.markup
 
+    chat_id = None
+    message_id = None
+    inline_message_id = None
+
+    if update.effective_message:
+        chat_id = update.effective_message.chat.id
+        message_id = update.effective_message.id
+    else:
+        if update.callback_query and update.callback_query.inline_message_id:
+            inline_message_id = update.callback_query.inline_message_id
+        else:
+            raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
+
     return await context.bot.edit_message_text(
-        message, tg_message.chat.id, message_id=tg_message.id, reply_markup=reply_markup
+        text=message,
+        chat_id=chat_id,
+        message_id=message_id,
+        inline_message_id=inline_message_id,
+        reply_markup=reply_markup,
     )
 
 
@@ -59,20 +75,26 @@ async def answer_inline_query(context: TMitupContext, update: Update, results: l
 
 
 async def update_single_meeting_message(
-    message: MessageModel, session: Session, context: TMitupContext, meeting: Meetup
+    message: MessageModel,
+    session: Session,
+    context: TMitupContext,
+    meeting: Meetup,
+    was_deleted: bool,
 ):
     view = (
         meeting.inline_view
         if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
         else meeting.main_view
     )
+    text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang) if was_deleted else view.description
+    reply_markup = None if was_deleted else MitupView.keyboard_to_markup(message.buttons.keyboard)
     try:
         await context.bot.edit_message_text(
-            text=view.description,
+            text=text,
             chat_id=message.chat_id,
             message_id=message.message_id,
             inline_message_id=message.inline_message_id,
-            reply_markup=MitupView.keyboard_to_markup(message.buttons.keyboard),
+            reply_markup=reply_markup,
         )
     except BadRequest as e:
         # Sometimes the message does not need to be updated but we don't know that in advance
@@ -95,6 +117,7 @@ async def update_meeting_messages(
     meeting: Meetup,
     current_message: MessageModel | None = None,
     skip_current=False,
+    was_deleted=False,
 ):
     """
     Updates meeting messages with the current meeting view.
@@ -109,36 +132,8 @@ async def update_meeting_messages(
     """
     # First lets update the current message for a better user experience
     if current_message and not skip_current:
-        await update_single_meeting_message(current_message, session, context, meeting)
+        await update_single_meeting_message(current_message, session, context, meeting, was_deleted)
     for message in meeting.messages:
         if message == current_message:
             continue
-
-        # If the message is an inline message, we should update the inline view
-        # otherwise the message is from a chat. When the chat id is the same as the owher telegram
-        # id, it means we can show everything.
-        view = (
-            meeting.inline_view
-            if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
-            else meeting.main_view
-        )
-        try:
-            await context.bot.edit_message_text(
-                text=view.description,
-                chat_id=message.chat_id,
-                message_id=message.message_id,
-                inline_message_id=message.inline_message_id,
-                reply_markup=MitupView.keyboard_to_markup(message.buttons.keyboard),
-            )
-        except BadRequest as e:
-            # Sometimes the message does not need to be updated but we don't know that in advance
-            # ignore the error when it happens
-            if "Message is not modified" in e.message:
-                continue
-            # If we get an error saying that the message is not found, we should delete the message
-            if "Message_id_invalid" in e.message:
-                logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
-                session.delete(message)
-                context.put_custom_metric(MetricKey.MESSAGE_DELETED)
-                continue
-            raise
+        await update_single_meeting_message(message, session, context, meeting, was_deleted)

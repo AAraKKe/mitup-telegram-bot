@@ -7,7 +7,7 @@ from telegram import InlineKeyboardMarkup, Update
 from telegram.error import BadRequest
 
 from mitup_bot.api import edit_message, send_message, update_meeting_messages
-from mitup_bot.exceptions import EffectiveChatNotSet, EffectiveMessageNotSet
+from mitup_bot.exceptions import EffectiveChatNotSet, NoMessageAvailable
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.types import TMitupContext
@@ -16,14 +16,27 @@ from tests.helpers import StubMitupContext, UpdateRequest
 from tests.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 
-async def test_edit_message_without_effective_message():
+async def test_edit_message_without_message_available():
     context = mock.AsyncMock()
     update = mock.MagicMock()
 
     message = "Hello, World"
     update.effective_message = None
+    update.callback_query = None
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(NoMessageAvailable):
+        await edit_message(context=context, update=update, view=message)
+
+
+async def test_edit_message_without_inline_message_id():
+    context = mock.AsyncMock()
+    update = mock.MagicMock()
+
+    message = "Hello, World"
+    update.effective_message = None
+    update.callback_query.inline_message_id = None
+
+    with pytest.raises(NoMessageAvailable):
         await edit_message(context=context, update=update, view=message)
 
 
@@ -57,22 +70,20 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
     await edit_message(context=cast(TMitupContext, context), update=update, view=default_view)
 
     context.bot.edit_message_text.assert_called_once_with(
-        default_view.description, 123, message_id=123, reply_markup=default_view.markup
+        text=default_view.description,
+        chat_id=123,
+        message_id=123,
+        inline_message_id=None,
+        reply_markup=default_view.markup,
     )
 
 
 async def test_edit_message_without_view(update: Update, context: StubMitupContext):
     await edit_message(context=cast(TMitupContext, context), update=update, view="Hello, World")
 
-    context.bot.edit_message_text.assert_called_once_with("Hello, World", 123, message_id=123, reply_markup=None)
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
-async def test_edit_message_fails_without_effective_message(
-    default_view: MitupView, update: Update, context: StubMitupContext
-):
-    with pytest.raises(EffectiveMessageNotSet):
-        await edit_message(context=cast(TMitupContext, context), update=update, view=default_view)
+    context.bot.edit_message_text.assert_called_once_with(
+        text="Hello, World", chat_id=123, message_id=123, inline_message_id=None, reply_markup=None
+    )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)

@@ -4,12 +4,13 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.api import update_meeting_messages
+from mitup_bot.api import edit_message, update_meeting_messages
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import JoinedUsers, Meetup, Message
 from mitup_bot.monitoring import Feature
+from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.types import TMitupContext
 
@@ -47,6 +48,9 @@ async def join_meetup(session: Session, update: Update, context: TMitupContext):
             session.refresh(meeting)
             # Edit now all messages where the meeting has been shared
             await update_meeting_messages(session=session, context=context, meeting=meeting)
+        else:
+            # The meeting was not found, update the message to inform the user
+            await edit_message(context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get())
     except UserNotFound:
         join_non_registered_user(session, update, context)
 
@@ -77,6 +81,9 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
             await update_meeting_messages(
                 session=session, context=context, meeting=meeting, current_message=current_message
             )
+        else:
+            # The meeting was not found, update the message to inform the user
+            await edit_message(context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get())
     except UserNotFound:
         leave_non_registered_user(session, update, context)
 

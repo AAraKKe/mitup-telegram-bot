@@ -193,6 +193,7 @@ class MeetingMessages(MessageBase):
         f"I am sure I can work with that {Emojis.BRAIN}."
     )
     DATE_TIME_DELETED = "The date and time of the meeting have been deleted successfully"
+    MEETING_HAS_BEEN_DELETED = f"{Emojis.PROHIB} This meeting has been deleted {Emojis.PROHIB}"
 
     # Show meeting list
     # TODO: this needs to be moved to a separate set of messages as it is not part of the meeting creation/editing

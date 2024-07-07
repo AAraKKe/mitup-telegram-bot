@@ -165,7 +165,7 @@ async def test_set_meeting_date_callback(
         update,
         expected_view,
     )
-    api.assert_update_meeting_messages_called(mock_session, context, meeting, None, skip_current=True)
+    api.assert_update_meeting_messages_called(mock_session, context, meeting, None, True)
 
 
 @pytest.mark.parametrize(
@@ -339,6 +339,7 @@ async def test_set_time_message_with_valid_time(
         update,
         meeting.edit_view.with_context(MeetingMessages.EDIT_TIME_SUCCESS.get(datetime=expected_time_displayed)),
     )
+    api.assert_update_meeting_messages_called(mock_session, context, meeting)
 
 
 @pytest.mark.parametrize(

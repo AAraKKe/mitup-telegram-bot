@@ -78,6 +78,7 @@ async def edit_title_meeting_message_handler(session: Session, update: Update, c
 
         view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=meeting.title))
         await api.send_message(context=context, update=update, view=view)
+        await api.update_meeting_messages(session=session, context=context, meeting=meeting)
 
         return ConversationHandler.END
 

@@ -203,6 +203,9 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
     if meeting is None:
         return
 
+    # Update messages before deleting the meeting and all its messages
+    await api.update_meeting_messages(session=session, context=context, meeting=meeting, was_deleted=True)
+
     session.delete(meeting)
 
     view = MitupView(
