@@ -1,7 +1,7 @@
 import logging
 
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
-from telegram.error import BadRequest, TelegramError
+from telegram.error import BadRequest
 from telegram.ext import CallbackContext
 
 from mitup_bot import guards
@@ -20,10 +20,7 @@ async def send_message(context: CallbackContext, update: Update, view: MitupView
         message = view.description
         reply_markup = view.markup
 
-    try:
-        return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
-    except TelegramError:
-        return None
+    return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
 async def edit_message(context: CallbackContext, update: Update, view: MitupView | str) -> Message | bool:
@@ -36,12 +33,9 @@ async def edit_message(context: CallbackContext, update: Update, view: MitupView
         message = view.description
         reply_markup = view.markup
 
-    try:
-        return await context.bot.edit_message_text(
-            message, tg_message.chat.id, message_id=tg_message.id, reply_markup=reply_markup
-        )
-    except TelegramError:
-        return False
+    return await context.bot.edit_message_text(
+        message, tg_message.chat.id, message_id=tg_message.id, reply_markup=reply_markup
+    )
 
 
 async def answer_inline_query(context: CallbackContext, update: Update, results: list[MitupInlineView]):
@@ -50,6 +44,7 @@ async def answer_inline_query(context: CallbackContext, update: Update, results:
         InlineQueryResultArticle(
             id=view.id,
             title=view.title,
+            description=view.inline_description,
             input_message_content=InputTextMessageContent(message_text=view.description),
             reply_markup=view.markup,
         )

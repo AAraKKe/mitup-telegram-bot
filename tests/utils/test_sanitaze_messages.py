@@ -1,9 +1,9 @@
-from mitup_bot.utils.messages import MessageBase, _sanitize
+from mitup_bot.utils.messages import MessageBase, sanitize
 
 
 def test_sanitIze():
-    message_point = _sanitize("Hello, World.")
-    message_exclamation = _sanitize("Hello, World!")
+    message_point = sanitize("Hello, World.")
+    message_exclamation = sanitize("Hello, World!")
 
     assert message_point == "Hello, World\\."
     assert message_exclamation == "Hello, World\\!"

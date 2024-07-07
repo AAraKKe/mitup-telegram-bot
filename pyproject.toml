@@ -171,7 +171,6 @@ validate = [
     "- test",
 ]
 setup-vscode = "python bin/setup_vscode.py"
-"setup-local" = ""
 migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -2"
 launch = "python -m mitup_bot.cli.run launch"

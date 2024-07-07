@@ -1,5 +1,5 @@
 import datetime as dt
-import logging
+from string import Template
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
@@ -11,6 +11,7 @@ from telegram import Update
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import sanitize
 from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
 
@@ -77,15 +78,28 @@ class Meetup(SQLModel, table=True):
         return len([link for link in self.joined_links if not link.is_waiting_list]) >= self.max_members
 
     def has_message(self, update: Update) -> bool:
-        logging.info("------- HAS MESSAGE -------")
         if eff_message := update.effective_message:
-            logging.info(f"Checking message {eff_message.message_id!r} in {self.messages}")
             return any(message.message_id == eff_message.message_id for message in self.messages)
         if update.callback_query and update.callback_query.inline_message_id:
             return any(
                 message.inline_message_id == update.callback_query.inline_message_id for message in self.messages
             )
         return False
+
+    @property
+    def short_description(self) -> str | None:
+        if self.description is None:
+            return
+        if len(self.description) <= 30:
+            return self.description
+
+        is_word_cuttoff = self.description[30] != " " and self.description[29] != " "
+        if is_word_cuttoff:
+            cut_description = self.description[:30].split(" ")[:-1]
+            return f"{" ".join(cut_description)} ..."
+
+        cut_description = " ".join(self.description[:30].rstrip().split(" "))
+        return f"{cut_description} ..."
 
     @property
     def timezone(self) -> ZoneInfo:
@@ -102,6 +116,20 @@ class Meetup(SQLModel, table=True):
         return MeetingMessages.DATE_NOT_SET.get()
 
     @property
+    def participants_badge(self) -> str:
+        empty = MeetingMessages.EMPTY.get(lang=self.lang)
+        joined_count = len(self.joined_links)
+        no_limit = f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language)})"
+
+        if self.max_members is None:
+            return empty if joined_count == 0 else f"{len(self.joined_links)} {no_limit}"
+
+        empty_with_max = (
+            f"{empty} {MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)}"
+        )
+        return empty_with_max if joined_count == 0 else f"({joined_count}/{self.max_members})"
+
+    @property
     def participants_text(self) -> str:
         if len(self.joined_links) == 0:
             total_participants = MeetingMessages.EMPTY.get(lang=self.lang)
@@ -113,25 +141,56 @@ class Meetup(SQLModel, table=True):
         max_participants = (
             MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
             if self.max_members
-            else ""
+            else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)})"
         )
 
         participant_list = [link.user.inline_name for link in self.joined_links]
-        participants_message = f"\n{"\n\t".join(participant_list)}" if participant_list else ""
+        participants_message = f"\n\t{"\n\t".join(participant_list)}" if participant_list else ""
 
-        return f"{total_participants} {max_participants}{participants_message}"
+        return f"{total_participants} {max_participants}{participants_message}".strip()
 
     @property
     def message(self) -> str:
-        return MeetingMessages.FEATURES.get(
-            title=self.title,
-            lang=self.lang,
-            owner=self.owner.username or self.owner.first_name,
-            description=self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang),
-            datetime=self.str_datetime,
-            location=str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(lang=self.lang),
-            participants=self.participants_text,
+        template = Template(
+            f"*$title* \\({MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)}\\)\n\n"
+            f"--- {Emojis.DESCRIPTION} $description\n"
+            f"--- {Emojis.CLOCK} $datetime\n"
+            f"--- {Emojis.MAP} $location\n"
+            f"--- {Emojis.JOINED} $participants\n"
         )
+
+        return sanitize(
+            template.substitute(
+                title=sanitize(self.title or "", full=True),
+                description=sanitize(
+                    self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang), full=True
+                ),
+                datetime=sanitize(self.str_datetime, full=True),
+                location=sanitize(
+                    str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(lang=self.lang), full=True
+                ),
+                participants=sanitize(self.participants_text, full=True),
+            )
+        )
+
+    @property
+    def inline_message(self) -> str:
+        result: list[str] = []
+
+        if self.description:
+            result.append(f"{Emojis.DESCRIPTION} {self.short_description}")
+
+        result.append(f"{Emojis.JOINED} {self.participants_badge}")
+
+        time_location = ""
+        if self.datetime:
+            time_location += f"{Emojis.CLOCK} {self.str_datetime}"
+        if self.location.name:
+            time_location += f" {Emojis.PIN} {str(self.location.name)}"
+
+        result.append(time_location.strip())
+
+        return sanitize("\n".join(result), full=True)
 
     @property
     def main_view(self) -> MitupView:
@@ -270,10 +329,11 @@ class Meetup(SQLModel, table=True):
     @property
     def inline_view(self) -> MitupInlineView:
         return MitupInlineView(
-            self.message,
-            self.build_inline_keyboard(),
+            description=self.message,
+            keyboard=self.build_inline_keyboard(),
             id=str(self.id),
             title=str(self.title),
+            inline_description=self.inline_message,
         )
 
     def build_inline_keyboard(self) -> Keyboard:

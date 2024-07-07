@@ -67,6 +67,7 @@ class MitupInlineView(MitupView):
     """MitupView that represent an inline view with a title and an id."""
 
     title: str
+    inline_description: str
     id: str
 
 

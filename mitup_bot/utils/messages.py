@@ -14,19 +14,20 @@ USER_INPUT_CHARACTERS_TO_SCAPE = CHARACTERS_TO_SCAPE + ["*", "_", "[", "]", "(",
 MessageParams = str | int | float | None
 
 
-def _sanitize(message: str, full=False) -> str:
+def sanitize(message: str, full=False) -> str:
     to_scape = USER_INPUT_CHARACTERS_TO_SCAPE if full else CHARACTERS_TO_SCAPE
     for character in to_scape:
         message = message.replace(character, f"\\{character}")
-    return message
+    # Clean up double scapes if any
+    return message.replace("\\\\", "\\")
 
 
 class MessageBase(StrEnum):
     def get(self, full: bool = True, lang: str = "en", **kwargs: MessageParams) -> str:
         for key, value in kwargs.items():
             assert value is not None, "Message parameter cannot be None!"
-            kwargs[key] = _sanitize(str(value), full=full)
-        return Template(_sanitize(self.to_lang(lang))).substitute(**kwargs)
+            kwargs[key] = sanitize(str(value), full=full)
+        return Template(sanitize(self.to_lang(lang))).substitute(**kwargs)
 
     def to_lang(self, lang: str) -> str:
         """Given a message, return the translation in the given language."""
@@ -113,13 +114,7 @@ class MeetingMessages(MessageBase):
     )
 
     # Meeting information
-    FEATURES = (
-        "*$title* \\(Created by: $owner\\)\n\n"
-        f"--- {Emojis.DESCRIPTION} $description\n"
-        f"--- {Emojis.CLOCK} $datetime\n"
-        f"--- {Emojis.MAP} $location\n"
-        f"--- {Emojis.JOINED} $participants\n"
-    )
+    CREATED_BY = "Created by: $owner"
     DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
