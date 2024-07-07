@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from unittest import mock
 
@@ -52,8 +53,33 @@ def expected_message(
         f"\\-\\-\\- {Emojis.DESCRIPTION} {str_description}\n"
         f"\\-\\-\\- {Emojis.CLOCK} {str_date}\n"
         f"\\-\\-\\- {Emojis.MAP} {location}\n"
-        f"\\-\\-\\- {Emojis.JOINED} {str_participants}\n"
+        f"\\-\\-\\- {Emojis.JOINED} {str_participants}"
     )
+
+
+def expected_inline_message(
+    description: bool,
+    datetime: bool,
+    username: bool,
+    location_name: bool,
+    coordinates: bool,
+    max_participants: bool,
+) -> str:
+    owner = "john\\_doe" if username else "John"
+    str_participants = expected_participants_message(max_participants)
+    str_location = expected_location_name(
+        "Test Location" if location_name else None, "\\[📍\\]" if coordinates else None
+    )
+    result = f"*Test Meeting* \\(Created by: {owner}\\)\n\n"
+    if description:
+        result += f"\\-\\-\\- {Emojis.DESCRIPTION} Test Description\n"
+    if datetime:
+        result += f"\\-\\-\\- {Emojis.CLOCK} 1987\\-07\\-17 01:59 \\(Europe/Madrid\\)\n"
+    if str_location != MeetingMessages.LOCATION_NOT_SET.get():
+        result += f"\\-\\-\\- {Emojis.MAP} {str_location}\n"
+
+    result += f"\\-\\-\\- {Emojis.JOINED} {str_participants}"
+    return result
 
 
 @pytest.mark.parametrize("mock_meeting", [EXAMPLE_MEETING, None], ids=["meeting_exist", "meeting_does_not_exist"])
@@ -127,7 +153,12 @@ def test_meetup_location_string_conversion(
         "all_fields",
     ],
 )
-def test_meetup_features_message(
+@pytest.mark.parametrize(
+    "is_inline,expected_method",
+    [[True, expected_inline_message], [False, expected_message]],
+    ids=["inline_message", "normal_message"],
+)
+def test_meetup_message(
     settings: Settings,
     description: bool,
     meetup_datetime: bool,
@@ -135,6 +166,8 @@ def test_meetup_features_message(
     location_name: bool,
     location_coordinates: bool,
     max_participants: bool,
+    is_inline: bool,
+    expected_method: Callable[[bool, bool, bool, bool, bool, bool], str],
 ):
     location = MeetupLocation(
         name="Test Location" if location_name else None,
@@ -149,11 +182,14 @@ def test_meetup_features_message(
         owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
     )
 
-    expected = expected_message(
+    expected = expected_method(
         description, meetup_datetime, username, location_name, location_coordinates, max_participants
     )
 
-    assert expected == meeting.message
+    if is_inline:  # sourcery skip: no-conditionals-in-tests
+        assert expected == meeting.inline_message
+    else:
+        assert expected == meeting.message
 
 
 def test_time_properly_converted_for_timezone(settings: Settings):
@@ -265,7 +301,7 @@ def build_inline_message(description: str | None, datetime: datetime | None, loc
     ],
     ids=["with_location", "without_location", "with_location_name", "with_location_coordinates"],
 )
-def test_inline_message(
+def test_inline_query_message(
     user_with_settings: User, description: str | None, datetime: datetime | None, location: MeetupLocation
 ):
     meeting = Meetup(
@@ -278,7 +314,7 @@ def test_inline_message(
 
     message = build_inline_message(description, datetime, location)
 
-    assert message == meeting.inline_message
+    assert message == meeting.inline_query_message
 
 
 @pytest.mark.parametrize(
@@ -305,3 +341,38 @@ def test_participants_text(user_with_settings: User, joined_count: int, max_part
         JoinedUsers(user=user, meetup=meeting)
 
     assert expected == meeting.participants_text
+
+
+@pytest.mark.parametrize(
+    "description, meetup_datetime, username, location_name, location_coordinates, max_participants",
+    [
+        (False, True, True, True, True, True),
+        (True, False, True, True, True, True),
+        (True, True, False, True, True, True),
+        (True, True, True, False, False, True),
+        (True, True, True, True, True, False),
+        (True, True, True, False, True, True),
+        (True, True, True, True, False, True),
+        (True, True, True, True, True, True),
+    ],
+    ids=[
+        "no_description",
+        "no_date",
+        "no_username",
+        "no_location",
+        "no_max_members",
+        "with_location_coordinates",
+        "with_location_name",
+        "all_fields",
+    ],
+)
+def test_inline_message(
+    settings: Settings,
+    description: bool,
+    meetup_datetime: bool,
+    username: bool,
+    location_name: bool,
+    location_coordinates: bool,
+    max_participants: bool,
+):
+    pass

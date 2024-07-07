@@ -48,6 +48,9 @@ class MeetupLocation(MutableModel):
                 coordinates_section = f"[{Emojis.PIN}]" if self.coordinates else ""
                 return f"{name_section} {coordinates_section}".strip()
 
+    def empty(self) -> bool:
+        return self.coerced_name is None and self.coordinates is None
+
 
 class Meetup(SQLModel, table=True):
     __tablename__: str = "meetups"  # type: ignore
@@ -156,9 +159,12 @@ class Meetup(SQLModel, table=True):
             f"--- {Emojis.DESCRIPTION} $description\n"
             f"--- {Emojis.CLOCK} $datetime\n"
             f"--- {Emojis.MAP} $location\n"
-            f"--- {Emojis.JOINED} $participants\n"
+            f"--- {Emojis.JOINED} $participants"
         )
 
+        return self.process_message_template(template)
+
+    def process_message_template(self, template: Template) -> str:
         return sanitize(
             template.substitute(
                 title=sanitize(self.title or "", full=True),
@@ -175,6 +181,27 @@ class Meetup(SQLModel, table=True):
 
     @property
     def inline_message(self) -> str:
+        """
+        This is similar to the message itself but used when the meeting is shared.
+        In this case, property that are not set are not shown.
+        """
+        message_lines = [
+            f"*$title* \\({MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)}\\)\n",
+        ]
+        if self.description:
+            message_lines.append(f"--- {Emojis.DESCRIPTION} $description")
+        if self.datetime:
+            message_lines.append(f"--- {Emojis.CLOCK} $datetime")
+        if not self.location.empty():
+            message_lines.append(f"--- {Emojis.MAP} $location")
+        message_lines.append(f"--- {Emojis.JOINED} $participants")
+
+        template = Template("\n".join(message_lines))
+
+        return self.process_message_template(template)
+
+    @property
+    def inline_query_message(self) -> str:
         result: list[str] = []
 
         if self.description:
@@ -334,7 +361,7 @@ class Meetup(SQLModel, table=True):
             keyboard=self.build_inline_keyboard(),
             id=str(self.id),
             title=str(self.title),
-            inline_description=self.inline_message,
+            inline_description=self.inline_query_message,
         )
 
     def build_inline_keyboard(self) -> Keyboard:
