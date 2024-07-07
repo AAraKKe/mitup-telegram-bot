@@ -8,7 +8,7 @@ from telegram.error import BadRequest
 
 from mitup_bot.api import edit_message, send_message, update_meeting_messages
 from mitup_bot.exceptions import EffectiveChatNotSet, EffectiveMessageNotSet
-from mitup_bot.models import Meetup, Message, MessageButtons
+from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
@@ -83,12 +83,17 @@ async def test_send_message_fails_without_effective_chat(
         await send_message(cast(TMitupContext, context), update, default_view)
 
 
-async def test_edit_meetup_messages(meeting: Meetup, context: StubMitupContext, mock_session: MockDbSession):
+async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession):
+    meeting = Meetup(id=123, owner=user_with_settings, title="Test meeting", description="Test description")
+    # Message in the chat with the owner
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
         keyboard=[[ButtonConfig(text="Text1", callback_data="cb1"), ButtonConfig(text="Text2", callback_data="cb2")]]
     )
+    # Inline message shared somewhere
     meeting.messages.append(Message(id=456, inline_message_id="456", chat_id=123, buttons=buttons))
+    # Message in the chat of someone who is not the owner
+    meeting.messages.append(Message(id=456, message_id=123, chat_id=234, buttons=buttons))
 
     await update_meeting_messages(mock_session, cast(TMitupContext, context), meeting)
 
@@ -100,15 +105,27 @@ async def test_edit_meetup_messages(meeting: Meetup, context: StubMitupContext, 
         "inline_message_id": None,
         "reply_markup": InlineKeyboardMarkup([]),
     }
-    assert edit.call_count == 2
+
+    assert edit.call_count == 3
     edit.assert_has_calls(
         [
-            mock.call(**(expected_call_params | {"message_id": 123})),
+            mock.call(**(expected_call_params | {"text": meeting.main_view.description, "message_id": 123})),
             mock.call(
                 **(
                     expected_call_params
                     | {
                         "inline_message_id": "456",
+                        "reply_markup": MitupView.keyboard_to_markup(buttons.keyboard),
+                    }
+                )
+            ),
+            mock.call(
+                **(
+                    expected_call_params
+                    | {
+                        "text": meeting.inline_view.description,
+                        "message_id": 123,
+                        "chat_id": 234,
                         "reply_markup": MitupView.keyboard_to_markup(buttons.keyboard),
                     }
                 )

@@ -3,12 +3,15 @@ from datetime import UTC, datetime
 from unittest import mock
 
 import pytest
+from telegram import Update
 
-from mitup_bot.exceptions import MeetupNotFound
-from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Settings, User
+from mitup_bot.callback_data import CallbackData
+from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
+from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Settings, User
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import MeetingMessages
-from tests.stub_db import MockDbSession
+from tests.helpers import UpdateRequest
+from tests.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 EXAMPLE_MEETING = Meetup(
     id=123,
@@ -344,35 +347,74 @@ def test_participants_text(user_with_settings: User, joined_count: int, max_part
 
 
 @pytest.mark.parametrize(
-    "description, meetup_datetime, username, location_name, location_coordinates, max_participants",
+    "update",
     [
-        (False, True, True, True, True, True),
-        (True, False, True, True, True, True),
-        (True, True, False, True, True, True),
-        (True, True, True, False, False, True),
-        (True, True, True, True, True, False),
-        (True, True, True, False, True, True),
-        (True, True, True, True, False, True),
-        (True, True, True, True, True, True),
+        UpdateRequest(message=True, callback_query=False),
+        UpdateRequest(message=False, callback_query=True),
+        UpdateRequest(message=False, callback_query=True, inline_message_id="123"),
     ],
-    ids=[
-        "no_description",
-        "no_date",
-        "no_username",
-        "no_location",
-        "no_max_members",
-        "with_location_coordinates",
-        "with_location_name",
-        "all_fields",
-    ],
+    ids=["message", "callback_query", "inline_query"],
+    indirect=True,
 )
-def test_inline_message(
-    settings: Settings,
-    description: bool,
-    meetup_datetime: bool,
-    username: bool,
-    location_name: bool,
-    location_coordinates: bool,
-    max_participants: bool,
+def test_getting_message_from_update(update: Update, meeting: Meetup):
+    message = Message(id=123, message_id=123, chat_id=123, inline_message_id="123", meetup=meeting)
+    assert message == meeting.message_from_update(update)
+
+
+def test_getting_message_from_update_returns_none_if_not_found(update: Update, meeting: Meetup):
+    assert meeting.message_from_update(update) is None
+
+
+def test_getting_message_from_update_returns_none_message_is_not_in_update(meeting: Meetup):
+    assert meeting.message_from_update(Update(123)) is None
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(message=True, callback_query=False),
+        UpdateRequest(message=False, callback_query=True),
+        UpdateRequest(message=False, callback_query=CallbackData(entity="test"), inline_message_id="123"),
+    ],
+    ids=["message", "callback_query", "inline_query"],
+    indirect=True,
+)
+@pytest.mark.parametrize("has_message", [True, False], ids=["has_message", "does_not_have_message"])
+def test_has_message(update: Update, meeting: Meetup, has_message: bool):
+    if has_message:
+        Message(id=123, message_id=123, chat_id=123, inline_message_id="123", meetup=meeting)
+    assert meeting.has_message(update) is has_message
+
+
+def test_has_message_returns_false_when_there_is_no_message(meeting: Meetup):
+    assert not meeting.has_message(Update(123))
+
+
+@pytest.mark.parametrize(
+    "update,message_id,inline_message_id,chat_id",
+    [
+        (UpdateRequest(message=True, callback_query=False), 123, None, 123),
+        (UpdateRequest(message=False, callback_query=True), 123, None, 123),
+        (
+            UpdateRequest(message=False, callback_query=CallbackData(entity="test"), inline_message_id="123"),
+            None,
+            "123",
+            None,
+        ),
+    ],
+    ids=["message", "callback_query", "inline_query"],
+    indirect=["update"],
+)
+def test_add_message_to_meeting_from_update(
+    meeting: Meetup, update: Update, message_id: int, inline_message_id: str, chat_id: int
 ):
-    pass
+    message = meeting.add_message(update, meeting.owner)
+
+    assert message.inline_message_id == inline_message_id
+    assert message.message_id == message_id
+    assert message.chat_id == chat_id
+
+
+def test_add_message_fails_if_no_message_in_update(meeting: Meetup):
+    with pytest.raises(NoMessageAvailable):
+        meeting.add_message(Update(123), meeting.owner)

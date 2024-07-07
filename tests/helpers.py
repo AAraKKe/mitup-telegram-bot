@@ -64,6 +64,7 @@ class UpdateRequest:
     callback_query: CallbackData | bool = False
     command: str | bool = False
     inline_query: str = ""
+    inline_message_id: str | None = None
 
 
 @dataclass

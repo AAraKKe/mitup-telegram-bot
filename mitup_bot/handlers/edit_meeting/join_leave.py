@@ -64,8 +64,7 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
         data = guards.valid_callback_data(cb.JOIN.parse(context.match), EditMeetingHandlerId.JOIN)
         if meeting := Meetup.by_id(session, data.id):
             # Register the message the button was clicked from to be able to edit it later
-            if not meeting.has_message(update):
-                session.add(Message.from_update(update, meeting, user))
+            current_message = meeting.add_message(update, user)
 
             # Only leave if the user is already joined
             if joined_link := user.joined_meeting(data.id):
@@ -75,7 +74,7 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
             session.flush()
             session.refresh(meeting)
             # Edit now all messages where the meeting has been shared
-            await update_meeting_messages(session, context, meeting)
+            await update_meeting_messages(session, context, meeting, current_message=current_message)
     except UserNotFound:
         leave_non_registered_user(session, update, context)
 

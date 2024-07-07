@@ -4,11 +4,12 @@ from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, SQLModel
 from telegram import Update
 
+from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.views import Keyboard
 
 from .mutable_model import MutableModel
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from . import Meetup, User
 
 
@@ -29,7 +30,7 @@ class Message(SQLModel, table=True):
         sa_column=Column(type_=MessageButtons.as_mutable(JSON(none_as_null=True)), nullable=True),
     )
 
-    meetups: "Meetup" = Relationship(back_populates="messages")
+    meetup: "Meetup" = Relationship(back_populates="messages")
 
     @classmethod
     def from_update(cls, update: Update, meeting: "Meetup", user: "User") -> "Message":
@@ -51,6 +52,9 @@ class Message(SQLModel, table=True):
             # The keyboard must be a simple inline keyboard. Leave the default
         if update.effective_chat:
             chat_id = update.effective_chat.id
+
+        if message_id is None and inline_message_id is None:
+            raise NoMessageAvailable("No message_id or inline_message_id found in the update")
 
         return cls.model_validate(
             {

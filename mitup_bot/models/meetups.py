@@ -9,6 +9,7 @@ from sqlmodel import Field, Relationship, Session, SQLModel, select
 from telegram import Update
 
 from mitup_bot.exceptions import MeetupNotFound
+from mitup_bot.models import Message
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import sanitize
@@ -19,7 +20,6 @@ from .mutable_model import MutableModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from .joined_users import JoinedUsers
-    from .messages import Message
     from .users import User
 
 
@@ -71,7 +71,7 @@ class Meetup(SQLModel, table=True):
     active: bool = True
 
     owner: "User" = Relationship(back_populates="meetups")
-    messages: list["Message"] = Relationship(back_populates="meetups")
+    messages: list[Message] = Relationship(back_populates="meetup")
     joined_links: list["JoinedUsers"] = Relationship(back_populates="meetup")
 
     @property
@@ -88,6 +88,35 @@ class Meetup(SQLModel, table=True):
                 message.inline_message_id == update.callback_query.inline_message_id for message in self.messages
             )
         return False
+
+    def message_from_update(self, update: Update) -> "Message | None":
+        if eff_message := update.effective_message:
+            return next((message for message in self.messages if message.message_id == eff_message.message_id), None)
+        if update.callback_query and update.callback_query.inline_message_id:
+            return next(
+                (
+                    message
+                    for message in self.messages
+                    if message.inline_message_id == update.callback_query.inline_message_id
+                ),
+                None,
+            )
+        return None
+
+    def add_message(self, update: Update, user: "User") -> Message:
+        """
+        Link a message to this meeting if it is not linked already and return the message object.
+
+        Args:
+            update: The update object containing message information.
+            user: The user that has interacted with the message. Use to understand what keyboard the message should have
+
+        Returns:
+            The newly added message object.
+        """
+        if (message := self.message_from_update(update)) is None:
+            message = Message.from_update(update, self, user)
+        return message
 
     @property
     def short_description(self) -> str | None:
@@ -267,7 +296,7 @@ class Meetup(SQLModel, table=True):
     def external_view(self) -> MitupView:
         """This is the view shown to users that do not own the meeting when checking through meetings I have joined"""
         return MitupView(
-            self.message,
+            self.inline_message,
             [
                 [
                     ButtonConfig(
@@ -357,7 +386,7 @@ class Meetup(SQLModel, table=True):
     @property
     def inline_view(self) -> MitupInlineView:
         return MitupInlineView(
-            description=self.message,
+            description=self.inline_message,
             keyboard=self.build_inline_keyboard(),
             id=str(self.id),
             title=str(self.title),

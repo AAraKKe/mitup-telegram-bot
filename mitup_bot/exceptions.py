@@ -134,3 +134,7 @@ class InlineQueryNotSetError(ValueError):
 class AnswerInlineQueryError(RuntimeError):
     def __init__(self, query: str):
         super().__init__(f"Error when answering inline query: {query}")
+
+
+class NoMessageAvailable(ValueError):
+    pass

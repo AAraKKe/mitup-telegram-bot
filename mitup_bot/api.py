@@ -7,6 +7,7 @@ from telegram.error import BadRequest
 from mitup_bot import guards
 from mitup_bot.exceptions import AnswerInlineQueryError
 from mitup_bot.models import Meetup
+from mitup_bot.models import Message as MessageModel
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
@@ -57,12 +58,57 @@ async def answer_inline_query(context: TMitupContext, update: Update, results: l
     raise AnswerInlineQueryError(query.query)
 
 
-async def update_meeting_messages(session: Session, context: TMitupContext, meeting: Meetup):
-    inline_view = meeting.inline_view
+async def update_single_meeting_message(
+    message: MessageModel, session: Session, context: TMitupContext, meeting: Meetup
+):
+    view = (
+        meeting.inline_view
+        if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
+        else meeting.main_view
+    )
+    try:
+        await context.bot.edit_message_text(
+            text=view.description,
+            chat_id=message.chat_id,
+            message_id=message.message_id,
+            inline_message_id=message.inline_message_id,
+            reply_markup=MitupView.keyboard_to_markup(message.buttons.keyboard),
+        )
+    except BadRequest as e:
+        # Sometimes the message does not need to be updated but we don't know that in advance
+        # ignore the error when it happens
+        if "Message is not modified" in e.message:
+            return
+        # If we get an error saying that the message is not found, we should delete the message
+        if "Message_id_invalid" in e.message:
+            logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
+            session.delete(message)
+            context.put_custom_metric(MetricKey.MESSAGE_DELETED)
+            return
+        raise
+
+
+async def update_meeting_messages(
+    session: Session, context: TMitupContext, meeting: Meetup, current_message: MessageModel | None = None
+):
+    # First lets update the current message for a better user experience
+    if current_message:
+        await update_single_meeting_message(current_message, session, context, meeting)
     for message in meeting.messages:
+        if message == current_message:
+            continue
+
+        # If the message is an inline message, we should update the inline view
+        # otherwise the message is from a chat. When the chat id is the same as the owher telegram
+        # id, it means we can show everything.
+        view = (
+            meeting.inline_view
+            if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
+            else meeting.main_view
+        )
         try:
             await context.bot.edit_message_text(
-                text=inline_view.description,
+                text=view.description,
                 chat_id=message.chat_id,
                 message_id=message.message_id,
                 inline_message_id=message.inline_message_id,

@@ -135,7 +135,14 @@ def tg_callback_query(tg_user: User, tg_message: Message) -> CallbackQuery:
     return CallbackQuery(id="123", from_user=tg_user, message=tg_message, chat_instance="someinstance")
 
 
-def callback_query_from_callback_data(data: CallbackData, user: User, message: Message) -> CallbackQuery:
+def callback_query_from_callback_data(
+    data: CallbackData, user: User, message: Message, inline_message_id: str | None
+) -> CallbackQuery:
+    if inline_message_id:
+        # If the request comes with inline_message_id, the update is requested form an inline sent message
+        return CallbackQuery(
+            id="123", from_user=user, data=str(data), chat_instance="someinstance", inline_message_id=inline_message_id
+        )
     return CallbackQuery(id="123", from_user=user, data=str(data), chat_instance="someinstance", message=message)
 
 
@@ -171,7 +178,7 @@ def update(
 
     if data.callback_query:
         query = (
-            callback_query_from_callback_data(data.callback_query, tg_user, tg_message)
+            callback_query_from_callback_data(data.callback_query, tg_user, tg_message, data.inline_message_id)
             if isinstance(data.callback_query, CallbackData)
             else tg_callback_query
         )
