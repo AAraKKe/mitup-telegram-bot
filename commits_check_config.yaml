@@ -11,6 +11,7 @@ aditional_commands:
     chore: "^chore(\\(.+\\))?:"
     revert: "^revert: "
     update: "^update(\\(.+\\))?:"
+    monitoring: "^monitoring(\\(.+\\))?:"
 
 aditional_emojis:
     feat: "✨"
@@ -22,6 +23,7 @@ aditional_emojis:
     perf: "🚀"
     test: "🧪"
     infra: "🏗️"
+    monitoring: "📈"
     ci: "👷"
     chore: "♻️"
     revert: "⏪"

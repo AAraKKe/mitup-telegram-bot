@@ -83,6 +83,7 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
         self.custom_metrics: dict[str, TM] = {}
         self.telegram_update = update
         self.handler_dimensions: dict[str, str] = {}
+        self.avoid_per_callback_metrics = False
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
         user_id = update.effective_user.id if update and update.effective_user else None
@@ -200,6 +201,8 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
             unit (Unit, optional): Dimension of the metric from `aws_embedded_metrics.unit.Unit`.
                 Defaults to Unit.COUNT.
         """
+        if self.avoid_per_callback_metrics:
+            return
         self.metrics.put_metric(str(name), value, unit.value)
 
     def put_custom_metric(
@@ -227,7 +230,7 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
             include_handler_dimensions (bool, optional): If True, the dimensions defined for the handler will be
             included.
         """
-        dimensions_key: str = str(dimensions) if dimensions else ""
+        dimensions_key: str = str(sorted(dimensions)) if dimensions else ""
         self.custom_metrics.setdefault(
             dimensions_key,
             self.__new_metrics_logger(dimensions, properties, with_handler_dimensions, with_update_properties),

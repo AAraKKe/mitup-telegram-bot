@@ -212,3 +212,20 @@ async def test_put_metrics_does_not_flush(context: StubMitupContext):
     metric_in_context = context.metrics.context.metrics["MyMetric"]
     assert Unit.MILLISECONDS.value == metric_in_context.unit
     assert metric_in_context.values == [123]
+
+
+async def test_put_metric_does_not_add_metrics_when_specified(context: StubMitupContext):
+    context.avoid_per_callback_metrics = True
+
+    context.put_metric(
+        name="MyMetric",
+        value=123,
+        unit=Unit.MILLISECONDS,
+    )
+
+    assert "MyMetric" not in context.metrics.context.metrics
+
+    # When flushing the metrics, the metric is not emitted
+    await context.flush_metrics()
+
+    context.metrics.assert_metrics_not_emited(["MyMetric"], [123])
