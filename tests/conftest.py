@@ -13,9 +13,9 @@ from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
-from mitup_bot.monitoring import configure_metrics
-from tests.helpers import UpdateRequest, build_context, build_metrics
-from tests.stub_db import MockDbSession
+from mitup_bot.monitoring.metrics import configure_metrics
+from tests.helpers import UpdateRequest, build_context
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture
@@ -224,17 +224,10 @@ def app() -> Application:
 
 @pytest.fixture
 def context(app: Application, update: Update) -> MitupContext:
-    context = build_context(update, app)
-
-    # Allow the StubMetrics to access the context it was built for
-    context.metrics.parent_context = context
-    return context
+    return build_context(update, app)
 
 
 @pytest.fixture(autouse=True, scope="session")
 def configure_test_metrics():
     """Make sure metrics are always configured during test session"""
-    configure_metrics(
-        MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False),
-        factory=build_metrics,
-    )
+    configure_metrics(MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False))

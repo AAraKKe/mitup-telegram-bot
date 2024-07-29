@@ -18,7 +18,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import factory
 from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
     expected_metric_values = [error_count, error_count, AnyFloat()]
     expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_handler_metrics_emitted(
+    context.metrics_engine.assert_handler_metrics_emitted(
         expected_metric_names,
         expected_metric_values,
         units=expected_metric_units,
@@ -99,7 +99,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
             assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
             _api.assert_edit_message_called(context, update, factory.main_menu_view())
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
         [1, 0, AnyFloat()],
         units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
@@ -210,7 +210,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
 
             assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
         [1, 0, AnyFloat()],
         units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
@@ -305,7 +305,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
             assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
             _api.assert_edit_message_called(context, update, factory.main_menu_view())
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
         [1, 0, AnyFloat()],
         units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],

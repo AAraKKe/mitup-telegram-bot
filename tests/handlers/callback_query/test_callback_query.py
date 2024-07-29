@@ -26,7 +26,7 @@ from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 async def test_callback_query_settings_is_called_with_settings_view(
@@ -83,11 +83,10 @@ async def test_callback_query_cancel_meeting_calls_to_current_view(
     await context.flush_metrics()
 
     api.assert_edit_message_called(context, update, factory.main_menu_view())
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=["Cancel"],
         values=[1],
         dimensions={"Feature": Feature.CREATE_MEETING},
-        add_update_properties=False,
         add_handler_dimensions=False,
     )
 

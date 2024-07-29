@@ -14,10 +14,12 @@ def handler(context: TMitupContext, error: Exception, env: Env):
 
     # Emit an error metric for the current update both including the error type and a general
     # error metric to aggregate all error types
-    context.metrics.add_stack_trace("exception")
     error_class = error.__class__.__name__
     context.put_metric(MetricKey.FAULT.with_prefix(error_class), 1)
     context.put_metric(MetricKey.FAULT, 1)
+    context.put_custom_metric(MetricKey.FAULT, 1)
+
+    context.metrics_engine.add_stack_trace()
 
     # If we are in development mode, lets print the exception when it happens
     if env is Env.DEV:

@@ -1,7 +1,7 @@
 import pytest
 
 from mitup_bot.models import Meetup, User
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 def create_meetup(

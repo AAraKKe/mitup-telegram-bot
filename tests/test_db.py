@@ -9,7 +9,7 @@ from sqlmodel import Session
 from mitup_bot import db
 from mitup_bot.config import DbConfig
 from mitup_bot.models import Meetup, MeetupLocation
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture(autouse=True, scope="function")

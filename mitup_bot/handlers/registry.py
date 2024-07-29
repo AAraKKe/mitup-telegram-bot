@@ -46,10 +46,6 @@ def callback_with_metrics(
     callback_id: CallbackId, handler_type: str, callback: HandlerCallback, env: Env
 ) -> HandlerCallback:
     async def inner_callback(update: Update, context: TMitupContext):
-        if context.metrics is None:
-            # If metrics has not been set just run the callback
-            return await callback(update, context)
-
         # Set Handler as dimensions for every metric emission from within a callback
         # Setting them as default dimensions so any flush does not remove them and we also
         # override aws default dimensions we are not interested in.
@@ -65,8 +61,13 @@ def callback_with_metrics(
             error_handler(context, e, env)
         else:
             context.put_metric(MetricKey.FAULT, 0)
+            # Emit error without dimensions as well
+            context.put_custom_metric(MetricKey.FAULT, 0, Unit.COUNT)
         finally:
-            context.put_metric(MetricKey.TIME, (perf_counter() - start) * 1000, Unit.MILLISECONDS)
+            latency = (perf_counter() - start) * 1000
+            context.put_metric(MetricKey.TIME, latency, Unit.MILLISECONDS)
+            # Emit latency without dimensions as well
+            context.put_custom_metric(MetricKey.TIME, latency, Unit.MILLISECONDS)
 
             # Make sure we flush the metrics after every callback to drain any buffered metrics
             await context.flush_metrics()

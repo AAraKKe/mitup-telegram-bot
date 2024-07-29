@@ -16,7 +16,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler, create_meetup
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 TEST_MEETING_DATETIME_UTC = dt.datetime(2024, 12, 21, 12, 0, tzinfo=dt.UTC)
 TEST_CURRENT_DATE = dt.date(2024, 11, 15)
@@ -263,7 +263,7 @@ async def test_edit_meeting_time_callback(
         units.append(Unit.COUNT)
         properties = {"ContextId": ContextId.EDIT_MEETING_TIME.value}
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=names,
         values=values,
         units=units,
@@ -320,7 +320,7 @@ async def test_set_time_message_with_valid_time(
     # Meeting id has been removed from context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=[
             MetricKey.TIME,
             MetricKey.FAULT,
@@ -375,7 +375,7 @@ async def test_set_time_message_with_invalid_time(
     # Message sent to retry
     api.assert_send_message_called(context, update, MeetingMessages.INVALID_TIME.get())
 
-    context.metrics.assert_handler_metrics_emitted(
+    context.metrics_engine.assert_handler_metrics_emitted(
         names=[
             MetricKey.TIME,
             MetricKey.FAULT,
@@ -437,7 +437,7 @@ async def test_conversation_fallback_with_wrong_message_format(
     # Message sent to retry
     api.assert_send_message_called(context, update, MeetingMessages.WRONG_TIME_FORMAT.get())
 
-    context.metrics.assert_handler_metrics_emitted(
+    context.metrics_engine.assert_handler_metrics_emitted(
         names=[
             MetricKey.TIME,
             MetricKey.FAULT,

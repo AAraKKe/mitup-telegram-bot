@@ -1,8 +1,10 @@
 from enum import Enum, auto
+from unittest import mock
 
 import pytest
+from aws_embedded_metrics.unit import Unit
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
@@ -11,7 +13,11 @@ from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerRegisteredError
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.registry import HandlerWrapper
+from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.monitoring.metrics import NULL_DIMENSIONALITY
 from mitup_bot.utils import callbacks as cb
+from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, build_context
+from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 
 class ClearableRegistry(HandlersRegistry):
@@ -148,3 +154,39 @@ def test_cannot_register_same_conversation_twice():
         )
 
     ClearableRegistry.clear()
+
+
+async def test_all_handlers_emit_global_metrics(
+    app: StubMitupApp, update: Update, context: StubMitupContext, mock_session: MockDbSession
+):
+    await app.initialize()
+
+    # Define check_stat that is valid for conversation handlers
+    check_state = [ConversationHandler.END, None, mock.AsyncMock(return_value=ConversationHandler.END), True]
+
+    # Handle update with all handlers
+    valid_handlers = 0
+
+    global_logger = context.metrics_engine.get_logger(NULL_DIMENSIONALITY)
+    for wrapper in HandlersRegistry.handlers.values():
+        # Ignore conversation handlers because those are never executed, only handlers registered in them
+        if wrapper.is_conversation:
+            continue
+
+        valid_handlers += 1
+
+        handler_context = build_context(update, app)
+        await wrapper.handler.handle_update(update, app, check_state, handler_context)
+        # Keep track of all metrics emitted in each context for no dimension metrics
+
+        logger = handler_context.metrics_engine.get_logger(NULL_DIMENSIONALITY)
+        global_logger.sink.container.extend(logger.sink.container)
+
+    # All handlers have emitted the global fault and time metric
+    context.metrics_engine.assert_metrics_emited(
+        [MetricKey.TIME, MetricKey.FAULT],
+        [AnyFloat(), AnyFloat()],
+        [Unit.MILLISECONDS, Unit.COUNT],
+        add_handler_dimensions=False,
+        times=valid_handlers,
+    )

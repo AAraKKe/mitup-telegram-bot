@@ -16,7 +16,7 @@ from mitup_bot.utils import ButtonMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import MockApi, StubMitupContext, UpdateRequest
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(

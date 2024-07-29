@@ -13,7 +13,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import StubMitupContext, UpdateRequest
-from tests.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
+from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 
 async def test_edit_message_without_message_available():
@@ -169,8 +169,11 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 
     assert edit.call_count == 2
     mock_session.assert_deleted(meeting.messages[0])
-    context.metrics.assert_metrics_emited(
-        [MetricKey.MESSAGE_DELETED], [1], [Unit.COUNT], add_handler_dimensions=False, add_update_properties=False
+    context.metrics_engine.assert_metrics_emited(
+        [MetricKey.MESSAGE_DELETED],
+        [1],
+        [Unit.COUNT],
+        add_handler_dimensions=False,
     )
 
 

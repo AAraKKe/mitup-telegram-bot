@@ -12,7 +12,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import factory
 from tests.helpers import MockApi, StubMitupContext, UpdateRequest
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 async def test_filter_messages_without_text_handler_with_correct_view(

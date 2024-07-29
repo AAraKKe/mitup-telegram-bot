@@ -10,7 +10,7 @@ from mitup_bot.models import User
 from mitup_bot.models.meetups import Meetup
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import MockApi, StubMitupContext, UpdateRequest
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture

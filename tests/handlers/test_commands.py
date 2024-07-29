@@ -21,11 +21,11 @@ from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
     RegistrationProcessHandlerId,
 )
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MitupMetricsEngine
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import main_menu_view
-from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, build_metrics, call_handler
-from tests.stub_db import MockDbSession
+from tests.helpers import MockApi, StubMetrics, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class CommandsTestId(CallbackId):
     COMMAND_NOT_REGISTERED = "not_registered"
 
 
-async def test_command_registry_can_register_command_handlers():
+async def test_command_registry_can_register_command_handlers(update: Update):
     @HandlersRegistry.register_command(CommandsTestId.COMMAND_EXAMPLE)
     async def command_my_command(update: Update, context: MitupContext):
         return "Done!"
@@ -57,7 +57,8 @@ async def test_command_registry_can_register_command_handlers():
     assert "my_command" in handler.commands
 
     callback_return = await handler.callback(
-        Update(0), MitupContext(mock.MagicMock(), mock.MagicMock(), build_metrics())
+        update,
+        MitupContext(mock.MagicMock(), update, MitupMetricsEngine(logger_provider=lambda ep: StubMetrics())),
     )
     assert callback_return == "Done!"
 
@@ -144,11 +145,10 @@ async def test_command_start_with_new_user(
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=[MetricKey.COUNT],
         values=[1],
         dimensions={"Feature": Feature.NEW_LANDING},
-        add_update_properties=False,
         add_handler_dimensions=False,
     )
 
@@ -160,7 +160,7 @@ async def test_command_stat_with_new_user_use_incorrect_user(
     with pytest.raises(EffectiveUserNotSet):
         await command_start_with_new_user(update, context)
 
-    context.metrics.assert_metrics_not_emited(
+    context.metrics_engine.assert_metrics_not_emited(
         names=[MetricKey.COUNT], values=[1], dimensions={"Feature": Feature.NEW_LANDING}
     )
 

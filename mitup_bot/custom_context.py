@@ -3,9 +3,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import auto
-from typing import Any, override
+from typing import override
 
-from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
@@ -16,11 +15,13 @@ from mitup_bot.exceptions import (
     InvalidUserData,
 )
 from mitup_bot.monitoring import (
+    NULL_DIMENSIONALITY,
     CamelCaseStrEnum,
+    Dimensionality,
     Feature,
     MetricKey,
+    MitupMetricsEngine,
     MitupMetricsLogger,
-    create_metrics_from_update,
     properties_from_update,
 )
 
@@ -54,7 +55,7 @@ class MitupUserData:
         return context in self.registry and self.registry[context].meeting_id is not None
 
 
-class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, MitupUserData, dict, dict]):
+class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, MitupUserData, dict, dict]):
     """
     Custom context for the Mitup bot that includes a user data registry. Access to the registry
     is provided through context managers that ensure that the data is removed once out of scope.
@@ -64,7 +65,8 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
         self,
         application: Application,
         update: Update,
-        metrics: TM,
+        # Python does not yet support generic of generics, until then we can keep this as TME
+        metrics_engine: TME,
     ):
         """
         Initializes a CustomContext object.
@@ -77,23 +79,26 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
             None
         """
 
-        self.metrics: TM = metrics
+        self.metrics_engine = metrics_engine
         # This metrics container represents any custom metric with a different dimensionality to that
         # of the hanlders dimensionality.
-        self.custom_metrics: dict[str, TM] = {}
         self.telegram_update = update
-        self.handler_dimensions: dict[str, str] = {}
+        self.handler_dimensionality = NULL_DIMENSIONALITY
         self.avoid_per_callback_metrics = False
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
         user_id = update.effective_user.id if update and update.effective_user else None
         super().__init__(application=application, chat_id=chat_id, user_id=user_id)
 
+    @property
+    def handler_metrics_logger(self) -> MitupMetricsLogger:
+        return self.metrics_engine.get_logger(self.handler_dimensionality)
+
     def __get_user_data_property[T: int | str | bool](
         self, context: ContextId, property: str, property_type: type[T], ensure_clean: bool
     ) -> Generator[T, None, None]:
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""
-        self.metrics.set_property("ContextId", context.value)
+        self.handler_metrics_logger.set_property("ContextId", context.value)
 
         if (
             self.user_data is None
@@ -139,7 +144,8 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
             raise InvalidUserData("User data requested but not set")
 
         self.user_data.store_meeting_id(context, meeting_id)
-        self.metrics.set_property("ContextId", context.value)
+        self.handler_metrics_logger.set_property("StoredMeetingId", meeting_id)
+        self.handler_metrics_logger.set_property("ContextId", context.value)
         self.put_metric("StoredMeetingId", 1, unit=Unit.COUNT)
 
     def clean_user_data(self, contexts: list[ContextId]):
@@ -149,7 +155,7 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
 
         for context in contexts:
             self.user_data.remove_context(context)
-            self.metrics.set_property("ContextId", context.value)
+            self.metrics_engine.properties["ContextId"] = context.value
             self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
 
     def clean_all_user_data(self):
@@ -163,30 +169,10 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
         self,
         handler_dimensions: dict[str, str] | None = None,
     ):
-        self.handler_dimensions = handler_dimensions or {}
-        self.metrics.put_dimensions(self.handler_dimensions)
+        if not handler_dimensions:
+            return
 
-    def __new_metrics_logger(
-        self,
-        dimensions: dict[str, str] | None = None,
-        properties: dict[str, Any] | None = None,
-        with_handler_dimensions: bool = False,
-        with_update_properties: bool = False,
-    ) -> TM:
-        new_metrics = self.metrics.new()
-
-        dimensions = dimensions or {}
-        if with_handler_dimensions:
-            dimensions = dimensions | self.handler_dimensions
-        new_metrics.set_dimensions(dimensions)
-
-        properties = properties or {}
-        if with_update_properties:
-            properties = properties | properties_from_update(self.telegram_update)
-        for k, v in properties.items():
-            new_metrics.set_property(k, v)
-
-        return new_metrics
+        self.handler_dimensionality = Dimensionality(**handler_dimensions)
 
     def put_metric(self, name: str | MetricKey, value: float, unit: Unit = Unit.COUNT):
         """
@@ -203,7 +189,13 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
         """
         if self.avoid_per_callback_metrics:
             return
-        self.metrics.put_metric(str(name), value, unit.value)
+        self.metrics_engine.put_metric(
+            name=name,
+            value=value,
+            unit=unit,
+            dimensions=self.handler_dimensionality,
+            properties=properties_from_update(self.telegram_update),
+        )
 
     def put_custom_metric(
         self,
@@ -213,7 +205,7 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
         dimensions: dict[str, str] | None = None,
         properties: dict[str, str | int | float | None] | None = None,
         with_handler_dimensions: bool = False,
-        with_update_properties: bool = False,
+        with_update_properties: bool = True,
     ):
         """
         Emit a metric with the provided name, value, unit, dimensions and properties. This method will create a new
@@ -230,11 +222,16 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
             include_handler_dimensions (bool, optional): If True, the dimensions defined for the handler will be
             included.
         """
-        dimensions_key: str = str(sorted(dimensions)) if dimensions else ""
-        self.custom_metrics.setdefault(
-            dimensions_key,
-            self.__new_metrics_logger(dimensions, properties, with_handler_dimensions, with_update_properties),
-        ).put_metric(str(name), value, unit.value)
+        dimensionality = Dimensionality.or_null(dimensions)
+        if with_handler_dimensions:
+            dimensionality += self.handler_dimensionality
+
+        properties = properties or {}
+        if with_update_properties:
+            properties |= properties_from_update(self.telegram_update)
+
+        logger = self.metrics_engine.get_logger(dimensionality, properties)
+        logger.put_metric(str(name), value, unit.value)
 
     def put_feature_metric(
         self,
@@ -245,7 +242,7 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
         dimensions: dict[str, str] | None = None,
         properties: dict[str, str | int | float | None] | None = None,
         with_handler_dimensions: bool = False,
-        with_update_properties: bool = False,
+        with_update_properties: bool = True,
     ):
         """
         A feature metric is a metric as any other that is emitted with a feature dimension. This is useful
@@ -267,22 +264,16 @@ class MitupContext[TB: ExtBot, TM: MitupMetricsLogger](CallbackContext[TB, Mitup
             name, value, unit, dimensions, properties, with_handler_dimensions, with_update_properties
         )
 
-    async def flush_metrics(self, logger: MetricsLogger | None = None):
+    async def flush_metrics(self):
         # If we are requesting to flush a stand alone metrics logger, flush it
-        if logger:
-            await logger.flush()
-            return
-
-        # Flush all cached metrics loggers
-        for metric_context in [self.metrics, *self.custom_metrics.values()]:
-            if metric_context.context.metrics:
-                await metric_context.flush()
+        await self.metrics_engine.flush_metrics()
 
     @classmethod
     @override
-    def from_update(cls, update: object, application: Application) -> "MitupContext[TB, MitupMetricsLogger]":
+    def from_update(
+        cls, update: object, application: Application, metrics_engine: MitupMetricsEngine | None = None
+    ) -> "MitupContext[TB, MitupMetricsEngine]":
         assert isinstance(update, Update), "This should never happen, type is always Update in Mitupbot"
 
-        logger = create_metrics_from_update(update)
-
-        return MitupContext(application, update=update, metrics=logger)
+        metrics_engine = metrics_engine or MitupMetricsEngine(logger_provider=lambda ep: MitupMetricsLogger(ep))
+        return MitupContext(application, update=update, metrics_engine=metrics_engine)

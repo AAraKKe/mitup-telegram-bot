@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 
 from mitup_bot.custom_context import (
     ContextData,
@@ -147,7 +146,7 @@ async def test_metrics_emitted(
 
     await context.flush_metrics()
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         ["test_metric"],
         [123],
         dimensions=dimensions,
@@ -168,64 +167,10 @@ async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupCo
 
     await context.flush_metrics()
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         ["MyMetric"],
         [123],
         dimensions={"DimeName": "DimeValue", "Feature": Feature.CREATE_MEETING.value},
         properties={"PropName": "PropValue"},
-        add_update_properties=False,
         add_handler_dimensions=False,
     )
-
-
-async def test_flush_metrics_does_not_flush_without_metrics(context: StubMitupContext):
-    # Metrics context already includes context information
-    assert len(context.metrics.context.properties) > 0
-
-    # When we add dimensions but no metrics
-    context.metrics.put_dimensions({"DimName": "DimValue"})
-
-    # Flushing the metrics does not emit anything
-    await context.flush_metrics()
-
-    assert context.metrics.metrics_container == []
-
-    # But adding a metric emitts it
-    context.put_metric("MyMetric", 123, unit=Unit.MILLISECONDS)
-    await context.flush_metrics()
-    assert context.metrics.metrics_container != []
-
-
-async def test_put_metrics_does_not_flush(context: StubMitupContext):
-    context.put_metric(
-        name="MyMetric",
-        value=123,
-        unit=Unit.MILLISECONDS,
-    )
-
-    # Just calling put does not emit the metric
-    context.metrics.assert_metrics_not_emited(["MyMetric"], [123])
-
-    # But it is part of the context
-    # The first context is the MitupContext and the second context is the MetricsContext ;)
-    assert "MyMetric" in context.metrics.context.metrics
-    metric_in_context = context.metrics.context.metrics["MyMetric"]
-    assert Unit.MILLISECONDS.value == metric_in_context.unit
-    assert metric_in_context.values == [123]
-
-
-async def test_put_metric_does_not_add_metrics_when_specified(context: StubMitupContext):
-    context.avoid_per_callback_metrics = True
-
-    context.put_metric(
-        name="MyMetric",
-        value=123,
-        unit=Unit.MILLISECONDS,
-    )
-
-    assert "MyMetric" not in context.metrics.context.metrics
-
-    # When flushing the metrics, the metric is not emitted
-    await context.flush_metrics()
-
-    context.metrics.assert_metrics_not_emited(["MyMetric"], [123])

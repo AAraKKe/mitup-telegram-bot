@@ -14,7 +14,7 @@ from mitup_bot.cli.options import Env
 from mitup_bot.config import Config, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.monitoring import configure_metrics
+from mitup_bot.monitoring.metrics import configure_metrics
 
 
 class MitupRuntime:
@@ -65,6 +65,7 @@ class MitupRuntime:
 
     def __configure_metrics(self):
         configure_metrics(self.config.metrics)
+        logging.info(f"Metrics Configuration set: {self.config.metrics}")
 
     def __build_application(self) -> Application:
         builder = Application.builder()

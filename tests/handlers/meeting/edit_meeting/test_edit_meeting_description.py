@@ -14,7 +14,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
 from tests.helpers import MockApi, StubMitupApp, UpdateRequest, call_handler
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture

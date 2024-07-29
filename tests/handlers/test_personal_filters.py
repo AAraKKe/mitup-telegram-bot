@@ -3,7 +3,7 @@ from telegram import Update
 
 from mitup_bot.handlers import PositiveNumberFilter, UserExistFilter
 from tests.helpers import UpdateRequest
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)

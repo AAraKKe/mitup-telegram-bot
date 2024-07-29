@@ -100,7 +100,7 @@ async def user_owns_meeting(
     Check if the user owns the meeting.
     If the user does, the meeting is returned.
     If not, if the redirect flag is set to True, warn and send the user to the main menu and None is returned.
-    If the redirect flat is False, None is returned but no communication happens with the user.
+    If the redirect flag is False, None is returned but no communication happens with the user.
     """
     if meeting := user.own_meeting(meeting_id):
         context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=Unit.COUNT)

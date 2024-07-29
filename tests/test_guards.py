@@ -33,7 +33,7 @@ from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import MockApi, StubMitupContext, UpdateRequest, create_meetup
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture
@@ -182,7 +182,9 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
         assert result is None
 
         api.assert_edit_message_called(context, update, factory.main_menu_view())
-        context.metrics.assert_metrics_emited([MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT])
+        context.metrics_engine.assert_metrics_emited(
+            [MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT]
+        )
 
 
 @pytest.mark.parametrize(

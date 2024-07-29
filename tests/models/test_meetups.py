@@ -11,7 +11,7 @@ from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Setti
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import MeetingMessages
 from tests.helpers import UpdateRequest
-from tests.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
+from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 EXAMPLE_MEETING = Meetup(
     id=123,

@@ -14,7 +14,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
     expected_metric_values = [error_count, error_count, AnyFloat()]
     expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_handler_metrics_emitted(
+    context.metrics_engine.assert_handler_metrics_emitted(
         expected_metric_names,
         expected_metric_values,
         units=expected_metric_units,

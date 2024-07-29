@@ -22,7 +22,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
 from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler
-from tests.stub_db import MockDbSession
+from tests.helpers.stub_db import MockDbSession
 
 
 @dataclass
@@ -180,7 +180,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat()]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
@@ -217,7 +217,7 @@ async def test_callback_fails_when_meeting_not_found(
     metric_values = test_context.metrics_emitted.values + [0, AnyFloat()]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
@@ -264,7 +264,7 @@ async def test_callback_fails_with_malformed_callback_data(
     metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat()]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
@@ -298,7 +298,7 @@ async def test_callback_fails_when_user_is_not_found(
     metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat()]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
@@ -339,7 +339,7 @@ async def test_callback_fails_when_missing_necessary_user_data(
     metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat()]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
 
-    context.metrics.assert_metrics_emited(
+    context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
