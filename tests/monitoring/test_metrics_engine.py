@@ -69,3 +69,17 @@ async def test_put_metrics_does_not_flush(stub_engine: StubMetricsEngine):
     metric_in_context = stub_engine.get_logger().context.metrics["MyMetric"]
     assert Unit.MILLISECONDS.value == metric_in_context.unit
     assert metric_in_context.values == [123]
+
+
+def test_engine_flushes_from_context_manager(stub_engine: StubMetricsEngine):
+    with stub_engine.auto_flush():
+        stub_engine.put_metric("MyMetric", 123, unit=Unit.MILLISECONDS)
+
+    stub_engine.assert_metrics_emited(["MyMetric"], [123], [Unit.MILLISECONDS])
+
+
+async def test_engine_flushes_from_context_async_manager(stub_engine: StubMetricsEngine):
+    async with stub_engine.async_auto_flush():
+        stub_engine.put_metric("MyMetric", 123, unit=Unit.MILLISECONDS)
+
+    stub_engine.assert_metrics_emited(["MyMetric"], [123], [Unit.MILLISECONDS])

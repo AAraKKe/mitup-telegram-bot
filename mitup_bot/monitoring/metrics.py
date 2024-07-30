@@ -2,7 +2,7 @@ import asyncio
 import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager
-from typing import Any, Self
+from typing import Any
 
 from aws_embedded_metrics.config import get_config
 from aws_embedded_metrics.environment import Environment
@@ -12,7 +12,6 @@ from aws_embedded_metrics.logger.metrics_context import MetricsContext
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
 from aws_embedded_metrics.serializers.log_serializer import LogSerializer
 from aws_embedded_metrics.sinks import Sink
-from aws_embedded_metrics.storage_resolution import StorageResolution
 from aws_embedded_metrics.unit import Unit
 from rich.console import Console
 from telegram import Update
@@ -28,11 +27,10 @@ class RichConsoleSink(Sink):
 
     def accept(self, context: MetricsContext) -> None:
         for serialized_content in self.serializer.serialize(context):
-            if serialized_content:
-                self.console.print_json(serialized_content, indent=2)
+            self.console.print_json(serialized_content, indent=2)
 
     @staticmethod
-    def name() -> str:
+    def name() -> str:  # pragma: no cover
         return "RichConsoleSink"
 
 
@@ -47,31 +45,10 @@ TLoggerProperties = dict[str, str | int | float | None]
 class MitupMetricsLogger(MetricsLogger):
     """Custom MetricsLogger for Mitup Bot that allows any custom behaviour we need to introduce"""
 
-    config: MetricsConfig | None = None
-
     def __init__(self, resolve_environment: Callable[..., Awaitable[Environment]]):
         context = MetricsContext.empty()
-        context.set_default_dimensions({})
+        context.should_use_default_dimensions = False
         super().__init__(resolve_environment, context)
-        self.flush_on_emission = self.config.flush_on_emission if self.config else False
-
-    def put_metric(
-        self,
-        key: str,
-        value: float,
-        unit: str = "None",
-        storage_resolution: StorageResolution = StorageResolution.STANDARD,
-    ) -> Self:
-        super().put_metric(key, value, unit, storage_resolution)
-        if self.flush_on_emission:
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                asyncio.run(self.flush())
-            else:
-                flush_task = asyncio.create_task(self.flush())
-                asyncio.ensure_future(flush_task)
-        return self
 
     async def flush(self):
         await super().flush()
@@ -138,15 +115,6 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
         self.properties: TLoggerProperties = properties or {}
         self.logger_provider = logger_provider
 
-    @staticmethod
-    def from_update[T: MitupMetricsLogger](
-        update: Update, logger_provider: Callable[[Callable[..., Awaitable[Environment]]], T]
-    ) -> "MitupMetricsEngine[T]":
-        return MitupMetricsEngine(
-            logger_provider=logger_provider,
-            properties=properties_from_update(update),
-        )
-
     def __prepare_logger(
         self,
         logger: TML,
@@ -204,21 +172,19 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
 
     @contextmanager
     def auto_flush(self) -> Generator["MitupMetricsEngine", None, None]:
+        """Context manager that allows using a logger and flush automatically from a synchronous context."""
         yield self
         asyncio.run(self.flush_metrics())
 
     @asynccontextmanager
     async def async_auto_flush(self) -> AsyncGenerator["MitupMetricsEngine", None]:
+        """Async context manager that allows using a logger and flush automatically from an asynchronous context."""
         yield self
         await self.flush_metrics()
 
     def add_stack_trace(self):
         for logger in self.loggers.values():
             logger.add_stack_trace("exception")
-
-
-def metrics_factory(environment_provider: Callable[..., Awaitable[Environment]]) -> MitupMetricsLogger:
-    return MitupMetricsLogger(environment_provider)
 
 
 def properties_from_update(update: Update) -> dict[str, Any]:
@@ -242,7 +208,6 @@ def configure_metrics(config: MetricsConfig):
     metrics for a given process have the same behavior
     """
     metrics_config = get_config()
-    MitupMetricsLogger.config = config
 
     metrics_config.namespace = config.namespace
 
