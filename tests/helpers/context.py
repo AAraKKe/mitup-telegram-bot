@@ -51,4 +51,7 @@ async def call_handler(
     assert check_result is not None, "This update would not be processed by the handler!"
     assert check_result is not False, "This update would not be processed by the handler!"
 
-    return context, await handler.handle_update(update, app, check_result, context)
+    # Force cast becuase PTB forces a return type when declaring handlers and set `object` as return type
+    # of ConversationHandlers which prevents us from using specific types as the return type is invariant
+    handler_result = cast(Enum | None, await handler.handle_update(update, app, check_result, context))
+    return context, handler_result
