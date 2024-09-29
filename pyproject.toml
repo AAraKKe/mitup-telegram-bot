@@ -52,6 +52,7 @@ filterwarnings = [
     # Ignore warnings from PTB regarding ChatFullInfo since we do not use that information
     'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*'
 ]
+asyncio_default_fixture_loop_scope="function"
 
 [tool.pyright]
 exclude = ["conftest.py"]

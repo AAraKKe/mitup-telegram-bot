@@ -78,7 +78,7 @@ def callback_with_metrics(
 
 @dataclass
 class HandlerWrapper:
-    handler: BaseHandler[Update, MitupContext]
+    handler: BaseHandler[Update, MitupContext, object]
     bindable: bool
     group: int = 0
     env: Env | None = None
@@ -261,7 +261,7 @@ class HandlersRegistry:
         app.add_handler(CallbackQueryHandler(callback=callback_query_fallback))
 
     @classmethod
-    def get_handler(cls, key: CallbackId) -> BaseHandler[Update, MitupContext]:
+    def get_handler(cls, key: CallbackId) -> BaseHandler[Update, MitupContext, object]:
         if key not in cls.handlers:
             raise HandlerNotRegistered(key)
         return cls.handlers[key].handler
