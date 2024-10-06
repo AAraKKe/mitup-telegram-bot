@@ -219,7 +219,7 @@ build-docs:
   before_script: *aws-prep
   <<: *kaniko
 
-## ------------- Push to staging --------------
+## -------------- Push to staging ---------------
 push-bot-tagged-staging:
   <<: *push-ecr
   resource_group: bot-tagged-staging
