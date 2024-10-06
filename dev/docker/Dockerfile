@@ -21,6 +21,9 @@ RUN hatch run prod:help
 
 # Build mo files for all translations under mitup_bot/locales
 RUN hatch run prod:build-locales
+# Remove unnecessary po files
+RUN rm -rf mitup_bot/locales/**/*.po
+RUN rm -rf mitup_bot/locales/mitup_bot.pot
 
 # Launch the bot
 CMD hatch run prod:launch

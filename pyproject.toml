@@ -196,6 +196,7 @@ build-locales = "python -m mitup_bot.cli.run build-locales"
 [tool.hatch.envs.prod.scripts]
 launch = "python -m mitup_bot.cli.run launch --env prod"
 help = "python -m mitup_bot.cli.run launch --help"
+build-locales = "python -m mitup_bot.cli.run build-locales"
 
 [build-system]
 requires = ["hatchling"]
