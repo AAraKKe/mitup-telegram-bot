@@ -30,7 +30,7 @@ msgstr ""
 "Project-Id-Version: {TranslationEngine.DOMAIN} {version}\\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\\n"
-"PO-Revision-Date: {dt.datetime.today().strftime("%Y-%m-%d %H:%M%z")}\\n"
+"PO-Revision-Date: {dt.datetime.now().strftime("%Y-%m-%d %H:%M%z")}\\n"
 "Language: en\\n"
 "MIME-Version: 1.0\\n"
 "Content-Type: text/plain; charset=UTF-8\\n"
@@ -50,13 +50,12 @@ def generate_translations(validate: bool):
     with open(po_path, "w") as f:
         f.write(METADATA)
 
-        f.write("\n\n#: mitup_bot/utils/messages.py\n\n")
+        f.write("\n\n#: mitup_bot/utils/messages.py\n")
         for message_class in messages:
             for message in message_class:
                 msgstr = repr(message.value)[1:-1].replace('"', r"\"")
-                f.write(f'msgid "{message.id()}"\n')
-                f.write(f'msgstr "{msgstr}"\n\n')
-        f.write("")
+                f.write(f'\nmsgid "{message.id()}"\n')
+                f.write(f'msgstr "{msgstr}"\n')
 
     if validate:
         return
@@ -78,10 +77,10 @@ def validate_translations() -> int:
     # diff both and find the differences
 
     with open(TranslationEngine.LOCALES_DIR / f"en/LC_MESSAGES/{TranslationEngine.DOMAIN}.po") as f:
-        real = [line for line in f.readlines() if "PO-Revision-Date" not in line]
+        real = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
     with open("validate.po") as f:
-        validate = [line for line in f.readlines() if "PO-Revision-Date" not in line]
+        validate = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
     if diff := list(difflib.unified_diff(real, validate)):
         for line in diff:
