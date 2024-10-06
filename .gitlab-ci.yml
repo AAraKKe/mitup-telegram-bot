@@ -234,6 +234,8 @@ push-bot-tagged-staging:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       <<: *deploy-rules
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
+      when: always
 
 push-bot-latest-staging:
   extends: push-bot-tagged-staging
@@ -310,6 +312,8 @@ deploy-staging:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       <<: *deploy-rules
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
+      when: always
 
 ## -------------- Deploy prod ---------------
 deploy-production:
