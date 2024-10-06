@@ -184,6 +184,8 @@ config-staging:
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       <<: *deploy-rules
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
+      when: always
 
 config-prod:
   <<: *aws-env-config
@@ -193,7 +195,6 @@ config-prod:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
-      <<: *deploy-rules
 
 build-docs:
   stage: prepare-deployment
