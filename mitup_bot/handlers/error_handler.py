@@ -4,7 +4,7 @@ from rich.console import Console
 
 from mitup_bot.config import Env
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.types import TMitupContext
+from mitup_bot.utils.mitup_types import TMitupContext
 
 console = Console()
 

@@ -6,7 +6,7 @@ from mitup_bot.monitoring.metrics import (
     Dimensionality,
     TLoggerProperties,
 )
-from mitup_bot.utils.types import TMitupEngine
+from mitup_bot.utils.mitup_types import TMitupEngine
 from tests.helpers import StubMetrics, StubMetricsEngine
 
 

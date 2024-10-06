@@ -39,16 +39,16 @@ async def test_callback_query_edit_meeting_description_works(
     mock_session: MockDbSession,
     update: Update,
     expected_description: str,
-    user: User,
+    user_with_settings: User,
     api: MockApi,
     app: StubMitupApp,
 ):
-    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     callback_query = cast(CallbackQuery, update.callback_query)
     meeting_id = cast(str, callback_query.data).split(":")[1]
 
-    mock_session.add_object(user.meetups[int(meeting_id) - 1])
+    mock_session.add_object(user_with_settings.meetups[int(meeting_id) - 1])
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.DESCRIPTION_CALLBACK)
 
@@ -58,11 +58,13 @@ async def test_callback_query_edit_meeting_description_works(
     meeting_id = context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id
 
     view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(full=False, description=expected_description),
+        description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
+            lang=user_with_settings.lang, full=False, description=expected_description
+        ),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(),
+                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_CANCEL.with_id(cast(int, meeting_id)),
                 )
             ]

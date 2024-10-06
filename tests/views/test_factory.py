@@ -3,16 +3,18 @@ from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 
-def test_edit_meeting_property_view_without_extra_options():
+def test_edit_meeting_property_view_without_extra_options(lang: str):
     message = "Test message"
     meeting_id = 1
 
-    view = factory.edit_meeting_property_view(message, meeting_id)
+    view = factory.edit_meeting_property_view(lang=lang, message=message, meeting_id=meeting_id)
     expected_view = MitupView(
         description=message,
         keyboard=[
             [
-                ButtonConfig(text=ButtonMessages.BACK_EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(meeting_id)),
+                ButtonConfig(
+                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                ),
             ],
         ],
     )
@@ -20,7 +22,7 @@ def test_edit_meeting_property_view_without_extra_options():
     assert expected_view == view
 
 
-def test_edit_meeting_property_view_with_extra_buttons():
+def test_edit_meeting_property_view_with_extra_buttons(lang: str):
     message = "Test message"
     meeting_id = 1
     extra_buttons = [
@@ -33,7 +35,9 @@ def test_edit_meeting_property_view_with_extra_buttons():
         ],
     ]
 
-    view = factory.edit_meeting_property_view(message, meeting_id, extra_buttons=extra_buttons)
+    view = factory.edit_meeting_property_view(
+        lang=lang, message=message, meeting_id=meeting_id, extra_buttons=extra_buttons
+    )
     expected_view = MitupView(
         description=message,
         keyboard=[
@@ -45,7 +49,9 @@ def test_edit_meeting_property_view_with_extra_buttons():
                 ButtonConfig(text="Option 3", callback_data="option_3"),
             ],
             [
-                ButtonConfig(text=ButtonMessages.BACK_EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(meeting_id)),
+                ButtonConfig(
+                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                ),
             ],
         ],
     )
@@ -53,12 +59,14 @@ def test_edit_meeting_property_view_with_extra_buttons():
     assert expected_view == view
 
 
-def test_edit_meeting_property_view_with_custom_back_button():
+def test_edit_meeting_property_view_with_custom_back_button(lang: str):
     message = "Test message"
     meeting_id = 1
     custom_back = ButtonConfig(text="Custom back", callback_data="custom_back")
 
-    view = factory.edit_meeting_property_view(message, meeting_id, back_button=custom_back)
+    view = factory.edit_meeting_property_view(
+        lang=lang, message=message, meeting_id=meeting_id, back_button=custom_back
+    )
     expected_view = MitupView(
         description=message,
         keyboard=[

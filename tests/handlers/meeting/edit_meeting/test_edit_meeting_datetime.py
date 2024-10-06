@@ -22,29 +22,32 @@ TEST_MEETING_DATETIME_UTC = dt.datetime(2024, 12, 21, 12, 0, tzinfo=dt.UTC)
 TEST_CURRENT_DATE = dt.date(2024, 11, 15)
 
 
-def set_new_date_view(meeting_id: int, datetime: str) -> MitupView:
+def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
     return MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
+            lang=lang,
             datetime=datetime,
-            back_edit_button=ButtonMessages.BACK_EDIT.get(),
-            set_time_button=ButtonMessages.SET_TIME.get(),
+            back_edit_button=ButtonMessages.BACK_EDIT.get(lang=lang),
+            set_time_button=ButtonMessages.SET_TIME.get(lang=lang),
         ),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.SET_TIME.get(), callback_data=cb.EDIT_MEETING_TIME.with_id(meeting_id)
+                    text=ButtonMessages.SET_TIME.get(lang=lang), callback_data=cb.EDIT_MEETING_TIME.with_id(meeting_id)
                 ),
-                ButtonConfig(text=ButtonMessages.BACK_EDIT.get(), callback_data=cb.EDIT_MEETING.with_id(meeting_id)),
+                ButtonConfig(
+                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                ),
             ]
         ],
     )
 
 
 def update_meeting_view(meeting: Meetup, datetime: str) -> MitupView:
-    return meeting.edit_view.with_context(MeetingMessages.DATE_UPDATE_SUCCESS.get(datetime=datetime))
+    return meeting.edit_view.with_context(MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=datetime))
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def api():
     with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
         yield api
@@ -101,26 +104,27 @@ async def test_edit_meeting_date_callback(
     api.assert_edit_message_called(
         context,
         update,
-        factory.edit_meeting_date_view(10, anchor_date, current_date, new=meeting.datetime is None),
+        factory.edit_meeting_date_view(
+            lang=user_with_settings.lang,
+            meeting_id=10,
+            anchor_date=anchor_date,
+            current_date=current_date,
+            new=meeting.datetime is None,
+        ),
     )
 
 
 @pytest.mark.parametrize(
-    "update,meeting,new",
+    "update,current_datetime,new",
     [
         (
             UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(TEST_MEETING_DATETIME_UTC.date())),
-            create_meetup(id=10, title="TestMeeting", description="Description"),
+            None,
             True,
         ),
         (
             UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(TEST_MEETING_DATETIME_UTC.date())),
-            create_meetup(
-                id=10,
-                title="TestMeeting",
-                description="Description",
-                datetime=dt.datetime(2024, 11, 11, 12, 30, tzinfo=dt.UTC),
-            ),
+            dt.datetime(2024, 11, 11, 12, 30, tzinfo=dt.UTC),
             False,
         ),
     ],
@@ -130,12 +134,13 @@ async def test_edit_meeting_date_callback(
 async def test_set_meeting_date_callback(
     mock_session: MockDbSession,
     update: Update,
-    meeting: Meetup,
+    current_datetime: dt.datetime,
     new: bool,
     user_with_settings: User,
     app: StubMitupApp,
     api: MockApi,
 ):
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=current_datetime)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -145,7 +150,7 @@ async def test_set_meeting_date_callback(
     context, _ = await call_handler(update, app, EditMeetingHandlerId.SET_DATE_CALLBACK)
 
     expected_view = (
-        set_new_date_view(10, "2024-12-21 23:59 (Europe/Madrid)")
+        set_new_date_view(user_with_settings.lang, 10, "2024-12-21 23:59 (Europe/Madrid)")
         if new
         else update_meeting_view(meeting, "2024-12-21 13:30 (Europe/Madrid)")
     )
@@ -197,7 +202,9 @@ async def test_delete_meeting_date(
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
     api.assert_edit_message_called(
-        context, update, meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get())
+        context,
+        update,
+        meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=user_with_settings.lang)),
     )
 
 
@@ -238,11 +245,11 @@ async def test_edit_meeting_time_callback(
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) or expected_response == ConversationHandler.END
 
     expected_view = MitupView(
-        description=MeetingMessages.EDIT_TIME.get(),
+        description=MeetingMessages.EDIT_TIME.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(),
+                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_CANCEL.with_id(10),
                 )
             ]
@@ -373,7 +380,7 @@ async def test_set_time_message_with_invalid_time(
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
     # Message sent to retry
-    api.assert_send_message_called(context, update, MeetingMessages.INVALID_TIME.get())
+    api.assert_send_message_called(context, update, MeetingMessages.INVALID_TIME.get(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_handler_metrics_emitted(
         names=[
@@ -435,7 +442,7 @@ async def test_conversation_fallback_with_wrong_message_format(
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
     # Message sent to retry
-    api.assert_send_message_called(context, update, MeetingMessages.WRONG_TIME_FORMAT.get())
+    api.assert_send_message_called(context, update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_handler_metrics_emitted(
         names=[

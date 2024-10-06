@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Callable
 from contextlib import nullcontext
 
 import pytest
@@ -117,11 +118,12 @@ async def test_meeting_accesible_works_with_a_meeting_that_belong_to_an_user(
 @pytest.mark.parametrize(
     "keyboard",
     [
-        None,
-        [
+        lambda lang: None,
+        lambda lang: [
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(), callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1)
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 ),
             ]
         ],
@@ -133,7 +135,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
-    keyboard: Keyboard | None,
+    keyboard: Callable[[str], Keyboard | None],
     api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -141,7 +143,13 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
 
     with caplog.at_level(logging.WARNING):
         result = await meeting_accessible(
-            mock_session, user_with_settings, 999, "Test method", update, context, custom_keyboard=keyboard
+            mock_session,
+            user_with_settings,
+            999,
+            "Test method",
+            update,
+            context,
+            custom_keyboard=keyboard(user_with_settings.lang),
         )
         # Call flush metrics that usually would be called by the handler
         await context.flush_metrics()
@@ -154,8 +162,15 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
             context,
             update,
             MitupView(
-                description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(),
-                keyboard=keyboard or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+                description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
+                keyboard=keyboard(user_with_settings.lang)
+                or [
+                    [
+                        ButtonConfig(
+                            text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang), callback_data=cb.MAIN_MENU
+                        )
+                    ]
+                ],
             ),
         )
 
@@ -181,7 +196,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
         assert "Meeting id: 999, user id: 1" in caplog.text
         assert result is None
 
-        api.assert_edit_message_called(context, update, factory.main_menu_view())
+        api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
         context.metrics_engine.assert_metrics_emited(
             [MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT]
         )

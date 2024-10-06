@@ -44,6 +44,7 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     update: Update,
     context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
+    user_with_settings: User,
     user: User,
     meeting: Meetup,
 ):
@@ -53,7 +54,8 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting.owner = user
     mock_session.add_object(meeting)
 
     await callback_query_edit_meeting(update, context)

@@ -10,7 +10,7 @@ from mitup_bot.api import edit_message, send_message, update_meeting_messages
 from mitup_bot.exceptions import EffectiveChatNotSet, NoMessageAvailable
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.types import TMitupContext
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules

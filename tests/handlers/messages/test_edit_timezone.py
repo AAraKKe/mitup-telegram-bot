@@ -36,7 +36,10 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
     result = await settings_timezone_text_message_handler(update, context)
 
     view = factory.settings_view(
-        SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=update.effective_message.text)
+        lang=user_with_settings.lang,
+        message=SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(
+            lang=user_with_settings.lang, timezone=update.effective_message.text
+        ),
     )
 
     mock_session.assert_flushed()
@@ -68,11 +71,11 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
     )
 
     view = MitupView(
-        description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(),
+        description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(),
+                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]
@@ -99,7 +102,12 @@ async def test_edit_timezone_with_location_update_correctly(
 
     result = await settings_timezone_location_message_handler(update, context)
 
-    view = factory.settings_view(SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone="Europe/Madrid"))
+    view = factory.settings_view(
+        lang=user_with_settings.lang,
+        message=SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(
+            lang=user_with_settings.lang, timezone="Europe/Madrid"
+        ),
+    )
 
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == "Europe/Madrid"
@@ -132,11 +140,11 @@ async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
     )
 
     view = MitupView(
-        description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(),
+        description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(),
+                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]

@@ -39,10 +39,10 @@ class MeetupLocation(MutableModel):
 
         return None if len(self.name.strip()) == 0 else self.name
 
-    def __str__(self) -> str:
+    def description(self, lang: str) -> str:
         match self.coerced_name, self.coordinates:
             case (None, None):
-                return MeetingMessages.LOCATION_NOT_SET.get()
+                return MeetingMessages.LOCATION_NOT_SET.get(lang=lang)
             case _:
                 name_section = f"{self.coerced_name}" if self.coerced_name else ""
                 coordinates_section = f"[{Emojis.PIN}]" if self.coordinates else ""
@@ -145,7 +145,7 @@ class Meetup(SQLModel, table=True):
     def str_datetime(self) -> str:
         if self.datetime:
             return f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})"
-        return MeetingMessages.DATE_NOT_SET.get()
+        return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
 
     @property
     def participants_badge(self) -> str:
@@ -201,9 +201,7 @@ class Meetup(SQLModel, table=True):
                     self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang), full=True
                 ),
                 datetime=sanitize(self.str_datetime, full=True),
-                location=sanitize(
-                    str(self.location) or MeetingMessages.LOCATION_NOT_SET.get(lang=self.lang), full=True
-                ),
+                location=sanitize(self.location.description(lang=self.lang), full=True),
                 participants=sanitize(self.participants_text, full=True),
             )
         )

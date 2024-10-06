@@ -27,6 +27,8 @@ from mitup_bot.monitoring import (
 
 
 class ContextId(CamelCaseStrEnum):
+    """Enum that identifies the different contexts that can be stored in the MitupUserData registry."""
+
     EDIT_MEETING_TITLE = auto()
     EDIT_MEETING_DESCRIPTION = auto()
     EDIT_MEETING_LOCATION_NAME = auto()
@@ -38,11 +40,15 @@ class ContextId(CamelCaseStrEnum):
 
 @dataclass
 class ContextData:
+    """Data class that represents the data to be stored per user in the MitupUserData registry."""
+
     meeting_id: int | None = None
 
 
 @dataclass
 class MitupUserData:
+    """Class that represents the user data type of MitupContext"""
+
     registry: dict[ContextId, ContextData] = field(default_factory=dict)
 
     def remove_context(self, context: ContextId):
@@ -57,8 +63,12 @@ class MitupUserData:
 
 class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, MitupUserData, dict, dict]):
     """
-    Custom context for the Mitup bot that includes a user data registry. Access to the registry
-    is provided through context managers that ensure that the data is removed once out of scope.
+    Custom context for the Mitup bot that includes several utilities.
+
+    - User data registry. Access to the registry is provided through context managers that ensure that
+    the data is removed once out of scope.
+    - Metrics. The context includes a metrics engine that allows emitting metrics with context specific
+    dimensions and properties as well as custom metrics with different dimensions.
     """
 
     def __init__(
@@ -68,26 +78,14 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         # Python does not yet support generic of generics, until then we can keep this as TME
         metrics_engine: TME,
     ):
-        """
-        Initializes a CustomContext object.
-
-        Args:
-            application (Application): The application instance.
-            update (Update): The Telegram update.
-            metrics (TM): The metrics instance.
-        Returns:
-            None
-        """
-
         self.metrics_engine = metrics_engine
-        # This metrics container represents any custom metric with a different dimensionality to that
-        # of the hanlders dimensionality.
         self.telegram_update = update
         self.handler_dimensionality = NULL_DIMENSIONALITY
         self.avoid_per_callback_metrics = False
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
         user_id = update.effective_user.id if update and update.effective_user else None
+
         super().__init__(application=application, chat_id=chat_id, user_id=user_id)
 
     @property

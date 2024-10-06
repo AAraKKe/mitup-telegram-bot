@@ -40,7 +40,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(
         timezone=cast(Message, update.effective_message).text
     )
-    view = factory.main_menu_view().with_context(message)
+    view = factory.main_menu_view(lang=user_with_settings.lang).with_context(message)
 
     mock_session.assert_added(user_with_settings)
     mock_session.assert_flushed()
@@ -86,7 +86,9 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
         in caplog.text
     )
 
-    api.assert_send_message_called(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
+    api.assert_send_message_called(
+        context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
+    )
     assert result == ConversationRegistrationProcessState.TIMEZONE
     context.metrics_engine.assert_metrics_emited(
         names=[MetricKey.COUNT, MetricKey.ERROR],
@@ -120,7 +122,7 @@ async def test_registration_timezone_with_location_update_correctly(
     result = await registration_timezone_location_message_handler(update, context)
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone="Europe/Dublin")
-    view = factory.main_menu_view().with_context(message)
+    view = factory.main_menu_view(lang=user_with_settings.lang).with_context(message)
 
     mock_session.assert_added(user_with_settings)
     mock_session.assert_flushed()
@@ -153,5 +155,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_coordina
         "Trying again" in caplog.text
     )
 
-    api.assert_send_message_called(context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get())
+    api.assert_send_message_called(
+        context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
+    )
     assert result == ConversationRegistrationProcessState.TIMEZONE

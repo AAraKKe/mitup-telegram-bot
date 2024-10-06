@@ -1,5 +1,4 @@
 import logging
-from typing import cast
 
 import pytest
 from _pytest.python_api import RaisesContext
@@ -76,7 +75,7 @@ async def test_edit_meeting_participants_works(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_participants_view(2))
+    api.assert_edit_message_called(context, update, edit_participants_view(user_with_settings.meetups[1]))
 
 
 @pytest.mark.parametrize(
@@ -97,7 +96,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
             context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
 
             assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view())
+            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang="en"))
 
     context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
@@ -123,6 +122,7 @@ async def test_edit_meeting_participants_failures(
     error_count: int,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
+    lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
@@ -153,7 +153,7 @@ async def test_edit_meeting_max_participants_works(
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
 
-    api.assert_send_message_called(context, update, edit_max_participants_view(1))
+    api.assert_send_message_called(context, update, edit_max_participants_view(user_with_settings.meetups[0]))
 
     assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
     with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS) as meeting_id:
@@ -175,6 +175,7 @@ async def test_edit_meeting_max_participants_failures(
     error_count: int,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
+    lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
@@ -206,7 +207,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
 
             assert result is ConversationHandler.END
             assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view())
+            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
             assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
@@ -242,8 +243,10 @@ async def test_edit_meeting_no_limit_participants_works(
     mock_session.assert_flushed()
     assert not meeting.max_members
 
-    response_view = edit_participants_view(1).with_context(
-        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=MeetingMessages.NO_LIMIT_PARTICIPANTS.get())
+    response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
+        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(
+            max_participants=MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=user_with_settings.lang)
+        )
     )
     api.assert_send_message_called(context, update, response_view)
     assert result is ConversationHandler.END
@@ -264,6 +267,7 @@ async def test_edit_meeting_no_limit_participants_failures(
     error_count: int,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
+    lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
@@ -303,7 +307,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
 
             assert result is ConversationHandler.END
             assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view())
+            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
@@ -329,7 +333,7 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_participants_view(2))
+    api.assert_edit_message_called(context, update, edit_participants_view(user_with_settings.meetups[1]))
     assert result is ConversationHandler.END
 
 
@@ -372,6 +376,7 @@ async def test_edit_meeting_max_participants_message_works(
 ):
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     # Default value to assert that it has been changed
     meeting.max_members = 10
@@ -383,7 +388,7 @@ async def test_edit_meeting_max_participants_message_works(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
-    expected_view = edit_participants_view(cast(int, meeting.id)).with_context(
+    expected_view = edit_participants_view(meeting).with_context(
         MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=meeting.max_members)
     )
 
@@ -406,6 +411,7 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
 ):
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
         context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE)
@@ -414,7 +420,7 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view())
+    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -434,13 +440,14 @@ async def test_edit_meeting_wrong_max_participants_works(
     api: MockApi,
     app: StubMitupApp,
 ):
+    mock_session.add_object(user_with_settings, "tg_user_id")
     context, result = await call_handler(
         update,
         app,
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
-    response_view = edit_max_participants_view(1, fail=True)
+    response_view = edit_max_participants_view(user_with_settings.meetups[0], fail=True)
 
     assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
     api.assert_send_message_called(context, update, response_view)
@@ -457,6 +464,7 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
 ):
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
         context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE)
@@ -465,4 +473,4 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     assert meeting.max_members is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view())
+    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))

@@ -1,4 +1,7 @@
-from mitup_bot.utils.messages import MessageBase, sanitize
+from typing import override
+
+from mitup_bot.translations import TranslationEngine
+from mitup_bot.utils.messages import MessageBase, TranslationEngineProtocol, sanitize
 
 
 def test_sanitIze():
@@ -13,8 +16,17 @@ def test_sanitIze():
 
 
 def test_sanitize_user_input():
+    class TestEngine(TranslationEngine):
+        @override
+        @classmethod
+        def translate(cls, message_id: str, lang: str) -> str:
+            return "Hello, **$name!**. _This is cursive_"
+
     class TestMessage(MessageBase):
         TEST = "Hello, **$name!**. _This is cursive_"
+
+        def translations_class(self) -> type[TranslationEngineProtocol]:
+            return TestEngine
 
     message = TestMessage.TEST.get(name="**New_World**")
     message_without_full_scape = TestMessage.TEST.get(full=False, name="_My World_")

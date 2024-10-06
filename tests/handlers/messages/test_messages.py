@@ -16,11 +16,13 @@ from tests.helpers.stub_db import MockDbSession
 
 
 async def test_filter_messages_without_text_handler_with_correct_view(
-    update: Update, context: StubMitupContext, api: MockApi
+    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
 ):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
     result = await filter_messages_without_text(update, context)
 
-    api.assert_send_message_called(context, update, factory.main_menu_view())
+    api.assert_send_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
     assert result == -1
 
 
@@ -105,8 +107,10 @@ async def test_edit_description_message_handler_update_the_description_and_send_
 
 
 async def test_filter_messages_without_text_delete_user_data_related_with_edit_meetings(
-    update: Update, context: MitupContext
+    update: Update, context: MitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
     assert context.user_data is not None
 
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)

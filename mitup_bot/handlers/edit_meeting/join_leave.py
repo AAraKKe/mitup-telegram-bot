@@ -12,7 +12,7 @@ from mitup_bot.models import JoinedUsers, Meetup, Message
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.types import TMitupContext
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import EditMeetingHandlerId
 
@@ -50,7 +50,9 @@ async def join_meetup(session: Session, update: Update, context: TMitupContext):
             await update_meeting_messages(session=session, context=context, meeting=meeting)
         else:
             # The meeting was not found, update the message to inform the user
-            await edit_message(context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get())
+            await edit_message(
+                context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang)
+            )
     except UserNotFound:
         join_non_registered_user(session, update, context)
 
@@ -83,7 +85,9 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
             )
         else:
             # The meeting was not found, update the message to inform the user
-            await edit_message(context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get())
+            await edit_message(
+                context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang)
+            )
     except UserNotFound:
         leave_non_registered_user(session, update, context)
 

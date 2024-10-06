@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from typing import cast
 from unittest import mock
 
@@ -21,6 +22,7 @@ from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
     RegistrationProcessHandlerId,
 )
+from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey, MitupMetricsEngine
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import main_menu_view
@@ -165,16 +167,29 @@ async def test_command_stat_with_new_user_use_incorrect_user(
     )
 
 
-@pytest.mark.parametrize("command_list", [command_start_with_existing_user, command_go_to_main_menu])
-async def test_commands_to_show_main_menu(command_list, update: Update, context: StubMitupContext, api: MockApi):
-    await command_start_with_existing_user(update, context)
+@pytest.mark.parametrize("command", [command_start_with_existing_user, command_go_to_main_menu])
+async def test_commands_to_show_main_menu(
+    command: Callable[[Update, MitupContext], Awaitable[None]],
+    update: Update,
+    context: StubMitupContext,
+    api: MockApi,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
-    expected_view = main_menu_view()
+    await command(update, context)
+
+    expected_view = main_menu_view(lang=user_with_settings.lang)
     api.assert_send_message_called(context, update, expected_view)
 
 
-async def test_command_cancel(update: Update, context: StubMitupContext, api: MockApi):
+async def test_command_cancel(
+    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
     await command_cancel(update, context)
 
-    expected_view = main_menu_view()
+    expected_view = main_menu_view(lang=user_with_settings.lang)
     api.assert_send_message_called(context, update, expected_view)

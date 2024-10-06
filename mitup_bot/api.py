@@ -10,7 +10,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import MeetingMessages
-from mitup_bot.utils.types import TMitupContext
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
 

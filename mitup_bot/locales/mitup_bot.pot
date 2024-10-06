@@ -1,0 +1,389 @@
+
+# MitupBot translations files.
+# Copyright (C) 2024
+# This file is distributed under the same license as the mitup_telegram_bot package.
+# J. P. Araque, 2024.
+# E. Araque, 2024.
+
+msgid ""
+msgstr ""
+"Project-Id-Version: mitup_bot 0.0.1\n"
+"Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
+"POT-Creation-Date: 2024-10-05 16:34+0100\n"
+"PO-Revision-Date: 2024-10-05 18:44\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+
+#: mitup_bot/utils/messages.py
+
+msgid "ButtonMessages.NEW_MEETING"
+msgstr "➕ New meeting"
+
+msgid "ButtonMessages.ACTIVE_MEETINGS"
+msgstr "📂 Your active meetings"
+
+msgid "ButtonMessages.PAST_MEETINGS"
+msgstr "💾 Your past meetings"
+
+msgid "ButtonMessages.JOINED_MEETINGS"
+msgstr "👥 Joined meetings"
+
+msgid "ButtonMessages.SETTINGS"
+msgstr "⚙️ Settings"
+
+msgid "ButtonMessages.HELP"
+msgstr "❓ Help"
+
+msgid "ButtonMessages.COLLABORATE"
+msgstr "♥ Collaborate"
+
+msgid "ButtonMessages.LANGUAGE"
+msgstr "🔣 Language"
+
+msgid "ButtonMessages.TIMEOUT"
+msgstr "⌛ Timeout"
+
+msgid "ButtonMessages.NOTIFICATIONS"
+msgstr "⏰ Notifications"
+
+msgid "ButtonMessages.TIMEZONE"
+msgstr "🌐 Timezone"
+
+msgid "ButtonMessages.DEFAULT_OPTIONS"
+msgstr "👥 Default Options"
+
+msgid "ButtonMessages.PRIVACY"
+msgstr "🛡️ Privacy"
+
+msgid "ButtonMessages.MAIN_MENU"
+msgstr "≪ Main Menu"
+
+msgid "ButtonMessages.CANCEL"
+msgstr "❌ Cancel"
+
+msgid "ButtonMessages.TITLE"
+msgstr "🅰️ Title"
+
+msgid "ButtonMessages.DESCRIPTION"
+msgstr "📄 Description"
+
+msgid "ButtonMessages.DATE"
+msgstr "🗓️ Date"
+
+msgid "ButtonMessages.CLOCK"
+msgstr "🕒 Time"
+
+msgid "ButtonMessages.SET_TIME"
+msgstr "🕒 Set time"
+
+msgid "ButtonMessages.PARTICIPANTS"
+msgstr "👥 Participants"
+
+msgid "ButtonMessages.LOCATION"
+msgstr "🗺️ Location"
+
+msgid "ButtonMessages.DONE"
+msgstr "✅ Done"
+
+msgid "ButtonMessages.JOIN"
+msgstr "✅ Join"
+
+msgid "ButtonMessages.INVITE"
+msgstr "😄 Invite"
+
+msgid "ButtonMessages.LEAVE"
+msgstr "❌ Leave"
+
+msgid "ButtonMessages.DELETE"
+msgstr "🗑️ Delete"
+
+msgid "ButtonMessages.EDIT"
+msgstr "✏️ Edit"
+
+msgid "ButtonMessages.SHARE"
+msgstr "📨 Share"
+
+msgid "ButtonMessages.CHAT"
+msgstr "💬 Chat"
+
+msgid "ButtonMessages.GO_BACK"
+msgstr "≪"
+
+msgid "ButtonMessages.GO_FORWARD"
+msgstr "≫"
+
+msgid "ButtonMessages.BACK_EDIT"
+msgstr "≪ Edit"
+
+msgid "ButtonMessages.MEETING_LOCATION_NAME"
+msgstr "🅰️ Name"
+
+msgid "ButtonMessages.MEETING_LOCATION_COORDINATES"
+msgstr "📍 Location"
+
+msgid "ButtonMessages.MEETING_MAX_PARTICIPANTS"
+msgstr "Max participants"
+
+msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
+msgstr "No limit"
+
+msgid "ButtonMessages.MEETING_KICK_OUT"
+msgstr "Kick out"
+
+msgid "ButtonMessages.CONFIRM"
+msgstr "✅ Confirm"
+
+msgid "ButtonMessages.DECLINE"
+msgstr "❌ Decline"
+
+msgid "ButtonMessages.DELETE_DATE"
+msgstr "🗑️ Delete date"
+
+msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
+msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
+
+msgid "Messages.DEFAULT_SETTINGS_DESCRIPTION"
+msgstr "Configure MitUp."
+
+msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
+msgstr "Your timezone is set to *${timezone}*. \nSend me the name of your city or your location to set your timezone or touch in *Cancel* to go back."
+
+msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
+msgstr "Your timezone has been set to: *${timezone}* "
+
+msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
+msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n**Important**: we do not store your location and this information is only used to configure your timezone."
+
+msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
+msgstr "Perfect! Your timezone is ${timezone}"
+
+msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
+msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
+
+msgid "MeetingMessages.CREATE"
+msgstr "Lets create a meeting. What is the title?"
+
+msgid "MeetingMessages.CREATED_SUCCESS"
+msgstr "A meeting has been created with the title: *${title}*\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
+
+msgid "MeetingMessages.CREATED_BY"
+msgstr "Created by: ${owner}"
+
+msgid "MeetingMessages.DESCRIPTION_NOT_SET"
+msgstr "🚫 No description defined 🚫"
+
+msgid "MeetingMessages.DATE_NOT_SET"
+msgstr "🚫 No time defined 🚫"
+
+msgid "MeetingMessages.LOCATION_NOT_SET"
+msgstr "🚫 No location defined 🚫"
+
+msgid "MeetingMessages.EMPTY"
+msgstr "Empty"
+
+msgid "MeetingMessages.PARTICIPANT"
+msgstr "Participant"
+
+msgid "MeetingMessages.PARTICIPANTS"
+msgstr "Participants"
+
+msgid "MeetingMessages.MAX_PARTICIPANTS"
+msgstr "(Max: ${max_participants})"
+
+msgid "MeetingMessages.MEETING_WITHOUT_DESCRIPTION"
+msgstr "_This meeting has no description yet_"
+
+msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
+msgstr "_This meeting has no participants yet_"
+
+msgid "MeetingMessages.EDIT_MEETING_TITLE"
+msgstr "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"
+
+msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
+msgstr "This is the current description of your meeting:\n${description}\n\n Send me the new one"
+
+msgid "MeetingMessages.TITLE_SET_SUCCESS"
+msgstr "The title has been properly set to: *${title}*"
+
+msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
+msgstr "The description has been properly set to: *${description}*"
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION"
+msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME"
+msgstr "Send me the name of the place."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
+msgstr "_Only from the phone 📱_\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
+
+msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
+msgstr "The name of the location has been set to: *${name}*"
+
+msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
+msgstr "The location has been saved successfuly"
+
+msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
+msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
+
+msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
+msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
+
+msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
+msgstr "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) or press in _No limit_ to allow an unlimited number of participants."
+
+msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
+msgstr "The maximum number of participants has been set to: *${max_participants}*"
+
+msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
+msgstr "No limit"
+
+msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
+msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
+
+msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
+msgstr "These are the users that joined the meeting. Choose who you want to kick out."
+
+msgid "MeetingMessages.DELETE_MEETING"
+msgstr "Are you sure you want to delete this meeting?"
+
+msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
+msgstr "The meeting has been deleted successfully"
+
+msgid "MeetingMessages.DELETE_MEETING_DECLINE"
+msgstr "The meeting won't be deleted"
+
+msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
+msgstr "This meeting has been deleted"
+
+msgid "MeetingMessages.EDIT_DATE"
+msgstr "Select the new date. Press **🗑️ Delete date** if you want to unset the date and time of the meeting."
+
+msgid "MeetingMessages.ADD_DATE"
+msgstr "Select the date."
+
+msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
+msgstr "The date has been set to: **${datetime}**. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
+
+msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
+msgstr "The date has been set to: **${datetime}**"
+
+msgid "MeetingMessages.EDIT_TIME"
+msgstr "Send me the time of the meeting in the format _HH:MM_"
+
+msgid "MeetingMessages.EDIT_TIME_SUCCESS"
+msgstr "The time of the meeting has been set to **${datetime}**"
+
+msgid "MeetingMessages.WRONG_TIME_FORMAT"
+msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"
+
+msgid "MeetingMessages.INVALID_TIME"
+msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), I am sure I can work with that 🧠."
+
+msgid "MeetingMessages.DATE_TIME_DELETED"
+msgstr "The date and time of the meeting have been deleted successfully"
+
+msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
+msgstr "🚫 This meeting has been deleted 🚫"
+
+msgid "MeetingMessages.NO_MEETINGS_FOUND"
+msgstr "_You don't have any meetings yet.\n\nClick on _${new_meeting_button}_ in the main menu to create one._"
+
+msgid "MeetingMessages.ACTIVE"
+msgstr "These are all your active meetings."
+
+msgid "Weekday.MONDAY"
+msgstr "Mon"
+
+msgid "Weekday.TUESDAY"
+msgstr "Tue"
+
+msgid "Weekday.WEDNESDAY"
+msgstr "Wed"
+
+msgid "Weekday.THURSDAY"
+msgstr "Thu"
+
+msgid "Weekday.FRIDAY"
+msgstr "Fri"
+
+msgid "Weekday.SATURDAY"
+msgstr "Sat"
+
+msgid "Weekday.SUNDAY"
+msgstr "Sun"
+
+msgid "Month.JANUARY"
+msgstr "January"
+
+msgid "Month.FEBRUARY"
+msgstr "February"
+
+msgid "Month.MARCH"
+msgstr "March"
+
+msgid "Month.APRIL"
+msgstr "April"
+
+msgid "Month.MAY"
+msgstr "May"
+
+msgid "Month.JUNE"
+msgstr "June"
+
+msgid "Month.JULY"
+msgstr "July"
+
+msgid "Month.AUGUST"
+msgstr "August"
+
+msgid "Month.SEPTEMBER"
+msgstr "September"
+
+msgid "Month.OCTOBER"
+msgstr "October"
+
+msgid "Month.NOVEMBER"
+msgstr "November"
+
+msgid "Month.DECEMBER"
+msgstr "December"
+
+msgid "MonthShort.JANUARY"
+msgstr "Jan"
+
+msgid "MonthShort.FEBRUARY"
+msgstr "Feb"
+
+msgid "MonthShort.MARCH"
+msgstr "Mar"
+
+msgid "MonthShort.APRIL"
+msgstr "Apr"
+
+msgid "MonthShort.MAY"
+msgstr "May"
+
+msgid "MonthShort.JUNE"
+msgstr "Jun"
+
+msgid "MonthShort.JULY"
+msgstr "Jul"
+
+msgid "MonthShort.AUGUST"
+msgstr "Aug"
+
+msgid "MonthShort.SEPTEMBER"
+msgstr "Sep"
+
+msgid "MonthShort.OCTOBER"
+msgstr "Oct"
+
+msgid "MonthShort.NOVEMBER"
+msgstr "Nov"
+
+msgid "MonthShort.DECEMBER"
+msgstr "Dec"

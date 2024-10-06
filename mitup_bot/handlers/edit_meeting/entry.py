@@ -9,7 +9,6 @@ from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 
@@ -52,6 +51,7 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
 @with_async_session
 async def cancel_edit_meeting(session: Session, update: Update, context: MitupContext):
     """If at any point the user clicks on Cancel we should get back to the Edit meeting view"""
+    user = guards.current_user(update, session)
 
     try:
         meeting_id = guards.valid_callback_data(
@@ -62,12 +62,14 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
         # Cleanup, log error and end possible conversation
         cleanup_states(context)
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view())
+        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
     logging.info(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
 
-    meetup = Meetup.by_id(session, meeting_id, must_exist=True)
+    meetup = await guards.user_owns_meeting(user, meeting_id, "Cancel edit meeting", update, context)
+    if meetup is None:
+        return ConversationHandler.END
 
     await api.edit_message(context=context, update=update, view=meetup.edit_view)
 

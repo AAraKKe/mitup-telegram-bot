@@ -69,11 +69,20 @@ preparation:
     - hatch run dev:echo
     - hatch run dev:pip list --local
 
+build-translations:
+  stage: build-ci
+  script:
+    - hatch run dev:build-locales
+  cache:
+    key: locales-$CI_COMMIT_SHORT_SHA
+    paths:
+      - mitup_bot/locales
+
 test:
   stage: test
   script: hatch run dev:test-cov
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
-  needs: [preparation]
+  needs: [preparation, build-translations]
   artifacts:
     when: always # Important to get reports when test fail
     reports:
@@ -102,6 +111,12 @@ validate-migrations:
   script: hatch run dev:validate-migrations
   needs: [preparation]
 
+validate-translations:
+  # This just validates that all messages in code are present in the translations english file
+  stage: test
+  script: hatch run dev:validate-translations
+  needs: [preparation, build-translations]
+
 sourcery-review:
   stage: test
   script:
@@ -116,6 +131,7 @@ sourcery-review:
   image:
     name: gcr.io/kaniko-project/executor:v1.23.1-debug
     entrypoint: [""]
+  needs: [build-translations]
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
     - /kaniko/executor

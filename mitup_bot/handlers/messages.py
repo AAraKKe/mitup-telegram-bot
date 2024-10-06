@@ -44,10 +44,12 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
 
 
 @HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT | filters.COMMAND, bindable=False)
-async def filter_messages_without_text(update: Update, context: MitupContext):
+@with_async_session
+async def filter_messages_without_text(session: Session, update: Update, context: MitupContext):
     context.clean_all_user_data()
 
-    view = factory.main_menu_view()
+    user = guards.current_user(update, session)
+    view = factory.main_menu_view(lang=user.lang)
 
     await api.send_message(context=context, update=update, view=view)
 

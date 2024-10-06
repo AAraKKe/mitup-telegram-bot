@@ -44,7 +44,7 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(),
+                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_CANCEL.with_id(1),
                 )
             ]
@@ -74,6 +74,7 @@ async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_wa
     update: Update,
     context: MitupContext,
     caplog: pytest.LogCaptureFixture,
+    user_with_settings: User,
     user: User,
     meeting: Meetup,
 ):
@@ -83,7 +84,8 @@ async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_wa
     assert match is not None
 
     context.matches = [match]
-    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting.owner = user
     mock_session.add_object(meeting)
 
     await callback_query_edit_meeting_title(update, context)

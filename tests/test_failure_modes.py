@@ -189,7 +189,7 @@ async def test_callback_fails_when_meeting_not_accessible(
         add_update_properties=True,
     )
     # The user is sent to the main menu
-    api.assert_edit_message_called(context, update, factory.main_menu_view())
+    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -227,13 +227,13 @@ async def test_callback_fails_when_meeting_not_found(
     )
     # The user is sent to the main menu
     keyboard = test_context.custom_keyboard or [
-        [ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]
+        [ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang), callback_data=cb.MAIN_MENU)]
     ]
     api.assert_edit_message_called(
         context,
         update,
         MitupView(
-            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(),
+            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
             keyboard=keyboard,
         ),
     )

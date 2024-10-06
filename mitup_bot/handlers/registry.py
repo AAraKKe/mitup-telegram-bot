@@ -29,7 +29,7 @@ from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.types import HandlerCallback, TMitupContext
+from mitup_bot.utils.mitup_types import HandlerCallback, TMitupContext
 
 from .error_handler import handler as error_handler
 

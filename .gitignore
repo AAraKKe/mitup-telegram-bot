@@ -33,3 +33,6 @@ dist
 
 # Ignore docs site
 site
+
+# Do not store mo binay files, should be build on the fly by CI
+*.mo

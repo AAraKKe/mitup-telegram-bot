@@ -33,10 +33,12 @@ class CallbackQueryId(CallbackId):
 @HandlersRegistry.register_callback_query(
     CallbackQueryId.CREATE_MEETING, callback_data=cb.CREATE_MEETING, bindable=False
 )
-async def callback_query_create_meeting(update: Update, context: MitupContext):
+@with_async_session
+async def callback_query_create_meeting(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_query_create_meeting")
 
-    view = views.factory.create_meeting_view()
+    user = guards.current_user(update, session)
+    view = views.factory.create_meeting_view(lang=user.lang)
 
     await api.edit_message(context=context, update=update, view=view)
 
@@ -63,7 +65,8 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
         custom_keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(), callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1)
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=user.lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 ),
             ]
         ],
@@ -87,12 +90,14 @@ async def callback_query_cancel_meeting(update: Update, context: MitupContext):
 
 
 @HandlersRegistry.register_callback_query(CallbackQueryId.MAIN_MENU, callback_data=cb.MAIN_MENU, bindable=True)
-async def callback_query_main_menu(update: Update, context: MitupContext):
+@with_async_session
+async def callback_query_main_menu(session: Session, update: Update, context: MitupContext):
     logging.info("Enter into callback_query_main_menu")
 
     context.clean_all_user_data()
 
-    view = views.factory.main_menu_view()
+    user = guards.current_user(update, session)
+    view = views.factory.main_menu_view(lang=user.lang)
 
     await api.edit_message(context=context, update=update, view=view)
 
@@ -119,7 +124,7 @@ async def callback_query_show_meetings(session: Session, update: Update, context
         for meeting in user_meetings
     ]:
         view = PaginatedMitupView(
-            description=MeetingMessages.ACTIVE.get(),
+            description=MeetingMessages.ACTIVE.get(lang=user.lang),
             buttons=user_meetings_buttons,
             page_number=callback_data.id,
         )
@@ -161,15 +166,15 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
         context=context,
         update=update,
         view=MitupView(
-            description=MeetingMessages.DELETE_MEETING.get(),
+            description=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CONFIRM.get(),
+                        text=ButtonMessages.CONFIRM.get(lang=user.lang),
                         callback_data=cb.CONFIRM_DELETE_MEETING.with_id(callback_data.id),
                     ),
                     ButtonConfig(
-                        text=ButtonMessages.DECLINE.get(),
+                        text=ButtonMessages.DECLINE.get(lang=user.lang),
                         callback_data=cb.DECLINE_DELETE_MEETING.with_id(callback_data.id),
                     ),
                 ]
@@ -209,11 +214,11 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
     session.delete(meeting)
 
     view = MitupView(
-        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(),
+        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(lang=user.lang),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.get(),
+                    text=ButtonMessages.MAIN_MENU.get(lang=user.lang),
                     callback_data=cb.MAIN_MENU,
                 )
             ]
@@ -249,5 +254,5 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
     await api.edit_message(
         context=context,
         update=update,
-        view=meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get()),
+        view=meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get(lang=user.lang)),
     )

@@ -24,6 +24,7 @@ async def test_cancel_edit_meeting_works(
     mock_session: MockDbSession, update: Update, meeting: Meetup, app: StubMitupApp, api: MockApi
 ):
     mock_session.add_object(meeting)
+    mock_session.add_object(meeting.owner, "tg_user_id")
 
     context, result = await call_handler(
         update, app, EditMeetingHandlerId.CANCEL, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
@@ -40,9 +41,12 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
     caplog: pytest.LogCaptureFixture,
     update: Update,
     meeting: Meetup,
+    user_with_settings,
     app: StubMitupApp,
     api: MockApi,
 ):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
     with caplog.at_level(logging.ERROR):
         context, result = await call_handler(
             update, app, EditMeetingHandlerId.CANCEL, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
@@ -50,4 +54,4 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view())
+    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=meeting.lang))

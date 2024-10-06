@@ -12,6 +12,7 @@ aditional_commands:
     revert: "^revert: "
     update: "^update(\\(.+\\))?:"
     monitoring: "^monitoring(\\(.+\\))?:"
+    wip: "^wip(\\(.+\\))?:"
 
 aditional_emojis:
     feat: "✨"
@@ -28,3 +29,4 @@ aditional_emojis:
     chore: "♻️"
     revert: "⏪"
     merge: "🔀"
+    wip: "⏳"

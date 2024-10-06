@@ -73,15 +73,15 @@ async def test_delete_meeting_works(
         context,
         update,
         MitupView(
-            description=MeetingMessages.DELETE_MEETING.get(),
+            description=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CONFIRM.get(),
+                        text=ButtonMessages.CONFIRM.get(lang=user_with_settings.lang),
                         callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
                     ),
                     ButtonConfig(
-                        text=ButtonMessages.DECLINE.get(),
+                        text=ButtonMessages.DECLINE.get(lang=user_with_settings.lang),
                         callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
                     ),
                 ]
@@ -134,8 +134,15 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
                 context,
                 update,
                 MitupView(
-                    description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(),
-                    keyboard=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+                    description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
+                    keyboard=[
+                        [
+                            ButtonConfig(
+                                text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang),
+                                callback_data=cb.MAIN_MENU,
+                            )
+                        ]
+                    ],
                 ),
             )
 
@@ -167,12 +174,14 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     update: Update,
     handler_id: CallbackQueryId,
     action: str,
+    user_with_settings: User,
     user: User,
     app: StubMitupApp,
     meeting: Meetup,
     caplog: pytest.LogCaptureFixture,
 ):
-    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting.owner = user
     mock_session.add_object(meeting)
 
     with MockApi.start("mitup_bot.guards") as api:
@@ -182,7 +191,7 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
             assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
             assert "Meeting id: 123, user id: 1" in caplog.text
 
-            api.assert_edit_message_called(context, update, factory.main_menu_view())
+            api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
@@ -203,11 +212,11 @@ async def test_confirm_delete_meeting_works(
     mock_session.assert_deleted(meeting_deleted)
 
     expected_view = MitupView(
-        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(),
+        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.get(),
+                    text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang),
                     callback_data=cb.MAIN_MENU,
                 )
             ]
@@ -234,7 +243,9 @@ async def test_decline_delete_meeting_works(
     api.assert_edit_message_called(
         context,
         update,
-        user_with_settings.meetups[0].main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get()),
+        user_with_settings.meetups[0].main_view.with_context(
+            MeetingMessages.DELETE_MEETING_DECLINE.get(lang=user_with_settings.lang)
+        ),
     )
 
 
@@ -251,6 +262,7 @@ async def test_delete_meeting_failures(
     user_fixture: str,
     error_type: type[Exception],
     app: StubMitupApp,
+    lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
@@ -273,6 +285,7 @@ async def test_confirm_delete_meeting_failures(
     user_fixture: str,
     error_type: type[Exception],
     app: StubMitupApp,
+    lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
@@ -295,6 +308,7 @@ async def test_decline_delete_meeting_failures(
     user_fixture: str,
     error_type: type[Exception],
     app: StubMitupApp,
+    lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")

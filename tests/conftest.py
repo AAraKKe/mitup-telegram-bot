@@ -14,6 +14,7 @@ from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring.metrics import configure_metrics
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 from tests.helpers import UpdateRequest, build_context
 from tests.helpers.stub_db import MockDbSession
 
@@ -25,6 +26,11 @@ def none():
     Specially in places where pytest getfixture value is used to dinamically load fixtures
     """
     return None
+
+
+@pytest.fixture(params=SUPPORTED_LANGUAGES, ids=[f"lang_{lang}" for lang in SUPPORTED_LANGUAGES])
+def lang(request: pytest.FixtureRequest) -> str:
+    return request.param
 
 
 @pytest.fixture
@@ -85,15 +91,19 @@ def user() -> UserModel:
 
 
 @pytest.fixture
-def user_with_settings(settings: Settings) -> UserModel:
+def user_with_settings(settings: Settings, lang: str) -> UserModel:
     user = UserModel(
         id=1,
         first_name="John",
         tg_user_id=123,
-        meetups=[Meetup(id=1, title="Test Meeting 1"), Meetup(id=2, title="Test Meeting 2")],
+        meetups=[
+            Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations"),
+            Meetup(id=2, title="Test Meeting 2"),
+        ],
     )
     settings.user = user
     settings.user_id = user.id
+    settings.language = lang
     user.settings = settings
     return user
 
@@ -107,6 +117,7 @@ def meeting(user_with_settings: UserModel) -> Meetup:
         datetime=dt.datetime(1987, 7, 16, 23, 59, tzinfo=dt.UTC),
         location=MeetupLocation(name="Test Location", coordinates=(123.1, 321.1)),
         owner=user_with_settings,
+        language="en",
     )
 
 

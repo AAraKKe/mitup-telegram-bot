@@ -60,9 +60,10 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
         context=context,
         update=update,
         view=factory.edit_meeting_date_view(
-            callback_data.id,
-            anchor_date,
-            current_date,
+            lang=user.lang,
+            meeting_id=callback_data.id,
+            anchor_date=anchor_date,
+            current_date=current_date,
             new=meeting.datetime is None,
         ),
     )

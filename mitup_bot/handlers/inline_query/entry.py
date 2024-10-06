@@ -6,7 +6,7 @@ from mitup_bot.db import with_async_session
 from mitup_bot.guards import current_user, user_owns_meeting, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils.types import TMitupContext
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import InlineQueryId
 

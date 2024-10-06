@@ -1,11 +1,13 @@
 from enum import auto
 
+from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import api, views
+from mitup_bot import api, guards, views
 from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
+from mitup_bot.db import with_async_session
 
 from .personal_filters import UserExistFilter
 from .registry import HandlersRegistry
@@ -22,8 +24,10 @@ class CommandsId(CallbackId):
     command="start",
     filters=UserExistFilter(),
 )
-async def command_start_with_existing_user(update: Update, context: MitupContext):
-    view = views.factory.main_menu_view()
+@with_async_session
+async def command_start_with_existing_user(session: Session, update: Update, context: MitupContext):
+    user = guards.current_user(update, session)
+    view = views.factory.main_menu_view(lang=user.lang)
 
     await api.send_message(context=context, update=update, view=view)
 

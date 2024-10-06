@@ -1,6 +1,8 @@
 from enum import StrEnum
 from string import Template
+from typing import Protocol
 
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import Emojis
 
 # https://core.telegram.org/bots/api#markdownv2-style
@@ -14,6 +16,11 @@ USER_INPUT_CHARACTERS_TO_SCAPE = CHARACTERS_TO_SCAPE + ["*", "_", "[", "]", "(",
 MessageParams = str | int | float | None
 
 
+class TranslationEngineProtocol(Protocol):
+    @classmethod
+    def translate(cls, message_id: str, lang: str) -> str: ...
+
+
 def sanitize(message: str, full=False) -> str:
     to_scape = USER_INPUT_CHARACTERS_TO_SCAPE if full else CHARACTERS_TO_SCAPE
     for character in to_scape:
@@ -23,16 +30,23 @@ def sanitize(message: str, full=False) -> str:
 
 
 class MessageBase(StrEnum):
-    def get(self, full: bool = True, lang: str = "en", **kwargs: MessageParams) -> str:
+    def get(self, full: bool = True, lang: str = TranslationEngine.FALLBACK_LANG, **kwargs: MessageParams) -> str:
         for key, value in kwargs.items():
-            assert value is not None, "Message parameter cannot be None!"
+            assert value is not None, f"Message parameter cannot be None and found {key}={value}!"
             kwargs[key] = sanitize(str(value), full=full)
         return Template(sanitize(self.to_lang(lang))).substitute(**kwargs)
 
     def to_lang(self, lang: str) -> str:
         """Given a message, return the translation in the given language."""
         # For now we are not yet translating messages but here is where we should implement it
-        return self.value
+        return self.translations_class().translate(self.id(), lang)
+
+    def id(self) -> str:
+        return f"{self.__class__.__name__}.{self.name}"
+
+    def translations_class(self) -> type[TranslationEngineProtocol]:
+        """This allows defining specific MessageBase types for testing without needed to provide translations"""
+        return TranslationEngine
 
 
 class ButtonMessages(MessageBase):
@@ -80,26 +94,26 @@ class ButtonMessages(MessageBase):
 
 
 class Messages(MessageBase):
-    DEFAULT_MAIN_MENU_DESCRIPTION = "Welcome to Mitup Bot!\n" "Choose one of the following options:"
+    DEFAULT_MAIN_MENU_DESCRIPTION = "Welcome to Mitup Bot!\n\nChoose one of the following options:"
     DEFAULT_SETTINGS_DESCRIPTION = "Configure MitUp."
 
 
 class SettingsMessages(MessageBase):
     SET_TIMEZONE_SETTINGS = (
-        "Your timezone is set to *$timezone*. \n"
+        "Your timezone is set to *${timezone}*. \n"
         "Send me the name of your city or your location to set your "
         "timezone or touch in *Cancel* to go back."
     )
-    TIMEZONE_SETTINGS_SET_SUCCESS = "Your timezone has been set to: *$timezone* "
+    TIMEZONE_SETTINGS_SET_SUCCESS = "Your timezone has been set to: *${timezone}* "
     SET_REGISTRATION_TIMEZONE = (
-        "Welcome to Mitup Bot $first_name!\n\n"
+        "Welcome to Mitup Bot ${first_name}!\n\n"
         "Let's start by setting your timezone. Send me the name of your city or, "
         f"for a more accurate result, your location by pressing on {Emojis.CLIP} and "
         "selecting Location.\n\n"
         "**Important**: we do not store your location and this information is only used to "
         "configure your timezone."
     )
-    REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is $timezone"
+    REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is ${timezone}"
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
 
 
@@ -107,29 +121,31 @@ class MeetingMessages(MessageBase):
     # Meeting creation
     CREATE = "Lets create a meeting. What is the title?"
     CREATED_SUCCESS = (
-        "A meeting has been created with the title: *$title*\n\n"
+        "A meeting has been created with the title: *${title}*\n\n"
         "You can add more information to the meeting with the options below. "
         "The information which has not been added won't be shown when the meeting is shared.\n\n"
         f"When finished click on {Emojis.CHECK} Done"
     )
 
     # Meeting information
-    CREATED_BY = "Created by: $owner"
+    CREATED_BY = "Created by: ${owner}"
     DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
     LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
     EMPTY = "Empty"
     PARTICIPANT = "Participant"
     PARTICIPANTS = "Participants"
-    MAX_PARTICIPANTS = "(Max: $max_participants)"
+    MAX_PARTICIPANTS = "(Max: ${max_participants})"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
 
     # Edit title and description
-    EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*$title*\n\n Send me the new one"
-    EDIT_MEETING_DESCRIPTION = "This is the current description of your meeting:\n$description\n\n Send me the new one"
-    TITLE_SET_SUCCESS = "The title has been properly set to: *$title*"
-    DESCRIPTION_SET_SUCCESS = "The description has been properly set to: *$description*"
+    EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"
+    EDIT_MEETING_DESCRIPTION = (
+        "This is the current description of your meeting:\n${description}\n\n Send me the new one"
+    )
+    TITLE_SET_SUCCESS = "The title has been properly set to: *${title}*"
+    DESCRIPTION_SET_SUCCESS = "The description has been properly set to: *${description}*"
 
     # Edit meeting location
     EDIT_MEETING_LOCATION = (
@@ -143,7 +159,7 @@ class MeetingMessages(MessageBase):
         f"Send the location of the meeting. Touch on the {Emojis.CLIP} icon and then choose location. "
         "You can send whatever location you want, not just your current location."
     )
-    LOCATION_NAME_SET_SUCCESS = "The name of the location has been set to: *$name*"
+    LOCATION_NAME_SET_SUCCESS = "The name of the location has been set to: *${name}*"
     LOCATION_COORDINATES_SUCCESS = "The location has been saved successfuly"
     LOCATION_COORDINATES_WRONG = "Send me the location again. Remember to touch on the clip icon and choose location."
 
@@ -157,11 +173,9 @@ class MeetingMessages(MessageBase):
         "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) "
         "or press in _No limit_ to allow an unlimited number of participants."
     )
-    MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *$max_participants*"
+    MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *${max_participants}*"
     NO_LIMIT_PARTICIPANTS = "No limit"
-    MAX_PARTICIPANTS_SET_FAIL = (
-        "The maximum number of participants must be a number greater than 0. Please, try again\n"
-    )
+    MAX_PARTICIPANTS_SET_FAIL = "The maximum number of participants must be a number greater than 0. Please, try again"
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
 
     # Delete meeting
@@ -177,12 +191,12 @@ class MeetingMessages(MessageBase):
     )
     ADD_DATE = "Select the date."
     NEW_DATE_SET_SUCCESS = (
-        "The date has been set to: **$datetime**. To set the time press _${set_time_button}_, "
+        "The date has been set to: **${datetime}**. To set the time press _${set_time_button}_, "
         "othwerise press _${back_edit_button}_ to go back to editing the meeting."
     )
-    DATE_UPDATE_SUCCESS = "The date has been set to: **$datetime**"
+    DATE_UPDATE_SUCCESS = "The date has been set to: **${datetime}**"
     EDIT_TIME = "Send me the time of the meeting in the format _HH:MM_"
-    EDIT_TIME_SUCCESS = "The time of the meeting has been set to **$datetime**"
+    EDIT_TIME_SUCCESS = "The time of the meeting has been set to **${datetime}**"
     WRONG_TIME_FORMAT = (
         f"Not sure I understand that time {Emojis.THINK}...\n\n"
         "Please, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"

@@ -64,7 +64,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
         logging.warning(f"The user {user.id} tried to set a timezone {address} that is not correct. Trying again")
 
         await api.send_message(
-            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get()
+            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
         )
 
         context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
@@ -77,7 +77,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     session.flush()
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
-    view = factory.main_menu_view().with_context(message)
+    view = factory.main_menu_view(lang=user.lang).with_context(message)
 
     await api.send_message(context=context, update=update, view=view)
 
@@ -101,7 +101,7 @@ async def registration_timezone_location_message_handler(session: Session, updat
         logging.warning(f"The user {user.id} tried to set a location {location} that is not correct. Trying again")
 
         await api.send_message(
-            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get()
+            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
         )
 
         context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=1)
@@ -113,7 +113,7 @@ async def registration_timezone_location_message_handler(session: Session, updat
     session.flush()
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
-    view = factory.main_menu_view().with_context(message)
+    view = factory.main_menu_view(lang=user.lang).with_context(message)
 
     await api.send_message(context=context, update=update, view=view)
 

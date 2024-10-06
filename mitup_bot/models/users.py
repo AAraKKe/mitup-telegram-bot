@@ -49,6 +49,10 @@ class User(SQLModel, table=True):
     def inline_name(self) -> str:
         return self.username or self.first_name
 
+    @property
+    def lang(self) -> str:
+        return self.settings.language
+
     def joined_meeting(self, meeting_id: int) -> "JoinedUsers | None":
         joined_links = [joined for joined in self.joined_links if joined.meetup_id == meeting_id]
         return joined_links[0] if joined_links else None

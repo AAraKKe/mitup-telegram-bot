@@ -27,7 +27,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
     user = guards.current_user(update, session)
     message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone=user.settings.timezone)
 
-    view = views.factory.change_settings_element_view(message)
+    view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
     await api.send_message(context=context, update=update, view=view)
 
@@ -46,11 +46,11 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
         logging.warning(f"The user {user.id} tried to set a timezone {address} that is not correct. Trying again")
 
         view = MitupView(
-            description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(),
+            description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CANCEL.get(),
+                        text=ButtonMessages.CANCEL.get(lang=user.lang),
                         callback_data=cb.CANCEL_SETTINGS,
                     )
                 ]
@@ -65,7 +65,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
     session.flush()
 
     message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
-    view = factory.settings_view(message)
+    view = factory.settings_view(lang=user.lang, message=message)
 
     await api.send_message(context=context, update=update, view=view)
 
@@ -86,11 +86,11 @@ async def settings_timezone_location_message_handler(session: Session, update: U
         logging.warning(f"The user {user.id} tried to set a location {location} that is not correct. Trying again")
 
         view = MitupView(
-            description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(),
+            description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CANCEL.get(),
+                        text=ButtonMessages.CANCEL.get(lang=user.lang),
                         callback_data=cb.CANCEL_SETTINGS,
                     )
                 ]
@@ -105,7 +105,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
     session.flush()
 
     message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
-    view = factory.settings_view(message)
+    view = factory.settings_view(lang=user.lang, message=message)
 
     await api.send_message(context=context, update=update, view=view)
 

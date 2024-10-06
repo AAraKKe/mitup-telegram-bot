@@ -21,7 +21,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
-from mitup_bot.utils.types import TMitupContext
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 
@@ -113,7 +113,7 @@ async def user_owns_meeting(
         )
         logging.warning(message)
         context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view())
+        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
     return None
 
 
@@ -138,9 +138,15 @@ async def meeting_accessible(
         context=context,
         update=update,
         view=MitupView(
-            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(),
+            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user.settings.language),
             keyboard=custom_keyboard
-            or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(), callback_data=cb.MAIN_MENU)]],
+            or [
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.MAIN_MENU.get(lang=user.settings.language), callback_data=cb.MAIN_MENU
+                    )
+                ]
+            ],
         ),
     )
     return None

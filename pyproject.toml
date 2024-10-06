@@ -92,7 +92,7 @@ packages = ["mitup_bot"]
 [tool.ruff]
 line-length = 120
 indent-width = 4
-exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist"]
+exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "sim.py"]
 src = ["mitup_bot", "tests"]
 
 [tool.ruff.lint]
@@ -185,6 +185,9 @@ mr-sourcery = ["ci-sourcery-login", "ci-sourcery"]
 serve-docs = "mkdocs serve"
 build-docs = "mkdocs build --strict"
 push-docs = "python -m mitup_bot.cli.run publish-docs"
+update-locales = "python -m mitup_bot.cli.run translations"
+validate-locales = "python -m mitup_bot.cli.run translations --validate"
+build-locales = "python -m mitup_bot.cli.run build-locales"
 
 
 # ----------------------

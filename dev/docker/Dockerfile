@@ -5,7 +5,7 @@ WORKDIR /mitup-telegram-bot
 
 # Install libraries needed to run pyscopg2
 RUN apt-get update && \
-    apt-get install -y libpq-dev gcc && \
+    apt-get install -y libpq-dev gcc gettext && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Hatch
@@ -18,6 +18,9 @@ COPY LICENSE /mitup-telegram-bot/LICENSE
 
 # Setup hatch prod environment
 RUN hatch run prod:help
+
+# Build mo files for all translations under mitup_bot/locales
+RUN hatch run prod:build-locales
 
 # Launch the bot
 CMD hatch run prod:launch
