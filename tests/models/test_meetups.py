@@ -242,7 +242,7 @@ def test_time_properly_converted_for_timezone(settings: Settings):
             2,
             lambda lang: (
                 f"{MeetingMessages.EMPTY.get(lang=lang)} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participantsss=2)}"
+                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}"
             ),
         ),
         (1, 2, lambda lang: "(1/2)"),

@@ -23,7 +23,7 @@ workflow:
 .deploy-rules: &deploy-rules
   changes:
     - mitup_bot/**/*
-    - dev/Dockerfile
+    - dev/docker/Dockerfile
     - pyproject.toml
 
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
@@ -114,10 +114,10 @@ validate-migrations:
   script: hatch run dev:validate-migrations
   needs: [preparation]
 
-validate-translations:
+validate-locales:
   # This just validates that all messages in code are present in the translations english file
   stage: test
-  script: hatch run dev:validate-translations
+  script: hatch run dev:validate-locales
   needs: [preparation]
 
 sourcery-review:
