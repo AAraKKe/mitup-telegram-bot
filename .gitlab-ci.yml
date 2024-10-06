@@ -218,8 +218,6 @@ build-docs:
   <<: *tokens
   before_script: *aws-prep
   <<: *kaniko
-  dependencies:
-    - build-translations
 
 ## ------------- Push to staging --------------
 push-bot-tagged-staging:
@@ -227,6 +225,9 @@ push-bot-tagged-staging:
   resource_group: bot-tagged-staging
   environment:
     name: staging
+  dependencies:
+    - build-translations
+    - config-staging
   variables:
     DOCKERFILE: Dockerfile
     PUSH_DESTINATION: $BOT_IMAGE_TAG
@@ -264,6 +265,9 @@ push-bot-tagged-prod:
   resource_group: bot-tagged-prod
   environment:
     name: production
+  dependencies:
+    - build-translations
+    - config-staging
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
