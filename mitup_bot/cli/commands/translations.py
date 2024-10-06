@@ -33,6 +33,7 @@ msgstr ""
 "PO-Revision-Date: {dt.datetime.now().strftime("%Y-%m-%d %H:%M%z")}\\n"
 "Language: en\\n"
 "MIME-Version: 1.0\\n"
+X-Crowdin-SourceKey: msgstr\n
 "Content-Type: text/plain; charset=UTF-8\\n"
 "Content-Transfer-Encoding: 8bit\\n"
 """
