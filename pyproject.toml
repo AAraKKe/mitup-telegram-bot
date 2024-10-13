@@ -185,9 +185,10 @@ mr-sourcery = ["ci-sourcery-login", "ci-sourcery"]
 serve-docs = "mkdocs serve"
 build-docs = "mkdocs build --strict"
 push-docs = "python -m mitup_bot.cli.run publish-docs"
-update-locales = "python -m mitup_bot.cli.run translations"
-validate-locales = "python -m mitup_bot.cli.run translations --validate"
-build-locales = "python -m mitup_bot.cli.run build-locales"
+update-source-language = "python -m mitup_bot.cli.run translations update"
+validate-locales = "python -m mitup_bot.cli.run translations validate-ids"
+build-locales = "python -m mitup_bot.cli.run translations build"
+update-locales = ["update-source-language", "build-locales"]
 
 
 # ----------------------

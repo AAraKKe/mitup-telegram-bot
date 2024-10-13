@@ -99,6 +99,7 @@ class Messages(MessageBase):
 
 
 class SettingsMessages(MessageBase):
+    # Timezone settings
     SET_TIMEZONE_SETTINGS = (
         "Your timezone is set to *${timezone}*. \n"
         "Send me the name of your city or your location to set your "
@@ -115,6 +116,9 @@ class SettingsMessages(MessageBase):
     )
     REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is ${timezone}"
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
+
+    # Language settings
+    SELECT_LANGUAGE = "Select a language"
 
 
 class MeetingMessages(MessageBase):
@@ -256,6 +260,15 @@ class MonthShort(MessageBase):
     OCTOBER = "Oct"
     NOVEMBER = "Nov"
     DECEMBER = "Dec"
+
+
+class Languages(MessageBase):
+    SPANISH = "🇪🇸 Spanish"
+    GALICIAN = "🇪🇸 Galician"
+    ENGLISH = "🇺🇸 English"
+    GERMAN = "🇩🇪 German"
+    PORTUGUESE = "🇧🇷 Portuguese"
+    ITALIAN = "🇮🇹 Italian"
 
 
 MonthList = [

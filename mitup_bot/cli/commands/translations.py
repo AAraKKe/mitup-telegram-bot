@@ -1,6 +1,7 @@
 import datetime as dt
 import difflib
 import shutil
+import subprocess
 from pathlib import Path
 
 import click
@@ -10,6 +11,7 @@ from mitup_bot.cli.helpers import console, error, success
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
 from mitup_bot.utils.messages import (
     ButtonMessages,
+    Languages,
     MeetingMessages,
     Messages,
     Month,
@@ -38,15 +40,22 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\\n"
 """
 
+VALIDATE_PO_FILE = Path("validate.po")
+POT_FILE = TranslationEngine.LOCALES_DIR / f"{TranslationEngine.DOMAIN}.pot"
+
+
+def po_file_for_language(lang: str) -> Path:
+    return TranslationEngine.LOCALES_DIR / f"{lang}.po"
+
+
+def mo_file_for_language(lang: str) -> Path:
+    return TranslationEngine.LOCALES_DIR / f"{lang}/LC_MESSAGES/{TranslationEngine.DOMAIN}.mo"
+
 
 def generate_translations(validate: bool):
-    messages = [ButtonMessages, Messages, SettingsMessages, MeetingMessages, Weekday, Month, MonthShort]
+    messages = [ButtonMessages, Messages, SettingsMessages, MeetingMessages, Weekday, Month, MonthShort, Languages]
 
-    po_path = (
-        Path("validate.po")
-        if validate
-        else TranslationEngine.LOCALES_DIR / f"en/LC_MESSAGES/{TranslationEngine.DOMAIN}.po"
-    )
+    po_path = VALIDATE_PO_FILE if validate else po_file_for_language("en")
 
     with open(po_path, "w") as f:
         f.write(METADATA)
@@ -61,7 +70,7 @@ def generate_translations(validate: bool):
     if validate:
         return
 
-    shutil.copy(po_path, TranslationEngine.LOCALES_DIR / f"{TranslationEngine.DOMAIN}.pot")
+    shutil.copy(po_path, POT_FILE)
 
 
 def print_diff_line(line: str):
@@ -74,13 +83,10 @@ def print_diff_line(line: str):
 
 
 def validate_translations() -> int:
-    # Load both po files, the real one and the one created for validation and using difflib
-    # diff both and find the differences
-
-    with open(TranslationEngine.LOCALES_DIR / f"en/LC_MESSAGES/{TranslationEngine.DOMAIN}.po") as f:
+    with open(po_file_for_language("en")) as f:
         real = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
-    with open("validate.po") as f:
+    with open(VALIDATE_PO_FILE) as f:
         validate = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
     if diff := list(difflib.unified_diff(real, validate)):
@@ -94,13 +100,12 @@ def validate_translations() -> int:
     return 0
 
 
-def validate_locales() -> int:
-    """Validate that all po files containe the same msgids."""
+def ensure_all_translations() -> int:
     console.print(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
 
     msgdis: dict[str, list[str]] = {}
     for lang in SUPPORTED_LANGUAGES:
-        with open(TranslationEngine.LOCALES_DIR / f"{lang}/LC_MESSAGES/{TranslationEngine.DOMAIN}.po") as f:
+        with open(po_file_for_language(lang)) as f:
             msgids = [line.split()[1] + "\n" for line in f.readlines() if line.startswith("msgid")]
             msgdis[lang] = msgids
 
@@ -123,24 +128,52 @@ def validate_locales() -> int:
     return 1
 
 
-@click.command()
-@click.option(
-    "--validate", is_flag=True, default=False, help="Validate translations showing if there is any difference."
-)
+@click.group("translations")
+def cli():
+    """All commands related to translations management."""
+    pass
+
+
+@cli.command()
+def update():
+    """Update the English translation file with every message available in mitup_bot.utils.messages"""
+    generate_translations(False)
+    success("English file updated successfully.")
+
+
+@cli.command()
 @click.pass_context
-def cli(ctx: click.Context, validate: bool):
-    """
-    Generate translation files for English and POT file. If --validate is provided the files are not generated.
-    Instead, the existing one will be validated showing if there is any difference with the latest values of the
-    strings in the code. This will also validate that all supported languages have the same messages available.
-    """
-    generate_translations(validate)
+def validate_ids(ctx: click.Context):
+    """Ensure that all messages are present in the source translation file."""
+    generate_translations(True)
+    ctx.exit(validate_translations())
 
-    if not validate:
-        success("Transations files generated successfully.")
-        return 0
 
-    return_code = validate_translations()
-    return_code += validate_locales()
+@cli.command()
+@click.pass_context
+def validate_locales(ctx: click.Context):
+    """Validate that all po files contain the same msgids."""
+    ctx.exit(ensure_all_translations())
 
-    ctx.exit(return_code)
+
+@cli.command()
+@click.pass_context
+def build(ctx: click.Context):
+    """Build all translations files for the bot."""
+    for lang in SUPPORTED_LANGUAGES:
+        po_path = po_file_for_language(lang)
+        mo_path = mo_file_for_language(lang)
+
+        if not po_path.exists():
+            print(f"ERROR: Po file {po_path} does not exist.")
+            ctx.exit(1)
+
+        # Compile po file
+        print(f"Compiling {lang!r} po file...")
+
+        try:
+            subprocess.run(["msgfmt", "-o", mo_path.absolute(), po_path.absolute()], check=True)
+            print(f"Successfully compiled {po_path} to {mo_path}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error compiling {po_path}: {e}")
+            ctx.exit(1)

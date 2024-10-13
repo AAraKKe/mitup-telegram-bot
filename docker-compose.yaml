@@ -50,7 +50,7 @@ services:
     volumes:
       - .:/bot
       - ./.docker_hatch:/.docker_hatch
-    command: hatch run dev:launch
+    command: bash -c "hatch run dev:update-locales && hatch run dev:launch"
 
   debug:
     <<: *launch-bot
