@@ -1,6 +1,5 @@
 import datetime as dt
 import difflib
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -9,16 +8,7 @@ import click
 from mitup_bot.__about__ import __version__ as version
 from mitup_bot.cli.helpers import console, error, success
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
-from mitup_bot.utils.messages import (
-    ButtonMessages,
-    Languages,
-    MeetingMessages,
-    Messages,
-    Month,
-    MonthShort,
-    SettingsMessages,
-    Weekday,
-)
+from mitup_bot.utils.messages import MessageBase
 
 METADATA = f"""
 # MitupBot translations files.
@@ -44,46 +34,44 @@ VALIDATE_PO_FILE = Path("validate.po")
 POT_FILE = TranslationEngine.LOCALES_DIR / f"{TranslationEngine.DOMAIN}.pot"
 
 
-def po_file_for_language(lang: str) -> Path:
-    return TranslationEngine.LOCALES_DIR / f"{lang}.po"
+def po_file_for_language(lang: str, validate: bool = False) -> Path:
+    return VALIDATE_PO_FILE if validate else TranslationEngine.LOCALES_DIR / f"{lang}.po"
 
 
 def mo_file_for_language(lang: str) -> Path:
     return TranslationEngine.LOCALES_DIR / f"{lang}/LC_MESSAGES/{TranslationEngine.DOMAIN}.mo"
 
 
-def generate_translations(validate: bool):
-    messages = [ButtonMessages, Messages, SettingsMessages, MeetingMessages, Weekday, Month, MonthShort, Languages]
+def all_messages() -> list[type[MessageBase]]:
+    # Get all classes from translations that are of type MessageBase
+    return [cls for cls in MessageBase.__subclasses__() if cls != MessageBase]
 
-    po_path = VALIDATE_PO_FILE if validate else po_file_for_language("en")
+
+def generate_translations(validate: bool):
+    po_path = po_file_for_language("en", validate)
 
     with open(po_path, "w") as f:
         f.write(METADATA)
 
         f.write("\n\n#: mitup_bot/utils/messages.py\n")
-        for message_class in messages:
+        for message_class in all_messages():
             for message in message_class:
                 msgstr = repr(message.value)[1:-1].replace('"', r"\"")
                 f.write(f'\nmsgid "{message.id()}"\n')
                 f.write(f'msgstr "{msgstr}"\n')
 
-    if validate:
-        return
-
-    shutil.copy(po_path, POT_FILE)
-
 
 def print_diff_line(line: str):
     if line.startswith("-"):
-        console.print(f"[red bold]{line}[/]", end="")
+        console().print(f"[red bold]{line}[/]", end="")
     elif line.startswith("+"):
-        console.print(f"[green bold]{line}[/]", end="")
+        console().print(f"[green bold]{line}[/]", end="")
     else:
-        console.print(line, end="")
+        console().print(line, end="")
 
 
 def validate_translations() -> int:
-    with open(po_file_for_language("en")) as f:
+    with open(po_file_for_language("en", False)) as f:
         real = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
     with open(VALIDATE_PO_FILE) as f:
@@ -101,7 +89,7 @@ def validate_translations() -> int:
 
 
 def ensure_all_translations() -> int:
-    console.print(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
+    console().print(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
 
     msgdis: dict[str, list[str]] = {}
     for lang in SUPPORTED_LANGUAGES:
@@ -128,7 +116,7 @@ def ensure_all_translations() -> int:
     return 1
 
 
-@click.group("translations")
+@click.group()
 def cli():
     """All commands related to translations management."""
     pass
@@ -165,15 +153,19 @@ def build(ctx: click.Context):
         mo_path = mo_file_for_language(lang)
 
         if not po_path.exists():
-            print(f"ERROR: Po file {po_path} does not exist.")
+            error(f"ERROR: Po file {po_path} does not exist.")
             ctx.exit(1)
 
+        if not mo_path.parent.exists():
+            console().print(f"Creating mo path for language {lang}")
+            mo_path.parent.mkdir(parents=True)
+
         # Compile po file
-        print(f"Compiling {lang!r} po file...")
+        console().print(f"Compiling {lang!r} mo file...")
 
         try:
             subprocess.run(["msgfmt", "-o", mo_path.absolute(), po_path.absolute()], check=True)
-            print(f"Successfully compiled {po_path} to {mo_path}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error compiling {po_path}: {e}")
+            success(f"Successfully compiled {po_path} to {mo_path}")
+        except Exception as e:
+            error(f"Error compiling {po_path}: {e}")
             ctx.exit(1)

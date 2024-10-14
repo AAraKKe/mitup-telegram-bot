@@ -1,7 +1,7 @@
 import gettext
 from pathlib import Path
 
-SUPPORTED_LANGUAGES = ["en", "es"]
+SUPPORTED_LANGUAGES = ["en", "es_ES"]
 
 
 class TranslationEngine:

@@ -13,7 +13,7 @@ from mitup_bot.cli.helpers import console, error, success
 
 
 def update_lambda_code(lambda_client: LambdaClient, name: str, image: str):
-    with console.status(f"Updating {name} lambda code..."):
+    with console().status(f"Updating {name} lambda code..."):
         lambda_client.update_function_code(FunctionName=name, ImageUri=image, Publish=True)
         function = lambda_client.get_function(FunctionName=name)
 
@@ -32,14 +32,14 @@ def update_lambda_code(lambda_client: LambdaClient, name: str, image: str):
 
         if status == "Failed":
             error(f"Failed updating code for lambda {name} for the following reason:")
-            console.print(function["Configuration"].get("LastUpdateStatusReason"))
+            console().print(function["Configuration"].get("LastUpdateStatusReason"))
             raise click.Abort()
 
         success(f"Lambda {name} function code updated")
 
 
 def invoke_lambda(lambda_client: LambdaClient, name: str):
-    with console.status(f"Invoking lambda function {name}..."):
+    with console().status(f"Invoking lambda function {name}..."):
         payload = {"action": "upgrade", "revision": "head"}
         response = lambda_client.invoke(
             FunctionName=name,
@@ -47,7 +47,7 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
             Payload=json.dumps(payload),
         )
 
-        console.rule("[bold]Log[/bold]")
+        console().rule("[bold]Log[/bold]")
         result = base64.b64decode(response["LogResult"]).decode().splitlines()
         for line in result:
             if not line:
@@ -58,18 +58,18 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
                 json_event = json.loads(line)
             except json.JSONDecodeError:
                 # Cannot parse as json, i.e. it is just a line
-                console.print(line)
+                console().print(line)
             else:
                 if "log_level" in json_event and json_event["log_level"] == "ERROR":
                     # Error log
-                    console.print(f"[bold red]Lambda failed execution: {json_event['errorMessage']}[/]")
-                    console.print("Stack trace:")
+                    console().print(f"[bold red]Lambda failed execution: {json_event['errorMessage']}[/]")
+                    console().print("Stack trace:")
                     for stack_line in json_event["stackTrace"]:
-                        console.print(stack_line)
+                        console().print(stack_line)
                 if "type" in json_event and json_event["type"] == "platform.report":
                     exec_time = json_event["record"]["metrics"]["durationMs"]
                     # Report execution, can get ifnormation about time
-                    console.rule(f"[bold]Lambda {name} run in {exec_time} ms")
+                    console().rule(f"[bold]Lambda {name} run in {exec_time} ms")
 
         if response["StatusCode"] != 200 or "FunctionError" in response:
             function_error = response["FunctionError"]
@@ -80,8 +80,8 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
 
 
 def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> str:
-    with console.status(f"Registering task definition {family!r}..."):
-        console.print(f"ECR image: {image}")
+    with console().status(f"Registering task definition {family!r}..."):
+        console().print(f"ECR image: {image}")
 
         task_def = ecs_client.describe_task_definition(taskDefinition=family)
         if (containers_definition := task_def["taskDefinition"].get("containerDefinitions")) is None:
@@ -120,7 +120,7 @@ def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> 
 
 
 def update_ecs_service(ecs_client: ECSClient, task_definition: str, service: str, cluster: str):
-    with console.status(f"Updating ECS service {service!r}"):
+    with console().status(f"Updating ECS service {service!r}"):
         response = ecs_client.update_service(
             cluster=cluster,
             service=service,
@@ -179,7 +179,7 @@ def update_status_for_deployment(
 
 
 def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, service: str, task_definition_arn: str):
-    with console.status(f"Waiting for ECS service {service!r} to deploy") as status:
+    with console().status(f"Waiting for ECS service {service!r} to deploy") as status:
         response = ecs_client.describe_services(services=[service], cluster=cluster)
         deployment = update_status_for_deployment(status, response, task_definition_arn=task_definition_arn)
 

@@ -12,17 +12,10 @@ from click.testing import CliRunner
 from mypy_boto3_ecs import ECSClient
 from mypy_boto3_ecs.type_defs import DescribeServicesResponseTypeDef
 from mypy_boto3_lambda import LambdaClient
-from rich.console import Capture, Console
+from rich.console import Capture
 from rich.status import Status
 
-from mitup_bot.cli import helpers
-
-# Make console not export colors and styles for testing
-# Override before importing the deploy module. This needs to be done
-# better but don't want to introduce a lot of complexity for testing
-helpers.console = Console(force_interactive=False, force_terminal=False)
-
-from mitup_bot.cli.commands import deploy  # noqa: E402
+from mitup_bot.cli.commands import deploy
 
 
 @dataclass
@@ -89,7 +82,7 @@ class DeploymentContext:
             mock_client.side_effect = lambda service, region_name: client_mapping[service]
             self.setup_lambda_returns()
             self.setup_ecs_returns()
-            with deploy.console.capture() as capture:
+            with deploy.console().capture() as capture:
                 # Also capture the output to the console
                 yield (
                     self.lambda_client,
@@ -99,13 +92,13 @@ class DeploymentContext:
 
 
 def test_success_formatter():
-    with deploy.console.capture() as capture:
+    with deploy.console().capture() as capture:
         deploy.success("Success!")
     assert capture.get() == "✔︎ Success!\n"
 
 
 def test_error_formatter():
-    with deploy.console.capture() as capture:
+    with deploy.console().capture() as capture:
         deploy.error("Error!")
     assert capture.get() == "✘ Error!\n"
 
@@ -121,8 +114,8 @@ def expected_rule(message: str) -> str:
     # While we can get a ruler in the same way with simple f-strings we don't want
     # to couple the test with whatever style we want to use. We just care about
     # having a ruler being printed with a give message. Use console to get it
-    with deploy.console.capture() as capture:
-        deploy.console.rule(message)
+    with deploy.console().capture() as capture:
+        deploy.console().rule(message)
     return capture.get().replace("\n", "")
 
 

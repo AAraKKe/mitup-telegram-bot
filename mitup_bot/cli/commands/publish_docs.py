@@ -20,7 +20,7 @@ def s3_sync() -> list[str]:
     """
     bucket = f"s3://{os.environ["BOT_DOMAIN"]}/"
 
-    console.rule(f"Syncing files to {bucket}")
+    console().rule(f"Syncing files to {bucket}")
 
     command = ["aws", "s3", "sync", "site", bucket, "--delete", "--size-only", "--no-progress"]
     outputs = subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0]
@@ -32,7 +32,7 @@ def s3_sync() -> list[str]:
         if not line:
             # Avoid empty lines that can come with the logs
             continue
-        console.print(line)
+        console().print(line)
         uploaded.append(line.replace("site/", "/").split()[1])
 
     return uploaded
@@ -52,10 +52,10 @@ def get_distribution_id(client: CloudFrontClient) -> str:
 
     if distribution is None:
         error(f"No distributions found. Reponse: {distribution}")
-        console.print(distributions)
+        console().print(distributions)
         raise click.Abort()
 
-    console.print("[bold]Distribution ID[/bold]:", distribution[0]["Id"])
+    console().print("[bold]Distribution ID[/bold]:", distribution[0]["Id"])
 
     return distribution[0]["Id"]
 
@@ -72,10 +72,10 @@ def cli():
     docs_files_updated = s3_sync()
 
     if docs_files_updated == []:
-        console.print("No files have been updated. No need to invalidate the cache.")
+        console().print("No files have been updated. No need to invalidate the cache.")
         return
 
-    console.rule("Invalidating CloudFront cache")
+    console().rule("Invalidating CloudFront cache")
 
     # Cloufront sits in us-east-1 as it uses Edge to reach to other regions
     client = boto3.client("cloudfront", region_name="us-east-1")
@@ -91,8 +91,8 @@ def cli():
             "CallerReference": f"mitup-ci-{os.environ['CI_COMMIT_SHORT_SHA']}",
         },
     }
-    console.print("[bold]Invalidation request[/bold]:")
-    console.print(request)
+    console().print("[bold]Invalidation request[/bold]:")
+    console().print(request)
     response = client.create_invalidation(**request)
 
     if response["ResponseMetadata"]["HTTPStatusCode"] != 201:
