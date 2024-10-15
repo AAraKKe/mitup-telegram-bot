@@ -23,6 +23,7 @@ from mitup_bot.cli.commands.translations import (
 from mitup_bot.cli.helpers import console
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from tests.helpers import MITUP_DIR
+from tests.helpers import console as test_console
 
 
 @pytest.mark.parametrize(
@@ -112,9 +113,12 @@ def test_build_fails_if_subprocess_fails(subprocess_mock: mock.Mock, mo_mock: mo
 
     assert result.exit_code == 1
     assert (
-        f"Error compiling {po_file_for_language("en").absolute()}: Command 'msgfmt' returned non-zero exit status 1."
+        test_console.text_with_ansi_codes(
+            f"[bold red]✘ Error compiling {po_file_for_language("en").absolute()}: "
+            "Command 'msgfmt' returned non-zero exit status 1.[/]"
+        )
         # Console can break long messages in separate lines
-        in captured.replace("\n", " ").replace("  ", " ")
+        in captured
     )
 
 

@@ -55,7 +55,35 @@ filterwarnings = [
 asyncio_default_fixture_loop_scope="function"
 
 [tool.pyright]
-exclude = ["conftest.py"]
+exclude = [
+    "**/.vscode/**",
+    "**/__pycache__/**",
+    "**/.egg-info/**",
+    "**/.git/**",
+    "**/.mypy_cache/**",
+    "**/.pytest_cache/**",
+    "**/.hatch/**",
+    "**/*.egg-info/**",
+    "aws",
+    "site",
+    "test.py",
+    "dist",
+    "conftest.py"
+]
+ignore = [
+    "**/.vscode/**",
+    "**/__pycache__/**",
+    "**/.egg-info/**",
+    "**/.git/**",
+    "**/.mypy_cache/**",
+    "**/.pytest_cache/**",
+    "**/.hatch/**",
+    "**/*.egg-info/**",
+    "aws",
+    "site",
+    "test.py",
+    "dist"
+]
 
 [tool.coverage.run]
 branch = true
@@ -157,8 +185,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.dev.scripts]
-test = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests"
-test-cov = "pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json"
+test = "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests"
+test-cov = "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json"
 format = "ruff format  ."
 format-check = "ruff format --diff --check ."
 lint = "ruff check {args:} --diff --unsafe-fixes ."

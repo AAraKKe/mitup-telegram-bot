@@ -16,6 +16,7 @@ from rich.console import Capture
 from rich.status import Status
 
 from mitup_bot.cli.commands import deploy
+from tests.helpers import console
 
 
 @dataclass
@@ -91,32 +92,11 @@ class DeploymentContext:
                 )
 
 
-def test_success_formatter():
-    with deploy.console().capture() as capture:
-        deploy.success("Success!")
-    assert capture.get() == "✔︎ Success!\n"
-
-
-def test_error_formatter():
-    with deploy.console().capture() as capture:
-        deploy.error("Error!")
-    assert capture.get() == "✘ Error!\n"
-
-
 @pytest.fixture(autouse=True)
 def mock_sleep():
     # Just make sure we do not sleep for tests
     with mock.patch("mitup_bot.cli.commands.deploy.time"):
         yield
-
-
-def expected_rule(message: str) -> str:
-    # While we can get a ruler in the same way with simple f-strings we don't want
-    # to couple the test with whatever style we want to use. We just care about
-    # having a ruler being printed with a give message. Use console to get it
-    with deploy.console().capture() as capture:
-        deploy.console().rule(message)
-    return capture.get().replace("\n", "")
 
 
 def test_update_lambda_code_succeeds_after_retry():
@@ -141,7 +121,7 @@ def test_update_lambda_code_succeeds_after_retry():
         Publish=True,
     )
     context.assert_lambda_called("get_function", n=3, FunctionName="MyLambda")
-    assert "✔︎ Lambda MyLambda function code updated" in capture.get()
+    assert console.text_with_ansi_codes("[bold green]✔︎ Lambda MyLambda function code updated[/]") in capture.get()
 
 
 def test_update_lambda_code_fails_aborting_command():
@@ -170,7 +150,15 @@ def test_update_lambda_code_fails_aborting_command():
         Publish=True,
     )
     context.assert_lambda_called("get_function", n=2, FunctionName="MyLambda")
-    assert "✘ Failed updating code for lambda MyLambda for the following reason:\nSomeReason" in capture.get()
+
+    captured = capture.get()
+    assert (
+        console.text_with_ansi_codes(
+            "[bold red]✘ Failed updating code for lambda MyLambda for the following reason:[/]"
+        )
+        in captured
+    )
+    assert "SomeReason" in captured
 
 
 @pytest.mark.parametrize(
@@ -225,19 +213,16 @@ def test_invoke_lambda_succeeds():
     )
 
     # Validate output in the correct order to report
-    expected_output = (
-        "\n".join(
-            [
-                expected_rule("Log"),
-                "This is a log line",
-                "And this is another",
-                expected_rule("Lambda MyLambda run in 123.123 ms"),
-                "✔︎ Lambda MyLambda finished successfully",
-            ]
-        )
-        + "\n"
+    expected_output = "\n".join(
+        [
+            console.rule("[bold]Log[/bold]").replace("\n", ""),
+            "This is a log line",
+            "And this is another",
+            console.rule("[bold]Lambda MyLambda run in 123.123 ms").replace("\n", ""),
+            console.text_with_ansi_codes("[bold green]✔︎ Lambda MyLambda finished successfully[/]"),
+        ]
     )  # Always ends with a new line
-    assert expected_output == capture.get()
+    assert expected_output in capture.get()
 
 
 @pytest.mark.parametrize("error_code", [400, 200], ids=["failure_400", "200_with_function_error"])
@@ -302,9 +287,11 @@ def test_invoke_lambda_fails_on_execution_and_error_is_logged():
         Payload=payload,
     )
 
-    assert "Lambda failed execution: This thing is broken!" in capture.get()
-    assert "Stack trace:\nline1\nline2\n" in capture.get()
-    assert "✘ Error invoking lambda MyLambda: FunctionIsBroken" in capture.get()
+    captured = capture.get()
+
+    assert console.text_with_ansi_codes("[bold red]Lambda failed execution: This thing is broken![/]") in captured
+    assert "Stack trace:\nline1\nline2\n" in captured
+    assert console.text_with_ansi_codes("[bold red]✘ Error invoking lambda MyLambda: FunctionIsBroken[/]") in captured
 
 
 def test_register_task_definition_succeeds():
@@ -344,16 +331,13 @@ def test_register_task_definition_succeeds():
         "register_task_definition", family=family, containerDefinitions=container_definitions, executionRoleArn=role
     )
     assert result == task_arn
-    expected_outputs = (
-        "\n".join(
-            [
-                f"ECR image: {image}",
-                f"✔︎ New task definition defined for family {family!r}, revision: 20",
-            ]
-        )
-        + "\n"
+
+    captured = capture.get()
+    assert f"ECR image: {image}" in captured
+    assert (
+        console.text_with_ansi_codes("[bold green]✔︎ New task definition defined for family 'MyTask', revision: 20[/]")
+        in captured
     )
-    assert expected_outputs == capture.get()
 
 
 def test_register_task_definition_when_failing():
@@ -392,8 +376,15 @@ def test_register_task_definition_when_failing():
         containerDefinitions=container_definitions,
         executionRoleArn=role,
     )
-    expected_output = f"ECR image: {image}\n✘ Error registering task definition for {family!r}: [StatusCode: 404]\n"
-    assert expected_output in capture.get()
+
+    captured = capture.get()
+    assert f"ECR image: {image}" in captured
+    assert (
+        console.text_with_ansi_codes(
+            f"[bold red]✘ Error registering task definition for {family!r}: [StatusCode: 404][/]"
+        )
+        in captured
+    )
 
 
 def task_definition_response_factory(container_definitions=True, execution_role=True):
@@ -519,7 +510,7 @@ def test_update_ecs_service_succeeds():
         deploy.update_ecs_service(ecs, "MyTask", "MyService", "MyCluster")
 
     context.assert_ecs_called("update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask")
-    assert "ECS service 'MyService' has been updated" in capture.get()
+    assert console.text_with_ansi_codes("[bold green]✔︎ ECS service 'MyService' has been updated[/]") in capture.get()
 
 
 def test_update_ecs_service_fails():
@@ -530,7 +521,10 @@ def test_update_ecs_service_fails():
             deploy.update_ecs_service(ecs, "MyTask", "MyService", "MyCluster")
 
     context.assert_ecs_called("update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask")
-    assert "Error updating ECS service 'MyService'. StatusCode: 404" in capture.get()
+    assert (
+        console.text_with_ansi_codes("[bold red]✘ Error updating ECS service 'MyService'. StatusCode: 404[/]")
+        in capture.get()
+    )
 
 
 def test_deployment_failes_while_waiting():
@@ -562,7 +556,9 @@ def test_deployment_succeeds_after_waiting():
         deploy.waiting_for_deployment_to_finish(ecs, "MyCluster", "MyService", "MyTask")
 
     context.assert_ecs_called("describe_services", services=["MyService"], cluster="MyCluster", n=3)
-    assert "ECS service 'MyService' successfuly deployed!" in capture.get()
+    assert (
+        console.text_with_ansi_codes("[bold green]✔︎ ECS service 'MyService' successfuly deployed![/]") in capture.get()
+    )
 
 
 def service_from_state_with_missing_data(rollout_state=True, rollout_state_reason=True) -> dict[str, Any]:

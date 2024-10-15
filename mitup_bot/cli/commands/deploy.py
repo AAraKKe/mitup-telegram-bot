@@ -47,36 +47,36 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
             Payload=json.dumps(payload),
         )
 
-        console().rule("[bold]Log[/bold]")
-        result = base64.b64decode(response["LogResult"]).decode().splitlines()
-        for line in result:
-            if not line:
-                # Avoid empty lines that can come with the logs
-                continue
+    console().rule("[bold]Log[/bold]")
+    result = base64.b64decode(response["LogResult"]).decode().splitlines()
+    for line in result:
+        if not line:
+            # Avoid empty lines that can come with the logs
+            continue
 
-            try:
-                json_event = json.loads(line)
-            except json.JSONDecodeError:
-                # Cannot parse as json, i.e. it is just a line
-                console().print(line)
-            else:
-                if "log_level" in json_event and json_event["log_level"] == "ERROR":
-                    # Error log
-                    console().print(f"[bold red]Lambda failed execution: {json_event['errorMessage']}[/]")
-                    console().print("Stack trace:")
-                    for stack_line in json_event["stackTrace"]:
-                        console().print(stack_line)
-                if "type" in json_event and json_event["type"] == "platform.report":
-                    exec_time = json_event["record"]["metrics"]["durationMs"]
-                    # Report execution, can get ifnormation about time
-                    console().rule(f"[bold]Lambda {name} run in {exec_time} ms")
+        try:
+            json_event = json.loads(line)
+        except json.JSONDecodeError:
+            # Cannot parse as json, i.e. it is just a line
+            console().print(line)
+        else:
+            if "log_level" in json_event and json_event["log_level"] == "ERROR":
+                # Error log
+                console().print(f"[bold red]Lambda failed execution: {json_event['errorMessage']}[/]")
+                console().print("Stack trace:")
+                for stack_line in json_event["stackTrace"]:
+                    console().print(stack_line)
+            if "type" in json_event and json_event["type"] == "platform.report":
+                exec_time = json_event["record"]["metrics"]["durationMs"]
+                # Report execution, can get ifnormation about time
+                console().rule(f"[bold]Lambda {name} run in {exec_time} ms")
 
-        if response["StatusCode"] != 200 or "FunctionError" in response:
-            function_error = response["FunctionError"]
-            error(f"Error invoking lambda {name}: {function_error}")
-            raise click.Abort()
+    if response["StatusCode"] != 200 or "FunctionError" in response:
+        function_error = response["FunctionError"]
+        error(f"Error invoking lambda {name}: {function_error}")
+        raise click.Abort()
 
-        success(f"Lambda {name} finished successfully")
+    success(f"Lambda {name} finished successfully")
 
 
 def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> str:
@@ -127,11 +127,11 @@ def update_ecs_service(ecs_client: ECSClient, task_definition: str, service: str
             taskDefinition=task_definition,
         )
 
-        status_code = response["ResponseMetadata"]["HTTPStatusCode"]
-        if status_code != 200:
-            error(f"Error updating ECS service {service!r}. StatusCode: {status_code}")
-            raise click.Abort()
-        success(f"ECS service {service!r} has been updated")
+    status_code = response["ResponseMetadata"]["HTTPStatusCode"]
+    if status_code != 200:
+        error(f"Error updating ECS service {service!r}. StatusCode: {status_code}")
+        raise click.Abort()
+    success(f"ECS service {service!r} has been updated")
 
 
 def update_status_for_deployment(
