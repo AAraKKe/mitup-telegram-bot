@@ -96,7 +96,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
             context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
 
             assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang="en"))
+            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],

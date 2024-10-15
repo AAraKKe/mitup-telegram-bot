@@ -143,7 +143,8 @@ async def meeting_accessible(
             or [
                 [
                     ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.get(lang=user.settings.language), callback_data=cb.MAIN_MENU
+                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user.settings.language)}",
+                        callback_data=cb.MAIN_MENU,
                     )
                 ]
             ],

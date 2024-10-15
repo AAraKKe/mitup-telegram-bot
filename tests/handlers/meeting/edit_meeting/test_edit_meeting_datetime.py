@@ -344,7 +344,9 @@ async def test_set_time_message_with_valid_time(
     api.assert_send_message_called(
         context,
         update,
-        meeting.edit_view.with_context(MeetingMessages.EDIT_TIME_SUCCESS.get(datetime=expected_time_displayed)),
+        meeting.edit_view.with_context(
+            MeetingMessages.EDIT_TIME_SUCCESS.get(lang=user_with_settings.lang, datetime=expected_time_displayed)
+        ),
     )
     api.assert_update_meeting_messages_called(mock_session, context, meeting)
 

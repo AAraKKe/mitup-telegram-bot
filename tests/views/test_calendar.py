@@ -20,6 +20,7 @@ def test_full_calendar_markup(lang: str):
         current_date=dt.date(2024, 7, 15),
         callback_data=DateCallbackData(entity="cal", action="go", id=1),
         navigation_callback_data=DateCallbackData(entity="nav", action="go", id=1),
+        lang=lang,
     )
 
     assert cal.keyboard == calendar_markup(lang)
@@ -31,95 +32,95 @@ def test_full_calendar_markup(lang: str):
         (
             dt.date(2024, 4, 22),
             lambda lang: [
-                [Month.APRIL.get(lang=lang), ButtonMessages.GO_FORWARD.get(lang=lang)],
-                ["2024", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [Month.APRIL.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2024, 4, 7),
             lambda lang: [
-                [Month.APRIL.get(lang=lang), ButtonMessages.GO_FORWARD.get(lang=lang)],
-                ["2024", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [Month.APRIL.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2024, 7, 22),
             lambda lang: [
-                [ButtonMessages.GO_BACK.get(lang=lang), "July", ButtonMessages.GO_FORWARD.get(lang=lang)],
-                ["2024", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [ButtonMessages.GO_BACK.get(), Month.JULY.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2024, 3, 12),
             lambda lang: [
-                [Month.MARCH.get(lang=lang), ButtonMessages.GO_FORWARD.get(lang=lang)],
-                ["2024", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [Month.MARCH.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2025, 5, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(lang=lang),
+                    ButtonMessages.GO_BACK.get(),
                     Month.MAY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
                 ],
-                [ButtonMessages.GO_BACK.get(lang=lang), "2025", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2025, 6, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(lang=lang),
+                    ButtonMessages.GO_BACK.get(),
                     Month.JUNE.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
                 ],
-                [ButtonMessages.GO_BACK.get(lang=lang), "2025", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2025, 7, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(lang=lang),
+                    ButtonMessages.GO_BACK.get(),
                     Month.JULY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
                 ],
-                [ButtonMessages.GO_BACK.get(lang=lang), "2025", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2024, 12, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(lang=lang),
+                    ButtonMessages.GO_BACK.get(),
                     Month.DECEMBER.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
                 ],
-                ["2024", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2025, 1, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(lang=lang),
+                    ButtonMessages.GO_BACK.get(),
                     Month.JANUARY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
                 ],
-                [ButtonMessages.GO_BACK.get(lang=lang), "2025", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
         (
             dt.date(2024, 7, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(lang=lang),
+                    ButtonMessages.GO_BACK.get(),
                     Month.JULY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
                 ],
-                ["2024", ButtonMessages.GO_FORWARD.get(lang=lang)],
+                ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),
     ],
@@ -144,6 +145,7 @@ def test_calendar_navigation_buttons(lang: str, current_date: dt.date, expected_
         current_date=current_date,
         callback_data=DateCallbackData(entity="cal", action="go", id=1),
         navigation_callback_data=DateCallbackData(entity="nav", action="go", id=1),
+        lang=lang,
     )
 
     # Navigations buttons are after the calendar rows

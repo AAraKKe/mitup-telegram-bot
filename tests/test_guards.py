@@ -167,7 +167,8 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
                 or [
                     [
                         ButtonConfig(
-                            text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang), callback_data=cb.MAIN_MENU
+                            text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
+                            callback_data=cb.MAIN_MENU,
                         )
                     ]
                 ],

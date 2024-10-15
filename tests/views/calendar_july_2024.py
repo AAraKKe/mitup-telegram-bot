@@ -188,12 +188,12 @@ def calendar_markup(lang: str) -> list[list[ButtonConfig]]:
         # Month navigation buttons
         [
             ButtonConfig(
-                text=str(ButtonMessages.GO_BACK),
+                text=str(ButtonMessages.GO_BACK.get()),
                 callback_data=DateCallbackData(entity="nav", action="go", id=1).with_date(dt.date(2024, 6, 16)),
             ),
-            ButtonConfig(text=str(MonthList[6]), callback_data=cb.EMPTY),
+            ButtonConfig(text=str(MonthList[6].get(lang=lang)), callback_data=cb.EMPTY),
             ButtonConfig(
-                text=str(ButtonMessages.GO_FORWARD),
+                text=str(ButtonMessages.GO_FORWARD.get()),
                 callback_data=DateCallbackData(entity="nav", action="go", id=1).with_date(dt.date(2024, 8, 16)),
             ),
         ],
@@ -201,7 +201,7 @@ def calendar_markup(lang: str) -> list[list[ButtonConfig]]:
         [
             ButtonConfig(text=str(2024), callback_data=cb.EMPTY),
             ButtonConfig(
-                text=str(ButtonMessages.GO_FORWARD),
+                text=str(ButtonMessages.GO_FORWARD.get()),
                 callback_data=DateCallbackData(entity="nav", action="go", id=1).with_date(dt.date(2025, 7, 16)),
             ),
         ],

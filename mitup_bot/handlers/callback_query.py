@@ -218,7 +218,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.get(lang=user.lang),
+                    text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user.lang)}",
                     callback_data=cb.MAIN_MENU,
                 )
             ]

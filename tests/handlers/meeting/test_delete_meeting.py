@@ -138,7 +138,7 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
                     keyboard=[
                         [
                             ButtonConfig(
-                                text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang),
+                                text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
                                 callback_data=cb.MAIN_MENU,
                             )
                         ]
@@ -216,7 +216,7 @@ async def test_confirm_delete_meeting_works(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang),
+                    text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
                     callback_data=cb.MAIN_MENU,
                 )
             ]

@@ -64,7 +64,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
 
     session.flush()
 
-    message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
 
     await api.send_message(context=context, update=update, view=view)
@@ -104,7 +104,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
 
     session.flush()
 
-    message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
 
     await api.send_message(context=context, update=update, view=view)

@@ -1,359 +1,374 @@
-
-# MitupBot translations files.
-# Copyright (C) 2024
-# This file is distributed under the same license as the mitup_telegram_bot package.
-# J. P. Araque, 2024.
-# E. Araque, 2024.
-
 msgid ""
 msgstr ""
-"Project-Id-Version: mitup_bot 0.0.1\n"
+"Project-Id-Version: mitupbot-20\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-10-05 18:44\n"
-"Language: en\n"
+"PO-Revision-Date: 2024-10-13 14:34\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
+"X-Crowdin-SourceKey: msgstr\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-
-
-#: mitup_bot/utils/messages.py
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Crowdin-Project: mitupbot-20\n"
+"X-Crowdin-Project-ID: 724481\n"
+"X-Crowdin-Language: es-ES\n"
+"X-Crowdin-File: /main/mitup_bot/locales/en.po\n"
+"X-Crowdin-File-ID: 64\n"
+"Language-Team: Spanish\n"
 
 msgid "ButtonMessages.NEW_MEETING"
-msgstr "➕ New meeting"
+msgstr "➕ Nueva quedada"
 
 msgid "ButtonMessages.ACTIVE_MEETINGS"
-msgstr "📂 Your active meetings"
+msgstr "📂 Tus quedadas activas"
 
 msgid "ButtonMessages.PAST_MEETINGS"
-msgstr "💾 Your past meetings"
+msgstr "💾 Tus quedadas pasadas"
 
 msgid "ButtonMessages.JOINED_MEETINGS"
-msgstr "👥 Joined meetings"
+msgstr "👥 Te has unido"
 
 msgid "ButtonMessages.SETTINGS"
-msgstr "⚙️ Settings"
+msgstr "⚙️ Ajustes"
 
 msgid "ButtonMessages.HELP"
-msgstr "❓ Help"
+msgstr "❓ Ayuda"
 
 msgid "ButtonMessages.COLLABORATE"
-msgstr "♥ Collaborate"
+msgstr "♥ Colabora"
 
 msgid "ButtonMessages.LANGUAGE"
-msgstr "🔣 Language"
+msgstr "🔣 Idioma"
 
 msgid "ButtonMessages.TIMEOUT"
-msgstr "⌛ Timeout"
+msgstr "⌛ Prórroga"
 
 msgid "ButtonMessages.NOTIFICATIONS"
-msgstr "⏰ Notifications"
+msgstr "⏰ Notificaciones"
 
 msgid "ButtonMessages.TIMEZONE"
-msgstr "🌐 Timezone"
+msgstr "🌐 Zona horaria"
 
 msgid "ButtonMessages.DEFAULT_OPTIONS"
-msgstr "👥 Default Options"
+msgstr "👥 Opciones Predefinidas"
 
 msgid "ButtonMessages.PRIVACY"
-msgstr "🛡️ Privacy"
+msgstr "🛡️ Privacidad"
 
 msgid "ButtonMessages.MAIN_MENU"
-msgstr "≪ Main Menu"
+msgstr "≪ Menú Principal"
 
 msgid "ButtonMessages.CANCEL"
-msgstr "❌ Cancel"
+msgstr "❌ Cancelar"
 
 msgid "ButtonMessages.TITLE"
-msgstr "🅰️ Title"
+msgstr "🅰️ Título"
 
 msgid "ButtonMessages.DESCRIPTION"
-msgstr "📄 Description"
+msgstr "📄 Descripción"
 
 msgid "ButtonMessages.DATE"
-msgstr "🗓️ Date"
+msgstr "🗓️ Fecha"
 
 msgid "ButtonMessages.CLOCK"
-msgstr "🕒 Time"
+msgstr "🕒 Hora"
 
 msgid "ButtonMessages.SET_TIME"
-msgstr "🕒 Set time"
+msgstr "🕒 Establecer hora"
 
 msgid "ButtonMessages.PARTICIPANTS"
-msgstr "👥 Participants"
+msgstr "👥 Participantes"
 
 msgid "ButtonMessages.LOCATION"
-msgstr "🗺️ Location"
+msgstr "🗺️ Lugar"
 
 msgid "ButtonMessages.DONE"
-msgstr "✅ Done"
+msgstr "✅ Hecho"
 
 msgid "ButtonMessages.JOIN"
-msgstr "✅ Join"
+msgstr "✅ Unirse"
 
 msgid "ButtonMessages.INVITE"
-msgstr "😄 Invite"
+msgstr "😄 Invitar"
 
 msgid "ButtonMessages.LEAVE"
-msgstr "❌ Leave"
+msgstr "❌ Salirse"
 
 msgid "ButtonMessages.DELETE"
-msgstr "🗑️ Delete"
+msgstr "🗑️ Borrar"
 
 msgid "ButtonMessages.EDIT"
-msgstr "✏️ Edit"
+msgstr "✏️ Editar"
 
 msgid "ButtonMessages.SHARE"
-msgstr "📨 Share"
+msgstr "📨 Compartir"
 
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
 
 msgid "ButtonMessages.GO_BACK"
-msgstr "≪"
+msgstr "<<"
 
 msgid "ButtonMessages.GO_FORWARD"
-msgstr "≫"
+msgstr ">>"
 
 msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Edit"
+msgstr "≪ Editar"
 
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
-msgstr "🅰️ Name"
+msgstr "🅰️ Nombre"
 
 msgid "ButtonMessages.MEETING_LOCATION_COORDINATES"
-msgstr "📍 Location"
+msgstr "📍 Ubicación"
 
 msgid "ButtonMessages.MEETING_MAX_PARTICIPANTS"
-msgstr "Max participants"
+msgstr "Límite de personas"
 
 msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
-msgstr "No limit"
+msgstr "Sin límite"
 
 msgid "ButtonMessages.MEETING_KICK_OUT"
-msgstr "Kick out"
+msgstr "Expulsar"
 
 msgid "ButtonMessages.CONFIRM"
-msgstr "✅ Confirm"
+msgstr "✅ Confirmar"
 
 msgid "ButtonMessages.DECLINE"
-msgstr "❌ Decline"
+msgstr "❌ Rechazar"
 
 msgid "ButtonMessages.DELETE_DATE"
-msgstr "🗑️ Delete date"
+msgstr "🗑️ Eliminar fecha"
 
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
-msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
+msgstr "¡Bienvenido a MitUp Bot!\n\n"
+"Elige una de las siguientes opciones:"
 
 msgid "Messages.DEFAULT_SETTINGS_DESCRIPTION"
-msgstr "Configure MitUp."
+msgstr "Configura MitUp."
 
 msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
-msgstr "Your timezone is set to *${timezone}*. \nSend me the name of your city or your location to set your timezone or touch in *Cancel* to go back."
+msgstr "Tu zona horaria es *${timezone}*.\n"
+"Envíame el nombre de tu ciudad o tu localización para configurar tu zona horaria o toca en *Cancelar* para volver."
 
 msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
-msgstr "Your timezone has been set to: *${timezone}* "
+msgstr "Tu zona horaria ha sido establecida a: *${timezone}* "
 
 msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
-msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n**Important**: we do not store your location and this information is only used to configure your timezone."
+msgstr "¡Bienvenido a MitUp Bot ${first_name}!\n\n"
+"Vamos a comenzar estableciendo tu zona horaria. Para ello puedes mandarme el nombre de tu ciudad o, para un mejor resultado, tu ubicación tocando en 📎 y seleccionando Ubicación.\n\n"
+"**Importante**: no guardamos tu ubicación y solo se utiliza para encontrar la zona horaria."
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
-msgstr "Perfect! Your timezone is ${timezone}"
+msgstr "¡Perfecto! Tu zona horaria es ${timezone}"
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
-msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
+msgstr "Lo siento, no pude establecer tu zona horaria. Por favor, inténtalo de nuevo."
+
+msgid "SettingsMessages.SELECT_LANGUAGE"
+msgstr "Selecciona un idioma"
 
 msgid "MeetingMessages.CREATE"
-msgstr "Lets create a meeting. What is the title?"
+msgstr "Vamos a crear una quedada. Dime cual será el título"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
-msgstr "A meeting has been created with the title: *${title}*\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
+msgstr "Se ha creado una quedada con el título ${title}.\n\n"
+"Puedes añadir más información a la quedada. Los campos que no se rellenen al crear la quedada no se mostrarán cuando se comparta.\n\n"
+"Cuando acabes pulsa en ✅ Hecho"
 
 msgid "MeetingMessages.CREATED_BY"
-msgstr "Created by: ${owner}"
+msgstr "Creada por: ${owner}"
 
 msgid "MeetingMessages.DESCRIPTION_NOT_SET"
-msgstr "🚫 No description defined 🚫"
+msgstr "🚫 No hay descripción 🚫"
 
 msgid "MeetingMessages.DATE_NOT_SET"
-msgstr "🚫 No time defined 🚫"
+msgstr "🚫 Sin hora definida 🚫"
 
 msgid "MeetingMessages.LOCATION_NOT_SET"
-msgstr "🚫 No location defined 🚫"
+msgstr "🚫 Sin lugar definido 🚫"
 
 msgid "MeetingMessages.EMPTY"
-msgstr "Empty"
+msgstr "Vacío"
 
 msgid "MeetingMessages.PARTICIPANT"
-msgstr "Participant"
+msgstr "Participante"
 
 msgid "MeetingMessages.PARTICIPANTS"
-msgstr "Participants"
+msgstr "Participantes"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS"
-msgstr "(Max: ${max_participants})"
+msgstr "(Máximo: ${max_participants})"
 
 msgid "MeetingMessages.MEETING_WITHOUT_DESCRIPTION"
-msgstr "_This meeting has no description yet_"
+msgstr "_Esta quedada aún no tiene descripción_"
 
 msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
-msgstr "_This meeting has no participants yet_"
+msgstr "_Esta quedada aún no tiene un número máximo de participantes_"
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
-msgstr "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"
+msgstr "Este es el título actual de la quedada:\n"
+"*${title}*\n\n"
+"Envíame el nuevo título"
 
 msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
-msgstr "This is the current description of your meeting:\n${description}\n\n Send me the new one"
+msgstr "Esta es la descripción actual de la quedada:\n"
+"${description}\n\n"
+"Envíame la nueva descripción"
 
 msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "The title has been properly set to: *${title}*"
+msgstr "El título se ha establecido correctamente como *${title}*"
 
 msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "The description has been properly set to: *${description}*"
+msgstr "La descripción se ha guardado correctamente como *${description}*"
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION"
-msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
+msgstr "Una quedada puede tener una ubicación asociada. Puedes indicar solo su nombre o también añadir la locación. Escoge cualquiera de las dos opciones."
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME"
-msgstr "Send me the name of the place."
+msgstr "Envíame el nombre del lugar donde será la quedada."
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
-msgstr "_Only from the phone 📱_\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
+msgstr "_Sólo desde el teléfono 📱_\n\n"
+"Envíame la localización de la quedada. Toca en el icono 📎 y selecciona Ubicación. Puedes escoger la localización que quieras, no solo tu ubicación actual."
 
 msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "The name of the location has been set to: *${name}*"
+msgstr "El lugar de la quedada ha sido guardado como: ${name}*"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
-msgstr "The location has been saved successfuly"
+msgstr "La ubicación de la quedada ha sido guardada correctamente"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
-msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
+msgstr "Envíame la ubicación otra vez. Recuerda tocar el icono del clip y elegir ubicación."
 
 msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
-msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
+msgstr "Aquí podrás gestionar los participantes de la quedada: puedes establecer el número máximo de personas que pueden asistir, así como expulsar a cualquiera de los participantes."
 
 msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
-msgstr "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) or press in _No limit_ to allow an unlimited number of participants."
+msgstr "Envíame el número máximo de miembros permitidos en la quedada \\(debe ser un número superior a 0\\) o selecciona _Ilimitado_ para permitir un número ilimitado de participantes."
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
-msgstr "The maximum number of participants has been set to: *${max_participants}*"
+msgstr "Se ha establecido correctamente un máximo de *${max_participants}* participantes"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
-msgstr "No limit"
+msgstr "Sin límite"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
-msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
+msgstr "El número máximo de participantes debe ser superior a 0. Por favor, inténtalo de nuevo"
 
 msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
-msgstr "These are the users that joined the meeting. Choose who you want to kick out."
+msgstr "Estas son las personas que se han unido a la quedada. Escoge a quien quieres expulsar."
 
 msgid "MeetingMessages.DELETE_MEETING"
-msgstr "Are you sure you want to delete this meeting?"
+msgstr "¿Estás seguro de que quieres eliminar esta quedada?"
 
 msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
-msgstr "The meeting has been deleted successfully"
+msgstr "La quedada se ha eliminado correctamente"
 
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
-msgstr "The meeting won't be deleted"
+msgstr "La quedada no se ha borrado"
 
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
-msgstr "This meeting has been deleted"
+msgstr "Esta qudada ha sido borrada"
 
 msgid "MeetingMessages.EDIT_DATE"
-msgstr "Select the new date. Press **🗑️ Delete date** if you want to unset the date and time of the meeting."
+msgstr "Seleccione la nueva fecha. Presione **🗑️ Eliminar fecha** si desea eliminar la fecha y hora de la quedada."
 
 msgid "MeetingMessages.ADD_DATE"
-msgstr "Select the date."
+msgstr "Selecciona la fecha."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to: **${datetime}**. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
+msgstr "La fecha ha sido fijada a: **${datetime}**. Para configurar la hora de la quedada selecciona _${set_time_button}_ o pulsa _${back_edit_button}_ para volver a editar la quedada."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "The date has been set to: **${datetime}**"
+msgstr "La fecha de la quedada se ha establecido para el **${datetime}**"
 
 msgid "MeetingMessages.EDIT_TIME"
-msgstr "Send me the time of the meeting in the format _HH:MM_"
+msgstr "Enviarme la hora de la reunión usando el formato _HH:MM_ \\(por ejemplo, 21:30\\)"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "The time of the meeting has been set to **${datetime}**"
+msgstr "La hora de la quedada se ha establecido para el **${datetime}**"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
-msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"
+msgstr "No entiendo esa hora que me has enviado 🤔...\n\n"
+"Por favor, envíame la hora de la quedada usando el formato _HH:MM_, por ejemplo _15:30_ o _09:15_"
 
 msgid "MeetingMessages.INVALID_TIME"
-msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), I am sure I can work with that 🧠."
+msgstr "Mi reloj interno es un poco antiguo y no entiende esa hora tan futurista 🛸.\n\n"
+"Intenta de nuevo con una hora que tenga horas válidas (00-23) y minutos (00-59), ¡seguro que así me ubico mejor 🧠!"
 
 msgid "MeetingMessages.DATE_TIME_DELETED"
-msgstr "The date and time of the meeting have been deleted successfully"
+msgstr "La fecha y hora de la quedada se han eliminado"
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
-msgstr "🚫 This meeting has been deleted 🚫"
+msgstr "🚫 Esta quedada ha sido eliminada 🚫"
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
-msgstr "_You don't have any meetings yet.\n\nClick on _${new_meeting_button}_ in the main menu to create one._"
+msgstr "_Aún no tienes ninguna quedada.\n\n"
+"Selecciona _${new_meeting_button}_ en el menú principal para crear una._"
 
 msgid "MeetingMessages.ACTIVE"
-msgstr "These are all your active meetings."
+msgstr "Estas son tus quedadas activas."
 
 msgid "Weekday.MONDAY"
-msgstr "Mon"
+msgstr "Lun"
 
 msgid "Weekday.TUESDAY"
-msgstr "Tue"
+msgstr "Mar"
 
 msgid "Weekday.WEDNESDAY"
-msgstr "Wed"
+msgstr "Mie"
 
 msgid "Weekday.THURSDAY"
-msgstr "Thu"
+msgstr "Jue"
 
 msgid "Weekday.FRIDAY"
-msgstr "Fri"
+msgstr "Vie"
 
 msgid "Weekday.SATURDAY"
-msgstr "Sat"
+msgstr "Sab"
 
 msgid "Weekday.SUNDAY"
-msgstr "Sun"
+msgstr "Dom"
 
 msgid "Month.JANUARY"
-msgstr "January"
+msgstr "Enero"
 
 msgid "Month.FEBRUARY"
-msgstr "February"
+msgstr "Febrero"
 
 msgid "Month.MARCH"
-msgstr "March"
+msgstr "Marzo"
 
 msgid "Month.APRIL"
-msgstr "April"
+msgstr "Abril"
 
 msgid "Month.MAY"
-msgstr "May"
+msgstr "Mayo"
 
 msgid "Month.JUNE"
-msgstr "June"
+msgstr "Junio"
 
 msgid "Month.JULY"
-msgstr "July"
+msgstr "Julio"
 
 msgid "Month.AUGUST"
-msgstr "August"
+msgstr "Agosto"
 
 msgid "Month.SEPTEMBER"
-msgstr "September"
+msgstr "Septiembre"
 
 msgid "Month.OCTOBER"
-msgstr "October"
+msgstr "Octubre"
 
 msgid "Month.NOVEMBER"
-msgstr "November"
+msgstr "Noviembre"
 
 msgid "Month.DECEMBER"
-msgstr "December"
+msgstr "Diciembre"
 
 msgid "MonthShort.JANUARY"
-msgstr "Jan"
+msgstr "Ene"
 
 msgid "MonthShort.FEBRUARY"
 msgstr "Feb"
@@ -362,10 +377,10 @@ msgid "MonthShort.MARCH"
 msgstr "Mar"
 
 msgid "MonthShort.APRIL"
-msgstr "Apr"
+msgstr "Abr"
 
 msgid "MonthShort.MAY"
-msgstr "May"
+msgstr "Mayo"
 
 msgid "MonthShort.JUNE"
 msgstr "Jun"
@@ -374,10 +389,10 @@ msgid "MonthShort.JULY"
 msgstr "Jul"
 
 msgid "MonthShort.AUGUST"
-msgstr "Aug"
+msgstr "Ago"
 
 msgid "MonthShort.SEPTEMBER"
-msgstr "Sep"
+msgstr "Sept"
 
 msgid "MonthShort.OCTOBER"
 msgstr "Oct"
@@ -386,4 +401,22 @@ msgid "MonthShort.NOVEMBER"
 msgstr "Nov"
 
 msgid "MonthShort.DECEMBER"
-msgstr "Dec"
+msgstr "Dic"
+
+msgid "Languages.SPANISH"
+msgstr "🇪🇸 Español"
+
+msgid "Languages.GALICIAN"
+msgstr "🇪🇸 Galician"
+
+msgid "Languages.ENGLISH"
+msgstr "🇺🇸 Inglés"
+
+msgid "Languages.GERMAN"
+msgstr "🇩🇪 Alemán"
+
+msgid "Languages.PORTUGUESE"
+msgstr "🇧🇷 Portugués"
+
+msgid "Languages.ITALIAN"
+msgstr "🇮🇹 Italiano"

@@ -173,7 +173,7 @@ class Meetup(SQLModel, table=True):
         max_participants = (
             MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
             if self.max_members
-            else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)})"
+            else f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)}"
         )
 
         participant_list = [link.user.inline_name for link in self.joined_links]
@@ -284,7 +284,8 @@ class Meetup(SQLModel, table=True):
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.get(lang=self.user_language), callback_data=cb.MAIN_MENU
+                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=self.user_language)}",
+                        callback_data=cb.MAIN_MENU,
                     ),
                 ],
             ],
@@ -312,7 +313,8 @@ class Meetup(SQLModel, table=True):
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.get(lang=self.user_language), callback_data=cb.MAIN_MENU
+                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=self.user_language)}",
+                        callback_data=cb.MAIN_MENU,
                     ),
                 ],
             ],
@@ -375,7 +377,8 @@ class Meetup(SQLModel, table=True):
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.get(lang=self.user_language), callback_data=cb.MAIN_MENU
+                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=self.user_language)}",
+                        callback_data=cb.MAIN_MENU,
                     ),
                 ],
             ],

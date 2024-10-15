@@ -141,6 +141,8 @@ class PaginatedMitupView(MitupView):
 
         if navegation_button_row:
             keyboard.append(navegation_button_row)
+        # TODO: this needs to go outisde the view, the navigation of the new is contextual and not part of the
+        # pagination logic. We would even need language context here to translate the button which makes no sesne.
         keyboard.append([ButtonConfig(text=ButtonMessages.MAIN_MENU, callback_data=cb.MAIN_MENU)])
 
         return keyboard

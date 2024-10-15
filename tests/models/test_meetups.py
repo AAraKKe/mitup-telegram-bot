@@ -9,7 +9,7 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Settings, User
 from mitup_bot.utils.emojis import Emojis
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingMessages, sanitize
 from tests.helpers import UpdateRequest
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -33,9 +33,13 @@ def expected_location_name(lang: str, expected_name: str | None, expected_coordi
 
 def expected_participants_message(max_participants: bool, lang: str) -> str:
     total_participants = MeetingMessages.EMPTY.get(lang=lang)
-    max_participants_text = "\\(Max: 5\\)" if max_participants else "\\(No limit\\)"
+    max_participants_text = (
+        f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5)}"
+        if max_participants
+        else f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}"
+    )
 
-    return f"{total_participants} {max_participants_text}"
+    return sanitize(f"{total_participants} {max_participants_text}", full=True)
 
 
 def expected_message(
@@ -57,7 +61,7 @@ def expected_message(
     )
     str_participants = expected_participants_message(max_participants, lang=lang)
     return (
-        f"*Test Meeting* \\(Created by: {owner}\\)\n\n"
+        f"*Test Meeting* \\({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner)}\\)\n\n"
         f"\\-\\-\\- {Emojis.DESCRIPTION} {str_description}\n"
         f"\\-\\-\\- {Emojis.CLOCK} {str_date}\n"
         f"\\-\\-\\- {Emojis.MAP} {location}\n"
@@ -81,7 +85,7 @@ def expected_inline_message(
         expected_name="Test Location" if location_name else None,
         expected_coordinates="\\[📍\\]" if coordinates else None,
     )
-    result = f"*Test Meeting* \\(Created by: {owner}\\)\n\n"
+    result = f"*Test Meeting* \\({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner)}\\)\n\n"
     if description:
         result += f"\\-\\-\\- {Emojis.DESCRIPTION} Test Description\n"
     if datetime:
@@ -193,6 +197,7 @@ def test_meetup_message(
         location=location,
         max_members=5 if max_participants else None,
         owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
+        language=lang,
     )
 
     expected = expected_method(
@@ -235,7 +240,7 @@ def test_time_properly_converted_for_timezone(settings: Settings):
 @pytest.mark.parametrize(
     "participants,max_participants,expected",
     [
-        (1, None, lambda lang: "1 (No limit)"),
+        (1, None, lambda lang: f"1 ({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)})"),
         (0, None, lambda lang: f"{MeetingMessages.EMPTY.get(lang=lang)}"),
         (
             0,
@@ -346,14 +351,36 @@ def test_inline_query_message(
 @pytest.mark.parametrize(
     "joined_count,max_participants,expected",
     [
-        (0, None, "Empty (No limit)"),
-        (1, None, "1 Participant (No limit)\n\tJoined_0"),
-        (2, 2, "2 Participants (Max: 2)\n\tJoined_0\n\tJoined_1"),
-        (1, 2, "1 Participant (Max: 2)\n\tJoined_0"),
+        (
+            0,
+            None,
+            lambda lang: f"{MeetingMessages.EMPTY.get(lang=lang)} "
+            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}",
+        ),
+        (
+            1,
+            None,
+            lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
+            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}\n\tJoined_0",
+        ),
+        (
+            2,
+            2,
+            lambda lang: f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang)} "
+            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}\n\tJoined_0\n\tJoined_1",
+        ),
+        (
+            1,
+            2,
+            lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
+            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}\n\tJoined_0",
+        ),
     ],
     ids=["empty", "no_limit", "limit_reached", "limit_not_reached"],
 )
-def test_participants_text(user_with_settings: User, joined_count: int, max_participants: int, expected: str):
+def test_participants_text(
+    user_with_settings: User, joined_count: int, max_participants: int, expected: Callable[[str], str]
+):
     meeting = Meetup(
         title="Test Meeting",
         description="Test Description",
@@ -366,7 +393,7 @@ def test_participants_text(user_with_settings: User, joined_count: int, max_part
         user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=user, meetup=meeting)
 
-    assert expected == meeting.participants_text
+    assert expected(user_with_settings.lang) == meeting.participants_text
 
 
 @pytest.mark.parametrize(

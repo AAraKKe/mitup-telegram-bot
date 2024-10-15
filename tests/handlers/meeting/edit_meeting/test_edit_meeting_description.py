@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Callable
 from typing import cast
 
 import pytest
@@ -28,9 +29,12 @@ def api():
     [
         (
             UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(1)),
-            "What a cool description. Congratulations",
+            lambda lang: "What a cool description. Congratulations",
         ),
-        (UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(2)), "_This meeting has no description yet_"),
+        (
+            UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(2)),
+            lambda lang: MeetingMessages.MEETING_WITHOUT_DESCRIPTION.get(lang=lang),
+        ),
     ],
     ids=["meeting_with_a_previous_description", "meeting_without_a_previous_description"],
     indirect=["update"],
@@ -38,7 +42,7 @@ def api():
 async def test_callback_query_edit_meeting_description_works(
     mock_session: MockDbSession,
     update: Update,
-    expected_description: str,
+    expected_description: Callable[[str], str],
     user_with_settings: User,
     api: MockApi,
     app: StubMitupApp,
@@ -59,7 +63,7 @@ async def test_callback_query_edit_meeting_description_works(
 
     view = MitupView(
         description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
-            lang=user_with_settings.lang, full=False, description=expected_description
+            lang=user_with_settings.lang, full=False, description=expected_description(user_with_settings.lang)
         ),
         keyboard=[
             [

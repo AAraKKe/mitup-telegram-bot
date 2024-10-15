@@ -227,7 +227,12 @@ async def test_callback_fails_when_meeting_not_found(
     )
     # The user is sent to the main menu
     keyboard = test_context.custom_keyboard or [
-        [ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang), callback_data=cb.MAIN_MENU)]
+        [
+            ButtonConfig(
+                text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
+                callback_data=cb.MAIN_MENU,
+            )
+        ]
     ]
     api.assert_edit_message_called(
         context,

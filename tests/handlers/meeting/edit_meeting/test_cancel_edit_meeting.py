@@ -7,6 +7,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup
+from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import MockApi, StubMitupApp, UpdateRequest, call_handler
@@ -41,7 +42,7 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
     caplog: pytest.LogCaptureFixture,
     update: Update,
     meeting: Meetup,
-    user_with_settings,
+    user_with_settings: User,
     app: StubMitupApp,
     api: MockApi,
 ):
@@ -54,4 +55,4 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=meeting.lang))
+    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))

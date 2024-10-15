@@ -94,7 +94,7 @@ class CalendarKeyboard:
 
         date_back = dt.date(year, month, self.anchor_date.day)
         return ButtonConfig(
-            text=str(ButtonMessages.GO_BACK),
+            text=str(ButtonMessages.GO_BACK.get()),
             callback_data=self.navigation_callback_data.with_date(date_back),
         )
 
@@ -116,7 +116,7 @@ class CalendarKeyboard:
 
         date_forward = dt.date(year, month, self.anchor_date.day)
         return ButtonConfig(
-            text=str(ButtonMessages.GO_FORWARD),
+            text=str(ButtonMessages.GO_FORWARD.get()),
             callback_data=self.navigation_callback_data.with_date(date_forward),
         )
 

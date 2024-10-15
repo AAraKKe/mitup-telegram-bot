@@ -49,7 +49,12 @@ def settings_view(lang: str, message: str | None = None) -> MitupView:
                 ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULTS),
                 ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY),
             ],
-            [ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.MAIN_MENU)],
+            [
+                ButtonConfig(
+                    text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=lang)}",
+                    callback_data=cb.MAIN_MENU,
+                )
+            ],
         ],
     )
 

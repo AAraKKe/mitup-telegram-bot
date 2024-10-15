@@ -63,7 +63,7 @@ class ButtonMessages(MessageBase):
     TIMEZONE = f"{Emojis.TIME} Timezone"
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
     PRIVACY = f"{Emojis.SHIELD} Privacy"
-    MAIN_MENU = "≪ Main Menu"
+    MAIN_MENU = "Main Menu"
     CANCEL = f"{Emojis.CANCEL} Cancel"
     TITLE = f"{Emojis.TITLE} Title"
     DESCRIPTION = f"{Emojis.DESCRIPTION} Description"
@@ -178,7 +178,7 @@ class MeetingMessages(MessageBase):
         "or press in _No limit_ to allow an unlimited number of participants."
     )
     MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *${max_participants}*"
-    NO_LIMIT_PARTICIPANTS = "No limit"
+    NO_LIMIT_PARTICIPANTS = "(No limit)"
     MAX_PARTICIPANTS_SET_FAIL = "The maximum number of participants must be a number greater than 0. Please, try again"
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
 
