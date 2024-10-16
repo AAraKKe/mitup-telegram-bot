@@ -52,6 +52,7 @@ sast:
 stages:
   - analysis
   - build-ci
+  - build
   - test
   - prepare-deployment
   - push-ecr
@@ -60,7 +61,7 @@ stages:
   - validate
 
 preparation:
-  stage: build-ci
+  stage: build
   script:
     - python --version
     - pip --version
@@ -70,7 +71,7 @@ preparation:
     - hatch run dev:pip list --local
 
 build-translations:
-  stage: build-ci
+  stage: build
   script:
     - hatch run dev:build-locales
   artifacts:
@@ -147,6 +148,8 @@ build-docker-ci:
     PUSH_DESTINATION: "${CI_REGISTRY_IMAGE}/ci-python"
   <<: *kaniko
   rules:
+    - changes:
+      - dev/docker/Dockerfile.ci
     - if: $CI_COMMIT_TAG
     # When requested adding [build-ci] to the commit message
     - if: $CI_COMMIT_TITLE =~ /\[build-ci\]/
