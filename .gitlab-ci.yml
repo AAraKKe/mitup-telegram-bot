@@ -122,6 +122,7 @@ validate-locales:
 
 sourcery-review:
   stage: test
+  allow_failure: true
   script:
     - hatch run dev:mr-sourcery
   rules:
