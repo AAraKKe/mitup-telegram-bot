@@ -120,13 +120,13 @@ validate-locales:
   stage: test
   script: hatch run dev:validate-locales
 
-sourcery-review:
-  stage: test
-  allow_failure: true
-  script:
-    - hatch run dev:mr-sourcery
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_EVENT_TYPE != 'merge_train'
+# sourcery-review:
+#   stage: test
+#   allow_failure: true
+#   script:
+#     - hatch run dev:mr-sourcery
+#   rules:
+#     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_EVENT_TYPE != 'merge_train'
 
 # --------------------
 # Docker build and push images
