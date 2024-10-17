@@ -7,9 +7,11 @@ from telegram import Location, Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.handlers.edit_settings.edit_timezone import (
+    callback_query_timezone,
     settings_timezone_location_message_handler,
     settings_timezone_text_message_handler,
 )
+from mitup_bot.handlers.edit_settings.entry import callback_query_settings
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, SettingsMessages
@@ -17,6 +19,51 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
+
+
+@pytest.fixture
+def api():
+    with MockApi.start("mitup_bot.handlers.edit_settings.edit_timezone") as api:
+        yield api
+
+
+async def test_callback_query_settings_is_called_with_settings_view(
+    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    await callback_query_settings(update, context)
+
+    api.assert_edit_message_called(context, update, factory.settings_view(lang=user_with_settings.lang))
+
+
+async def test_callback_query_timezone_with_correct_view(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    api: MockApi,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    result = await callback_query_timezone(update, context)
+
+    view = factory.change_settings_element_view(
+        lang=user_with_settings.lang,
+        message=SettingsMessages.SET_TIMEZONE_SETTINGS.get(
+            lang=user_with_settings.lang, timezone=user_with_settings.settings.timezone
+        ),
+    )
+
+    api.assert_send_message_called(context, update, view)
+    assert result == ConversationSettingsState.TIMEZONE
+
+
+async def test_callback_query_timezone_without_found_user(
+    mock_session: MockDbSession, update: Update, context: StubMitupContext
+):
+    with pytest.raises(RuntimeError):
+        await callback_query_timezone(update, context)
 
 
 async def test_settings_timezone_message_handler_set_the_correct_timezone_and_view(

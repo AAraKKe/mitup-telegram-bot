@@ -15,12 +15,10 @@ from mitup_bot.handlers.callback_query import (
     callback_query_show_meetings,
 )
 from mitup_bot.handlers.conversations_states import ConversationMeetingState
-from mitup_bot.handlers.edit_settings.edit_timezone import callback_query_timezone
 from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
-from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils import MeetingMessages, SettingsMessages
+from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
@@ -37,33 +35,6 @@ async def test_callback_query_settings_is_called_with_settings_view(
     await callback_query_settings(update, context)
 
     api.assert_edit_message_called(context, update, factory.settings_view(lang=user_with_settings.lang))
-
-
-async def test_callback_query_timezone_with_correct_view(
-    mock_session: MockDbSession,
-    update: Update,
-    context: StubMitupContext,
-    api: MockApi,
-    user_with_settings: User,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    result = await callback_query_timezone(update, context)
-
-    view = factory.change_settings_element_view(
-        lang=user_with_settings.lang,
-        message=SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone=user_with_settings.settings.timezone),
-    )
-
-    api.assert_send_message_called(context, update, view)
-    assert result == ConversationSettingsState.TIMEZONE
-
-
-async def test_callback_query_timezone_without_found_user(
-    mock_session: MockDbSession, update: Update, context: StubMitupContext
-):
-    with pytest.raises(RuntimeError):
-        await callback_query_timezone(update, context)
 
 
 async def test_callback_query_show_main_menu(
@@ -221,6 +192,16 @@ async def test_callback_query_show_meetings_use_correct_view(
         page_number=1,
         column_size=2,
         row_size=2,
+        navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
     )
     api.assert_edit_message_called(context, update, expected_view)
 

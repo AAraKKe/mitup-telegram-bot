@@ -127,6 +127,16 @@ async def callback_query_show_meetings(session: Session, update: Update, context
             description=MeetingMessages.ACTIVE.get(lang=user.lang),
             buttons=user_meetings_buttons,
             page_number=callback_data.id,
+            navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
+        ).with_context_menu(
+            [
+                [
+                    ButtonConfig(
+                        text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user.lang)}",
+                        callback_data=cb.MAIN_MENU,
+                    )
+                ]
+            ]
         )
 
     else:

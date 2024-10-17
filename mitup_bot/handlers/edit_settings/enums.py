@@ -19,6 +19,10 @@ class EditSettingsHandlerId(CallbackId):
     TIMEZONE_CONVERSATION = auto()
     CANCEL = auto()
 
+    # Edit language
+    LANGUAGE_CALLBACK = auto()
+    SET_LANGUAGE_CALLBACK = auto()
+
 
 class ConversationSettingsState(Enum):
     TIMEZONE = auto()

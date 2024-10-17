@@ -16,6 +16,7 @@ PAGINATED_VIEW_UNIQUE = PaginatedMitupView(
     page_number=1,
     column_size=2,
     row_size=2,
+    navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
 )
 
 PAGINATED_VIEW_FIRST = PaginatedMitupView(
@@ -31,6 +32,7 @@ PAGINATED_VIEW_FIRST = PaginatedMitupView(
     page_number=1,
     column_size=3,
     row_size=1,
+    navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
 )
 
 PAGINATED_VIEW_MIDDLE = PaginatedMitupView(
@@ -44,6 +46,7 @@ PAGINATED_VIEW_MIDDLE = PaginatedMitupView(
     page_number=2,
     column_size=1,
     row_size=1,
+    navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
 )
 
 PAGINATED_VIEW_LAST = PaginatedMitupView(
@@ -57,6 +60,7 @@ PAGINATED_VIEW_LAST = PaginatedMitupView(
     page_number=2,
     column_size=1,
     row_size=2,
+    navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
 )
 
 EXPEXTED_MARKUP_UNIQUE = InlineKeyboardMarkup(
@@ -69,18 +73,18 @@ EXPEXTED_MARKUP_UNIQUE = InlineKeyboardMarkup(
             InlineKeyboardButton("action_button3", callback_data="show;meeting:3"),
             InlineKeyboardButton("action_button4", callback_data="show;meeting:4"),
         ],
-        [InlineKeyboardButton(ButtonMessages.MAIN_MENU, callback_data="show;main_menu:")],
     ]
 )
 
 
 EXPEXTED_MARKUP_FIRST = InlineKeyboardMarkup(
     [
-        [InlineKeyboardButton("action_button1", callback_data="show;meeting:1")],
-        [InlineKeyboardButton("action_button2", callback_data="show;meeting:2")],
-        [InlineKeyboardButton("action_button3", callback_data="show;meeting:3")],
+        [
+            InlineKeyboardButton("action_button1", callback_data="show;meeting:1"),
+            InlineKeyboardButton("action_button2", callback_data="show;meeting:2"),
+            InlineKeyboardButton("action_button3", callback_data="show;meeting:3"),
+        ],
         [InlineKeyboardButton(ButtonMessages.GO_FORWARD, callback_data="show;active_meeting_page:2")],
-        [InlineKeyboardButton(ButtonMessages.MAIN_MENU, callback_data="show;main_menu:")],
     ]
 )
 
@@ -91,18 +95,14 @@ EXPEXTED_MARKUP_MIDDLE = InlineKeyboardMarkup(
             InlineKeyboardButton(ButtonMessages.GO_BACK, callback_data="show;active_meeting_page:1"),
             InlineKeyboardButton(ButtonMessages.GO_FORWARD, callback_data="show;active_meeting_page:3"),
         ],
-        [InlineKeyboardButton(ButtonMessages.MAIN_MENU, callback_data="show;main_menu:")],
     ]
 )
 
 EXPEXTED_MARKUP_LAST = InlineKeyboardMarkup(
     [
-        [
-            InlineKeyboardButton("action_button3", callback_data="show;meeting:3"),
-            InlineKeyboardButton("action_button4", callback_data="show;meeting:4"),
-        ],
+        [InlineKeyboardButton("action_button3", callback_data="show;meeting:3")],
+        [InlineKeyboardButton("action_button4", callback_data="show;meeting:4")],
         [InlineKeyboardButton(ButtonMessages.GO_BACK, callback_data="show;active_meeting_page:1")],
-        [InlineKeyboardButton(ButtonMessages.MAIN_MENU, callback_data="show;main_menu:")],
     ]
 )
 
@@ -135,4 +135,21 @@ def tests_paginated_mitup_view_with_incorrect_page(invalid_page: int):
             page_number=invalid_page,
             column_size=2,
             row_size=2,
+            navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
+        )
+
+
+def test_paginated_view_fails_without_navigation_callback_and_multiple_pages():
+    with pytest.raises(ValueError):
+        PaginatedMitupView(
+            description="unique",
+            buttons=[
+                ButtonConfig(text="action_button1", callback_data=cb.SHOW_MEETING.with_id(1)),
+                ButtonConfig(text="action_button2", callback_data=cb.SHOW_MEETING.with_id(2)),
+                ButtonConfig(text="action_button3", callback_data=cb.SHOW_MEETING.with_id(3)),
+                ButtonConfig(text="action_button4", callback_data=cb.SHOW_MEETING.with_id(4)),
+            ],
+            page_number=1,
+            column_size=2,
+            row_size=1,
         )

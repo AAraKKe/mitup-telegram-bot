@@ -21,7 +21,7 @@ class CallbackData(BaseModel):
     id: int | None = Field(default=None, ge=0)
 
     def __str__(self):
-        return f"{self.action};{self.entity}:{self.id or ''}"
+        return f"{self.action};{self.entity}:{'' if self.id is None else self.id}"
 
     @classmethod
     def parse[T: BaseModel](cls: type[T], match: re.Match | None) -> T:

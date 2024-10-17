@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import batched
 from math import ceil
-from typing import Self
+from typing import Self, assert_never
 
 from pydantic import BaseModel, field_validator
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -52,7 +52,14 @@ class MitupView:
         return self.keyboard_to_markup(self.keyboard)
 
     def with_context(self, message: str) -> Self:
+        """Add a message to the context of the view. This is useful to add information about the view"""
         self.description = f"{message}\n\n{self.description}"
+
+        return self
+
+    def with_context_menu(self, keyboard: Keyboard) -> Self:
+        """Add a keyboard to be attached below the view keyboard. This can be used to add back buttons to views"""
+        self.keyboard += keyboard
 
         return self
 
@@ -79,21 +86,38 @@ class PaginatedViewPosition(Enum):
 
 
 class PaginatedMitupView(MitupView):
+    """
+    A view that displays buttons in a paginated format.
+
+    This class manages the pagination of buttons, allowing users to navigate through multiple pages of button
+    configurations.
+
+    Args:
+        description (str): A description of the view.
+        buttons (list[ButtonConfig]): A list of button configurations to display.
+        page_number (int): The current page number to display.
+        navigation_callback_data (CallbackData): The callback data to use for navigation buttons.
+        row_size (int, optional): The number of buttons per row. Defaults to 2.
+        column_size (int, optional): The number of buttons per column. Defaults to 2.
+    """
+
     def __init__(
         self,
         *,
         description: str,
         buttons: list[ButtonConfig],
         page_number: int,
+        navigation_callback_data: cb.CallbackData | None = None,
         row_size: int = 2,
         column_size: int = 2,
     ):
-        self.row_size: int = row_size
-        self.column_size: int = column_size
-        self.page_size: int = row_size * column_size
-        self.page_number: int = page_number
-        self.total_pages: int = ceil(len(buttons) / self.page_size)
-        self.buttons: list[ButtonConfig] = buttons
+        self.row_size = row_size
+        self.column_size = column_size
+        self.page_size = row_size * column_size
+        self.page_number = page_number
+        self.navigation_callback_data = navigation_callback_data
+        self.total_pages = ceil(len(buttons) / self.page_size)
+        self.buttons = buttons
 
         if self.total_pages == 1:
             self.position = PaginatedViewPosition.UNIQUE
@@ -112,37 +136,36 @@ class PaginatedMitupView(MitupView):
             raise ValueError("Invalid paginated position")
 
         first_button = (self.page_number - 1) * self.page_size
-        last_button = len(self.buttons) if self.page_number == self.total_pages else first_button + self.page_size
+        last_button = min(len(self.buttons), first_button + self.page_size)
 
         button_in_page = self.buttons[first_button:last_button]
-        # keyboard = self.__match_action_buttons(button_in_page)
-        keyboard = [list(row) for row in batched(button_in_page, self.row_size)]
-        keyboard += self.__match_navigation_button()
+        keyboard = [list(row) for row in batched(button_in_page, self.column_size)]
+        if self.position is not PaginatedViewPosition.UNIQUE:
+            keyboard += [self.__match_navigation_button()]
 
         return keyboard
 
-    def __match_navigation_button(self) -> list[ButtonRow]:
-        keyboard: list[ButtonRow] = []
-        navegation_button_row: list[ButtonConfig] = []
+    def __match_navigation_button(self) -> ButtonRow:
+        if self.navigation_callback_data is None:
+            raise ValueError("Navigation callback data is required for paginated views with more than one page")
 
-        if self.position in {PaginatedViewPosition.MIDDLE, PaginatedViewPosition.LAST}:
-            navegation_button_row.append(
-                ButtonConfig(
-                    text=ButtonMessages.GO_BACK, callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(self.page_number - 1)
-                )
-            )
-        if self.position in {PaginatedViewPosition.MIDDLE, PaginatedViewPosition.FIRST}:
-            navegation_button_row.append(
-                ButtonConfig(
-                    text=ButtonMessages.GO_FORWARD,
-                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(self.page_number + 1),
-                )
-            )
+        go_back = ButtonConfig(
+            text=ButtonMessages.GO_BACK,
+            callback_data=self.navigation_callback_data.with_id(self.page_number - 1),
+        )
+        go_forward = ButtonConfig(
+            text=ButtonMessages.GO_FORWARD,
+            callback_data=self.navigation_callback_data.with_id(self.page_number + 1),
+        )
 
-        if navegation_button_row:
-            keyboard.append(navegation_button_row)
-        # TODO: this needs to go outisde the view, the navigation of the new is contextual and not part of the
-        # pagination logic. We would even need language context here to translate the button which makes no sesne.
-        keyboard.append([ButtonConfig(text=ButtonMessages.MAIN_MENU, callback_data=cb.MAIN_MENU)])
-
-        return keyboard
+        match self.position:
+            case PaginatedViewPosition.MIDDLE:
+                return [go_back, go_forward]
+            case PaginatedViewPosition.FIRST:
+                return [go_forward]
+            case PaginatedViewPosition.LAST:
+                return [go_back]
+            case PaginatedViewPosition.UNIQUE:
+                return []
+            case _ as unreachable:
+                assert_never(unreachable)

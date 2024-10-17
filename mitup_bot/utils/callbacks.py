@@ -76,6 +76,7 @@ COLLABORATE = CallbackData(entity="collaborate")
 # ----------------------------------------
 CANCEL_SETTINGS = CallbackData(action="cancel", entity="settings")
 EDIT_LANGUAGE = CallbackData(action="edit", entity="lang")
+SET_LANGUAGE = CallbackData(action="set", entity="lang")
 EDIT_TIMEOUT = CallbackData(action="edit", entity="timeout")
 EDIT_NOTIFICATIONS = CallbackData(action="edit", entity="notif")
 EDIT_TIEMZONE = CallbackData(action="edit", entity="timezone")

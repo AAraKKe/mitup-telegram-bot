@@ -1,8 +1,21 @@
 import datetime as dt
+from math import ceil
 
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import ButtonMessages, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView
+from mitup_bot.utils.messages import Languages, SettingsMessages
+from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView, PaginatedMitupView
+
+# Representation from language code to button to be used when generating views
+LANGUAGE_BUTTONS = {
+    "es_ES": Languages.SPANISH,
+    "gl_ES": Languages.GALICIAN,
+    "en": Languages.ENGLISH,
+    "de_DE": Languages.GERMAN,
+    "pt_BR": Languages.PORTUGUESE,
+    "it_IT": Languages.ITALIAN,
+}
 
 
 def main_menu_view(lang: str, message: str | None = None) -> MitupView:
@@ -70,14 +83,53 @@ def create_meeting_view(lang: str, message: str | None = None) -> MitupView:
     )
 
 
-def change_settings_element_view(lang: str, message: str) -> MitupView:
+def request_information_with_cancel_view(lang: str, message: str, callback_data: cb.CallbackData) -> MitupView:
+    """
+    Use this wen we want to ask the user for information and give them the option to cancel the action.
+
+    The callback_data represents what the action taken when the user clicks on Cancel.
+    """
     return MitupView(
         message,
         [
             [
-                ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=cb.CANCEL_SETTINGS),
+                ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=callback_data),
             ],
         ],
+    )
+
+
+def change_settings_element_view(lang: str, message: str) -> MitupView:
+    """
+    This view is used when in order to change a setting the user is asked for a message and we want to give
+    them the option to Cancel the action and go back to settings.
+    """
+    return request_information_with_cancel_view(lang, message, cb.CANCEL_SETTINGS)
+
+
+def settings_set_language_view(lang: str, message: str | None = None) -> MitupView:
+    n_languages = len(SUPPORTED_LANGUAGES)
+    n_columns = min(n_languages, 3)
+    buttons = [
+        ButtonConfig(text=LANGUAGE_BUTTONS[lang_code].get(lang=lang), callback_data=cb.SET_LANGUAGE.with_id(idx))
+        for idx, lang_code in enumerate(SUPPORTED_LANGUAGES)
+    ]
+
+    return PaginatedMitupView(
+        description=message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=LANGUAGE_BUTTONS.get(lang)),
+        buttons=buttons,
+        column_size=n_columns,
+        row_size=ceil(n_languages / n_columns),
+        page_number=1,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.SETTINGS.back(lang=lang),
+                    callback_data=cb.SETTINGS,
+                ),
+            ]
+        ]
     )
 
 

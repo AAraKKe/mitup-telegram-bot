@@ -1,3 +1,3 @@
-__all__ = ["entry", "edit_timezone", "enums"]
+__all__ = ["entry", "edit_timezone", "edit_language", "enums"]
 
-from . import entry, edit_timezone, enums
+from . import entry, edit_timezone, edit_language, enums

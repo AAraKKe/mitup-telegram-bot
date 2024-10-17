@@ -92,6 +92,9 @@ class ButtonMessages(MessageBase):
     DECLINE = f"{Emojis.CANCEL} Decline"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
 
+    def back(self, lang: str, full=True, **kwargs: str) -> str:
+        return f"{self.GO_BACK} {self.get(lang=lang, full=full, **kwargs)}"
+
 
 class Messages(MessageBase):
     DEFAULT_MAIN_MENU_DESCRIPTION = "Welcome to Mitup Bot!\n\nChoose one of the following options:"
@@ -118,7 +121,8 @@ class SettingsMessages(MessageBase):
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
 
     # Language settings
-    SELECT_LANGUAGE = "Select a language"
+    SELECT_LANGUAGE = "Current language: **${language}**.\n\nSelect a language."
+    LANGUAGE_SET_SUCCESS = "The language has been set successfully."
 
 
 class MeetingMessages(MessageBase):

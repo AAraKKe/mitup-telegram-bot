@@ -15,6 +15,12 @@ from tests.helpers import MockApi, StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
 
+@pytest.fixture
+def api():
+    with MockApi.start("mitup_bot.handlers.messages") as api:
+        yield api
+
+
 async def test_filter_messages_without_text_handler_with_correct_view(
     update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
 ):

@@ -25,7 +25,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
     logging.info("Enter into callback_query_settings_timezone")
 
     user = guards.current_user(update, session)
-    message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(timezone=user.settings.timezone)
+    message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(lang=user.lang, timezone=user.settings.timezone)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
