@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: mitupbot-20\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-10-16 21:27\n"
+"PO-Revision-Date: 2024-10-19 14:32\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -16,6 +16,21 @@ msgstr ""
 "X-Crowdin-File: /main/mitup_bot/locales/en.po\n"
 "X-Crowdin-File-ID: 64\n"
 "Language-Team: German\n"
+
+msgid "ButtonMessages.MAIN_MENU"
+msgstr "≪ Main Menu"
+
+msgid "ButtonMessages.GO_BACK"
+msgstr "≪"
+
+msgid "ButtonMessages.GO_FORWARD"
+msgstr "≫"
+
+msgid "ButtonMessages.CONFIRM"
+msgstr "✅ Confirm"
+
+msgid "ButtonMessages.DECLINE"
+msgstr "❌ Decline"
 
 msgid "ButtonMessages.NEW_MEETING"
 msgstr "➕ Neues Treffen"
@@ -56,8 +71,20 @@ msgstr "👥 Default Options"
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacy"
 
-msgid "ButtonMessages.MAIN_MENU"
-msgstr "≪ Main Menu"
+msgid "ButtonMessages.WAITING_LIST"
+msgstr "Waiting list"
+
+msgid "ButtonMessages.PUBLIC"
+msgstr "Public"
+
+msgid "ButtonMessages.OPEN_INVITATION"
+msgstr "Open invitations"
+
+msgid "ButtonMessages.INCOGNITO"
+msgstr "Incognito"
+
+msgid "ButtonMessages.SHOW_TIMEZONE"
+msgstr "Show timezone"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Abbrechen"
@@ -71,8 +98,8 @@ msgstr "📄 Beschreibung"
 msgid "ButtonMessages.DATE"
 msgstr "🗓️ Date"
 
-msgid "ButtonMessages.CLOCK"
-msgstr "🕒 Uhrzeit"
+msgid "ButtonMessages.TIME"
+msgstr "🕒 Time"
 
 msgid "ButtonMessages.SET_TIME"
 msgstr "🕒 Set time"
@@ -107,12 +134,6 @@ msgstr "📨 Teilen"
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
 
-msgid "ButtonMessages.GO_BACK"
-msgstr "≪"
-
-msgid "ButtonMessages.GO_FORWARD"
-msgstr "≫"
-
 msgid "ButtonMessages.BACK_EDIT"
 msgstr "≪ Bearbeiten"
 
@@ -130,12 +151,6 @@ msgstr "Unbegrenzt"
 
 msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Rausschmeißen"
-
-msgid "ButtonMessages.CONFIRM"
-msgstr "✅ Confirm"
-
-msgid "ButtonMessages.DECLINE"
-msgstr "❌ Decline"
 
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Delete date"
@@ -157,7 +172,7 @@ msgstr "Your timezone has been set to: *${timezone}* "
 msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\n"
 "Let's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n"
-"**Important**: we do not store your location and this information is only used to configure your timezone."
+"*Important*: we do not store your location and this information is only used to configure your timezone."
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
 msgstr "Perfect! Your timezone is ${timezone}"
@@ -166,7 +181,20 @@ msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
 msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
 
 msgid "SettingsMessages.SELECT_LANGUAGE"
-msgstr "Select a language"
+msgstr "Current language: *${language}*.\n\n"
+"Select a language."
+
+msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
+msgstr "The language has been set successfully."
+
+msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
+msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\n"
+"You can configure different aspects of your meeting:\n\n"
+"*Waiting list*: allow users to join the meeting even when it is full. Users joining after it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n"
+"*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n"
+"*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n"
+"*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown.\n\n"
+"*Show timezone*: meetings usually include the timezone the date and time refers to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
 
 msgid "MeetingMessages.CREATE"
 msgstr "Lass uns ein Treffen erstellen. Wie lautet der Titel?"
@@ -272,22 +300,22 @@ msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Dieses Treffen wurde gelöscht"
 
 msgid "MeetingMessages.EDIT_DATE"
-msgstr "Select the new date. Press **🗑️ Delete date** if you want to unset the date and time of the meeting."
+msgstr "Select the new date. Press *🗑️ Delete date* if you want to unset the date and time of the meeting."
 
 msgid "MeetingMessages.ADD_DATE"
 msgstr "Select the date."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to: **${datetime}**. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
+msgstr "The date has been set to: *${datetime}*. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "The date has been set to: **${datetime}**"
+msgstr "The date has been set to: *${datetime}*"
 
 msgid "MeetingMessages.EDIT_TIME"
 msgstr "Send me the time of the meeting in the format _HH:MM_"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "The time of the meeting has been set to **${datetime}**"
+msgstr "The time of the meeting has been set to *${datetime}*"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
 msgstr "Not sure I understand that time 🤔...\n\n"
