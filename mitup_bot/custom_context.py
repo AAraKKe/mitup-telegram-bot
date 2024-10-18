@@ -3,6 +3,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import auto
+from time import perf_counter
 from typing import override
 
 from aws_embedded_metrics.unit import Unit
@@ -261,6 +262,25 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         self.put_custom_metric(
             name, value, unit, dimensions, properties, with_handler_dimensions, with_update_properties
         )
+
+    @contextmanager
+    def with_time_metric(self, preffix: str, handler_metrics: bool = False) -> Generator[None, None, None]:
+        """
+        Context manager that emits a Time metric measuring the time it takes the code inside the context to run.
+
+        Args:
+            preffix (str): the preffix is added to the metric name. The resulting metric name will be <preffix>Time.
+            handler_metrics (bool, optional): If True, the metric will be emitted using the handler dimensions.
+                Defaults to False.
+        """
+        start_time = perf_counter()
+        yield
+        elapsed_time = 1000 * (perf_counter() - start_time)
+
+        if handler_metrics:
+            self.put_metric(f"{preffix}Time", elapsed_time, Unit.MILLISECONDS)
+        else:
+            self.put_custom_metric(f"{preffix}Time", elapsed_time, Unit.MILLISECONDS)
 
     async def flush_metrics(self):
         # If we are requesting to flush a stand alone metrics logger, flush it

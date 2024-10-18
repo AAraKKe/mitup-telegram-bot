@@ -12,11 +12,22 @@ from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
-from tests.helpers import StubMitupContext, UpdateRequest
+from tests.helpers import AnyFloat, StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 
-async def test_edit_message_without_message_available():
+async def assert_time_metric_emitted(context: StubMitupContext):
+    await context.flush_metrics()
+
+    context.metrics_engine.assert_metrics_emited(
+        ["TelegramApiTime"],
+        [AnyFloat()],
+        [Unit.MILLISECONDS],
+        add_handler_dimensions=False,
+    )
+
+
+async def test_edit_message_without_message_available(context: StubMitupContext, update: Update):
     context = mock.AsyncMock()
     update = mock.MagicMock()
 
@@ -28,7 +39,7 @@ async def test_edit_message_without_message_available():
         await edit_message(context=context, update=update, view=message)
 
 
-async def test_edit_message_without_inline_message_id():
+async def test_edit_message_without_inline_message_id(context: StubMitupContext, update: Update):
     context = mock.AsyncMock()
     update = mock.MagicMock()
 
@@ -40,28 +51,30 @@ async def test_edit_message_without_inline_message_id():
         await edit_message(context=context, update=update, view=message)
 
 
-async def test_send_message_with_a_view(default_view: MitupView):
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
+async def test_send_message_with_a_view(context: StubMitupContext, update: Update, default_view: MitupView):
+    assert context.telegram_update.effective_chat is not None
 
-    update.effective_chat.id = 123456789
-
-    await send_message(context=context, update=update, view=default_view)
+    await send_message(context=cast(TMitupContext, context), update=update, view=default_view)
 
     context.bot.send_message.assert_called_once_with(
-        chat_id=123456789, text=default_view.description, reply_markup=default_view.markup
+        chat_id=context.telegram_update.effective_chat.id,
+        text=default_view.description,
+        reply_markup=default_view.markup,
     )
 
+    await assert_time_metric_emitted(context)
 
-async def test_send_message_without_view():
-    context = mock.AsyncMock()
-    update = mock.MagicMock()
 
-    update.effective_chat.id = 123456789
+async def test_send_message_without_view(context: StubMitupContext, update: Update):
+    assert context.telegram_update.effective_chat is not None
 
-    await send_message(context=context, update=update, view="Hello, World")
+    await send_message(context=cast(TMitupContext, context), update=update, view="Hello, World")
 
-    context.bot.send_message.assert_called_once_with(chat_id=123456789, text="Hello, World", reply_markup=None)
+    context.bot.send_message.assert_called_once_with(
+        chat_id=context.telegram_update.effective_chat.id, text="Hello, World", reply_markup=None
+    )
+
+    await assert_time_metric_emitted(context)
 
 
 async def test_edit_message_with_a_view(default_view: MitupView, update: Update, context: StubMitupContext):
@@ -77,6 +90,8 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
         reply_markup=default_view.markup,
     )
 
+    await assert_time_metric_emitted(context)
+
 
 async def test_edit_message_without_view(update: Update, context: StubMitupContext):
     await edit_message(context=cast(TMitupContext, context), update=update, view="Hello, World")
@@ -84,6 +99,8 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
     context.bot.edit_message_text.assert_called_once_with(
         text="Hello, World", chat_id=123, message_id=123, inline_message_id=None, reply_markup=None
     )
+
+    await assert_time_metric_emitted(context)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
@@ -144,6 +161,8 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
         ]
     )
 
+    await assert_time_metric_emitted(context)
+
 
 async def test_edit_meetup_messages_deletes_message_on_failure(
     meeting: Meetup, context: StubMitupContext, mock_session: MockDbSession
@@ -170,9 +189,9 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
     assert edit.call_count == 2
     mock_session.assert_deleted(meeting.messages[0])
     context.metrics_engine.assert_metrics_emited(
-        [MetricKey.MESSAGE_DELETED],
-        [1],
-        [Unit.COUNT],
+        [MetricKey.MESSAGE_DELETED, "TelegramApiTime"],
+        [1, AnyFloat()],
+        [Unit.COUNT, Unit.MILLISECONDS],
         add_handler_dimensions=False,
     )
 
@@ -198,3 +217,5 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
     await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
 
     assert edit.call_count == 2
+
+    await assert_time_metric_emitted(context)

@@ -13,6 +13,8 @@ from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
+TELEMGRAM_API_TIME_PREFFIX = "TelegramApi"
+
 
 async def send_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
     chat_id = guards.chat(update).id
@@ -24,7 +26,8 @@ async def send_message(*, context: TMitupContext, update: Update, view: MitupVie
         message = view.description
         reply_markup = view.markup
 
-    return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+    with context.with_time_metric(preffix=TELEMGRAM_API_TIME_PREFFIX) as _:
+        return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
 async def edit_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | bool:
@@ -48,13 +51,14 @@ async def edit_message(*, context: TMitupContext, update: Update, view: MitupVie
         else:
             raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
-    return await context.bot.edit_message_text(
-        text=message,
-        chat_id=chat_id,
-        message_id=message_id,
-        inline_message_id=inline_message_id,
-        reply_markup=reply_markup,
-    )
+    with context.with_time_metric(preffix=TELEMGRAM_API_TIME_PREFFIX):
+        return await context.bot.edit_message_text(
+            text=message,
+            chat_id=chat_id,
+            message_id=message_id,
+            inline_message_id=inline_message_id,
+            reply_markup=reply_markup,
+        )
 
 
 async def answer_inline_query(context: TMitupContext, update: Update, results: list[MitupInlineView]):
@@ -89,13 +93,14 @@ async def update_single_meeting_message(
     text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang) if was_deleted else view.description
     reply_markup = None if was_deleted else MitupView.keyboard_to_markup(message.buttons.keyboard)
     try:
-        await context.bot.edit_message_text(
-            text=text,
-            chat_id=message.chat_id,
-            message_id=message.message_id,
-            inline_message_id=message.inline_message_id,
-            reply_markup=reply_markup,
-        )
+        with context.with_time_metric(preffix=TELEMGRAM_API_TIME_PREFFIX):
+            await context.bot.edit_message_text(
+                text=text,
+                chat_id=message.chat_id,
+                message_id=message.message_id,
+                inline_message_id=message.inline_message_id,
+                reply_markup=reply_markup,
+            )
     except BadRequest as e:
         # Sometimes the message does not need to be updated but we don't know that in advance
         # ignore the error when it happens

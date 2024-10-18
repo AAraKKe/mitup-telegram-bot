@@ -92,6 +92,7 @@ class StubMetrics(MitupMetricsLogger):
     def __build_actual_body(self) -> TSinkContainer:
         # Take the emitted metrics from the container and remove timestamps, not interesting for testing
         result: TSinkContainer = []
+
         for metric in self.metrics_container:
             current = dict(metric.items())
             current["CloudWatchMetrics"] = current["_aws"]["CloudWatchMetrics"]

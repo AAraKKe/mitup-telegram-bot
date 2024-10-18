@@ -42,7 +42,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
     user = guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
-    if (new_timezone := timezone_api.get_timezone_by_address(address)) is None:
+    if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
         logging.warning(f"The user {user.id} tried to set a timezone {address} that is not correct. Trying again")
 
         view = MitupView(
@@ -82,7 +82,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
     user = guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
-    if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude)) is None:
+    if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
         logging.warning(f"The user {user.id} tried to set a location {location} that is not correct. Trying again")
 
         view = MitupView(

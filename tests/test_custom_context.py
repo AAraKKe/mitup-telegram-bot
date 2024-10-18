@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+from aws_embedded_metrics.unit import Unit
 
 from mitup_bot.custom_context import (
     ContextData,
@@ -9,7 +10,7 @@ from mitup_bot.custom_context import (
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
 from mitup_bot.monitoring import Feature
-from tests.helpers import StubMitupContext
+from tests.helpers import AnyFloat, StubMitupContext
 
 
 def test_add_and_remove_context(context: MitupContext):
@@ -173,4 +174,26 @@ async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupCo
         dimensions={"DimeName": "DimeValue", "Feature": Feature.CREATE_MEETING.value},
         properties={"PropName": "PropValue"},
         add_handler_dimensions=False,
+    )
+
+
+async def test_timing_metrics(context: StubMitupContext):
+    with context.with_time_metric("MyMetric"):
+        pass
+
+    await context.flush_metrics()
+
+    context.metrics_engine.assert_metrics_emited(["MyMetricTime"], [AnyFloat()], [Unit.MILLISECONDS])
+
+
+async def test_timing_metrics_with_handler_dimensions(context: StubMitupContext):
+    context.prepare_handler_metrics({"HandlerDim": "HandlerValue"})
+
+    with context.with_time_metric("MyMetric", handler_metrics=True):
+        pass
+
+    await context.flush_metrics()
+
+    context.metrics_engine.assert_metrics_emited(
+        ["MyMetricTime"], [AnyFloat()], [Unit.MILLISECONDS], dimensions={"HandlerDim": "HandlerValue"}
     )
