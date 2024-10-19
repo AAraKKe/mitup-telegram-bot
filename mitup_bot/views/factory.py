@@ -117,7 +117,9 @@ def settings_set_language_view(lang: str, message: str | None = None) -> MitupVi
     ]
 
     return PaginatedMitupView(
-        description=message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=LANGUAGE_BUTTONS.get(lang)),
+        description=(
+            message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=LANGUAGE_BUTTONS[lang].get(lang=lang))
+        ),
         buttons=buttons,
         column_size=n_columns,
         row_size=ceil(n_languages / n_columns),
