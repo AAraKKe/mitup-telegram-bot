@@ -58,3 +58,7 @@ class Emojis(Enum):
 
     def __str__(self):
         return self.value
+
+    @classmethod
+    def boolean(cls, value: bool) -> str:
+        return cls.CHECK.value if value else cls.RED_CIRCLE.value

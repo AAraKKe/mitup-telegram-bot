@@ -1,3 +1,6 @@
+import pytest
+
+from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -77,3 +80,15 @@ def test_edit_meeting_property_view_with_custom_back_button(lang: str):
     )
 
     assert expected_view == view
+
+
+@pytest.mark.parametrize("option", [True, False])
+def test_flag_button(option: bool):
+    callback_data = cb.SET_DEFAULT_WAITING_LIST
+    text = ButtonMessages.WAITING_LIST.get(lang="en")
+    emoji = Emojis.CHECK if option else Emojis.RED_CIRCLE
+
+    button = factory.options_button(callback_data=callback_data, text=text, option=option)
+    expected_button = ButtonConfig(text=f"{emoji} {text}", callback_data=callback_data)
+
+    assert expected_button == button

@@ -50,6 +50,14 @@ class MessageBase(StrEnum):
 
 
 class ButtonMessages(MessageBase):
+    # Navigation buttons
+    MAIN_MENU = "Main Menu"
+    GO_BACK = "≪"
+    GO_FORWARD = "≫"
+    CONFIRM = f"{Emojis.CHECK} Confirm"
+    DECLINE = f"{Emojis.CANCEL} Decline"
+
+    # Main Menu buttons
     NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"
     ACTIVE_MEETINGS = f"{Emojis.LIST} Your active meetings"
     PAST_MEETINGS = f"{Emojis.PAST} Your past meetings"
@@ -57,18 +65,26 @@ class ButtonMessages(MessageBase):
     SETTINGS = f"{Emojis.SETTINGS} Settings"
     HELP = f"{Emojis.HELP} Help"
     COLLABORATE = f"{Emojis.HEART} Collaborate"
+
+    # Settings buttons
     LANGUAGE = f"{Emojis.LANG} Language"
     TIMEOUT = f"{Emojis.TIMEOUT} Timeout"
     NOTIFICATIONS = f"{Emojis.NOTIF} Notifications"
     TIMEZONE = f"{Emojis.TIME} Timezone"
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
     PRIVACY = f"{Emojis.SHIELD} Privacy"
-    MAIN_MENU = "Main Menu"
+    WAITING_LIST = "Waiting list"
+    PUBLIC = "Public"
+    OPEN_INVITATION = "Open invitations"
+    INCOGNITO = "Incognito"
+    SHOW_TIMEZONE = "Show timezone"
+
+    # Meeting buttons
     CANCEL = f"{Emojis.CANCEL} Cancel"
     TITLE = f"{Emojis.TITLE} Title"
     DESCRIPTION = f"{Emojis.DESCRIPTION} Description"
     DATE = f"{Emojis.CALENDAR} Date"
-    CLOCK = f"{Emojis.CLOCK} Time"
+    TIME = f"{Emojis.CLOCK} Time"
     SET_TIME = f"{Emojis.CLOCK} Set time"
     PARTICIPANTS = f"{Emojis.JOINED} Participants"
     LOCATION = f"{Emojis.MAP} Location"
@@ -80,16 +96,12 @@ class ButtonMessages(MessageBase):
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     CHAT = f"{Emojis.CHAT} Chat"
-    GO_BACK = "≪"
-    GO_FORWARD = "≫"
     BACK_EDIT = f"{GO_BACK} Edit"
     MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
     MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"
     MEETING_MAX_PARTICIPANTS = "Max participants"
     MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
     MEETING_KICK_OUT = "Kick out"
-    CONFIRM = f"{Emojis.CHECK} Confirm"
-    DECLINE = f"{Emojis.CANCEL} Decline"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
 
     def back(self, lang: str, full=True, **kwargs: str) -> str:
@@ -114,15 +126,36 @@ class SettingsMessages(MessageBase):
         "Let's start by setting your timezone. Send me the name of your city or, "
         f"for a more accurate result, your location by pressing on {Emojis.CLIP} and "
         "selecting Location.\n\n"
-        "**Important**: we do not store your location and this information is only used to "
+        "*Important*: we do not store your location and this information is only used to "
         "configure your timezone."
     )
     REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is ${timezone}"
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
 
     # Language settings
-    SELECT_LANGUAGE = "Current language: **${language}**.\n\nSelect a language."
+    SELECT_LANGUAGE = "Current language: *${language}*.\n\nSelect a language."
     LANGUAGE_SET_SUCCESS = "The language has been set successfully."
+
+    # Default meeting defualt options
+    DEFAULT_MEETING_OPTIONS_MESSAGE = (
+        "Here you can configure the default options used when creating a meeting. "
+        "Do you usually create public meetings? Set it here. "
+        "Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. "
+        "All your meetings will inherit this configuration.\n\n"
+        "You can configure different aspects of your meeting:\n\n"
+        "*Waiting list*: allow users to join the meeting even when it is full. "
+        "Users joining after it is full will be added to a waiting list and added to the participants "
+        "list as soon as a spot is available in the order they joined.\n\n"
+        "*Public*: activate this to allow everyone that receives the meeting to share it again. "
+        "Perfect to reach more people.\n\n"
+        "*Open invitations*: activate this option to allow users who have joined the meeting to add friends "
+        "even if those friends are not in Telegram.\n\n"
+        "*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
+        "Only the number of participants will be shown.\n\n"
+        "*Show timezone*: meetings usually include the timezone the date and time refers to. "
+        "If you don't need this information displayed on the meeting message you can disable it here. "
+        "This will also disable the _Timezone_ button shown when the meeting is shared."
+    )
 
 
 class MeetingMessages(MessageBase):
@@ -194,17 +227,17 @@ class MeetingMessages(MessageBase):
 
     # Edit meeting date and time
     EDIT_DATE = (
-        f"Select the new date. Press **{ButtonMessages.DELETE_DATE}** if you want to "
+        f"Select the new date. Press *{ButtonMessages.DELETE_DATE}* if you want to "
         "unset the date and time of the meeting."
     )
     ADD_DATE = "Select the date."
     NEW_DATE_SET_SUCCESS = (
-        "The date has been set to: **${datetime}**. To set the time press _${set_time_button}_, "
+        "The date has been set to: *${datetime}*. To set the time press _${set_time_button}_, "
         "othwerise press _${back_edit_button}_ to go back to editing the meeting."
     )
-    DATE_UPDATE_SUCCESS = "The date has been set to: **${datetime}**"
+    DATE_UPDATE_SUCCESS = "The date has been set to: *${datetime}*"
     EDIT_TIME = "Send me the time of the meeting in the format _HH:MM_"
-    EDIT_TIME_SUCCESS = "The time of the meeting has been set to **${datetime}**"
+    EDIT_TIME_SUCCESS = "The time of the meeting has been set to *${datetime}*"
     WRONG_TIME_FORMAT = (
         f"Not sure I understand that time {Emojis.THINK}...\n\n"
         "Please, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"

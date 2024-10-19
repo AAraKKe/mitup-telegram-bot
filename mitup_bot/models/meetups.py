@@ -345,7 +345,7 @@ class Meetup(SQLModel, table=True):
                         callback_data=cb.EDIT_MEETING_DATE.with_id(self.id).with_date(now_in_tz.date()),
                     ),
                     ButtonConfig(
-                        text=ButtonMessages.CLOCK.get(lang=self.user_language),
+                        text=ButtonMessages.TIME.get(lang=self.user_language),
                         callback_data=cb.EDIT_MEETING_TIME.with_id(self.id),
                     ),
                 ],

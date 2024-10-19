@@ -63,6 +63,13 @@ class MitupView:
 
         return self
 
+    def with_back_button(self, text: ButtonMessages, lang: str, callback_data: CallbackData) -> Self:
+        """Add a back button to the view"""
+        back_text = text.back(lang=lang)
+        self.keyboard += [[ButtonConfig(text=back_text, callback_data=callback_data)]]
+
+        return self
+
     @staticmethod
     def keyboard_to_markup(keyboard: Keyboard) -> InlineKeyboardMarkup:
         inline_keyboard = [[button_config.button for button_config in row] for row in keyboard]

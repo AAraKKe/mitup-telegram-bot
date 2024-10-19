@@ -1,8 +1,9 @@
 import datetime as dt
 from math import ceil
 
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
-from mitup_bot.utils import ButtonMessages, MeetingMessages, Messages
+from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import Languages, SettingsMessages
 from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView, PaginatedMitupView
@@ -59,7 +60,7 @@ def settings_view(lang: str, message: str | None = None) -> MitupView:
                 ButtonConfig(text=ButtonMessages.TIMEZONE.get(lang=lang), callback_data=cb.EDIT_TIEMZONE),
             ],
             [
-                ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULTS),
+                ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS),
                 ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY),
             ],
             [
@@ -185,3 +186,10 @@ def edit_meeting_date_view(
     calendar_keyboard.extend(__edit_meeting_date_final_row(lang=lang, meeting_id=meeting_id, new=new))
 
     return MitupView(description=message, keyboard=calendar_keyboard)
+
+
+def options_button(callback_data: CallbackData, text: str, option: bool) -> ButtonConfig:
+    boolean_emojin = Emojis.boolean(option)
+    text = f"{boolean_emojin} {text}"
+
+    return ButtonConfig(text=text, callback_data=callback_data)
