@@ -1,0 +1,117 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from sqlmodel import Session
+from telegram import Update
+
+from mitup_bot import api, guards
+from mitup_bot.custom_context import MitupContext
+from mitup_bot.db import with_async_session
+from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.models import Meetup
+from mitup_bot.utils import callbacks as cb
+
+from .enums import EditMeetingHandlerId
+
+
+@HandlersRegistry.register_callback_query(
+    EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK, callback_data=cb.EDIT_MEETING_SETTINGS
+)
+@with_async_session
+async def callback_query_edit_meeting_settings(session: Session, update: Update, context: MitupContext):
+    user = guards.current_user(update, session)
+
+    meeting_id = guards.valid_callback_data(
+        cb.EDIT_MEETING_SETTINGS.parse(context.match), EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK
+    ).id
+
+    if (
+        meeting := await guards.meeting_accessible(
+            session=session,
+            user=user,
+            meeting_id=meeting_id,
+            action="edit_meeting_settings",
+            update=update,
+            context=context,
+        )
+    ) is not None:
+        await api.edit_message(context=context, update=update, view=meeting.settings_view)
+
+
+@asynccontextmanager
+async def toggle_meeting_setting(
+    session: Session,
+    update: Update,
+    context: MitupContext,
+    handler_id: EditMeetingHandlerId,
+    callback_data: cb.CallbackData,
+) -> AsyncGenerator[Meetup | None, None]:
+    user = guards.current_user(update, session)
+
+    meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
+
+    if (
+        meeting := await guards.meeting_accessible(
+            session=session,
+            user=user,
+            meeting_id=meeting_id,
+            action=handler_id.name,
+            update=update,
+            context=context,
+        )
+    ) is not None:
+        yield meeting
+        session.flush()
+
+        # Update all messages to ensure any visible message contains the new changes
+        await api.edit_message(context=context, update=update, view=meeting.settings_view)
+        await api.update_meeting_messages(session=session, context=context, meeting=meeting)
+    else:
+        yield None
+
+
+def create_meeting_settings_toggle_handler(
+    handler_id: EditMeetingHandlerId, callback_data: cb.CallbackData, attribute: str
+):
+    @HandlersRegistry.register_callback_query(handler_id, callback_data=callback_data)
+    @with_async_session
+    async def handler(session: Session, update: Update, context: MitupContext):
+        async with toggle_meeting_setting(
+            session=session,
+            update=update,
+            context=context,
+            handler_id=handler_id,
+            callback_data=callback_data,
+        ) as meeting:
+            if meeting is None:
+                return
+            setattr(meeting, attribute, not getattr(meeting, attribute))
+
+    return handler
+
+
+create_meeting_settings_toggle_handler(
+    EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
+    callback_data=cb.SET_MEETING_WAITING_LIST,
+    attribute="waiting_list",
+)
+
+create_meeting_settings_toggle_handler(
+    EditMeetingHandlerId.SET_MEETING_PUBLIC_CALLBACK, callback_data=cb.SET_MEETING_PUBLIC, attribute="public"
+)
+
+create_meeting_settings_toggle_handler(
+    EditMeetingHandlerId.SET_MEETING_ALLOW_INVITATIONS_CALLBACK,
+    callback_data=cb.SET_MEETING_ALLOW_INVITATIONS,
+    attribute="allow_invitation",
+)
+
+create_meeting_settings_toggle_handler(
+    EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK, callback_data=cb.SET_MEETING_INCOGNITO, attribute="incognito"
+)
+
+create_meeting_settings_toggle_handler(
+    EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
+    callback_data=cb.SET_MEETING_SHOW_TIMEZONE,
+    attribute="show_timezone",
+)

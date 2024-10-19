@@ -46,6 +46,14 @@ class EditMeetingHandlerId(CallbackId):
     WRONG_TIME_MESSAGE = auto()
     DELETE_DATE_TIME_CALLBACK = auto()
 
+    # Edit meeting settings
+    MEETING_SETTINGS_CALLBACK = auto()
+    SET_MEETING_WAITING_LIST_CALLBACK = auto()
+    SET_MEETING_PUBLIC_CALLBACK = auto()
+    SET_MEETING_ALLOW_INVITATIONS_CALLBACK = auto()
+    SET_MEETING_INCOGNITO_CALLBACK = auto()
+    SET_MEETING_SHOW_TIMEZONE_CALLBACK = auto()
+
     # Cancel button during edit
     CANCEL = auto()
 

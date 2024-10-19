@@ -32,6 +32,7 @@ async def test_filter_messages_without_text_handler_with_correct_view(
     assert result == -1
 
 
+@pytest.mark.parametrize("update", ([UpdateRequest(message_text="A new meeting is born!")]), indirect=True)
 async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_correct_view(
     mock_session: MockDbSession,
     update: Update,
@@ -41,6 +42,13 @@ async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_cor
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     assert len(user_with_settings.meetups) == 2
+
+    # Set default meetings settings on user's settings
+    user_with_settings.settings.default_waiting_list = True
+    user_with_settings.settings.default_public = True
+    user_with_settings.settings.default_allow_invitation = False
+    user_with_settings.settings.default_incognito = True
+    user_with_settings.settings.default_show_timezone = False
 
     def flush():
         # We flush after having added the meetup
@@ -57,6 +65,12 @@ async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_cor
     new_meeting = user_with_settings.meetups[2]
     mock_session.assert_added(new_meeting)
     mock_session.assert_flushed()
+    assert new_meeting.title == "A new meeting is born!"
+    assert new_meeting.waiting_list is True
+    assert new_meeting.public is True
+    assert new_meeting.allow_invitation is False
+    assert new_meeting.incognito is True
+    assert new_meeting.show_timezone is False
 
     message = MeetingMessages.CREATED_SUCCESS.get(title=cast(Message, update.effective_message).text)
     api.assert_send_message_called(context, update, new_meeting.edit_view.with_context(message))

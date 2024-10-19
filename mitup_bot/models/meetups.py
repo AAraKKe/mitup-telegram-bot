@@ -14,6 +14,7 @@ from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import sanitize
 from mitup_bot.views import MitupInlineView, MitupView
+from mitup_bot.views.factory import options_button
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
 
 from .mutable_model import MutableModel
@@ -57,7 +58,12 @@ class Meetup(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     owner_id: int | None = Field(default=None, foreign_key="users.id")
-    title: str | None = None
+    title: str = Field(nullable=False)
+    waiting_list: bool = Field(nullable=False)
+    public: bool = Field(nullable=False)
+    allow_invitation: bool = Field(nullable=False)
+    incognito: bool = Field(nullable=False)
+    show_timezone: bool = Field(nullable=False)
     description: str | None = None
     created_time: dt.datetime | None = None
     updated_time: dt.datetime | None = None
@@ -383,6 +389,47 @@ class Meetup(SQLModel, table=True):
                 ],
             ],
         )
+
+    @property
+    def settings_view(self) -> MitupView:
+        keyboard = [
+            [
+                options_button(
+                    cb.SET_MEETING_WAITING_LIST.with_id(cast(int, self.id)),
+                    ButtonMessages.WAITING_LIST.get(lang=self.owner.lang),
+                    self.waiting_list,
+                ),
+                options_button(
+                    cb.SET_MEETING_PUBLIC.with_id(cast(int, self.id)),
+                    ButtonMessages.PUBLIC.get(lang=self.owner.lang),
+                    self.public,
+                ),
+            ],
+            [
+                options_button(
+                    cb.SET_MEETING_ALLOW_INVITATIONS.with_id(cast(int, self.id)),
+                    ButtonMessages.OPEN_INVITATION.get(lang=self.owner.lang),
+                    self.allow_invitation,
+                ),
+                options_button(
+                    cb.SET_MEETING_INCOGNITO.with_id(cast(int, self.id)),
+                    ButtonMessages.INCOGNITO.get(lang=self.owner.lang),
+                    self.incognito,
+                ),
+            ],
+            [
+                options_button(
+                    cb.SET_MEETING_SHOW_TIMEZONE.with_id(cast(int, self.id)),
+                    ButtonMessages.SHOW_TIMEZONE.get(lang=self.owner.lang),
+                    self.show_timezone,
+                ),
+            ],
+        ]
+
+        return MitupView(
+            MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=self.owner.lang),
+            keyboard=keyboard,
+        ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(cast(int, self.id)))
 
     @property
     def inline_view(self) -> MitupInlineView:

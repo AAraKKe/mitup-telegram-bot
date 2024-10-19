@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 from unittest import mock
 
 import pytest
@@ -8,8 +9,11 @@ from telegram import Update
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Settings, User
+from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.emojis import Emojis
-from mitup_bot.utils.messages import MeetingMessages, sanitize
+from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, sanitize
+from mitup_bot.views import MitupView
+from mitup_bot.views.factory import options_button
 from tests.helpers import UpdateRequest
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -19,6 +23,11 @@ EXAMPLE_MEETING = Meetup(
     title="Test Meeting",
     description="Test Description",
     datetime=datetime(2001, 1, 1, 12, 12),
+    waiting_list=False,
+    public=False,
+    allow_invitation=False,
+    incognito=False,
+    show_timezone=True,
 )
 COORDINATES = (123.1, -321.1)
 
@@ -198,6 +207,11 @@ def test_meetup_message(
         max_members=5 if max_participants else None,
         owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
         language=lang,
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        show_timezone=True,
     )
 
     expected = expected_method(
@@ -222,6 +236,11 @@ def test_time_properly_converted_for_timezone(settings: Settings):
         description="Test Description",
         datetime=datetime(2024, 1, 12, 12, 30),
         owner=User(first_name="John", username="john_doe", tg_user_id=1, settings=settings),
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        show_timezone=True,
     )
 
     # Expected time is 1 hour ahead of the one in the meeting (in UTC) assuming converstion to settings.tz
@@ -262,6 +281,11 @@ def test_participants_badge(
         description="Test Description",
         owner=user_with_settings,
         max_members=max_participants,
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        show_timezone=True,
     )
 
     # sourcery skip: no-loop-in-tests
@@ -290,6 +314,11 @@ def test_short_description(description: str | None, expected_description: str | 
         title="Test Meeting",
         description=description,
         owner=User(first_name="John", username="john_doe", tg_user_id=1),
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        show_timezone=True,
     )
 
     assert expected_description == meeting.short_description
@@ -341,6 +370,11 @@ def test_inline_query_message(
         datetime=datetime,
         location=location,
         owner=user_with_settings,
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        show_timezone=True,
     )
 
     message = build_inline_message(user_with_settings.lang, description, datetime, location)
@@ -386,6 +420,11 @@ def test_participants_text(
         description="Test Description",
         owner=user_with_settings,
         max_members=max_participants,
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        show_timezone=True,
     )
 
     # sourcery skip: no-loop-in-tests
@@ -468,3 +507,75 @@ def test_add_message_to_meeting_from_update(
 def test_add_message_fails_if_no_message_in_update(meeting: Meetup):
     with pytest.raises(NoMessageAvailable):
         meeting.add_message(Update(123), meeting.owner)
+
+
+def expected_meeting_settings_view(
+    meeting: Meetup,
+) -> MitupView:
+    lang = meeting.owner.lang
+    waiting_list = meeting.waiting_list
+    public = meeting.public
+    invitation = meeting.allow_invitation
+    incognito = meeting.incognito
+    show_timezone = meeting.show_timezone
+
+    message = MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=lang)
+    waiting_list_button = options_button(
+        cb.SET_MEETING_WAITING_LIST.with_id(cast(int, meeting.id)),
+        ButtonMessages.WAITING_LIST.get(lang=lang),
+        waiting_list,
+    )
+    public_button = options_button(
+        cb.SET_MEETING_PUBLIC.with_id(cast(int, meeting.id)), ButtonMessages.PUBLIC.get(lang=lang), public
+    )
+    invitation_button = options_button(
+        cb.SET_MEETING_ALLOW_INVITATIONS.with_id(cast(int, meeting.id)),
+        ButtonMessages.OPEN_INVITATION.get(lang=lang),
+        invitation,
+    )
+    incognito_button = options_button(
+        cb.SET_MEETING_INCOGNITO.with_id(cast(int, meeting.id)), ButtonMessages.INCOGNITO.get(lang=lang), incognito
+    )
+    show_timezone_button = options_button(
+        cb.SET_MEETING_SHOW_TIMEZONE.with_id(cast(int, meeting.id)),
+        ButtonMessages.SHOW_TIMEZONE.get(lang=lang),
+        show_timezone,
+    )
+
+    return MitupView(
+        message,
+        keyboard=[
+            [waiting_list_button, public_button],
+            [invitation_button, incognito_button],
+            [show_timezone_button],
+        ],
+    ).with_back_button(
+        text=ButtonMessages.EDIT, callback_data=cb.EDIT_MEETING.with_id(cast(int, meeting.id)), lang=lang
+    )
+
+
+@pytest.mark.parametrize("waiting_list", [True, False], ids=["waiting_list_true", "waiting_list_false"])
+@pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
+@pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
+@pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
+@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone_true", "show_timezone_false"])
+def test_default_meeting_options_view(
+    waiting_list: bool,
+    public: bool,
+    invitation: bool,
+    incognito: bool,
+    show_timezone: bool,
+    user_with_settings: User,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.allow_invitation = invitation
+    meeting.incognito = incognito
+    meeting.public = public
+    meeting.show_timezone = show_timezone
+    meeting.waiting_list = waiting_list
+
+    view = meeting.settings_view
+
+    expected_view = expected_meeting_settings_view(meeting)
+
+    assert expected_view == view

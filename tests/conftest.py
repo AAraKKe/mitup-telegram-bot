@@ -15,7 +15,7 @@ from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring.metrics import configure_metrics
 from mitup_bot.translations import SUPPORTED_LANGUAGES
-from tests.helpers import UpdateRequest, build_context
+from tests.helpers import UpdateRequest, build_context, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -84,8 +84,8 @@ def user() -> UserModel:
         first_name="John",
         tg_user_id=123,
         meetups=[
-            Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations"),
-            Meetup(id=2, title="Test Meeting 2"),
+            create_meetup(1, "Test Meeting 1", "What a cool description. Congratulations"),
+            create_meetup(2, "Test Meeting 2"),
         ],
     )
 
@@ -97,8 +97,8 @@ def user_with_settings(settings: Settings, lang: str) -> UserModel:
         first_name="John",
         tg_user_id=123,
         meetups=[
-            Meetup(id=1, title="Test Meeting 1", description="What a cool description. Congratulations"),
-            Meetup(id=2, title="Test Meeting 2"),
+            create_meetup(1, "Test Meeting 1", "What a cool description. Congratulations"),
+            create_meetup(2, "Test Meeting 2"),
         ],
     )
     settings.user = user
@@ -110,7 +110,7 @@ def user_with_settings(settings: Settings, lang: str) -> UserModel:
 
 @pytest.fixture
 def meeting(user_with_settings: UserModel) -> Meetup:
-    return Meetup(
+    return create_meetup(
         id=123,
         title="Test Meeting",
         description="Test Description",

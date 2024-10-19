@@ -95,7 +95,7 @@ async def callback_delete_date_time(session: Session, update: Update, context: M
     session.add(meeting)
     session.flush()
 
-    view = meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=meeting.lang))
+    view = meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=user.lang))
     await api.edit_message(context=context, update=update, view=view)
     await api.update_meeting_messages(
         session=session,

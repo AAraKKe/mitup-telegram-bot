@@ -55,6 +55,12 @@ CANCEL_EDIT_MEETING_LOCATION = CallbackData(action="cancel", entity="meet_loc")
 EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
 # ---- Settings
 EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
+SET_MEETING_WAITING_LIST = CallbackData(action="set", entity="meet_wait")
+SET_MEETING_PUBLIC = CallbackData(action="set", entity="meet_pub")
+SET_MEETING_ALLOW_INVITATIONS = CallbackData(action="set", entity="meet_inv")
+SET_MEETING_INCOGNITO = CallbackData(action="set", entity="meet_inc")
+SET_MEETING_SHOW_TIMEZONE = CallbackData(action="set", entity="meet_show_tz")
+EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
 # ---- General
 EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 

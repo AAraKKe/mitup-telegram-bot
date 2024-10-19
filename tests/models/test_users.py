@@ -1,15 +1,7 @@
 import pytest
 
 from mitup_bot.models import Meetup, User
-from tests.helpers.stub_db import MockDbSession
-
-
-def create_meetup(
-    id: int,
-    title: str = "Default title",
-    description="Default description",
-) -> Meetup:
-    return Meetup(id=id, title=title, description=description)
+from tests.helpers import MockDbSession, create_meetup
 
 
 def test_user_does_not_exist(mock_session: MockDbSession):

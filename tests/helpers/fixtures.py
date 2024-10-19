@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from telegram import Location
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.models.meetups import Meetup
+from mitup_bot.models import Meetup, MeetupLocation, User
 
 
 @dataclass
@@ -39,7 +39,32 @@ class UpdateRequest:
 def create_meetup(
     id: int,
     title: str = "Default title",
-    description: str = "Default description",
+    description: str | None = None,
     datetime: dt.datetime | None = None,
+    location: MeetupLocation | None = None,
+    waiting_list: bool = False,
+    language: str = "en",
+    owner: User | None = None,
+    public: bool = False,
+    invitation: bool = False,
+    incognito: bool = False,
+    show_timezone: bool = False,
 ) -> Meetup:
-    return Meetup(id=id, title=title, description=description, datetime=datetime)
+    meetup = Meetup(
+        id=id,
+        title=title,
+        description=description,
+        datetime=datetime,
+        waiting_list=waiting_list,
+        public=public,
+        language=language,
+        location=location or MeetupLocation(),
+        allow_invitation=invitation,
+        incognito=incognito,
+        show_timezone=show_timezone,
+    )
+
+    if owner:
+        owner.meetups.append(meetup)
+
+    return meetup

@@ -18,12 +18,12 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -138,6 +138,42 @@ CONTEXTS = [
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="delete_meeting_datetime",
     ),
+    Context(
+        callback_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(99)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_settings",
+    ),
+    Context(
+        callback_id=EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_WAITING_LIST.with_id(99)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="set_meeting_waiting_list",
+    ),
+    Context(
+        callback_id=EditMeetingHandlerId.SET_MEETING_PUBLIC_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_PUBLIC.with_id(99)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="set_meeting_public",
+    ),
+    Context(
+        callback_id=EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_INCOGNITO.with_id(99)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="set_meeting_incognito",
+    ),
+    Context(
+        callback_id=EditMeetingHandlerId.SET_MEETING_ALLOW_INVITATIONS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_ALLOW_INVITATIONS.with_id(99)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="set_meeting_allow_invitations",
+    ),
+    Context(
+        callback_id=EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_SHOW_TIMEZONE.with_id(99)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="set_meeting_show_timezone",
+    ),
 ]
 
 
@@ -194,7 +230,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(Meetup(id=99))
+    mock_session.add_object(create_meetup(id=99))
 
     with MockApi.start("mitup_bot.guards") as api:
         context, _ = await call_handler(update, app, test_context.callback_id, test_context.meeting_id)

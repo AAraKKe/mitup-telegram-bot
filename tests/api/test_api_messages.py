@@ -12,8 +12,7 @@ from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
-from tests.helpers import AnyFloat, StubMitupContext, UpdateRequest
-from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
+from tests.helpers import AnyFloat, MockDbSession, StubMitupContext, UpdateRequest, create_meetup
 
 
 async def assert_time_metric_emitted(context: StubMitupContext):
@@ -112,7 +111,7 @@ async def test_send_message_fails_without_effective_chat(
 
 
 async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession):
-    meeting = Meetup(id=123, owner=user_with_settings, title="Test meeting", description="Test description")
+    meeting = create_meetup(id=123, owner=user_with_settings, title="Test meeting", description="Test description")
     # Message in the chat with the owner
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(

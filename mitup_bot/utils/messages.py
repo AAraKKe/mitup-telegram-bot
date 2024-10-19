@@ -144,15 +144,15 @@ class SettingsMessages(MessageBase):
         "All your meetings will inherit this configuration.\n\n"
         "You can configure different aspects of your meeting:\n\n"
         "*Waiting list*: allow users to join the meeting even when it is full. "
-        "Users joining after it is full will be added to a waiting list and added to the participants "
+        "Users joining when it is full will be added to a waiting list and added to the participants "
         "list as soon as a spot is available in the order they joined.\n\n"
         "*Public*: activate this to allow everyone that receives the meeting to share it again. "
         "Perfect to reach more people.\n\n"
         "*Open invitations*: activate this option to allow users who have joined the meeting to add friends "
         "even if those friends are not in Telegram.\n\n"
         "*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
-        "Only the number of participants will be shown.\n\n"
-        "*Show timezone*: meetings usually include the timezone the date and time refers to. "
+        "Only the number of participants will be shown. You will still be able to see the participants.\n\n"
+        "*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. "
         "If you don't need this information displayed on the meeting message you can disable it here. "
         "This will also disable the _Timezone_ button shown when the meeting is shared."
     )
@@ -249,6 +249,23 @@ class MeetingMessages(MessageBase):
     )
     DATE_TIME_DELETED = "The date and time of the meeting have been deleted successfully"
     MEETING_HAS_BEEN_DELETED = f"{Emojis.PROHIB} This meeting has been deleted {Emojis.PROHIB}"
+
+    # Edit meeting settings
+    EDIT_SETTINGS_MESSAGE = (
+        "You can configure different aspects of your meeting:\n\n"
+        "*Waiting list*: allow users to join the meeting even when it is full. "
+        "Users joining when it is full will be added to a waiting list and added to the participants "
+        "list as soon as a spot is available in the order they joined.\n\n"
+        "*Public*: activate this to allow everyone that receives the meeting to share it again. "
+        "Perfect to reach more people.\n\n"
+        "*Open invitations*: activate this option to allow users who have joined the meeting to add friends "
+        "even if those friends are not in Telegram.\n\n"
+        "*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
+        "Only the number of participants will be shown. You will still be able to see the participants.\n\n"
+        "*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. "
+        "If you don't need this information displayed on the meeting message you can disable it here. "
+        "This will also disable the _Timezone_ button shown when the meeting is shared."
+    )
 
     # Show meeting list
     # TODO: this needs to be moved to a separate set of messages as it is not part of the meeting creation/editing

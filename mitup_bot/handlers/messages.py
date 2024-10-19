@@ -28,7 +28,15 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
 
     if title := guards.message(update).text:
         user = guards.current_user(update, session)
-        meetup = Meetup(title=title, owner=user)
+        meetup = Meetup(
+            title=title,
+            owner=user,
+            waiting_list=user.settings.default_waiting_list,
+            public=user.settings.default_public,
+            allow_invitation=user.settings.default_allow_invitation,
+            incognito=user.settings.default_incognito,
+            show_timezone=user.settings.default_show_timezone,
+        )
 
         session.add(meetup)
         session.flush()
