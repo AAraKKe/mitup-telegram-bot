@@ -63,9 +63,16 @@ async def toggle_meeting_setting(
         yield meeting
         session.flush()
 
-        # Update all messages to ensure any visible message contains the new changes
         await api.edit_message(context=context, update=update, view=meeting.settings_view)
-        await api.update_meeting_messages(session=session, context=context, meeting=meeting)
+        # Update all messages to ensure any visible message contains the new changes but skip current one
+        # if preseento to stay in the settings view.
+        await api.update_meeting_messages(
+            session=session,
+            context=context,
+            meeting=meeting,
+            current_message=meeting.message_from_update(update),
+            skip_current=True,
+        )
     else:
         yield None
 
