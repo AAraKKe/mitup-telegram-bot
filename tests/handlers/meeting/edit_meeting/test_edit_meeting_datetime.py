@@ -131,6 +131,8 @@ async def test_edit_meeting_date_callback(
     indirect=["update"],
     ids=["set_date_for_the_first_time", "update_existing_date"],
 )
+# This should always show the timezone no matter what the configuration is
+@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
 async def test_set_meeting_date_callback(
     mock_session: MockDbSession,
     update: Update,
@@ -139,8 +141,11 @@ async def test_set_meeting_date_callback(
     user_with_settings: User,
     app: StubMitupApp,
     api: MockApi,
+    show_timezone: bool,
 ):
-    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=current_datetime)
+    meeting = create_meetup(
+        id=10, title="TestMeeting", description="Description", datetime=current_datetime, show_timezone=show_timezone
+    )
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -300,6 +305,8 @@ async def test_edit_meeting_time_callback(
     ids=["meeting_with_time", "meeting_without_time"],
 )
 @freeze_time("2024-12-31 23:20:00", tz_offset=0)  # Freeze UTC time just before midnight to test timezone conversion
+# Always show timezone here no matter whether the meeting is configured to show it or not
+@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
 async def test_set_time_message_with_valid_time(
     mock_session: MockDbSession,
     update: Update,
@@ -308,7 +315,9 @@ async def test_set_time_message_with_valid_time(
     expected_time_displayed: str,
     user_with_settings: User,
     app: StubMitupApp,
+    show_timezone: bool,
 ):
+    meeting.show_timezone = show_timezone
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")

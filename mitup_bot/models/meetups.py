@@ -149,9 +149,20 @@ class Meetup(SQLModel, table=True):
         return self.owner.datetime_in_tz(self.datetime) if self.datetime else None
 
     @property
-    def str_datetime(self) -> str:
+    def full_str_datetime(self) -> str:
+        """Alawyas shows the time with the timezone"""
         if self.datetime:
             return f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})"
+
+        return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
+
+    @property
+    def str_datetime(self) -> str:
+        if self.datetime:
+            datetime_str = f"{self.datetime_in_tz:%Y-%m-%d %H:%M}"
+            if self.show_timezone:
+                datetime_str += f" ({self.timezone.key})"
+            return datetime_str
         return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
 
     @property
@@ -472,18 +483,29 @@ class Meetup(SQLModel, table=True):
         )
 
     def build_inline_keyboard(self) -> Keyboard:
-        return [
+        keyboard = [
             [
                 ButtonConfig(
-                    text=ButtonMessages.JOIN.get(lang=self.user_language),
+                    text=ButtonMessages.JOIN.get(lang=self.lang),
                     callback_data=cb.JOIN.with_id(cast(int, self.id)),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.LEAVE.get(lang=self.user_language),
+                    text=ButtonMessages.LEAVE.get(lang=self.lang),
                     callback_data=cb.LEAVE.with_id(cast(int, self.id)),
                 ),
             ],
         ]
+        if self.show_timezone:
+            keyboard.append(
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.SHOW_IN_YOUR_TIMEZONE.get(lang=self.lang),
+                        callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(cast(int, self.id)),
+                    ),
+                ]
+            )
+
+        return keyboard
 
     @overload
     @classmethod

@@ -78,6 +78,7 @@ class ButtonMessages(MessageBase):
     OPEN_INVITATION = "Open invitations"
     INCOGNITO = "Incognito"
     SHOW_TIMEZONE = "Show timezone"
+    SHOW_IN_YOUR_TIMEZONE = "Show timezone"
 
     # Meeting buttons
     CANCEL = f"{Emojis.CANCEL} Cancel"

@@ -49,7 +49,7 @@ def create_meetup(
     public: bool = False,
     invitation: bool = False,
     incognito: bool = False,
-    show_timezone: bool = False,
+    show_timezone: bool = True,
 ) -> Meetup:
     meetup = Meetup(
         id=id,

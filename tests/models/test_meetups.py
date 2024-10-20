@@ -9,10 +9,11 @@ from telegram import Update
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Settings, User
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, sanitize
-from mitup_bot.views import MitupView
+from mitup_bot.views import ButtonConfig, Keyboard, MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
 from tests.helpers import UpdateRequest, create_meetup
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
@@ -266,6 +267,18 @@ def test_time_properly_converted_for_timezone(settings: Settings):
     # since Dublin is in the same timezone as UTC
     settings.timezone = "Europe/Dublin"
     expected_time = "2024-01-12 12:30 (Europe/Dublin)"
+    assert expected_time == meeting.str_datetime
+
+
+@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
+def test_timezone_not_included_when_show_timezone_disabled(show_timezone: bool, settings: Settings):
+    owner = User(first_name="John", username="john_doe", tg_user_id=1, settings=settings)
+    meeting = create_meetup(
+        id=123, title="Test meeting", show_timezone=show_timezone, datetime=datetime(2024, 1, 12, 12, 30), owner=owner
+    )
+
+    expected_time = "2024-01-12 13:30 (Europe/Madrid)" if show_timezone else "2024-01-12 13:30"
+
     assert expected_time == meeting.str_datetime
 
 
@@ -616,5 +629,56 @@ def test_default_meeting_options_view(
     view = meeting.settings_view
 
     expected_view = expected_meeting_settings_view(meeting)
+
+    assert expected_view == view
+
+
+def expected_inline_keyboard(language: str, with_timezone: bool) -> Keyboard:
+    expected_keyboard = [
+        [
+            ButtonConfig(
+                text=ButtonMessages.JOIN.get(lang=language),
+                callback_data=cb.JOIN.with_id(123),
+            ),
+            ButtonConfig(
+                text=ButtonMessages.LEAVE.get(lang=language),
+                callback_data=cb.LEAVE.with_id(123),
+            ),
+        ]
+    ]
+    if with_timezone:
+        expected_keyboard.append(
+            [
+                ButtonConfig(
+                    text=ButtonMessages.SHOW_IN_YOUR_TIMEZONE.get(lang=language),
+                    callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(123),
+                ),
+            ],
+        )
+
+    return expected_keyboard
+
+
+@pytest.mark.parametrize(
+    "meeting_language",
+    SUPPORTED_LANGUAGES + [None],
+    ids=[f"meeting_language_{lang}" for lang in SUPPORTED_LANGUAGES] + ["meeting_language_none"],
+)
+@pytest.mark.parametrize("with_timezone", [True, False], ids=["with_timezone", "without_timezone"])
+def test_inline_view(meeting: Meetup, meeting_language: str | None, with_timezone: bool):
+    # Ensure the language of the inline view is the language of the meeting
+    # except when the meeting has no language
+    meeting.language = meeting_language
+    meeting.show_timezone = with_timezone
+    used_language = meeting_language or meeting.owner.lang
+    view = meeting.inline_view
+
+    expected_view = MitupInlineView(
+        description=meeting.inline_message,
+        keyboard=expected_inline_keyboard(language=used_language, with_timezone=with_timezone),
+        id="123",
+        title=meeting.title,
+        inline_description=meeting.inline_query_message,
+    )
 
     assert expected_view == view
