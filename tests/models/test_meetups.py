@@ -14,7 +14,7 @@ from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, sanitize
 from mitup_bot.views import MitupView
 from mitup_bot.views.factory import options_button
-from tests.helpers import UpdateRequest
+from tests.helpers import UpdateRequest, create_meetup
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 EXAMPLE_MEETING = Meetup(
@@ -41,7 +41,7 @@ def expected_location_name(lang: str, expected_name: str | None, expected_coordi
 
 
 def expected_participants_message(max_participants: bool, lang: str) -> str:
-    total_participants = MeetingMessages.EMPTY.get(lang=lang)
+    total_participants = f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)}"
     max_participants_text = (
         f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5)}"
         if max_participants
@@ -59,6 +59,7 @@ def expected_message(
     location_name: bool,
     coordinates: bool,
     max_participants: bool,
+    incognito: bool,
 ) -> str:
     str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang)
     str_date = "1987\\-07\\-17 01:59 \\(Europe/Madrid\\)" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
@@ -69,6 +70,9 @@ def expected_message(
         expected_coordinates="\\[📍\\]" if coordinates else None,
     )
     str_participants = expected_participants_message(max_participants, lang=lang)
+    incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
+    str_participants = f"{incognito_prefix}{str_participants}\n\t{owner}"
+
     return (
         f"*Test Meeting* \\({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner)}\\)\n\n"
         f"\\-\\-\\- {Emojis.DESCRIPTION} {str_description}\n"
@@ -86,9 +90,14 @@ def expected_inline_message(
     location_name: bool,
     coordinates: bool,
     max_participants: bool,
+    incognito: bool,
 ) -> str:
     owner = "john\\_doe" if username else "John"
     str_participants = expected_participants_message(max_participants, lang=lang)
+    incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
+    participants_list = "" if incognito else f"\n\t{owner}"
+    str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
+
     str_location = expected_location_name(
         lang=lang,
         expected_name="Test Location" if location_name else None,
@@ -183,6 +192,7 @@ def test_meetup_location_string_conversion(
     [[True, expected_inline_message], [False, expected_message]],
     ids=["inline_message", "normal_message"],
 )
+@pytest.mark.parametrize("incognito", [True, False], ids=["incognito", "no_incognito"])
 def test_meetup_message(
     settings: Settings,
     description: bool,
@@ -192,27 +202,31 @@ def test_meetup_message(
     location_coordinates: bool,
     max_participants: bool,
     is_inline: bool,
-    expected_method: Callable[[str, bool, bool, bool, bool, bool, bool], str],
+    expected_method: Callable[[str, bool, bool, bool, bool, bool, bool, bool], str],
     lang: str,
+    incognito: bool,
 ):
     location = MeetupLocation(
         name="Test Location" if location_name else None,
         coordinates=COORDINATES if location_coordinates else None,
     )
+    owner = User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings)
     meeting = Meetup(
         title="Test Meeting",
         description="Test Description" if description else None,
         datetime=datetime(1987, 7, 16, 23, 59, tzinfo=UTC) if meetup_datetime else None,
         location=location,
         max_members=5 if max_participants else None,
-        owner=User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings),
+        owner=owner,
         language=lang,
         waiting_list=False,
         public=False,
         allow_invitation=False,
-        incognito=False,
+        incognito=incognito,
         show_timezone=True,
     )
+    # Have at least one user joined to evaluate the list of user joined
+    JoinedUsers(user=owner, meetup=meeting)
 
     expected = expected_method(
         lang,
@@ -222,12 +236,11 @@ def test_meetup_message(
         location_name,
         location_coordinates,
         max_participants,
+        incognito,
     )
 
-    if is_inline:  # sourcery skip: no-conditionals-in-tests
-        assert expected == meeting.inline_message
-    else:
-        assert expected == meeting.message
+    actual = meeting.inline_message if is_inline else meeting.message
+    assert expected == actual
 
 
 def test_time_properly_converted_for_timezone(settings: Settings):
@@ -273,19 +286,25 @@ def test_time_properly_converted_for_timezone(settings: Settings):
     ],
     ids=["one_participant_no_limit", "empty", "empty_with_limit", "one_participant_with_limit"],
 )
+@pytest.mark.parametrize(
+    "incognito, expected_incognito", [(True, f"{Emojis.GLASSES} "), (False, "")], ids=["incognito", "no_incognito"]
+)
 def test_participants_badge(
-    participants: int, max_participants: int, expected: Callable[[str], str], user_with_settings: User
+    participants: int,
+    max_participants: int,
+    expected: Callable[[str], str],
+    user_with_settings: User,
+    incognito: bool,
+    expected_incognito: str,
 ):
-    meeting = Meetup(
+    meeting = create_meetup(
+        id=1,
+        owner=user_with_settings,
         title="Test Meeting",
         description="Test Description",
-        owner=user_with_settings,
         max_members=max_participants,
-        waiting_list=False,
-        public=False,
-        allow_invitation=False,
-        incognito=False,
-        show_timezone=True,
+        incognito=incognito,
+        language=user_with_settings.lang,
     )
 
     # sourcery skip: no-loop-in-tests
@@ -293,7 +312,7 @@ def test_participants_badge(
         user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=user, meetup=meeting)
 
-    assert expected(user_with_settings.lang) == meeting.participants_badge
+    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == meeting.participants_badge
 
 
 @pytest.mark.parametrize(
@@ -395,44 +414,64 @@ def test_inline_query_message(
             1,
             None,
             lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}\n\tJoined_0",
+            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}|\n\tJoined_0",
         ),
         (
             2,
             2,
             lambda lang: f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang)} "
-            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}\n\tJoined_0\n\tJoined_1",
+            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n\tJoined_0\n\tJoined_1",
         ),
         (
             1,
             2,
             lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}\n\tJoined_0",
+            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n\tJoined_0",
         ),
     ],
     ids=["empty", "no_limit", "limit_reached", "limit_not_reached"],
 )
+@pytest.mark.parametrize(
+    "incognito, expected_incognito", [(True, f"{Emojis.GLASSES} "), (False, "")], ids=["incognito", "no_incognito"]
+)
+@pytest.mark.parametrize("with_list", [True, False], ids=["with_list", "without_list"])
 def test_participants_text(
-    user_with_settings: User, joined_count: int, max_participants: int, expected: Callable[[str], str]
+    user_with_settings: User,
+    joined_count: int,
+    max_participants: int,
+    expected: Callable[[str], str],
+    incognito: bool,
+    expected_incognito: str,
+    with_list: bool,
 ):
-    meeting = Meetup(
+    meeting = create_meetup(
+        id=1,
+        owner=user_with_settings,
         title="Test Meeting",
         description="Test Description",
-        owner=user_with_settings,
+        language=user_with_settings.lang,
+        incognito=incognito,
         max_members=max_participants,
-        waiting_list=False,
-        public=False,
-        allow_invitation=False,
-        incognito=False,
-        show_timezone=True,
     )
 
+    # Add as many joined user as necessary
     # sourcery skip: no-loop-in-tests
     for idx in range(joined_count):
         user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=user, meetup=meeting)
 
-    assert expected(user_with_settings.lang) == meeting.participants_text
+    # We expect the text to cinlude the list or not depending on:
+    # - with_list: Always include the list
+    # - incognito: Not include it only if we are not requesting to show the list
+    expected_text = (
+        expected(user_with_settings.lang).replace("|", "")
+        if with_list
+        else expected(user_with_settings.lang).split("|")[0]
+        if incognito
+        else expected(user_with_settings.lang).replace("|", "")
+    )
+    participants_text = meeting.participants_text_with_list if with_list else meeting.participants_text
+    assert f"{expected_incognito}{expected_text}" == participants_text
 
 
 @pytest.mark.parametrize(

@@ -126,6 +126,7 @@ class Meetup(SQLModel, table=True):
 
     @property
     def short_description(self) -> str | None:
+        """A version of the meeting description used when showing the meeting on an inline query"""
         if self.description is None:
             return
         if len(self.description) <= 30:
@@ -155,20 +156,43 @@ class Meetup(SQLModel, table=True):
 
     @property
     def participants_badge(self) -> str:
+        """Shwos a badge with participants information when the meeting is shown in an inline query results"""
         empty = MeetingMessages.EMPTY.get(lang=self.lang)
         joined_count = len(self.joined_links)
         no_limit = f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language)})"
 
+        incognito_preffix = f"{Emojis.GLASSES} " if self.incognito else ""
+
         if self.max_members is None:
-            return empty if joined_count == 0 else f"{len(self.joined_links)} {no_limit}"
+            result_badged = empty if joined_count == 0 else f"{len(self.joined_links)} {no_limit}"
+            return f"{incognito_preffix}{result_badged}"
 
         empty_with_max = (
             f"{empty} {MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)}"
         )
-        return empty_with_max if joined_count == 0 else f"({joined_count}/{self.max_members})"
+        result_badged = empty_with_max if joined_count == 0 else f"({joined_count}/{self.max_members})"
+        return f"{incognito_preffix}{result_badged}"
+
+    @property
+    def participants_list_text(self) -> str:
+        """This shows the participants of the meeting with one line per participant"""
+        participant_list = [link.user.inline_name for link in self.joined_links]
+        return f"\n\t{"\n\t".join(participant_list)}" if participant_list else ""
 
     @property
     def participants_text(self) -> str:
+        """
+        String representing the participants information of the meeting. The list of participants is included
+        only in the case that the meeting is not incognito.
+        """
+        participant_list = "" if self.incognito else self.participants_list_text
+        return f"{self.participants_text_without_list}{participant_list}".strip()
+
+    @property
+    def participants_text_without_list(self) -> str:
+        """
+        Text representing the participants of the meeting without the list of participants.
+        """
         if len(self.joined_links) == 0:
             total_participants = MeetingMessages.EMPTY.get(lang=self.lang)
         elif len(self.joined_links) == 1:
@@ -182,10 +206,15 @@ class Meetup(SQLModel, table=True):
             else f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)}"
         )
 
-        participant_list = [link.user.inline_name for link in self.joined_links]
-        participants_message = f"\n\t{"\n\t".join(participant_list)}" if participant_list else ""
+        incognito_preffix = f"{Emojis.GLASSES} " if self.incognito else ""
+        return f"{incognito_preffix}{total_participants} {max_participants}".strip()
 
-        return f"{total_participants} {max_participants}{participants_message}".strip()
+    @property
+    def participants_text_with_list(self) -> str:
+        """
+        String representing the participants information of the meeting. The list of participants is always included.
+        """
+        return f"{self.participants_text_without_list}{self.participants_list_text}".strip()
 
     @property
     def message(self) -> str:
@@ -194,7 +223,7 @@ class Meetup(SQLModel, table=True):
             f"--- {Emojis.DESCRIPTION} $description\n"
             f"--- {Emojis.CLOCK} $datetime\n"
             f"--- {Emojis.MAP} $location\n"
-            f"--- {Emojis.JOINED} $participants"
+            f"--- {Emojis.JOINED} $participants_text_with_list"
         )
 
         return self.process_message_template(template)
@@ -208,7 +237,8 @@ class Meetup(SQLModel, table=True):
                 ),
                 datetime=sanitize(self.str_datetime, full=True),
                 location=sanitize(self.location.description(lang=self.lang), full=True),
-                participants=sanitize(self.participants_text, full=True),
+                participants_text_with_list=sanitize(self.participants_text_with_list, full=True),
+                participants_text=sanitize(self.participants_text, full=True),
             )
         )
 
@@ -227,7 +257,7 @@ class Meetup(SQLModel, table=True):
             message_lines.append(f"--- {Emojis.CLOCK} $datetime")
         if not self.location.empty():
             message_lines.append(f"--- {Emojis.MAP} $location")
-        message_lines.append(f"--- {Emojis.JOINED} $participants")
+        message_lines.append(f"--- {Emojis.JOINED} $participants_text")
 
         template = Template("\n".join(message_lines))
 
