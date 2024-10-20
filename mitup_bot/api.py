@@ -13,7 +13,7 @@ from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
-TELEMGRAM_API_TIME_PREFFIX = "TelegramApi"
+TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
 
 
 async def send_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
@@ -26,7 +26,7 @@ async def send_message(*, context: TMitupContext, update: Update, view: MitupVie
         message = view.description
         reply_markup = view.markup
 
-    with context.with_time_metric(preffix=TELEMGRAM_API_TIME_PREFFIX) as _:
+    with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX) as _:
         return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
@@ -51,7 +51,7 @@ async def edit_message(*, context: TMitupContext, update: Update, view: MitupVie
         else:
             raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
-    with context.with_time_metric(preffix=TELEMGRAM_API_TIME_PREFFIX):
+    with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
         return await context.bot.edit_message_text(
             text=message,
             chat_id=chat_id,
@@ -93,7 +93,7 @@ async def update_single_meeting_message(
     text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang) if was_deleted else view.description
     reply_markup = None if was_deleted else MitupView.keyboard_to_markup(message.buttons.keyboard)
     try:
-        with context.with_time_metric(preffix=TELEMGRAM_API_TIME_PREFFIX):
+        with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             await context.bot.edit_message_text(
                 text=text,
                 chat_id=message.chat_id,

@@ -264,12 +264,12 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         )
 
     @contextmanager
-    def with_time_metric(self, preffix: str, handler_metrics: bool = False) -> Generator[None, None, None]:
+    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None, None, None]:
         """
         Context manager that emits a Time metric measuring the time it takes the code inside the context to run.
 
         Args:
-            preffix (str): the preffix is added to the metric name. The resulting metric name will be <preffix>Time.
+            prefix (str): the prefix is added to the metric name. The resulting metric name will be <prefix>Time.
             handler_metrics (bool, optional): If True, the metric will be emitted using the handler dimensions.
                 Defaults to False.
         """
@@ -278,9 +278,9 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         elapsed_time = 1000 * (perf_counter() - start_time)
 
         if handler_metrics:
-            self.put_metric(f"{preffix}Time", elapsed_time, Unit.MILLISECONDS)
+            self.put_metric(f"{prefix}Time", elapsed_time, Unit.MILLISECONDS)
         else:
-            self.put_custom_metric(f"{preffix}Time", elapsed_time, Unit.MILLISECONDS)
+            self.put_custom_metric(f"{prefix}Time", elapsed_time, Unit.MILLISECONDS)
 
     async def flush_metrics(self):
         # If we are requesting to flush a stand alone metrics logger, flush it

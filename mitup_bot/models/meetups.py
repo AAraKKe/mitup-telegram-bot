@@ -172,17 +172,17 @@ class Meetup(SQLModel, table=True):
         joined_count = len(self.joined_links)
         no_limit = f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language)})"
 
-        incognito_preffix = f"{Emojis.GLASSES} " if self.incognito else ""
+        incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
 
         if self.max_members is None:
             result_badged = empty if joined_count == 0 else f"{len(self.joined_links)} {no_limit}"
-            return f"{incognito_preffix}{result_badged}"
+            return f"{incognito_prefix}{result_badged}"
 
         empty_with_max = (
             f"{empty} {MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)}"
         )
         result_badged = empty_with_max if joined_count == 0 else f"({joined_count}/{self.max_members})"
-        return f"{incognito_preffix}{result_badged}"
+        return f"{incognito_prefix}{result_badged}"
 
     @property
     def participants_list_text(self) -> str:
@@ -217,8 +217,8 @@ class Meetup(SQLModel, table=True):
             else f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)}"
         )
 
-        incognito_preffix = f"{Emojis.GLASSES} " if self.incognito else ""
-        return f"{incognito_preffix}{total_participants} {max_participants}".strip()
+        incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
+        return f"{incognito_prefix}{total_participants} {max_participants}".strip()
 
     @property
     def participants_text_with_list(self) -> str:
