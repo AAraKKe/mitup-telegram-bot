@@ -15,7 +15,7 @@ from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring.metrics import configure_metrics
 from mitup_bot.translations import SUPPORTED_LANGUAGES
-from tests.helpers import UpdateRequest, build_context, create_meetup
+from tests.helpers import HandlerContext, UpdateRequest, build_context, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -242,3 +242,8 @@ def context(app: Application, update: Update) -> MitupContext:
 def configure_test_metrics():
     """Make sure metrics are always configured during test session"""
     configure_metrics(MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False))
+
+
+@pytest.fixture
+def handler_context(update: Update, app: Application) -> HandlerContext:
+    return HandlerContext(update=update, app=app)

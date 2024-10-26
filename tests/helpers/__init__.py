@@ -13,6 +13,7 @@ __all__ = [
     "MockDbSession",
     "MITUP_DIR",
     "console",
+    "HandlerContext",
 ]
 
 from .types import AnyFloat, StubMitupApp, StubMitupContext, DEFAULT_CURRENT_MESSAGE
@@ -23,3 +24,4 @@ from .fixtures import UpdateRequest, create_meetup
 from .stub_db import MockDbSession
 from .filesystem import MITUP_DIR
 from . import console
+from .handler_context import HandlerContext

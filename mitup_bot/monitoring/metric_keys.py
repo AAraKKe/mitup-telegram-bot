@@ -26,6 +26,8 @@ class MetricKey(CamelCaseStrEnum):
     """Metric to be emitted when the user tries to do an action with a meeting that does not belong to them."""
     MESSAGE_DELETED = auto()
     """Represents a message that has been deleted in Telegram and deleted from the database"""
+    STALE_MEETING_MESSAGE = auto()
+    """This metrics is emitted when someone interacts with a message of a meeting that should not be available."""
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

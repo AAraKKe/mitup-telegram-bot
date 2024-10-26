@@ -43,6 +43,12 @@ def valid_inline_query(update: Update) -> InlineQuery:
     return update.inline_query
 
 
+def valid_callback_query(update: Update) -> CallbackQuery:
+    if update.callback_query is None:
+        raise CallbackQueryNotSet(update)
+    return update.callback_query
+
+
 def valid_date_callback_data(cb: DateCallbackData, callback_id: CallbackId) -> ValidDateCallbackData:
     """
     Validates the callback `cb`. If an id or date cannot be set or the entity is unknown,

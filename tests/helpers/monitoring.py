@@ -335,6 +335,51 @@ class StubMetricsEngine(MitupMetricsEngine[StubMetrics]):
             times=times,
         )
 
+    def assert_feature_metrics_emitted(
+        self,
+        feature: Feature,
+        times: int = 1,
+    ):
+        """Assert wheather a given feature metric has been emitted.
+
+        Args:
+            feature (Feature): The feature metric that should have been emitted
+            times (int, optional): How many times the metric has been emitted. Defaults to 1.
+        """
+        dimensions = {"Feature": feature.value}
+
+        self.assert_metrics_emited(
+            [MetricKey.COUNT],
+            [1.0],
+            [Unit.COUNT],
+            dimensions=dimensions,
+            add_handler_dimensions=False,
+            add_update_properties=True,
+            times=times,
+        )
+
+    def assert_feature_metrcs_not_emitted(
+        self,
+        feature: Feature,
+    ):
+        """Assert wheather a given feature metric has not been emitted.
+
+        Args:
+            feature (Feature): The feature metric that should not have been emitted
+        """
+        dimensions = {"Feature": feature.value}
+
+        self.assert_metrics_emited(
+            [MetricKey.COUNT],
+            [1.0],
+            [Unit.COUNT],
+            dimensions=dimensions,
+            add_handler_dimensions=False,
+            add_update_properties=True,
+            times=0,
+            negative_case=True,
+        )
+
     def assert_metrics_not_emited(
         self,
         names: list[str | MetricKey],

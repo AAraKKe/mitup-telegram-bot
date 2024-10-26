@@ -80,6 +80,12 @@ class Meetup(SQLModel, table=True):
     messages: list[Message] = Relationship(back_populates="meetup")
     joined_links: list["JoinedUsers"] = Relationship(back_populates="meetup")
 
+    def __hash__(self) -> int:
+        return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
+
+    def __eq__(self, other: object) -> bool:
+        return hash(self) == hash(other) if isinstance(other, Meetup) else NotImplemented
+
     @property
     def full(self) -> bool:
         if self.max_members is None:
@@ -87,15 +93,14 @@ class Meetup(SQLModel, table=True):
         return len([link for link in self.joined_links if not link.is_waiting_list]) >= self.max_members
 
     def has_message(self, update: Update) -> bool:
-        if eff_message := update.effective_message:
-            return any(message.message_id == eff_message.message_id for message in self.messages)
-        if update.callback_query and update.callback_query.inline_message_id:
-            return any(
-                message.inline_message_id == update.callback_query.inline_message_id for message in self.messages
-            )
-        return False
+        """Return True if the message where the update was sent from is linked to this meeting."""
+        return self.message_from_update(update) is not None
 
     def message_from_update(self, update: Update) -> "Message | None":
+        """
+        Get the message linked to this meeting that represents the message where the update was sent from.
+        None if the message does not exist.
+        """
         if eff_message := update.effective_message:
             return next((message for message in self.messages if message.message_id == eff_message.message_id), None)
         if update.callback_query and update.callback_query.inline_message_id:

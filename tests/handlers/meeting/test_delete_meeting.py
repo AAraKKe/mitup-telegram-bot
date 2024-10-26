@@ -7,13 +7,12 @@ from telegram import Update
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.callback_query import CallbackQueryId
-from mitup_bot.models import User
-from mitup_bot.models.meetups import Meetup
+from mitup_bot.models import Settings, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -151,17 +150,17 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     "update, handler_id, action",
     [
         (
-            (UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(123))),
+            (UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(111))),
             CallbackQueryId.DELETE_MEETING,
             "Delete meeting",
         ),
         (
-            (UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(123))),
+            (UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(111))),
             CallbackQueryId.CONFIRM_DELETE_MEETING,
             "Confirm delete meeting",
         ),
         (
-            (UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(123))),
+            (UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(111))),
             CallbackQueryId.DECLINE_DELETE_MEETING,
             "Decline delete meeting",
         ),
@@ -175,13 +174,12 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     handler_id: CallbackQueryId,
     action: str,
     user_with_settings: User,
-    user: User,
     app: StubMitupApp,
-    meeting: Meetup,
     caplog: pytest.LogCaptureFixture,
 ):
+    owner = User(tg_user_id=2, first_name="Another", id=2, settings=Settings())
+    meeting = create_meetup(id=111, title="Meeting", owner=owner)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    meeting.owner = user
     mock_session.add_object(meeting)
 
     with MockApi.start("mitup_bot.guards") as api:
@@ -189,7 +187,7 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
             context, _ = await call_handler(update, app, handler_id)
 
             assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
-            assert "Meeting id: 123, user id: 1" in caplog.text
+            assert "Meeting id: 111, user id: 1" in caplog.text
 
             api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 

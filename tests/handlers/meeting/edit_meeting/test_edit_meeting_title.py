@@ -8,12 +8,11 @@ from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.edit_meeting.edit_meeting_title import callback_query_edit_meeting_title
 from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState
-from mitup_bot.models.meetups import Meetup
-from mitup_bot.models.users import User
+from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import MockApi
+from tests.helpers import MockApi, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -75,8 +74,6 @@ async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_wa
     context: MitupContext,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
-    user: User,
-    meeting: Meetup,
 ):
     caplog.set_level(logging.WARNING)
 
@@ -85,7 +82,9 @@ async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_wa
 
     context.matches = [match]
     mock_session.add_object(user_with_settings, "tg_user_id")
-    meeting.owner = user
+    owner = User(tg_user_id=2, first_name="Another", id=2, settings=Settings())
+    meeting = create_meetup(id=123, title="Meeting", owner=owner)
+
     mock_session.add_object(meeting)
 
     await callback_query_edit_meeting_title(update, context)

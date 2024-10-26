@@ -19,8 +19,8 @@ class JoinedUsers(SQLModel, table=True):
     meetup: "Meetup" = Relationship(back_populates="joined_links")
     user: "User" = Relationship(back_populates="joined_links")
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, JoinedUsers):
-            return NotImplemented
+    def __hash__(self) -> int:
+        return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
 
-        return self.user_id == other.user_id and self.meetup_id == other.meetup_id
+    def __eq__(self, other: object) -> bool:
+        return hash(self) == hash(other) if isinstance(other, JoinedUsers) else NotImplemented

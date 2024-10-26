@@ -32,6 +32,12 @@ class Message(SQLModel, table=True):
 
     meetup: "Meetup" = Relationship(back_populates="messages")
 
+    def __hash__(self) -> int:
+        return hash(self.model_dump_json(exclude={"id"}))
+
+    def __eq__(self, other: object) -> bool:
+        return hash(self) == hash(other) if isinstance(other, Message) else NotImplemented
+
     @classmethod
     def from_update(cls, update: Update, meeting: "Meetup", user: "User") -> "Message":
         message_id = None

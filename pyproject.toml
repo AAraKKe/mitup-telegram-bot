@@ -102,6 +102,10 @@ exclude_also = [
     '^ +assert_never\(.*?\)$',
     # Case statements should be exhaustive
     '^ +case .*? as unreachable:$',
+    # Ignore @overload functions
+    '^ +@overload$',
+    # Ignore type checking imports
+    'if TYPE_CHECKING:',
 ]
 # --------------------------
 # Builds
@@ -183,6 +187,8 @@ dependencies = [
     "mkdocs",
     "mkdocs-material",
 ]
+[tool.hatch.envs.dev.env-vars]
+PYRIGHT_PYTHON_FORCE_VERSION = "latest"
 
 [tool.hatch.envs.dev.scripts]
 test = ["build-locales", "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests"]

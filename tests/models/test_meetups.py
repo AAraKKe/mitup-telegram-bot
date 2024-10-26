@@ -4,11 +4,12 @@ from typing import cast
 from unittest import mock
 
 import pytest
-from telegram import Update
+from telegram import Chat, Update
+from telegram import Message as TgMessage
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
-from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Settings, User
+from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, MessageButtons, Settings, User
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.emojis import Emojis
@@ -556,6 +557,19 @@ def test_add_message_to_meeting_from_update(
     assert message.chat_id == chat_id
 
 
+def test_add_message_does_nothing_if_message_exists():
+    meeting = create_meetup(id=1, owner=User(first_name="John", tg_user_id=1, settings=Settings()))
+    message = Message(
+        id=123, message_id=123, chat_id=123, buttons=MessageButtons(keyboard=meeting.main_view.keyboard), meetup=meeting
+    )
+
+    assert message == meeting.add_message(
+        Update(123, message=TgMessage(message_id=123, date=datetime.now(), chat=Chat(id=123, type="PRIVATE"))),
+        meeting.owner,
+    )
+    assert len(meeting.messages) == 1
+
+
 def test_add_message_fails_if_no_message_in_update(meeting: Meetup):
     with pytest.raises(NoMessageAvailable):
         meeting.add_message(Update(123), meeting.owner)
@@ -682,3 +696,30 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None, with_timezon
     )
 
     assert expected_view == view
+
+
+@pytest.mark.parametrize(
+    "max_members,is_full", [[1, True], [2, False], [None, False]], ids=["full_not", "not_full", "not_full_no_limit"]
+)
+def test_meeting_is_full(max_members: int | None, is_full: bool):
+    meeting = create_meetup(id=1, max_members=max_members)
+
+    meeting.max_members = max_members
+    JoinedUsers(user=meeting.owner, meetup=meeting)
+    assert meeting.full is is_full
+
+
+@pytest.mark.parametrize(
+    "meeting_datetime, expected",
+    [
+        (datetime(2024, 1, 12, 12, 30, tzinfo=UTC), "2024-01-12 12:30 (UTC)"),
+        (None, MeetingMessages.DATE_NOT_SET.get(lang="en")),
+    ],
+    ids=["with_datetime", "without_datetime"],
+)
+def test_meeting_full_datetime_string(meeting_datetime: datetime | None, expected: str):
+    meeting = create_meetup(
+        id=1, datetime=meeting_datetime, owner=User(first_name="John", tg_user_id=1, settings=Settings())
+    )
+
+    assert meeting.full_str_datetime == expected

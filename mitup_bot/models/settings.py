@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Field, Relationship, SQLModel
 
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import MitupView
@@ -21,7 +22,7 @@ class Settings(SQLModel, table=True):
     user_id: int | None = Field(default=None, foreign_key="users.id")
     created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
     updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
-    language: str = "en"
+    language: str = TranslationEngine.FALLBACK_LANG
     timezone: str = "UTC"
     notification: bool = True
     notification_time: int = 5
@@ -33,6 +34,12 @@ class Settings(SQLModel, table=True):
     default_show_timezone: bool = True
 
     user: "User" = Relationship(back_populates="settings")
+
+    def __hash__(self) -> int:
+        return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
+
+    def __eq__(self, other: object) -> bool:
+        return hash(self) == hash(other) if isinstance(other, Settings) else NotImplemented
 
     @property
     def tz(self) -> ZoneInfo:

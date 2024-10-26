@@ -30,6 +30,7 @@ class MockApi:
     send_message_mock: mock.AsyncMock
     edit_message_mock: mock.AsyncMock
     update_meeting_messages_mock: mock.AsyncMock
+    answer_callback_query_mock: mock.AsyncMock
 
     @classmethod
     @contextmanager
@@ -38,11 +39,13 @@ class MockApi:
             mock.patch(f"{module_path}.api.edit_message") as edit_patch,
             mock.patch(f"{module_path}.api.send_message") as send_patch,
             mock.patch(f"{module_path}.api.update_meeting_messages") as update_meeting_messages_patch,
+            mock.patch(f"{module_path}.api.answer_callback_query") as answer_callback_query_patch,
         ):
             yield MockApi(
                 send_message_mock=send_patch,
                 edit_message_mock=edit_patch,
                 update_meeting_messages_mock=update_meeting_messages_patch,
+                answer_callback_query_mock=answer_callback_query_patch,
             )
 
     def assert_send_message_called(
@@ -54,6 +57,26 @@ class MockApi:
         self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
     ):
         self.assert_method_called(self.edit_message_mock, context, update, view, times)
+
+    def assert_answer_callback_query_called(
+        self,
+        context: mock.MagicMock | MitupContext,
+        update: Update,
+        text: str | None = None,
+        show_alert: bool = False,
+        times: int = 1,
+    ):
+        if times == 1:
+            self.answer_callback_query_mock.assert_awaited_once_with(
+                context=context, update=update, text=text, show_alert=show_alert
+            )
+        else:
+            call_count = self.answer_callback_query_mock.call_count
+            assert call_count == times, f"Expected {times} call but found {call_count}"
+            expected_call = mock.call(context=context, update=update, text=text, show_alert=show_alert)
+            assert any(
+                expected_call == call for call in self.answer_callback_query_mock.await_args_list
+            ), f"Expected call {expected_call} not found in method"
 
     def assert_update_meeting_messages_called(
         self,

@@ -6,10 +6,9 @@ from telegram import Update
 
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.edit_meeting.entry import callback_query_edit_meeting
-from mitup_bot.models import User
-from mitup_bot.models.meetups import Meetup
+from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import MockApi, StubMitupContext, UpdateRequest
+from tests.helpers import MockApi, StubMitupContext, UpdateRequest, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -45,23 +44,22 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
-    user: User,
-    meeting: Meetup,
 ):
     caplog.set_level(logging.WARNING)
 
-    match = re.match(cb.EDIT_MEETING.pattern, "edit;meeting:123")
+    match = re.match(cb.EDIT_MEETING.pattern, "edit;meeting:111")
     assert match is not None
 
     context.matches = [match]
+    owner = User(tg_user_id=2, first_name="Another", id=2, settings=Settings())
+    meeting = create_meetup(id=111, title="Meeting", owner=owner)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    meeting.owner = user
     mock_session.add_object(meeting)
 
     await callback_query_edit_meeting(update, context)
 
     assert "User tried 'Edit meeting' with a meeting that does not belong to them. " in caplog.text
-    assert "Meeting id: 123, user id: 1" in caplog.text
+    assert "Meeting id: 111, user id: 1" in caplog.text
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)

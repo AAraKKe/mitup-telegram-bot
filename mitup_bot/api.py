@@ -78,6 +78,11 @@ async def answer_inline_query(context: TMitupContext, update: Update, results: l
     raise AnswerInlineQueryError(query.query)
 
 
+async def answer_callback_query(*, context: TMitupContext, update: Update, text: str, show_alert: bool):
+    query = guards.valid_callback_query(update)
+    await context.bot.answer_callback_query(query.id, text=text, show_alert=show_alert)
+
+
 async def update_single_meeting_message(
     message: MessageModel,
     session: Session,

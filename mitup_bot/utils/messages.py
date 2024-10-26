@@ -30,11 +30,29 @@ def sanitize(message: str, full=False) -> str:
 
 
 class MessageBase(StrEnum):
-    def get(self, full: bool = True, lang: str = TranslationEngine.FALLBACK_LANG, **kwargs: MessageParams) -> str:
+    def get(
+        self,
+        full: bool = True,
+        lang: str = TranslationEngine.FALLBACK_LANG,
+        plain: bool = False,
+        **kwargs: MessageParams,
+    ) -> str:
+        """
+        Retrieves a formatted message string based on the provided parameters.
+        Args:
+            full (bool): If True, performs full sanitization on the message parameters. Defaults to True.
+            lang (str): The language code to use for the message translation.
+                Defaults to TranslationEngine.FALLBACK_LANG.
+            plain (bool): If True, returns the message without sanitization. Defaults to False.
+            **kwargs (MessageParams): Additional message parameters to be substituted into the message template.
+        Returns:
+            str: The formatted message string.
+        """
+
         for key, value in kwargs.items():
             assert value is not None, f"Message parameter cannot be None and found {key}={value}!"
-            kwargs[key] = sanitize(str(value), full=full)
-        return Template(sanitize(self.to_lang(lang))).substitute(**kwargs)
+            kwargs[key] = str(value) if plain else sanitize(str(value), full=full)
+        return Template(self.to_lang(lang) if plain else sanitize(self.to_lang(lang))).substitute(**kwargs)
 
     def to_lang(self, lang: str) -> str:
         """Given a message, return the translation in the given language."""
@@ -106,7 +124,7 @@ class ButtonMessages(MessageBase):
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
 
     def back(self, lang: str, full=True, **kwargs: str) -> str:
-        return f"{self.GO_BACK} {self.get(lang=lang, full=full, **kwargs)}"
+        return f"{self.GO_BACK} {self.get(lang=lang, full=full, plain=False, **kwargs)}"
 
 
 class Messages(MessageBase):
@@ -180,6 +198,28 @@ class MeetingMessages(MessageBase):
     MAX_PARTICIPANTS = "(Max: ${max_participants})"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
+
+    # Join and Leave messages
+    JOINED_MEETING_SUCCESS = "You joined the meeting!"
+    JOINED_MEETING_ALREADY = "You have already joined this meeting"
+    JOINED_MEETING_NOT_FOUND = "The meeting you tried to join does not exist"
+    JOINED_MEETING_FULL = "The meeting is full"
+    JOINED_MEETING_FULL_WAITING_LIST = "The meeting is full. You have been added to the waiting list."
+    JOINED_MEETING_UNREGISTERED = (
+        "You have joined the meeting, %{user}! "
+        "It seems you have never used Mitup before, open a chat with @mitupbot to be "
+        "able to received notifications and create new meetings!\n\n"
+        "If you don't open a chat with the bot, you can be removed from the meeting at any time."
+    )
+    LEFT_MEETING_SUCCESS = "You have left the meeting"
+    LEFT_MEETING_ALREADY = "You cannot leave a meeting you have not joined"
+    LEFT_MEETING_NOT_FOUND = "The meeting you tried to leave does not exist"
+    LEFT_MEETING_UNREGISTERED = (
+        "You have left the meeting, %{user}! "
+        "It seems you have never used Mitup before, open a chat with @mitupbot to be "
+        "able to received notifications and create new meetings!\n\n"
+        "If you don't open a chat with the bot, you can be added to the meeting at any time."
+    )
 
     # Edit title and description
     EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"

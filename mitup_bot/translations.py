@@ -13,7 +13,7 @@ class TranslationEngine:
 
     translations: dict[str, gettext.GNUTranslations] = {}
 
-    def __init__(self):
+    def __init__(self):  # pragma: no cover
         self.translations: dict[str, gettext.GNUTranslations] = {}
 
     @classmethod

@@ -26,6 +26,12 @@ class User(SQLModel, table=True):
     meetups: list["Meetup"] = Relationship(back_populates="owner")
     joined_links: list["JoinedUsers"] = Relationship(back_populates="user")
 
+    def __hash__(self) -> int:
+        return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
+
+    def __eq__(self, other: object) -> bool:
+        return hash(self) == hash(other) if isinstance(other, User) else NotImplemented
+
     @overload
     @classmethod
     def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: Literal[True]) -> Self: ...

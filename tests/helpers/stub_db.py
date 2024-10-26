@@ -31,11 +31,15 @@ class MockDbSession(mock.MagicMock):
     def __init__(self, *args, **kwargs):
         # Ensure the mock is created with Sesison as the spec
         super().__init__(*args, spec=Session, **kwargs)
-        self.add = mock.MagicMock()
+        self.add = mock.MagicMock(side_effect=self.__add_side_effect)
         self.flush = mock.MagicMock()
         self.exec = mock.MagicMock(side_effect=self.__exec_side_effect)
         self.delete = mock.MagicMock()
         self.statements_registry: dict[str, Result] = {}
+        self.objects_in_db: set[SQLModel] = set()
+
+    def __add_side_effect(self, obj: SQLModel):
+        self.objects_in_db.add(obj)
 
     def __exec_side_effect(self, statement: SelectBase) -> Result | None:
         statement_str = str(statement.compile(compile_kwargs={"literal_binds": True}))
@@ -154,3 +158,12 @@ class MockDbSession(mock.MagicMock):
         user = User(id=1, tg_user_id=update.effective_user.id, first_name=update.effective_user.first_name)
         self.add_object(user, "tg_user_id")
         return user
+
+    def assert_object_added(self, obj: SQLModel):
+        """
+        Asserts that the specified object has been added to the database through a call to the `add` method.
+
+        Args:
+            obj: The object to be checked.
+        """
+        assert obj in self.objects_in_db
