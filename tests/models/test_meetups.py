@@ -73,7 +73,7 @@ def expected_message(
     )
     str_participants = expected_participants_message(max_participants, lang=lang)
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
-    str_participants = f"{incognito_prefix}{str_participants}\n\t{owner}"
+    str_participants = f"{incognito_prefix}{str_participants}\n  {owner}"
 
     return (
         f"*Test Meeting* \\({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner)}\\)\n\n"
@@ -97,7 +97,7 @@ def expected_inline_message(
     owner = "john\\_doe" if username else "John"
     str_participants = expected_participants_message(max_participants, lang=lang)
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
-    participants_list = "" if incognito else f"\n\t{owner}"
+    participants_list = "" if incognito else f"\n  {owner}"
     str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
 
     str_location = expected_location_name(
@@ -428,19 +428,19 @@ def test_inline_query_message(
             1,
             None,
             lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}|\n\tJoined_0",
+            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}|\n  Joined\\_0",
         ),
         (
             2,
             2,
             lambda lang: f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang)} "
-            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n\tJoined_0\n\tJoined_1",
+            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n  Joined\\_0\n  Joined\\_1",
         ),
         (
             1,
             2,
             lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n\tJoined_0",
+            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n  Joined\\_0",
         ),
     ],
     ids=["empty", "no_limit", "limit_reached", "limit_not_reached"],

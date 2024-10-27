@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from sqlmodel import Session
 from telegram import Update
@@ -7,7 +7,7 @@ from mitup_bot import api, guards
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.models import JoinedUsers, Meetup, Message, User, build
+from mitup_bot.models import Meetup, Message, User, utils
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
@@ -39,13 +39,20 @@ async def user_joins_meeting(
     The provided user joins the meeting.
     """
 
-    def join_operation(meeting: Meetup, user: User) -> MeetingMessages:
+    async def join_operation(meeting: Meetup, user: User) -> MeetingMessages:
         assert meeting.id is not None
 
         if not user.joined_meeting(meeting.id):
-            session.add(JoinedUsers(user=user, meetup=meeting))
-            context.put_feature_metric(Feature.JOIN_MEETING)
-            return MeetingMessages.JOINED_MEETING_SUCCESS
+            if (joined_link := utils.joined_link(meeting, user)) is not None:
+                session.add(joined_link)
+                context.put_feature_metric(Feature.JOIN_MEETING)
+                return (
+                    MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST
+                    if meeting.full
+                    else MeetingMessages.JOINED_MEETING_SUCCESS
+                )
+            else:
+                return MeetingMessages.JOINED_MEETING_FULL
 
         return MeetingMessages.JOINED_MEETING_ALREADY
 
@@ -59,7 +66,7 @@ def register_default_user(session: Session, update: Update) -> User:
     if update.effective_user is None:  # pragma: no cover
         raise EffectiveUserNotSet(update)
 
-    new_user = build.user_from_update(update)
+    new_user = utils.user_from_update(update)
     session.add(new_user)
     session.flush()
 
@@ -99,12 +106,21 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
 async def user_leaves_meeting(
     session: Session, update: Update, context: TMitupContext, user: User, with_notification: bool = True
 ):
-    def leave_operation(meeting: Meetup, user: User) -> MeetingMessages:
+    async def leave_operation(meeting: Meetup, user: User) -> MeetingMessages:
         assert meeting.id is not None
 
         if joined_link := user.joined_meeting(meeting.id):
-            meeting.joined_links.remove(joined_link)
+            session.delete(joined_link)
             context.put_feature_metric(Feature.LEAVE_MEETING)
+
+            # Handle promotions from the waiting list
+            promoted_links = utils.promote_from_waiting_list(meeting)
+            await api.send_message_to_users(
+                context,
+                [link.user for link in promoted_links],
+                MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title),
+            )
+
             return MeetingMessages.LEFT_MEETING_SUCCESS
 
         return MeetingMessages.LEFT_MEETING_ALREADY
@@ -132,7 +148,7 @@ async def handle_join_leave_operation(
     update: Update,
     context: TMitupContext,
     user: User,
-    operation: Callable[[Meetup, User], MeetingMessages],
+    operation: Callable[[Meetup, User], Awaitable[MeetingMessages]],
     with_notification: bool = True,
 ):
     """Handle common infrastructure for meeting operations (join/leave)."""
@@ -144,7 +160,7 @@ async def handle_join_leave_operation(
             meeting.messages.append(current_message)
 
         # Execute core operation
-        notification_key = operation(meeting, user)
+        notification_key = await operation(meeting, user)
 
         if with_notification:
             await api.answer_callback_query(

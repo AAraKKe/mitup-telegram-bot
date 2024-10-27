@@ -6,7 +6,7 @@ from unittest import mock
 from telegram import Update
 
 from mitup_bot.custom_context import MitupContext
-from mitup_bot.models.meetups import Meetup, Message
+from mitup_bot.models import Meetup, Message, User
 from mitup_bot.views import MitupView
 from tests.helpers.stub_db import MockDbSession
 
@@ -28,6 +28,7 @@ class MockApi:
     """
 
     send_message_mock: mock.AsyncMock
+    send_to_user_mock: mock.AsyncMock
     edit_message_mock: mock.AsyncMock
     update_meeting_messages_mock: mock.AsyncMock
     answer_callback_query_mock: mock.AsyncMock
@@ -38,11 +39,13 @@ class MockApi:
         with (
             mock.patch(f"{module_path}.api.edit_message") as edit_patch,
             mock.patch(f"{module_path}.api.send_message") as send_patch,
+            mock.patch(f"{module_path}.api.send_message_to_user") as send__to_user_patch,
             mock.patch(f"{module_path}.api.update_meeting_messages") as update_meeting_messages_patch,
             mock.patch(f"{module_path}.api.answer_callback_query") as answer_callback_query_patch,
         ):
             yield MockApi(
                 send_message_mock=send_patch,
+                send_to_user_mock=send__to_user_patch,
                 edit_message_mock=edit_patch,
                 update_meeting_messages_mock=update_meeting_messages_patch,
                 answer_callback_query_mock=answer_callback_query_patch,
@@ -57,6 +60,19 @@ class MockApi:
         self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
     ):
         self.assert_method_called(self.edit_message_mock, context, update, view, times)
+
+    def assert_send_to_user_called(
+        self, context: mock.MagicMock | MitupContext, user: User, view: MitupView | str, times: int = 1
+    ):
+        if times == 1:
+            self.send_to_user_mock.assert_awaited_once_with(context=context, user=user, view=view)
+        else:
+            call_count = self.send_to_user_mock.call_count
+            assert call_count == times, f"Expected {times} call but found {call_count}"
+            expected_call = mock.call(context=context, user=user, view=view)
+            assert any(
+                expected_call == call for call in self.send_to_user_mock.await_args_list
+            ), f"Expected call {expected_call} not found in send_message_to_user method"
 
     def assert_answer_callback_query_called(
         self,

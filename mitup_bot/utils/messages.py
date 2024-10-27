@@ -86,7 +86,7 @@ class ButtonMessages(MessageBase):
 
     # Settings buttons
     LANGUAGE = f"{Emojis.LANG} Language"
-    TIMEOUT = f"{Emojis.TIMEOUT} Timeout"
+    TIMEOUT = f"{Emojis.HOURGLASS} Timeout"
     NOTIFICATIONS = f"{Emojis.NOTIF} Notifications"
     TIMEZONE = f"{Emojis.TIME} Timezone"
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
@@ -195,7 +195,7 @@ class MeetingMessages(MessageBase):
     EMPTY = "Empty"
     PARTICIPANT = "Participant"
     PARTICIPANTS = "Participants"
-    MAX_PARTICIPANTS = "(Max: ${max_participants})"
+    MAX_PARTICIPANTS = "\\(Max: ${max_participants}\\)"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
 
@@ -203,7 +203,7 @@ class MeetingMessages(MessageBase):
     JOINED_MEETING_SUCCESS = "You joined the meeting!"
     JOINED_MEETING_ALREADY = "You have already joined this meeting"
     JOINED_MEETING_NOT_FOUND = "The meeting you tried to join does not exist"
-    JOINED_MEETING_FULL = "The meeting is full"
+    JOINED_MEETING_FULL = "Sorry! The meeting is full"
     JOINED_MEETING_FULL_WAITING_LIST = "The meeting is full. You have been added to the waiting list."
     JOINED_MEETING_UNREGISTERED = (
         "You have joined the meeting, %{user}! "
@@ -219,6 +219,9 @@ class MeetingMessages(MessageBase):
         "It seems you have never used Mitup before, open a chat with @mitupbot to be "
         "able to received notifications and create new meetings!\n\n"
         "If you don't open a chat with the bot, you can be added to the meeting at any time."
+    )
+    PROMOTED_FROM_THE_WAITING_LIST = (
+        "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
     )
 
     # Edit title and description
@@ -256,7 +259,7 @@ class MeetingMessages(MessageBase):
         "or press in _No limit_ to allow an unlimited number of participants."
     )
     MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *${max_participants}*"
-    NO_LIMIT_PARTICIPANTS = "(No limit)"
+    NO_LIMIT_PARTICIPANTS = "\\(No limit\\)"
     MAX_PARTICIPANTS_SET_FAIL = "The maximum number of participants must be a number greater than 0. Please, try again"
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
 

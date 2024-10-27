@@ -3,10 +3,10 @@ from aws_embedded_metrics.unit import Unit
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
-from mitup_bot.models import JoinedUsers, User, build
+from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils.messages import MeetingMessages
-from tests.helpers import AnyFloat, HandlerContext, MockApi, MockDbSession, UpdateRequest, call_handler
+from tests.helpers import AnyFloat, HandlerContext, MockApi, MockDbSession, UpdateRequest, call_handler, create_meetup
 
 
 @pytest.fixture
@@ -94,6 +94,37 @@ async def test_user_already_join_does_not_join(
     )
 
 
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(123))], indirect=True)
+async def test_user_cannot_join_if_the_meeting_is_full(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    api: MockApi,
+):
+    owner = User(first_name="Owner", tg_user_id=1, settings=Settings())
+    meeting = create_meetup(id=123, title="My Meeting", max_members=1, waiting_list=False, owner=owner)
+    JoinedUsers(user=owner, meetup=meeting)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+
+    # The user should not have joined the meeting
+    assert len(meeting.joined_links) == 1
+    mock_session.assert_flushed()
+
+    # No feature metric has been emitted
+    context.metrics_engine.assert_feature_metrcs_not_emitted(Feature.JOIN_MEETING)
+
+    # The user has been notified
+    api.assert_answer_callback_query_called(
+        context=context,
+        update=handler_context.update,
+        text=MeetingMessages.JOINED_MEETING_FULL.get(lang=user_with_settings.lang, plain=True),
+        show_alert=False,
+    )
+
+
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(999))], indirect=True)
 async def test_user_join_for_non_existing_meeting(
     user_with_settings: User,
@@ -135,7 +166,7 @@ async def test_non_existent_user_joins_meeting(
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
 
     # Assert user has been registered
-    user = build.user_from_update(handler_context.update)
+    user = utils.user_from_update(handler_context.update)
     mock_session.assert_object_added(user)
 
     # Message has been updated
@@ -157,11 +188,12 @@ async def test_user_leaves_meeting(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
     meeting = user_with_settings.meetups[0]
-    JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
+    link = JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
 
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
-    assert len(meeting.joined_links) == 0
+    # Deleting the link does not remove it from the meeting with a mock session, we can test we have deleted it.
+    mock_session.assert_deleted(link)
     assert len(meeting.messages) == 1
     mock_session.assert_flushed()
 
@@ -198,7 +230,7 @@ async def test_non_existing_user_leaves_meeting(
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
     # Assert user has been registered
-    user = build.user_from_update(handler_context.update)
+    user = utils.user_from_update(handler_context.update)
     mock_session.assert_object_added(user)
 
     # Message has been updated

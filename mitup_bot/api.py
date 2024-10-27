@@ -1,4 +1,5 @@
 import logging
+from asyncio import gather
 
 from sqlmodel import Session
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
@@ -6,7 +7,7 @@ from telegram.error import BadRequest
 
 from mitup_bot import guards
 from mitup_bot.exceptions import AnswerInlineQueryError, NoMessageAvailable
-from mitup_bot.models import Meetup
+from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import MeetingMessages
@@ -28,6 +29,35 @@ async def send_message(*, context: TMitupContext, update: Update, view: MitupVie
 
     with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX) as _:
         return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+
+
+async def send_message_to_user(*, context: TMitupContext, user: User, view: MitupView | str) -> Message | None:
+    if isinstance(view, str):
+        message = view
+        reply_markup = None
+    else:
+        message = view.description
+        reply_markup = view.markup
+
+    with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+        return await context.bot.send_message(chat_id=user.tg_user_id, text=message, reply_markup=reply_markup)
+
+
+async def send_message_to_users(context: TMitupContext, users: list[User], view: MitupView | str):
+    """
+    Sends the same message to multiple users.
+    """
+
+    awaitables = [
+        send_message_to_user(
+            context=context,
+            user=user,
+            view=view,
+        )
+        for user in users
+    ]
+
+    await gather(*awaitables)
 
 
 async def edit_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | bool:

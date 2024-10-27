@@ -42,7 +42,7 @@ class Emojis(Enum):
     TIME = "🌐"
     ATTACH = "⬇"
     DEATTACH = "⬆"
-    TIMEOUT = "⌛"
+    HOURGLASS = "⌛"
     NOTIF = "⏰"
     LANG = "🔣"
     WAITING = "😴"

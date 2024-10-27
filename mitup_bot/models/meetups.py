@@ -87,10 +87,25 @@ class Meetup(SQLModel, table=True):
         return hash(self) == hash(other) if isinstance(other, Meetup) else NotImplemented
 
     @property
+    def n_joined(self) -> int:
+        """Number of participants in the meeting. Not counting the waiting list."""
+        return sum(not link.is_waiting_list for link in self.joined_links)
+
+    @property
+    def n_waiting(self) -> int:
+        """Number of participants in the waiting list."""
+        return sum(link.is_waiting_list for link in self.joined_links)
+
+    @property
     def full(self) -> bool:
-        if self.max_members is None:
-            return False
-        return len([link for link in self.joined_links if not link.is_waiting_list]) >= self.max_members
+        return False if self.max_members is None else self.n_joined >= self.max_members
+
+    def join_allowed(self) -> bool:
+        return not self.full or self.waiting_list
+
+    def waiting_links(self) -> list["JoinedUsers"]:
+        """Get the joined links that are in the waiting list sorted by the time they joined"""
+        return sorted((link for link in self.joined_links if link.is_waiting_list), key=lambda x: x.created_time)
 
     def has_message(self, update: Update) -> bool:
         """Return True if the message where the update was sent from is linked to this meeting."""
@@ -192,8 +207,19 @@ class Meetup(SQLModel, table=True):
     @property
     def participants_list_text(self) -> str:
         """This shows the participants of the meeting with one line per participant"""
-        participant_list = [link.user.inline_name for link in self.joined_links]
-        return f"\n\t{"\n\t".join(participant_list)}" if participant_list else ""
+        participant_list = [
+            sanitize(link.user.inline_name, full=True) for link in self.joined_links if not link.is_waiting_list
+        ]
+        waiting_list = [
+            sanitize(link.user.inline_name, full=True) for link in self.joined_links if link.is_waiting_list
+        ]
+        final_list = f"\n  {"\n  ".join(participant_list)}" if participant_list else ""
+
+        if waiting_list:
+            final_list += f"\n--- {Emojis.WAITING} _{ButtonMessages.WAITING_LIST.get(lang=self.lang)}_ \n  "
+            final_list += "\n  ".join(waiting_list)
+
+        return final_list
 
     @property
     def participants_text(self) -> str:
@@ -253,8 +279,8 @@ class Meetup(SQLModel, table=True):
                 ),
                 datetime=sanitize(self.str_datetime, full=True),
                 location=sanitize(self.location.description(lang=self.lang), full=True),
-                participants_text_with_list=sanitize(self.participants_text_with_list, full=True),
-                participants_text=sanitize(self.participants_text, full=True),
+                participants_text_with_list=self.participants_text_with_list,
+                participants_text=self.participants_text,
             )
         )
 
