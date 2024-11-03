@@ -57,6 +57,12 @@ class MitupRuntime:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO, handlers=handlers
         )
 
+        # Remove https logs
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+
+        # Ensure debug logs from bot when working in dev environment
+        logging.getLogger("telegram.ext.ExtBot").setLevel(logging.DEBUG if self.env is Env.DEV else logging.WARNING)
+
     def __setup_db(self):
         db.configure_db(self.config.db)
 

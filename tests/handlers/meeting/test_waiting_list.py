@@ -24,13 +24,21 @@ def full_meeting():
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(123))], indirect=True)
+@pytest.mark.parametrize(
+    "is_full,response",
+    [[True, MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST], [False, MeetingMessages.JOINED_MEETING_SUCCESS]],
+    ids=["full", "not_full"],
+)
 async def test_user_joins_waiting_list_with_full_meeting(
     full_meeting: Meetup,
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     api: MockApi,
+    is_full: bool,
+    response: MeetingMessages,
 ):
+    full_meeting.max_members = 1 if is_full else 2
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(full_meeting)
 
@@ -42,8 +50,8 @@ async def test_user_joins_waiting_list_with_full_meeting(
 
     # The user should have joined the meeting
     assert len(full_meeting.joined_links) == 2
-    assert full_meeting.n_joined == 1
-    assert full_meeting.n_waiting == 1
+    assert full_meeting.n_joined == (1 if is_full else 2)
+    assert full_meeting.n_waiting == (1 if is_full else 0)
 
     mock_session.assert_flushed()
 
@@ -51,7 +59,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
     api.assert_answer_callback_query_called(
         context=context,
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST.get(lang=user_with_settings.lang, plain=True),
+        text=response.get(lang=user_with_settings.lang, plain=True),
         show_alert=False,
     )
 

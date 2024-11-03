@@ -43,12 +43,13 @@ async def user_joins_meeting(
         assert meeting.id is not None
 
         if not user.joined_meeting(meeting.id):
+            is_full = meeting.full
             if (joined_link := utils.joined_link(meeting, user)) is not None:
                 session.add(joined_link)
                 context.put_feature_metric(Feature.JOIN_MEETING)
                 return (
                     MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST
-                    if meeting.full
+                    if is_full
                     else MeetingMessages.JOINED_MEETING_SUCCESS
                 )
             else:
