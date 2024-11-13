@@ -15,6 +15,7 @@ class JoinedUsers(SQLModel, table=True):
     meetup_id: int | None = Field(default=None, foreign_key="meetups.id")
     created_time: dt.datetime = dt.datetime.now(dt.UTC)
     is_waiting_list: bool = False
+    notification_sent: bool = False
 
     meetup: "Meetup" = Relationship(back_populates="joined_links")
     user: "User" = Relationship(back_populates="joined_links")

@@ -42,11 +42,11 @@ def deserialize_pydantic_model(data: str) -> BaseModel | None:
     return None
 
 
-def configure_db(db_config: DbConfig):
+def configure_db(db_config: DbConfig, skip_if_initialized: bool = False) -> None:
     """Configure the db module by creating the engine and the session factory"""
     global __sessionmaker
 
-    if __sessionmaker is not None:
+    if __sessionmaker is not None and not skip_if_initialized:
         raise DbAlreadyInitializedError()
 
     engine = create_engine(

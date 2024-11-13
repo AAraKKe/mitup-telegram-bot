@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from telegram import Location
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.models import Meetup, MeetupLocation, User
+from mitup_bot.models import Meetup, MeetupLocation, Settings, User
 
 
 @dataclass
@@ -70,3 +70,52 @@ def create_meetup(
         owner.meetups.append(meetup)
 
     return meetup
+
+
+def create_settings(
+    id: int = 1,
+    user: User | None = None,
+    language: str = "en",
+    timezone: str = "UTC",
+    notification: bool = True,
+    default_extension_period: int = 0,
+    default_waiting_list: bool = False,
+    default_public: bool = False,
+    default_allow_invitation: bool = False,
+    default_incognito: bool = False,
+    default_show_timezone: bool = True,
+) -> Settings:
+    return Settings(
+        id=id,
+        language=language,
+        timezone=timezone,
+        notification=notification,
+        default_extension_period=default_extension_period,
+        default_waiting_list=default_waiting_list,
+        default_public=default_public,
+        default_allow_invitation=default_allow_invitation,
+        default_incognito=default_incognito,
+        default_show_timezone=default_show_timezone,
+    )
+
+
+def create_user(
+    id: int,
+    username: str | None = None,
+    tg_user_id: int = 123,
+    first_name: str = "Test FirstName",
+    last_name: str | None = None,
+    is_active: bool = True,
+    owned_meetings: list[Meetup] | None = None,
+    settings: Settings | None = None,
+):
+    return User(
+        id=id,
+        tg_user_id=tg_user_id,
+        username=username,
+        first_name=first_name,
+        last_name=last_name,
+        is_active=is_active,
+        meetups=owned_meetings or [],
+        settings=settings or create_settings(),
+    )

@@ -2,8 +2,10 @@ import datetime as dt
 from typing import TYPE_CHECKING, Literal, Self, overload
 
 from sqlmodel import Field, Relationship, Session, SQLModel, select
+from telegram.ext import ExtBot
 
 from mitup_bot.exceptions import UserNotFound
+from mitup_bot.views import MitupView
 
 from . import JoinedUsers, Meetup
 
@@ -20,6 +22,7 @@ class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
     updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
+    is_active: bool = True
     last_name: str | None = None
     username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
@@ -71,3 +74,10 @@ class User(SQLModel, table=True):
 
     def now_in_tz(self) -> dt.datetime:
         return self.datetime_in_tz(dt.datetime.now(dt.UTC))
+
+    async def send_message(self, bot: ExtBot, view: MitupView):
+        await bot.send_message(
+            chat_id=self.tg_user_id,
+            text=view.description,
+            reply_markup=view.markup,
+        )

@@ -57,7 +57,7 @@ class StubMetrics(MitupMetricsLogger):
         self,
         names: Sequence[str | MetricKey],
         namespace: str,
-        values: Sequence[float] | None = None,
+        values: Sequence[float] | Sequence[Sequence[float]] | None = None,
         units: Sequence[Unit] | None = None,
         dimensions: list[dict[str, str]] | None = None,
         properties: dict[str, Any] | None = None,
@@ -116,7 +116,7 @@ class StubMetrics(MitupMetricsLogger):
     def assert_metrics_emited(
         self,
         names: Sequence[str | MetricKey],
-        values: Sequence[float] | None = None,
+        values: Sequence[float] | Sequence[Sequence[float]] | None = None,
         units: Sequence[Unit] | None = None,
         namespace: str | None = None,
         dimensions: dict[str, str | Feature] | None = None,

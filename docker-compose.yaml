@@ -14,6 +14,7 @@ services:
       - postgres
     volumes:
       - .:/bot
+      - ./.docker_hatch:/.docker_hatch
     environment:
       - MITUPBOT__DB__USERNAME=mitupbot
       - MITUPBOT__DB__PASSWORD=12345pass
@@ -57,3 +58,10 @@ services:
     command: hatch run dev:debug
     ports:
       - 5678:5678
+
+  lambdas:
+    <<: *launch-bot
+    command: bash -c "hatch run dev:update-locales && hatch run dev:launch-recurrent-events"
+    environment:
+      - MITUPBOT__METRICS__ENVIRONMENT=rich
+      - MITUPBOT__METRICS__NAMESPACE=MitupDocker/RecurrentEvents

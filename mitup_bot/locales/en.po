@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-11-03 16:09\n"
+"PO-Revision-Date: 2024-11-09 19:16\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -252,10 +252,13 @@ msgid "MeetingMessages.LEFT_MEETING_NOT_FOUND"
 msgstr "The meeting you tried to leave does not exist"
 
 msgid "MeetingMessages.LEFT_MEETING_UNREGISTERED"
-msgstr "You have left the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to be able to received notifications and create new meetings!\n\nIf you don't open a chat with the bot, you can be added to the meeting at any time."
+msgstr "You haveeee left the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to be able to received notifications and create new meetings!\n\nIf you don't open a chat with the bot, you can be added to the meeting at any time."
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+
+msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
+msgstr "The meeting _*${meeting_title}*_ is starting soon!"
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"

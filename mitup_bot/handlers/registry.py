@@ -58,7 +58,7 @@ def callback_with_metrics(
             # Relying on error handlers by the application will result in the creation of a
             # separate context. Lets handle errors here where we still have the context
             # of the handler that was executed including metrics context.
-            error_handler(context, e, env)
+            await error_handler(context, e, env)
         else:
             context.put_metric(MetricKey.FAULT, 0)
             # Emit error without dimensions as well

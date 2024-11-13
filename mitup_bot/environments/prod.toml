@@ -1,5 +1,5 @@
 [metrics]
-namespace = "MitupBot"
+namespace = "MitupBot/Service"
 environment = "local"
 
 [bot]

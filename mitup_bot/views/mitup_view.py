@@ -48,7 +48,7 @@ class MitupView:
     keyboard: Keyboard
 
     @property
-    def markup(self):
+    def markup(self) -> InlineKeyboardMarkup:
         return self.keyboard_to_markup(self.keyboard)
 
     def with_context(self, message: str) -> Self:

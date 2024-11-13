@@ -28,6 +28,11 @@ class MetricKey(CamelCaseStrEnum):
     """Represents a message that has been deleted in Telegram and deleted from the database"""
     STALE_MEETING_MESSAGE = auto()
     """This metrics is emitted when someone interacts with a message of a meeting that should not be available."""
+    INACTIVE_USER_SET = auto()
+    """Metric emitted when an inactive user has been detected and is_active is set to False."""
+    INACTIVE_USERS_DELETED = auto()
+    """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
+    NOTIFICATION_FAILED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

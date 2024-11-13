@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from typing import overload
 from unittest import mock
 
@@ -14,10 +15,13 @@ from mitup_bot.models import User
 class Result:
     """This is a stub of the SQLAlchemy ScalarResult class. Implement any method we might need for testing"""
 
-    results: tuple[SQLModel, ...]
+    results: tuple[SQLModel, ...] = field(default_factory=tuple)
 
     def first(self) -> SQLModel | None:
         return self.results[0] if self.results else None
+
+    def all(self) -> tuple[SQLModel, ...]:
+        return self.results
 
 
 class MockDbSession(mock.MagicMock):
@@ -33,10 +37,24 @@ class MockDbSession(mock.MagicMock):
         super().__init__(*args, spec=Session, **kwargs)
         self.add = mock.MagicMock(side_effect=self.__add_side_effect)
         self.flush = mock.MagicMock()
+        self.exec_return = mock.MagicMock()
         self.exec = mock.MagicMock(side_effect=self.__exec_side_effect)
         self.delete = mock.MagicMock()
         self.statements_registry: dict[str, Result] = {}
         self.objects_in_db: set[SQLModel] = set()
+
+    @staticmethod
+    def normalize_query(query: str) -> str:
+        """
+        Normalizes a query string by removing new lines and extra spaces.
+
+        Args:
+            query: The query string to be normalized.
+
+        Returns:
+            str: The normalized query string.
+        """
+        return re.sub(r"\s+", " ", query)
 
     def __add_side_effect(self, obj: SQLModel):
         self.objects_in_db.add(obj)
@@ -44,7 +62,7 @@ class MockDbSession(mock.MagicMock):
     def __exec_side_effect(self, statement: SelectBase) -> Result | None:
         statement_str = str(statement.compile(compile_kwargs={"literal_binds": True}))
         # If we have not registered the object, return an empty result mimicking the behavior of the real session
-        return self.statements_registry.get(statement_str, Result(results=()))
+        return self.statements_registry.get(statement_str, Result())
 
     def assert_not_flushed(self):
         """
@@ -103,16 +121,18 @@ class MockDbSession(mock.MagicMock):
         self.delete.assert_not_called()
 
     @property
-    def queries_executed(self):
+    def queries_executed(self) -> list[str]:
         """
-        Returns a list of executed queries.
+        Returns a list of executed queries. Each query is represented as a string without new lines.
 
         Returns:
             List[str]: A list of strings representing the executed queries.
         """
 
         return [
-            str(call.args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+            self.normalize_query(
+                str(call.args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+            )
             for call in self.exec.call_args_list
         ]
 

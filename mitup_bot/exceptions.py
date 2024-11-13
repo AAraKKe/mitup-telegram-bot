@@ -143,3 +143,10 @@ class NoMessageAvailable(ValueError):
 class InvalidLanguageError(ValueError):
     def __init__(self, idx: int):
         super().__init__(f"Language {idx} is not supported and was received as callabck id.")
+
+
+class InactiveUserInteraction(RuntimeError):
+    def __init__(self, user_id: int, private: bool):
+        self.user_id = user_id
+        self.private = private
+        super().__init__(f"The user {user_id} is inactive and interacted with the bot")
