@@ -337,6 +337,7 @@ push-recurrent-latest-prod:
   script:
     - hatch run dev:deploy
       --migrations-image $MIGRATIONS_IMAGE_TAG
+      --recurrent-events-image $RECURRENT_IMAGE_TAG
       --bot-image $BOT_IMAGE_TAG
 
 ## -------------- Deploy staging ---------------
