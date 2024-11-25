@@ -276,7 +276,7 @@ push-recurrent-latest-staging:
   extends: push-recurrent-lambda-staging
   resource_group: recurrent-latest-staging
   variables:
-    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}:latest"
+    PUSH_DESTINATION: "${ECR_RECURRENT_REPO_URI}:latest"
 
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
@@ -324,7 +324,7 @@ push-recurrent-latest-prod:
   extends: push-recurrent-lambda-prod
   resource_group: recurrent-latest-prod
   variables:
-    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}:latest"
+    PUSH_DESTINATION: "${ECR_RECURRENT_REPO_URI}:latest"
 
 # --------------------
 # Deploy
