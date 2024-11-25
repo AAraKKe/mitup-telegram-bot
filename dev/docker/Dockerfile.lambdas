@@ -2,7 +2,7 @@
 # that runs migrations in RDS.
 # It uses the lambda image that contains the python runtime and the lambda
 # setup to be able to call the handler when a lambda is launched
-FROM public.ecr.aws/lambda/python:3.13 as base
+FROM public.ecr.aws/lambda/python:3.13 AS base
 
 # Install libraries needed to run pyscopg2
 RUN dnf install -y libpq-devel gcc \
@@ -26,9 +26,8 @@ RUN hatch build -t wheel
 # Install the proejct
 RUN pip install ${LAMBDA_TASK_ROOT}/$(ls -1 dist/*whl)
 
-FROM base as migrations
 # The CMD needs to be set to the lambda handler
 CMD ["mitup_bot.lambdas.migrations.run_migrations"]
 
-FROM base as recurrent
+FROM base AS recurrent
 CMD ["mitup_bot.lambdas.recurrent_lambda.lambda_handler"]

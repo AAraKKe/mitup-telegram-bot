@@ -1,7 +1,7 @@
 # This Dockerfile builds an image that includes the Python:3.12 image
 # with Hatch to allow executing pipeline jobs.
 # The image is build by a manual job in any pipeline
-FROM python:3.13-slim-bookworm as base
+FROM python:3.13-slim-bookworm AS base
 
 RUN apt-get update && \
     apt-get install -y libpq-dev gcc groff unzip curl less jq gettext && \

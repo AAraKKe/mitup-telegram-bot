@@ -24,6 +24,7 @@ workflow:
   changes:
     - mitup_bot/**/*
     - dev/docker/Dockerfile
+    - dev/docker/Dockerfile.lambdas
     - pyproject.toml
 
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
@@ -256,7 +257,7 @@ push-migrations-lambda-staging:
   resource_group: migrations-tagged-staging
   variables:
     DOCKERFILE: Dockerfile.lambdas
-    DOCKER_TARGET: "migrations"
+    DOCKER_TARGET: "base"
     PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-staging:
@@ -304,7 +305,7 @@ push-migrations-lambda-prod:
   resource_group: migrations-tagged-prod
   variables:
     DOCKERFILE: Dockerfile.lambdas
-    DOCKER_TARGET: "migrations"
+    DOCKER_TARGET: "base"
     PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-prod:

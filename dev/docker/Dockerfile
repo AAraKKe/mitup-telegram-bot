@@ -1,4 +1,4 @@
-FROM python:3.13-slim-bookworm as base
+FROM python:3.13-slim-bookworm AS base
 
 # Set the working directory to /mitup-telegram-bot
 WORKDIR /mitup-telegram-bot
