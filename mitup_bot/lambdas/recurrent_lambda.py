@@ -23,7 +23,7 @@ class EventType(Enum):
 
 class MaintainanceEvent(BaseModel):
     event_type: EventType
-    env: Env
+    env: Env = Env.PROD
 
 
 def build_bot(config: BotConfig) -> ExtBot:

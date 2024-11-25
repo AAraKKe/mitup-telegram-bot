@@ -141,6 +141,7 @@ validate-locales:
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --destination "${PUSH_DESTINATION}"
+      --target "${DOCKER_TARGET}"
 
 build-docker-ci:
   stage: build-ci
@@ -164,10 +165,14 @@ build-docker-ci:
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
     - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
     - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
+    - ECR_RECURRENT_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "recurrent-events-lambda") | .repositoryUri' describe_response.json)
     - echo "ECR_MITUP_REPO_URI=$ECR_MITUP_REPO_URI" >> dotenv
     - echo "ECR_MIGRATIONS_REPO_URI=$ECR_MIGRATIONS_REPO_URI" >> dotenv
+    - echo "ECR_RECURRENT_REPO_URI=$ECR_RECURRENT_REPO_URI" >> dotenv
     - echo "BOT_IMAGE_TAG=$ECR_MITUP_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
     - echo "MIGRATIONS_IMAGE_TAG=$ECR_MIGRATIONS_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
+    - echo "RECURRENT_IMAGE_TAG=$ECR_RECURRENT_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
+    - echo "DOCKER_TARGET=base" >> dotenv
 
   artifacts:
     reports:
@@ -259,6 +264,19 @@ push-migrations-latest-staging:
   variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
+push-recurrent-lambda-staging:
+  extends: push-bot-tagged-staging
+  resource_group: recurrent-tagged-staging
+  variables:
+    DOCKERFILE: Dockerfile.migrations
+    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
+
+push-recurrent-latest-staging:
+  extends: push-recurrent-lambda-staging
+  resource_group: recurrent-latest-staging
+  variables:
+    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}:latest"
+
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
   # We can reuse the one for staging and change the environment
@@ -292,6 +310,19 @@ push-migrations-latest-prod:
   resource_group: migrations-latest-prod
   variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
+
+push-recurrent-lambda-prod:
+  extends: push-bot-tagged-prod
+  resource_group: recurrent-tagged-prod
+  variables:
+    DOCKERFILE: Dockerfile.migrations
+    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
+
+push-recurrent-latest-prod:
+  extends: push-recurrent-lambda-prod
+  resource_group: recurrent-latest-prod
+  variables:
+    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}:latest"
 
 # --------------------
 # Deploy
