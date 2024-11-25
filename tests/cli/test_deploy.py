@@ -595,21 +595,24 @@ def test_deployment_fails_when_missing_response_data(responses: list[dict[str, A
 @pytest.mark.parametrize(
     "side_effects,number_of_calls,exit_code",
     [
-        # Update lambda fails
-        [(click.Abort, None, None, None, None), (1, 0, 0, 0, 0), 1],
+        # Update migrations lambda fails
+        [([click.Abort, None], None, None, None, None), (1, 0, 0, 0, 0), 1],
+        # Update recurrent lambda fails
+        [([None, click.Abort], None, None, None, None), (2, 0, 0, 0, 0), 1],
         # Invoke lambda fails
-        [(None, click.Abort, None, None, None), (1, 1, 0, 0, 0), 1],
+        [([None, None], click.Abort, None, None, None), (2, 1, 0, 0, 0), 1],
         # Register task fails
-        [(None, None, click.Abort, None, None), (1, 1, 1, 0, 0), 1],
+        [([None, None], None, click.Abort, None, None), (2, 1, 1, 0, 0), 1],
         # Update service fails
-        [(None, None, None, click.Abort, None), (1, 1, 1, 1, 0), 1],
+        [([None, None], None, None, click.Abort, None), (2, 1, 1, 1, 0), 1],
         # Waiting for deployment fails
-        [(None, None, None, None, click.Abort), (1, 1, 1, 1, 1), 1],
+        [([None, None], None, None, None, click.Abort), (2, 1, 1, 1, 1), 1],
         # All successfull
-        [(None, None, None, None, None), (1, 1, 1, 1, 1), 0],
+        [([None, None], None, None, None, None), (2, 1, 1, 1, 1), 0],
     ],
     ids=[
-        "fail_on_update_lambda",
+        "fail_on_update_migrations_lambda",
+        "fail_on_update_recurrent_lambda",
         "fail_on_invoke_lambda",
         "fail_on_register_task_definition",
         "fail_on_update_ecs_service",
