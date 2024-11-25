@@ -266,7 +266,7 @@ push-migrations-latest-staging:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
 push-recurrent-lambda-staging:
-  extends: push-bot-tagged-staging
+  extends: push-migrations-lambda-staging
   resource_group: recurrent-tagged-staging
   variables:
     DOCKER_TARGET: "recurrent"
@@ -314,7 +314,7 @@ push-migrations-latest-prod:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
 push-recurrent-lambda-prod:
-  extends: push-bot-tagged-prod
+  extends: push-migrations-lambda-prod
   resource_group: recurrent-tagged-prod
   variables:
     PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
