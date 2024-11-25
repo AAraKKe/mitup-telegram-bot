@@ -142,7 +142,6 @@ validate-locales:
       --context "${CI_PROJECT_DIR}"
       --dockerfile "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --destination "${PUSH_DESTINATION}"
-      --target "${DOCKER_TARGET}"
 
 build-docker-ci:
   stage: build-ci
@@ -173,7 +172,6 @@ build-docker-ci:
     - echo "BOT_IMAGE_TAG=$ECR_MITUP_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
     - echo "MIGRATIONS_IMAGE_TAG=$ECR_MIGRATIONS_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
     - echo "RECURRENT_IMAGE_TAG=$ECR_RECURRENT_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
-    - echo "DOCKER_TARGET=base" >> dotenv
 
   artifacts:
     reports:
@@ -256,8 +254,7 @@ push-migrations-lambda-staging:
   extends: push-bot-tagged-staging
   resource_group: migrations-tagged-staging
   variables:
-    DOCKERFILE: Dockerfile.lambdas
-    DOCKER_TARGET: "base"
+    DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-staging:
@@ -270,7 +267,7 @@ push-recurrent-lambda-staging:
   extends: push-migrations-lambda-staging
   resource_group: recurrent-tagged-staging
   variables:
-    DOCKER_TARGET: "recurrent"
+    DOCKERFILE: Dockerfile.recurrent
     PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
 
 push-recurrent-latest-staging:
@@ -304,8 +301,7 @@ push-migrations-lambda-prod:
   extends: push-bot-tagged-prod
   resource_group: migrations-tagged-prod
   variables:
-    DOCKERFILE: Dockerfile.lambdas
-    DOCKER_TARGET: "base"
+    DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-prod:
@@ -318,8 +314,8 @@ push-recurrent-lambda-prod:
   extends: push-migrations-lambda-prod
   resource_group: recurrent-tagged-prod
   variables:
+    DOCKERFILE: Dockerfile.recurrent
     PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
-    DOCKER_TARGET: "recurrent"
 
 push-recurrent-latest-prod:
   extends: push-recurrent-lambda-prod
