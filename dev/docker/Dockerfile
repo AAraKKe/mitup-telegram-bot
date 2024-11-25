@@ -23,5 +23,5 @@ RUN hatch run prod:help
 RUN rm -rf mitup_bot/locales/**/*.po
 RUN rm -rf mitup_bot/locales/mitup_bot.pot
 
-# Launch the bot
+# Launch bot
 CMD hatch run prod:launch
