@@ -255,9 +255,9 @@ push-migrations-lambda-staging:
   extends: push-bot-tagged-staging
   resource_group: migrations-tagged-staging
   variables:
-    DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
+    DOCKERFILE: Dockerfile.lambdas
     DOCKER_TARGET: "migrations"
+    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-staging:
   extends: push-migrations-lambda-staging
@@ -269,9 +269,8 @@ push-recurrent-lambda-staging:
   extends: push-bot-tagged-staging
   resource_group: recurrent-tagged-staging
   variables:
-    DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
     DOCKER_TARGET: "recurrent"
+    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
 
 push-recurrent-latest-staging:
   extends: push-recurrent-lambda-staging
@@ -304,9 +303,9 @@ push-migrations-lambda-prod:
   extends: push-bot-tagged-prod
   resource_group: migrations-tagged-prod
   variables:
-    DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
+    DOCKERFILE: Dockerfile.lambdas
     DOCKER_TARGET: "migrations"
+    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
 
 push-migrations-latest-prod:
   extends: push-migrations-lambda-prod
@@ -318,7 +317,6 @@ push-recurrent-lambda-prod:
   extends: push-bot-tagged-prod
   resource_group: recurrent-tagged-prod
   variables:
-    DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
     DOCKER_TARGET: "recurrent"
 
