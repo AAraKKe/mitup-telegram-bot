@@ -61,6 +61,7 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
     joined_links = joined_links_to_notify(session)
     deactivated_users = 0
     failed = 0
+    sent = 0
 
     for joined_link in joined_links:
         try:
@@ -77,9 +78,11 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
                 joined_link.notification_sent = True
             # If we have deactivated the user, incremenet deactivate_users
             deactivated_users += not joined_link.user.is_active
+            sent += 1
         except Exception as e:
             failed += 1
             logging.exception(f"Failed to send notification: {e}")
 
+    metrics.put_metric(MetricKey.MEETING_NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.NOTIFICATION_FAILED.value, failed, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.INACTIVE_USER_SET.value, deactivated_users, unit=Unit.COUNT.value)

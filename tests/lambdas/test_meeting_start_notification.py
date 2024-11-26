@@ -87,9 +87,9 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
         any_order=True,
     )
     metrics.assert_metrics_emited(
-        [MetricKey.NOTIFICATION_FAILED, MetricKey.INACTIVE_USER_SET],
-        [0, 0],
-        [Unit.COUNT, Unit.COUNT],
+        [MetricKey.MEETING_NOTIFICATIONS_SENT, MetricKey.NOTIFICATION_FAILED, MetricKey.INACTIVE_USER_SET],
+        [2, 0, 0],
+        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -127,8 +127,8 @@ async def test_forbidden_message_sent(
     )
 
     metrics.assert_metrics_emited(
-        [MetricKey.NOTIFICATION_FAILED, MetricKey.INACTIVE_USER_SET],
-        [0, 1],
-        [Unit.COUNT, Unit.COUNT],
+        [MetricKey.MEETING_NOTIFICATIONS_SENT, MetricKey.NOTIFICATION_FAILED, MetricKey.INACTIVE_USER_SET],
+        [2, 0, 1],
+        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
