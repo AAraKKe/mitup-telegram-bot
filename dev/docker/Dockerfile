@@ -22,6 +22,3 @@ RUN hatch run prod:help
 # Remove unnecessary po(t) files
 RUN rm -rf mitup_bot/locales/**/*.po
 RUN rm -rf mitup_bot/locales/mitup_bot.pot
-
-# Launch bot
-CMD hatch run prod:launch
