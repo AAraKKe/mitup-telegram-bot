@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Sequence
 from contextlib import contextmanager
 
@@ -64,24 +63,20 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
     sent = 0
 
     for joined_link in joined_links:
-        try:
-            with handle_forbidden(joined_link):
-                await joined_link.user.send_message(
-                    bot,
-                    MitupView(
-                        description=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(
-                            lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
-                        ),
-                        keyboard=[],
+        with handle_forbidden(joined_link):
+            await joined_link.user.send_message(
+                bot,
+                MitupView(
+                    description=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(
+                        lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
                     ),
-                )
-                joined_link.notification_sent = True
-            # If we have deactivated the user, incremenet deactivate_users
-            deactivated_users += not joined_link.user.is_active
-            sent += 1
-        except Exception as e:
-            failed += 1
-            logging.exception(f"Failed to send notification: {e}")
+                    keyboard=[],
+                ),
+            )
+            joined_link.notification_sent = True
+        # If we have deactivated the user, incremenet deactivate_users
+        deactivated_users += not joined_link.user.is_active
+        sent += 1
 
     metrics.put_metric(MetricKey.MEETING_NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.NOTIFICATION_FAILED.value, failed, unit=Unit.COUNT.value)
