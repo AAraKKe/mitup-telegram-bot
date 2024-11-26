@@ -59,25 +59,26 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
     """Send a notification to all users that have joined a meeting that is about to start"""
     joined_links = joined_links_to_notify(session)
     deactivated_users = 0
-    failed = 0
     sent = 0
 
-    for joined_link in joined_links:
-        with handle_forbidden(joined_link):
-            await joined_link.user.send_message(
-                bot,
-                MitupView(
-                    description=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(
-                        lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
-                    ),
-                    keyboard=[],
-                ),
-            )
-            joined_link.notification_sent = True
-        # If we have deactivated the user, incremenet deactivate_users
-        deactivated_users += not joined_link.user.is_active
-        sent += 1
+    metrics.put_metric(MetricKey.NOTIFICATIONS_TO_SEND.value, len(joined_links), unit=Unit.COUNT.value)
 
-    metrics.put_metric(MetricKey.MEETING_NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.NOTIFICATION_FAILED.value, failed, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.INACTIVE_USER_SET.value, deactivated_users, unit=Unit.COUNT.value)
+    try:
+        for joined_link in joined_links:
+            with handle_forbidden(joined_link):
+                await joined_link.user.send_message(
+                    bot,
+                    MitupView(
+                        description=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(
+                            lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
+                        ),
+                        keyboard=[],
+                    ),
+                )
+                joined_link.notification_sent = True
+            # If we have deactivated the user, incremenet deactivate_users
+            deactivated_users += not joined_link.user.is_active
+            sent += 1
+    finally:
+        metrics.put_metric(MetricKey.MEETING_NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
+        metrics.put_metric(MetricKey.INACTIVE_USER_SET.value, deactivated_users, unit=Unit.COUNT.value)

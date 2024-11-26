@@ -31,8 +31,8 @@ class MetricKey(CamelCaseStrEnum):
     INACTIVE_USER_SET = auto()
     """Metric emitted when an inactive user has been detected and is_active is set to False."""
     INACTIVE_USERS_DELETED = auto()
-    """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
-    NOTIFICATION_FAILED = auto()
+    """Show how many notifications should be sent when a meeting is about to start"""
+    NOTIFICATIONS_TO_SEND = auto()
     """Number of notifications sent when a meeting is about to start"""
     MEETING_NOTIFICATIONS_SENT = auto()
 
