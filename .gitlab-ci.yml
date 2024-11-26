@@ -165,7 +165,7 @@ build-docker-ci:
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
     - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
     - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
-    - ECR_RECURRENT_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "recurrent-events-lambda") | .repositoryUri' describe_response.json)
+    - ECR_RECURRENT_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "recurrent-events") | .repositoryUri' describe_response.json)
     - echo "ECR_MITUP_REPO_URI=$ECR_MITUP_REPO_URI" >> dotenv
     - echo "ECR_MIGRATIONS_REPO_URI=$ECR_MIGRATIONS_REPO_URI" >> dotenv
     - echo "ECR_RECURRENT_REPO_URI=$ECR_RECURRENT_REPO_URI" >> dotenv
@@ -263,19 +263,6 @@ push-migrations-latest-staging:
   variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
 
-push-recurrent-lambda-staging:
-  extends: push-migrations-lambda-staging
-  resource_group: recurrent-tagged-staging
-  variables:
-    DOCKERFILE: Dockerfile.recurrent
-    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
-
-push-recurrent-latest-staging:
-  extends: push-recurrent-lambda-staging
-  resource_group: recurrent-latest-staging
-  variables:
-    PUSH_DESTINATION: "${ECR_RECURRENT_REPO_URI}:latest"
-
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
   # We can reuse the one for staging and change the environment
@@ -309,19 +296,6 @@ push-migrations-latest-prod:
   resource_group: migrations-latest-prod
   variables:
     PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
-
-push-recurrent-lambda-prod:
-  extends: push-migrations-lambda-prod
-  resource_group: recurrent-tagged-prod
-  variables:
-    DOCKERFILE: Dockerfile.recurrent
-    PUSH_DESTINATION: "${RECURRENT_IMAGE_TAG}"
-
-push-recurrent-latest-prod:
-  extends: push-recurrent-lambda-prod
-  resource_group: recurrent-latest-prod
-  variables:
-    PUSH_DESTINATION: "${ECR_RECURRENT_REPO_URI}:latest"
 
 # --------------------
 # Deploy

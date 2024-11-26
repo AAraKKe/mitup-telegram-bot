@@ -6,8 +6,8 @@ from telegram import InlineKeyboardMarkup
 from telegram.error import Forbidden
 from telegram.ext import ExtBot
 
-from mitup_bot.lambdas import notify_meetings
-from mitup_bot.lambdas.recurrent_lambda import EventType
+from mitup_bot.cli import notify_meetings
+from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.models import JoinedUsers
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.messages import MeetingMessages
@@ -87,9 +87,14 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
         any_order=True,
     )
     metrics.assert_metrics_emited(
-        [MetricKey.MEETING_NOTIFICATIONS_SENT, MetricKey.NOTIFICATION_FAILED, MetricKey.INACTIVE_USER_SET],
-        [2, 0, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+        [
+            MetricKey.NOTIFICATIONS_TO_SEND,
+            MetricKey.MEETING_NOTIFICATIONS_SENT,
+            MetricKey.NOTIFICATION_FAILED,
+            MetricKey.INACTIVE_USER_SET,
+        ],
+        [2, 2, 0, 0],
+        [Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -127,8 +132,13 @@ async def test_forbidden_message_sent(
     )
 
     metrics.assert_metrics_emited(
-        [MetricKey.MEETING_NOTIFICATIONS_SENT, MetricKey.NOTIFICATION_FAILED, MetricKey.INACTIVE_USER_SET],
-        [2, 0, 1],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+        [
+            MetricKey.NOTIFICATIONS_TO_SEND,
+            MetricKey.MEETING_NOTIFICATIONS_SENT,
+            MetricKey.NOTIFICATION_FAILED,
+            MetricKey.INACTIVE_USER_SET,
+        ],
+        [2, 2, 0, 1],
+        [Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )

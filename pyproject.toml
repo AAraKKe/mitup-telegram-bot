@@ -208,7 +208,7 @@ validate = [
 setup-vscode = "python bin/setup_vscode.py"
 migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -1"
-launch-recurrent-events = "python -m mitup_bot.lambdas.local {args:}"
+launch-events = "python -m mitup_bot.cli.run recurrent-events {args:}"
 launch = "python -m mitup_bot.cli.run launch"
 debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for-client mitup_bot/cli/run.py launch"
 help = "python -m mitup_bot.cli.run launch --help"
@@ -233,6 +233,7 @@ update-locales = ["update-source-language", "build-locales"]
 launch = "python -m mitup_bot.cli.run launch --env prod"
 help = "python -m mitup_bot.cli.run launch --help"
 build-locales = "python -m mitup_bot.cli.run translations build"
+launch-events = "python -m mitup_bot.cli.run recurrent-events {args:}"
 
 [build-system]
 requires = ["hatchling"]

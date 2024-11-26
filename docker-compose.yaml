@@ -59,9 +59,9 @@ services:
     ports:
       - 5678:5678
 
-  lambdas:
+  events:
     <<: *launch-bot
-    command: bash -c "hatch run dev:update-locales && hatch run dev:launch-recurrent-events"
+    command: bash -c "hatch run dev:update-locales && hatch run dev:launch-events --notify-meeting-interval 1 --user-cleanup-interval 10 --env dev"
     environment:
       - MITUPBOT__METRICS__ENVIRONMENT=rich
       - MITUPBOT__METRICS__NAMESPACE=MitupDocker/RecurrentEvents

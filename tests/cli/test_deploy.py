@@ -527,7 +527,7 @@ def test_update_ecs_service_fails():
     )
 
 
-def test_deployment_failes_while_waiting():
+def test_deployment_fails_while_waiting():
     context = DeploymentContext(
         describe_services_responses=[
             service_from_state("IN_PROGRESS", "All good"),
@@ -596,27 +596,33 @@ def test_deployment_fails_when_missing_response_data(responses: list[dict[str, A
     "side_effects,number_of_calls,exit_code",
     [
         # Update migrations lambda fails
-        [([click.Abort, None], None, None, None, None), (1, 0, 0, 0, 0), 1],
-        # Update recurrent lambda fails
-        [([None, click.Abort], None, None, None, None), (2, 0, 0, 0, 0), 1],
+        [(click.Abort, None, [None, None], [None, None], [None, None]), (1, 0, 0, 0, 0), 1],
         # Invoke lambda fails
-        [([None, None], click.Abort, None, None, None), (2, 1, 0, 0, 0), 1],
-        # Register task fails
-        [([None, None], None, click.Abort, None, None), (2, 1, 1, 0, 0), 1],
+        [(None, click.Abort, [None, None], [None, None], [None, None]), (1, 1, 0, 0, 0), 1],
+        # Register bot task fails
+        [(None, None, [click.Abort, None], [None, None], [None, None]), (1, 1, 1, 0, 0), 1],
         # Update service fails
-        [([None, None], None, None, click.Abort, None), (2, 1, 1, 1, 0), 1],
+        [(None, None, [None, None], [click.Abort, None], [None, None]), (1, 1, 1, 1, 0), 1],
         # Waiting for deployment fails
-        [([None, None], None, None, None, click.Abort), (2, 1, 1, 1, 1), 1],
+        [(None, None, [None, None], [None, None], [click.Abort, None]), (1, 1, 1, 1, 1), 1],
+        # Register recurrent events task fails
+        [(None, None, [None, click.Abort], [None, None], [None, None]), (1, 1, 2, 1, 1), 1],
+        # Update events service fails
+        [(None, None, [None, None], [None, click.Abort], [None, None]), (1, 1, 2, 2, 1), 1],
+        # Waiting for events deployment fails
+        [(None, None, [None, None], [None, None], [None, click.Abort]), (1, 1, 2, 2, 2), 1],
         # All successfull
-        [([None, None], None, None, None, None), (2, 1, 1, 1, 1), 0],
+        [(None, None, [None, None], [None, None], [None, None]), (1, 1, 2, 2, 2), 0],
     ],
     ids=[
         "fail_on_update_migrations_lambda",
-        "fail_on_update_recurrent_lambda",
         "fail_on_invoke_lambda",
         "fail_on_register_task_definition",
         "fail_on_update_ecs_service",
         "fail_on_waiting_for_deployment",
+        "fail_on_register_recurrent_events_task",
+        "fail_on_update_events_service",
+        "fail_on_waiting_for_events_deployment",
         "all_successfull",
     ],
 )
