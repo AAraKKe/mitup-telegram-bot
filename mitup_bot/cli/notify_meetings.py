@@ -87,6 +87,6 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
                 f"Failed to send notification (user: {joined_link.user_id}, meeting: {joined_link.meetup_id}): {e}"
             )
 
-    metrics.put_metric(MetricKey.MEETING_NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.NOTIFICATION_FAILED.value, failed, unit=Unit.COUNT.value)
+    metrics.put_metric(MetricKey.NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
+    metrics.put_metric(MetricKey.NOTIFICATIONS_FAILED.value, failed, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.INACTIVE_USER_SET.value, deactivated_users, unit=Unit.COUNT.value)
