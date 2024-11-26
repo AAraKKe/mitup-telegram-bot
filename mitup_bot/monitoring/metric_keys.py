@@ -31,10 +31,12 @@ class MetricKey(CamelCaseStrEnum):
     INACTIVE_USER_SET = auto()
     """Metric emitted when an inactive user has been detected and is_active is set to False."""
     INACTIVE_USERS_DELETED = auto()
-    """Show how many notifications should be sent when a meeting is about to start"""
-    NOTIFICATIONS_TO_SEND = auto()
+    """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
+    NOTIFICATION_FAILED = auto()
     """Number of notifications sent when a meeting is about to start"""
     MEETING_NOTIFICATIONS_SENT = auto()
+    """Show how many notifications should be sent when a meeting is about to start"""
+    NOTIFICATIONS_TO_SEND = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
