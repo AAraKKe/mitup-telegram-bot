@@ -20,6 +20,7 @@ from tests.helpers.stub_db import MockDbSession
 
 TEST_MEETING_DATETIME_UTC = dt.datetime(2024, 12, 21, 12, 0, tzinfo=dt.UTC)
 TEST_CURRENT_DATE = dt.date(2024, 11, 15)
+TEST_31ST_DATETIME = dt.datetime(2024, 10, 31, 12, 30, 0, tzinfo=dt.UTC)
 
 
 def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
@@ -81,9 +82,15 @@ def freeze_current_date():
             TEST_MEETING_DATETIME_UTC,
             TEST_CURRENT_DATE,
         ),
+        (
+            UpdateRequest(callback_query=cb.EDIT_MEETING_DATE.with_id(10).with_date(TEST_CURRENT_DATE)),
+            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_31ST_DATETIME),
+            TEST_CURRENT_DATE,
+            TEST_CURRENT_DATE,
+        ),
     ],
     indirect=["update"],
-    ids=["meeting_dt_set", "meeting_dt_not_set", "meeting_dt_set_different_current_date"],
+    ids=["meeting_dt_set", "meeting_dt_not_set", "meeting_dt_set_different_current_date", "meeting_dt_on_31st"],
 )
 async def test_edit_meeting_date_callback(
     mock_session: MockDbSession,

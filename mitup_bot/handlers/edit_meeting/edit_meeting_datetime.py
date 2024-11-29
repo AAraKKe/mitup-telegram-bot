@@ -20,6 +20,17 @@ from mitup_bot.views import ButtonConfig, MitupView, factory
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 
 
+def safe_anchor_date(meeting_datetime: dt.datetime | None, user_now: dt.datetime) -> dt.date:
+    """
+    Returns the anchor date for the calendar view. If the meeting has a datetime set, and it is in the future,
+    return the date of the meeting. Otherwise, return the current date.
+    """
+    if meeting_datetime:
+        meeting_date = dt.date(meeting_datetime.year, meeting_datetime.month, meeting_datetime.day)
+        return meeting_date if meeting_date >= user_now.date() else user_now.date()
+    return user_now.date()
+
+
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.DATE_CALLBACK, callback_data=cb.EDIT_MEETING_DATE)
 @with_async_session
 async def callback_edit_meeting_date(session: Session, update: Update, context: MitupContext):
@@ -40,11 +51,12 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
     ) is None:
         return
 
-    # If the meeting already has a date selected, lets mark that date as anchor, otherwise take today
+    # If the meeting already has a date selected, and is either in the current month or the future
+    # lets mark that date as anchor, otherwise take today.
     # Need cast because pyright cannot infer the type of models properly
     now_in_user_timezone = meeting.owner.now_in_tz()
     today_in_user_timezone = now_in_user_timezone.date()
-    anchor_date = cast(dt.date, (meeting.datetime_in_tz or now_in_user_timezone).date())
+    anchor_date = safe_anchor_date(meeting.datetime, now_in_user_timezone)
 
     # If the date we want to navigate to is in the past, show the present month
     current_date = callback_data.date if today_in_user_timezone <= callback_data.date else today_in_user_timezone

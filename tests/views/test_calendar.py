@@ -10,7 +10,7 @@ from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, Month
 from mitup_bot.views.calendar import CalendarKeyboard
-from tests.views.calendar_july_2024 import calendar_markup
+from tests.helpers.calendar_july_2024 import calendar_markup
 
 
 @freezegun.freeze_time("2024-06-12", tz_offset=0)

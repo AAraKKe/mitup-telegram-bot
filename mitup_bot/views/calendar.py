@@ -47,6 +47,15 @@ class CalendarKeyboard:
         keyboard.append(self.__navigation_buttons(by="year"))
         return keyboard
 
+    def __navigation_day(self, year: int, month: int) -> int:
+        """Returns the day to be use in navigation buttons taking care the date exist"""
+        try:
+            dt.date(year, month, self.anchor_date.day)
+            return self.anchor_date.day
+        except ValueError:
+            # If the day does not exist in the month, we use the last day of the month
+            return calendar.monthrange(year, month)[1]
+
     def __weekdays_row(self) -> ButtonRow:
         """Generates the row with the weekdays in the calendar."""
         return [
@@ -92,7 +101,7 @@ class CalendarKeyboard:
             case (_, _, _) as unreachable:
                 assert_never(unreachable)
 
-        date_back = dt.date(year, month, self.anchor_date.day)
+        date_back = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
             text=str(ButtonMessages.GO_BACK.get()),
             callback_data=self.navigation_callback_data.with_date(date_back),
@@ -114,7 +123,7 @@ class CalendarKeyboard:
             case (_, _, _) as unreachable:
                 assert_never(unreachable)
 
-        date_forward = dt.date(year, month, self.anchor_date.day)
+        date_forward = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
             text=str(ButtonMessages.GO_FORWARD.get()),
             callback_data=self.navigation_callback_data.with_date(date_forward),
@@ -148,3 +157,6 @@ class CalendarKeyboard:
             )
         )
         return row
+
+    def __str__(self) -> str:
+        return "".join(" | ".join(button.text for button in row) + "\n" for row in self.keyboard)

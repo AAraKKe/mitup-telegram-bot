@@ -17,6 +17,7 @@ __all__ = [
     "console",
     "HandlerContext",
     "Result",
+    "calendar_july_2024",
 ]
 
 from .types import AnyFloat, StubMitupApp, StubMitupContext, DEFAULT_CURRENT_MESSAGE
@@ -26,5 +27,5 @@ from .api import MockApi
 from .fixtures import UpdateRequest, create_meetup, create_user, create_settings
 from .stub_db import MockDbSession, Result
 from .filesystem import MITUP_DIR
-from . import console
+from . import console, calendar_july_2024
 from .handler_context import HandlerContext
