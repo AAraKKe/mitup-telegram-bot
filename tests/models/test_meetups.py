@@ -249,7 +249,7 @@ def test_time_properly_converted_for_timezone(settings: Settings):
     meeting = Meetup(
         title="Test Meeting",
         description="Test Description",
-        datetime=datetime(2024, 1, 12, 12, 30),
+        datetime=datetime(2024, 1, 12, 12, 30, tzinfo=UTC),
         owner=User(first_name="John", username="john_doe", tg_user_id=1, settings=settings),
         waiting_list=False,
         public=False,
@@ -275,7 +275,11 @@ def test_time_properly_converted_for_timezone(settings: Settings):
 def test_timezone_not_included_when_show_timezone_disabled(show_timezone: bool, settings: Settings):
     owner = User(first_name="John", username="john_doe", tg_user_id=1, settings=settings)
     meeting = create_meetup(
-        id=123, title="Test meeting", show_timezone=show_timezone, datetime=datetime(2024, 1, 12, 12, 30), owner=owner
+        id=123,
+        title="Test meeting",
+        show_timezone=show_timezone,
+        datetime=datetime(2024, 1, 12, 12, 30, tzinfo=UTC),
+        owner=owner,
     )
 
     expected_time = "2024-01-12 13:30 (Europe/Madrid)" if show_timezone else "2024-01-12 13:30"
@@ -381,7 +385,7 @@ def build_inline_message(
 )
 @pytest.mark.parametrize(
     "datetime",
-    [datetime(2024, 1, 12, 12, 30).astimezone(UTC), None],
+    [datetime(2024, 1, 12, 12, 30, tzinfo=UTC), None],
     ids=["with_datetime", "without_datetime"],
 )
 @pytest.mark.parametrize(

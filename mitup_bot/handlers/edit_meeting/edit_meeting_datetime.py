@@ -149,8 +149,10 @@ async def handle_datetime_update(
 ):
     # If the meeting already has a datetime, update the date
     meeting.datetime = dt.datetime.combine(
-        dt.date(cb_date.year, cb_date.month, cb_date.day), cast(dt.datetime, meeting.datetime).time()
-    ).astimezone(dt.UTC)
+        dt.date(cb_date.year, cb_date.month, cb_date.day),
+        cast(dt.datetime, meeting.datetime).time(),
+        tzinfo=dt.UTC,
+    )
     session.add(meeting)
     session.flush()
 
