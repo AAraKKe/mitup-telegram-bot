@@ -37,7 +37,7 @@ def meetings_stats(session: Session, metrics: MitupMetricsLogger):
     total_meetings = func.count()
     incognito_meetings = func.sum(cast(Meetup.incognito, Integer))
     public_meetings = func.sum(cast(Meetup.public, Integer))
-    meetings_with_invitiation = func.sum(cast(Meetup.allow_invitation, Integer))
+    meetings_with_invitation = func.sum(cast(Meetup.allow_invitation, Integer))
 
     result: tuple[int, int, int, int, int] = session.exec(
         select(  # type: ignore no overload for "exec" matches argument types
@@ -45,7 +45,7 @@ def meetings_stats(session: Session, metrics: MitupMetricsLogger):
             total_meetings,
             incognito_meetings,
             public_meetings,
-            meetings_with_invitiation,
+            meetings_with_invitation,
         )
     ).first()
 
@@ -53,7 +53,7 @@ def meetings_stats(session: Session, metrics: MitupMetricsLogger):
     metrics.put_metric(MetricKey.INACTIVE_MEETINGS.value, result[1] - result[0], Unit.COUNT.value)
     metrics.put_metric(MetricKey.INCOGNITO_MEETINGS.value, result[2], Unit.COUNT.value)
     metrics.put_metric(MetricKey.PUBLIC_MEETINGS.value, result[3], Unit.COUNT.value)
-    metrics.put_metric(MetricKey.MEETINGS_WITH_INVITIATION.value, result[4], Unit.COUNT.value)
+    metrics.put_metric(MetricKey.MEETINGS_WITH_INVITATION.value, result[4], Unit.COUNT.value)
 
     # Get number of shared meetings through inline messages
     shared_meetings = func.count(distinct(Message.meetup_id))
