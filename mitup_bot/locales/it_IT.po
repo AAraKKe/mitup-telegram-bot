@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: mitupbot-20\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-12-08 13:57\n"
+"PO-Revision-Date: 2024-12-08 19:27\n"
 "Language: it\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -85,6 +85,12 @@ msgstr "Incognito"
 
 msgid "ButtonMessages.SHOW_TIMEZONE"
 msgstr "Show timezone"
+
+msgid "ButtonMessages.ENABLE"
+msgstr "Enable"
+
+msgid "ButtonMessages.DISABLE"
+msgstr "Disable"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Annulla"
@@ -195,6 +201,34 @@ msgstr "Here you can configure the default options used when creating a meeting.
 "*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n"
 "*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n"
 "*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+
+msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
+msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your *Past meetings menu*.\n\n"
+"The curent timeout is *${timeout} minutes*\n\n"
+"Send the timeout \\(in minutes\\) you would like to use or touch Cancel to go back."
+
+msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
+msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
+
+msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
+msgstr "The timeout has been set to: *${timeout} minutes*"
+
+msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
+msgstr "Configure MeetUp notifications.\n\n"
+"Notifications: ${notifications_status}\n"
+"When notifications are enabled, MeetUp will notify you *${notifications_time} minutes* before a meeting starts."
+
+msgid "SettingsMessages.NOTIFICATION_SET_TIME"
+msgstr "Send how long before a meeting starts \\(in minutes\\) you would like to be notified or touch Cancel to go back."
+
+msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
+msgstr "The notification time has been set to *${notifications_time} minutes*."
+
+msgid "SettingsMessages.ENABLED"
+msgstr "Enabled ✅"
+
+msgid "SettingsMessages.DISABLED"
+msgstr "Disabled ❌"
 
 msgid "MeetingMessages.CREATE"
 msgstr "Creiamo un incontro. Qual è il titolo?"

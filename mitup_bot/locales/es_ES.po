@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: mitupbot-20\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-12-08 14:04\n"
+"PO-Revision-Date: 2024-12-08 19:35\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -85,6 +85,12 @@ msgstr "Incógnito"
 
 msgid "ButtonMessages.SHOW_TIMEZONE"
 msgstr "Mostrar zona horaria"
+
+msgid "ButtonMessages.ENABLE"
+msgstr "Activar"
+
+msgid "ButtonMessages.DISABLE"
+msgstr "Desactivar"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Cancelar"
@@ -195,6 +201,34 @@ msgstr "Aquí puedes configurar las opciones predeterminadas cuando creas una nu
 "*Con invitación*: activa esta opción para que aquellos participantes en una quedada puedan añadir otros miembros, incluso si no tienen Telegram.\n\n"
 "*Incógnito*: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú si podrás ver los participantes de la quedada.\n\n"
 "*Mostrar zona horaria*: normalmente, cuando una quedada se comparte, incluye la zona horaría en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón _Zona horaria_ no aparezca cuando compartes la quedada."
+
+msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
+msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene pasada su hora de inicio. Después de este tiempo la quedada es automáticamente desactivada. Puedes activarla de nuevo desde el menú *Tus quedadas pasadas*.\n\n"
+"El tiempo de prórroga actual es de *${timeout} minutos*.\n\n"
+"Dime cuál es el tiempo de prórroga \\(en minutos\\) que te gustaría usar o toca en Cancelar para volver."
+
+msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
+msgstr "¡Vaya! Parece que ese no es un número válido. Por favor, envíame un número entero positivo. ¡No se permiten decimales!"
+
+msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
+msgstr "El tiempo de prórroga se ha guardado como *${timeout} minutos*"
+
+msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
+msgstr "Configurar las notificaciones de Meetup.\n\n"
+"Notificaciones: ${notifications_status}\n"
+"Cuando las notificaciones están activadas, Meetup te notificará *${notifications_time} minutos* antes de que comience la quedada."
+
+msgid "SettingsMessages.NOTIFICATION_SET_TIME"
+msgstr "Envíame cuánto tiempo antes de que empiece una quedada \\(en minutos\\) te gustaría recibir una notificación o toca Cancelar para volver."
+
+msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
+msgstr "El tiempo de las notificaciones se ha guardado como *${notifications_time} minutos*."
+
+msgid "SettingsMessages.ENABLED"
+msgstr "Activado ✅"
+
+msgid "SettingsMessages.DISABLED"
+msgstr "Desactivado ✅"
 
 msgid "MeetingMessages.CREATE"
 msgstr "Vamos a crear una quedada. Dime cual será el título"
