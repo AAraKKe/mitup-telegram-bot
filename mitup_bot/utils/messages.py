@@ -208,17 +208,15 @@ class MeetingMessages(MessageBase):
     JOINED_MEETING_UNREGISTERED = (
         "You have joined the meeting, %{user}! "
         "It seems you have never used Mitup before, open a chat with @mitupbot to be "
-        "able to received notifications and create new meetings!\n\n"
-        "If you don't open a chat with the bot, you can be removed from the meeting at any time."
+        "receive notifications and create new meetings!\n\n"
     )
     LEFT_MEETING_SUCCESS = "You have left the meeting"
     LEFT_MEETING_ALREADY = "You cannot leave a meeting you have not joined"
     LEFT_MEETING_NOT_FOUND = "The meeting you tried to leave does not exist"
     LEFT_MEETING_UNREGISTERED = (
-        "You haveeee left the meeting, %{user}! "
-        "It seems you have never used Mitup before, open a chat with @mitupbot to be "
-        "able to received notifications and create new meetings!\n\n"
-        "If you don't open a chat with the bot, you can be added to the meeting at any time."
+        "You have left the meeting, %{user}! "
+        "It seems you have never used Mitup before, open a chat with @mitupbot to "
+        "receive notifications and create new meetings!\n\n"
     )
     PROMOTED_FROM_THE_WAITING_LIST = (
         "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
