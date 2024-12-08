@@ -95,3 +95,6 @@ SET_DEFAULT_INVITATIONS = CallbackData(action="set", entity="def_inv")
 SET_DEFAULT_INCOGNITO = CallbackData(action="set", entity="def_inc")
 SET_DEFAULT_SHOW_TIMEZONE = CallbackData(action="set", entity="def_show_tz")
 EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
+# Notifications
+TOGGLE_NOTIFICATIONS = CallbackData(action="toggle", entity="notif")
+SET_NOTIFICATION_TIME = CallbackData(action="set", entity="notif_time")

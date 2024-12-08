@@ -24,7 +24,7 @@ async def callback_query_timeout(session: Session, update: Update, context: Mitu
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await api.edit_message(context=context, update=update, view=view)
 
     return ConversationSettingsState.TIMEOUT
 
@@ -54,7 +54,7 @@ async def settings_timeout_text_message_handler(session: Session, update: Update
 @with_async_session
 async def settings_timeout_invalid_input_handler(session: Session, update: Update, context: MitupContext):
     user = guards.current_user(update, session)
-    message = SettingsMessages.TIMEOUT_INVALID_INPUT.get(lang=user.lang)
+    message = SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 

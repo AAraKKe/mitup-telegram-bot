@@ -100,12 +100,12 @@ def request_information_with_cancel_view(lang: str, message: str, callback_data:
     )
 
 
-def change_settings_element_view(lang: str, message: str) -> MitupView:
+def change_settings_element_view(lang: str, message: str, callback_data=cb.CANCEL_SETTINGS) -> MitupView:
     """
     This view is used when in order to change a setting the user is asked for a message and we want to give
     them the option to Cancel the action and go back to settings.
     """
-    return request_information_with_cancel_view(lang, message, cb.CANCEL_SETTINGS)
+    return request_information_with_cancel_view(lang, message, callback_data)
 
 
 def settings_set_language_view(lang: str, message: str | None = None) -> MitupView:

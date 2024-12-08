@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-12-08 15:45\n"
+"PO-Revision-Date: 2024-12-08 19:10\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -88,6 +88,12 @@ msgstr "Incognito"
 
 msgid "ButtonMessages.SHOW_TIMEZONE"
 msgstr "Show timezone"
+
+msgid "ButtonMessages.ENABLE"
+msgstr "Enable"
+
+msgid "ButtonMessages.DISABLE"
+msgstr "Disable"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Cancel"
@@ -189,13 +195,28 @@ msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
 msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
-msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your *Past meetings menu*.\n\nThe curent timeout is *${timeout} minutes*\n\nSend the timeout \\(in minutes\\) you would like to use or touch in Cancel to go back."
+msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your *Past meetings menu*.\n\nThe curent timeout is *${timeout} minutes*\n\nSend the timeout \\(in minutes\\) you would like to use or touch Cancel to go back."
 
-msgid "SettingsMessages.TIMEOUT_INVALID_INPUT"
+msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
 msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
 
 msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
 msgstr "The timeout has been set to: *${timeout} minutes*"
+
+msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
+msgstr "Configure MeetUp notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, MeetUp will notify you *${notifications_time} minutes* before a meeting starts."
+
+msgid "SettingsMessages.NOTIFICATION_SET_TIME"
+msgstr "Send how long before a meeting starts \\(in minutes\\) you would like to be notified or touch Cancel to go back."
+
+msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
+msgstr "The notification time has been set to *${notifications_time} minutes*."
+
+msgid "SettingsMessages.ENABLED"
+msgstr "Enabled ✅"
+
+msgid "SettingsMessages.DISABLED"
+msgstr "Disabled ❌"
 
 msgid "MeetingMessages.CREATE"
 msgstr "Lets create a meeting. What is the title?"

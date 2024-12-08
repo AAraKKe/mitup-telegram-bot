@@ -31,7 +31,7 @@ async def test_callback_query_timeout(
         ),
     )
 
-    api.assert_send_message_called(context, update, expected_view)
+    api.assert_edit_message_called(context, update, expected_view)
     assert result == ConversationSettingsState.TIMEOUT
 
 
@@ -86,11 +86,12 @@ async def test_settings_timeout_invalid_input_handler(
     context, _ = await call_handler(update, app, EditSettingsHandlerId.TIMEOUT_CONVERSATION)
 
     expected_view = factory.change_settings_element_view(
-        lang=user_with_settings.lang, message=SettingsMessages.TIMEOUT_INVALID_INPUT.get(lang=user_with_settings.lang)
+        lang=user_with_settings.lang,
+        message=SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user_with_settings.lang),
     )
 
     # Tow messages are sent, one to request the timeout and another one to inform the user that the input was invalid
-    api.assert_send_message_called(context, update, expected_view, times=2)
+    api.assert_send_message_called(context, update, expected_view)
 
     # After failing we should still be on the proper state, send now a valid message
     assert update.effective_message is not None

@@ -97,6 +97,8 @@ class ButtonMessages(MessageBase):
     INCOGNITO = "Incognito"
     SHOW_TIMEZONE = "Show timezone"
     SHOW_IN_YOUR_TIMEZONE = "Show timezone"
+    ENABLE = "Enable"
+    DISABLE = "Disable"
 
     # Meeting buttons
     CANCEL = f"{Emojis.CANCEL} Cancel"
@@ -181,12 +183,25 @@ class SettingsMessages(MessageBase):
         "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. "
         "You can activate it again from your *Past meetings menu*.\n\n"
         "The curent timeout is *${timeout} minutes*\n\n"
-        "Send the timeout \\(in minutes\\) you would like to use or touch in Cancel to go back."
+        "Send the timeout \\(in minutes\\) you would like to use or touch Cancel to go back."
     )
-    TIMEOUT_INVALID_INPUT = (
+    INVALID_POSITIVE_INTEGER = (
         "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
     )
     TIMEOUT_SET_SUCCESS = "The timeout has been set to: *${timeout} minutes*"
+    NOTIFICATIONS_SETTINGS = (
+        "Configure MeetUp notifications.\n\n"
+        "Notifications: ${notifications_status}\n"
+        "When notifications are enabled, MeetUp will notify "
+        "you *${notifications_time} minutes* before a meeting starts."
+    )
+    NOTIFICATION_SET_TIME = (
+        "Send how long before a meeting starts \\(in minutes\\) you would like to be "
+        "notified or touch Cancel to go back."
+    )
+    NOTIFICATION_TIME_SET_SUCCESS = "The notification time has been set to *${notifications_time} minutes*."
+    ENABLED = f"Enabled {Emojis.CHECK}"
+    DISABLED = f"Disabled {Emojis.CANCEL}"
 
 
 class MeetingMessages(MessageBase):

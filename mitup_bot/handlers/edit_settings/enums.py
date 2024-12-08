@@ -37,7 +37,16 @@ class EditSettingsHandlerId(CallbackId):
     TIMEOUT_INVALID_INPUT = auto()
     TIMEOUT_CONVERSATION = auto()
 
+    # Edit notifications
+    NOTIFICATIONS_CALLBACK = auto()
+    TOGGLE_NOTIFICATIONS = auto()
+    SET_NOTIFICATION_TIME = auto()
+    NOTIFICATION_TIME_MESSAGE_WITH_TEXT = auto()
+    NOTIFICATION_TIME_INVALID_INPUT = auto()
+    NOTIFICATION_CONVERSATION = auto()
+
 
 class ConversationSettingsState(Enum):
     TIMEZONE = auto()
     TIMEOUT = auto()
+    NOTIFICATION_TIME = auto()
