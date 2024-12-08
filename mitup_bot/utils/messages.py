@@ -106,6 +106,7 @@ class ButtonMessages(MessageBase):
     DESCRIPTION = f"{Emojis.DESCRIPTION} Description"
     DATE = f"{Emojis.CALENDAR} Date"
     TIME = f"{Emojis.CLOCK} Time"
+    NOTIFICATIONS_TIME = f"{Emojis.NOTIF} Time"
     SET_TIME = f"{Emojis.CLOCK} Set time"
     PARTICIPANTS = f"{Emojis.JOINED} Participants"
     LOCATION = f"{Emojis.MAP} Location"

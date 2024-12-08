@@ -29,7 +29,7 @@ def edit_notification_view(user: User) -> MitupView:
         notifications_time=user.settings.notification_time,
     )
     action = (ButtonMessages.DISABLE if user.settings.notification else ButtonMessages.ENABLE).get(lang=user.lang)
-    set_time_action = ButtonMessages.TIME.get(lang=user.lang)
+    set_time_action = ButtonMessages.NOTIFICATIONS_TIME.get(lang=user.lang)
 
     return MitupView(
         description=message,

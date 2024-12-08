@@ -107,6 +107,9 @@ msgstr "🗓️ Fecha"
 msgid "ButtonMessages.TIME"
 msgstr "🕒 Hora"
 
+msgid "ButtonMessages.NOTIFICATIONS_TIME"
+msgstr "⏰ Tiempo"
+
 msgid "ButtonMessages.SET_TIME"
 msgstr "🕒 Establecer hora"
 
@@ -526,4 +529,3 @@ msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
-

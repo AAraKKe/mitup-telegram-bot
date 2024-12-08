@@ -34,7 +34,7 @@ def expected_view(user: User, notifications_enabled: bool, notifications_time: i
                     callback_data=cb.TOGGLE_NOTIFICATIONS,
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.TIME.get(lang=user.lang),
+                    text=ButtonMessages.NOTIFICATIONS_TIME.get(lang=user.lang),
                     callback_data=cb.SET_NOTIFICATION_TIME,
                 ),
             ],
