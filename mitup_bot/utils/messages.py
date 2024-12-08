@@ -176,6 +176,18 @@ class SettingsMessages(MessageBase):
         "This will also disable the _Timezone_ button shown when the meeting is shared."
     )
 
+    # Timeout messages
+    SET_TIMEOUT_SETTINGS = (
+        "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. "
+        "You can activate it again from your *Past meetings menu*.\n\n"
+        "The curent timeout is *${timeout} minutes*\n\n"
+        "Send the timeout \\(in minutes\\) you would like to use or touch in Cancel to go back."
+    )
+    TIMEOUT_INVALID_INPUT = (
+        "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
+    )
+    TIMEOUT_SET_SUCCESS = "The timeout has been set to: *${timeout} minutes*"
+
 
 class MeetingMessages(MessageBase):
     # Meeting creation

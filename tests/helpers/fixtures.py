@@ -2,6 +2,7 @@ import datetime as dt
 from dataclasses import dataclass
 
 from telegram import Location
+from telegram import User as TgUser
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.models import Meetup, MeetupLocation, Settings, User
@@ -78,7 +79,7 @@ def create_settings(
     language: str = "en",
     timezone: str = "UTC",
     notification: bool = True,
-    default_extension_period: int = 0,
+    timeout: int = 1,
     default_waiting_list: bool = False,
     default_public: bool = False,
     default_allow_invitation: bool = False,
@@ -90,7 +91,7 @@ def create_settings(
         language=language,
         timezone=timezone,
         notification=notification,
-        default_extension_period=default_extension_period,
+        timeout=timeout,
         default_waiting_list=default_waiting_list,
         default_public=default_public,
         default_allow_invitation=default_allow_invitation,
@@ -118,4 +119,14 @@ def create_user(
         is_active=is_active,
         meetups=owned_meetings or [],
         settings=settings or create_settings(),
+    )
+
+
+def telegram_user_from_user(user: User) -> TgUser:
+    return TgUser(
+        id=user.tg_user_id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        username=user.username,
+        is_bot=False,
     )

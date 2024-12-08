@@ -16,9 +16,9 @@ __all__ = (
 # First lets expose the registry
 from .registry import HandlersRegistry
 
-# Then subpackages
-from . import registration_process, edit_meeting, edit_settings, inline_query
-
-# Now we can import the rest of modules
+# Then all other utils
 from . import callback_query, commands, conversations, messages
 from .personal_filters import UserExistFilter, PositiveNumberFilter
+
+# Then subpackages with different handlers registered
+from . import registration_process, edit_meeting, edit_settings, inline_query

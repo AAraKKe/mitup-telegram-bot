@@ -31,6 +31,13 @@ class EditSettingsHandlerId(CallbackId):
     SET_DEFAULT_INCOGNITO = auto()
     SET_DEFAULT_SHOW_TIMEZONE = auto()
 
+    # Edit timeout
+    TIMEOUT_CALLBACK = auto()
+    TIMEOUT_MESSAGE_WITH_TEXT = auto()
+    TIMEOUT_INVALID_INPUT = auto()
+    TIMEOUT_CONVERSATION = auto()
+
 
 class ConversationSettingsState(Enum):
     TIMEZONE = auto()
+    TIMEOUT = auto()
