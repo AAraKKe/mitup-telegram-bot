@@ -39,7 +39,7 @@ def expected_view(user: User, notifications_enabled: bool, notifications_time: i
                 ),
             ],
         ],
-    )
+    ).with_back_button(ButtonMessages.SETTINGS, lang=user.lang, callback_data=cb.SETTINGS)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_NOTIFICATIONS)], indirect=True)

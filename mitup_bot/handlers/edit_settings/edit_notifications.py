@@ -39,7 +39,7 @@ def edit_notification_view(user: User) -> MitupView:
                 ButtonConfig(text=set_time_action, callback_data=cb.SET_NOTIFICATION_TIME),
             ],
         ],
-    )
+    ).with_back_button(ButtonMessages.SETTINGS, lang=user.lang, callback_data=cb.SETTINGS)
 
 
 @HandlersRegistry.register_callback_query(
