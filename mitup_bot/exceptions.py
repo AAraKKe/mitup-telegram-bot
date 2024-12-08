@@ -150,3 +150,9 @@ class InactiveUserInteraction(RuntimeError):
         self.user_id = user_id
         self.private = private
         super().__init__(f"The user {user_id} is inactive and interacted with the bot")
+
+
+class CallbackQueryTextTooLong(ValueError):
+    def __init__(self, text: str):
+        length = len(text)
+        super().__init__(f"Callback query text is too long [{length}, max: 200]: {text!r}")

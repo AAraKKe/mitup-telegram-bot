@@ -7,7 +7,12 @@ from telegram import InlineQueryResultArticle, InputTextMessageContent, Message,
 from telegram.error import BadRequest, Forbidden
 
 from mitup_bot import guards
-from mitup_bot.exceptions import AnswerInlineQueryError, InactiveUserInteraction, NoMessageAvailable
+from mitup_bot.exceptions import (
+    AnswerInlineQueryError,
+    CallbackQueryTextTooLong,
+    InactiveUserInteraction,
+    NoMessageAvailable,
+)
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.monitoring import MetricKey
@@ -136,6 +141,8 @@ async def answer_inline_query(context: TMitupContext, update: Update, results: l
 
 
 async def answer_callback_query(*, context: TMitupContext, update: Update, text: str, show_alert: bool):
+    if len(text) > 200:
+        CallbackQueryTextTooLong(text)
     query = guards.valid_callback_query(update)
     await context.bot.answer_callback_query(query.id, text=text, show_alert=show_alert)
 
