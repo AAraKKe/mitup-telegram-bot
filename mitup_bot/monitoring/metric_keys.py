@@ -37,6 +37,24 @@ class MetricKey(CamelCaseStrEnum):
     NOTIFICATIONS_SENT = auto()
     """Show how many notifications should be sent when a meeting is about to start"""
     NOTIFICATIONS_TO_SEND = auto()
+    """Stat for total number of active users"""
+    ACTIVE_USERS = auto()
+    """Stat for the number of inactive users"""
+    INACTIVE_USERS = auto()
+    """Stat for the total of invited users"""
+    INVITED_USERS = auto()
+    """Stat for the total number of active meetings"""
+    ACTIVE_MEETINGS = auto()
+    """Stat for the total number of inactive meetings"""
+    INACTIVE_MEETINGS = auto()
+    """Stat for the total number of incognito meetings"""
+    INCOGNITO_MEETINGS = auto()
+    """Stat for the total number of public meetings"""
+    PUBLIC_MEETINGS = auto()
+    """Stat for the total number of meetings with invitation"""
+    MEETINGS_WITH_INVITIATION = auto()
+    """Stat for the total number of shared meetings"""
+    SHARED_MEETINGS = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

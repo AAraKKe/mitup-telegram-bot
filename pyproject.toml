@@ -94,6 +94,8 @@ omit = [
     # have no impact in production and mainly helper scripts
     "bin",
     "__about__.py",
+    # This does not impact the proper working of the bot
+    "generate_stats.py",
 ]
 exclude_also = [
     # Exclude protocol classes since they have no logic

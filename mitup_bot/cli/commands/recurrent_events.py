@@ -13,17 +13,19 @@ from telegram import constants
 from telegram.ext import AIORateLimiter, Defaults, ExtBot
 
 from mitup_bot import db
-from mitup_bot.cli import notify_meetings, user_cleanup
+from mitup_bot.cli import generate_stats, notify_meetings, user_cleanup
 from mitup_bot.cli.options import EnumChoice
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.monitoring.metrics import MetricKey, MitupMetricsLogger, configure_metrics
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
+DEFAULT_GENERATE_STATS_INTERVAL = 3600
 DEFAULT_NOTIFY_MEETINGS_START = 60
 
 
 class EventType(Enum):
     USER_CLEANUP = "UserCleanup"
+    GENERATE_STATS = "Stats"
     NOTIFY_START_MEETING = "NotifyStartMeeting"
 
 
@@ -31,6 +33,7 @@ class EventType(Enum):
 class IntervalsConfiguration:
     user_cleanup: int
     notify_start_meeting: int
+    generate_stats: int
 
     def get(self, event_type: EventType) -> int:
         match event_type:
@@ -38,6 +41,8 @@ class IntervalsConfiguration:
                 return self.user_cleanup
             case EventType.NOTIFY_START_MEETING:
                 return self.notify_start_meeting
+            case EventType.GENERATE_STATS:
+                return self.generate_stats
             case _:
                 assert_never()
 
@@ -61,6 +66,8 @@ async def launch_event(event: MaintainanceEvent, bot: ExtBot, metrics: MitupMetr
             user_cleanup.run(bot, metrics)
         case EventType.NOTIFY_START_MEETING:
             await notify_meetings.run(bot, metrics)
+        case EventType.GENERATE_STATS:
+            generate_stats.run(bot, metrics)
         case _:
             assert_never()
 
@@ -87,7 +94,7 @@ async def handle_maintainance(event: MaintainanceEvent) -> None:
         fault = True
         metrics.add_stack_trace("exception")
     finally:
-        metrics.put_metric(MetricKey.FAULT.value, 1 if fault else 0)
+        metrics.put_metric(MetricKey.FAULT.value, 1 if fault else 0, unit=Unit.COUNT.value)
         metrics.put_metric(MetricKey.TIME.value, (perf_counter() - start_time) * 1000, unit=Unit.MILLISECONDS.value)
         await metrics.flush()
 
@@ -133,6 +140,12 @@ async def run_all_tasks(intervals: IntervalsConfiguration, env: Env, start_time:
     show_default=True,
 )
 @click.option(
+    "--generate-stats-interval",
+    default=DEFAULT_GENERATE_STATS_INTERVAL,
+    help="Interval in seconds to generate bots stats",
+    show_default=True,
+)
+@click.option(
     "--env",
     default=Env.DEV,
     type=EnumChoice(Env),
@@ -145,7 +158,13 @@ async def run_all_tasks(intervals: IntervalsConfiguration, env: Env, start_time:
     type=float,
     help="Time before starting the first event",
 )
-def cli(user_cleanup_interval: int, notify_meeting_interval: int, env: Env, start_time: float):
+def cli(
+    user_cleanup_interval: int, notify_meeting_interval: int, env: Env, start_time: float, generate_stats_interval: int
+):
     """This method is used when launching notifications locally as a container"""
-    intervals = IntervalsConfiguration(user_cleanup=user_cleanup_interval, notify_start_meeting=notify_meeting_interval)
+    intervals = IntervalsConfiguration(
+        user_cleanup=user_cleanup_interval,
+        notify_start_meeting=notify_meeting_interval,
+        generate_stats=generate_stats_interval,
+    )
     asyncio.run(run_all_tasks(intervals, env, start_time))

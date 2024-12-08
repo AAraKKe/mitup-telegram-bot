@@ -61,7 +61,7 @@ services:
 
   events:
     <<: *launch-bot
-    command: bash -c "hatch run dev:update-locales && hatch run dev:launch-events --notify-meeting-interval 1 --user-cleanup-interval 10 --env dev"
+    command: bash -c "hatch run dev:update-locales && hatch run dev:launch-events --notify-meeting-interval 5 --user-cleanup-interval 10 --generate-stats-interval 5 --env dev"
     environment:
       - MITUPBOT__METRICS__ENVIRONMENT=rich
       - MITUPBOT__METRICS__NAMESPACE=MitupDocker/RecurrentEvents
