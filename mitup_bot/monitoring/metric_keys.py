@@ -52,7 +52,7 @@ class MetricKey(CamelCaseStrEnum):
     """Stat for the total number of public meetings"""
     PUBLIC_MEETINGS = auto()
     """Stat for the total number of meetings with invitation"""
-    MEETINGS_WITH_INVITIATION = auto()
+    MEETINGS_WITH_INVITATION = auto()
     """Stat for the total number of shared meetings"""
     SHARED_MEETINGS = auto()
 
