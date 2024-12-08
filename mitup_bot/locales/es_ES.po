@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: mitupbot-20\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-10-19 15:01\n"
+"PO-Revision-Date: 2024-12-08 14:04\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -234,6 +234,42 @@ msgstr "_Esta quedada aún no tiene descripción_"
 msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
 msgstr "_Esta quedada aún no tiene un número máximo de participantes_"
 
+msgid "MeetingMessages.JOINED_MEETING_SUCCESS"
+msgstr "¡Te has unido a la quedada!"
+
+msgid "MeetingMessages.JOINED_MEETING_ALREADY"
+msgstr "Ya te habías unido a esta quedada"
+
+msgid "MeetingMessages.JOINED_MEETING_NOT_FOUND"
+msgstr "La quedada a la que intentaste unirte no existe"
+
+msgid "MeetingMessages.JOINED_MEETING_FULL"
+msgstr "¡Lo siento! La quedada ya está completa."
+
+msgid "MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST"
+msgstr "La quedada está completa. Se te ha añadido a la lista de espera."
+
+msgid "MeetingMessages.JOINED_MEETING_UNREGISTERED"
+msgstr "¡Te has unido a la quedada, %{user}! Parece que es la primera vez que usas Mitup, abre un chat privado con @mitupbot para recibir notificaciones y ¡crear nuevas quedadas!"
+
+msgid "MeetingMessages.LEFT_MEETING_SUCCESS"
+msgstr "Has abandonado la quedada"
+
+msgid "MeetingMessages.LEFT_MEETING_ALREADY"
+msgstr "No puedes dejar una quedada a la que no te has unido"
+
+msgid "MeetingMessages.LEFT_MEETING_NOT_FOUND"
+msgstr "La quedada de la que intentaste salir no existe"
+
+msgid "MeetingMessages.LEFT_MEETING_UNREGISTERED"
+msgstr "¡Has abandonado la quedada, %{user}! Parece que es la primera vez que usas Mitup, abre un chat privado con @mitupbot para recibir notificaciones y ¡crear nuevas quedadas!"
+
+msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
+msgstr "Hay un espacio libre en la quedada ${meeting_title}. ¡Te has unido desde la lista de espera!"
+
+msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
+msgstr "¡La quedada _*${meeting_title}*_ comenzará pronto!"
+
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "Este es el título actual de la quedada:\n"
 "*${title}*\n\n"
@@ -330,6 +366,14 @@ msgstr "La fecha y hora de la quedada se han eliminado"
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Esta quedada ha sido eliminada 🚫"
+
+msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
+msgstr "Puedes configurar diferentes opciones en tu quedada:\n\n"
+"*Lista de espera*: permite a tus contactos unirse a la quedada aunque esté llena. Los usuarios que se unan a la quedada una vez llena se añadirán a una lista de espera y serán aceptados como participantes en cuanto haya un hueco libre en el orden en el que se unieron.\n\n"
+"*Pública*: activa esta opción para permitir reenviar tus quedadas a todos aquellos que la recivan. Una opción perfecta para llegar a más personas.\n\n"
+"*Con invitación*: activa esta opción para que aquellos participantes en una quedada puedan añadir otros miembros, incluso si no tienen Telegram.\n\n"
+"*Incógnito*: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú si podrás ver los participantes de la quedada.\n\n"
+"*Mostrar zona horaria*: normalmente, cuando una quedada se comparte, incluye la zona horaría en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón _Zona horaria_ no aparezca cuando compartes la quedada."
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
 msgstr "_Aún no tienes ninguna quedada.\n\n"
@@ -448,3 +492,4 @@ msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
+
