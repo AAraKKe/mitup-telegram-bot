@@ -3,7 +3,7 @@ msgstr ""
 "Project-Id-Version: mitupbot-20\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-12-08 19:35\n"
+"PO-Revision-Date: 2024-12-08 20:31\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -231,7 +231,7 @@ msgid "SettingsMessages.ENABLED"
 msgstr "Activado ✅"
 
 msgid "SettingsMessages.DISABLED"
-msgstr "Desactivado ✅"
+msgstr "Desactivado ❌"
 
 msgid "MeetingMessages.CREATE"
 msgstr "Vamos a crear una quedada. Dime cual será el título"
@@ -529,3 +529,4 @@ msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
+
