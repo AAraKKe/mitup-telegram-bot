@@ -156,6 +156,7 @@ def test_calendar_navigation_buttons(lang: str, current_date: dt.date, expected_
     assert expected_text(lang) == actual_text
 
 
+@freezegun.freeze_time("2024-06-12", tz_offset=0)
 def test_callback_in_buttons():
     cal = CalendarKeyboard(
         anchor_date=dt.date(2024, 6, 12),
