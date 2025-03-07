@@ -25,7 +25,7 @@ dependencies = [
     "pydantic~=2.10.1",
     "alembic~=1.6",
     "rich~=13.0",
-    "tzdata~=2024.1",
+    "tzdata~=2025.1",
     "googlemaps~=4.10.0",
     "aws-embedded-metrics~=3.2.0",
 ]
