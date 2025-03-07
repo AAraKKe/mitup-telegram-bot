@@ -343,7 +343,7 @@ class MeetingMessages(MessageBase):
     # TODO: this needs to be moved to a separate set of messages as it is not part of the meeting creation/editing
     # See https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/75
     NO_MEETINGS_FOUND = (
-        "_You don't have any meetings yet.\n\n" "Click on _${new_meeting_button}_ in the main menu to create one._"
+        "_You don't have any meetings yet.\n\nClick on _${new_meeting_button}_ in the main menu to create one._"
     )
     ACTIVE = "These are all your active meetings."
 

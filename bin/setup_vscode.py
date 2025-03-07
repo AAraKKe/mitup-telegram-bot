@@ -70,7 +70,7 @@ def print_compare(current: dict[str, TSettingValue], proposed: dict[str, TSettin
     diff = current_set ^ proposed_set
 
     if len(diff) == 0:
-        print("Your current VSCode settings " "[bold green]are compatiblep[/bold green] " "with this project settigns!")
+        print("Your current VSCode settings [bold green]are compatiblep[/bold green] with this project settigns!")
         exit(0)
 
     diff_dict = dict(diff)

@@ -148,12 +148,12 @@ class StubMetrics(MitupMetricsLogger):
         Raises:
             AssertionError: If the expected metrics are not found or if unexpected metrics are emitted.
         """
-        assert values is None or len(names) == len(
-            values
-        ), f"The amount of names and values should match. Names: {len(names)}, Values: {len(values)}"
-        assert units is None or len(names) == len(
-            units
-        ), f"The amount of names and units should match. Names: {len(names)}, Values: {len(units)}"
+        assert values is None or len(names) == len(values), (
+            f"The amount of names and values should match. Names: {len(names)}, Values: {len(values)}"
+        )
+        assert units is None or len(names) == len(units), (
+            f"The amount of names and units should match. Names: {len(names)}, Values: {len(units)}"
+        )
 
         if exception is not None:
             properties = properties or {}
@@ -175,9 +175,9 @@ class StubMetrics(MitupMetricsLogger):
         emitted_list = "\n- ".join(str(element) for element in actual)
 
         if negative_case:
-            assert all(
-                expected != cw_metrics for cw_metrics in actual
-            ), f"Unexpected metrics emitted.\nNot expected:\n- {expected}\nEmitted:\n- {emitted_list}"
+            assert all(expected != cw_metrics for cw_metrics in actual), (
+                f"Unexpected metrics emitted.\nNot expected:\n- {expected}\nEmitted:\n- {emitted_list}"
+            )
         else:
             found = sum(expected == cw_metrics for cw_metrics in actual)
             assert found == times, (

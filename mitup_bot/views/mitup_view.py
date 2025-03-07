@@ -24,9 +24,9 @@ class ButtonConfig(BaseModel):
     @classmethod
     def validate_callback_data(cls, value: CallbackData | str | None) -> CallbackData | str | None:
         str_value = str(value)
-        assert (
-            len(str_value.encode()) <= 64
-        ), f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram"
+        assert len(str_value.encode()) <= 64, (
+            f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram"
+        )
         return value
 
     @property

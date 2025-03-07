@@ -70,9 +70,9 @@ class MockApi:
             call_count = self.send_to_user_mock.call_count
             assert call_count == times, f"Expected {times} call but found {call_count}"
             expected_call = mock.call(context=context, user=user, view=view)
-            assert any(
-                expected_call == call for call in self.send_to_user_mock.await_args_list
-            ), f"Expected call {expected_call} not found in send_message_to_user method"
+            assert any(expected_call == call for call in self.send_to_user_mock.await_args_list), (
+                f"Expected call {expected_call} not found in send_message_to_user method"
+            )
 
     def assert_answer_callback_query_called(
         self,
@@ -90,9 +90,9 @@ class MockApi:
             call_count = self.answer_callback_query_mock.call_count
             assert call_count == times, f"Expected {times} call but found {call_count}"
             expected_call = mock.call(context=context, update=update, text=text, show_alert=show_alert)
-            assert any(
-                expected_call == call for call in self.answer_callback_query_mock.await_args_list
-            ), f"Expected call {expected_call} not found in method"
+            assert any(expected_call == call for call in self.answer_callback_query_mock.await_args_list), (
+                f"Expected call {expected_call} not found in method"
+            )
 
     def assert_update_meeting_messages_called(
         self,
@@ -119,9 +119,9 @@ class MockApi:
             call_count = self.update_meeting_messages_mock.call_count
             assert call_count == times, f"Expected {times} call but found {call_count}"
             expected_call = mock.call(**arguments)
-            assert any(
-                expected_call == call for call in self.update_meeting_messages_mock.await_args_list
-            ), f"Expected call {expected_call} not found in method"
+            assert any(expected_call == call for call in self.update_meeting_messages_mock.await_args_list), (
+                f"Expected call {expected_call} not found in method"
+            )
 
     def assert_send_message_not_called(self):
         self.send_message_mock.assert_not_called()
@@ -148,6 +148,6 @@ class MockApi:
             # and at least one of them with the appropriate arguments
             assert len(method.call_args_list) == times, f"Expected {times} call but found {len(method.call_args_list)}"
             expected_call = mock.call(context=context, update=update, view=view)
-            assert any(
-                expected_call == call for call in method.await_args_list
-            ), f"Expected call {expected_call} not found in method"
+            assert any(expected_call == call for call in method.await_args_list), (
+                f"Expected call {expected_call} not found in method"
+            )

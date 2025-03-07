@@ -114,7 +114,7 @@ def test_build_fails_if_subprocess_fails(subprocess_mock: mock.Mock, mo_mock: mo
     assert result.exit_code == 1
     assert (
         test_console.text_with_ansi_codes(
-            f"[bold red]✘ Error compiling {po_file_for_language("en").absolute()}: "
+            f"[bold red]✘ Error compiling {po_file_for_language('en').absolute()}: "
             "Command 'msgfmt' returned non-zero exit status 1.[/]"
         )
         # Console can break long messages in separate lines

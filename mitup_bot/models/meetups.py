@@ -155,7 +155,7 @@ class Meetup(SQLModel, table=True):
         is_word_cuttoff = self.description[30] != " " and self.description[29] != " "
         if is_word_cuttoff:
             cut_description = self.description[:30].split(" ")[:-1]
-            return f"{" ".join(cut_description)} ..."
+            return f"{' '.join(cut_description)} ..."
 
         cut_description = " ".join(self.description[:30].rstrip().split(" "))
         return f"{cut_description} ..."
@@ -213,7 +213,7 @@ class Meetup(SQLModel, table=True):
         waiting_list = [
             sanitize(link.user.inline_name, full=True) for link in self.joined_links if link.is_waiting_list
         ]
-        final_list = f"\n  {"\n  ".join(participant_list)}" if participant_list else ""
+        final_list = f"\n  {'\n  '.join(participant_list)}" if participant_list else ""
 
         if waiting_list:
             final_list += f"\n--- {Emojis.WAITING} _{ButtonMessages.WAITING_LIST.get(lang=self.lang)}_ \n  "

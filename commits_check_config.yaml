@@ -1,35 +1,49 @@
-additional_commands:
-    feat: "^Feat: "
-    fix: "^Fix: "
-    docs: "^Docs: "
-    style: "^Style: "
-    refactor: "^Refactor: "
-    perf: "^Perf: "
-    test: "^Test: "
-    infra: "^Infra: "
-    ci: "^CI: "
-    chore: "^Chore: "
-    revert: "^Revert: "
-    merge: "^Merge: "
-    update: "^Update: "
-    monitoring: "^Monitoring: "
-    wip: "^WIP"
-    copy: "^Copy: "
-
-additional_emojis:
-    feat: "✨"
-    fix: "🐛"
-    docs: "📚"
-    style: "💎"
-    refactor: "🧹"
-    update: "🚀"
-    perf: "🚀"
-    test: "🧪"
-    infra: "🏗️"
-    monitoring: "📈"
-    ci: "👷"
-    chore: "♻️"
-    revert: "⏪"
-    merge: "🔀"
-    wip: "⏳"
-    copy: "🗣️"
+additional_commit_types:
+  feat:
+    description: Introduce new features.
+    emoji: "✨"
+  fix:
+    description: Fix a bug.
+    emoji: "🐛"
+  docs:
+    description: Add or update documentation.
+    emoji: "📚"
+  style:
+    description: Improve code style without affecting functionality.
+    emoji: "💎"
+  refactor:
+    description: Refactor code without changing functionality.
+    emoji: "🧹"
+  perf:
+    description: Improve performance.
+    emoji: "🚀"
+  test:
+    description: Add or update tests.
+    emoji: "🧪"
+  infra:
+    description: Infrastructure changes.
+    emoji: "🏗️"
+  ci:
+    description: Continuous Integration changes.
+    emoji: "👷"
+  chore:
+    description: Other changes that don't modify src or test files.
+    emoji: "♻️"
+  revert:
+    description: Revert changes.
+    emoji: "⏪"
+  merge:
+    description: Merge branches.
+    emoji: "🔀"
+  update:
+    description: Update dependencies or other changes.
+    emoji: "🚀"
+  monitoring:
+    description: Add or update monitoring.
+    emoji: "📈"
+  wip:
+    description: Work in progress.
+    emoji: "⏳"
+  copy:
+    description: Copy changes.
+    emoji: "🗣️"

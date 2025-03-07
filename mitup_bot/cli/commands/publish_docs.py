@@ -18,7 +18,7 @@ def s3_sync() -> list[str]:
 
     We can use this list later to invalidate the CloudFormation cache only for these files.
     """
-    bucket = f"s3://{os.environ["BOT_DOMAIN"]}/"
+    bucket = f"s3://{os.environ['BOT_DOMAIN']}/"
 
     console().rule(f"Syncing files to {bucket}")
 

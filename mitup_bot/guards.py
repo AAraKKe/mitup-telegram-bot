@@ -135,9 +135,7 @@ async def meeting_accessible(
     if Meetup.by_id(session, meeting_id):
         return await user_owns_meeting(user, meeting_id, action, update, context)
 
-    message = (
-        f"User tried {action!r} with a meeting that does not exist. " f"Meeting id: {meeting_id}, user id: {user.id}"
-    )
+    message = f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.id}"
     logging.warning(message)
 
     await api.edit_message(
