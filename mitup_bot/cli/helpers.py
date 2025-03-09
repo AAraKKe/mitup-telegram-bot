@@ -1,6 +1,6 @@
 from rich.console import Console
 
-__console = Console(width=90)
+__console = Console(width=90, force_terminal=True)
 
 
 def console() -> Console:
