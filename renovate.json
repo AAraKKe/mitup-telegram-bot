@@ -11,7 +11,7 @@
   "dependencyDashboardLabels": [
     "type::dependency-upgrade"
   ],
-  "commitMessagePrefix": "🚀 Update:",
+  "commitMessagePrefix": "🚀 update:",
   "labels": [
     "type::dependency-upgrade"
   ],
