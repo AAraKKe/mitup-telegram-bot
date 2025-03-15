@@ -7,8 +7,8 @@
   script:
     - mkdir -p ~/.aws
     - mkdir -p /tmp
-    - echo "${OIDC_TOKEN}" > /tmp/web_identity_token
-    - echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
+    - echo "${OIDC_TOKEN}" > ${CI_PROJECT_DIR}/web_identity_token
+    - echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=${CI_PROJECT_DIR}/web_identity_token" > ~/.aws/config
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
     - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
     - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
@@ -16,14 +16,18 @@
     - echo "ECR_MIGRATIONS_REPO_URI=$ECR_MIGRATIONS_REPO_URI" >> dotenv
     - echo "BOT_IMAGE_TAG=$ECR_MITUP_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
     - echo "MIGRATIONS_IMAGE_TAG=$ECR_MIGRATIONS_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
+    - cp ~/.aws/config ${CI_PROJECT_DIR}/aws-config
 
   artifacts:
     reports:
       dotenv: dotenv
     paths:
-      - ~/.aws/config
+      - web_identity_token
+      - aws-config
     when: on_success
     expire_in: 2 hours
+    access:
+      - none
 
 config-staging:
   extends: .aws-config

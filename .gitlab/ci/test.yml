@@ -64,11 +64,3 @@ validate-locales:
   # This just validates that all messages in code are present in the translations english file
   stage: test
   script: hatch run dev:validate-locales
-
-# sourcery-review:
-#   stage: test
-#   allow_failure: true
-#   script:
-#     - hatch run dev:mr-sourcery
-#   rules:
-#     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_EVENT_TYPE != 'merge_train'
