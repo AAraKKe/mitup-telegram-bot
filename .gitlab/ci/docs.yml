@@ -1,0 +1,52 @@
+build-docs:
+  stage: prepare-deployment
+  script:
+    - hatch run dev:build-docs
+  artifacts:
+    paths:
+      - site
+    expire_in: 1 day
+  needs: [preparation]
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
+      when: never
+    # Only run if the doc files change
+    - changes:
+      - docs/**/*
+      - mkdocs.yml
+
+## -------------- Documentation ---------------
+# Run after deploy to be sure that documentation is not updated until the bot has been updated
+.push-docs: &push-docs
+  stage: documentation
+  dependencies:
+    # Get artifacts from build-docs job
+    - build-docs
+  <<: *tokens
+  before_script: *aws-prep
+  script:
+    - hatch run dev:push-docs
+
+push-docs-staging:
+  extends: .push-docs
+  resource_group: docs-staging
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      # Only run if in the default branch and the doc files change
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+
+push-docs-production:
+  extends: .push-docs
+  resource_group: docs-production
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
+      when: never
+    - if: $CI_COMMIT_BRANCH == "release"

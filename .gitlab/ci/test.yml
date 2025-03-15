@@ -1,0 +1,74 @@
+preparation:
+  stage: build
+  script:
+    - python --version
+    - pip --version
+    - hatch --version
+    # Trigger dev environment to cache it
+    - hatch run dev:echo
+    - hatch run dev:pip list --local
+
+build-translations:
+  stage: build
+  script:
+    - hatch run dev:build-locales
+  artifacts:
+    when: on_success
+    access: none
+    expire_in: "1 day"
+    paths:
+      - mitup_bot/locales
+
+test:
+  stage: test
+  script: hatch run dev:test-cov
+  coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
+  dependencies:
+    - build-translations
+  needs: [preparation, build-translations]
+  artifacts:
+    when: always # Important to get reports when test fail
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  rules:
+    # run only when the mitupbot, dev or tests folders are updated
+    - changes:
+      - mitup_bot/**/*
+      - dev/**/*
+      - tests/**/*
+
+format-check:
+  stage: test
+  script: hatch run dev:format-check
+  needs: [preparation]
+
+linter:
+  stage: test
+  script: hatch run dev:lint
+  needs: [preparation]
+
+type-check:
+  stage: test
+  script: hatch run dev:type-check
+  needs: [preparation]
+
+validate-migrations:
+  stage: test
+  script: hatch run dev:validate-migrations
+  needs: [preparation]
+
+validate-locales:
+  # This just validates that all messages in code are present in the translations english file
+  stage: test
+  script: hatch run dev:validate-locales
+
+# sourcery-review:
+#   stage: test
+#   allow_failure: true
+#   script:
+#     - hatch run dev:mr-sourcery
+#   rules:
+#     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_EVENT_TYPE != 'merge_train'

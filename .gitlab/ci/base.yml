@@ -1,0 +1,62 @@
+# Custom image created for CI/CD purposes from Dockerfile.ci
+image: registry.gitlab.com/meetupbot/mitup-telegram-bot/ci-python
+
+# Templates for security and and code analysis
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+# Global variables for all jobs
+variables:
+  # Exclude paths for SAST analysis
+  SAST_EXCLUDED_PATHS: "tests, .hatch"
+
+# Only run in MergeRequests, tags and default branch
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "release"
+
+.deploy-rules: &deploy-rules
+  changes:
+    - mitup_bot/**/*
+    - dev/docker/Dockerfile
+    - dev/docker/Dockerfile.lambdas
+    - pyproject.toml
+
+# Utilize web identity federation to allow AWS to perform STS calls on our behalf
+.aws-prep: &aws-prep
+  - |
+    mkdir -p ~/.aws
+    mkdir -p /tmp
+    echo "${OIDC_TOKEN}" > /tmp/web_identity_token
+    echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
+
+.tokens: &tokens
+  id_tokens:
+    OIDC_TOKEN:
+      aud: mitup-gitlab-ci-service
+
+# Default cache for Hatch environments
+cache:
+  key: $CI_COMMIT_SHORT_SHA
+  paths:
+    - .hatch
+
+# This is a GitLab provided job, no need to configure it
+sast:
+  stage: analysis
+
+stages:
+  - analysis
+  - build-ci
+  - build
+  - test
+  - prepare-deployment
+  - push-ecr
+  - deploy
+  - documentation
+  - validate
