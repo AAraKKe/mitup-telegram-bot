@@ -46,7 +46,7 @@ push-docs-production:
   extends: .push-docs
   resource_group: docs-production
   dependencies:
-    - config-production
+    - config-prod
     - build-docs
   environment:
     name: production

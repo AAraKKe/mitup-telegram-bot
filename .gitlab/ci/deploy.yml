@@ -38,7 +38,7 @@ deploy-production:
   # This job will first run the migrations on the database and the update ECS
   extends: .migrate-and-deploy
   dependencies:
-    - config-production
+    - config-prod
   resource_group: deploy-production
   environment:
     name: production
