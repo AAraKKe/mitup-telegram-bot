@@ -19,13 +19,9 @@ build-docs:
 # Run after deploy to be sure that documentation is not updated until the bot has been updated
 .push-docs: &push-docs
   stage: documentation
-  dependencies:
-    # Get artifacts from build-docs job
-    - build-docs
   id_tokens:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service
-  before_script: *aws-prep
   script:
     - hatch run dev:push-docs
 
@@ -34,6 +30,9 @@ push-docs-staging:
   resource_group: docs-staging
   environment:
     name: staging
+  dependencies:
+    - config-staging
+    - build-docs
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
@@ -46,6 +45,9 @@ push-docs-staging:
 push-docs-production:
   extends: .push-docs
   resource_group: docs-production
+  dependencies:
+    - config-production
+    - build-docs
   environment:
     name: production
   rules:
