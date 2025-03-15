@@ -45,5 +45,5 @@ additional_commit_types:
     description: Work in progress.
     emoji: ⏳
   translations:
-    description: Copy changes.
+    description: Translations updates.
     emoji: 🗣️

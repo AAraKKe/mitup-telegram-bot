@@ -484,7 +484,7 @@ def service_from_state(state: str, reason: str) -> dict[str, Any]:
         # More than one task
         create_service_description(1, 1, 0, "myTask", 2),
     ],
-    ids="missing_deployments invalid_task_definition multiple_deployments_per_task".split(),
+    ids=["missing_deployments", "invalid_task_definition", "multiple_deployments_per_task"],
 )
 def test_update_deployment_status_fails(describe_service_response: DescribeServicesResponseTypeDef):
     with pytest.raises(click.Abort):
