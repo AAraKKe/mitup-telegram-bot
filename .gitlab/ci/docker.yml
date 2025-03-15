@@ -3,7 +3,7 @@
 # ---------------------
 .kaniko-build-push: &kaniko
   image:
-    name: gcr.io/kaniko-project/executor:v1.23.1-debug
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
     entrypoint: [""]
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
