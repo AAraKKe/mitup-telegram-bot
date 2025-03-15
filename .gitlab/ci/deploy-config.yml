@@ -26,8 +26,7 @@
       - aws-config
     when: on_success
     expire_in: 2 hours
-    access:
-      - none
+    access: none
 
 config-staging:
   extends: .aws-config
