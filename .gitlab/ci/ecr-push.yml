@@ -1,7 +1,8 @@
 .push-ecr: &push-ecr
   stage: push-ecr
-  <<: *tokens
-  before_script: *aws-prep
+  id_tokens:
+    OIDC_TOKEN:
+      aud: mitup-gitlab-ci-service
   image:
     name: gcr.io/kaniko-project/executor:v1.23.1-debug
     entrypoint: [""]
@@ -30,7 +31,11 @@ push-bot-tagged-staging:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
       when: on_success
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      <<: *deploy-rules
+      changes:
+        - mitup_bot/**/*
+        - dev/docker/Dockerfile
+        - dev/docker/Dockerfile.lambdas
+        - pyproject.toml
 
 push-bot-latest-staging:
   extends: push-bot-tagged-staging

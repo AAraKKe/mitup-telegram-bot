@@ -9,6 +9,8 @@ include:
   - local: .gitlab/ci/test.yml
   # Docker build and push
   - local: .gitlab/ci/docker.yml
+  # Configuring the aws credentials and the ECR URIs
+  - local: .gitlab/ci/deploy-config.yml
   # ECR push
   - local: .gitlab/ci/ecr-push.yml
   # Deployment

@@ -22,7 +22,9 @@ build-docs:
   dependencies:
     # Get artifacts from build-docs job
     - build-docs
-  <<: *tokens
+  id_tokens:
+    OIDC_TOKEN:
+      aud: mitup-gitlab-ci-service
   before_script: *aws-prep
   script:
     - hatch run dev:push-docs

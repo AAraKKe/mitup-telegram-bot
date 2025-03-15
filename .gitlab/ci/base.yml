@@ -20,13 +20,6 @@ workflow:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_BRANCH == "release"
 
-.deploy-rules: &deploy-rules
-  changes:
-    - mitup_bot/**/*
-    - dev/docker/Dockerfile
-    - dev/docker/Dockerfile.lambdas
-    - pyproject.toml
-
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
   - |
@@ -34,11 +27,6 @@ workflow:
     mkdir -p /tmp
     echo "${OIDC_TOKEN}" > /tmp/web_identity_token
     echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
-
-.tokens: &tokens
-  id_tokens:
-    OIDC_TOKEN:
-      aud: mitup-gitlab-ci-service
 
 # Default cache for Hatch environments
 cache:
