@@ -1,0 +1,52 @@
+# This job will configure the aws credentials and the ECR URIs
+.aws-config: &aws-env-config
+  stage: prepare-deployment
+  id_tokens:
+    OIDC_TOKEN:
+      aud: mitup-gitlab-ci-service
+  script:
+    - mkdir -p ~/.aws
+    - mkdir -p /tmp
+    - echo "${OIDC_TOKEN}" > /tmp/web_identity_token
+    - echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
+    - aws ecr describe-repositories --region eu-west-1 > describe_response.json
+    - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
+    - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
+    - echo "ECR_MITUP_REPO_URI=$ECR_MITUP_REPO_URI" >> dotenv
+    - echo "ECR_MIGRATIONS_REPO_URI=$ECR_MIGRATIONS_REPO_URI" >> dotenv
+    - echo "BOT_IMAGE_TAG=$ECR_MITUP_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
+    - echo "MIGRATIONS_IMAGE_TAG=$ECR_MIGRATIONS_REPO_URI:ci-$CI_COMMIT_SHORT_SHA" >> dotenv
+
+  artifacts:
+    reports:
+      dotenv: dotenv
+    paths:
+      - ~/.aws/config
+    when: on_success
+    expire_in: 2 hours
+
+config-staging:
+  extends: .aws-config
+  resource_group: staging
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
+      when: on_success
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - mitup_bot/**/*
+        - dev/docker/Dockerfile
+        - dev/docker/Dockerfile.lambdas
+        - pyproject.toml
+
+config-prod:
+  extends: .aws-config
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
+      when: never
+    - if: $CI_COMMIT_BRANCH == "release"
