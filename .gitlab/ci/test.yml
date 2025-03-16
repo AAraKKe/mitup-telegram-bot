@@ -34,6 +34,8 @@ test:
         coverage_format: cobertura
         path: coverage.xml
   rules:
+    # Run always in master
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     # run only when the mitupbot, dev or tests folders are updated
     - changes:
       - mitup_bot/**/*

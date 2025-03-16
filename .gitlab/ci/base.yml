@@ -1,16 +1,16 @@
 # Custom image created for CI/CD purposes from Dockerfile.ci
 image: registry.gitlab.com/meetupbot/mitup-telegram-bot/ci-python
 
+# Global variables for all jobs
+variables:
+  # Exclude paths for SAST analysis
+  SAST_EXCLUDED_PATHS: "tests, .hatch"
+
 # Templates for security and and code analysis
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Dependency-Scanning.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
-
-# Global variables for all jobs
-variables:
-  # Exclude paths for SAST analysis
-  SAST_EXCLUDED_PATHS: "tests, .hatch"
 
 # Only run in MergeRequests, tags and default branch
 workflow:
