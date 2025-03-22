@@ -48,6 +48,11 @@
         ".gitlab-ci.yml"
       ],
       "enabled": false
+    },
+    {
+      "matchPackageNames": ["ruff", "pyright"],
+      "matchUpdateTypes": ["patch"],
+      "enabled": false
     }
   ],
   "major": {
