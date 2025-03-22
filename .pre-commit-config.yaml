@@ -27,3 +27,12 @@ repos:
     hooks:
       - id: conventional-commits-check
         stages: [commit-msg]
+  - repo: local
+    hooks:
+      - id: build-docs
+        name: Build documentation
+        entry: hatch run dev:build-docs
+        language: system
+        pass_filenames: false
+        files: ^(docs/|mkdocs.yml)$
+        stages: [pre-commit]
