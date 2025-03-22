@@ -15,7 +15,11 @@ nav:
       - Lifecycle of a Meeting: usage/meeting_lifecycle.md
   - FAQ:
     - Privacy: faq/privacy.md
-  - Collaborate: collaborate.md
+  - Collaborate:
+    - Being a supporter: collaborate/supporter.md
+    - Donation: collaborate/donation.md
+    - Become a Translator: collaborate/translator.md
+    - Code Contribution: collaborate/code-contributor.md
 theme:
   name: material
   custom_dir: docs/overrides
@@ -32,6 +36,7 @@ theme:
     - navigation.tabs
     - navigation.path
     - navigation.top
+    - navigation.tracking
     - content.code.annotate
     - content.tooltips
     - navigation.footer

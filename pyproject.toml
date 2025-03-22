@@ -193,8 +193,11 @@ dependencies = [
 PYRIGHT_PYTHON_FORCE_VERSION = "latest"
 
 [tool.hatch.envs.dev.scripts]
-test = ["build-locales", "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests"]
-test-cov = "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json"
+test = ["build-locales", "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests {args:}"]
+test-cov = [
+    "build-locales",
+    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json {args:}",
+]
 format = "ruff format  ."
 format-check = "ruff format --diff --check ."
 lint = "ruff check {args:} --diff --unsafe-fixes ."
