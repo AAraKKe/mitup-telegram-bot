@@ -19,7 +19,7 @@ The different available actions are:
 * :busts_in_silhouette: **Joined meetings**: these are meetings you have joined but that you do not own. This is helpful if you want to access an upcoming meeting but cannot find where it was sent to you. Since you do not own these meetings, editing options are not accessible on these meetings.
 * :gear: **Settings**: here is where you can configure Mitup. See [Mitup Configuration](configuration.md).
 * :question: **Help**: here you can find useful links within the bot and access to support. We do our best answering your questions in a timely manner.
-* :white_heart: **Collaborate**: Mitup does not monetize the bot with adds to avoid turning into a nuisance for its users. However, if you want to support the effort, help building Mitup or help with the operational costs of maintaining this bot running, here you will find the ways you can help. See the [Collaborate](../collaborate.md) page.
+* :white_heart: **Collaborate**: Mitup does not monetize the bot with adds to avoid turning into a nuisance for its users. However, if you want to support the effort, help building Mitup or help with the operational costs of maintaining this bot running, here you will find the ways you can help. See the [Collaborate](../collaborate/supporter.md) page.
 
 !!! info "Meeting lifecycle"
 
