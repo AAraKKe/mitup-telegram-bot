@@ -7,12 +7,12 @@ exclude_docs: |
 nav:
   - MitupBot: index.md
   - How to use MitupBot?:
-    - Getting Started: usage/getting_started.md
-    - Main Menu: usage/main_menu.md
-    - Mitup Configuration: usage/configuration.md
+    - Getting Started: user-guide/getting_started.md
+    - Main Menu: user-guide/main_menu.md
+    - Mitup Configuration: user-guide/configuration.md
     - Meetings:
-      - Create a meeting: usage/create_meeting.md
-      - Lifecycle of a Meeting: usage/meeting_lifecycle.md
+      - Create a meeting: user-guide/create_meeting.md
+      - Lifecycle of a Meeting: user-guide/meeting_lifecycle.md
   - FAQ:
     - Privacy: faq/privacy.md
   - Collaborate:
