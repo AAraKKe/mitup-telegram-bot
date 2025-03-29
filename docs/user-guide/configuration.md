@@ -27,8 +27,8 @@ Setting your correct timezone ensures that all meeting times display accurately 
 1. Go to Settings
 2. Tap **Timezone**
 3. You can set your timezone in two ways:
-   - Send a text message with your city or location name
-   - Share your current location using Telegram's location feature
+    * Send a text message with your city or location name
+    * Share your current location using Telegram's location feature
 
 Mitup will use this timezone to display all meeting times. This is particularly important when joining meetings created by users in different timezones.
 
@@ -41,8 +41,8 @@ Mitup can send reminders before your meetings start so you don't miss them.
 1. Go to Settings
 2. Tap **Notifications**
 3. You'll see two options:
-   - **Enable/Disable**: Toggle notifications on or off
-   - **Notification Time**: Set how many minutes before a meeting you want to be notified
+    * **Enable/Disable**: Toggle notifications on or off
+    * **Notification Time**: Set how many minutes before a meeting you want to be notified
 
 By default, Mitup notifies you 5 minutes before a meeting starts, but you can adjust this to suit your needs.
 
@@ -70,23 +70,23 @@ These settings determine the default configuration for new meetings you create. 
 
 ### Waiting List :raised_hand:
 
-When enabled, users can join your meeting even when it's full. They'll be added to a waiting list and automatically moved to the participants list when spots become available.
+This option allows people to join your meeting even when it's full. Participants will automatically be added to a waiting list and moved to the active list when spots become available.
 
 ### Public :globe_with_meridians:
 
-When enabled, anyone who receives your meeting invite can share it with others, helping you reach a wider audience.
+Enabling this option allows anyone who receives your meeting invite to share it with others, helping you reach a wider audience.
 
 ### Open Invitations :handshake:
 
-When enabled, participants can add friends to the meeting even if those friends aren't on Telegram.
+With this option, participants can add friends to the meeting even if those friends aren't on Telegram.
 
 ### Incognito :spy:
 
-When enabled, the participant list remains hidden when the meeting is shared - only the total number of participants is shown. As the creator, you'll still see the complete participant list.
+This privacy feature hides the participant list when your meeting is shared - only showing the total number of participants. As the creator, you'll still see the complete list of who has joined.
 
 ### Show Timezone :world_map:
 
-When enabled, meeting messages include timezone information. When disabled, both the timezone information and the timezone button are hidden from meeting messages.
+This option controls whether timezone information appears in meeting messages. When disabled, both the timezone information and the timezone button are hidden from meeting messages.
 
 ## Privacy Settings :lock:
 
@@ -97,10 +97,6 @@ Privacy settings help you control your personal information within Mitup.
 1. Go to Settings
 2. Tap **Privacy**
 3. Adjust the available options according to your preference
-
-## Saving Your Settings :floppy_disk:
-
-All settings are automatically saved when you make changes. There's no need to explicitly save your configuration - just select your preferred options and they'll apply immediately.
 
 ---
 
