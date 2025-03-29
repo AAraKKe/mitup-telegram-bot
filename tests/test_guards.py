@@ -1,10 +1,9 @@
 import logging
 import re
 from collections.abc import Callable
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 
 import pytest
-from _pytest.python_api import RaisesContext
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import Chat, Message, Update
@@ -89,7 +88,7 @@ def test_message_succeeds(tg_message: Message, update: Update):
     indirect=["update"],
     ids=["callback_query_not_set", "callback_query_set"],
 )
-def test_callback_query(update: Update, expect: RaisesContext):
+def test_callback_query(update: Update, expect: AbstractContextManager):
     with expect:
         callback_query(update)
 

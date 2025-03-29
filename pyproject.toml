@@ -68,7 +68,9 @@ exclude = [
     "site",
     "test.py",
     "dist",
-    "conftest.py"
+    "conftest.py",
+    # Ignore migrations since updates in type checker would force to update them
+    "mitup_bot/migrations",
 ]
 ignore = [
     "**/.vscode/**",

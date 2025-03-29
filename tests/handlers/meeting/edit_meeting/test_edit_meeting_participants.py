@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-from _pytest.python_api import RaisesContext
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -338,11 +337,11 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
 
 
 @pytest.mark.parametrize(
-    "update, expectation",
+    "update",
     [
-        (UpdateRequest(message_text="0"), pytest.raises(AssertionError)),
-        (UpdateRequest(message_text="-3"), pytest.raises(AssertionError)),
-        (UpdateRequest(message_text="not a number"), pytest.raises(AssertionError)),
+        (UpdateRequest(message_text="0")),
+        (UpdateRequest(message_text="-3")),
+        (UpdateRequest(message_text="not a number")),
     ],
     indirect=["update"],
     ids=["zero_participants", "negative_participants", "not_a_number"],
@@ -351,7 +350,6 @@ async def test_positive_filter_works(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
-    expectation: RaisesContext,
     user_with_settings: User,
     api: MockApi,
     app: StubMitupApp,
@@ -359,7 +357,7 @@ async def test_positive_filter_works(
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
 
-    with expectation:
+    with pytest.raises(AssertionError):
         with caplog.at_level(logging.ERROR):
             # If the update is not a positive number, the handler should not be able to process it
             _, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE)

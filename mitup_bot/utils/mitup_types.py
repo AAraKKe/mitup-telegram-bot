@@ -4,8 +4,7 @@ from collections.abc import Callable, Collection, Coroutine
 from typing import Any, TypeVar, Union
 
 from telegram import Update
-from telegram.ext import Application, CallbackContext, ExtBot
-from telegram.ext._utils.types import JQ
+from telegram.ext import Application, CallbackContext, ExtBot, JobQueue
 
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.monitoring import MitupMetricsEngine, MitupMetricsLogger
@@ -33,5 +32,6 @@ TMitupContext = MitupContext[ExtBot, MitupMetricsEngine[MitupMetricsLogger]]
 TMitupEngine = MitupMetricsEngine[MitupMetricsLogger]
 """Full type of the standard metrics engine"""
 
+JQ = TypeVar("JQ", bound=JobQueue | None)
 MitupApp = Application[ExtBot, TMitupContext, MitupUserData, dict, dict, JQ]
 """Standard application type for the MitupBot"""
