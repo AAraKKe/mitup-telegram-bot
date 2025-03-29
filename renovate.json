@@ -57,5 +57,8 @@
   ],
   "major": {
     "additionalBranchPrefix": "major-"
+  },
+  "pre-commit": {
+    "enabled": true
   }
 }
