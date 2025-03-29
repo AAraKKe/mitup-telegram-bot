@@ -12,7 +12,7 @@ The simplest way to donate is directly through the mitup bot using Telegram's bu
 
 ### PayPal Donations
 
-For those who prefer PayPal, we accept donations through our PayPal account. Visit our [PayPal donation page](https://paypal.me/mitupbot) to contribute.
+For those who prefer PayPal, we accept donations through our PayPal account. Visit our [PayPal donation page](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=3HJ8U8SZ9BAXE) to contribute.
 
 ### Future: Telegram Stars System
 
@@ -21,6 +21,7 @@ We're planning to implement a proper tier system leveraging Telegram Stars in th
 ## Where Your Money Goes
 
 All donations go directly toward:
+
 - Server and hosting costs
 - Development of new features
 - Maintenance and bug fixes

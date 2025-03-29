@@ -19,7 +19,8 @@ nav:
     - Being a supporter: collaborate/supporter.md
     - Donation: collaborate/donation.md
     - Become a Translator: collaborate/translator.md
-    - Code Contribution: collaborate/code-contributor.md
+    - Code Contribution:
+      - Introduction: collaborate/code-contributor.md
 theme:
   name: material
   custom_dir: docs/overrides
@@ -40,6 +41,7 @@ theme:
     - content.code.annotate
     - content.tooltips
     - navigation.footer
+    - content.code.copy
 markdown_extensions:
   - admonition
   - pymdownx.details

@@ -98,6 +98,9 @@ omit = [
     "__about__.py",
     # This does not impact the proper working of the bot
     "generate_stats.py",
+    # No need to cover the local tooling CLI for coverage
+    "setup_vscode.py",
+    "cli/commands/dev.py",
 ]
 exclude_also = [
     # Exclude protocol classes since they have no logic
@@ -232,6 +235,7 @@ update-source-language = "python -m mitup_bot.cli.run translations update"
 validate-locales = "python -m mitup_bot.cli.run translations validate-ids"
 build-locales = "python -m mitup_bot.cli.run translations build"
 update-locales = ["update-source-language", "build-locales"]
+set-local-bot = "python -m mitup_bot.cli.run dev {args:}"
 
 
 # ----------------------
