@@ -44,6 +44,8 @@ config-staging:
         - dev/docker/Dockerfile
         - dev/docker/Dockerfile.lambdas
         - pyproject.toml
+        - docs/**/*
+        - mkdocs.yml
 
 config-prod:
   extends: .aws-config
