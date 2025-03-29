@@ -20,7 +20,7 @@ nav:
     - Donation: collaborate/donation.md
     - Become a Translator: collaborate/translator.md
     - Code Contribution:
-      - Introduction: collaborate/code-contributor.md
+      - Setup: collaborate/code-contributor.md
 theme:
   name: material
   custom_dir: docs/overrides
@@ -57,6 +57,8 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tabbed:
+      alternate_style: true
 extra_css:
   - assets/stylesheets/main.css
 extra:

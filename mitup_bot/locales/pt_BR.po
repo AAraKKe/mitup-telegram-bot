@@ -529,4 +529,3 @@ msgstr "🇧🇷 Portuguese"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italian"
-
