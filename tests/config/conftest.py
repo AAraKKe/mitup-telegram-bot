@@ -9,7 +9,7 @@ from mitup_bot.config import ConfigMap
 @pytest.fixture
 def mock_toml_config(
     request: pytest.FixtureRequest,
-) -> Generator[tuple[mock.Mock, mock.Mock], None, None]:
+) -> Generator[tuple[mock.Mock, mock.Mock]]:
     """
     This fixture makes sure that in every test in this module we are not actuallyr eading any resources
     so our tests do not depend on what is or not stored on disk. This ensure the test is self-contained

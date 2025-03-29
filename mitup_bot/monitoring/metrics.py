@@ -171,13 +171,13 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
             await logger.flush()
 
     @contextmanager
-    def auto_flush(self) -> Generator["MitupMetricsEngine", None, None]:
+    def auto_flush(self) -> Generator["MitupMetricsEngine"]:
         """Context manager that allows using a logger and flush automatically from a synchronous context."""
         yield self
         asyncio.run(self.flush_metrics())
 
     @asynccontextmanager
-    async def async_auto_flush(self) -> AsyncGenerator["MitupMetricsEngine", None]:
+    async def async_auto_flush(self) -> AsyncGenerator["MitupMetricsEngine"]:
         """Async context manager that allows using a logger and flush automatically from an asynchronous context."""
         yield self
         await self.flush_metrics()

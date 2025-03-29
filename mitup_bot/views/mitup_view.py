@@ -146,7 +146,7 @@ class PaginatedMitupView(MitupView):
         last_button = min(len(self.buttons), first_button + self.page_size)
 
         button_in_page = self.buttons[first_button:last_button]
-        keyboard = [list(row) for row in batched(button_in_page, self.column_size)]
+        keyboard = [list(row) for row in batched(button_in_page, self.column_size, strict=False)]
         if self.position is not PaginatedViewPosition.UNIQUE:
             keyboard += [self.__match_navigation_button()]
 

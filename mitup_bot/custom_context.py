@@ -95,7 +95,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
 
     def __get_user_data_property[T: int | str | bool](
         self, context: ContextId, property: str, property_type: type[T], ensure_clean: bool
-    ) -> Generator[T, None, None]:
+    ) -> Generator[T]:
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""
         self.handler_metrics_logger.set_property("ContextId", context.value)
 
@@ -129,7 +129,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
             self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
 
     @contextmanager
-    def meeting_id(self, context: ContextId, ensure_clean=True) -> Generator[int, None, None]:
+    def meeting_id(self, context: ContextId, ensure_clean=True) -> Generator[int]:
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""
         yield from self.__get_user_data_property(context, "meeting_id", int, ensure_clean=ensure_clean)
 
@@ -264,7 +264,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         )
 
     @contextmanager
-    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None, None, None]:
+    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
         """
         Context manager that emits a Time metric measuring the time it takes the code inside the context to run.
 

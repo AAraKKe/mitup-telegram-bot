@@ -35,7 +35,7 @@ class MockApi:
 
     @classmethod
     @contextmanager
-    def start(cls, module_path: str) -> Generator["MockApi", None, None]:
+    def start(cls, module_path: str) -> Generator["MockApi"]:
         with (
             mock.patch(f"{module_path}.api.edit_message") as edit_patch,
             mock.patch(f"{module_path}.api.send_message") as send_patch,

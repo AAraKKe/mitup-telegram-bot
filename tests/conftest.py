@@ -34,7 +34,7 @@ def lang(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture
-def mock_session(db_config: DbConfig) -> Generator[MockDbSession, None, None]:
+def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
     """
     This fixture is used to patch the interaction with the database by
     patching the Session object and yielding the patch to later be configured in

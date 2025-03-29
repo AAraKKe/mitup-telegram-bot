@@ -73,7 +73,7 @@ class DeploymentContext:
     @contextmanager
     def setup_mock(
         self,
-    ) -> Generator[tuple[LambdaClient, ECSClient, Capture], None, None]:
+    ) -> Generator[tuple[LambdaClient, ECSClient, Capture]]:
         client_mapping = {
             "lambda": self.lambda_client,
             "ecs": self.ecs_client,

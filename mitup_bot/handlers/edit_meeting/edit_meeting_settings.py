@@ -45,7 +45,7 @@ async def toggle_meeting_setting(
     context: MitupContext,
     handler_id: EditMeetingHandlerId,
     callback_data: cb.CallbackData,
-) -> AsyncGenerator[Meetup | None, None]:
+) -> AsyncGenerator[Meetup | None]:
     user = guards.current_user(update, session)
 
     meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id

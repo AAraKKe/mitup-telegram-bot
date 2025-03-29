@@ -59,7 +59,7 @@ def configure_db(db_config: DbConfig, skip_if_initialized: bool = False) -> None
 
 
 @contextmanager
-def begin() -> Generator[Session, None, None]:
+def begin() -> Generator[Session]:
     if __sessionmaker is None:
         raise DbNotInitializedError()
 
