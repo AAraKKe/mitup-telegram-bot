@@ -3,16 +3,6 @@ This template is intended for structuring issues created via the Service Desk em
 The initial summary and description will likely come from the original request.
 -->
 
-<!-- This issue was automatically created via the Service Desk email address. -->
-
-**Reporter:** (GitLab will add the sender's email address here if configured)
-
----
-
-**Original Request:**
-
-(The content of the user's email will appear below this line)
-
 ---
 
 ### Maintainer Checklist
