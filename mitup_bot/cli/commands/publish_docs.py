@@ -1,6 +1,7 @@
 import os
 import subprocess
 from time import sleep
+from urllib.parse import urlparse
 
 import boto3
 import click
@@ -23,9 +24,14 @@ def s3_sync() -> list[str]:
     console().rule(f"Syncing files to {bucket}")
 
     command = ["aws", "s3", "sync", "site", bucket, "--delete", "--size-only", "--no-progress"]
-    outputs = subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
 
-    lines = list(outputs.decode().split("\n"))
+    # Check if the command failed
+    if process.returncode != 0:
+        raise RuntimeError(f"Failed to sync files to S3. Error: {stderr.decode().strip()}")
+
+    lines = list(stdout.decode().split("\n"))
 
     uploaded = []
     for line in lines:
@@ -33,7 +39,27 @@ def s3_sync() -> list[str]:
             # Avoid empty lines that can come with the logs
             continue
         console().print(line)
-        uploaded.append(line.replace("site/", "/").split()[1])
+
+        parts = line.split()
+        s3_uri = ""
+        if parts[0] == "upload:":
+            # e.g., "upload: site/foo.html to s3://bucket/foo.html" -> parts[3] is the s3 uri
+            s3_uri = parts[3]
+        elif parts[0] == "delete:":
+            # e.g., "delete: s3://bucket/bar.html" -> parts[1] is the s3 uri
+            s3_uri = parts[1]
+
+        if s3_uri:
+            # Parse the S3 URI and get the path component
+            parsed_uri = urlparse(s3_uri)
+            path = parsed_uri.path
+            if path:  # Only append if a path was actually found
+                uploaded.append(path)
+            else:
+                console().print(f"[yellow]Could not parse path from S3 URI:[/yellow] {s3_uri}")
+        else:
+            # Log unexpected lines if necessary, or just skip
+            console().print(f"[yellow]Skipping unexpected sync log line:[/yellow] {line}")
 
     return uploaded
 
@@ -51,7 +77,11 @@ def get_distribution_id(client: CloudFrontClient) -> str:
     distribution = distributions["DistributionList"].get("Items")
 
     if distribution is None:
-        error(f"No distributions found. Reponse: {distribution}")
+        error(f"No distributions found. Response: {distributions}")
+        console().print(distributions)
+        raise click.Abort()
+    elif not distribution:  # Check if the list is empty
+        error(f"No distributions found (empty list). Response: {distributions}")
         console().print(distributions)
         raise click.Abort()
 
