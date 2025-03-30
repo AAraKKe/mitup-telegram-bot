@@ -1,0 +1,21 @@
+---
+description: This rule specify how to run tests and get coverage
+globs: *py
+alwaysApply: false
+---
+# Running tests
+Tests are always run through a hatch command. All commands we run while developing are part of the `dev` environmen in hatch. To run tests:
+
+```bash
+hatch run dev:test {extra arguments}
+```
+
+
+# Command to run to check coverage
+If we want to check the coverage of a given test we run it with hatch command:
+
+```bash
+hatch run dev:test-cov {extra arguments}
+```
+
+This will output the coverage into the file `report.json` with the output of the coverage python package.

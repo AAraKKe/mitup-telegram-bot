@@ -1,0 +1,6 @@
+---
+description: Always validate docs after modifying the docs folder
+globs: docs
+alwaysApply: false
+---
+When modifying files in the doc folders, always run `hatch run dev:build-docs` to validate that the docs are building.
