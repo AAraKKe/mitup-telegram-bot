@@ -56,3 +56,18 @@ push-docs-production:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
+
+publish_docs_manual:
+  extends: .push-docs
+  stage: documentation
+  script:
+    - echo "Manually publishing documentation and invalidating entire cache..."
+    # Assuming push-docs is the correct command from the CLI file we modified earlier
+    - hatch run dev:push-docs --invalidate-all
+  needs: [build-docs] # Ensure docs are built first
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH' # Use default branch variable
+      when: manual
+      allow_failure: false
+  environment:
+    name: staging

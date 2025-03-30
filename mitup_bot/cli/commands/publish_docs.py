@@ -91,9 +91,15 @@ def get_distribution_id(client: CloudFrontClient) -> str:
 
 
 @click.command()
-def cli():
+@click.option(
+    "--invalidate-all",
+    is_flag=True,
+    default=False,
+    help="Invalidate the entire CloudFront cache (/*) instead of only updated files.",
+)
+def cli(invalidate_all: bool):
     """
-    This command invalidates the CloudFormation cache after files have been updated to s3.
+    This command synchronizes the 'site' directory to S3 and invalidates the CloudFront cache.
 
     The reason why we do not want to just invalidate the whole cache is because of costs. By having
     a command that invlidates only those files that have been updated, minimizing the number o paths
@@ -101,7 +107,8 @@ def cli():
     """
     docs_files_updated = s3_sync()
 
-    if docs_files_updated == []:
+    # Only exit early if we are NOT doing invalidate_all AND no files were updated
+    if not invalidate_all and not docs_files_updated:
         console().print("No files have been updated. No need to invalidate the cache.")
         return
 
@@ -111,12 +118,20 @@ def cli():
     client = boto3.client("cloudfront", region_name="us-east-1")
     distribution_id = get_distribution_id(client)
 
+    # Determine paths to invalidate
+    if invalidate_all:
+        console().print("[bold yellow]Invalidating entire cache (/*)[/bold yellow]")
+        paths_to_invalidate = ["/*"]
+    else:
+        paths_to_invalidate = docs_files_updated
+
+    # Build the invalidation request
     request = {
         "DistributionId": distribution_id,
         "InvalidationBatch": {
             "Paths": {
-                "Quantity": len(docs_files_updated),
-                "Items": docs_files_updated,
+                "Quantity": len(paths_to_invalidate),
+                "Items": paths_to_invalidate,
             },
             "CallerReference": f"mitup-ci-{os.environ['CI_COMMIT_SHORT_SHA']}",
         },

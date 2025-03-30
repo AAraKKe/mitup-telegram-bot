@@ -390,3 +390,132 @@ def test_s3_sync_unparseable_path(mock_popen: MagicMock, mock_console: MagicMock
     mock_popen.assert_called_once()
     # Assert that the warning message was printed
     mock_console().print.assert_any_call("[yellow]Could not parse path from S3 URI:[/yellow] s3://test.domain.com")
+
+
+@patch(f"{MODULE_PATH}.sleep", return_value=None)
+@patch(f"{MODULE_PATH}.success")
+@patch(f"{MODULE_PATH}.error")
+@patch(f"{MODULE_PATH}.console")
+@patch(f"{MODULE_PATH}.boto3.client")
+@patch(f"{MODULE_PATH}.s3_sync")
+def test_publish_docs_invalidate_all_success(
+    mock_s3_sync: MagicMock,
+    mock_boto_client: MagicMock,
+    mock_console: MagicMock,
+    mock_error: MagicMock,
+    mock_success: MagicMock,
+    mock_sleep: MagicMock,
+    runner: CliRunner,
+):
+    """Test the happy path using --invalidate-all flag."""
+    # s3_sync might return files or not, shouldn't matter for --invalidate-all
+    mock_s3_sync.return_value = ["/some/updated/file.html"]
+    mock_dist_id = "EXAMPLE_ALL_123"
+    mock_invalidation_id = "INVALIDATION_ALL_456"
+    mock_caller_ref = f"mitup-ci-{os.environ['CI_COMMIT_SHORT_SHA']}"
+
+    mock_cf_client = MagicMock()
+    mock_boto_client.return_value = mock_cf_client
+    mock_cf_client.list_distributions.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+        "DistributionList": {"Items": [{"Id": mock_dist_id}]},
+    }
+    mock_cf_client.create_invalidation.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 201},
+        "Invalidation": {"Id": mock_invalidation_id},
+    }
+    mock_cf_client.get_invalidation.side_effect = [
+        {
+            "ResponseMetadata": {"HTTPStatusCode": 200},
+            "Invalidation": {"Status": "InProgress", "Id": mock_invalidation_id},
+        },
+        {
+            "ResponseMetadata": {"HTTPStatusCode": 200},
+            "Invalidation": {"Status": "Completed", "Id": mock_invalidation_id},
+        },
+    ]
+
+    result = runner.invoke(publish_docs_cli, ["--invalidate-all"])
+
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    mock_s3_sync.assert_called_once()  # s3_sync should still be called
+    mock_boto_client.assert_called_once_with("cloudfront", region_name="us-east-1")
+    mock_cf_client.list_distributions.assert_called_once()
+
+    expected_invalidation_request = {
+        "DistributionId": mock_dist_id,
+        "InvalidationBatch": {
+            "Paths": {"Quantity": 1, "Items": ["/*"]},  # Check for wildcard invalidation
+            "CallerReference": mock_caller_ref,
+        },
+    }
+    mock_cf_client.create_invalidation.assert_called_once_with(**expected_invalidation_request)
+    mock_console().print.assert_any_call("[bold yellow]Invalidating entire cache (/*)[/bold yellow]")
+    assert mock_cf_client.get_invalidation.call_count == 2
+    mock_error.assert_not_called()
+    mock_success.assert_called_once_with("CloudFront cache has been invalidated")
+
+
+@patch(f"{MODULE_PATH}.sleep", return_value=None)
+@patch(f"{MODULE_PATH}.success")
+@patch(f"{MODULE_PATH}.error")
+@patch(f"{MODULE_PATH}.console")
+@patch(f"{MODULE_PATH}.boto3.client")
+@patch(f"{MODULE_PATH}.s3_sync")
+def test_publish_docs_invalidate_all_no_updates(
+    mock_s3_sync: MagicMock,
+    mock_boto_client: MagicMock,
+    mock_console: MagicMock,
+    mock_error: MagicMock,
+    mock_success: MagicMock,
+    mock_sleep: MagicMock,
+    runner: CliRunner,
+):
+    """Test --invalidate-all works even if s3_sync returns no updates."""
+    mock_s3_sync.return_value = []  # Simulate no file updates
+    mock_dist_id = "EXAMPLE_ALL_789"
+    mock_invalidation_id = "INVALIDATION_ALL_012"
+    mock_caller_ref = f"mitup-ci-{os.environ['CI_COMMIT_SHORT_SHA']}"
+
+    mock_cf_client = MagicMock()
+    mock_boto_client.return_value = mock_cf_client
+    mock_cf_client.list_distributions.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+        "DistributionList": {"Items": [{"Id": mock_dist_id}]},
+    }
+    mock_cf_client.create_invalidation.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 201},
+        "Invalidation": {"Id": mock_invalidation_id},
+    }
+    mock_cf_client.get_invalidation.side_effect = [
+        {
+            "ResponseMetadata": {"HTTPStatusCode": 200},
+            "Invalidation": {"Status": "InProgress", "Id": mock_invalidation_id},
+        },
+        {
+            "ResponseMetadata": {"HTTPStatusCode": 200},
+            "Invalidation": {"Status": "Completed", "Id": mock_invalidation_id},
+        },
+    ]
+
+    result = runner.invoke(publish_docs_cli, ["--invalidate-all"])
+
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    mock_s3_sync.assert_called_once()
+    # Should NOT have printed the "No files updated" message
+    assert mock_console().print.call_args_list != [call("No files have been updated. No need to invalidate the cache.")]
+    mock_boto_client.assert_called_once_with("cloudfront", region_name="us-east-1")
+    mock_cf_client.list_distributions.assert_called_once()
+
+    expected_invalidation_request = {
+        "DistributionId": mock_dist_id,
+        "InvalidationBatch": {
+            "Paths": {"Quantity": 1, "Items": ["/*"]},  # Still check for wildcard
+            "CallerReference": mock_caller_ref,
+        },
+    }
+    mock_cf_client.create_invalidation.assert_called_once_with(**expected_invalidation_request)
+    mock_console().print.assert_any_call("[bold yellow]Invalidating entire cache (/*)[/bold yellow]")
+    assert mock_cf_client.get_invalidation.call_count == 2
+    mock_error.assert_not_called()
+    mock_success.assert_called_once_with("CloudFront cache has been invalidated")
