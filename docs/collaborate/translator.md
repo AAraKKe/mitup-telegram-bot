@@ -1,10 +1,10 @@
-# Become a mitup Translator :globe_with_meridians:
+# Become a Mitup Translator :globe_with_meridians:
 
-Help make mitup accessible to more people around the world by contributing translations! Language barriers shouldn't prevent anyone from enjoying what mitup has to offer.
+Help make Mitup accessible to more people around the world by contributing translations! Language barriers shouldn't prevent anyone from enjoying what Mitup has to offer.
 
 ## Join Our Translation Community
 
-mitup is translated by our amazing community through Crowdin, a collaborative translation platform that makes contributing translations easy and enjoyable.
+Mitup is translated by our amazing community through Crowdin, a collaborative translation platform that makes contributing translations easy and enjoyable.
 
 ### How to Start Translating
 
@@ -26,8 +26,8 @@ When translating:
 
 ## Why Translations Matter
 
-Every new language we add makes mitup accessible to millions more potential users. Your contributions directly help grow the mitup community and make the service more inclusive.
+Every new language we add makes Mitup accessible to millions more potential users. Your contributions directly help grow the Mitup community and make the service more inclusive.
 
 If you have any questions about the translation process, feel free to join our [community chat](https://t.me/mitup_community) and ask!
 
-Thank you for helping make mitup a global service!
+Thank you for helping make Mitup a global service!

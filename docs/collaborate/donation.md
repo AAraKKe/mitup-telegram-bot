@@ -1,16 +1,16 @@
-# Supporting mitup Financially :moneybag:
+# Supporting Mitup Financially :moneybag:
 
-Thank you for considering a financial contribution to mitup! Your donations help us cover hosting costs, development time, and enable us to build new features.
+Thank you for considering a financial contribution to Mitup! Your donations help us cover hosting costs, development time, and enables us to build new features.
 
 ## Donation Options
 
-To access the donation options, first navigate to the Main Menu, then tap the *:heart: Collaborate*{.button-like} button. From there, you will find options to support the project financially.
+To access the donation options, first navigate to the Main Menu, then tap the *:heart: Collaborate*{.button-like} button. From there, you'll find options to support the project financially.
 
 We offer several convenient ways to support the project financially:
 
 ### Telegram Payments
 
-The simplest way to donate is directly through the mitup bot using Telegram's built-in payment system.
+The simplest way to donate is directly via the Mitup bot using Telegram's built-in payment system.
 
 ### PayPal Donations
 

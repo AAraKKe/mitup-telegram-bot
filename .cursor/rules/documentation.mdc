@@ -9,6 +9,7 @@ alwaysApply: false
 - Try to use emojis for conveying emotions. Mostly on headers and never withing paragraphs. Use the twimoji emojis instead of simple emojis, e.g. :pen: or :check_mark:
 - Whena adding examples, do not assume meeting only refers to business meetings. These refer to all types of meetings, mostly with friends. Add examples that showcase different situations.
 - When adding bullet points use `*` instead of `-` because some times they do not render properly.
+- Any new file should be named in snake_case.
 
 # Documentation
 Documenation files, under the `docs` folder, are served with mkdocs. The mkdocs config file in the root of the project is used to handle mkdocs configuraiton.

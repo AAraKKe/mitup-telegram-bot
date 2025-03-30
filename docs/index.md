@@ -17,7 +17,7 @@ hide:
 We know how hard it can be to organize anything with friends in a Telegram group with over 20-50 people. We have seen it all:
 
 ??? quote ":eye: **The Déjà vu**"
-    _If you are comming copy the message and add your name to the list!_
+    _If you are coming copy the message and add your name to the list!_
 
 ??? quote ":fontawesome-brands-meta:{.lg} **The group**"
     _Hey guys! We have created this group for the event, please join!_
@@ -28,7 +28,7 @@ We know how hard it can be to organize anything with friends in a Telegram group
 
 </div>
 
-Mitup Telegram Bot was born out of necessity when, back in 2014, we found how hard it was to organize an online game in a group with 120 people. Since then, tenths of thousands of users have used it to organize all kind of events with their friends in Telegram.
+Mitup Telegram Bot was born out of necessity when, back in 2014, we realized how hard it was to organize an online game in a group with 120 people. Since then, tens of thousands of users have used it to organize all kinds of events with their friends in Telegram.
 
 <div markdown>
 
@@ -38,12 +38,12 @@ Mitup Telegram Bot was born out of necessity when, back in 2014, we found how ha
 </div>
 ## Easy to use
 
-With [@mitupbot] there is no need to add the bot to your groups and annoy every one in it while the people going to the event interact with it.
+With [@mitupbot] there is no need to add the bot to your groups and annoy everyone in it while the people going to the event interact with it.
 
 * :lock: Interact with the bot in your own chat
-* :pen: Create a meeting a configure it the way you want it
-* :envelope: Share the meeting as a normal message to your group
-* :check_mark: Keep track of the people that have joined
+* :pen: Create a meeting and configure it the way you want it
+* :envelope: Share the meeting in your group as a normal message
+* :check_mark: Keep track of the people who have joined
 
 <figure markdown="span">
   ![Image title](assets/images/shared_meeting.png){ width="300" }

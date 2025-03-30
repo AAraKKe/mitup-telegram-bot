@@ -16,11 +16,11 @@ Mitup supports multiple languages, allowing you to use the bot in your preferred
 2. Tap *:symbols: Language*{.button-like}
 3. Select your preferred language from the list
 
-Once changed, all bot messages, buttons, and notifications will appear in your chosen language.
+Once set, all bot messages, buttons, and notifications will appear in your chosen language.
 
 ## Timezone Settings :clock2:
 
-Setting your correct timezone ensures that all meeting times display accurately for you.
+Setting the correct timezone ensures that all meeting times display accurately for you.
 
 **How to set your timezone:**
 
@@ -82,7 +82,7 @@ With this option, participants can add friends to the meeting even if those frie
 
 ### Incognito :spy:
 
-This privacy feature hides the participant list when your meeting is shared - only showing the total number of participants. As the creator, you'll still see the complete list of who has joined.
+This privacy feature hides the participant list when your meeting is shared, showing only the total number of participants. As the creator, you'll still see the complete list of who has joined.
 
 ### Show Timezone :world_map:
 

@@ -58,7 +58,7 @@ representative at an online or offline event.
 
 ## Communication Language
 
-To ensure clear communication and understanding among all contributors from different regions, **all communication in project issues, merge requests, and discussions should be conducted in English.** While the bot itself supports multiple languages, English serves as the common language for development collaboration.
+To ensure clear communication and understanding among all contributors across different regions, **all communication in project issues, merge requests, and discussions must be conducted in English.** While the bot itself supports multiple languages, English serves as the common language for development collaboration.
 
 ## Enforcement
 

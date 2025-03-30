@@ -1,6 +1,6 @@
 # Configure Your Meeting :gear:
 
-After creating a meeting, Mitup gives you a powerful set of tools to tailor it exactly to your needs. You can access these options right after creation or anytime later by navigating to the meeting and tapping the *:pencil2: Edit*{.button-like} button.
+After creating a meeting, Mitup provides a powerful set of tools to tailor it exactly to your needs. You can access these options right after creation or any time later by navigating to the meeting and tapping the *:pencil2: Edit*{.button-like} button.
 
 Here's a breakdown of what you can configure:
 
@@ -21,8 +21,8 @@ Tap the *:gear: Settings*{.button-like} button within the edit view to access th
 
 -   **Waiting List**: If you've set a maximum number of participants, enable this to allow users to join a waiting list when the meeting is full. They'll be automatically added if space becomes available.
 -   **Public**: (This feature might still be under development) Make your meeting discoverable by others.
--   **Allow Invitations**: Decide if participants can invite other people to the meeting.
--   **Incognito**: If enabled, the list of participants will be hidden from anyone who hasn't joined the meeting.
+-   **Allow Invitations**: Decide if participants can invite others to the meeting.
+-   **Incognito**: If enabled, the participant list will be hidden from anyone who hasn't joined.
 -   **Show Timezone**: Choose whether to display the meeting's timezone next to the scheduled date and time.
 
 Remember, you can always come back and adjust these settings as needed!
