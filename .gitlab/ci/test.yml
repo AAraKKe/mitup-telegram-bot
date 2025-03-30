@@ -39,6 +39,7 @@ test:
     # run only when the mitupbot, dev or tests folders are updated
     - changes:
       - mitup_bot/**/*
+      - pyproject.toml
       - dev/**/*
       - tests/**/*
 
