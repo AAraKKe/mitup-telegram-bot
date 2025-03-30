@@ -1,11 +1,9 @@
 {
     "recommendations": [
         "ms-python.python",
-        "kevinrose.vsc-python-indent",
-        "visualstudioexptteam.vscodeintellicode",
-        "njpwerner.autodocstring",
         "ms-python.isort",
         "rangav.vscode-thunder-client",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml"
     ]
 }
