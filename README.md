@@ -21,7 +21,7 @@ Check out the full **[Mitup Documentation Site](https://staging.mitup.social/)**
 We welcome contributions! Whether you want to fix a bug, propose a feature, improve the docs, or help with translations, your input is valuable.
 
 *   **[Contribution Guidelines](https://staging.mitup.social/collaborate/commiting-to-repo/):** Learn how to contribute code, follow our development process, and set up your environment.
-*   **[Code of Conduct](https://staging.mitup.social/collaborate/CODE_OF_CONDUCT/):** Please read and follow our community standards.
+*   **[Code of Conduct](https://staging.mitup.social/collaborate/code_of_conduct/):** Please read and follow our community standards.
 
 Looking for ways to contribute beyond code? Check out our [Being a Supporter guide](https://staging.mitup.social/collaborate/supporter/).
 

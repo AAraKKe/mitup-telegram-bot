@@ -21,10 +21,10 @@ nav:
     - Donation: collaborate/donation.md
     - Become a Translator: collaborate/translator.md
     - Code Contribution:
-      - Setup: collaborate/code-contributor.md
-      - Making contributions: collaborate/commiting-to-repo.md
-      - Local Validation: collaborate/local-validation.md
-    - Code of Conduct: collaborate/CODE_OF_CONDUCT.md
+      - Setup: collaborate/code_contributor.md
+      - Making contributions: collaborate/committing_to_repo.md
+      - Local Validation: collaborate/local_validation.md
+    - Code of Conduct: collaborate/code_of_conduct.md
 theme:
   name: material
   custom_dir: docs/overrides
