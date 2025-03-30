@@ -13,6 +13,10 @@ Documenation files, under the `docs` folder, are served with mkdocs. The mkdocs 
 
 Every time a new page is added to the documentation we need to ensure that it is added to the appropriate place in the mkdocs file to be accesible through the navigation in the docs site.
 
+# Linking non-doc files
+
+Any non documentation file should be linked with the full url of the Mitup repository pointing to the main branch. This is because the project files are not deployed with the documentation.
+
 # Heading
 When creating a heading (either through standard markdown heading or in bold to simulate a heading) allays have the heading surounded by blank lines to ensure that formatting is correct.
 

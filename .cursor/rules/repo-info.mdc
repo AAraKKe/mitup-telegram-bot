@@ -1,0 +1,10 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+## Information about the Mitup repo
+
+If at any point a link to the mitup repo needs to be added somehwere, the repo is located here: https://gitlab.com/meetupbot/mitup-telegram-bot. Any link needs to follow gitlab url rules, not githubs.
+
+If a quick link to a new issue wants to be added, use the issue templates under `.gitlab/issue_templates` to know which ones can be used and add it the link.

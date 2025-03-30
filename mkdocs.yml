@@ -21,6 +21,9 @@ nav:
     - Become a Translator: collaborate/translator.md
     - Code Contribution:
       - Setup: collaborate/code-contributor.md
+      - Making contributions: collaborate/commiting-to-repo.md
+      - Local Validation: collaborate/local-validation.md
+    - Code of Conduct: collaborate/CODE_OF_CONDUCT.md
 theme:
   name: material
   custom_dir: docs/overrides
