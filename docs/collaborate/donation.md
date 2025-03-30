@@ -4,11 +4,13 @@ Thank you for considering a financial contribution to mitup! Your donations help
 
 ## Donation Options
 
+To access the donation options, first navigate to the Main Menu, then tap the *:heart: Collaborate*{.button-like} button. From there, you will find options to support the project financially.
+
 We offer several convenient ways to support the project financially:
 
 ### Telegram Payments
 
-The simplest way to donate is directly through the mitup bot using Telegram's built-in payment system. Just use the `/donate` command when chatting with the bot and follow the instructions.
+The simplest way to donate is directly through the mitup bot using Telegram's built-in payment system.
 
 ### PayPal Donations
 
@@ -22,9 +24,9 @@ We're planning to implement a proper tier system leveraging Telegram Stars in th
 
 All donations go directly toward:
 
-- Server and hosting costs
-- Development of new features
-- Maintenance and bug fixes
-- Expanding bot capabilities
+* Server and hosting costs
+* Development of new features
+* Maintenance and bug fixes
+* Expanding bot capabilities
 
 Thank you for your generosity and support!

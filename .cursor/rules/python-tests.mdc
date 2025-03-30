@@ -1,8 +1,13 @@
 ---
-description: This rule specify how to run tests and get coverage
+description:
 globs: *py
 alwaysApply: false
 ---
+
+# Parameterizing tests
+
+When there are multiple tests that do basically the same thing, try combining them with a pytest parameterization to avoid code duplication.
+
 # Running tests
 Tests are always run through a hatch command. All commands we run while developing are part of the `dev` environmen in hatch. To run tests:
 

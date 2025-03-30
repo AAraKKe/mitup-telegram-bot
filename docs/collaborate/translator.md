@@ -18,10 +18,11 @@ No previous translation experience is required - just fluency in your target lan
 ## Translation Guidelines
 
 When translating:
-- Maintain the friendly tone of the original text
-- Preserve the meaning of the original message
-- Consider the context provided for each string
-- Be consistent with terminology throughout the translation
+
+* Maintain the friendly tone of the original text
+* Preserve the meaning of the original message
+* Consider the context provided for each string
+* Be consistent with terminology throughout the translation
 
 ## Why Translations Matter
 

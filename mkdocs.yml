@@ -6,12 +6,13 @@ exclude_docs: |
   hooks
 nav:
   - MitupBot: index.md
-  - How to use MitupBot?:
+  - User Guide:
     - Getting Started: user-guide/getting_started.md
     - Main Menu: user-guide/main_menu.md
     - Mitup Configuration: user-guide/configuration.md
     - Meetings:
       - Create a meeting: user-guide/create_meeting.md
+      - Configure a Meeting: user-guide/configure_meeting.md
       - Lifecycle of a Meeting: user-guide/meeting_lifecycle.md
   - FAQ:
     - Privacy: faq/privacy.md

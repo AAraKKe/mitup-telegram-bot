@@ -6,3 +6,25 @@
 img:not(.twemoji) {
     box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
 }
+
+/* Style for inline button-like elements */
+.button-like {
+    background-color: #e0e0e0;
+    /* Light grey background */
+    padding: 0.1em 0.4em;
+    /* Small padding */
+    border-radius: 4px;
+    /* Rounded corners */
+    border: 1px solid #cccccc;
+    /* Slightly darker border for contrast */
+    white-space: nowrap;
+    /* Prevent wrapping */
+}
+
+/* Adjust emoji position slightly within the button */
+.button-like .twemoji {
+    vertical-align: -0.15em;
+    /* Adjust vertical alignment */
+    margin-right: 0.1em;
+    /* Small space after emoji */
+}

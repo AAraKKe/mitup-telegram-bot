@@ -4,7 +4,7 @@ This guide explains all the settings available in Mitup and how to configure the
 
 ## Accessing Settings :wrench:
 
-To access your settings, open the Mitup bot in Telegram and navigate to the main menu. Tap the **Settings** button to view all available configuration options.
+To access your settings, open the Mitup bot in Telegram and navigate to the main menu. Tap the *:gear: Settings*{.button-like} button to view all available configuration options.
 
 ## Language Settings :earth_americas:
 
@@ -13,7 +13,7 @@ Mitup supports multiple languages, allowing you to use the bot in your preferred
 **How to change language:**
 
 1. Go to Settings
-2. Tap **Language**
+2. Tap *:symbols: Language*{.button-like}
 3. Select your preferred language from the list
 
 Once changed, all bot messages, buttons, and notifications will appear in your chosen language.
@@ -25,7 +25,7 @@ Setting your correct timezone ensures that all meeting times display accurately 
 **How to set your timezone:**
 
 1. Go to Settings
-2. Tap **Timezone**
+2. Tap *:globe_with_meridians: Timezone*{.button-like}
 3. You can set your timezone in two ways:
     * Send a text message with your city or location name
     * Share your current location using Telegram's location feature
@@ -39,7 +39,7 @@ Mitup can send reminders before your meetings start so you don't miss them.
 **How to configure notifications:**
 
 1. Go to Settings
-2. Tap **Notifications**
+2. Tap *:alarm_clock: Notifications*{.button-like}
 3. You'll see two options:
     * **Enable/Disable**: Toggle notifications on or off
     * **Notification Time**: Set how many minutes before a meeting you want to be notified
@@ -53,7 +53,7 @@ The timeout setting determines how long a meeting remains active in your list af
 **How to set timeout:**
 
 1. Go to Settings
-2. Tap **Timeout**
+2. Tap *:hourglass_flowing_sand: Timeout*{.button-like}
 3. Enter the number of minutes you want meetings to remain active after they end
 
 When the timeout period expires, meetings automatically move to your past meetings list. You can always reactivate past meetings if needed.
@@ -65,7 +65,7 @@ These settings determine the default configuration for new meetings you create. 
 **How to configure default meeting options:**
 
 1. Go to Settings
-2. Tap **Default Options**
+2. Tap *:busts_in_silhouette: Default Options*{.button-like}
 3. Toggle each option according to your preference:
 
 ### Waiting List :raised_hand:
@@ -95,9 +95,9 @@ Privacy settings help you control your personal information within Mitup.
 **How to access privacy settings:**
 
 1. Go to Settings
-2. Tap **Privacy**
+2. Tap *:shield: Privacy*{.button-like}
 3. Adjust the available options according to your preference
 
 ---
 
-You can modify these settings at any time through the Settings menu in the Mitup bot. If you have questions or need assistance, use the Help option from the main menu.
+You can modify these settings at any time through the Settings menu in the Mitup bot. If you have questions or need assistance, use the *:question: Help*{.button-like} option from the main menu.
