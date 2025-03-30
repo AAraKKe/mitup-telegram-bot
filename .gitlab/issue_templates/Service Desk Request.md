@@ -13,4 +13,4 @@ The initial summary and description will likely come from the original request.
 *   [ ] Assign appropriate maintainer(s)
 *   [ ] Update issue title for clarity if needed
 
-/label ~"Service Desk" ~"support" ~"needs-triage"
+/label ~"type::service-desk" ~"state::triage-needed"
