@@ -1,16 +1,20 @@
-## Erroneous translation
+## Language
+
+<!-- Specify the language this translation issue applies to (e.g., Spanish, German). -->
+
+## Translation Issue Description
+
 <!--
-Specify the text that is wrongly translated. Include other information such as
-- Where is this found
-- Whether there is any specific action that triggers it
+Describe the translation issue. Please specify:
+- The text that is currently wrong OR the English text that is missing a translation.
+- Where this text is found in the bot/interface.
+- Any specific action that triggers showing this text.
 -->
 
-## Proposed translation fix
+## Suggested Translation
+
 <!--
-What would be the appropriate translation? Feel free to provide some context as to better
-understand why this translation would be better than the existing one
+What should the correct or new translation be? Feel free to provide context if it helps understand the nuance.
 -->
-
-
 
 /labels ~"type::bug" ~"scope::translations" ~"state::discussion"
