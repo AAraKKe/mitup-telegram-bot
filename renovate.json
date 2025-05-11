@@ -56,7 +56,9 @@
     },
     {
       "matchFileNames": [".pre-commit-config.yaml"],
-      "autoApprove": true
+      "autoApprove": true,
+      "reviewers": [],
+      "automerge": true
     }
   ],
   "major": {
