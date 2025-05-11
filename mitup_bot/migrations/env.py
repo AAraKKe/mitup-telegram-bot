@@ -3,8 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from mitup_bot.cli.options import Env
-from mitup_bot.config import Config, EnvVariablesConfigProvider, TomlConfigProvider
+from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.models import users
 
 # this is the Alembic Config object, which provides
