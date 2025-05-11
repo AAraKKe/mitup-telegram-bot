@@ -53,6 +53,10 @@
       "matchPackageNames": ["ruff", "pyright"],
       "matchUpdateTypes": ["patch"],
       "enabled": false
+    },
+    {
+      "matchFileNames": [".pre-commit-config.yaml"],
+      "autoApprove": true
     }
   ],
   "major": {
