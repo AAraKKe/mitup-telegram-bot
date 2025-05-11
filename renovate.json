@@ -2,14 +2,11 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    ":semanticCommitsDisabled"
+    ":semanticCommitsDisabled",
+    ":disableDependencyDashboard"
   ],
   "reviewers": [
     "@jparaque"
-  ],
-  "dependencyDashboardAutoclose": true,
-  "dependencyDashboardLabels": [
-    "type::dependency-upgrade"
   ],
   "commitMessagePrefix": "🚀 update:",
   "labels": [

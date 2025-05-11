@@ -1,49 +1,49 @@
 additional_commit_types:
-  feat:
+  Feat:
     description: Introduce new features.
     emoji: ✨
-  fix:
+  Fix:
     description: Fix a bug.
     emoji: 🐛
-  docs:
+  Docs:
     description: Add or update documentation.
     emoji: 📚
-  style:
+  Style:
     description: Improve code style without affecting functionality.
     emoji: 💎
-  refactor:
+  Refactor:
     description: Refactor code without changing functionality.
     emoji: 🧹
-  perf:
+  Perf:
     description: Improve performance.
     emoji: 🚀
-  test:
+  Test:
     description: Add or update tests.
     emoji: 🧪
-  infra:
+  Infra:
     description: Infrastructure changes.
     emoji: 🏗️
-  ci:
+  CI:
     description: Continuous Integration changes.
     emoji: 👷
-  chore:
+  Chore:
     description: Other changes that don't modify src or test files.
     emoji: ♻️
-  revert:
+  Revert:
     description: Revert changes.
     emoji: ⏪
-  merge:
+  Merge:
     description: Merge branches.
     emoji: 🔀
-  update:
+  Update:
     description: Update dependencies or other changes.
     emoji: 🚀
-  monitoring:
+  Monitoring:
     description: Add or update monitoring.
     emoji: 📈
-  wip:
+  WIP:
     description: Work in progress.
-    emoji: ⏳
-  translations:
+    emoji: 🚧
+  Translations:
     description: Translations updates.
     emoji: 🗣️
