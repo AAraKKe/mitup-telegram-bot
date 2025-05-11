@@ -3,8 +3,7 @@ from unittest import mock
 import pytest
 
 from mitup_bot import environments
-from mitup_bot.cli.options import Env
-from mitup_bot.config import TomlConfigProvider
+from mitup_bot.config import Env, TomlConfigProvider
 
 TOML_CONTENT = """
 [table1]

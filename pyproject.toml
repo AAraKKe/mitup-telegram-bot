@@ -17,7 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "python-telegram-bot[ext]==22.0",
-    "click~=8.0",
+    "click~=8.2.0",
     "python-dateutil",
     "sqlalchemy~=2.0.25",
     "psycopg2~=2.9",

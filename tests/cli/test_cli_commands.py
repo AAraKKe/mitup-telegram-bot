@@ -35,3 +35,6 @@ def test_cli_commands_loads_commands_properly(command_name: str, dummy_context: 
     # The name of the command create is always cli, as that is the name of the method
     # even if we interact with them with the proper name
     assert command.name == "cli"
+
+
+expected_command_names()

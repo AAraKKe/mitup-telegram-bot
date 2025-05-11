@@ -21,7 +21,7 @@ def command_to_file(name: str) -> str:
     return format(name, to_command=False)
 
 
-class MitupCliCommand(click.MultiCommand):
+class MitupCliCommand(click.Group):
     def list_commands(self, ctx: click.Context) -> list[str]:
         # The list of command names supported is obtained from the filename
         # of any python code in the commands folder

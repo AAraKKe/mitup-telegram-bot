@@ -1,6 +1,8 @@
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Protocol
 from unittest import mock
 
+from click.testing import Result
 from telegram.ext import Application
 
 from mitup_bot.custom_context import MitupContext, MitupUserData
@@ -23,3 +25,9 @@ class AnyFloat(float):
 
     def __eq__(self, other: Any) -> bool:
         return True
+
+
+class CliRunner(Protocol):
+    def __call__(
+        self, args: str | None = None, input: str | None = None, env: Mapping[str, str] | None = None
+    ) -> Result: ...

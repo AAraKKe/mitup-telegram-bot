@@ -4,8 +4,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import URL
 
-from mitup_bot.cli.options import Env
-from mitup_bot.config import Config, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
+from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 
 TOML_CONTENT = """
 [db]

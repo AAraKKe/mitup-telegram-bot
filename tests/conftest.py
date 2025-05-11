@@ -1,20 +1,24 @@
 import datetime as dt
-from collections.abc import Generator
+import os
+from collections.abc import Generator, Mapping
 from unittest import mock
 
 import pytest
+from click.testing import CliRunner, Result
 from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, MessageEntity, Update, User
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot import db
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.cli.cli_commands import MitupCliCommand
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring.metrics import configure_metrics
 from mitup_bot.translations import SUPPORTED_LANGUAGES
+from tests.helpers import CliRunner as TypeRunner
 from tests.helpers import HandlerContext, UpdateRequest, build_context, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
@@ -234,6 +238,20 @@ def app() -> Application:
 
 
 @pytest.fixture
+def cli() -> TypeRunner:
+    def wrapper(
+        args: str | None = None,
+        input: str | None = None,
+        env: Mapping[str, str] | None = None,
+    ) -> Result:
+        command = MitupCliCommand(no_args_is_help=True)
+        runner = CliRunner()
+        return runner.invoke(command, args=args, env=env, input=input)
+
+    return wrapper
+
+
+@pytest.fixture
 def context(app: Application, update: Update) -> MitupContext:
     return build_context(update, app)
 
@@ -247,3 +265,30 @@ def configure_test_metrics():
 @pytest.fixture
 def handler_context(update: Update, app: Application) -> HandlerContext:
     return HandlerContext(update=update, app=app)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def test_env():
+    """
+    Fixture that sets up test-specific environment variables.
+    These variables will be available during test execution only.
+    """
+    # Store original environment variables
+    original_env = dict(os.environ)
+
+    # Set test-specific environment variables
+    test_env_vars = {
+        "TEST_DATABASE_URL": "postgresql://test:test@localhost:5432/test_db",
+        "TEST_TELEGRAM_BOT_TOKEN": "test_token_123",
+        "TEST_METRICS_ENABLED": "false",
+        "TEST_ENVIRONMENT": "test",
+    }
+
+    # Update environment with test variables
+    os.environ.update(test_env_vars)
+
+    yield
+
+    # Restore original environment variables
+    os.environ.clear()
+    os.environ.update(original_env)

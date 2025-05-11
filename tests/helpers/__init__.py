@@ -1,5 +1,6 @@
 __all__ = [
     "AnyFloat",
+    "CliRunner",
     "StubMitupApp",
     "StubMitupContext",
     "DEFAULT_CURRENT_MESSAGE",
@@ -21,7 +22,7 @@ __all__ = [
     "telegram_user_from_user",
 ]
 
-from .types import AnyFloat, StubMitupApp, StubMitupContext, DEFAULT_CURRENT_MESSAGE
+from .types import AnyFloat, StubMitupApp, StubMitupContext, DEFAULT_CURRENT_MESSAGE, CliRunner
 from .monitoring import StubMetrics, StubMetricsEngine
 from .context import build_context, call_handler
 from .api import MockApi

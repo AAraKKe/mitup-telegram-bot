@@ -10,8 +10,7 @@ from telegram import constants
 from telegram.ext import AIORateLimiter, Application, ContextTypes, Defaults
 
 from mitup_bot import db, timezone_api
-from mitup_bot.cli.options import Env
-from mitup_bot.config import Config, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
+from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.monitoring.metrics import configure_metrics

@@ -13,11 +13,17 @@ from typing import Protocol
 from pydantic import BaseModel, SecretStr
 from sqlalchemy import URL
 
-from mitup_bot.cli.options import Env
-
 from . import environments
 
 ConfigMap = dict[str, dict[str, str | int | bool | float]]
+
+
+class Env(StrEnum):
+    DEV = auto()
+    PROD = auto()
+    # Sample environment to ensure config values even though
+    # they are not real
+    SAMPLE = auto()
 
 
 class MetricsEnv(StrEnum):

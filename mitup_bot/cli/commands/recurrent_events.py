@@ -14,7 +14,6 @@ from telegram.ext import AIORateLimiter, Defaults, ExtBot
 
 from mitup_bot import db
 from mitup_bot.cli import generate_stats, notify_meetings, user_cleanup
-from mitup_bot.cli.options import EnumChoice
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.monitoring.metrics import MetricKey, MitupMetricsLogger, configure_metrics
 
@@ -43,8 +42,8 @@ class IntervalsConfiguration:
                 return self.notify_start_meeting
             case EventType.GENERATE_STATS:
                 return self.generate_stats
-            case _:
-                assert_never()
+            case never:
+                assert_never(never)
 
 
 class MaintainanceEvent(BaseModel):
@@ -68,8 +67,8 @@ async def launch_event(event: MaintainanceEvent, bot: ExtBot, metrics: MitupMetr
             await notify_meetings.run(bot, metrics)
         case EventType.GENERATE_STATS:
             generate_stats.run(bot, metrics)
-        case _:
-            assert_never()
+        case never:
+            assert_never(never)
 
 
 async def handle_maintainance(event: MaintainanceEvent) -> None:
@@ -148,7 +147,7 @@ async def run_all_tasks(intervals: IntervalsConfiguration, env: Env, start_time:
 @click.option(
     "--env",
     default=Env.DEV,
-    type=EnumChoice(Env),
+    type=click.Choice(Env, case_sensitive=False),
     help="Environment to execute the command with",
     show_default=True,
 )
