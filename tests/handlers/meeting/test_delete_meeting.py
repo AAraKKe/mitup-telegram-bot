@@ -6,7 +6,7 @@ from telegram import Update
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
-from mitup_bot.handlers.callback_query import CallbackQueryId
+from mitup_bot.handlers.meeting import MeetingHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
@@ -18,7 +18,7 @@ from tests.helpers.stub_db import MockDbSession
 
 @pytest.fixture
 def api():
-    with MockApi.start("mitup_bot.handlers.callback_query") as api:
+    with MockApi.start("mitup_bot.handlers.meeting.delete_meeting") as api:
         yield api
 
 
@@ -65,7 +65,7 @@ async def test_delete_meeting_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(update, app, CallbackQueryId.DELETE_MEETING)
+    context, _ = await call_handler(update, app, MeetingHandlerId.DELETE_MEETING_CALLBACK)
 
     mock_session.assert_not_deleted()
     api.assert_send_message_called(
@@ -94,17 +94,17 @@ async def test_delete_meeting_works(
     [
         (
             (UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(999))),
-            CallbackQueryId.DELETE_MEETING,
+            MeetingHandlerId.DELETE_MEETING_CALLBACK,
             "Delete meeting",
         ),
         (
             (UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(999))),
-            CallbackQueryId.CONFIRM_DELETE_MEETING,
+            MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK,
             "Confirm delete meeting",
         ),
         (
             (UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(999))),
-            CallbackQueryId.DECLINE_DELETE_MEETING,
+            MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
             "Decline delete meeting",
         ),
     ],
@@ -114,7 +114,7 @@ async def test_delete_meeting_works(
 async def test_delete_meeting_buttons_fails_without_existing_meeting(
     mock_session: MockDbSession,
     update: Update,
-    handler_id: CallbackQueryId,
+    handler_id: MeetingHandlerId,
     action: str,
     user_with_settings: User,
     app: StubMitupApp,
@@ -151,17 +151,17 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     [
         (
             (UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(111))),
-            CallbackQueryId.DELETE_MEETING,
+            MeetingHandlerId.DELETE_MEETING_CALLBACK,
             "Delete meeting",
         ),
         (
             (UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(111))),
-            CallbackQueryId.CONFIRM_DELETE_MEETING,
+            MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK,
             "Confirm delete meeting",
         ),
         (
             (UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(111))),
-            CallbackQueryId.DECLINE_DELETE_MEETING,
+            MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
             "Decline delete meeting",
         ),
     ],
@@ -171,7 +171,7 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
 async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to_user(
     mock_session: MockDbSession,
     update: Update,
-    handler_id: CallbackQueryId,
+    handler_id: MeetingHandlerId,
     action: str,
     user_with_settings: User,
     app: StubMitupApp,
@@ -205,7 +205,7 @@ async def test_confirm_delete_meeting_works(
     meeting_deleted = user_with_settings.meetups[0]
     mock_session.add_object(meeting_deleted)
 
-    context, _ = await call_handler(update, app, CallbackQueryId.CONFIRM_DELETE_MEETING)
+    context, _ = await call_handler(update, app, MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK)
 
     mock_session.assert_deleted(meeting_deleted)
 
@@ -235,7 +235,7 @@ async def test_decline_delete_meeting_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(update, app, CallbackQueryId.DECLINE_DELETE_MEETING)
+    context, _ = await call_handler(update, app, MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK)
 
     mock_session.assert_not_deleted()
     api.assert_edit_message_called(
@@ -265,7 +265,7 @@ async def test_delete_meeting_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, CallbackQueryId.DELETE_MEETING)
+    context, _ = await call_handler(update, app, MeetingHandlerId.DELETE_MEETING_CALLBACK)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -288,7 +288,7 @@ async def test_confirm_delete_meeting_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, CallbackQueryId.CONFIRM_DELETE_MEETING)
+    context, _ = await call_handler(update, app, MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -311,6 +311,6 @@ async def test_decline_delete_meeting_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, CallbackQueryId.DECLINE_DELETE_MEETING)
+    context, _ = await call_handler(update, app, MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK)
 
     assert_metrics_for_failure(1, error_type, context)

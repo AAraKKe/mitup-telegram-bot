@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2024-12-08 19:48\n"
+"PO-Revision-Date: 2025-05-15 15:51\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -226,6 +226,9 @@ msgstr "Lets create a meeting. What is the title?"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
 msgstr "A meeting has been created with the title: *${title}*\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
+
+msgid "MeetingMessages.INVALID_TITLE"
+msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on *Cancel*."
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Created by: ${owner}"

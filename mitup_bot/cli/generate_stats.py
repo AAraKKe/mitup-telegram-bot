@@ -1,15 +1,10 @@
 from aws_embedded_metrics.unit import Unit
-from sqlmodel import Integer, Session, and_, cast, distinct, func, null, select, true
-from sqlmodel.sql.expression import SelectOfScalar
+from sqlmodel import Integer, Session, cast, distinct, func, null, select
 from telegram.ext import ExtBot
 
 from mitup_bot.db import with_session
 from mitup_bot.models import Meetup, Message, Settings, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
-
-UNIQUE_USERS_STATEMENT: SelectOfScalar[User] = select(func.sum(User.is_active).label("active_users")).where(
-    and_(User.is_active == true())
-)
 
 
 def users_stats(session: Session, metrics: MitupMetricsLogger):

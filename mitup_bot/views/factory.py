@@ -78,7 +78,7 @@ def create_meeting_view(lang: str, message: str | None = None) -> MitupView:
         message or MeetingMessages.CREATE.get(lang=lang),
         [
             [
-                ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=cb.CANCEL_MEETING),
+                ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=cb.CANCEL_CREATE_MEETING),
             ],
         ],
     )

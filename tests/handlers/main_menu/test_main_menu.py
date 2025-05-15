@@ -1,4 +1,3 @@
-import logging
 import re
 
 import pytest
@@ -6,16 +5,17 @@ from telegram import Update
 
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.handlers.callback_query import (
-    CallbackQueryId,
+from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
+from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId  # For call_handler with SHOW_MEETINGS_CALLBACK
+from mitup_bot.handlers.main_menu.show_active_meetings import callback_query_show_meetings
+
+# Updated imports for handlers and enums:
+from mitup_bot.handlers.main_menu.show_main_menu import callback_query_main_menu
+from mitup_bot.handlers.meeting.create_meeting import (
+    ConversationMeetingState,  # For create_meeting context
     callback_query_cancel_meeting,
     callback_query_create_meeting,
-    callback_query_main_menu,
-    callback_query_show_meeting,
-    callback_query_show_meetings,
 )
-from mitup_bot.handlers.conversations_states import ConversationMeetingState
-from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingMessages
@@ -25,6 +25,12 @@ from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
+
+
+@pytest.fixture
+def api():
+    with MockApi.start("mitup_bot.handlers.main_menu.show_main_menu") as api:
+        yield api
 
 
 async def test_callback_query_settings_is_called_with_settings_view(
@@ -47,7 +53,7 @@ async def test_callback_query_show_main_menu(
     api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
-async def test_callback_query_cancel_meeting_calls_to_current_view(
+async def test_callback_query_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
     update: Update,
     context: StubMitupContext,
     api: MockApi,
@@ -55,10 +61,10 @@ async def test_callback_query_cancel_meeting_calls_to_current_view(
     mock_session: MockDbSession,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    match = re.match(cb.CANCEL_MEETING.pattern, str(cb.CANCEL_MEETING))
+    match = re.match(cb.CANCEL_CREATE_MEETING.pattern, str(cb.CANCEL_CREATE_MEETING))
     assert match is not None
 
-    context.matches = [match]
+    context.matches = [match]  # callback_query_cancel_meeting might rely on context.match
 
     await callback_query_cancel_meeting(update, context)
     await context.flush_metrics()
@@ -68,7 +74,7 @@ async def test_callback_query_cancel_meeting_calls_to_current_view(
         names=["Cancel"],
         values=[1],
         dimensions={"Feature": Feature.CREATE_MEETING},
-        add_handler_dimensions=False,
+        add_handler_dimensions=False,  # Assuming this was intentional
     )
 
 
@@ -100,69 +106,17 @@ async def test_callback_query_create_meeting_return_the_correct_state(
     assert result == ConversationMeetingState.TITLE
 
 
-@pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1))]), indirect=True)
-async def test_callback_query_show_meeting_calls_to_meeting_view_when_meeting_is_set(
-    mock_session: MockDbSession,
-    update: Update,
-    app: StubMitupApp,
-    user_with_settings: User,
-    api: MockApi,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(user_with_settings.meetups[0])
-
-    context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETING)
-
-    expected_view = user_with_settings.meetups[0].main_view
-    api.assert_edit_message_called(context, update, expected_view)
-
-
-async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
-    mock_session: MockDbSession,
+async def test_callback_query_show_meetings_fails_without_callback_query_data(
+    mock_session: MockDbSession,  # Added mock_session as it's a common fixture
     update: Update,
     context: StubMitupContext,
-    caplog: pytest.LogCaptureFixture,
-    user_with_settings: User,
 ):
-    caplog.set_level(logging.WARNING)
-
-    match = re.match(cb.SHOW_MEETING.pattern, "show;meeting:4")
-    assert match is not None
-
-    context.matches = [match]
-    mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(create_meetup(4))
-
-    await callback_query_show_meeting(update, context)
-
-    assert (
-        "User tried 'Show meeting' with a meeting that does not belong to them. Meeting id: 4, user id: 1"
-        in caplog.text
-    )
-
-
-@pytest.mark.parametrize(
-    "method, callback_data_pattern, expected",
-    [
-        (callback_query_show_meeting, cb.SHOW_MEETING.pattern, "show;meeting:"),
-        (callback_query_show_meetings, cb.SHOW_ACTIVE_MEETING_PAGE.pattern, "show;active_meeting_page:"),
-    ],
-    ids=["SHOW_MEETING", "SHOW_ACTIVE_MEETING_PAGE"],
-)
-async def test_callback_query_show_meeting_fails_without_callback_query_data(
-    mock_session: MockDbSession,
-    update: Update,
-    context: StubMitupContext,
-    method,
-    callback_data_pattern: str,
-    expected: str,
-):
-    match = re.match(callback_data_pattern, expected)
+    match = re.match(cb.SHOW_ACTIVE_MEETING_PAGE.pattern, "show;active_meeting_page:")
     assert match is not None
 
     context.matches = [match]
     with pytest.raises(MalformedCallbackData):
-        await method(update, context)
+        await callback_query_show_meetings(update, context)
 
 
 async def test_callback_query_show_meetings_use_correct_view(
@@ -215,11 +169,13 @@ async def test_callback_query_show_meetings_without_meetings_to_show_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     user_with_settings.meetups = []
 
-    context, _ = await call_handler(update, app, CallbackQueryId.SHOW_MEETINGS)
+    # Use MainMenuHandlerId for call_handler
+    context, _ = await call_handler(update, app, MainMenuHandlerId.SHOW_MEETINGS_CALLBACK)
 
     expected_view = factory.main_menu_view(
         MeetingMessages.NO_MEETINGS_FOUND.get(
-            new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang)
+            lang=user_with_settings.lang,  # ensure lang is passed
+            new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang),
         )
     )
 
@@ -234,6 +190,7 @@ async def test_callback_query_main_menu_delete_user_data_related_with_edit_meeti
     assert context.user_data is not None
 
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
+    # Accessing registry directly might be an issue if internal structure changes, but following original test
     assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
 
     await callback_query_main_menu(update, context)

@@ -1,13 +1,12 @@
-from typing import cast
 from unittest import mock
 
 import pytest
-from telegram import Message, Update
+from telegram import Update
 
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handlers.edit_meeting.edit_meeting_description import edit_description_meeting_message_handler
 from mitup_bot.handlers.edit_meeting.edit_meeting_title import edit_title_meeting_message_handler
-from mitup_bot.handlers.messages import create_meeting_message_handler, filter_messages_without_text
+from mitup_bot.handlers.messages import filter_messages_without_text
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import factory
@@ -30,50 +29,6 @@ async def test_filter_messages_without_text_handler_with_correct_view(
 
     api.assert_send_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
     assert result == -1
-
-
-@pytest.mark.parametrize("update", ([UpdateRequest(message_text="A new meeting is born!")]), indirect=True)
-async def test_create_meeting_message_handler_creates_a_new_meeting_and_send_correct_view(
-    mock_session: MockDbSession,
-    update: Update,
-    context: StubMitupContext,
-    user_with_settings: User,
-    api: MockApi,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-    assert len(user_with_settings.meetups) == 2
-
-    # Set default meetings settings on user's settings
-    user_with_settings.settings.default_waiting_list = True
-    user_with_settings.settings.default_public = True
-    user_with_settings.settings.default_allow_invitation = False
-    user_with_settings.settings.default_incognito = True
-    user_with_settings.settings.default_show_timezone = False
-
-    def flush():
-        # We flush after having added the meetup
-        assert len(user_with_settings.meetups) > 0, "Flush is being called without having adding a meeting first"
-        user_with_settings.meetups[2].id = 3
-
-    # Mimic flush behaviour
-    mock_session.flush.side_effect = flush
-
-    await create_meeting_message_handler(update, context)
-
-    assert len(user_with_settings.meetups) == 3
-
-    new_meeting = user_with_settings.meetups[2]
-    mock_session.assert_added(new_meeting)
-    mock_session.assert_flushed()
-    assert new_meeting.title == "A new meeting is born!"
-    assert new_meeting.waiting_list is True
-    assert new_meeting.public is True
-    assert new_meeting.allow_invitation is False
-    assert new_meeting.incognito is True
-    assert new_meeting.show_timezone is False
-
-    message = MeetingMessages.CREATED_SUCCESS.get(title=cast(Message, update.effective_message).text)
-    api.assert_send_message_called(context, update, new_meeting.edit_view.with_context(message))
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)

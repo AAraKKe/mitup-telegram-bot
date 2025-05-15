@@ -8,7 +8,6 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import api, guards, timezone_api, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
-from mitup_bot.handlers.commands import CommandsId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
@@ -122,5 +121,5 @@ HandlersRegistry.register_conversation_handler(
             EditSettingsHandlerId.CANCEL,
         ],
     },
-    fallbacks=[CommandsId.CANCEL],
+    fallbacks=[],
 )

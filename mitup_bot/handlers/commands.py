@@ -2,7 +2,6 @@ from enum import auto
 
 from sqlmodel import Session
 from telegram import Update
-from telegram.ext import ConversationHandler
 
 from mitup_bot import api, guards, views
 from mitup_bot.callback_id import CallbackId
@@ -15,7 +14,6 @@ from .registry import HandlersRegistry
 
 class CommandsId(CallbackId):
     START_WITH_EXISTING_USER = auto()
-    CANCEL = auto()
     MAIN_MENU = auto()
 
 
@@ -35,10 +33,3 @@ async def command_start_with_existing_user(session: Session, update: Update, con
 @HandlersRegistry.register_command(CommandsId.MAIN_MENU, command="main_menu")
 async def command_go_to_main_menu(update: Update, context: MitupContext):
     await command_start_with_existing_user(update, context)
-
-
-@HandlersRegistry.register_command(CommandsId.CANCEL, command="cancel", bindable=False)
-async def command_cancel(update: Update, context: MitupContext):
-    await command_start_with_existing_user(update, context)
-
-    return ConversationHandler.END

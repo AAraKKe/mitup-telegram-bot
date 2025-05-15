@@ -214,6 +214,10 @@ class MeetingMessages(MessageBase):
         "The information which has not been added won't be shown when the meeting is shared.\n\n"
         f"When finished click on {Emojis.CHECK} Done"
     )
+    INVALID_TITLE = (
+        f"I did not recognize what you sent as a valid title {Emojis.THINK}.\n\n"
+        "Send a message with the title of the meeting or click on *Cancel*."
+    )
 
     # Meeting information
     CREATED_BY = "Created by: ${owner}"

@@ -9,7 +9,6 @@ from mitup_bot import api, guards, timezone_api
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import EffectiveUserNotSet
-from mitup_bot.handlers.commands import CommandsId
 from mitup_bot.handlers.personal_filters import UserExistFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Settings, User
@@ -131,5 +130,5 @@ HandlersRegistry.register_conversation_handler(
             RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION,
         ],
     },
-    fallbacks=[CommandsId.CANCEL],
+    fallbacks=[],
 )

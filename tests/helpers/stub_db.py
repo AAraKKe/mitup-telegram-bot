@@ -41,7 +41,8 @@ class MockDbSession(mock.MagicMock):
         self.exec = mock.MagicMock(side_effect=self.__exec_side_effect)
         self.delete = mock.MagicMock()
         self.statements_registry: dict[str, Result] = {}
-        self.objects_in_db: set[SQLModel] = set()
+        self.objects_added: list[SQLModel] = []
+        self.__last_id = 0
 
     @staticmethod
     def normalize_query(query: str) -> str:
@@ -57,7 +58,11 @@ class MockDbSession(mock.MagicMock):
         return re.sub(r"\s+", " ", query)
 
     def __add_side_effect(self, obj: SQLModel):
-        self.objects_in_db.add(obj)
+        self.objects_added.append(obj)
+        # Some times the id field is only generated after storing int he db.
+        if hasattr(obj, "id") and obj.id is None:  # type: ignore
+            self.__last_id += 1
+            obj.id = self.__last_id
 
     def __exec_side_effect(self, statement: SelectBase) -> Result | None:
         statement_str = str(statement.compile(compile_kwargs={"literal_binds": True}))
@@ -172,6 +177,9 @@ class MockDbSession(mock.MagicMock):
             raise ValueError(f"The statement {statement_str!r} is already registered!")
         self.statements_registry[statement_str] = Result(results=objects)
 
+    def add_user(self, user: User):
+        self.add_object(user, query_field="tg_user_id")
+
     def add_user_from_update(self, update: Update) -> User:
         assert update.effective_user is not None
 
@@ -186,4 +194,4 @@ class MockDbSession(mock.MagicMock):
         Args:
             obj: The object to be checked.
         """
-        assert obj in self.objects_in_db
+        assert obj in self.objects_added

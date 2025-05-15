@@ -55,7 +55,9 @@ linter:
 
 type-check:
   stage: test
-  script: hatch run dev:type-check
+  script: |
+    hatch run dev:pyright --version
+    hatch run dev:type-check
   needs: [preparation]
 
 validate-migrations:

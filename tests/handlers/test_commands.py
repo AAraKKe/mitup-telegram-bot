@@ -16,7 +16,7 @@ from mitup_bot.exceptions import (
     WrongCommandNameError,
 )
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.handlers.commands import command_cancel, command_go_to_main_menu, command_start_with_existing_user
+from mitup_bot.handlers.commands import command_go_to_main_menu, command_start_with_existing_user
 from mitup_bot.handlers.registration_process.edit_registration_timezone import command_start_with_new_user
 from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
@@ -179,17 +179,6 @@ async def test_commands_to_show_main_menu(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     await command(update, context)
-
-    expected_view = main_menu_view(lang=user_with_settings.lang)
-    api.assert_send_message_called(context, update, expected_view)
-
-
-async def test_command_cancel(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    await command_cancel(update, context)
 
     expected_view = main_menu_view(lang=user_with_settings.lang)
     api.assert_send_message_called(context, update, expected_view)

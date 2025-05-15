@@ -36,3 +36,11 @@ repos:
         pass_filenames: false
         files: ^(docs/|mkdocs.yml)$
         stages: [pre-commit]
+  - repo: local
+    hooks:
+      - id: validate-locales
+        name: Validate source language
+        entry: hatch run dev:validate-locales
+        language: system
+        stages:
+          - pre-push
