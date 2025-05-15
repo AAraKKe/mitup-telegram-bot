@@ -13,6 +13,7 @@ __all__ = [
     "create_meetup",
     "create_user",
     "create_settings",
+    "create_joined_link",
     "MockDbSession",
     "MITUP_DIR",
     "console",
@@ -26,7 +27,14 @@ from .types import AnyFloat, StubMitupApp, StubMitupContext, DEFAULT_CURRENT_MES
 from .monitoring import StubMetrics, StubMetricsEngine
 from .context import build_context, call_handler
 from .api import MockApi
-from .fixtures import UpdateRequest, create_meetup, create_user, create_settings, telegram_user_from_user
+from .fixtures import (
+    UpdateRequest,
+    create_meetup,
+    create_user,
+    create_settings,
+    telegram_user_from_user,
+    create_joined_link,
+)
 from .stub_db import MockDbSession, Result
 from .filesystem import MITUP_DIR
 from . import console, calendar_july_2024

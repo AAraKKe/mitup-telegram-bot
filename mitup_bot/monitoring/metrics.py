@@ -189,16 +189,35 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
 
 def properties_from_update(update: Update) -> dict[str, Any]:
     """Create a dictionary with the properties from the provided Update."""
-    chat_id = update.effective_chat.id if update.effective_chat else None
-    user_id = update.effective_user.id if update.effective_user else None
-    callback_data = update.callback_query.data if update.callback_query else None
-
     return {
-        "ChatId": chat_id,
-        "UserId": user_id,
-        "CallbackData": callback_data,
-        "Update": update.to_dict(),
+        "Update": __update_fields_from_update(update),
     }
+
+
+def __update_fields_from_update(update: Update) -> dict[str, Any]:
+    values = {}
+
+    # Callback data fields
+    if cb := update.callback_query:
+        values["callback"] = {"data": cb.data}
+
+    if user := update.effective_user:
+        values["user"] = {
+            "tg_user_id": user.id,
+            "username": user.username,
+        }
+
+    if message := update.effective_message:
+        values["message"] = {
+            "text": message.text,
+            "markup": message.reply_markup.to_dict() if message.reply_markup is not None else None,
+        }
+
+    # Show inline query queries
+    if query := update.inline_query:
+        values["inline_query"] = {"query": query.query}
+
+    return values
 
 
 def configure_metrics(config: MetricsConfig):

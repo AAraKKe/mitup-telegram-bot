@@ -1,4 +1,5 @@
 import logging
+import re
 from asyncio import gather
 from contextlib import contextmanager
 
@@ -21,6 +22,11 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView, MitupView
 
 TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
+MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
+    re.compile(r"Message_id_invalid"),
+    re.compile(r"Message to edit not found"),
+]
+EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
 
 
 async def send_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
@@ -79,10 +85,11 @@ def handle_edit_errors(
     except BadRequest as e:
         # Sometimes the message does not need to be updated but we don't know that in advance
         # ignore the error when it happens
-        if "Message is not modified" in e.message:
+        if any(pattern.findall(e.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
             return
+
         # If we get an error saying that the message is not found, we should delete the message
-        if "Message_id_invalid" in e.message:
+        if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
             if session and message and context:
                 logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
                 session.delete(message)
@@ -106,11 +113,10 @@ async def edit_message(*, context: TMitupContext, update: Update, view: MitupVie
     if update.effective_message:
         chat_id = update.effective_message.chat.id
         message_id = update.effective_message.id
+    elif update.callback_query and update.callback_query.inline_message_id:
+        inline_message_id = update.callback_query.inline_message_id
     else:
-        if update.callback_query and update.callback_query.inline_message_id:
-            inline_message_id = update.callback_query.inline_message_id
-        else:
-            raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
+        raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
     with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
         with handle_edit_errors():

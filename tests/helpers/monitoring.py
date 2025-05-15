@@ -16,6 +16,7 @@ from mitup_bot.monitoring import (
     MetricKey,
     MitupMetricsEngine,
     MitupMetricsLogger,
+    properties_from_update,
 )
 
 TSinkContainer = list[dict[str, Any]]
@@ -234,18 +235,7 @@ class StubMetricsEngine(MitupMetricsEngine[StubMetrics]):
         if self.parent_context is None:
             return properties or {}
 
-        callback_data = (
-            self.parent_context.telegram_update.callback_query.data
-            if self.parent_context.telegram_update and self.parent_context.telegram_update.callback_query
-            else None
-        )
-        parent_properties = {
-            "UserId": self.parent_context._user_id,
-            "ChatId": self.parent_context._chat_id,
-            "CallbackData": callback_data,
-            "Update": self.parent_context.telegram_update.to_dict(),
-        }
-        return (properties or {}) | parent_properties
+        return (properties or {}) | properties_from_update(self.parent_context.telegram_update)
 
     def assert_metrics_emited(
         self,

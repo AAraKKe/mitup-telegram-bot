@@ -15,6 +15,7 @@ EMPTY = CallbackData(action="empty", entity="empty", id=0)
 # ----------------------------------------
 SHOW_MEETING = CallbackData(action="show", entity="meeting")
 SHOW_ACTIVE_MEETING_PAGE = CallbackData(action="show", entity="active_meeting_page")
+SHOW_JOINED_MEETINGS_PAGE = CallbackData(action="show", entity="joined_meetings")
 EDIT_MEETING = CallbackData(action="edit", entity="meeting")
 CREATE_MEETING = CallbackData(action="create", entity="meeting")
 CANCEL_CREATE_MEETING = CallbackData(action="cancel", entity="meeting")
@@ -70,9 +71,7 @@ EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 # These are callbacks for the main menu actions
 # ----------------------------------------
 MAIN_MENU = CallbackData(entity="main_menu")
-ACTIVE_MEETINGS = CallbackData(entity="meetings")
 PAST_MEETINGS = CallbackData(entity="past_meetings")
-JOINED_MEETINGS = CallbackData(entity="joined_meetings")
 SETTINGS = CallbackData(entity="settings")
 HELP = CallbackData(entity="help")
 COLLABORATE = CallbackData(entity="collaborate")

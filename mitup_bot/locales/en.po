@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2025-05-15 15:51\n"
+"PO-Revision-Date: 2025-05-15 21:11\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -392,8 +392,14 @@ msgstr "You can configure different aspects of your meeting:\n\n*Waiting list*: 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
 msgstr "_You don't have any meetings yet.\n\nClick on _${new_meeting_button}_ in the main menu to create one._"
 
-msgid "MeetingMessages.ACTIVE"
+msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "These are all your active meetings."
+
+msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
+msgstr "These are the meetings you have joined."
+
+msgid "MeetingMessages.NO_JOINED_MEETINGS"
+msgstr "_You have not joined any meeting yet._"
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

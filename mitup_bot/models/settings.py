@@ -19,7 +19,7 @@ class Settings(SQLModel, table=True):
     __tablename__: str = "settings"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)
-    user_id: int | None = Field(default=None, foreign_key="users.id")
+    user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
     created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
     updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
     language: str = TranslationEngine.FALLBACK_LANG

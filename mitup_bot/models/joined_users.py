@@ -11,8 +11,8 @@ class JoinedUsers(SQLModel, table=True):
     __tablename__ = "joined_users"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)
-    user_id: int | None = Field(default=None, foreign_key="users.id")
-    meetup_id: int | None = Field(default=None, foreign_key="meetups.id")
+    user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
+    meetup_id: int | None = Field(default=None, foreign_key="meetups.id", ondelete="CASCADE")
     created_time: dt.datetime = dt.datetime.now(dt.UTC)
     is_waiting_list: bool = False
     notification_sent: bool = False

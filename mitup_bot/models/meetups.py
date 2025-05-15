@@ -57,7 +57,7 @@ class Meetup(SQLModel, table=True):
     __tablename__: str = "meetups"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)
-    owner_id: int | None = Field(default=None, foreign_key="users.id")
+    owner_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
     title: str = Field(nullable=False)
     waiting_list: bool = Field(nullable=False)
     public: bool = Field(nullable=False)
@@ -78,7 +78,7 @@ class Meetup(SQLModel, table=True):
 
     owner: "User" = Relationship(back_populates="meetups")
     messages: list[Message] = Relationship(back_populates="meetup")
-    joined_links: list["JoinedUsers"] = Relationship(back_populates="meetup")
+    joined_links: list["JoinedUsers"] = Relationship(back_populates="meetup", cascade_delete=True)
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))

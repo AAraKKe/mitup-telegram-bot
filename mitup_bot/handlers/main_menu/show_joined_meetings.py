@@ -1,4 +1,3 @@
-import logging
 from typing import cast
 
 from sqlmodel import Session
@@ -16,31 +15,29 @@ from .enums import MainMenuHandlerId
 
 
 @HandlersRegistry.register_callback_query(
-    MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, callback_data=cb.SHOW_ACTIVE_MEETING_PAGE, bindable=True
+    MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, callback_data=cb.SHOW_JOINED_MEETINGS_PAGE, bindable=True
 )
 @with_async_session
-async def callback_query_show_meetings(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_show_meetings")
-
+async def callback_query_show_joined_meetings(session: Session, update: Update, context: MitupContext):
     callback_data = guards.valid_callback_data(
-        cb.SHOW_ACTIVE_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_MEETINGS_CALLBACK
+        cb.SHOW_JOINED_MEETINGS_PAGE.parse(context.match), MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK
     )
 
     user = guards.current_user(update, session)
-    user_meetings = sorted(user.meetups, key=lambda meeting_id: cast(int, meeting_id.id))
+    joined_meetings = sorted((link.meetup for link in user.joined_links), key=lambda meetup: cast(int, meetup.id))
 
     if user_meetings_buttons := [
         ButtonConfig(
             text=str(meeting.title),
             callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)),
         )
-        for meeting in user_meetings
+        for meeting in joined_meetings
     ]:
         view = PaginatedMitupView(
-            description=MeetingMessages.ACTIVE_MEETINGS_PAGE.get(lang=user.lang),
+            description=MeetingMessages.JOINED_MEETINGS_PAGE.get(lang=user.lang),
             buttons=user_meetings_buttons,
             page_number=callback_data.id,
-            navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
+            navigation_callback_data=cb.SHOW_JOINED_MEETINGS_PAGE,
         ).with_context_menu(
             [
                 [
@@ -53,12 +50,6 @@ async def callback_query_show_meetings(session: Session, update: Update, context
         )
 
     else:
-        view = factory.main_menu_view(
-            lang=user.lang,
-            message=MeetingMessages.NO_MEETINGS_FOUND.get(
-                lang=user.settings.language,
-                new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user.settings.language),
-            ),
-        )
+        view = factory.main_menu_view(lang=user.lang, message=MeetingMessages.NO_JOINED_MEETINGS.get(lang=user.lang))
 
     await api.edit_message(context=context, update=update, view=view)

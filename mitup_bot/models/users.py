@@ -26,8 +26,8 @@ class User(SQLModel, table=True):
     last_name: str | None = None
     username: str | None = None
     settings: "Settings" = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
-    meetups: list["Meetup"] = Relationship(back_populates="owner")
-    joined_links: list["JoinedUsers"] = Relationship(back_populates="user")
+    meetups: list["Meetup"] = Relationship(back_populates="owner", cascade_delete=True)
+    joined_links: list["JoinedUsers"] = Relationship(back_populates="user", cascade_delete=True)
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))

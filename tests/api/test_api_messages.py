@@ -6,7 +6,13 @@ from aws_embedded_metrics.unit import Unit
 from telegram import InlineKeyboardMarkup, Update
 from telegram.error import BadRequest
 
-from mitup_bot.api import edit_message, send_message, update_meeting_messages
+from mitup_bot.api import (
+    EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS,
+    MESSAGE_NOT_FOUND_ERROR_PATTERNS,
+    edit_message,
+    send_message,
+    update_meeting_messages,
+)
 from mitup_bot.exceptions import EffectiveChatNotSet, NoMessageAvailable
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
@@ -163,8 +169,12 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
     await assert_time_metric_emitted(context)
 
 
+@pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in MESSAGE_NOT_FOUND_ERROR_PATTERNS])
 async def test_edit_meetup_messages_deletes_message_on_failure(
-    meeting: Meetup, context: StubMitupContext, mock_session: MockDbSession
+    meeting: Meetup,
+    context: StubMitupContext,
+    mock_session: MockDbSession,
+    bad_request_message: str,
 ):
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
@@ -177,7 +187,7 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
     # Make the call fail for one call, we should delete the message but still edit properly the other one
     def raise_error(*args, **kwargs):
         if kwargs.get("message_id") == 123:
-            raise BadRequest("Message_id_invalid")
+            raise BadRequest(bad_request_message)
 
     edit.side_effect = raise_error
 
@@ -195,8 +205,12 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
     )
 
 
+@pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS])
 async def test_edit_meetup_messages_ignore_unchanged_message(
-    meeting: Meetup, context: StubMitupContext, mock_session: MockDbSession
+    meeting: Meetup,
+    context: StubMitupContext,
+    mock_session: MockDbSession,
+    bad_request_message: str,
 ):
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
@@ -209,7 +223,7 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
     # Make the call fail for one call, we should delete the message but still edit properly the other one
     def raise_error(*args, **kwargs):
         if kwargs.get("message_id") == 123:
-            raise BadRequest("Message is not modified")
+            raise BadRequest(bad_request_message)
 
     edit.side_effect = raise_error
 

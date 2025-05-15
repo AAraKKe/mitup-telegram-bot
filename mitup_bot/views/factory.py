@@ -19,7 +19,7 @@ LANGUAGE_BUTTONS = {
 }
 
 
-def main_menu_view(lang: str, message: str | None = None) -> MitupView:
+def main_menu_view(*, lang: str, message: str | None = None) -> MitupView:
     return MitupView(
         message or Messages.DEFAULT_MAIN_MENU_DESCRIPTION.get(lang=lang),
         keyboard=[
@@ -36,7 +36,10 @@ def main_menu_view(lang: str, message: str | None = None) -> MitupView:
                 ButtonConfig(text=ButtonMessages.PAST_MEETINGS.get(lang=lang), callback_data=cb.PAST_MEETINGS),
             ],
             [
-                ButtonConfig(text=ButtonMessages.JOINED_MEETINGS.get(lang=lang), callback_data=cb.JOINED_MEETINGS),
+                ButtonConfig(
+                    text=ButtonMessages.JOINED_MEETINGS.get(lang=lang),
+                    callback_data=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1),
+                ),
                 ButtonConfig(text=ButtonMessages.SETTINGS.get(lang=lang), callback_data=cb.SETTINGS),
             ],
             [
@@ -47,7 +50,7 @@ def main_menu_view(lang: str, message: str | None = None) -> MitupView:
     )
 
 
-def settings_view(lang: str, message: str | None = None) -> MitupView:
+def settings_view(*, lang: str, message: str | None = None) -> MitupView:
     return MitupView(
         message or Messages.DEFAULT_SETTINGS_DESCRIPTION.get(lang=lang),
         [
@@ -73,7 +76,7 @@ def settings_view(lang: str, message: str | None = None) -> MitupView:
     )
 
 
-def create_meeting_view(lang: str, message: str | None = None) -> MitupView:
+def create_meeting_view(*, lang: str, message: str | None = None) -> MitupView:
     return MitupView(
         message or MeetingMessages.CREATE.get(lang=lang),
         [
@@ -84,7 +87,7 @@ def create_meeting_view(lang: str, message: str | None = None) -> MitupView:
     )
 
 
-def request_information_with_cancel_view(lang: str, message: str, callback_data: cb.CallbackData) -> MitupView:
+def request_information_with_cancel_view(*, lang: str, message: str, callback_data: cb.CallbackData) -> MitupView:
     """
     Use this wen we want to ask the user for information and give them the option to cancel the action.
 
@@ -100,15 +103,15 @@ def request_information_with_cancel_view(lang: str, message: str, callback_data:
     )
 
 
-def change_settings_element_view(lang: str, message: str, callback_data=cb.CANCEL_SETTINGS) -> MitupView:
+def change_settings_element_view(*, lang: str, message: str, callback_data=cb.CANCEL_SETTINGS) -> MitupView:
     """
     This view is used when in order to change a setting the user is asked for a message and we want to give
     them the option to Cancel the action and go back to settings.
     """
-    return request_information_with_cancel_view(lang, message, callback_data)
+    return request_information_with_cancel_view(lang=lang, message=message, callback_data=callback_data)
 
 
-def settings_set_language_view(lang: str, message: str | None = None) -> MitupView:
+def settings_set_language_view(*, lang: str, message: str | None = None) -> MitupView:
     n_languages = len(SUPPORTED_LANGUAGES)
     n_columns = min(n_languages, 3)
     buttons = [
@@ -137,6 +140,7 @@ def settings_set_language_view(lang: str, message: str | None = None) -> MitupVi
 
 
 def edit_meeting_property_view(
+    *,
     lang: str,
     message: str,
     meeting_id: int,
@@ -154,7 +158,7 @@ def edit_meeting_property_view(
     return MitupView(message, keyboard=keyboard)
 
 
-def __edit_meeting_date_final_row(lang: str, meeting_id: int, new: bool) -> list[list[ButtonConfig]]:
+def __edit_meeting_date_final_row(*, lang: str, meeting_id: int, new: bool) -> list[list[ButtonConfig]]:
     final_rows = [
         [ButtonConfig(text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
     ]
@@ -174,7 +178,7 @@ def __edit_meeting_date_final_row(lang: str, meeting_id: int, new: bool) -> list
 
 
 def edit_meeting_date_view(
-    lang: str, meeting_id: int, anchor_date: dt.date, current_date: dt.date, new: bool
+    *, lang: str, meeting_id: int, anchor_date: dt.date, current_date: dt.date, new: bool
 ) -> MitupView:
     message = MeetingMessages.ADD_DATE.get(lang=lang) if new else MeetingMessages.EDIT_DATE.get(lang=lang)
     calendar_keyboard = CalendarKeyboard(

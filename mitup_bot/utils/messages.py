@@ -32,8 +32,9 @@ def sanitize(message: str, full=False) -> str:
 class MessageBase(StrEnum):
     def get(
         self,
-        full: bool = True,
+        *,
         lang: str = TranslationEngine.FALLBACK_LANG,
+        full: bool = True,
         plain: bool = False,
         **kwargs: MessageParams,
     ) -> str:
@@ -349,7 +350,9 @@ class MeetingMessages(MessageBase):
     NO_MEETINGS_FOUND = (
         "_You don't have any meetings yet.\n\nClick on _${new_meeting_button}_ in the main menu to create one._"
     )
-    ACTIVE = "These are all your active meetings."
+    ACTIVE_MEETINGS_PAGE = "These are all your active meetings."
+    JOINED_MEETINGS_PAGE = "These are the meetings you have joined."
+    NO_JOINED_MEETINGS = "_You have not joined any meeting yet._"
 
 
 class Weekday(MessageBase):

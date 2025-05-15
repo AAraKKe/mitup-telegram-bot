@@ -5,7 +5,7 @@ from telegram import Location
 from telegram import User as TgUser
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.models import Meetup, MeetupLocation, Settings, User
+from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Settings, User
 
 
 @dataclass
@@ -109,7 +109,7 @@ def create_user(
     is_active: bool = True,
     owned_meetings: list[Meetup] | None = None,
     settings: Settings | None = None,
-):
+) -> User:
     return User(
         id=id,
         tg_user_id=tg_user_id,
@@ -119,6 +119,26 @@ def create_user(
         is_active=is_active,
         meetups=owned_meetings or [],
         settings=settings or create_settings(),
+    )
+
+
+def create_joined_link(
+    user: User,
+    meetup: Meetup,
+    id: int | None = None,
+    created_time: dt.datetime | None = None,
+    is_waiting_list: bool = False,
+    notification_sent: bool = False,
+) -> JoinedUsers:
+    return JoinedUsers(
+        id=id,
+        user_id=user.id,
+        meetup_id=meetup.id,
+        user=user,
+        meetup=meetup,
+        created_time=created_time or dt.datetime.now(dt.UTC),
+        is_waiting_list=is_waiting_list,
+        notification_sent=notification_sent,
     )
 
 
