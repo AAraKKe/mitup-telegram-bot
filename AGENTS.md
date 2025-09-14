@@ -124,7 +124,7 @@ a simple mock.
 
 ### Calling handlers
 
-Avoid calling handler methods directly, this skips some verifications done at the registry level that could be important when testing that a request is properly handled. Instead, use the call_hanlder method under tests.helpers.context.
+Avoid calling handler methods directly, this skips some verifications done at the registry level that could be important when testing that a request is properly handled. Instead, use the call_handler method under tests.helpers.context.
 
 This allows to also mimic conversations with a given user, as an example check the tests in tests/handlers/meeting/edit_meeting/test_edit_meeting_datetime.py
 
@@ -137,7 +137,7 @@ that is globally available. We do not need to mock every update in every test. S
 
 ### Information about the Mitup repo
 
-If at any point a link to the mitup repo needs to be added somehwere, the repo is located here: <https://gitlab.com/meetupbot/mitup-telegram-bot>. Any link needs to follow gitlab url rules, not githubs.
+If at any point a link to the mitup repo needs to be added somewhere, the repo is located here: <https://gitlab.com/meetupbot/mitup-telegram-bot>. Any link needs to follow gitlab url rules, not githubs.
 
 If a quick link to a new issue wants to be added, use the issue templates under `.gitlab/issue_templates` to know which ones can be used and add it the link.
 
