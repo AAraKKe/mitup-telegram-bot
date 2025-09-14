@@ -19,7 +19,7 @@ Handlers can also have filters. Filters are used to identify whether a given upd
 
 ### Adding a database session to a handler
 
-If a handler needs a database session, which most of them do, the handler callback should also be decorated with a with_assync_session decorator. This method is part of the mitup_bot.db module. This injects a new argument to the handler, session, that has a database session withan open trasaction associated to it.
+If a handler needs a database session, which most of them do, the handler callback should also be decorated with a with_async_session decorator. This method is part of the mitup_bot.db module. This injects a new argument to the handler, session, that has a database session with an open transaction associated to it.
 
 ## Documentation
 
@@ -36,7 +36,7 @@ If a handler needs a database session, which most of them do, the handler callba
 
 Documentation files, under the `docs` folder, are served with mkdocs. The mkdocs config file in the root of the project is used to handle mkdocs configuration.
 
-Every time a new page is added to the documentation we need to ensure that it is added to the appropriate place in the mkdocs file to be accesible through the navigation in the docs site.
+Every time a new page is added to the documentation we need to ensure that it is added to the appropriate place in the mkdocs file to be accessible through the navigation in the docs site.
 
 ### Linking non-doc files
 
@@ -109,7 +109,7 @@ This will output the coverage into the file `report.json` with the output of the
 
 Tests should be defined in modules that mimic the structure of the ones under mitup_bot.
 
-For example, if I want to test code writen in the mitup_bot.handlers.main_menu.create_meeting.py, the tests should be located under tests.handlers.main_menu.test_create_meeting.py
+For example, if I want to test code wriyten in the mitup_bot.handlers.main_menu.create_meeting.py, the tests should be located under tests.handlers.main_menu.test_create_meeting.py
 
 ### Mocking
 
