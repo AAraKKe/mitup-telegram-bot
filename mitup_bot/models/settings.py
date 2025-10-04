@@ -11,11 +11,13 @@ from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.factory import options_button
 
+from .base_model import BaseModel
+
 if TYPE_CHECKING:  # pragma: no cover
     from .users import User
 
 
-class Settings(SQLModel, table=True):
+class Settings(BaseModel, SQLModel, table=True):
     __tablename__: str = "settings"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)

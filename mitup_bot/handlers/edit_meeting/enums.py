@@ -1,9 +1,9 @@
 from enum import Enum, auto
 
-from mitup_bot.callback_id import CallbackId
+from mitup_bot.handler_id import HandlerId
 
 
-class EditMeetingHandlerId(CallbackId):
+class EditMeetingHandlerId(HandlerId):
     EDIT = auto()
 
     # Edit meeting title
@@ -24,6 +24,9 @@ class EditMeetingHandlerId(CallbackId):
     PARTICIPANTS_MAXIMUM_MESSAGE = auto()
     PARTICIPANTS_MAXIMUM_CONVERSATION = auto()
     PARTICIPANTS_MAXIMUM_WRONG_MESSAGE = auto()
+    PARTICIPANTS_KICK_OUT_CALLBACK = auto()
+    PARTICIPANTS_KICK_OUT_ACTION_CALLBACK = auto()
+    PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK = auto()
 
     # Edit meeting location
     LOCATION_CALLBACK = auto()

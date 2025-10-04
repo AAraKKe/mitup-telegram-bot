@@ -24,7 +24,7 @@ from .views import edit_location_view
 )
 @with_async_session
 async def callback_edit_meeting_location(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_edit_meeting_location")
+    logging.debug("Enter into callback_edit_meeting_location")
 
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_LOCATION.parse(context.match), EditMeetingHandlerId.LOCATION_CALLBACK
@@ -98,7 +98,7 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
 )
 @with_async_session
 async def callback_cancel_edit_meeting_location_property(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_cancel_edit_meeting_location_property")
+    logging.debug("Enter into callback_cancel_edit_meeting_location_property")
 
     await callback_edit_meeting_location(update, context)
 

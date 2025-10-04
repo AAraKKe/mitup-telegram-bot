@@ -3,9 +3,9 @@ from functools import cached_property, reduce
 from typing import override
 
 
-class CallbackId(Enum):
+class HandlerId(Enum):
     """
-    CallbackID is an Enum that is used to identify the different handlers that are registered in the bot via the
+    HandlerId is an Enum that is used to identify the different handlers that are registered in the bot via the
     registry.
 
     It is supposed to be subclasses, with each subclass of CallbackId represents a semantic group of handlers.

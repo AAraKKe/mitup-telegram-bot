@@ -5,8 +5,14 @@ from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 
 from mitup_bot import api
-from mitup_bot.callback_data import CallbackData, DateCallbackData, ValidCallbackData, ValidDateCallbackData
-from mitup_bot.callback_id import CallbackId
+from mitup_bot.callback_data import (
+    CallbackData,
+    DateCallbackData,
+    KickoutCallbackData,
+    ValidCallbackData,
+    ValidDateCallbackData,
+    ValidKickoutCallbackData,
+)
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
@@ -17,6 +23,7 @@ from mitup_bot.exceptions import (
     MalformedCallbackData,
     UserNotFound,
 )
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
@@ -49,28 +56,40 @@ def valid_callback_query(update: Update) -> CallbackQuery:
     return update.callback_query
 
 
-def valid_date_callback_data(cb: DateCallbackData, callback_id: CallbackId) -> ValidDateCallbackData:
+def valid_date_callback_data(cb: DateCallbackData, handler_id: HandlerId) -> ValidDateCallbackData:
     """
     Validates the callback `cb`. If an id or date cannot be set or the entity is unknown,
-    a MalformedCallbackData exception is raised scoped to the `callback_id` provided.
+    a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
 
     The output of the guard is a `ValidDateCallbackData`.
     """
     if cb.id is None or cb.date is None or cb.unknown():
-        raise MalformedCallbackData(callback_id, cb)
+        raise MalformedCallbackData(handler_id, cb)
     return ValidDateCallbackData(entity=cb.entity, action=cb.action, id=cb.id, date=cb.date)
 
 
-def valid_callback_data(cb: CallbackData, callback_id: CallbackId) -> ValidCallbackData:
+def valid_callback_data(cb: CallbackData, handler_id: HandlerId) -> ValidCallbackData:
     """
     Validates the callback `cb`. If an id cannot be set or the entity is unknown,
-    a MalformedCallbackData exception is raised scoped to the `callback_id` provided.
+    a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
 
     The output of the guard is a `ValidCallbackData`.
     """
     if cb.id is None or cb.unknown():
-        raise MalformedCallbackData(callback_id, cb)
+        raise MalformedCallbackData(handler_id, cb)
     return ValidCallbackData(entity=cb.entity, action=cb.action, id=cb.id)
+
+
+def valid_kickout_callback_data(cb: KickoutCallbackData, handler_id: HandlerId) -> ValidKickoutCallbackData:
+    """
+    Validates the kickout callback `cb`. If an id cannot be set or the entity is unknown,
+    a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
+
+    The output of the guard is a `ValidKickoutCallbackData`.
+    """
+    if cb.id is None or cb.unknown() or cb.meeting_id is None:
+        raise MalformedCallbackData(handler_id, cb)
+    return ValidKickoutCallbackData(entity=cb.entity, action=cb.action, id=cb.id, meeting_id=cb.meeting_id)
 
 
 def chat(update: Update) -> Chat:
@@ -115,7 +134,7 @@ async def user_owns_meeting(
     if redirect:
         message = (
             f"User tried {action!r} with a meeting that does not belong to them. "
-            f"Meeting id: {meeting_id}, user id: {user.id}"
+            f"Meeting id: {meeting_id}, user id: {user.db_id}"
         )
         logging.warning(message)
         context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
@@ -132,10 +151,25 @@ async def meeting_accessible(
     context: MitupContext,
     custom_keyboard: Keyboard | None = None,
 ) -> Meetup | None:
+    """
+    Check if the user has access to the meeting.
+    If the user does, the meeting is returned.
+    If not, warn and send the user to the main menu and None is returned.
+
+    If the meeting does not exist, the user is warned that the meeting has been removed.
+
+    If `custom_keyboard` is provided, it is attached to the message shown the user. Otherwise, a
+    a keyboard with a back button to the main menu is shown.
+
+    **Note**: this method can only be used when a meeting is being accessed from the bot chat.
+    """
+
     if Meetup.by_id(session, meeting_id):
         return await user_owns_meeting(user, meeting_id, action, update, context)
 
-    message = f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.id}"
+    message = (
+        f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.db_id}"
+    )
     logging.warning(message)
 
     await api.edit_message(
@@ -147,7 +181,7 @@ async def meeting_accessible(
             or [
                 [
                     ButtonConfig(
-                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user.settings.language)}",
+                        text=f"{ButtonMessages.MAIN_MENU.back(lang=user.settings.language)}",
                         callback_data=cb.MAIN_MENU,
                     )
                 ]

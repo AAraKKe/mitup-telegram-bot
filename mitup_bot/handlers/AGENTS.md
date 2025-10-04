@@ -10,8 +10,8 @@ A handler is a python method that needs to be decorated with a @HandlerRegistry 
 - register_message: used to register a handler that will pick up any message sent by the user
 - register_callback_query: this type of handler gets user request when they click on a button in the telegram bot. Callback queries usually have callback_data attached to it.
 - register_conversation_handler: this is a special type of handlers for handling long conversations with different states depending on what the user answers. These receive a list of other handlers that have different roles:
-  - entry_point_handlers_names: list of callback ids from the handlers that should trigger the beginning of the conversation.
-  - states: a dictionary where the keys are enums (returned by any of the handlers in the conversations) and the values are a list of callback ids. This allows the conversation to flow through different states.
+  - entry_point_handlers_names: list of handler ids from the handlers that should trigger the beginning of the conversation.
+  - states: a dictionary where the keys are enums (returned by any of the handlers in the conversations) and the values are a list of handler ids. This allows the conversation to flow through different states.
   - fallbacks: this defines the states the conversation could go through if none of the previous states matches.
 - register_inline_handler: this is a handler for inline queries.
 

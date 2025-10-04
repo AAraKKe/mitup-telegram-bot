@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import datetime as dt
 from math import ceil
+from typing import TYPE_CHECKING
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
@@ -7,6 +10,9 @@ from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import Languages, SettingsMessages
 from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView, PaginatedMitupView
+
+if TYPE_CHECKING:
+    from mitup_bot.models import User
 
 # Representation from language code to button to be used when generating views
 LANGUAGE_BUTTONS = {
@@ -68,7 +74,7 @@ def settings_view(*, lang: str, message: str | None = None) -> MitupView:
             ],
             [
                 ButtonConfig(
-                    text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=lang)}",
+                    text=ButtonMessages.MAIN_MENU.back(lang=lang),
                     callback_data=cb.MAIN_MENU,
                 )
             ],
@@ -148,7 +154,7 @@ def edit_meeting_property_view(
     back_button: ButtonConfig | None = None,
 ) -> MitupView:
     back_button = back_button or ButtonConfig(
-        text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+        text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
     )
     keyboard = [[back_button]]
 
@@ -160,7 +166,7 @@ def edit_meeting_property_view(
 
 def __edit_meeting_date_final_row(*, lang: str, meeting_id: int, new: bool) -> list[list[ButtonConfig]]:
     final_rows = [
-        [ButtonConfig(text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
+        [ButtonConfig(text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
     ]
 
     if not new:
@@ -199,3 +205,23 @@ def options_button(callback_data: CallbackData, text: str, option: bool) -> Butt
     text = f"{boolean_emojin} {text}"
 
     return ButtonConfig(text=text, callback_data=callback_data)
+
+
+def user_button(user: User, callback_data: CallbackData) -> ButtonConfig:
+    return ButtonConfig(text=user.inline_name, callback_data=callback_data)
+
+
+def confirmation_view(
+    *,
+    lang: str,
+    message: str,
+    confirm_callback_data: CallbackData,
+    decline_callback_data: CallbackData,
+) -> MitupView:
+    return MitupView(
+        message,
+        [
+            [ButtonConfig(text=ButtonMessages.CONFIRM.get(lang=lang), callback_data=confirm_callback_data)],
+            [ButtonConfig(text=ButtonMessages.DECLINE.get(lang=lang), callback_data=decline_callback_data)],
+        ],
+    )

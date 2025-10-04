@@ -132,8 +132,8 @@ def create_joined_link(
 ) -> JoinedUsers:
     return JoinedUsers(
         id=id,
-        user_id=user.id,
-        meetup_id=meetup.id,
+        user_id=user.db_id,
+        meetup_id=meetup.db_id,
         user=user,
         meetup=meetup,
         created_time=created_time or dt.datetime.now(dt.UTC),

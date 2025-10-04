@@ -27,7 +27,7 @@ from .enums import ConversationRegistrationProcessState, RegistrationProcessHand
 )
 @with_async_session
 async def command_start_with_new_user(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into command_start_with_new_user")
+    logging.debug("Enter into command_start_with_new_user")
 
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
@@ -53,14 +53,14 @@ async def command_start_with_new_user(session: Session, update: Update, context:
 )
 @with_async_session
 async def registration_timezone_text_message_handler(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into registration_timezone_text_message_handler")
+    logging.debug("Enter into registration_timezone_text_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
 
     user = guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
-        logging.warning(f"The user {user.id} tried to set a timezone {address} that is not correct. Trying again")
+        logging.warning(f"The user {user.db_id} tried to set a timezone {address} that is not correct. Trying again")
 
         await api.send_message(
             context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
@@ -90,14 +90,14 @@ async def registration_timezone_text_message_handler(session: Session, update: U
 )
 @with_async_session
 async def registration_timezone_location_message_handler(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into registration_timezone_location_message_handler")
+    logging.debug("Enter into registration_timezone_location_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
 
     user = guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
-        logging.warning(f"The user {user.id} tried to set a location {location} that is not correct. Trying again")
+        logging.warning(f"The user {user.db_id} tried to set a location {location} that is not correct. Trying again")
 
         await api.send_message(
             context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)

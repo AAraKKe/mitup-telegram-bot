@@ -1,6 +1,6 @@
 import datetime as dt
 from string import Template
-from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
+from typing import TYPE_CHECKING, ClassVar, Literal, Self, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
@@ -17,6 +17,7 @@ from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
 
+from .base_model import BaseModel
 from .mutable_model import MutableModel
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -53,7 +54,7 @@ class MeetupLocation(MutableModel):
         return self.coerced_name is None and self.coordinates is None
 
 
-class Meetup(SQLModel, table=True):
+class Meetup(BaseModel, SQLModel, table=True):
     __tablename__: str = "meetups"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)
@@ -99,6 +100,73 @@ class Meetup(SQLModel, table=True):
     @property
     def full(self) -> bool:
         return False if self.max_members is None else self.n_joined >= self.max_members
+
+    @property
+    def participants(self) -> list["JoinedUsers"]:
+        """Get the users that have joined the meeting (not including the waiting list)"""
+        return [link for link in self.joined_links if not link.is_waiting_list]
+
+    def participant(self, user_id: int) -> "JoinedUsers | None":
+        return next((link for link in self.participants if link.user_id == user_id), None)
+
+    def has_participant(self, user_id: int) -> bool:
+        return any(link.user_id == user_id for link in self.joined_links)
+
+    def remove_participant(self, participant: "JoinedUsers") -> list["JoinedUsers"]:
+        """
+        Remove a participant from the meeting. If there are users in the waiting list, they will be promoted to the
+        joined list.
+
+        If the action of removing the participant makes anyone promote, the list of promoted participants is returned.
+        """
+        self.joined_links.remove(participant)
+        # Check if someone in the waiting list can be promoted to the joined list
+        if not self.full:
+            return self.promote_from_waiting_list()
+        return []
+
+    def add_participant(self, user: "User") -> "JoinedUsers | None":
+        """
+        Add the user to the meeting. If the meeting is full, the user will be added to the waiting list
+        if it is enabled.
+
+        If the meeting is full and the waiting list is not enabled, None will be returned.
+        """
+        from mitup_bot.models import JoinedUsers
+
+        if self.full:
+            if self.waiting_list:
+                joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=True)
+                # This check is done explicitly to avoid duplicates which chan happen during tests
+                # or depending on how the session is being used
+                if joined_link not in self.joined_links:
+                    self.joined_links.append(joined_link)
+                return joined_link
+            return None
+        joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=False)
+        if joined_link not in self.joined_links:
+            self.joined_links.append(joined_link)
+        return joined_link
+
+    def promote_from_waiting_list(self) -> list["JoinedUsers"]:
+        """
+        Handle promotions from the waiting list to the joined list for the given meeting.
+
+        If the meeting is not full and waiting list is enabled, users will be promoted from the waiting list
+        to the joined based on the order they joined the waiting list.
+        """
+        if waiting_links := self.waiting_links():
+            to_promote = (
+                self.n_waiting if self.max_members is None else min(self.n_waiting, self.max_members - self.n_joined)
+            )
+            promoted = []
+
+            for link in waiting_links[:to_promote]:
+                link.is_waiting_list = False
+                promoted.append(link)
+
+            return promoted
+        return []
 
     def join_allowed(self) -> bool:
         return not self.full or self.waiting_list
@@ -206,7 +274,11 @@ class Meetup(SQLModel, table=True):
 
     @property
     def participants_list_text(self) -> str:
-        """This shows the participants of the meeting with one line per participant"""
+        """
+        Strings that represents the list of participants in the meeting with one line per participant.
+
+        If there are users in the waiting list, they are shown after the participants with a separator and a title.
+        """
         participant_list = [
             sanitize(link.user.inline_name, full=True) for link in self.joined_links if not link.is_waiting_list
         ]
@@ -224,16 +296,21 @@ class Meetup(SQLModel, table=True):
     @property
     def participants_text(self) -> str:
         """
-        String representing the participants information of the meeting. The list of participants is included
-        only in the case that the meeting is not incognito.
+        String representing the participants information of the meeting. The list of participants is not included
+        for incognito meetings.
+
+        To get the participants text ignoring whether the meeting is incognito or not,
+        use `participants_text_with_list`.
         """
         participant_list = "" if self.incognito else self.participants_list_text
-        return f"{self.participants_text_without_list}{participant_list}".strip()
+        return f"{self.participants_text_title}{participant_list}".strip()
 
     @property
-    def participants_text_without_list(self) -> str:
+    def participants_text_title(self) -> str:
         """
-        Text representing the participants of the meeting without the list of participants.
+        This is the title of the participants section of the meeting.
+
+        It includes things like the number of participants, the maximum number of participants, etc.
         """
         if len(self.joined_links) == 0:
             total_participants = MeetingMessages.EMPTY.get(lang=self.lang)
@@ -254,9 +331,9 @@ class Meetup(SQLModel, table=True):
     @property
     def participants_text_with_list(self) -> str:
         """
-        String representing the participants information of the meeting. The list of participants is always included.
+        String representing the participants section of the meeting. The list of participants is always included.
         """
-        return f"{self.participants_text_without_list}{self.participants_list_text}".strip()
+        return f"{self.participants_text_title}{self.participants_list_text}".strip()
 
     @property
     def message(self) -> str:
@@ -333,36 +410,36 @@ class Meetup(SQLModel, table=True):
                 [
                     ButtonConfig(
                         text=ButtonMessages.JOIN.get(lang=self.user_language),
-                        callback_data=cb.JOIN.with_id(cast(int, self.id)),
+                        callback_data=cb.JOIN.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.INVITE.get(lang=self.user_language),
-                        callback_data=cb.INVITE.with_id(cast(int, self.id)),
+                        callback_data=cb.INVITE.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.LEAVE.get(lang=self.user_language),
-                        callback_data=cb.LEAVE.with_id(cast(int, self.id)),
+                        callback_data=cb.LEAVE.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
                         text=ButtonMessages.EDIT.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING.with_id(cast(int, self.id)),
+                        callback_data=cb.EDIT_MEETING.with_id(self.db_id),
                     ),
                     ButtonConfig(text=ButtonMessages.CHAT.get(lang=self.user_language), callback_data=cb.CHAT),
                     ButtonConfig(
                         text=ButtonMessages.DELETE.get(lang=self.user_language),
-                        callback_data=cb.DELETE_MEETING.with_id(cast(int, self.id)),
+                        callback_data=cb.DELETE_MEETING.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
-                        text=ButtonMessages.SHARE.get(lang=self.user_language), switch_inline_query=str(self.id)
+                        text=ButtonMessages.SHARE.get(lang=self.user_language), switch_inline_query=str(self.db_id)
                     ),
                 ],
                 [
                     ButtonConfig(
-                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=self.user_language)}",
+                        text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
                         callback_data=cb.MAIN_MENU,
                     ),
                 ],
@@ -378,20 +455,20 @@ class Meetup(SQLModel, table=True):
                 [
                     ButtonConfig(
                         text=ButtonMessages.JOIN.get(lang=self.user_language),
-                        callback_data=cb.JOIN.with_id(cast(int, self.id)),
+                        callback_data=cb.JOIN.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.INVITE.get(lang=self.user_language),
-                        callback_data=cb.INVITE.with_id(cast(int, self.id)),
+                        callback_data=cb.INVITE.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.LEAVE.get(lang=self.user_language),
-                        callback_data=cb.LEAVE.with_id(cast(int, self.id)),
+                        callback_data=cb.LEAVE.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
-                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=self.user_language)}",
+                        text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
                         callback_data=cb.MAIN_MENU,
                     ),
                 ],
@@ -400,8 +477,6 @@ class Meetup(SQLModel, table=True):
 
     @property
     def edit_view(self) -> MitupView:
-        assert self.id is not None, "View cannot be generated without id"
-
         now_in_tz: dt.datetime = self.datetime_in_tz or self.owner.now_in_tz()
 
         return MitupView(
@@ -410,52 +485,52 @@ class Meetup(SQLModel, table=True):
                 [
                     ButtonConfig(
                         text=ButtonMessages.TITLE.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_TITLE.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_TITLE.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.DESCRIPTION.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
                         text=ButtonMessages.DATE.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_DATE.with_id(self.id).with_date(now_in_tz.date()),
+                        callback_data=cb.EDIT_MEETING_DATE.with_id(self.db_id).with_date(now_in_tz.date()),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.TIME.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_TIME.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_TIME.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
                         text=ButtonMessages.PARTICIPANTS.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.LOCATION.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_LOCATION.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_LOCATION.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
                         text=ButtonMessages.LANGUAGE.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(self.db_id),
                     ),
                     ButtonConfig(
                         text=ButtonMessages.SETTINGS.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_SETTINGS.with_id(self.id),
+                        callback_data=cb.EDIT_MEETING_SETTINGS.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
                         text=ButtonMessages.DONE.get(lang=self.user_language),
-                        callback_data=cb.SHOW_MEETING.with_id(self.id),
+                        callback_data=cb.SHOW_MEETING.with_id(self.db_id),
                     ),
                 ],
                 [
                     ButtonConfig(
-                        text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=self.user_language)}",
+                        text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
                         callback_data=cb.MAIN_MENU,
                     ),
                 ],
@@ -467,31 +542,31 @@ class Meetup(SQLModel, table=True):
         keyboard = [
             [
                 options_button(
-                    cb.SET_MEETING_WAITING_LIST.with_id(cast(int, self.id)),
+                    cb.SET_MEETING_WAITING_LIST.with_id(self.db_id),
                     ButtonMessages.WAITING_LIST.get(lang=self.owner.lang),
                     self.waiting_list,
                 ),
                 options_button(
-                    cb.SET_MEETING_PUBLIC.with_id(cast(int, self.id)),
+                    cb.SET_MEETING_PUBLIC.with_id(self.db_id),
                     ButtonMessages.PUBLIC.get(lang=self.owner.lang),
                     self.public,
                 ),
             ],
             [
                 options_button(
-                    cb.SET_MEETING_ALLOW_INVITATIONS.with_id(cast(int, self.id)),
+                    cb.SET_MEETING_ALLOW_INVITATIONS.with_id(self.db_id),
                     ButtonMessages.OPEN_INVITATION.get(lang=self.owner.lang),
                     self.allow_invitation,
                 ),
                 options_button(
-                    cb.SET_MEETING_INCOGNITO.with_id(cast(int, self.id)),
+                    cb.SET_MEETING_INCOGNITO.with_id(self.db_id),
                     ButtonMessages.INCOGNITO.get(lang=self.owner.lang),
                     self.incognito,
                 ),
             ],
             [
                 options_button(
-                    cb.SET_MEETING_SHOW_TIMEZONE.with_id(cast(int, self.id)),
+                    cb.SET_MEETING_SHOW_TIMEZONE.with_id(self.db_id),
                     ButtonMessages.SHOW_TIMEZONE.get(lang=self.owner.lang),
                     self.show_timezone,
                 ),
@@ -501,14 +576,14 @@ class Meetup(SQLModel, table=True):
         return MitupView(
             MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=self.owner.lang),
             keyboard=keyboard,
-        ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(cast(int, self.id)))
+        ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(self.db_id))
 
     @property
     def inline_view(self) -> MitupInlineView:
         return MitupInlineView(
             description=self.inline_message,
             keyboard=self.build_inline_keyboard(),
-            id=str(self.id),
+            id=str(self.db_id),
             title=str(self.title),
             inline_description=self.inline_query_message,
         )
@@ -518,11 +593,11 @@ class Meetup(SQLModel, table=True):
             [
                 ButtonConfig(
                     text=ButtonMessages.JOIN.get(lang=self.lang),
-                    callback_data=cb.JOIN.with_id(cast(int, self.id)),
+                    callback_data=cb.JOIN.with_id(self.db_id),
                 ),
                 ButtonConfig(
                     text=ButtonMessages.LEAVE.get(lang=self.lang),
-                    callback_data=cb.LEAVE.with_id(cast(int, self.id)),
+                    callback_data=cb.LEAVE.with_id(self.db_id),
                 ),
             ],
         ]
@@ -531,7 +606,7 @@ class Meetup(SQLModel, table=True):
                 [
                     ButtonConfig(
                         text=ButtonMessages.SHOW_IN_YOUR_TIMEZONE.get(lang=self.lang),
-                        callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(cast(int, self.id)),
+                        callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(self.db_id),
                     ),
                 ]
             )

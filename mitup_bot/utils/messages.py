@@ -119,7 +119,6 @@ class ButtonMessages(MessageBase):
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     CHAT = f"{Emojis.CHAT} Chat"
-    BACK_EDIT = f"{GO_BACK} Edit"
     MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
     MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"
     MEETING_MAX_PARTICIPANTS = "Max participants"
@@ -295,6 +294,14 @@ class MeetingMessages(MessageBase):
     NO_LIMIT_PARTICIPANTS = "\\(No limit\\)"
     MAX_PARTICIPANTS_SET_FAIL = "The maximum number of participants must be a number greater than 0. Please, try again"
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
+    KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE = (
+        "Are you sure you want to kick out *${participant}* from the meeting *${meeting_title}*?"
+    )
+    PARTICIPANT_NO_LONGER_IN_MEETING = "The participant you tried to kick out is no longer in the meeting."
+    PARTICIPANT_KICKED_OUT_SUCCESS = "The participant *${participant}* has been kicked out successfully."
+    PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS = (
+        "The participant *${participant}* has been kicked out successfully. There are no more participants to kick out."
+    )
 
     # Delete meeting
     DELETE_MEETING = "Are you sure you want to delete this meeting?"

@@ -8,6 +8,7 @@ from telegram import Update
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.views import MitupView
+from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_diff
 from tests.helpers.stub_db import MockDbSession
 
 from .types import DEFAULT_CURRENT_MESSAGE
@@ -65,14 +66,9 @@ class MockApi:
         self, context: mock.MagicMock | MitupContext, user: User, view: MitupView | str, times: int = 1
     ):
         if times == 1:
-            self.send_to_user_mock.assert_awaited_once_with(context=context, user=user, view=view)
+            assert_awaited_once_with_diff(self.send_to_user_mock, context=context, user=user, view=view)
         else:
-            call_count = self.send_to_user_mock.call_count
-            assert call_count == times, f"Expected {times} call but found {call_count}"
-            expected_call = mock.call(context=context, user=user, view=view)
-            assert any(expected_call == call for call in self.send_to_user_mock.await_args_list), (
-                f"Expected call {expected_call} not found in send_message_to_user method"
-            )
+            assert_awaited_with_diff(self.send_to_user_mock, times, context=context, user=user, view=view)
 
     def assert_answer_callback_query_called(
         self,
@@ -83,15 +79,12 @@ class MockApi:
         times: int = 1,
     ):
         if times == 1:
-            self.answer_callback_query_mock.assert_awaited_once_with(
-                context=context, update=update, text=text, show_alert=show_alert
+            assert_awaited_once_with_diff(
+                self.answer_callback_query_mock, context=context, update=update, text=text, show_alert=show_alert
             )
         else:
-            call_count = self.answer_callback_query_mock.call_count
-            assert call_count == times, f"Expected {times} call but found {call_count}"
-            expected_call = mock.call(context=context, update=update, text=text, show_alert=show_alert)
-            assert any(expected_call == call for call in self.answer_callback_query_mock.await_args_list), (
-                f"Expected call {expected_call} not found in method"
+            assert_awaited_with_diff(
+                self.answer_callback_query_mock, times, context=context, update=update, text=text, show_alert=show_alert
             )
 
     def assert_update_meeting_messages_called(
@@ -114,14 +107,9 @@ class MockApi:
             arguments["skip_current"] = skip_current
 
         if times == 1:
-            self.update_meeting_messages_mock.assert_awaited_once_with(**arguments)
+            assert_awaited_once_with_diff(self.update_meeting_messages_mock, **arguments)
         else:
-            call_count = self.update_meeting_messages_mock.call_count
-            assert call_count == times, f"Expected {times} call but found {call_count}"
-            expected_call = mock.call(**arguments)
-            assert any(expected_call == call for call in self.update_meeting_messages_mock.await_args_list), (
-                f"Expected call {expected_call} not found in method"
-            )
+            assert_awaited_with_diff(self.update_meeting_messages_mock, times, **arguments)
 
     def assert_send_message_not_called(self):
         self.send_message_mock.assert_not_called()
@@ -142,12 +130,6 @@ class MockApi:
         assert update.effective_message is not None
 
         if times == 1:
-            method.assert_awaited_once_with(context=context, update=update, view=view)
+            assert_awaited_once_with_diff(method, context=context, update=update, view=view)
         else:
-            # If more than one time we need to assert that we have called it the amount of times requested
-            # and at least one of them with the appropriate arguments
-            assert len(method.call_args_list) == times, f"Expected {times} call but found {len(method.call_args_list)}"
-            expected_call = mock.call(context=context, update=update, view=view)
-            assert any(expected_call == call for call in method.await_args_list), (
-                f"Expected call {expected_call} not found in method"
-            )
+            assert_awaited_with_diff(method, times, context=context, update=update, view=view)

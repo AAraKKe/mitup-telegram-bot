@@ -3,8 +3,8 @@ from typing import cast
 
 from telegram import Update
 
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 
 from .monitoring import StubMetrics, StubMetricsEngine
@@ -39,7 +39,7 @@ def build_context(
 async def call_handler(
     update: Update,
     app: StubMitupApp,
-    handler_id: CallbackId,
+    handler_id: HandlerId,
     with_meeting_id: dict[ContextId, int] | None = None,
 ) -> tuple[StubMitupContext, Enum | None]:
     context = build_context(update, app, with_meeting_id)

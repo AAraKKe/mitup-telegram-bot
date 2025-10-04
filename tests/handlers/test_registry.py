@@ -8,9 +8,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerRegisteredError
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.registry import HandlerWrapper
 from mitup_bot.monitoring.metric_keys import MetricKey
@@ -21,14 +21,14 @@ from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-te
 
 
 class ClearableRegistry(HandlersRegistry):
-    handlers: dict[CallbackId, HandlerWrapper] = {}
+    handlers: dict[HandlerId, HandlerWrapper] = {}
 
     @classmethod
     def clear(cls):
         cls.handlers = {}
 
 
-class HandlerTestId(CallbackId):
+class HandlerTestId(HandlerId):
     BINDABLE = auto()
     NOT_BINDABLE = auto()
     ENTRY_POINT = auto()

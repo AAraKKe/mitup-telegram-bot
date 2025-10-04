@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2025-05-15 21:11\n"
+"PO-Revision-Date: 2025-10-04 23:15\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -145,9 +145,6 @@ msgstr "📨 Share"
 
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
-
-msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Edit"
 
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Name"
@@ -343,6 +340,18 @@ msgstr "The maximum number of participants must be a number greater than 0. Plea
 
 msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
 msgstr "These are the users that joined the meeting. Choose who you want to kick out."
+
+msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
+msgstr "Are you sure you want to kick out *${participant}* from the meeting *${meeting_title}*?"
+
+msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
+msgstr "The participant you tried to kick out is no longer in the meeting."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
+msgstr "The participant *${participant}* has been kicked out successfully."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
+msgstr "The participant *${participant}* has been kicked out successfully. There are no more participants to kick out."
 
 msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Are you sure you want to delete this meeting?"

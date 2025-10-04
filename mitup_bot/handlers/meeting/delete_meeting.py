@@ -19,7 +19,7 @@ from .enums import MeetingHandlerId
 )
 @with_async_session
 async def callback_query_delete_meeting(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_delete_meeting")
+    logging.debug("Enter into callback_query_delete_meeting")
 
     callback_data = guards.valid_callback_data(
         cb.DELETE_MEETING.parse(context.match), MeetingHandlerId.DELETE_MEETING_CALLBACK
@@ -64,7 +64,7 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
 )
 @with_async_session
 async def callback_query_confirm_delete_meeting(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_confirm_delete_meeting")
+    logging.debug("Enter into callback_query_confirm_delete_meeting")
 
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_DELETE_MEETING.parse(context.match),
@@ -93,7 +93,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
         keyboard=[
             [
                 ButtonConfig(
-                    text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user.lang)}",
+                    text=ButtonMessages.MAIN_MENU.back(lang=user.lang),
                     callback_data=cb.MAIN_MENU,
                 )
             ]
@@ -107,7 +107,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
 )
 @with_async_session
 async def callback_query_decline_delete_meeting(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_decline_delete_meeting")
+    logging.debug("Enter into callback_query_decline_delete_meeting")
 
     callback_data = guards.valid_callback_data(
         cb.DECLINE_DELETE_MEETING.parse(context.match),

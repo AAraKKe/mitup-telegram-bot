@@ -40,16 +40,13 @@ async def user_joins_meeting(
     """
 
     async def join_operation(meeting: Meetup, user: User) -> MeetingMessages:
-        assert meeting.id is not None
-
-        if not user.joined_meeting(meeting.id):
-            is_full = meeting.full
-            if (joined_link := utils.joined_link(meeting, user)) is not None:
+        if not user.joined_meeting(meeting.db_id):
+            if (joined_link := meeting.add_participant(user)) is not None:
                 session.add(joined_link)
                 context.put_feature_metric(Feature.JOIN_MEETING)
                 return (
                     MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST
-                    if is_full
+                    if joined_link.is_waiting_list
                     else MeetingMessages.JOINED_MEETING_SUCCESS
                 )
             else:
@@ -108,19 +105,23 @@ async def user_leaves_meeting(
     session: Session, update: Update, context: TMitupContext, user: User, with_notification: bool = True
 ):
     async def leave_operation(meeting: Meetup, user: User) -> MeetingMessages:
-        assert meeting.id is not None
-
-        if joined_link := user.joined_meeting(meeting.id):
-            session.delete(joined_link)
+        if joined_link := meeting.participant(user.db_id):
+            promoted_links = meeting.remove_participant(joined_link)
             context.put_feature_metric(Feature.LEAVE_MEETING)
 
-            # Handle promotions from the waiting list
-            promoted_links = utils.promote_from_waiting_list(meeting)
-            await api.send_message_to_users(
-                context,
-                [link.user for link in promoted_links],
-                MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title),
-            )
+            promoted_users = [link.user for link in promoted_links]
+
+            if promoted_users:
+                views_to_send = [
+                    MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title)
+                    for user in promoted_users
+                ]
+
+                await api.send_messages_to_users(
+                    context,
+                    promoted_users,
+                    views_to_send,
+                )
 
             return MeetingMessages.LEFT_MEETING_SUCCESS
 
@@ -172,7 +173,6 @@ async def handle_join_leave_operation(
             )
 
         session.flush()
-        session.refresh(meeting)
 
         await api.update_meeting_messages(
             session=session, context=context, meeting=meeting, current_message=current_message

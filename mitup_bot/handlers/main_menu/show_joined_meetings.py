@@ -1,5 +1,3 @@
-from typing import cast
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -24,12 +22,12 @@ async def callback_query_show_joined_meetings(session: Session, update: Update, 
     )
 
     user = guards.current_user(update, session)
-    joined_meetings = sorted((link.meetup for link in user.joined_links), key=lambda meetup: cast(int, meetup.id))
+    joined_meetings = sorted((link.meetup for link in user.joined_links), key=lambda meetup: meetup.db_id)
 
     if user_meetings_buttons := [
         ButtonConfig(
             text=str(meeting.title),
-            callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)),
+            callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
         )
         for meeting in joined_meetings
     ]:
@@ -42,7 +40,7 @@ async def callback_query_show_joined_meetings(session: Session, update: Update, 
             [
                 [
                     ButtonConfig(
-                        text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user.lang)}",
+                        text=ButtonMessages.MAIN_MENU.back(lang=user.lang),
                         callback_data=cb.MAIN_MENU,
                     )
                 ]

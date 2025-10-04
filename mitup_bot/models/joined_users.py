@@ -3,11 +3,13 @@ from typing import TYPE_CHECKING
 
 from sqlmodel import Field, Relationship, SQLModel
 
+from .base_model import BaseModel
+
 if TYPE_CHECKING:  # pragma: no cover
     from . import Meetup, User
 
 
-class JoinedUsers(SQLModel, table=True):
+class JoinedUsers(BaseModel, SQLModel, table=True):
     __tablename__ = "joined_users"  # type: ignore
 
     id: int | None = Field(default=None, primary_key=True)

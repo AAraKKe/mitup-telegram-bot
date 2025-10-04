@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from telegram import Update
 
-from tests.helpers import StubMitupApp
+from tests.helpers.types import StubMitupApp
 
 
 @dataclass

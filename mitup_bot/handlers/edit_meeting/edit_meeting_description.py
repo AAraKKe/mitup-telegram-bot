@@ -22,7 +22,7 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
 )
 @with_async_session
 async def callback_query_edit_meeting_description(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_edit_description_meeting")
+    logging.debug("Enter into callback_query_edit_description_meeting")
 
     assert context.matches is not None
 
@@ -71,7 +71,7 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
 @HandlersRegistry.register_message(EditMeetingHandlerId.DESCRIPTION_MESSAGE, filters.TEXT, bindable=False)
 @with_async_session
 async def edit_description_meeting_message_handler(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into edit_description_meeting_message_handler")
+    logging.debug("Enter into edit_description_meeting_message_handler")
 
     assert update.effective_message is not None
 

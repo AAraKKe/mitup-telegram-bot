@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ------
+# This script is inteded to run the same steps someone would run when
+# first starting working on the project during CI to validate that
+# everything works.
+# ------
+
 set -ex
 apt update
 apt install -y pipx libpq-dev gcc gettext git

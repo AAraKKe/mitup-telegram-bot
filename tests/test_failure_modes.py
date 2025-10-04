@@ -13,9 +13,9 @@ import pytest
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
 
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData, UserNotFound
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.models import User
@@ -25,6 +25,9 @@ from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
 from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
+
+MEETING_ID_NOT_OWNED = 99
+MEETING_ID_NOT_FOUND = 9999
 
 
 class ErrorMode(Enum):
@@ -48,7 +51,7 @@ class MetricsProperties:
 
 @dataclass
 class Context:
-    callback_id: CallbackId
+    handler_id: HandlerId
     update_request: UpdateRequest
     id: str
     error_modes: set[ErrorMode]
@@ -63,31 +66,35 @@ class Context:
 
 CONTEXTS = [
     Context(
-        callback_id=EditMeetingHandlerId.DATE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE.with_id(99).with_date(dt.date(2024, 12, 21))),
+        handler_id=EditMeetingHandlerId.DATE_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
+        ),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_date",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(99).with_date(dt.date(2024, 12, 21))),
+        handler_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.SET_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
+        ),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_date",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(99)),
+        handler_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_time",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(99)),
+        handler_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="delete_meeting_datetime",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_time_message",
@@ -96,83 +103,105 @@ CONTEXTS = [
         meeting_id={ContextId.EDIT_MEETING_TIME: 99},
     ),
     Context(
-        callback_id=EditMeetingHandlerId.WRONG_TIME_FORMAT,
+        handler_id=EditMeetingHandlerId.WRONG_TIME_FORMAT,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="wrong_time_format",
     ),
     Context(
-        callback_id=EditSettingsHandlerId.LANGUAGE_CALLBACK,
+        handler_id=EditSettingsHandlerId.LANGUAGE_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_LANGUAGE),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="user_not_found_edit_language",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MISSING_USER_DATA},
         metrics_properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
         id="set_meeting_time_message",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.DATE_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE.with_date(dt.date(2024, 12, 21))),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="edit_meeting_date",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_date(dt.date(2024, 12, 21))),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="set_meeting_date",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
+        handler_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="edit_meeting_time",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
+        handler_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="delete_meeting_datetime",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(99)),
+        handler_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="edit_meeting_settings",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_WAITING_LIST.with_id(99)),
+        handler_id=EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_WAITING_LIST.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="set_meeting_waiting_list",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_MEETING_PUBLIC_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_PUBLIC.with_id(99)),
+        handler_id=EditMeetingHandlerId.SET_MEETING_PUBLIC_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_PUBLIC.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="set_meeting_public",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_INCOGNITO.with_id(99)),
+        handler_id=EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_INCOGNITO.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="set_meeting_incognito",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_MEETING_ALLOW_INVITATIONS_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_ALLOW_INVITATIONS.with_id(99)),
+        handler_id=EditMeetingHandlerId.SET_MEETING_ALLOW_INVITATIONS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_ALLOW_INVITATIONS.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="set_meeting_allow_invitations",
     ),
     Context(
-        callback_id=EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_SHOW_TIMEZONE.with_id(99)),
+        handler_id=EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_SHOW_TIMEZONE.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="set_meeting_show_timezone",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(MEETING_ID_NOT_FOUND, 1)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_FOUND},
+        id="edit_meeting_participants_kick_out",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(MEETING_ID_NOT_OWNED, 1)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_participants_kick_out",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(MEETING_ID_NOT_OWNED, 1)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_participants_kick_out",
     ),
 ]
 
@@ -203,7 +232,7 @@ def handler_stops_when_meeting_not_found() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_NOT_FOUND in context.error_modes]
 
 
-def handler_stopes_due_to_missing_user_data() -> list[Context]:
+def handler_stops_due_to_missing_user_data() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MISSING_USER_DATA in context.error_modes]
 
 
@@ -230,10 +259,10 @@ async def test_callback_fails_when_meeting_not_accessible(
     user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(create_meetup(id=99))
+    mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED))
 
     with MockApi.start("mitup_bot.guards") as api:
-        context, _ = await call_handler(update, app, test_context.callback_id, test_context.meeting_id)
+        context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -274,7 +303,7 @@ async def test_callback_fails_when_meeting_not_found(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with MockApi.start("mitup_bot.guards") as api:
-        context, _ = await call_handler(update, app, test_context.callback_id, test_context.meeting_id)
+        context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [MetricKey.FAULT, MetricKey.TIME]
@@ -293,7 +322,7 @@ async def test_callback_fails_when_meeting_not_found(
     keyboard = test_context.custom_keyboard or [
         [
             ButtonConfig(
-                text=f"{ButtonMessages.GO_BACK}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
+                text=f"{ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang)}",
                 callback_data=cb.MAIN_MENU,
             )
         ]
@@ -322,7 +351,7 @@ async def test_callback_fails_with_malformed_callback_data(
     update: Update,
     app: StubMitupApp,
 ):
-    context, _ = await call_handler(update, app, test_context.callback_id, test_context.meeting_id)
+    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -356,7 +385,7 @@ async def test_callback_fails_when_user_is_not_found(
     app: StubMitupApp,
 ):
     # Do not register the user in the db and call the handler
-    context, _ = await call_handler(update, app, test_context.callback_id, test_context.meeting_id)
+    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -382,7 +411,7 @@ async def test_callback_fails_when_user_is_not_found(
     "test_context, update",
     [
         pytest.param(context, context.update_request, id=context.id)
-        for context in handler_stopes_due_to_missing_user_data()
+        for context in handler_stops_due_to_missing_user_data()
     ],
     indirect=["update"],
 )
@@ -397,7 +426,7 @@ async def test_callback_fails_when_missing_necessary_user_data(
     # there is no need to add any.
     # If this test fails because the an object is not found in the database, it means that the
     # validation is not happening in the right place and the callback needs to be updated.
-    context, _ = await call_handler(update, app, test_context.callback_id, test_context.meeting_id)
+    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [

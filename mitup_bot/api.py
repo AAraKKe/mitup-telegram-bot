@@ -1,6 +1,7 @@
 import logging
 import re
 from asyncio import gather
+from collections.abc import Sequence
 from contextlib import contextmanager
 
 from sqlmodel import Session
@@ -55,25 +56,43 @@ async def send_message_to_user(*, context: TMitupContext, user: User, view: Mitu
         try:
             return await context.bot.send_message(chat_id=user.tg_user_id, text=message, reply_markup=reply_markup)
         except Forbidden as e:
-            logging.info(f"User {user.tg_user_id} has blocked the bot.")
+            logging.warning(f"User {user.tg_user_id} has blocked the bot.")
             raise InactiveUserInteraction(user.tg_user_id, private=True) from e
+        except BadRequest as e:
+            if "not found" in e.message:
+                logging.warning(f"User {user.tg_user_id} is not in Telegram.")
+                raise InactiveUserInteraction(user.tg_user_id, private=True) from e
+            raise
 
 
-async def send_message_to_users(context: TMitupContext, users: list[User], view: MitupView | str):
+async def send_messages_to_users(context: TMitupContext, users: Sequence[User], views: Sequence[MitupView | str]):
     """
-    Sends the same message to multiple users.
+    Sends messages to multiple users.
+
+    If a user has blocked the bot or is no longer available, they will be marked as inactive
+    in the database and no exception will be raised.
     """
+
+    if len(users) != len(views):
+        raise ValueError("The number of users and views must be the same")
 
     awaitables = [
         send_message_to_user(
             context=context,
             user=user,
-            view=view,
+            view=views[i],
         )
-        for user in users
+        for i, user in enumerate(users)
     ]
 
-    await gather(*awaitables)
+    results = await gather(*awaitables, return_exceptions=True)
+
+    # Mark users as inactive if they have blocked the bot
+    for user, result in zip(users, results, strict=True):
+        if isinstance(result, InactiveUserInteraction):
+            logging.info(f"Marking user {user.tg_user_id} as inactive")
+            user.is_active = False
+            context.put_custom_metric(MetricKey.INACTIVE_USER_SET)
 
 
 @contextmanager

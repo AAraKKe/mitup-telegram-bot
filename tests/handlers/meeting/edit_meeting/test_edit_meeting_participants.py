@@ -13,9 +13,18 @@ from mitup_bot.handlers.edit_meeting.views import edit_max_participants_view, ed
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import (
+    AnyFloat,
+    MockApi,
+    StubMitupApp,
+    StubMitupContext,
+    UpdateRequest,
+    call_handler,
+    create_meetup,
+    create_user,
+)
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -472,3 +481,39 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
     api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+
+
+def test_edit_meeting_participants_view_without_participants(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    view = edit_participants_view(user_with_settings.meetups[0])
+
+    # Without any participants the view only has the max participants button
+    # The keyboard has the max participants button and the back button
+    assert len(view.keyboard) == 2
+    # The first row only has one
+    assert len(view.keyboard[0]) == 1
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=user_with_settings.lang)
+
+
+def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    other_user = create_user(id=2, username="other_user", first_name="Other User")
+    user_with_settings.meetups[0].add_participant(other_user)
+
+    view = edit_participants_view(user_with_settings.meetups[0])
+
+    # The keyboard has the 2 rows of buttons
+    assert len(view.keyboard) == 2
+    # The first row now has 2 buttons
+    assert len(view.keyboard[0]) == 2
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=user_with_settings.lang)
+    assert view.keyboard[0][1].text == ButtonMessages.MEETING_KICK_OUT.get(lang=user_with_settings.lang)

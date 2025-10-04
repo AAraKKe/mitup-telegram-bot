@@ -27,7 +27,7 @@ class ConversationMeetingState(Enum):
 )
 @with_async_session
 async def callback_query_create_meeting(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_create_meeting")
+    logging.debug("Enter into callback_query_create_meeting")
 
     user = guards.current_user(update, session)
     view = views.factory.create_meeting_view(lang=user.lang)
@@ -75,7 +75,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
     MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK, callback_data=cb.CANCEL_CREATE_MEETING, bindable=False
 )
 async def callback_query_cancel_meeting(update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_cancel_meeting")
+    logging.debug("Enter into callback_query_cancel_meeting")
 
     # Just send the user to the main menu
     await callback_query_main_menu(update, context)

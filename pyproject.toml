@@ -2,18 +2,17 @@
 name = "mitup_bot"
 dynamic = ["version"]
 description = "Telegram social bot to manage your meetings"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 requires-python = ">=3.13"
 authors = [
     { name = "Enrique Araque", email = "minixute@gmail.com" },
-    { name = "Juanpe Araque", email = "erjuanpea@gmail.com" }
+    { name = "Juanpe Araque", email = "erjuanpea@gmail.com" },
 ]
 classifiers = [
     "Development Status :: 1 - Planning",
     "Programming Language :: Python :: 3.13",
-    "Framework :: FastAPI",
     "Framework :: Hatch",
-    "Topic :: Communications :: Chat"
+    "Topic :: Communications :: Chat",
 ]
 dependencies = [
     "python-telegram-bot[ext]==22.5",
@@ -28,6 +27,7 @@ dependencies = [
     "tzdata~=2025.1",
     "googlemaps~=4.10.0",
     "aws-embedded-metrics~=3.3.0",
+    "pyyaml~=6.0",
 ]
 
 [project.urls]
@@ -50,9 +50,9 @@ filterwarnings = [
     # Warning thrown by alembic on the test we break on purpose the revision graph
     'ignore:.*Revision rev3.*Migration 4:UserWarning',
     # Ignore warnings from PTB regarding ChatFullInfo since we do not use that information
-    'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*'
+    'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*',
 ]
-asyncio_default_fixture_loop_scope="function"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.pyright]
 exclude = [
@@ -84,7 +84,7 @@ ignore = [
     "aws",
     "site",
     "test.py",
-    "dist"
+    "dist",
 ]
 
 [tool.coverage.run]
@@ -118,20 +118,22 @@ exclude_also = [
 # Builds
 # --------------------------
 [tool.hatch.build.targets.wheel]
-exclude = [
-    ".gitlab-ci.yaml",
-    ".gitlab",
-    ".vscode",
-    "bin",
-    "tests"
-]
+exclude = [".gitlab-ci.yaml", ".gitlab", ".vscode", "bin", "tests"]
 packages = ["mitup_bot"]
 
 
 [tool.ruff]
 line-length = 120
 indent-width = 4
-exclude = [".hatch", ".git", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "sim.py"]
+exclude = [
+    ".hatch",
+    ".git",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "sim.py",
+]
 src = ["mitup_bot", "tests"]
 
 [tool.ruff.lint]
@@ -189,17 +191,21 @@ dependencies = [
     "freezegun",
     "ruff==0.13.0",
     "boto3~=1.34",
-    "boto3-stubs[essential,ecs,cloudfront]",
     "debugpy",
-    "sourcery-nightly",
     "mkdocs",
     "mkdocs-material",
+    "deepdiff",
+    "boto3-stubs[essential,ecs,cloudfront]",
+    "sourcery-nightly",
 ]
 [tool.hatch.envs.dev.env-vars]
 PYRIGHT_PYTHON_FORCE_VERSION = "latest"
 
 [tool.hatch.envs.dev.scripts]
-test = ["build-locales", "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests {args:}"]
+test = [
+    "build-locales",
+    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests {args:}",
+]
 test-cov = [
     "build-locales",
     "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json {args:}",
@@ -210,13 +216,7 @@ lint = "ruff check {args:} --diff --unsafe-fixes ."
 fix-lint = "ruff check --fix --unsafe-fixes ."
 fix = ["format", "fix-lint"]
 type-check = "pyright --stats --warnings mitup_bot tests bin"
-validate = [
-    "- format-check",
-    "- lint",
-    "- type-check",
-    "- test",
-]
-setup-vscode = "python bin/setup_vscode.py"
+validate = ["- format-check", "- lint", "- type-check", "- test"]
 migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -1"
 launch-events = "python -m mitup_bot.cli.run recurrent-events {args:}"
@@ -225,9 +225,6 @@ debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for
 help = "python -m mitup_bot.cli.run launch --help"
 deploy = "python -m mitup_bot.cli.run deploy {args:}"
 validate-migrations = "python -m mitup_bot.cli.run validate-migrations"
-ci-sourcery-login = "sourcery login --token $SOURCERY_TOKEN"
-ci-sourcery = "sourcery assistant review gitlab-merge-request --gitlab-token $SOURCERY_AI_BOT --project $CI_PROJECT_PATH --merge-request $CI_MERGE_REQUEST_IID --commit $CI_COMMIT_SHA"
-mr-sourcery = ["ci-sourcery-login", "ci-sourcery"]
 serve-docs = "mkdocs serve"
 build-docs = "mkdocs build --strict"
 push-docs = "python -m mitup_bot.cli.run publish-docs {args:}"
@@ -236,7 +233,10 @@ validate-locales = "python -m mitup_bot.cli.run translations validate-ids"
 build-locales = "python -m mitup_bot.cli.run translations build"
 update-locales = ["update-source-language", "build-locales"]
 set-local-bot = "python -m mitup_bot.cli.run dev {args:}"
-
+populate-db = "python bin/populate_db.py {args:}"
+ci-sourcery-login = "sourcery login --token $SOURCERY_TOKEN"
+ci-sourcery = "sourcery assistant review gitlab-merge-request --gitlab-token $SOURCERY_AI_BOT --project $CI_PROJECT_PATH --merge-request $CI_MERGE_REQUEST_IID --commit $CI_COMMIT_SHA"
+mr-sourcery = ["ci-sourcery-login", "ci-sourcery"]
 
 # ----------------------
 # Production environment

@@ -1,6 +1,5 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import cast
 from unittest import mock
 
 import pytest
@@ -591,23 +590,23 @@ def expected_meeting_settings_view(
 
     message = MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=lang)
     waiting_list_button = options_button(
-        cb.SET_MEETING_WAITING_LIST.with_id(cast(int, meeting.id)),
+        cb.SET_MEETING_WAITING_LIST.with_id(meeting.db_id),
         ButtonMessages.WAITING_LIST.get(lang=lang),
         waiting_list,
     )
     public_button = options_button(
-        cb.SET_MEETING_PUBLIC.with_id(cast(int, meeting.id)), ButtonMessages.PUBLIC.get(lang=lang), public
+        cb.SET_MEETING_PUBLIC.with_id(meeting.db_id), ButtonMessages.PUBLIC.get(lang=lang), public
     )
     invitation_button = options_button(
-        cb.SET_MEETING_ALLOW_INVITATIONS.with_id(cast(int, meeting.id)),
+        cb.SET_MEETING_ALLOW_INVITATIONS.with_id(meeting.db_id),
         ButtonMessages.OPEN_INVITATION.get(lang=lang),
         invitation,
     )
     incognito_button = options_button(
-        cb.SET_MEETING_INCOGNITO.with_id(cast(int, meeting.id)), ButtonMessages.INCOGNITO.get(lang=lang), incognito
+        cb.SET_MEETING_INCOGNITO.with_id(meeting.db_id), ButtonMessages.INCOGNITO.get(lang=lang), incognito
     )
     show_timezone_button = options_button(
-        cb.SET_MEETING_SHOW_TIMEZONE.with_id(cast(int, meeting.id)),
+        cb.SET_MEETING_SHOW_TIMEZONE.with_id(meeting.db_id),
         ButtonMessages.SHOW_TIMEZONE.get(lang=lang),
         show_timezone,
     )
@@ -619,9 +618,7 @@ def expected_meeting_settings_view(
             [invitation_button, incognito_button],
             [show_timezone_button],
         ],
-    ).with_back_button(
-        text=ButtonMessages.EDIT, callback_data=cb.EDIT_MEETING.with_id(cast(int, meeting.id)), lang=lang
-    )
+    ).with_back_button(text=ButtonMessages.EDIT, callback_data=cb.EDIT_MEETING.with_id(meeting.db_id), lang=lang)
 
 
 @pytest.mark.parametrize("waiting_list", [True, False], ids=["waiting_list_true", "waiting_list_false"])

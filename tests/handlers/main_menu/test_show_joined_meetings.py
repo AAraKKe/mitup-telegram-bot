@@ -1,5 +1,4 @@
 import re
-from typing import cast
 
 import pytest
 from telegram import Update
@@ -67,7 +66,7 @@ async def test_show_meetings_use_correct_view(
     context, _ = await call_handler(update, app, MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK)
 
     user_meetings_buttons: list[ButtonConfig] = [
-        ButtonConfig(text=str(link.meetup.title), callback_data=cb.SHOW_MEETING.with_id(cast(int, link.meetup.id)))
+        ButtonConfig(text=str(link.meetup.title), callback_data=cb.SHOW_MEETING.with_id(link.meetup.db_id))
         for link in user_with_settings.joined_links
     ]
 
@@ -82,7 +81,7 @@ async def test_show_meetings_use_correct_view(
         [
             [
                 ButtonConfig(
-                    text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
                     callback_data=cb.MAIN_MENU,
                 )
             ]

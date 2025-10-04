@@ -102,8 +102,9 @@ class PaginatedMitupView(MitupView):
     Args:
         description (str): A description of the view.
         buttons (list[ButtonConfig]): A list of button configurations to display.
-        page_number (int): The current page number to display.
+        page_number (int): The current page number to display. Starts at 1.
         navigation_callback_data (CallbackData): The callback data to use for navigation buttons.
+                                                 Mandatory if there are more than one page.
         row_size (int, optional): The number of buttons per row. Defaults to 2.
         column_size (int, optional): The number of buttons per column. Defaults to 2.
     """
@@ -122,7 +123,6 @@ class PaginatedMitupView(MitupView):
         self.column_size = column_size
         self.page_size = row_size * column_size
         self.page_number = page_number
-        self.navigation_callback_data = navigation_callback_data
         self.total_pages = ceil(len(buttons) / self.page_size)
         self.buttons = buttons
 
@@ -135,10 +135,10 @@ class PaginatedMitupView(MitupView):
         else:
             self.position = PaginatedViewPosition.MIDDLE
 
-        keyboard = self.__get_paginated_view()
+        keyboard = self.__get_paginated_view(navigation_callback_data)
         super().__init__(description, keyboard)
 
-    def __get_paginated_view(self) -> list[ButtonRow]:
+    def __get_paginated_view(self, navigation_callback_data: CallbackData | None) -> list[ButtonRow]:
         if self.page_number <= 0 or self.page_number > self.total_pages:
             raise ValueError("Invalid paginated position")
 
@@ -148,21 +148,20 @@ class PaginatedMitupView(MitupView):
         button_in_page = self.buttons[first_button:last_button]
         keyboard = [list(row) for row in batched(button_in_page, self.column_size, strict=False)]
         if self.position is not PaginatedViewPosition.UNIQUE:
-            keyboard += [self.__match_navigation_button()]
+            if navigation_callback_data is None:
+                raise ValueError("navigation_callback_data is required when there are more than one page")
+            keyboard += [self.__match_navigation_button(navigation_callback_data)]
 
         return keyboard
 
-    def __match_navigation_button(self) -> ButtonRow:
-        if self.navigation_callback_data is None:
-            raise ValueError("Navigation callback data is required for paginated views with more than one page")
-
+    def __match_navigation_button(self, navigation_callback_data: CallbackData) -> ButtonRow:
         go_back = ButtonConfig(
             text=ButtonMessages.GO_BACK,
-            callback_data=self.navigation_callback_data.with_id(self.page_number - 1),
+            callback_data=navigation_callback_data.with_id(self.page_number - 1),
         )
         go_forward = ButtonConfig(
             text=ButtonMessages.GO_FORWARD,
-            callback_data=self.navigation_callback_data.with_id(self.page_number + 1),
+            callback_data=navigation_callback_data.with_id(self.page_number + 1),
         )
 
         match self.position:

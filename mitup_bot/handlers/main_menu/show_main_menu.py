@@ -17,7 +17,7 @@ from .enums import MainMenuHandlerId
 )
 @with_async_session
 async def callback_query_main_menu(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_main_menu")
+    logging.debug("Enter into callback_query_main_menu")
 
     context.clean_all_user_data()
 

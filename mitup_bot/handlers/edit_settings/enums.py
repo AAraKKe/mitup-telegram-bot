@@ -1,9 +1,9 @@
 from enum import Enum, auto
 
-from mitup_bot.callback_id import CallbackId
+from mitup_bot.handler_id import HandlerId
 
 
-class EditSettingsHandlerId(CallbackId):
+class EditSettingsHandlerId(HandlerId):
     EDIT = auto()
 
     # Edit registration timezone

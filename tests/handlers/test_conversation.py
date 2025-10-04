@@ -1,20 +1,20 @@
 import pytest
 from telegram import Update
 
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 
 
-class CommandsTestId(CallbackId):
+class CommandsTestId(HandlerId):
     COMMAND_REGISTERED = "new_command_registered"
     COMMAND_REGISTERED_2 = "other new command registered"
     COMMAND_NOT_REGISTERED = "not_registered"
 
 
-class ConversationsTestId(CallbackId):
+class ConversationsTestId(HandlerId):
     CONVERSATION_WITH_NO_HANDLERS = "conversation_with_no_handlers"
     CONVERSATION_WITH_HANDLERS = "conversation_with_handlers"
 

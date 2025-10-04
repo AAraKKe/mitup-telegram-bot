@@ -2,33 +2,33 @@ from enum import auto
 
 import pytest
 
-from mitup_bot.callback_id import CallbackId
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.commands import CommandsId
 
 
-class MyCallbackId(CallbackId):
+class MyCallbackId(HandlerId):
     SOMETHING = auto()
     SOMETHING_ELSE = auto()
 
 
-class MyHandlerId(CallbackId):
+class MyHandlerId(HandlerId):
     LOCATION_NAME = auto()
     LOCATION_COORDINATES = auto()
 
 
-class MyHandler(CallbackId):
+class MyHandler(HandlerId):
     LOCATION_NAME = auto()
     LOCATION_COORDINATES = auto()
 
 
-class NoKeywords(CallbackId):
+class NoKeywords(HandlerId):
     SINGLE = auto()
     MULTIPLE_PARTS = auto()
     CALLBACK = auto()
 
 
 @pytest.mark.parametrize(
-    "callback_id, expected",
+    "handler_id, expected",
     [
         (MyCallbackId.SOMETHING, "MySomething"),
         (MyCallbackId.SOMETHING_ELSE, "MySomethingElse"),
@@ -52,12 +52,12 @@ class NoKeywords(CallbackId):
         "CommandsId.MAIN_MENU",
     ],
 )
-def test_callback_id_dimension(callback_id: CallbackId, expected: CallbackId):
-    assert callback_id.dimension == expected
+def test_handler_id_dimension(handler_id: HandlerId, expected: HandlerId):
+    assert handler_id.dimension == expected
 
 
 @pytest.mark.parametrize(
-    "callback_id, expected",
+    "handler_id, expected",
     [
         (MyCallbackId.SOMETHING, "MyCallbackId.SOMETHING"),
         (MyCallbackId.SOMETHING_ELSE, "MyCallbackId.SOMETHING_ELSE"),
@@ -69,5 +69,5 @@ def test_callback_id_dimension(callback_id: CallbackId, expected: CallbackId):
         "MyHandlerId.LOCATION_NAME",
     ],
 )
-def test_callback_id_value(callback_id: CallbackId, expected: CallbackId):
-    assert callback_id.value == expected
+def test_handler_id_value(handler_id: HandlerId, expected: HandlerId):
+    assert handler_id.value == expected

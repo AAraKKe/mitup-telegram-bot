@@ -83,11 +83,15 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         self.telegram_update = update
         self.handler_dimensionality = NULL_DIMENSIONALITY
         self.avoid_per_callback_metrics = False
+        self.__update = update
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
         user_id = update.effective_user.id if update and update.effective_user else None
 
         super().__init__(application=application, chat_id=chat_id, user_id=user_id)
+
+    def get_update(self) -> Update:
+        return self.__update
 
     @property
     def handler_metrics_logger(self) -> MitupMetricsLogger:
@@ -96,7 +100,11 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
     def __get_user_data_property[T: int | str | bool](
         self, context: ContextId, property: str, property_type: type[T], ensure_clean: bool
     ) -> Generator[T]:
-        """Retrive the meeting id stored in given context and remove it once out of the context manager"""
+        """
+        Retrive a given property stored in the user data.
+
+        If ensure_clean is True, the property is removed after yielding it
+        """
         self.handler_metrics_logger.set_property("ContextId", context.value)
 
         if (

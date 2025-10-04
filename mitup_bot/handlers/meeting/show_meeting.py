@@ -19,7 +19,7 @@ from .enums import MeetingHandlerId
 )
 @with_async_session
 async def callback_query_show_meeting(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_show_meeting")
+    logging.debug("Enter into callback_query_show_meeting")
 
     callback_data = guards.valid_callback_data(
         cb.SHOW_MEETING.parse(context.match), MeetingHandlerId.SHOW_MEETING_CALLBACK

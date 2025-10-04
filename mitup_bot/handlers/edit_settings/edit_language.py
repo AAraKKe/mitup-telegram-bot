@@ -18,7 +18,7 @@ from .enums import EditSettingsHandlerId
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.LANGUAGE_CALLBACK, callback_data=cb.EDIT_LANGUAGE)
 @with_async_session
 async def callback_query_timezone(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_settings_timezone")
+    logging.debug("Enter into callback_query_settings_timezone")
 
     user = guards.current_user(update, session)
 
@@ -30,7 +30,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_LANGUAGE)
 @with_async_session
 async def callback_query_set_timezone(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_settings_timezone")
+    logging.debug("Enter into callback_query_settings_timezone")
 
     user = guards.current_user(update, session)
 

@@ -33,7 +33,7 @@ The rest of the modules in the root of the mitup_bot folder reference direct uti
 - api: methods to interact with the bot api
 - app: defines the PTB app that is run when the bot is launched
 - callback_data contains the centralized definition of how callback data is handled in a request. All callbacks in the utils.callbacks module are instances of this callback data
-- callback_id contains the definition of a callback id, used to identify each handler.
+- handler_id contains the definition of a handler id, used to identify each handler.
 - custom_context contains the custom PTB context for the bot. This defines methods to access telemetry and emit it among other things
 - db contains the necessary tooling to interact with the database
 - guards are a set of methods that are used to validate input received by a handler

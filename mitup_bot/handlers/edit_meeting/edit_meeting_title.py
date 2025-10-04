@@ -22,7 +22,7 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
 )
 @with_async_session
 async def callback_query_edit_meeting_title(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_edit_title_meeting")
+    logging.debug("Enter into callback_query_edit_title_meeting")
 
     meeting_id = guards.valid_callback_data(
         cb.EDIT_MEETING_TITLE.parse(context.match), EditMeetingHandlerId.TITLE_CALLBACK
@@ -65,7 +65,7 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
 @HandlersRegistry.register_message(EditMeetingHandlerId.TITLE_MESSAGE, filters.TEXT, bindable=False)
 @with_async_session
 async def edit_title_meeting_message_handler(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into edit_title_meeting_message_handler")
+    logging.debug("Enter into edit_title_meeting_message_handler")
 
     assert update.effective_message is not None and update.effective_message.text is not None
 

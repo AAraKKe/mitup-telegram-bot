@@ -69,3 +69,4 @@ class Feature(CamelCaseStrEnum):
     SHARE_MEETING = auto()
     JOIN_MEETING = auto()
     LEAVE_MEETING = auto()
+    KICK_OUT_PARTICIPANT = auto()

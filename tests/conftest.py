@@ -18,9 +18,11 @@ from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring.metrics import configure_metrics
 from mitup_bot.translations import SUPPORTED_LANGUAGES
-from tests.helpers import CliRunner as TypeRunner
-from tests.helpers import HandlerContext, UpdateRequest, build_context, create_meetup
+from tests.helpers.context import build_context
+from tests.helpers.fixtures import UpdateRequest, create_meetup
+from tests.helpers.handler_context import HandlerContext
 from tests.helpers.stub_db import MockDbSession
+from tests.helpers.types import CliRunner as TypeRunner
 
 
 @pytest.fixture
@@ -77,7 +79,7 @@ def settings(user: UserModel) -> Settings:
         id=1,
         timezone="Europe/Madrid",
         user=user,
-        user_id=user.id,
+        user_id=user.db_id,
     )
 
 
@@ -106,7 +108,7 @@ def user_with_settings(settings: Settings, lang: str) -> UserModel:
         ],
     )
     settings.user = user
-    settings.user_id = user.id
+    settings.user_id = user.db_id
     settings.language = lang
     user.settings = settings
     return user

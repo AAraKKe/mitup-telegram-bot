@@ -37,6 +37,7 @@ class MockDbSession(mock.MagicMock):
         super().__init__(*args, spec=Session, **kwargs)
         self.add = mock.MagicMock(side_effect=self.__add_side_effect)
         self.flush = mock.MagicMock()
+        self.refresh = mock.MagicMock()
         self.exec_return = mock.MagicMock()
         self.exec = mock.MagicMock(side_effect=self.__exec_side_effect)
         self.delete = mock.MagicMock()
@@ -80,6 +81,12 @@ class MockDbSession(mock.MagicMock):
         Asserts that the `flush` method has been called exactly once.
         """
         self.flush.assert_called_once()
+
+    def assert_refresh(self, *objs: SQLModel):
+        """
+        Asserts that the `refresh` method has been called for the given objects.
+        """
+        self.refresh.assert_has_calls([mock.call(obj) for obj in objs], any_order=True)
 
     def assert_added(self, *objs: SQLModel):
         """

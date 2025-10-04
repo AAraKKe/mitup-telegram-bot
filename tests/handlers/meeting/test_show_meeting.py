@@ -41,13 +41,13 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     # The user_with_settings fixture should ideally set this up.
     # If not, we need to adjust it here or the fixture.
     # Assuming user_with_settings.meetups is populated by the fixture and meetups[0] has id=1.
-    if not user_with_settings.meetups or user_with_settings.meetups[0].id != 1:
+    if not user_with_settings.meetups or user_with_settings.meetups[0].db_id != 1:
         # If fixture doesn't provide meetups[0] as id=1, create/modify it
         # This is a fallback, ideally fixture is canonical
         meeting1 = create_meetup(id=1, title="Test Meeting 1 for Show", owner=user_with_settings)
         if user_with_settings.meetups:
             # Try to replace or ensure it's the first for consistency if test relies on meetups[0]
-            if user_with_settings.meetups[0].id == 1:
+            if user_with_settings.meetups[0].db_id == 1:
                 user_with_settings.meetups[0] = meeting1  # replace if id matches but owner might be wrong
             else:
                 user_with_settings.meetups.insert(0, meeting1)  # add at beginning
@@ -57,7 +57,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
         user_with_settings.meetups[0].owner = user_with_settings
 
     target_meeting = user_with_settings.meetups[0]
-    assert target_meeting.id == 1, "Target meeting for test should have ID 1"
+    assert target_meeting.db_id == 1, "Target meeting for test should have ID 1"
     assert target_meeting.owner == user_with_settings, "Target meeting not owned by user_with_settings"
 
     mock_session.add_object(target_meeting)

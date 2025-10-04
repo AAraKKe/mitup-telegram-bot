@@ -24,10 +24,10 @@ from telegram.warnings import PTBUserWarning
 
 from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.mitup_types import HandlerCallback, TMitupContext
 
@@ -43,13 +43,13 @@ filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBU
 
 
 def callback_with_metrics(
-    callback_id: CallbackId, handler_type: str, callback: HandlerCallback, env: Env
+    handler_id: HandlerId, handler_type: str, callback: HandlerCallback, env: Env
 ) -> HandlerCallback:
     async def inner_callback(update: Update, context: TMitupContext):
         # Set Handler as dimensions for every metric emission from within a callback
         # Setting them as default dimensions so any flush does not remove them and we also
         # override aws default dimensions we are not interested in.
-        context.prepare_handler_metrics({"Handler": callback_id.dimension, "HandlerType": handler_type})
+        context.prepare_handler_metrics({"Handler": handler_id.dimension, "HandlerType": handler_type})
         start = perf_counter()
         return_value = None
         try:
@@ -94,7 +94,7 @@ async def callback_query_fallback(update: Update, context: TMitupContext):
     # No need to create a message for this as there will be no transaltions. Before translations
     # are added all features should be finished.
     message = "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀"
-    logging.info(update)
+    logging.debug(update)
     with suppress(TelegramError):
         await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
 
@@ -110,12 +110,12 @@ class HandlersRegistry:
     """
 
     env: Env = Env.DEV
-    handlers: dict[CallbackId, HandlerWrapper] = {}
+    handlers: dict[HandlerId, HandlerWrapper] = {}
 
     @classmethod
     def register_command(
         cls,
-        callback_id: CallbackId,
+        handler_id: HandlerId,
         bindable: bool = True,
         group: int = 0,
         command: str | None = None,
@@ -143,13 +143,13 @@ class HandlersRegistry:
 
             command_name = command or func_name.replace("command_", "")
 
-            if callback_id in cls.handlers:
-                raise HandlerRegisteredError(callback_id)
+            if handler_id in cls.handlers:
+                raise HandlerRegisteredError(handler_id)
 
-            cls.handlers[callback_id] = HandlerWrapper(
+            cls.handlers[handler_id] = HandlerWrapper(
                 handler=CommandHandler(
                     command_name,
-                    callback=callback_with_metrics(callback_id, "Command", callback, cls.env),
+                    callback=callback_with_metrics(handler_id, "Command", callback, cls.env),
                     filters=filters,
                     block=block,
                     has_args=has_args,
@@ -164,7 +164,7 @@ class HandlersRegistry:
     @classmethod
     def register_message(
         cls,
-        callback_id: CallbackId,
+        handler_id: HandlerId,
         filters: BaseFilter,
         bindable: bool = True,
         group: int = 0,
@@ -181,13 +181,13 @@ class HandlersRegistry:
         def wrapper(
             callback: HandlerCallback,
         ) -> HandlerCallback:
-            if callback_id in cls.handlers:
-                raise HandlerRegisteredError(callback_id)
+            if handler_id in cls.handlers:
+                raise HandlerRegisteredError(handler_id)
 
-            cls.handlers[callback_id] = HandlerWrapper(
+            cls.handlers[handler_id] = HandlerWrapper(
                 handler=MessageHandler(
                     filters=filters,
-                    callback=callback_with_metrics(callback_id, "Message", callback, cls.env),
+                    callback=callback_with_metrics(handler_id, "Message", callback, cls.env),
                     block=block,
                 ),
                 bindable=bindable,
@@ -200,7 +200,7 @@ class HandlersRegistry:
     @classmethod
     def register_callback_query(
         cls,
-        callback_id: CallbackId,
+        handler_id: HandlerId,
         bindable: bool = True,
         auto_answer: bool = True,
         group: int = 0,
@@ -220,8 +220,8 @@ class HandlersRegistry:
         def wrapper(
             callback: HandlerCallback,
         ) -> HandlerCallback:
-            if callback_id in cls.handlers:
-                raise HandlerRegisteredError(callback_id)
+            if handler_id in cls.handlers:
+                raise HandlerRegisteredError(handler_id)
 
             async def inner_wrapper(update: Update, context: MitupContext):
                 result = await callback(update, context)
@@ -231,10 +231,10 @@ class HandlersRegistry:
                         await context.bot.answer_callback_query(update.callback_query.id)
                 return result
 
-            cls.handlers[callback_id] = HandlerWrapper(
+            cls.handlers[handler_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
                     pattern=callback_data.pattern if callback_data else None,
-                    callback=callback_with_metrics(callback_id, "Callback", inner_wrapper, cls.env),
+                    callback=callback_with_metrics(handler_id, "Callback", inner_wrapper, cls.env),
                     block=block,
                 ),
                 bindable=bindable,
@@ -261,7 +261,7 @@ class HandlersRegistry:
         app.add_handler(CallbackQueryHandler(callback=callback_query_fallback))
 
     @classmethod
-    def get_handler(cls, key: CallbackId) -> BaseHandler[Update, MitupContext, object]:
+    def get_handler(cls, key: HandlerId) -> BaseHandler[Update, MitupContext, object]:
         if key not in cls.handlers:
             raise HandlerNotRegistered(key)
         return cls.handlers[key].handler
@@ -269,10 +269,10 @@ class HandlersRegistry:
     @classmethod
     def register_conversation_handler(
         cls,
-        callback_id: CallbackId,
-        entry_points_handler_names: list[CallbackId],
-        states: dict[Enum, list[CallbackId]],
-        fallbacks: list[CallbackId],
+        handler_id: HandlerId,
+        entry_points_handler_names: list[HandlerId],
+        states: dict[Enum, list[HandlerId]],
+        fallbacks: list[HandlerId],
         bindable: bool = True,
         group: int = 0,
         allow_reentry: bool = True,
@@ -284,8 +284,8 @@ class HandlersRegistry:
         map_to_parent: dict[object, object] | None = None,
         block: bool = True,
     ):
-        if callback_id in cls.handlers:
-            raise HandlerRegisteredError(callback_id)
+        if handler_id in cls.handlers:
+            raise HandlerRegisteredError(handler_id)
 
         missing_handlers = [name for name in entry_points_handler_names if name not in cls.handlers]
         missing_handlers += [name for state in states.values() for name in state if name not in cls.handlers]
@@ -294,7 +294,7 @@ class HandlersRegistry:
         if missing_handlers:
             raise HandlerNotRegistered(missing_handlers)
 
-        cls.handlers[callback_id] = HandlerWrapper(
+        cls.handlers[handler_id] = HandlerWrapper(
             ConversationHandler(
                 entry_points=[cls.handlers[name].handler for name in entry_points_handler_names],
                 states={
@@ -309,7 +309,7 @@ class HandlersRegistry:
                 conversation_timeout=conversation_timeout,
                 persistent=persistent,
                 map_to_parent=map_to_parent,
-                name=callback_id.value,
+                name=handler_id.value,
                 block=block,
             ),
             bindable=bindable,
@@ -319,22 +319,22 @@ class HandlersRegistry:
     @classmethod
     def register_inline_handler(
         cls,
-        callback_id: CallbackId,
+        handler_id: HandlerId,
         bindable: bool = True,
         group: int = 0,
         block: bool = True,
         pattern: str | None = None,
         chat_types: list[str] | None = None,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
-        if callback_id in cls.handlers:
-            raise HandlerRegisteredError(callback_id)
+        if handler_id in cls.handlers:
+            raise HandlerRegisteredError(handler_id)
 
         def wrapper(
             callback: HandlerCallback,
         ) -> HandlerCallback:
-            cls.handlers[callback_id] = HandlerWrapper(
+            cls.handlers[handler_id] = HandlerWrapper(
                 handler=InlineQueryHandler(
-                    callback=callback_with_metrics(callback_id, "InlineQuery", callback, cls.env),
+                    callback=callback_with_metrics(handler_id, "InlineQuery", callback, cls.env),
                     pattern=pattern,
                     chat_types=chat_types,
                     block=block,

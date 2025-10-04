@@ -5,15 +5,15 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import api, guards
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.views import factory
 
 from .registry import HandlersRegistry
 
 
-class MessagesId(CallbackId):
+class MessagesId(HandlerId):
     MESSAGE_CREATE_MEETING = auto()
     MESSAGE_WITHOUT_TEXT = auto()
 

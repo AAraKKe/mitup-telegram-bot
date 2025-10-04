@@ -85,3 +85,35 @@ class DateCallbackData(CallbackData):
 
     def with_date(self, date: dt.date) -> Self:
         return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)
+
+
+class ValidKickoutCallbackData(ValidCallbackData):
+    """
+    Callback data to be used when kicking a user out of a meeting
+    The `id` field is the user being kicked out and the meeting id is provided
+    through the `meeting_id` field.
+    """
+
+    meeting_id: int
+
+
+class KickoutCallbackData(CallbackData):
+    meeting_id: int | None = None
+
+    def __str__(self):
+        return f"{self.action};{self.entity}:{self.id or ''}:{self.meeting_id or ''}"
+
+    @property
+    def pattern(self) -> str:
+        return f"^(?P<action>{self.action});(?P<entity>{self.entity}):(?P<id>\\d*):(?P<meeting_id>\\d*)$"
+
+    @field_validator("meeting_id", mode="before")
+    @classmethod
+    def validate_ids(cls, value: str | int):
+        # If meeting_id is parsed as an empty string from the callback data, let it be None
+        # Allow pydantic to handle conversion from str to int later.
+        return value or None if isinstance(value, str) else value
+
+    def with_ids(self, meeting_id: int, id: int) -> Self:
+        """Creates a KickoutCallbackData with the same information but different IDs"""
+        return self.__class__(entity=self.entity, action=self.action, id=id, meeting_id=meeting_id)

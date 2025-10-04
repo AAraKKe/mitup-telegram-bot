@@ -8,12 +8,13 @@ from mitup_bot.exceptions import UserNotFound
 from mitup_bot.views import MitupView
 
 from . import JoinedUsers, Meetup
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from . import JoinedUsers, Meetup, Settings
 
 
-class User(SQLModel, table=True):
+class User(BaseModel, SQLModel, table=True):
     # Until better configuration is available through SQLModel (https://github.com/tiangolo/sqlmodel/issues/159)
     __tablename__: str = "users"  # type: ignore
 
@@ -67,7 +68,7 @@ class User(SQLModel, table=True):
         return joined_links[0] if joined_links else None
 
     def own_meeting(self, meeting_id: int) -> "Meetup | None":  # type: ignore
-        return next((meetup for meetup in self.meetups if meetup.id == meeting_id), None)
+        return next((meetup for meetup in self.meetups if meetup.db_id == meeting_id), None)
 
     def datetime_in_tz(self, datetime: dt.datetime) -> dt.datetime:
         return datetime.astimezone(self.settings.tz)

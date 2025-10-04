@@ -1,7 +1,7 @@
 from enum import auto
 
-from mitup_bot.callback_id import CallbackId
+from mitup_bot.handler_id import HandlerId
 
 
-class InlineQueryId(CallbackId):
+class InlineQueryId(HandlerId):
     SHARE_MEETING = auto()

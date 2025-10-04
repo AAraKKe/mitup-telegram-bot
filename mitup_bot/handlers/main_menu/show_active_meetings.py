@@ -1,5 +1,4 @@
 import logging
-from typing import cast
 
 from sqlmodel import Session
 from telegram import Update
@@ -20,19 +19,19 @@ from .enums import MainMenuHandlerId
 )
 @with_async_session
 async def callback_query_show_meetings(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_show_meetings")
+    logging.debug("Enter into callback_query_show_meetings")
 
     callback_data = guards.valid_callback_data(
         cb.SHOW_ACTIVE_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_MEETINGS_CALLBACK
     )
 
     user = guards.current_user(update, session)
-    user_meetings = sorted(user.meetups, key=lambda meeting_id: cast(int, meeting_id.id))
+    user_meetings = sorted(user.meetups, key=lambda meeting_id: meeting_id.db_id)
 
     if user_meetings_buttons := [
         ButtonConfig(
             text=str(meeting.title),
-            callback_data=cb.SHOW_MEETING.with_id(cast(int, meeting.id)),
+            callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
         )
         for meeting in user_meetings
     ]:
@@ -45,7 +44,7 @@ async def callback_query_show_meetings(session: Session, update: Update, context
             [
                 [
                     ButtonConfig(
-                        text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user.lang)}",
+                        text=ButtonMessages.MAIN_MENU.back(lang=user.lang),
                         callback_data=cb.MAIN_MENU,
                     )
                 ]

@@ -7,7 +7,6 @@ from telegram import Update
 from telegram.ext import CommandHandler
 from telegram.ext.filters import CAPTION, PHOTO
 
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
     EffectiveUserNotSet,
@@ -15,6 +14,7 @@ from mitup_bot.exceptions import (
     HandlerRegisteredError,
     WrongCommandNameError,
 )
+from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.commands import command_go_to_main_menu, command_start_with_existing_user
 from mitup_bot.handlers.registration_process.edit_registration_timezone import command_start_with_new_user
@@ -36,7 +36,7 @@ def api():
         yield api
 
 
-class CommandsTestId(CallbackId):
+class CommandsTestId(HandlerId):
     COMMAND_EXAMPLE = "my_command"
     COMMAND_CUSTOM_NAME = "the_custom_command_name"
     COMMAND_WITH_FILTERS = "with_filters"

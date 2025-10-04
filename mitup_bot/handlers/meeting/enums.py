@@ -1,9 +1,9 @@
 from enum import auto
 
-from mitup_bot.callback_id import CallbackId
+from mitup_bot.handler_id import HandlerId
 
 
-class MeetingHandlerId(CallbackId):
+class MeetingHandlerId(HandlerId):
     CREATE_MEETING_CALLBACK = auto()
     CREATE_MEETING_CONVERSATION = auto()
     CREATE_MEETING_TITLE_MESSAGE = auto()

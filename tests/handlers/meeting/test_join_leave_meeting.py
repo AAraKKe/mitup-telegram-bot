@@ -188,16 +188,14 @@ async def test_user_leaves_meeting(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
     meeting = user_with_settings.meetups[0]
-    link = JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
+    JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
 
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
-    # Deleting the link does not remove it from the meeting with a mock session, we can test we have deleted it.
-    mock_session.assert_deleted(link)
-    assert len(meeting.messages) == 1
-    mock_session.assert_flushed()
+    # The user is no longer in the meeting
+    assert not meeting.has_participant(user_with_settings.db_id)
 
-    # We have emited a feature metric for user joined
+    # We have emited a feature metric for user left
     context.metrics_engine.assert_feature_metrics_emitted(Feature.LEAVE_MEETING)
 
     # The user has been notified

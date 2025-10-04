@@ -28,7 +28,7 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
             lang=lang,
             datetime=datetime,
-            back_edit_button=ButtonMessages.BACK_EDIT.get(lang=lang),
+            back_edit_button=ButtonMessages.EDIT.back(lang=lang),
             set_time_button=ButtonMessages.SET_TIME.get(lang=lang),
         ),
         keyboard=[
@@ -37,7 +37,7 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
                     text=ButtonMessages.SET_TIME.get(lang=lang), callback_data=cb.EDIT_MEETING_TIME.with_id(meeting_id)
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                    text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
                 ),
             ]
         ],
@@ -245,7 +245,7 @@ async def test_edit_meeting_time_callback(
     user_with_settings: User,
     app: StubMitupApp,
 ):
-    if meeting.id == 10:
+    if meeting.db_id == 10:
         user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")

@@ -30,7 +30,7 @@ def cleanup_states(context: MitupContext):
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.EDIT, callback_data=cb.EDIT_MEETING, bindable=True)
 @with_async_session
 async def callback_query_edit_meeting(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_query_edit_meeting")
+    logging.debug("Enter into callback_query_edit_meeting")
 
     callback_data = guards.valid_callback_data(cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.EDIT)
 
@@ -65,7 +65,7 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
         await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
-    logging.info(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
+    logging.debug(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
 
     meetup = await guards.user_owns_meeting(user, meeting_id, "Cancel edit meeting", update, context)
     if meetup is None:

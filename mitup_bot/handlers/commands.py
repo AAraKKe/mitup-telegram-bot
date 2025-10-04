@@ -4,15 +4,15 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import api, guards, views
-from mitup_bot.callback_id import CallbackId
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
+from mitup_bot.handler_id import HandlerId
 
 from .personal_filters import UserExistFilter
 from .registry import HandlersRegistry
 
 
-class CommandsId(CallbackId):
+class CommandsId(HandlerId):
     START_WITH_EXISTING_USER = auto()
     MAIN_MENU = auto()
 

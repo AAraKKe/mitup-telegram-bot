@@ -92,6 +92,9 @@ hatch run dev:validate
     hatch run dev:setup-vscode
     ```
 
+    !!! tip
+        For better IDE experience with type hints, you can use the `ide` environment (`hatch shell ide`) which includes boto3-stubs for enhanced autocompletion and type checking.
+
 ### Configure Your Development Bot
 
 To test your changes through Telegram, you need to link a bot to Mitup. Head to [BotFather](https://t.me/BotFather) and register a new bot:

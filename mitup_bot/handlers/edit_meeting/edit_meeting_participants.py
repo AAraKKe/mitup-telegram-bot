@@ -24,7 +24,7 @@ from .views import edit_max_participants_view, edit_participants_view
 )
 @with_async_session
 async def callback_edit_meeting_participants(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_edit_meeting_participants")
+    logging.debug("Enter into callback_edit_meeting_participants")
 
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_CALLBACK
@@ -51,7 +51,7 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
 )
 @with_async_session
 async def callback_edit_meeting_max_participants(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_edit_meeting_max_participants")
+    logging.debug("Enter into callback_edit_meeting_max_participants")
 
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_MAX_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK
@@ -85,7 +85,7 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
 )
 @with_async_session
 async def callback_edit_meeting_no_limit_participants(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_edit_meeting_no_limit_participants")
+    logging.debug("Enter into callback_edit_meeting_no_limit_participants")
 
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK
@@ -125,7 +125,7 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
 )
 @with_async_session
 async def callback_cancel_edit_meeting_participants(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into callback_cancel_edit_meeting_participants_property")
+    logging.debug("Enter into callback_cancel_edit_meeting_participants_property")
 
     context.clean_all_user_data()
 
@@ -139,7 +139,7 @@ async def callback_cancel_edit_meeting_participants(session: Session, update: Up
 )
 @with_async_session
 async def edit_meeting_max_participants(session: Session, update: Update, context: MitupContext):
-    logging.info("Enter into edit_meeting_max_participants")
+    logging.debug("Enter into edit_meeting_max_participants")
 
     number = guards.message(update).text
     user = guards.current_user(update, session)

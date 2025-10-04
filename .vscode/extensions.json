@@ -1,7 +1,6 @@
 {
     "recommendations": [
         "ms-python.python",
-        "ms-python.isort",
         "rangav.vscode-thunder-client",
         "charliermarsh.ruff",
         "tamasfe.even-better-toml"

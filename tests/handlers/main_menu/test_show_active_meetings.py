@@ -54,7 +54,7 @@ async def test_show_meetings_use_correct_view(
     await callback_query_show_meetings(update, context)
 
     user_meetings_buttons: list[ButtonConfig] = [
-        ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(int(meeting.id)))  # type: ignore
+        ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(meeting.db_id))
         for meeting in user_with_settings.meetups
     ]
 
@@ -69,7 +69,7 @@ async def test_show_meetings_use_correct_view(
         [
             [
                 ButtonConfig(
-                    text=f"{ButtonMessages.GO_BACK.get()}{ButtonMessages.MAIN_MENU.get(lang=user_with_settings.lang)}",
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
                     callback_data=cb.MAIN_MENU,
                 )
             ]

@@ -38,7 +38,7 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
     This callback is called whenever we either tap on the edit date button in the meeting edit view or when we
     navigate through the calendar view.
     """
-    logging.info("Enter into callback_edit_meeting_date")
+    logging.debug("Enter into callback_edit_meeting_date")
     assert context.matches is not None
 
     callback_data = guards.valid_date_callback_data(
@@ -89,7 +89,7 @@ async def callback_delete_date_time(session: Session, update: Update, context: M
     """
     This callback is called when the user wants to delete the date and time of the meeting.
     """
-    logging.info("Enter into callback_delete_date_time")
+    logging.debug("Enter into callback_delete_date_time")
 
     callback_data = guards.valid_callback_data(
         cb.DELETE_MEETING_DATE.parse(context.match), EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK
@@ -130,18 +130,18 @@ async def handle_first_datetime_set(
     keyboard = [
         ButtonConfig(
             text=ButtonMessages.SET_TIME.get(lang=meeting.owner.settings.language),
-            callback_data=cb.EDIT_MEETING_TIME.with_id(cast(int, meeting.id)),
+            callback_data=cb.EDIT_MEETING_TIME.with_id(meeting.db_id),
         ),
         ButtonConfig(
-            text=ButtonMessages.BACK_EDIT.get(lang=meeting.owner.settings.language),
-            callback_data=cb.EDIT_MEETING.with_id(cast(int, meeting.id)),
+            text=ButtonMessages.EDIT.back(lang=meeting.owner.settings.language),
+            callback_data=cb.EDIT_MEETING.with_id(meeting.db_id),
         ),
     ]
     view = MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
             lang=meeting.owner.settings.language,
             datetime=meeting.full_str_datetime,
-            back_edit_button=ButtonMessages.BACK_EDIT.get(lang=meeting.owner.settings.language),
+            back_edit_button=ButtonMessages.EDIT.back(lang=meeting.owner.settings.language),
             set_time_button=ButtonMessages.SET_TIME.get(lang=meeting.owner.settings.language),
         ),
         keyboard=[keyboard],
@@ -192,7 +192,7 @@ async def callback_set_meeting_date(session: Session, update: Update, context: M
     The `SET_MEETING_DATE` callback is used only when a given date wants to be set
     on the meeting by tapping on a specific date on the calendar.
     """
-    logging.info("Enter into callback_set_meeting_time")
+    logging.debug("Enter into callback_set_meeting_time")
 
     callback_data = guards.valid_date_callback_data(
         cb.SET_MEETING_DATE.parse(context.match), EditMeetingHandlerId.SET_DATE_CALLBACK
@@ -219,7 +219,7 @@ async def callback_set_meeting_time(session: Session, update: Update, context: M
     This callback method is the entry point for a conversation to set the time of the meeting. This can happen
     either by taping on the edit time button on the edit meeting view or by setting the time after setting the date.
     """
-    logging.info("Enter into callback_edit_meeting_date")
+    logging.debug("Enter into callback_edit_meeting_date")
 
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_TIME.parse(context.match), EditMeetingHandlerId.EDIT_TIME_CALLBACK
@@ -269,7 +269,7 @@ async def set_time_message(session: Session, update: Update, context: MitupConte
     This is the callback that should read the time from the user and set it on the meeting. Only messages with the
     format HH:MM are accepted.
     """
-    logging.info("Enter into set_time_message")
+    logging.debug("Enter into set_time_message")
 
     time_info = cast(Match, context.match).groupdict()
 
@@ -343,7 +343,7 @@ async def wrong_message_sent_for_time(session: Session, update: Update, context:
     """
     This handler is intended as a fallback on the conversation when a text not matching the expected format is sent.
     """
-    logging.info("Enter into set_time_message")
+    logging.debug("Enter into set_time_message")
 
     return await fallback_answer(session, update, context)
 
@@ -358,7 +358,7 @@ async def wrong_message_type_sent_for_time(session: Session, update: Update, con
     """
     This handler is intended as a fallback on the conversation when a message that is not text is sent
     """
-    logging.info("Enter into set_time_message")
+    logging.debug("Enter into set_time_message")
 
     return await fallback_answer(session, update, context)
 

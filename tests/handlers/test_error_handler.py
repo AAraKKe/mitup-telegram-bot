@@ -27,11 +27,12 @@ async def test_errors_ignored(error: type, message: str, context: StubMitupConte
 
 async def test_handle_inactive_user_error(context: StubMitupContext, user: User, mock_session: MockDbSession):
     assert user.is_active
-    assert user.id is not None
 
     mock_session.add_object(user)
 
-    await error_handler.handler(cast(TMitupContext, context), InactiveUserInteraction(user.id, private=True), Env.DEV)
+    await error_handler.handler(
+        cast(TMitupContext, context), InactiveUserInteraction(user.db_id, private=True), Env.DEV
+    )
     await context.metrics_engine.flush_metrics()
 
     assert not user.is_active

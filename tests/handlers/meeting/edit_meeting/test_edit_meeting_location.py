@@ -1,5 +1,4 @@
 import logging
-from typing import cast
 
 import pytest
 from aws_embedded_metrics.unit import Unit
@@ -59,7 +58,7 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
 
 
 def test_edit_location_view(meeting: Meetup, lang: str):
-    meeting_id = cast(int, meeting.id)
+    meeting_id = meeting.db_id
     meeting.language = lang
 
     result = edit_location_view(meeting=meeting)
@@ -78,7 +77,7 @@ def test_edit_location_view(meeting: Meetup, lang: str):
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                    text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
                 ),
             ],
         ],

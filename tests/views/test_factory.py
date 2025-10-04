@@ -16,7 +16,7 @@ def test_edit_meeting_property_view_without_extra_options(lang: str):
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                    text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
                 ),
             ],
         ],
@@ -53,7 +53,7 @@ def test_edit_meeting_property_view_with_extra_buttons(lang: str):
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.BACK_EDIT.get(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
+                    text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
                 ),
             ],
         ],
