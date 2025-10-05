@@ -121,9 +121,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         """
         self.joined_links.remove(participant)
         # Check if someone in the waiting list can be promoted to the joined list
-        if not self.full:
-            return self.promote_from_waiting_list()
-        return []
+        return [] if self.full else self.promote_from_waiting_list()
 
     def add_participant(self, user: "User") -> "JoinedUsers | None":
         """
@@ -132,18 +130,20 @@ class Meetup(BaseModel, SQLModel, table=True):
 
         If the meeting is full and the waiting list is not enabled, None will be returned.
         """
-        from mitup_bot.models import JoinedUsers
 
         if self.full:
-            if self.waiting_list:
-                joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=True)
-                # This check is done explicitly to avoid duplicates which chan happen during tests
-                # or depending on how the session is being used
-                if joined_link not in self.joined_links:
-                    self.joined_links.append(joined_link)
-                return joined_link
-            return None
-        joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=False)
+            return self.create_joined_link(user, True) if self.waiting_list else None
+        return self.create_joined_link(user, False)
+
+    def create_joined_link(self, user: "User", is_waiting_list: bool) -> "JoinedUsers":
+        """
+        Create a new JoinedUsers instance and add it to the meeting if it is not already in the list.
+        """
+        from mitup_bot.models import JoinedUsers
+
+        joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=is_waiting_list)
+        # This check is done explicitly to avoid duplicates which chan happen during tests
+        # or depending on how the session is being used
         if joined_link not in self.joined_links:
             self.joined_links.append(joined_link)
         return joined_link
