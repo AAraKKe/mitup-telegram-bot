@@ -84,7 +84,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
     if meeting is None:
         return
 
-    await api.update_meeting_messages(session=session, context=context, meeting=meeting, was_deleted=True)
+    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting, was_deleted=True)
 
     session.delete(meeting)
 

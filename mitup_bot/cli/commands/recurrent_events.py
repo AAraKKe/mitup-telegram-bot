@@ -13,19 +13,21 @@ from telegram import constants
 from telegram.ext import AIORateLimiter, Defaults, ExtBot
 
 from mitup_bot import db
-from mitup_bot.cli import generate_stats, notify_meetings, user_cleanup
+from mitup_bot.cli import generate_stats, inactive_meetings, notify_meetings, user_cleanup
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.monitoring.metrics import MetricKey, MitupMetricsLogger, configure_metrics
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
 DEFAULT_GENERATE_STATS_INTERVAL = 3600
 DEFAULT_NOTIFY_MEETINGS_START = 60
+DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
 
 
 class EventType(Enum):
     USER_CLEANUP = "UserCleanup"
     GENERATE_STATS = "Stats"
     NOTIFY_START_MEETING = "NotifyStartMeeting"
+    DEACTIVATE_MEETINGS = "DeactivateMeetings"
 
 
 @dataclass
@@ -33,6 +35,7 @@ class IntervalsConfiguration:
     user_cleanup: int
     notify_start_meeting: int
     generate_stats: int
+    deactivate_meetings: int
 
     def get(self, event_type: EventType) -> int:
         match event_type:
@@ -42,6 +45,8 @@ class IntervalsConfiguration:
                 return self.notify_start_meeting
             case EventType.GENERATE_STATS:
                 return self.generate_stats
+            case EventType.DEACTIVATE_MEETINGS:
+                return self.deactivate_meetings
             case never:
                 assert_never(never)
 
@@ -67,6 +72,8 @@ async def launch_event(event: MaintainanceEvent, bot: ExtBot, metrics: MitupMetr
             await notify_meetings.run(bot, metrics)
         case EventType.GENERATE_STATS:
             generate_stats.run(bot, metrics)
+        case EventType.DEACTIVATE_MEETINGS:
+            await inactive_meetings.run(bot, metrics)
         case never:
             assert_never(never)
 
@@ -145,6 +152,12 @@ async def run_all_tasks(intervals: IntervalsConfiguration, env: Env, start_time:
     show_default=True,
 )
 @click.option(
+    "--deactivate-meetings-interval",
+    default=DEFAULT_DEACTIVATE_MEETINGS_INTERVAL,
+    help="Interval in seconds to check for meetings to deactivate",
+    show_default=True,
+)
+@click.option(
     "--env",
     default=Env.DEV,
     type=click.Choice(Env, case_sensitive=False),
@@ -158,12 +171,18 @@ async def run_all_tasks(intervals: IntervalsConfiguration, env: Env, start_time:
     help="Time before starting the first event",
 )
 def cli(
-    user_cleanup_interval: int, notify_meeting_interval: int, env: Env, start_time: float, generate_stats_interval: int
+    user_cleanup_interval: int,
+    notify_meeting_interval: int,
+    generate_stats_interval: int,
+    deactivate_meetings_interval: int,
+    env: Env,
+    start_time: float,
 ):
-    """This method is used when launching notifications locally as a container"""
+    """Launch all recurrent events periodically"""
     intervals = IntervalsConfiguration(
         user_cleanup=user_cleanup_interval,
         notify_start_meeting=notify_meeting_interval,
         generate_stats=generate_stats_interval,
+        deactivate_meetings=deactivate_meetings_interval,
     )
     asyncio.run(run_all_tasks(intervals, env, start_time))

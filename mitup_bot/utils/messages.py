@@ -340,6 +340,7 @@ class MeetingMessages(MessageBase):
     )
     DATE_TIME_DELETED = "The date and time of the meeting have been deleted successfully"
     MEETING_HAS_BEEN_DELETED = f"{Emojis.PROHIB} This meeting has been deleted {Emojis.PROHIB}"
+    MEETING_HAS_FINISHED = f"{Emojis.CHECK} This meeting has finished {Emojis.CHECK}"
 
     # Edit meeting settings
     EDIT_SETTINGS_MESSAGE = (

@@ -68,7 +68,7 @@ async def toggle_meeting_setting(
         # if preseento to stay in the settings view.
         await api.update_meeting_messages(
             session=session,
-            context=context,
+            context_or_bot=context,
             meeting=meeting,
             current_message=meeting.message_from_update(update),
             skip_current=True,

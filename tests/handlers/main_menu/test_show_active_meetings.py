@@ -49,13 +49,20 @@ async def test_show_meetings_use_correct_view(
 
     context.matches = [match]
     mock_session.add_object(user_with_settings, "tg_user_id")
-    user_with_settings.meetups += [create_meetup(10), create_meetup(11), create_meetup(12), create_meetup(13)]
+    user_with_settings.meetups += [
+        create_meetup(10),
+        create_meetup(11),
+        create_meetup(12),
+        create_meetup(13),
+        create_meetup(14, active=False),
+    ]
 
     await callback_query_show_meetings(update, context)
 
     user_meetings_buttons: list[ButtonConfig] = [
         ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(meeting.db_id))
         for meeting in user_with_settings.meetups
+        if meeting.active
     ]
 
     expected_view = PaginatedMitupView(
@@ -85,7 +92,7 @@ async def test_show_meetings_without_meetings_to_show_works(
     mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User, api: MockApi
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    user_with_settings.meetups = []
+    user_with_settings.meetups = [create_meetup(10, active=False)]
 
     # Use MainMenuHandlerId for call_handler
     context, _ = await call_handler(update, app, MainMenuHandlerId.SHOW_MEETINGS_CALLBACK)

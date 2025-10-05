@@ -122,14 +122,9 @@ def test_build_fails_if_subprocess_fails(subprocess_mock: mock.Mock, mo_mock: mo
     )
 
 
-@pytest.mark.parametrize(
-    "validate, po_path",
-    [[True, Path("validate.po")], [False, Path("en.po")]],
-    ids=["validate", "no_validate"],
-)
 @mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
-def test_generate_translations(po_mock: mock.Mock, validate: bool, po_path: Path, tmp_path: Path):
-    po_mock.return_value = tmp_path / po_path
+def test_generate_translations(po_mock: mock.Mock, tmp_path: Path):
+    po_mock.return_value = tmp_path / "en.po"
 
     CliRunner().invoke(update)
 

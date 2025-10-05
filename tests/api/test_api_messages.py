@@ -128,7 +128,7 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
     # Message in the chat of someone who is not the owner
     meeting.messages.append(Message(id=456, message_id=123, chat_id=234, buttons=buttons))
 
-    await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
+    await update_meeting_messages(session=mock_session, context_or_bot=cast(TMitupContext, context), meeting=meeting)
 
     edit: mock.MagicMock = context.bot.edit_message_text
     expected_call_params = {
@@ -191,7 +191,7 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 
     edit.side_effect = raise_error
 
-    await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
+    await update_meeting_messages(session=mock_session, context_or_bot=cast(TMitupContext, context), meeting=meeting)
     # Since this is outside a callback, make sure we flush metrics
     await context.flush_metrics()
 
@@ -227,7 +227,7 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
 
     edit.side_effect = raise_error
 
-    await update_meeting_messages(session=mock_session, context=cast(TMitupContext, context), meeting=meeting)
+    await update_meeting_messages(session=mock_session, context_or_bot=cast(TMitupContext, context), meeting=meeting)
 
     assert edit.call_count == 2
 

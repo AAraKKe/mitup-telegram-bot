@@ -216,6 +216,7 @@ fix-lint = "ruff check --fix --unsafe-fixes ."
 fix = ["format", "fix-lint"]
 type-check = "pyright --stats --warnings mitup_bot tests bin"
 validate = ["- format-check", "- lint", "- type-check", "- test"]
+check-commit = "python bin/check_commit_message.py {args:}"
 migrations-upgrade = "alembic upgrade head"
 migrations-downgrade = "alembic downgrade -1"
 launch-events = "python -m mitup_bot.cli.run recurrent-events {args:}"

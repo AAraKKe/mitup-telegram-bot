@@ -111,7 +111,7 @@ async def callback_delete_date_time(session: Session, update: Update, context: M
     await api.edit_message(context=context, update=update, view=view)
     await api.update_meeting_messages(
         session=session,
-        context=context,
+        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -149,7 +149,7 @@ async def handle_first_datetime_set(
     await api.edit_message(context=context, update=update, view=view)
     await api.update_meeting_messages(
         session=session,
-        context=context,
+        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -178,7 +178,7 @@ async def handle_datetime_update(
     )
     await api.update_meeting_messages(
         session=session,
-        context=context,
+        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -312,7 +312,7 @@ async def set_time_message(session: Session, update: Update, context: MitupConte
         )
 
         await api.send_message(context=context, update=update, view=view)
-        await api.update_meeting_messages(session=session, context=context, meeting=meeting)
+        await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
 
         return ConversationHandler.END
 

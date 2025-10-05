@@ -98,7 +98,7 @@ class MockApi:
     ):
         arguments = {
             "session": session,
-            "context": context,
+            "context_or_bot": context,
             "meeting": meeting,
         }
         if current_message != DEFAULT_CURRENT_MESSAGE:

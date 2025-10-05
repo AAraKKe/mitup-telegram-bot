@@ -177,8 +177,7 @@ Example: If you want to add '{commit_type}', add this to commits_check_config.ya
             Exit code (0 for success, 1 for failure)
         """
         try:
-            with open(commit_msg_file) as f:
-                message = f.read()
+            message = commit_msg_file.read_text()
         except FileNotFoundError:
             print(f"❌ Commit message file not found: {commit_msg_file}")
             return 1

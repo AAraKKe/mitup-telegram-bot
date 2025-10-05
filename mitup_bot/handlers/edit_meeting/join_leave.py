@@ -175,7 +175,7 @@ async def handle_join_leave_operation(
         session.flush()
 
         await api.update_meeting_messages(
-            session=session, context=context, meeting=meeting, current_message=current_message
+            session=session, context_or_bot=context, meeting=meeting, current_message=current_message
         )
     else:
         # The meeting was not found, update the message to inform the user

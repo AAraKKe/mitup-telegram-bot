@@ -74,7 +74,7 @@ def validate_translations() -> int:
     with open(po_file_for_language("en", False)) as f:
         real = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
-    with open(VALIDATE_PO_FILE) as f:
+    with open(po_file_for_language("en", True)) as f:
         validate = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
     if diff := list(difflib.unified_diff(real, validate)):

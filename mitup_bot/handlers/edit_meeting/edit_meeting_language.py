@@ -69,6 +69,6 @@ async def callback_set_meeting_language(session: Session, update: Update, contex
     )
 
     # Since the language has changed, we need to update the messages of the meeting
-    await api.update_meeting_messages(session=session, context=context, meeting=meeting)
+    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
 
     context.put_feature_metric(Feature.MEETING_LANGUAGE_SET)

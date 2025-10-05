@@ -86,7 +86,7 @@ async def edit_description_meeting_message_handler(session: Session, update: Upd
             MeetingMessages.DESCRIPTION_SET_SUCCESS.get(description=meeting.description)
         )
         await api.send_message(context=context, update=update, view=view)
-        await api.update_meeting_messages(session=session, context=context, meeting=meeting)
+        await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
 
         return ConversationHandler.END
 

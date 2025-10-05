@@ -200,7 +200,7 @@ async def edit_meeting_kickout_participant_confirm(session: Session, update: Upd
     # Avoid editing current message since we have done that already
     await api.update_meeting_messages(
         session=session,
-        context=context,
+        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,

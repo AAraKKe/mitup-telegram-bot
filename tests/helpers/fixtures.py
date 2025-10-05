@@ -51,6 +51,7 @@ def create_meetup(
     invitation: bool = False,
     incognito: bool = False,
     show_timezone: bool = True,
+    active: bool = True,
 ) -> Meetup:
     meetup = Meetup(
         id=id,
@@ -65,6 +66,7 @@ def create_meetup(
         allow_invitation=invitation,
         incognito=incognito,
         show_timezone=show_timezone,
+        active=active,
     )
 
     if owner:

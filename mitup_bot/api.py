@@ -2,11 +2,12 @@ import logging
 import re
 from asyncio import gather
 from collections.abc import Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 
 from sqlmodel import Session
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
 from telegram.error import BadRequest, Forbidden
+from telegram.ext import CallbackContext, ExtBot
 
 from mitup_bot import guards
 from mitup_bot.exceptions import (
@@ -110,9 +111,10 @@ def handle_edit_errors(
 
         # If we get an error saying that the message is not found, we should delete the message
         if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
-            if session and message and context:
+            if session and message:
                 logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
                 session.delete(message)
+            if context:
                 context.emit_metric(MetricKey.MESSAGE_DELETED, include_handler_dimensions=False)
             return
         raise
@@ -176,21 +178,53 @@ async def answer_callback_query(*, context: TMitupContext, update: Update, text:
 async def update_single_meeting_message(
     message: MessageModel,
     session: Session,
-    context: TMitupContext,
+    context_or_bot: TMitupContext | ExtBot,
     meeting: Meetup,
-    was_deleted: bool,
+    was_deleted: bool = False,
+    has_finished: bool = False,
 ):
+    """
+    Updates a single meeting message with the current meeting view.
+
+    Args:
+        message: The message model to update.
+        session: The database session.
+        context_or_bot: The context or bot instance.
+        meeting: The meeting object.
+        was_deleted: If set to True, the meeting has been deleted and the messages will be updated to inform the user.
+        has_finished: If set to True, the meeting has finished and the messages will be updated to inform the user.
+    """
+    # Support both MitupContext and ExtBot for flexibility
+    bot = context_or_bot.bot if isinstance(context_or_bot, CallbackContext) else context_or_bot
+
     view = (
         meeting.inline_view
         if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
         else meeting.main_view
     )
-    text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang) if was_deleted else view.description
-    reply_markup = None if was_deleted else MitupView.keyboard_to_markup(message.buttons.keyboard)
 
-    with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-        with handle_edit_errors(message, session, context):
-            await context.bot.edit_message_text(
+    # Determine the text and markup based on meeting state
+    if was_deleted:
+        text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang)
+        reply_markup = None
+    elif has_finished:
+        text = view.with_context(MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang)).description
+        reply_markup = None
+    else:
+        text = view.description
+        reply_markup = MitupView.keyboard_to_markup(message.buttons.keyboard)
+
+    # Use context metrics if available, otherwise skip metrics
+    if isinstance(context_or_bot, CallbackContext):
+        metrics_context = context_or_bot.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX)
+    else:
+        metrics_context = nullcontext()
+
+    with metrics_context:
+        with handle_edit_errors(
+            message, session, context_or_bot if isinstance(context_or_bot, CallbackContext) else None
+        ):
+            await bot.edit_message_text(
                 text=text,
                 chat_id=message.chat_id,
                 message_id=message.message_id,
@@ -202,28 +236,37 @@ async def update_single_meeting_message(
 async def update_meeting_messages(
     *,
     session: Session,
-    context: TMitupContext,
+    context_or_bot: TMitupContext | ExtBot,
     meeting: Meetup,
     current_message: MessageModel | None = None,
     skip_current=False,
     was_deleted=False,
+    has_finished=False,
 ):
     """
     Updates meeting messages with the current meeting view.
 
+    The `context_or_bot` parameter accept both a context, when used when running as part of the
+    service and a bot instance, when used when running as part of the CLI for stand alone operations.
+
+    If a bot is passed, internal metrics will not be emitted.
+
     Args:
         session: The database session.
-        context: The update context.
+        context_or_bot: The update context or bot instance.
         meeting: The Meetup object.
         current_message: The current message model, if any. If provided, it will be edited before any other message.
         skip_current: If set to True, the current message will be skipped. This is needed if the current message
                       is being updated in a different way.
         was_deleted: If set to True, the meeting has been deleted and the messages will be updated to inform the user.
+        has_finished: If set to True, the meeting has finished and the messages will be updated to inform the user.
     """
     # First lets update the current message for a better user experience
     if current_message and not skip_current:
-        await update_single_meeting_message(current_message, session, context, meeting, was_deleted)
+        await update_single_meeting_message(
+            current_message, session, context_or_bot, meeting, was_deleted, has_finished
+        )
     for message in meeting.messages:
         if message == current_message:
             continue
-        await update_single_meeting_message(message, session, context, meeting, was_deleted)
+        await update_single_meeting_message(message, session, context_or_bot, meeting, was_deleted, has_finished)
