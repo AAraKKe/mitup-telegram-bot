@@ -218,6 +218,7 @@ async def update_meeting_messages(
         current_message: The current message model, if any. If provided, it will be edited before any other message.
         skip_current: If set to True, the current message will be skipped. This is needed if the current message
                       is being updated in a different way.
+        was_deleted: If set to True, the meeting has been deleted and the messages will be updated to inform the user.
     """
     # First lets update the current message for a better user experience
     if current_message and not skip_current:

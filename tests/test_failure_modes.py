@@ -203,6 +203,14 @@ CONTEXTS = [
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="edit_meeting_participants_kick_out",
     ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(MEETING_ID_NOT_OWNED, 1)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_participants_kick_out_confirm",
+    ),
 ]
 
 

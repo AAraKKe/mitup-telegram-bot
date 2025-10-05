@@ -231,14 +231,15 @@ async def test_edit_meeting_kickout_participant_confirm(
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
-    participant_to_delete = user_with_settings.meetups[0].participant(10)
+    meeting = user_with_settings.meetups[0]
+    participant_to_delete = meeting.participant(10)
     assert participant_to_delete is not None
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK)
 
     # Test the message has been edited successfully
     expected_view = kick_out_users_view(
-        meeting=user_with_settings.meetups[0],
+        meeting=meeting,
         current_user=user_with_settings,
         page_number=1,
     ).with_context(
@@ -254,6 +255,15 @@ async def test_edit_meeting_kickout_participant_confirm(
     # Ensure the list of buttons does not include the participant that has been kicked out
     all_buttons_text = {button.text for row in expected_view.keyboard for button in row}
     assert "joined_user_10" not in all_buttons_text
+
+    # Kickout should trigger meeting messages update
+    api.assert_update_meeting_messages_called(
+        session=mock_session,
+        context=context,
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
 
 
 @pytest.mark.parametrize(
