@@ -13,9 +13,6 @@ class TranslationEngine:
 
     translations: dict[str, gettext.GNUTranslations] = {}
 
-    def __init__(self):  # pragma: no cover
-        self.translations: dict[str, gettext.GNUTranslations] = {}
-
     @classmethod
     def __load_translation(cls, lang: str):
         cls.translations[lang] = gettext.translation(

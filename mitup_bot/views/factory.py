@@ -12,7 +12,7 @@ from mitup_bot.utils.messages import Languages, SettingsMessages
 from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView, PaginatedMitupView
 
 if TYPE_CHECKING:
-    from mitup_bot.models import User
+    from mitup_bot.models import Meetup, User
 
 # Representation from language code to button to be used when generating views
 LANGUAGE_BUTTONS = {
@@ -118,30 +118,36 @@ def change_settings_element_view(*, lang: str, message: str, callback_data=cb.CA
 
 
 def settings_set_language_view(*, lang: str, message: str | None = None) -> MitupView:
+    message = message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=LANGUAGE_BUTTONS[lang].get(lang=lang))
+    return set_language_view(lang, message, cb.SET_LANGUAGE).with_back_button(
+        ButtonMessages.SETTINGS, lang, cb.SETTINGS
+    )
+
+
+def meeting_set_language_view(*, meeting: Meetup) -> MitupView:
+    message = MeetingMessages.EDIT_MEETING_LANGUAGE.get(
+        lang=meeting.user_language, language=LANGUAGE_BUTTONS[meeting.lang].get(lang=meeting.user_language)
+    )
+
+    return set_language_view(
+        meeting.user_language, message, cb.SET_MEETING_LANGUAGE.with_ids(meeting.db_id, 0)
+    ).with_back_button(ButtonMessages.EDIT, meeting.user_language, cb.EDIT_MEETING.with_id(meeting.db_id))
+
+
+def set_language_view(lang: str, message: str, callback_data: CallbackData) -> PaginatedMitupView:
     n_languages = len(SUPPORTED_LANGUAGES)
     n_columns = min(n_languages, 3)
     buttons = [
-        ButtonConfig(text=LANGUAGE_BUTTONS[lang_code].get(lang=lang), callback_data=cb.SET_LANGUAGE.with_id(idx))
+        ButtonConfig(text=LANGUAGE_BUTTONS[lang_code].get(lang=lang), callback_data=callback_data.with_id(idx))
         for idx, lang_code in enumerate(SUPPORTED_LANGUAGES)
     ]
 
     return PaginatedMitupView(
-        description=(
-            message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=LANGUAGE_BUTTONS[lang].get(lang=lang))
-        ),
+        description=message,
         buttons=buttons,
         column_size=n_columns,
         row_size=ceil(n_languages / n_columns),
         page_number=1,
-    ).with_context_menu(
-        [
-            [
-                ButtonConfig(
-                    text=ButtonMessages.SETTINGS.back(lang=lang),
-                    callback_data=cb.SETTINGS,
-                ),
-            ]
-        ]
     )
 
 

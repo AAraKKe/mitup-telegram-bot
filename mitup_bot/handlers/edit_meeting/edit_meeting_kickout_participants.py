@@ -31,7 +31,7 @@ async def edit_meeting_kickout_participants(session: Session, update: Update, co
     """
     logging.debug("Enter into edit_meeting_kickout_participants")
 
-    callback_data = guards.valid_kickout_callback_data(
+    callback_data = guards.valid_meeting_callback_data(
         cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK
     )
 
@@ -81,7 +81,7 @@ async def edit_meeting_kickout_participant(session: Session, update: Update, con
     """
     logging.debug("Enter into edit_meeting_kickout_participant")
 
-    callback_data = guards.valid_kickout_callback_data(
+    callback_data = guards.valid_meeting_callback_data(
         cb.EDIT_MEETING_KICK_OUT_ACTION.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK
     )
 
@@ -145,7 +145,7 @@ async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, cont
 async def edit_meeting_kickout_participant_confirm(session: Session, update: Update, context: MitupContext):
     logging.debug("Enter into edit_meeting_kickout_participant_confirm")
 
-    callback_data = guards.valid_kickout_callback_data(
+    callback_data = guards.valid_meeting_callback_data(
         cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.parse(context.match),
         EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
     )

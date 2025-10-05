@@ -87,21 +87,21 @@ class DateCallbackData(CallbackData):
         return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)
 
 
-class ValidKickoutCallbackData(ValidCallbackData):
+class ValidMeetingCallbackData(ValidCallbackData):
     """
-    Callback data to be used when kicking a user out of a meeting
-    The `id` field is the user being kicked out and the meeting id is provided
-    through the `meeting_id` field.
+    Callback data to be used when performing an action on a meeting
+    The `id` field represents the id associated with the action that is to be performed in the meeting
+    represented by the `meeting_id` field.
     """
 
     meeting_id: int
 
 
-class KickoutCallbackData(CallbackData):
+class MeetingCallbackData(CallbackData):
     meeting_id: int | None = None
 
     def __str__(self):
-        return f"{self.action};{self.entity}:{self.id or ''}:{self.meeting_id or ''}"
+        return f"{self.action};{self.entity}:{'' if self.id is None else self.id}:{self.meeting_id or ''}"
 
     @property
     def pattern(self) -> str:
@@ -115,5 +115,9 @@ class KickoutCallbackData(CallbackData):
         return value or None if isinstance(value, str) else value
 
     def with_ids(self, meeting_id: int, id: int) -> Self:
-        """Creates a KickoutCallbackData with the same information but different IDs"""
+        """Creates a MeetingCallbackData with the same information but different IDs"""
         return self.__class__(entity=self.entity, action=self.action, id=id, meeting_id=meeting_id)
+
+    @override
+    def with_id(self, id: int) -> Self:
+        return self.__class__(entity=self.entity, action=self.action, id=id, meeting_id=self.meeting_id)

@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData
+from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallbackData
 
 
 @pytest.mark.parametrize(
@@ -71,3 +71,36 @@ def test_date_callback_data_matches():
 def test_date_callback_data_with_date():
     cb = DateCallbackData(entity="meeting", action="edit", id=21).with_date(dt.date(2024, 7, 15))
     assert str(cb) == "edit;meeting:21;date:2024-07-15"
+
+
+def test_meeting_callback_data_pattern():
+    cb = MeetingCallbackData(entity="meeting", action="edit", id=21)
+    assert cb.pattern == r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*):(?P<meeting_id>\d*)$"
+
+
+@pytest.mark.parametrize(
+    "input_str, expected_id, expected_meeting_id",
+    [
+        ("edit;meeting:21:10", 21, 10),
+        ("edit;meeting:21:", 21, None),
+        ("edit;meeting::10", None, 10),
+        ("edit;meeting:0:0", 0, 0),
+    ],
+    ids=["full_content", "missing_meeting_id", "missing_id", "zero_values"],
+)
+def test_meeting_callback_data_matches(input_str: str, expected_id: int | None, expected_meeting_id: int | None):
+    cb = MeetingCallbackData(entity="meeting", action="edit")
+    match = re.match(cb.pattern, input_str)
+    assert cb.parse(match).id == expected_id
+    assert cb.parse(match).meeting_id == expected_meeting_id
+
+
+def test_meeting_callback_data_with_ids():
+    cb = MeetingCallbackData(entity="meeting", action="edit").with_ids(meeting_id=10, id=21)
+    assert str(cb) == "edit;meeting:21:10"
+
+
+def test_meeting_callback_data_with_id():
+    cb = MeetingCallbackData(entity="meeting", action="edit").with_ids(meeting_id=10, id=21)
+    cb = cb.with_id(10)
+    assert str(cb) == "edit;meeting:10:10"

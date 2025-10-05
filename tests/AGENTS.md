@@ -49,3 +49,111 @@ This allows to also mimic conversations with a given user, as an example check t
 
 When we need to use the Telegram.Update object on a given test, we can provide this through a parameter of type UpdateRequest (under tests.helpers.fixtures). This UpdateRequest object is used as an indirect parameter to the `update` fixture
 that is globally available. We do not need to mock every update in every test. See, again, `tests/handlers/meeting/edit_meeting/test_edit_meeting_datetime.py` foran example about how UpdateRequest is used.
+
+## Creating models
+When you need to create a model (e.g. User, Meetup, etc.) you can use the create_* helper methods that are available in tests.helpers module. For example, to create a user you can do:
+
+```python
+from tests.helpers import create_user
+
+user = create_user(id=1, first_name="John", tg_user_id=123)
+```
+
+This will create a user with the given id, first name and telegram user id.
+
+There are specific fixtures to create models that work right away when testing handlers. The fixture `user_with_settings` will create a user with a settings object associated to it. Use this fixture in a test where
+we need to call a handler because the user has all the properties needed to operate as a real user.
+
+## Failure Mode Tests
+
+To avoid repeating the same failure tests for every handler, we have a centralized failure mode testing system in `tests/test_failure_modes.py`. This file contains parameterized tests that automatically test common error scenarios for all registered handlers.
+
+### When to Add Handlers to Failure Mode Tests
+
+**IMPORTANT**: Whenever you create a new handler that uses any of the following:
+- `guards.current_user()` - to get the current user
+- `guards.meeting_accessible()` - to check meeting ownership
+- `guards.valid_callback_data()` or `guards.valid_meeting_callback_data()` - to parse callback data
+- Context data (e.g., `context.get_meeting_id()`) - to retrieve stored meeting IDs
+
+You **must** add it to the `CONTEXTS` list in `tests/test_failure_modes.py`.
+
+### Available Error Modes
+
+The following error modes are available and should be used based on what your handler validates:
+
+- `ErrorMode.MEETING_NOT_OWNED` - User tries to access a meeting they don't own
+- `ErrorMode.MEETING_NOT_FOUND` - Meeting doesn't exist in the database
+- `ErrorMode.USER_NOT_FOUND` - User is not registered in the database
+- `ErrorMode.MALFORMED_CALLBACK_DATA` - Callback data is missing required parameters
+- `ErrorMode.MISSING_USER_DATA` - Required context data is not set
+
+### How to Add a Handler
+
+Add a `Context` object to the `CONTEXTS` list with the appropriate error modes:
+
+```python
+Context(
+    handler_id=EditMeetingHandlerId.YOUR_HANDLER_CALLBACK,
+    update_request=UpdateRequest(callback_query=cb.YOUR_CALLBACK.with_id(MEETING_ID_NOT_OWNED)),
+    error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+    id="your_handler_name",
+),
+```
+
+### Example: Adding Language Handlers
+
+Here's an example of how the language handlers were added:
+
+```python
+# Handler that checks meeting ownership
+Context(
+    handler_id=EditMeetingHandlerId.LANGUAGE_CALLBACK,
+    update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LANGUAGE.with_id(MEETING_ID_NOT_OWNED)),
+    error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+    id="edit_meeting_language",
+),
+
+# Handler that validates callback data
+Context(
+    handler_id=EditMeetingHandlerId.LANGUAGE_CALLBACK,
+    update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LANGUAGE),
+    error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+    id="edit_meeting_language_malformed",
+),
+```
+
+### Special Cases
+
+Some handlers may need additional configuration:
+
+- **Custom keyboards**: Use `custom_keyboard` parameter if the error view has a custom keyboard
+- **Context data**: Use `meeting_id` parameter to pre-populate context data (e.g., for conversation handlers)
+- **Additional metrics**: Use `metrics_emitted` to specify extra metrics that should be emitted during the test
+- **Metrics properties**: Use `metrics_properties` to add properties to the emitted metrics
+
+Example with context data:
+
+```python
+Context(
+    handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
+    update_request=UpdateRequest(message_text="12:00"),
+    error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+    id="set_meeting_time_message",
+    meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+    metrics_emitted=MetricsProperties(
+        metrics=["CleanUserData"],
+        values=[1],
+        units=[Unit.COUNT]
+    ),
+    metrics_properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
+),
+```
+
+### Benefits
+
+By adding your handlers to the centralized failure mode tests, you ensure:
+1. Consistent error handling across all handlers
+2. Proper metrics emission for all failure scenarios
+3. Reduced test code duplication
+4. Easy maintenance when error handling patterns change

@@ -1,4 +1,4 @@
-from mitup_bot.callback_data import KickoutCallbackData
+from mitup_bot.callback_data import MeetingCallbackData
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
@@ -97,7 +97,7 @@ def kick_out_users_view(
         column_size=2,
         row_size=5,
         # Use the kickout callback using the entity as the page instead of user to maintain meeting id information
-        navigation_callback_data=KickoutCallbackData(entity="kickout_page", action="show", meeting_id=meeting.db_id),
+        navigation_callback_data=MeetingCallbackData(entity="kickout_page", action="show", meeting_id=meeting.db_id),
     ).with_context_menu(
         [
             [

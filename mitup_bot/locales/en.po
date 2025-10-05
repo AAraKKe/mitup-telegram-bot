@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2025-10-05 09:59\n"
+"PO-Revision-Date: 2025-10-05 14:27\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -352,6 +352,12 @@ msgstr "The participant *${participant}* has been kicked out successfully."
 
 msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
 msgstr "The participant *${participant}* has been kicked out successfully. There are no more participants to kick out."
+
+msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
+msgstr "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\nCurrent language: *${language}*."
+
+msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
+msgstr "The language has been set successfully."
 
 msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Are you sure you want to delete this meeting?"

@@ -3,7 +3,7 @@ While custom CallbackData classes can be crated, it is common to use the same se
 instances throughout the entire bot.
 """
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData, KickoutCallbackData
+from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallbackData
 
 # Empty callback data. Inline keyboards are forced to include some callback data but sometimes
 # we just need a button for display purposes (i.e. CalendarKeyboard)
@@ -46,9 +46,9 @@ EDIT_MEETING_TIME = CallbackData(action="edit", entity="meet_time")
 EDIT_MEETING_PARTICIPANTS = CallbackData(action="edit", entity="meet_part")
 EDIT_MEETING_MAX_PARTICIPANTS = CallbackData(action="edit", entity="meet_max_part")
 EDIT_MEETING_NO_LIMIT_PARTICIPANTS = CallbackData(action="edit", entity="meet_nl_part")
-EDIT_MEETING_KICK_OUT_PARTICIPANTS = KickoutCallbackData(action="show", entity="kickout_page")
-EDIT_MEETING_KICK_OUT_ACTION = KickoutCallbackData(action="kickout", entity="user")
-EDIT_MEETING_KICK_OUT_ACTION_CONFIRM = KickoutCallbackData(action="confirm", entity="kickout")
+EDIT_MEETING_KICK_OUT_PARTICIPANTS = MeetingCallbackData(action="show", entity="kickout_page")
+EDIT_MEETING_KICK_OUT_ACTION = MeetingCallbackData(action="kickout", entity="user")
+EDIT_MEETING_KICK_OUT_ACTION_CONFIRM = MeetingCallbackData(action="confirm", entity="kickout")
 CANCEL_EDIT_MEETING_PARTICIPANS = CallbackData(action="cancel", entity="meet_part")
 # ---- Location
 EDIT_MEETING_LOCATION = CallbackData(action="edit", entity="meet_loc")
@@ -57,6 +57,7 @@ EDIT_MEETING_LOCATION_COORDINATES = CallbackData(action="edit", entity="meet_loc
 CANCEL_EDIT_MEETING_LOCATION = CallbackData(action="cancel", entity="meet_loc")
 # ---- Language
 EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
+SET_MEETING_LANGUAGE = MeetingCallbackData(action="set", entity="meet_lang")
 # ---- Settings
 EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
 SET_MEETING_WAITING_LIST = CallbackData(action="set", entity="meet_wait")

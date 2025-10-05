@@ -303,6 +303,13 @@ class MeetingMessages(MessageBase):
         "The participant *${participant}* has been kicked out successfully. There are no more participants to kick out."
     )
 
+    # Edit meeting language
+    EDIT_MEETING_LANGUAGE = (
+        "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\n"
+        "Current language: *${language}*."
+    )
+    LANGUAGE_SET_SUCCESS = "The language has been set successfully."
+
     # Delete meeting
     DELETE_MEETING = "Are you sure you want to delete this meeting?"
     DELETE_MEETING_SUCCESS = "The meeting has been deleted successfully"

@@ -211,6 +211,30 @@ CONTEXTS = [
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="edit_meeting_participants_kick_out_confirm",
     ),
+    Context(
+        handler_id=EditMeetingHandlerId.LANGUAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LANGUAGE.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_language",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_LANGUAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_LANGUAGE.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="set_meeting_language",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LANGUAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LANGUAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="edit_meeting_language_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_LANGUAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_LANGUAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="set_meeting_language_malformed",
+    ),
 ]
 
 

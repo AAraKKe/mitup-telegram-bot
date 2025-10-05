@@ -8,10 +8,10 @@ from mitup_bot import api
 from mitup_bot.callback_data import (
     CallbackData,
     DateCallbackData,
-    KickoutCallbackData,
+    MeetingCallbackData,
     ValidCallbackData,
     ValidDateCallbackData,
-    ValidKickoutCallbackData,
+    ValidMeetingCallbackData,
 )
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
@@ -80,16 +80,16 @@ def valid_callback_data(cb: CallbackData, handler_id: HandlerId) -> ValidCallbac
     return ValidCallbackData(entity=cb.entity, action=cb.action, id=cb.id)
 
 
-def valid_kickout_callback_data(cb: KickoutCallbackData, handler_id: HandlerId) -> ValidKickoutCallbackData:
+def valid_meeting_callback_data(cb: MeetingCallbackData, handler_id: HandlerId) -> ValidMeetingCallbackData:
     """
-    Validates the kickout callback `cb`. If an id cannot be set or the entity is unknown,
+    Validates the meeting callback `cb`. If an id cannot be set or the entity is unknown,
     a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
 
-    The output of the guard is a `ValidKickoutCallbackData`.
+    The output of the guard is a `ValidMeetingCallbackData`.
     """
     if cb.id is None or cb.unknown() or cb.meeting_id is None:
         raise MalformedCallbackData(handler_id, cb)
-    return ValidKickoutCallbackData(entity=cb.entity, action=cb.action, id=cb.id, meeting_id=cb.meeting_id)
+    return ValidMeetingCallbackData(entity=cb.entity, action=cb.action, id=cb.id, meeting_id=cb.meeting_id)
 
 
 def chat(update: Update) -> Chat:
