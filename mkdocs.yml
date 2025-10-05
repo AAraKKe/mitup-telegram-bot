@@ -23,6 +23,7 @@ nav:
     - Code Contribution:
       - Setup: collaborate/code_contributor.md
       - Making contributions: collaborate/committing_to_repo.md
+      - Commit Message Format: collaborate/commit_message_format.md
       - Local Validation: collaborate/local_validation.md
     - Code of Conduct: collaborate/code_of_conduct.md
 theme:

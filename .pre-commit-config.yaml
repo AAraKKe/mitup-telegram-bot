@@ -22,13 +22,13 @@ repos:
         stages: [pre-commit]
       - id: ruff-format
         stages: [pre-commit]
-  - repo: https://github.com/AliYmn/conventional-commits-check
-    rev: v2.9.0  # Use the latest release version
-    hooks:
-      - id: conventional-commits-check
-        stages: [commit-msg]
   - repo: local
     hooks:
+      - id: check-commit-message
+        name: Check conventional commit message
+        entry: bin/check_commit_message.py
+        language: system
+        stages: [commit-msg]
       - id: build-docs
         name: Build documentation
         entry: hatch run dev:build-docs
