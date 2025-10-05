@@ -10,7 +10,7 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.edit_meeting.views import edit_max_participants_view, edit_participants_view
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
@@ -500,17 +500,16 @@ def test_edit_meeting_participants_view_without_participants():
     assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=owner.lang)
 
     # And the owner is a participant
-    assert owner in [participant.user for participant in meeting.joined_links]
+    assert owner in [participant.user for participant in meeting.participants]
 
 
-def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
-    owner: User,
-    meeting: Meetup,
-):
+def test_edit_meeting_participants_view_with_participants_shows_kick_out_button():
+    owner = create_user(id=1, username="owner", first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
     other_user = create_user(id=2, username="other_user", first_name="Other User")
-    meeting.add_participant(other_user)
-    other_user = create_user(id=2, username="other_user", first_name="Other User")
-    meeting.add_participant(other_user)
+    meeting.create_joined_link(other_user, is_waiting_list=False)
+    other_user = create_user(id=3, username="other_user", first_name="Other User")
+    meeting.create_joined_link(other_user, is_waiting_list=False)
 
     view = edit_participants_view(meeting)
 

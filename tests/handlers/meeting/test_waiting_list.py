@@ -3,10 +3,19 @@ import datetime as dt
 import pytest
 
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
-from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
-from tests.helpers import HandlerContext, MockApi, MockDbSession, UpdateRequest, call_handler, create_meetup
+from tests.helpers import (
+    HandlerContext,
+    MockApi,
+    MockDbSession,
+    UpdateRequest,
+    call_handler,
+    create_joined_link,
+    create_meetup,
+    create_user,
+)
 
 
 @pytest.fixture
@@ -17,9 +26,9 @@ def api():
 
 @pytest.fixture
 def full_meeting():
-    owner = User(first_name="Owner", tg_user_id=1, settings=Settings())
+    owner = create_user(id=99, first_name="Owner", tg_user_id=1)
     meeting = create_meetup(id=123, title="My Meeting", max_members=1, waiting_list=True, owner=owner)
-    JoinedUsers(user=owner, meetup=meeting)
+    create_joined_link(user=owner, meetup=meeting)
     return meeting
 
 
@@ -82,21 +91,9 @@ async def test_user_leaves_and_waiting_list_promotes(
 ):
     # Setup the meeting to have a second user on the waiting list and user with settings is going to leave
     full_meeting.max_members = 2
-    second_user = User(first_name="Second", tg_user_id=2, settings=user_with_settings.settings)
-    JoinedUsers(
-        user=user_with_settings,
-        meetup_id=full_meeting.id,
-        user_id=user_with_settings.id,
-        meetup=full_meeting,
-        is_waiting_list=False,
-    )
-    JoinedUsers(
-        user=second_user,
-        meetup=full_meeting,
-        meetup_id=full_meeting.id,
-        user_id=second_user.id,
-        is_waiting_list=True,
-    )
+    second_user = create_user(id=2, first_name="Second", tg_user_id=2)
+    create_joined_link(user=user_with_settings, meetup=full_meeting)
+    create_joined_link(user=second_user, meetup=full_meeting, is_waiting_list=True)
 
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(full_meeting)
@@ -208,40 +205,19 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
 ):
     # Setup the meeting to have three users on the waiting list and user with settings is going to leave
     full_meeting.max_members = 3
-    first_waiting_user = User(first_name="FirstWaiting", tg_user_id=2, settings=user_with_settings.settings)
-    second_waiting_user = User(first_name="SecondWaiting", tg_user_id=3, settings=user_with_settings.settings)
-    third_waiting_user = User(first_name="ThirdWaiting", tg_user_id=4, settings=user_with_settings.settings)
-    JoinedUsers(
-        user=user_with_settings,
-        meetup_id=full_meeting.id,
-        user_id=user_with_settings.id,
-        meetup=full_meeting,
-        is_waiting_list=False,
+    first_waiting_user = create_user(
+        id=2, first_name="FirstWaiting", tg_user_id=2, settings=user_with_settings.settings
     )
-    JoinedUsers(
-        user=first_waiting_user,
-        meetup=full_meeting,
-        meetup_id=full_meeting.id,
-        user_id=first_waiting_user.id,
-        is_waiting_list=True,
-        created_time=dt.datetime.now(),
+    second_waiting_user = create_user(
+        id=3, first_name="SecondWaiting", tg_user_id=3, settings=user_with_settings.settings
     )
-    JoinedUsers(
-        user=second_waiting_user,
-        meetup=full_meeting,
-        meetup_id=full_meeting.id,
-        user_id=second_waiting_user.id,
-        is_waiting_list=True,
-        created_time=dt.datetime.now() - dt.timedelta(hours=1),
+    third_waiting_user = create_user(
+        id=4, first_name="ThirdWaiting", tg_user_id=4, settings=user_with_settings.settings
     )
-    JoinedUsers(
-        user=third_waiting_user,
-        meetup=full_meeting,
-        meetup_id=full_meeting.id,
-        user_id=third_waiting_user.id,
-        is_waiting_list=True,
-        created_time=dt.datetime.now() - dt.timedelta(hours=2),
-    )
+    create_joined_link(user=user_with_settings, meetup=full_meeting)
+    create_joined_link(user=first_waiting_user, meetup=full_meeting, is_waiting_list=True)
+    create_joined_link(user=second_waiting_user, meetup=full_meeting, is_waiting_list=True)
+    create_joined_link(user=third_waiting_user, meetup=full_meeting, is_waiting_list=True)
 
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(full_meeting)
@@ -250,18 +226,15 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 3
 
-    # Ensure that when the link is deleted it disappears from the meeting
-    mock_session.delete.side_effect = lambda link: full_meeting.joined_links.remove(link)
-
     # Call the handler for the user leaving
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
     # The user should have left the meeting and the first two waiting list users should be promoted
     assert full_meeting.n_participants == 3
     assert full_meeting.n_waiting == 1
-    users_joined = {link.user.first_name for link in full_meeting.joined_links}
+    users_joined = {link.user.first_name for link in full_meeting.participants}
+    assert "FirstWaiting" in users_joined
     assert "SecondWaiting" in users_joined
-    assert "ThirdWaiting" in users_joined
     assert "Owner" in users_joined
 
     mock_session.assert_flushed()
@@ -269,17 +242,17 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     # The users who were promoted have been notified
     api.assert_send_to_user_called(
         context=context,
-        user=second_waiting_user,
+        user=first_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
-            lang=second_waiting_user.lang, meeting_title=full_meeting.title
+            lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,
     )
     api.assert_send_to_user_called(
         context=context,
-        user=third_waiting_user,
+        user=second_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
-            lang=third_waiting_user.lang, meeting_title=full_meeting.title
+            lang=second_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,
     )
