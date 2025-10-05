@@ -88,7 +88,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         return hash(self) == hash(other) if isinstance(other, Meetup) else NotImplemented
 
     @property
-    def n_joined(self) -> int:
+    def n_participants(self) -> int:
         """Number of participants in the meeting. Not counting the waiting list."""
         return sum(not link.is_waiting_list for link in self.joined_links)
 
@@ -99,7 +99,7 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def full(self) -> bool:
-        return False if self.max_members is None else self.n_joined >= self.max_members
+        return False if self.max_members is None else self.n_participants >= self.max_members
 
     @property
     def participants(self) -> list["JoinedUsers"]:
@@ -107,10 +107,10 @@ class Meetup(BaseModel, SQLModel, table=True):
         return [link for link in self.joined_links if not link.is_waiting_list]
 
     def participant(self, user_id: int) -> "JoinedUsers | None":
-        return next((link for link in self.participants if link.user_id == user_id), None)
+        return next((link for link in self.participants if link.user.db_id == user_id), None)
 
     def has_participant(self, user_id: int) -> bool:
-        return any(link.user_id == user_id for link in self.joined_links)
+        return any(link.user.db_id == user_id for link in self.joined_links)
 
     def remove_participant(self, participant: "JoinedUsers") -> list["JoinedUsers"]:
         """
@@ -145,7 +145,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         # This check is done explicitly to avoid duplicates which chan happen during tests
         # or depending on how the session is being used
         if joined_link not in self.joined_links:
-            self.joined_links.append(joined_link)
+            self.joined_links.append(joined_link)  # pragma: no cover
         return joined_link
 
     def promote_from_waiting_list(self) -> list["JoinedUsers"]:
@@ -157,7 +157,9 @@ class Meetup(BaseModel, SQLModel, table=True):
         """
         if waiting_links := self.waiting_links():
             to_promote = (
-                self.n_waiting if self.max_members is None else min(self.n_waiting, self.max_members - self.n_joined)
+                self.n_waiting
+                if self.max_members is None
+                else min(self.n_waiting, self.max_members - self.n_participants)
             )
             promoted = []
 
@@ -275,7 +277,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def participants_list_text(self) -> str:
         """
-        Strings that represents the list of participants in the meeting with one line per participant.
+        Textual representation of the list of participants in the meeting with one line per participant.
 
         If there are users in the waiting list, they are shown after the participants with a separator and a title.
         """
@@ -296,7 +298,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def participants_text(self) -> str:
         """
-        String representing the participants information of the meeting. The list of participants is not included
+        Textual representation of the participants information of the meeting. The list of participants is not included
         for incognito meetings.
 
         To get the participants text ignoring whether the meeting is incognito or not,
@@ -331,7 +333,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def participants_text_with_list(self) -> str:
         """
-        String representing the participants section of the meeting. The list of participants is always included.
+        Textual representation of the participants section of the meeting. The list of participants is always included.
         """
         return f"{self.participants_text_title}{self.participants_list_text}".strip()
 
@@ -384,6 +386,9 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def inline_query_message(self) -> str:
+        """
+        Textual representation of the meeting when it is shown in an inline query.
+        """
         result: list[str] = []
 
         if self.description:

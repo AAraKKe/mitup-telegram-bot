@@ -15,7 +15,7 @@ from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, sanitize
 from mitup_bot.views import ButtonConfig, Keyboard, MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
-from tests.helpers import UpdateRequest, create_meetup
+from tests.helpers import UpdateRequest, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 EXAMPLE_MEETING = Meetup(
@@ -531,10 +531,6 @@ def test_has_message(update: Update, meeting: Meetup, has_message: bool):
     assert meeting.has_message(update) is has_message
 
 
-def test_has_message_returns_false_when_there_is_no_message(meeting: Meetup):
-    assert not meeting.has_message(Update(123))
-
-
 @pytest.mark.parametrize(
     "update,message_id,inline_message_id,chat_id",
     [
@@ -724,3 +720,483 @@ def test_meeting_full_datetime_string(meeting_datetime: datetime | None, expecte
     )
 
     assert meeting.full_str_datetime == expected
+
+
+@pytest.mark.parametrize("is_waiting_list", [True, False], ids=["waiting_list", "not_waiting_list"])
+def test_create_joined_link(is_waiting_list: bool):
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user = create_user(id=2, first_name="Bob")
+    joined_link = meeting.create_joined_link(user, is_waiting_list)
+
+    assert joined_link.is_waiting_list == is_waiting_list
+    assert joined_link.meetup == meeting
+    assert joined_link.user == user
+    assert joined_link in meeting.joined_links
+
+
+def test_n_joined_counts_only_non_waiting_participants():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+
+    meeting.create_joined_link(user1, is_waiting_list=False)
+    meeting.create_joined_link(user2, is_waiting_list=False)
+    meeting.create_joined_link(user3, is_waiting_list=True)
+
+    assert meeting.n_participants == 2
+
+
+def test_n_waiting_counts_only_waiting_participants():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+
+    meeting.create_joined_link(user1, is_waiting_list=False)
+    meeting.create_joined_link(user2, is_waiting_list=True)
+    meeting.create_joined_link(user3, is_waiting_list=True)
+
+    assert meeting.n_waiting == 2
+
+
+def test_participants_returns_only_non_waiting_links():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=False)
+    link2 = meeting.create_joined_link(user2, is_waiting_list=False)
+    meeting.create_joined_link(user3, is_waiting_list=True)
+
+    participants = meeting.participants
+
+    assert len(participants) == 2
+    assert link1 in participants
+    assert link2 in participants
+
+
+def test_participant_returns_specific_participant_by_user_id():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=False)
+    meeting.create_joined_link(user2, is_waiting_list=False)
+
+    participant = meeting.participant(2)
+
+    assert participant is not None
+    assert participant == link1
+    assert participant.user == user1
+
+
+def test_participant_returns_none_if_user_not_found():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+
+    meeting.create_joined_link(user1, is_waiting_list=False)
+
+    participant = meeting.participant(999)
+
+    assert participant is None
+
+
+def test_participant_returns_none_for_waiting_list_user():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+
+    meeting.create_joined_link(user1, is_waiting_list=True)
+
+    participant = meeting.participant(2)
+
+    assert participant is None
+
+
+def test_has_participant_returns_true_for_joined_user():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+
+    meeting.create_joined_link(user1, is_waiting_list=False)
+
+    assert meeting.has_participant(2)
+
+
+def test_has_participant_returns_true_for_waiting_list_user():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+
+    meeting.create_joined_link(user1, is_waiting_list=True)
+
+    assert meeting.has_participant(2)
+
+
+def test_has_participant_returns_false_for_non_participant():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+
+    assert not meeting.has_participant(999)
+
+
+def test_waiting_links_returns_sorted_waiting_list():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=True)
+    meeting.create_joined_link(user2, is_waiting_list=False)
+    link3 = meeting.create_joined_link(user3, is_waiting_list=True)
+
+    waiting = meeting.waiting_links()
+
+    assert len(waiting) == 2
+    assert waiting[0] == link1
+    assert waiting[1] == link3
+
+
+@pytest.mark.parametrize(
+    "max_members,waiting_list_enabled,expected",
+    [
+        (None, False, True),
+        (None, True, True),
+        (2, False, False),
+        (2, True, True),
+        (3, False, True),
+    ],
+    ids=["no_limit", "no_limit_with_waiting", "full_no_waiting", "full_with_waiting", "not_full"],
+)
+def test_join_allowed(max_members: int | None, waiting_list_enabled: bool, expected: bool):
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=max_members)
+    meeting.waiting_list = waiting_list_enabled
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+
+    meeting.create_joined_link(user1, is_waiting_list=False)
+    meeting.create_joined_link(user2, is_waiting_list=False)
+
+    assert meeting.join_allowed() == expected
+
+
+def test_add_participant_adds_to_meeting_when_not_full():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=3)
+    user1 = create_user(id=2, first_name="Bob")
+
+    joined_link = meeting.add_participant(user1)
+
+    assert joined_link is not None
+    assert not joined_link.is_waiting_list
+    assert joined_link.user == user1
+    assert meeting.n_participants == 1
+
+
+def test_add_participant_adds_to_waiting_list_when_full():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=1)
+    meeting.waiting_list = True
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    meeting.create_joined_link(user2, is_waiting_list=False)
+
+    joined_link = meeting.add_participant(user1)
+
+    assert joined_link is not None
+    assert joined_link.is_waiting_list
+    assert joined_link.user == user1
+    assert meeting.n_waiting == 1
+
+
+def test_add_participant_returns_none_when_full_and_no_waiting_list():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=1)
+    meeting.waiting_list = False
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    meeting.create_joined_link(user2, is_waiting_list=False)
+
+    joined_link = meeting.add_participant(user1)
+
+    assert joined_link is None
+    assert meeting.n_participants == 1
+
+
+def test_remove_participant_removes_participant():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+
+    link = meeting.create_joined_link(user1, is_waiting_list=False)
+    promoted = meeting.remove_participant(link)
+
+    assert link not in meeting.joined_links
+    assert len(promoted) == 0
+
+
+def test_remove_participant_promotes_from_waiting_list():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=2)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=False)
+    link2 = meeting.create_joined_link(user2, is_waiting_list=True)
+
+    promoted = meeting.remove_participant(link1)
+
+    assert len(promoted) == 1
+    assert promoted[0] == link2
+    assert not link2.is_waiting_list
+    assert meeting.n_participants == 1
+    assert meeting.n_waiting == 0
+
+
+def test_remove_participant_promotes_multiple_from_waiting_list():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=3, waiting_list=True)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+    user4 = create_user(id=5, first_name="Diana")
+    user5 = create_user(id=6, first_name="Ethan")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=False)
+    link2 = meeting.create_joined_link(user2, is_waiting_list=True)
+    link3 = meeting.create_joined_link(user3, is_waiting_list=True)
+    link4 = meeting.create_joined_link(user4, is_waiting_list=True)
+    link5 = meeting.create_joined_link(user5, is_waiting_list=True)
+
+    promoted = meeting.remove_participant(link1)
+
+    assert len(promoted) == 3
+    assert promoted[0] == link2
+    assert promoted[1] == link3
+    assert promoted[2] == link4
+    assert not link2.is_waiting_list
+    assert not link3.is_waiting_list
+    assert not link4.is_waiting_list
+    assert link5.is_waiting_list
+    assert meeting.n_participants == 3
+    assert meeting.n_waiting == 1
+
+
+def test_promote_from_waiting_list_promotes_all_when_no_limit():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=True)
+    link2 = meeting.create_joined_link(user2, is_waiting_list=True)
+
+    promoted = meeting.promote_from_waiting_list()
+
+    assert len(promoted) == 2
+    assert promoted[0] == link1
+    assert promoted[1] == link2
+    assert not link1.is_waiting_list
+    assert not link2.is_waiting_list
+    assert meeting.n_waiting == 0
+
+
+def test_promote_from_waiting_list_promotes_up_to_max():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=2)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=True)
+    link2 = meeting.create_joined_link(user2, is_waiting_list=True)
+    link3 = meeting.create_joined_link(user3, is_waiting_list=True)
+
+    promoted = meeting.promote_from_waiting_list()
+
+    assert len(promoted) == 2
+    assert promoted[0] == link1
+    assert promoted[1] == link2
+    assert not link1.is_waiting_list
+    assert not link2.is_waiting_list
+    assert link3.is_waiting_list
+    assert meeting.n_waiting == 1
+    assert meeting.n_participants == 2
+
+
+def test_promote_from_waiting_list_returns_empty_when_no_waiting():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+
+    promoted = meeting.promote_from_waiting_list()
+
+    assert len(promoted) == 0
+
+
+def test_promote_from_waiting_list_respects_order():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=2)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+
+    link1 = meeting.create_joined_link(user1, is_waiting_list=True)
+    link2 = meeting.create_joined_link(user2, is_waiting_list=True)
+    link3 = meeting.create_joined_link(user3, is_waiting_list=True)
+
+    promoted = meeting.promote_from_waiting_list()
+
+    # Should promote in order they joined
+    assert promoted[0] == link1
+    assert promoted[1] == link2
+    assert link3.is_waiting_list
+
+
+def test_participants_list_text_includes_waiting_list_section():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner, max_members=3)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+    user3 = create_user(id=4, first_name="Charlie")
+    user4 = create_user(id=5, first_name="Dave")
+
+    # Add regular participants
+    meeting.create_joined_link(user1, is_waiting_list=False)
+    meeting.create_joined_link(user2, is_waiting_list=False)
+    meeting.create_joined_link(user3, is_waiting_list=False)
+
+    # Add waiting list participants
+    meeting.create_joined_link(user4, is_waiting_list=True)
+
+    expected = (
+        f"\n  {sanitize('Bob', full=True)}"
+        f"\n  {sanitize('Alice', full=True)}"
+        f"\n  {sanitize('Charlie', full=True)}"
+        f"\n--- {Emojis.WAITING} _{ButtonMessages.WAITING_LIST.get(lang=meeting.lang)}_ \n  "
+        f"{sanitize('Dave', full=True)}"
+    )
+
+    assert expected == meeting.participants_list_text
+
+
+def test_participants_list_text_without_waiting_list():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    user1 = create_user(id=2, first_name="Bob")
+    user2 = create_user(id=3, first_name="Alice")
+
+    # Add only regular participants
+    meeting.create_joined_link(user1, is_waiting_list=False)
+    meeting.create_joined_link(user2, is_waiting_list=False)
+
+    expected = f"\n  {sanitize('Bob', full=True)}\n  {sanitize('Alice', full=True)}"
+
+    assert expected == meeting.participants_list_text
+
+
+def test_external_view():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+
+    expected_view = MitupView(
+        meeting.inline_message,
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.JOIN.get(lang=meeting.user_language),
+                    callback_data=cb.JOIN.with_id(meeting.db_id),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.INVITE.get(lang=meeting.user_language),
+                    callback_data=cb.INVITE.with_id(meeting.db_id),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.LEAVE.get(lang=meeting.user_language),
+                    callback_data=cb.LEAVE.with_id(meeting.db_id),
+                ),
+            ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
+                    callback_data=cb.MAIN_MENU,
+                ),
+            ],
+        ],
+    )
+
+    assert expected_view == meeting.external_view
+
+
+def test_edit_view(user_with_settings: User):
+    meeting = user_with_settings.meetups[0]
+    now_in_tz = meeting.datetime_in_tz or meeting.owner.now_in_tz()
+
+    expected_view = MitupView(
+        meeting.message,
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.TITLE.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_TITLE.with_id(meeting.db_id),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.DESCRIPTION.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(meeting.db_id),
+                ),
+            ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.DATE.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_DATE.with_id(meeting.db_id).with_date(now_in_tz.date()),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.TIME.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_TIME.with_id(meeting.db_id),
+                ),
+            ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.PARTICIPANTS.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.LOCATION.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting.db_id),
+                ),
+            ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.LANGUAGE.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(meeting.db_id),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.SETTINGS.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_SETTINGS.with_id(meeting.db_id),
+                ),
+            ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.DONE.get(lang=meeting.user_language),
+                    callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
+                ),
+            ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
+                    callback_data=cb.MAIN_MENU,
+                ),
+            ],
+        ],
+    )
+
+    assert expected_view == meeting.edit_view

@@ -47,7 +47,7 @@ def promote_from_waiting_list(meeting: Meetup) -> list[JoinedUsers]:
     if meeting.join_allowed() and (waiting_links := meeting.waiting_links()):
         assert meeting.max_members is not None
 
-        to_promote = min(meeting.n_waiting, meeting.max_members - meeting.n_joined)
+        to_promote = min(meeting.n_waiting, meeting.max_members - meeting.n_participants)
         promoted = []
 
         for link in waiting_links[:to_promote]:

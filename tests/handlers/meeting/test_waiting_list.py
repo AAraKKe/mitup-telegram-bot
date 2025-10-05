@@ -50,7 +50,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
 
     # The user should have joined the meeting
     assert len(full_meeting.joined_links) == 2
-    assert full_meeting.n_joined == (1 if is_full else 2)
+    assert full_meeting.n_participants == (1 if is_full else 2)
     assert full_meeting.n_waiting == (1 if is_full else 0)
 
     mock_session.assert_flushed()
@@ -102,7 +102,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     mock_session.add_object(full_meeting)
 
     # Before calling the handler, the meeting has two users joined and one in the waiting list
-    assert full_meeting.n_joined == 2
+    assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 1
 
     # Ensure that when the link is deleted it disappears from the meeting
@@ -112,7 +112,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
     # The user should have left the meeting and the waiting list user should be promoted
-    assert full_meeting.n_joined == 2
+    assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 0
     users_joined = {link.user.first_name for link in full_meeting.joined_links}
     assert "Second" in users_joined
@@ -170,7 +170,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     mock_session.add_object(full_meeting)
 
     # Before calling the handler, the meeting has two users joined and two in the waiting list
-    assert full_meeting.n_joined == 2
+    assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 2
 
     # Ensure that when the link is deleted it disappears from the meeting
@@ -180,7 +180,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
     # The user should have left the meeting and the first waiting list user should be promoted
-    assert full_meeting.n_joined == 2
+    assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 1
     users_joined = {link.user.first_name for link in full_meeting.joined_links}
     assert "SecondWaiting" in users_joined
@@ -247,7 +247,7 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     mock_session.add_object(full_meeting)
 
     # Before calling the handler, the meeting has two users joined and three in the waiting list
-    assert full_meeting.n_joined == 2
+    assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 3
 
     # Ensure that when the link is deleted it disappears from the meeting
@@ -257,7 +257,7 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
 
     # The user should have left the meeting and the first two waiting list users should be promoted
-    assert full_meeting.n_joined == 3
+    assert full_meeting.n_participants == 3
     assert full_meeting.n_waiting == 1
     users_joined = {link.user.first_name for link in full_meeting.joined_links}
     assert "SecondWaiting" in users_joined
