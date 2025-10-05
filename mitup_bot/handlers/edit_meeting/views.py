@@ -35,7 +35,10 @@ def edit_participants_view(meeting: Meetup) -> MitupView:
         )
     ]
 
-    if meeting.participants:
+    participants_to_kick_out = [
+        participant for participant in meeting.participants if participant.user.db_id != meeting.owner.db_id
+    ]
+    if participants_to_kick_out:
         buttons.append(
             ButtonConfig(
                 text=ButtonMessages.MEETING_KICK_OUT.get(lang=meeting.owner.lang),

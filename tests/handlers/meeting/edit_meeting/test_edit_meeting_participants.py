@@ -10,7 +10,7 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.edit_meeting.views import edit_max_participants_view, edit_participants_view
-from mitup_bot.models import User
+from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
@@ -483,37 +483,40 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
-def test_edit_meeting_participants_view_without_participants(
-    user_with_settings: User,
-    mock_session: MockDbSession,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(user_with_settings.meetups[0])
+def test_edit_meeting_participants_view_without_participants():
+    owner = create_user(id=1, username="owner", first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
 
-    view = edit_participants_view(user_with_settings.meetups[0])
+    # The owner can be a participant but if no one else is, it should not show the kick out button
+    meeting.create_joined_link(owner, is_waiting_list=False)
+
+    view = edit_participants_view(meeting)
 
     # Without any participants the view only has the max participants button
     # The keyboard has the max participants button and the back button
     assert len(view.keyboard) == 2
     # The first row only has one
     assert len(view.keyboard[0]) == 1
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=user_with_settings.lang)
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=owner.lang)
+
+    # And the owner is a participant
+    assert owner in [participant.user for participant in meeting.joined_links]
 
 
 def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
-    user_with_settings: User,
-    mock_session: MockDbSession,
+    owner: User,
+    meeting: Meetup,
 ):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(user_with_settings.meetups[0])
     other_user = create_user(id=2, username="other_user", first_name="Other User")
-    user_with_settings.meetups[0].add_participant(other_user)
+    meeting.add_participant(other_user)
+    other_user = create_user(id=2, username="other_user", first_name="Other User")
+    meeting.add_participant(other_user)
 
-    view = edit_participants_view(user_with_settings.meetups[0])
+    view = edit_participants_view(meeting)
 
     # The keyboard has the 2 rows of buttons
     assert len(view.keyboard) == 2
     # The first row now has 2 buttons
     assert len(view.keyboard[0]) == 2
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=user_with_settings.lang)
-    assert view.keyboard[0][1].text == ButtonMessages.MEETING_KICK_OUT.get(lang=user_with_settings.lang)
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=owner.lang)
+    assert view.keyboard[0][1].text == ButtonMessages.MEETING_KICK_OUT.get(lang=owner.lang)
