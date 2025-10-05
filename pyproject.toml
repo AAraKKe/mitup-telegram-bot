@@ -196,7 +196,6 @@ dependencies = [
     "mkdocs-material",
     "deepdiff",
     "boto3-stubs[essential,ecs,cloudfront]",
-    "sourcery-nightly",
 ]
 [tool.hatch.envs.dev.env-vars]
 PYRIGHT_PYTHON_FORCE_VERSION = "latest"
@@ -234,9 +233,6 @@ build-locales = "python -m mitup_bot.cli.run translations build"
 update-locales = ["update-source-language", "build-locales"]
 set-local-bot = "python -m mitup_bot.cli.run dev {args:}"
 populate-db = "python bin/populate_db.py {args:}"
-ci-sourcery-login = "sourcery login --token $SOURCERY_TOKEN"
-ci-sourcery = "sourcery assistant review gitlab-merge-request --gitlab-token $SOURCERY_AI_BOT --project $CI_PROJECT_PATH --merge-request $CI_MERGE_REQUEST_IID --commit $CI_COMMIT_SHA"
-mr-sourcery = ["ci-sourcery-login", "ci-sourcery"]
 
 # ----------------------
 # Production environment

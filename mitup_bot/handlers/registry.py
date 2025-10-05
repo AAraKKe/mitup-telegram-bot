@@ -248,7 +248,7 @@ class HandlersRegistry:
     @classmethod
     def bind(cls, app: Application):
         """Bind all registered handlers to a given application"""
-        # Sort them setting conversation handlers first to be sure that any unexpected answer to a conversation is
+        # Sort them, setting conversation handlers first to be sure that any unexpected answer to a conversation is
         # handled by its fallbacks
         sorted_items = sorted(cls.handlers.items(), key=lambda v: v[1].is_conversation(), reverse=True)
         for key, wrapper in sorted_items:
