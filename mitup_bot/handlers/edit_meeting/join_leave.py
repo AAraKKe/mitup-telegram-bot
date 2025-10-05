@@ -183,4 +183,4 @@ async def handle_join_leave_operation(
         await api.edit_message(
             context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang)
         )
-        context.put_custom_metric(MetricKey.STALE_MEETING_MESSAGE)
+        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_dimensions=False)

@@ -26,7 +26,7 @@ SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
 async def handle_inactive_user(session: Session, context: TMitupContext, user_id: int):
     if user := session.exec(select(User).where(User.id == user_id)).first():
         user.is_active = False
-        context.put_custom_metric(MetricKey.INACTIVE_USER_SET, 1)
+        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_dimensions=False)
 
 
 def should_ignore_error(error: Exception) -> bool:
@@ -49,9 +49,8 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # Emit an error metric for the current update both including the error type and a general
     # error metric to aggregate all error types
     error_class = error.__class__.__name__
-    context.put_metric(MetricKey.FAULT.with_prefix(error_class), 1)
-    context.put_metric(MetricKey.FAULT, 1)
-    context.put_custom_metric(MetricKey.FAULT, 1)
+    context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1)
+    context.emit_metric(MetricKey.FAULT, 1, emit_global=True)
 
     context.metrics_engine.add_stack_trace()
 

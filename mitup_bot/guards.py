@@ -128,7 +128,7 @@ async def user_owns_meeting(
     If the redirect flag is False, None is returned but no communication happens with the user.
     """
     if meeting := user.own_meeting(meeting_id):
-        context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=Unit.COUNT)
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=Unit.COUNT)
         return meeting
 
     if redirect:
@@ -137,7 +137,7 @@ async def user_owns_meeting(
             f"Meeting id: {meeting_id}, user id: {user.db_id}"
         )
         logging.warning(message)
-        context.put_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
         await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
     return None
 

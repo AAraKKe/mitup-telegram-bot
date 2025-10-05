@@ -60,14 +60,12 @@ def callback_with_metrics(
             # of the handler that was executed including metrics context.
             await error_handler(context, e, env)
         else:
-            context.put_metric(MetricKey.FAULT, 0)
-            # Emit error without dimensions as well
-            context.put_custom_metric(MetricKey.FAULT, 0, Unit.COUNT)
+            # Emit FAULT=0 with handler dimensions and globally for aggregation
+            context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
         finally:
             latency = (perf_counter() - start) * 1000
-            context.put_metric(MetricKey.TIME, latency, Unit.MILLISECONDS)
-            # Emit latency without dimensions as well
-            context.put_custom_metric(MetricKey.TIME, latency, Unit.MILLISECONDS)
+            # Emit latency with handler dimensions and globally for aggregation
+            context.emit_metric(MetricKey.TIME, latency, Unit.MILLISECONDS, emit_global=True)
 
             # Make sure we flush the metrics after every callback to drain any buffered metrics
             await context.flush_metrics()

@@ -281,7 +281,7 @@ async def set_time_message(session: Session, update: Update, context: MitupConte
             update=update,
             view=MeetingMessages.INVALID_TIME.get(lang=current_user.settings.language),
         )
-        context.put_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
+        context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
         return ConversationMeetingState.EDIT_TIME
 
     # Handle update witha valid time
@@ -328,7 +328,7 @@ async def fallback_answer(session: Session, update: Update, context: MitupContex
         update=update,
         view=MeetingMessages.WRONG_TIME_FORMAT.get(lang=current_user.settings.language),
     )
-    context.put_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
+    context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
 
     return ConversationMeetingState.EDIT_TIME
 

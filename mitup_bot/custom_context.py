@@ -82,7 +82,6 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         self.metrics_engine = metrics_engine
         self.telegram_update = update
         self.handler_dimensionality = NULL_DIMENSIONALITY
-        self.avoid_per_callback_metrics = False
         self.__update = update
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
@@ -129,12 +128,12 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         except Exception:
             if ensure_clean:
                 self.user_data.remove_context(context)
-                self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
+                self.emit_metric("CleanUserData", 1, unit=Unit.COUNT)
             raise
 
         if ensure_clean:
             self.user_data.remove_context(context)
-            self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
+            self.emit_metric("CleanUserData", 1, unit=Unit.COUNT)
 
     @contextmanager
     def meeting_id(self, context: ContextId, ensure_clean=True) -> Generator[int]:
@@ -153,7 +152,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         self.user_data.store_meeting_id(context, meeting_id)
         self.handler_metrics_logger.set_property("StoredMeetingId", meeting_id)
         self.handler_metrics_logger.set_property("ContextId", context.value)
-        self.put_metric("StoredMeetingId", 1, unit=Unit.COUNT)
+        self.emit_metric("StoredMeetingId", 1, unit=Unit.COUNT)
 
     def clean_user_data(self, contexts: list[ContextId]):
         if self.user_data is None:  # pragma: no cover
@@ -163,7 +162,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         for context in contexts:
             self.user_data.remove_context(context)
             self.metrics_engine.properties["ContextId"] = context.value
-            self.put_metric("CleanUserData", 1, unit=Unit.COUNT)
+            self.emit_metric("CleanUserData", 1, unit=Unit.COUNT)
 
     def clean_all_user_data(self):
         if self.user_data is None:  # pragma: no cover
@@ -181,64 +180,72 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
 
         self.handler_dimensionality = Dimensionality(**handler_dimensions)
 
-    def put_metric(self, name: str | MetricKey, value: float, unit: Unit = Unit.COUNT):
-        """
-        This method puts a metric in the context for the request that is being processed. This is useful when
-        we want to emit metrics with the default request dimensions, e.g. Handler and HandlerType. If no specific
-        dimension is needed, this method should be used instead of `emit_metric`. This method does not flush the
-        metrics, batching metrics with the same dimensions in the same log line.
-
-        Args:
-            name (str | MetricKey): Name of the metric to emit
-            value (float): Value of the metric
-            unit (Unit, optional): Dimension of the metric from `aws_embedded_metrics.unit.Unit`.
-                Defaults to Unit.COUNT.
-        """
-        if self.avoid_per_callback_metrics:
-            return
-        self.metrics_engine.put_metric(
-            name=name,
-            value=value,
-            unit=unit,
-            dimensions=self.handler_dimensionality,
-            properties=properties_from_update(self.telegram_update),
-        )
-
-    def put_custom_metric(
+    def emit_metric(
         self,
-        name: str | MetricKey = MetricKey.COUNT,
+        name: str | MetricKey,
         value: float = 1.0,
         unit: Unit = Unit.COUNT,
+        *,
+        # Dimension control
         dimensions: dict[str, str] | None = None,
+        include_handler_dimensions: bool = True,
+        # Property control
         properties: dict[str, str | int | float | None] | None = None,
-        with_handler_dimensions: bool = False,
-        with_update_properties: bool = True,
+        include_update_properties: bool = True,
+        # Special flag for global aggregation
+        emit_global: bool = False,
     ):
         """
-        Emit a metric with the provided name, value, unit, dimensions and properties. This method will create a new
-        metrics logger and flush it inmediately. This method should only be used when metrics are needed with a
-        different set of dimensions when compared to the context dimensions.
+        Emit a metric with flexible dimension and property configuration.
+
+        Metrics are batched by dimensionality and flushed at the end of handler execution.
+        Multiple metrics with the same dimensions are combined into a single EMF log line for cost optimization.
 
         Args:
-            name (str | MetricKey): Name of the metric to emit
-            value (float): Value of the metric
-            unit (Unit, optional): Dimension of the metric from `aws_embedded_metrics.unit.Unit`.
-                Defaults to Unit.COUNT.
-            dimensions (dict[str, str], optional): Dimensions to include in the metric. Defaults to None.
-            properties (dict[str, Any], optional): Properties to include in the metric. Defaults to None.
-            include_handler_dimensions (bool, optional): If True, the dimensions defined for the handler will be
-            included.
+            name (str | MetricKey): Metric name (use MetricKey enum for standard metrics)
+            value (float): Metric value
+            unit (Unit): Unit type (COUNT, MILLISECONDS, etc.)
+            dimensions (dict[str, str], optional): Additional custom dimensions to add. Defaults to None.
+            include_handler_dimensions (bool): If True, includes Handler and HandlerType dimensions. Defaults to True.
+            properties (dict[str, str | int | float | None], optional): Additional custom properties. Defaults to None.
+            include_update_properties (bool): If True, includes Telegram update metadata. Defaults to True.
+            emit_global (bool): If True, also emits the metric without any dimensions for global aggregation.
+                Defaults to False.
+
+        Examples:
+            # Simple handler metric (most common case)
+            context.emit_metric(MetricKey.ERROR, 1)
+
+            # Custom dimensions without handler context
+            context.emit_metric("ApiCall", 1, dimensions={"Service": "Google"}, include_handler_dimensions=False)
+
+            # Emit both with handler dims AND global (for aggregation)
+            context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
+
+            # Feature metric
+            context.emit_metric(MetricKey.COUNT, dimensions={"Feature": "JoinMeeting"})
         """
+        # Build dimensionality
         dimensionality = Dimensionality.or_null(dimensions)
-        if with_handler_dimensions:
+        if include_handler_dimensions:
             dimensionality += self.handler_dimensionality
 
-        properties = properties or {}
-        if with_update_properties:
-            properties |= properties_from_update(self.telegram_update)
+        # Build properties
+        props = properties or {}
+        if include_update_properties:
+            props |= properties_from_update(self.telegram_update)
 
-        logger = self.metrics_engine.get_logger(dimensionality, properties)
+        # Emit primary metric
+        logger = self.metrics_engine.get_logger(dimensionality, props)
         logger.put_metric(str(name), value, unit.value)
+
+        # Optionally emit global version
+        if emit_global:
+            global_props = properties or {}
+            if include_update_properties:
+                global_props |= properties_from_update(self.telegram_update)
+            global_logger = self.metrics_engine.get_logger(NULL_DIMENSIONALITY, global_props)
+            global_logger.put_metric(str(name), value, unit.value)
 
     def put_feature_metric(
         self,
@@ -252,23 +259,37 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         with_update_properties: bool = True,
     ):
         """
-        A feature metric is a metric as any other that is emitted with a feature dimension. This is useful
-        when we want to emit feature usage metrics, e.g. how many times timezone is set using the location
-        or the message method.
+        Emit a metric with a Feature dimension for tracking feature usage.
 
-        The arguments are the same as in `put_custom_metric` but with the addition of the `feature` argument that
-        define the feature name.
+        This is a convenience wrapper around emit_metric() that automatically adds the Feature dimension.
+        Useful for tracking feature usage like "how many times timezone is set using location vs message".
 
-        Since we are usually interested in the feature usage, i.e. how many times it is used, the metric name
-        is set to Count by default. However, any metric name can be provided if needed.
+        Args:
+            feature (Feature): The feature being tracked
+            value (float): Metric value. Defaults to 1.0.
+            name (str | MetricKey): Metric name. Defaults to COUNT for counting feature usage.
+            unit (Unit): Unit type. Defaults to COUNT.
+            dimensions (dict[str, str], optional): Additional dimensions. Defaults to None.
+            properties (dict[str, str | int | float | None], optional): Additional properties. Defaults to None.
+            with_handler_dimensions (bool): Include handler dimensions. Defaults to False.
+            with_update_properties (bool): Include update properties. Defaults to True.
 
-        For the same context, each feature metric logger is cached to avoid emitting extra logs for the same
-        feature metric context.
+        Examples:
+            # Track feature usage
+            context.put_feature_metric(Feature.JOIN_MEETING)
+
+            # Track feature errors
+            context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=1)
         """
-
-        dimensions = (dimensions or {}) | {"Feature": str(feature)}
-        self.put_custom_metric(
-            name, value, unit, dimensions, properties, with_handler_dimensions, with_update_properties
+        feature_dimensions = (dimensions or {}) | {"Feature": str(feature)}
+        self.emit_metric(
+            name,
+            value,
+            unit,
+            dimensions=feature_dimensions,
+            properties=properties,
+            include_handler_dimensions=with_handler_dimensions,
+            include_update_properties=with_update_properties,
         )
 
     @contextmanager
@@ -277,18 +298,28 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         Context manager that emits a Time metric measuring the time it takes the code inside the context to run.
 
         Args:
-            prefix (str): the prefix is added to the metric name. The resulting metric name will be <prefix>Time.
-            handler_metrics (bool, optional): If True, the metric will be emitted using the handler dimensions.
-                Defaults to False.
+            prefix (str): The prefix added to the metric name. The resulting metric name will be <prefix>Time.
+            handler_metrics (bool): If True, includes handler dimensions in the metric. Defaults to False.
+
+        Examples:
+            # Measure API call time without handler dimensions
+            with context.with_time_metric("TelegramApi"):
+                await context.bot.send_message(...)
+
+            # Measure operation time with handler dimensions
+            with context.with_time_metric("ProcessPayment", handler_metrics=True):
+                process_payment()
         """
         start_time = perf_counter()
         yield
         elapsed_time = 1000 * (perf_counter() - start_time)
 
-        if handler_metrics:
-            self.put_metric(f"{prefix}Time", elapsed_time, Unit.MILLISECONDS)
-        else:
-            self.put_custom_metric(f"{prefix}Time", elapsed_time, Unit.MILLISECONDS)
+        self.emit_metric(
+            MetricKey.TIME.with_prefix(prefix, separator=""),
+            elapsed_time,
+            Unit.MILLISECONDS,
+            include_handler_dimensions=handler_metrics,
+        )
 
     async def flush_metrics(self):
         # If we are requesting to flush a stand alone metrics logger, flush it

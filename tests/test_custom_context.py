@@ -136,13 +136,13 @@ async def test_metrics_emitted(
     with_update_properties: bool,
     with_handler_dimensions: bool,
 ):
-    context.put_custom_metric(
+    context.emit_metric(
         "test_metric",
         value=123,
         dimensions=dimensions,
         properties=properties,
-        with_handler_dimensions=with_handler_dimensions,
-        with_update_properties=with_update_properties,
+        include_handler_dimensions=with_handler_dimensions,
+        include_update_properties=with_update_properties,
     )
 
     await context.flush_metrics()

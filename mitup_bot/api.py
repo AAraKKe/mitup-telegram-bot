@@ -57,6 +57,7 @@ async def send_message_to_user(*, context: TMitupContext, user: User, view: Mitu
             return await context.bot.send_message(chat_id=user.tg_user_id, text=message, reply_markup=reply_markup)
         except Forbidden as e:
             logging.warning(f"User {user.tg_user_id} has blocked the bot.")
+            context.emit_metric(MetricKey.INACTIVE_USER_SET, include_handler_dimensions=False)
             raise InactiveUserInteraction(user.tg_user_id, private=True) from e
         except BadRequest as e:
             if "not found" in e.message:
@@ -92,7 +93,7 @@ async def send_messages_to_users(context: TMitupContext, users: Sequence[User], 
         if isinstance(result, InactiveUserInteraction):
             logging.info(f"Marking user {user.tg_user_id} as inactive")
             user.is_active = False
-            context.put_custom_metric(MetricKey.INACTIVE_USER_SET)
+            context.emit_metric(MetricKey.INACTIVE_USER_SET, include_handler_dimensions=False)
 
 
 @contextmanager
@@ -112,7 +113,7 @@ def handle_edit_errors(
             if session and message and context:
                 logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
                 session.delete(message)
-                context.put_custom_metric(MetricKey.MESSAGE_DELETED)
+                context.emit_metric(MetricKey.MESSAGE_DELETED, include_handler_dimensions=False)
             return
         raise
 
