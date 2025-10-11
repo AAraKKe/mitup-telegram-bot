@@ -1,20 +1,52 @@
-# This Dockerfile builds an image that includes the Python:3.12 image
+# This Dockerfile builds an image that includes the Python:3.13 image
 # with Hatch to allow executing pipeline jobs.
-# The image is build by a manual job in any pipeline
+# The image is built by a manual job in any pipeline
 FROM python:3.13-slim-bookworm
 
+# Install build and runtime dependencies for CI/CD
 RUN apt-get update && \
-    apt-get install -y libpq-dev gcc groff unzip curl less jq gettext && \
+    apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    libc-dev \
+    groff \
+    unzip \
+    curl \
+    less \
+    jq \
+    gettext && \
     rm -rf /var/lib/apt/lists/*
 
-# Instal AWS CLI
+# Install AWS CLI
 RUN mkdir aws && cd aws && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \
     ./aws/install && \
     cd .. && rm -rf aws
 
 # Install Hatch
-RUN pip install hatch
+RUN pip install --no-cache-dir hatch
 
-# Cache hatch environment
+# Configure hatch to use local cache directory
 RUN hatch config set dirs.env.virtual .hatch
+
+# Set working directory for pre-installing dependencies
+WORKDIR /ci-build
+
+# Copy pyproject.toml to pre-install dependencies
+COPY pyproject.toml /ci-build/pyproject.toml
+COPY LICENSE /ci-build/LICENSE
+
+# Create minimal package structure to allow dependency installation
+RUN mkdir -p /ci-build/mitup_bot && \
+    echo '__version__ = "0.0.0"' > /ci-build/mitup_bot/__about__.py && \
+    touch /ci-build/mitup_bot/__init__.py
+
+# Pre-install dev environment with all dependencies
+# This caches all dependencies so CI jobs start faster
+RUN hatch env create dev
+
+# Clean up build files - actual code will be checked out in CI jobs
+RUN rm -rf /ci-build
+
+# Reset working directory
+WORKDIR /builds

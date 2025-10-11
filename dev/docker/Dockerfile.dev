@@ -1,15 +1,21 @@
 FROM python:3.13-slim-bookworm
 
-# Install libraries needed to run pyscopg2
+# Install libraries needed to run psycopg2 and build packages
+# Keep build dependencies in dev image for faster iteration
 RUN apt-get update && \
-    apt-get install -y libpq-dev gcc gettext && \
+    apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    libc-dev \
+    gettext && \
     rm -rf /var/lib/apt/lists/*
 
 # Set the working directory to /mitup-telegram-bot
 WORKDIR /bot
 
 # Install Hatch
-RUN pip install hatch
+RUN pip install --no-cache-dir hatch
 
-# Cache hatch environment
+# Configure hatch to use a persistent cache directory
+# Dependencies will be installed on first run and cached in the .docker_hatch volume
 RUN hatch config set dirs.env.virtual /.docker_hatch

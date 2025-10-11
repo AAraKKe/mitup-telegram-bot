@@ -35,6 +35,9 @@ Source = "https://gitlab.com/meetupbot/mitup-telegram-bot"
 Documentation = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/README.md"
 Issues = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues"
 
+[project.scripts]
+mitup = "mitup_bot.cli.run:main"
+
 [tool.hatch.version]
 path = "mitup_bot/__about__.py"
 
@@ -241,10 +244,10 @@ populate-db = "python bin/populate_db.py {args:}"
 [tool.hatch.envs.prod]
 installer = "uv"
 [tool.hatch.envs.prod.scripts]
-launch = "python -m mitup_bot.cli.run launch --env prod"
-help = "python -m mitup_bot.cli.run launch --help"
-build-locales = "python -m mitup_bot.cli.run translations build"
-launch-events = "python -m mitup_bot.cli.run recurrent-events {args:}"
+launch = "mitup launch --env prod"
+help = "mitup launch --help"
+build-locales = "mitup translations build"
+launch-events = "mitup recurrent-events {args:}"
 
 [build-system]
 requires = ["hatchling"]
