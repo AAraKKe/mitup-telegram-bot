@@ -1,11 +1,10 @@
 preparation:
   stage: build
   script:
+    - echo "Using CI image tag ${CI_IMAGE_TAG}"
     - python --version
     - pip --version
     - hatch --version
-    # Trigger dev environment to cache it
-    - hatch run dev:echo
     - hatch run dev:pip list --local
 
 build-translations:
@@ -68,10 +67,12 @@ validate-migrations:
 validate-locales:
   # This just validates that all messages in code are present in the translations english file
   stage: test
-  script: hatch run dev:validate-locales
+  script:
+    - hatch run dev:validate-locales
 
 validate-local-setup:
   # This job avlidates the setup process for new contributors
   image: python:3.13-bookworm
   stage: test
-  script: ./bin/local-setup.sh
+  script:
+    - ./bin/local-setup.sh

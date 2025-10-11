@@ -16,15 +16,19 @@ build-docker-ci:
   stage: build-ci
   variables:
     DOCKERFILE: Dockerfile.ci
-    PUSH_DESTINATION: "${CI_REGISTRY_IMAGE}/ci-python"
+    # Push to the dynamically determined tag
+    PUSH_DESTINATION: "${CI_REGISTRY_IMAGE}/ci-python:${CI_IMAGE_TAG}"
   extends: .kaniko-build-push
   rules:
-    - if: $CI_COMMIT_TAG
-    # When requested adding [build-ci] to the commit message
-    - if: $CI_COMMIT_TITLE =~ /\[build-ci\]/
-    # If the docker ci file has changed
-    - changes:
-      - dev/docker/Dockerfile.ci
-    # If no rule matched yet, allow building manually anytime that is needed
+    # Build automatically for MR-specific images (when CI files changed in MR)
+    - if: '$CI_IMAGE_TAG =~ /^mr-/'
+    # Build on main/release when CI files changed
+    - if: '($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "release")'
+      changes:
+        - dev/docker/Dockerfile.ci
+        - pyproject.toml
+    # Allow manual trigger with [build-ci] in commit message
+    - if: '$CI_COMMIT_TITLE =~ /\[build-ci\]/'
+    # Manual fallback for any other case
     - when: manual
       allow_failure: true
