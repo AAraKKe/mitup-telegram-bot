@@ -18,21 +18,16 @@
     # Setup AWS credentials using OIDC
     - mkdir -p ~/.aws
     - cp ${CI_PROJECT_DIR}/aws-config ~/.aws/config
-    # Extract ECR registry domain from destination
-    - export ECR_REGISTRY=$(echo $PUSH_DESTINATION | cut -d'/' -f1)
-    - export AWS_SDK_LOAD_CONFIG=1
-    - export AWS_REGION=eu-west-1
-    # Authenticate Docker to ECR
-    - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
     # Create and bootstrap buildx builder
     - docker buildx create --use --driver docker-container --name builder
     - docker buildx inspect --bootstrap
   script:
     - |
       set -e
-      COMMIT_DESTINATION="${PUSH_DESTINATION}:ci-${CI_COMMIT_SHORT_SHA}"
-      CACHE_TAG="${PUSH_DESTINATION}:build-cache"
-      LATEST_TAG="${PUSH_DESTINATION}:latest"
+      COMMIT_DESTINATION=$PUSH_DESTINATION
+      IMAGE_BASE_URI=$(echo "$PUSH_DESTINATION" | cut -d':' -f1)
+      CACHE_TAG="${IMAGE_BASE_URI}:build-cache"
+      LATEST_TAG="${IMAGE_BASE_URI}:latest"
 
       echo "Building $DOCKERFILE and pushing to ${COMMIT_DESTINATION} and ${LATEST_TAG}..."
 
@@ -41,7 +36,7 @@
         --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}" \
         --tag "${COMMIT_DESTINATION}" \
         --tag "${LATEST_TAG}" \
-        --cache-from "type=registry,ref=${CACHE_TAG}" \
+        --cache-from "type-registry,ref=${CACHE_TAG}" \
         --cache-to "type=registry,ref=${CACHE_TAG},mode=max" \
         --provenance=false \
         --push \
@@ -61,7 +56,7 @@ push-bot-tagged-staging:
     - config-staging
   variables:
     DOCKERFILE: Dockerfile
-    PUSH_DESTINATION: $ECR_MITUP_REPO_URI
+    PUSH_DESTINATION: $BOT_IMAGE_TAG
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
@@ -77,7 +72,7 @@ push-migrations-lambda-staging:
   resource_group: migrations-tagged-staging
   variables:
     DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: $ECR_MIGRATIONS_REPO_URI
+    PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
 
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
@@ -99,4 +94,4 @@ push-migrations-lambda-prod:
   resource_group: migrations-tagged-prod
   variables:
     DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: $ECR_MIGRATIONS_REPO_URI
+    PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
