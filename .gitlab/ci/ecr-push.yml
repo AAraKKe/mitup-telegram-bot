@@ -30,6 +30,7 @@
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
     - docker buildx build
+      --platform linux/amd64
       --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --tag "${PUSH_DESTINATION}"
       --push
