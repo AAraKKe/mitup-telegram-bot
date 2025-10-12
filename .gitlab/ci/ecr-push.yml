@@ -28,18 +28,25 @@
     - docker buildx create --use --driver docker-container --name builder
     - docker buildx inspect --bootstrap
   script:
-    - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
-    - export CACHE_IMAGE=$(echo $PUSH_DESTINATION | cut -d':' -f1):latest
-    - docker buildx build
-      --platform linux/amd64
-      --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
-      --tag "${PUSH_DESTINATION}"
-      --cache-from "type=registry,ref=${CACHE_IMAGE}"
-      --cache-to "type=registry,ref=${CACHE_IMAGE},mode=max"
-      --provenance=false
-      --push
-      --progress=plain
-      "${CI_PROJECT_DIR}"
+    - |
+      set -e
+      COMMIT_DESTINATION="${PUSH_DESTINATION}:ci-${CI_COMMIT_SHORT_SHA}"
+      CACHE_TAG="${PUSH_DESTINATION}:build-cache"
+      LATEST_TAG="${PUSH_DESTINATION}:latest"
+
+      echo "Building $DOCKERFILE and pushing to ${COMMIT_DESTINATION} and ${LATEST_TAG}..."
+
+      docker buildx build \
+        --platform linux/amd64 \
+        --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}" \
+        --tag "${COMMIT_DESTINATION}" \
+        --tag "${LATEST_TAG}" \
+        --cache-from "type=registry,ref=${CACHE_TAG}" \
+        --cache-to "type=registry,ref=${CACHE_TAG},mode=max" \
+        --provenance=false \
+        --push \
+        --progress=plain \
+        "${CI_PROJECT_DIR}"
   after_script:
     - docker buildx rm builder
 
@@ -54,7 +61,7 @@ push-bot-tagged-staging:
     - config-staging
   variables:
     DOCKERFILE: Dockerfile
-    PUSH_DESTINATION: $BOT_IMAGE_TAG
+    PUSH_DESTINATION: $ECR_MITUP_REPO_URI
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
@@ -65,24 +72,12 @@ push-bot-tagged-staging:
         paths: !reference [.deployment-files]
       when: on_success
 
-push-bot-latest-staging:
-  extends: push-bot-tagged-staging
-  resource_group: bot-latest-staging
-  variables:
-    PUSH_DESTINATION: "${ECR_MITUP_REPO_URI}:latest"
-
 push-migrations-lambda-staging:
   extends: push-bot-tagged-staging
   resource_group: migrations-tagged-staging
   variables:
     DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
-
-push-migrations-latest-staging:
-  extends: push-migrations-lambda-staging
-  resource_group: migrations-latest-staging
-  variables:
-    PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
+    PUSH_DESTINATION: $ECR_MIGRATIONS_REPO_URI
 
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
@@ -99,21 +94,9 @@ push-bot-tagged-prod:
       when: never
     - if: $CI_COMMIT_BRANCH == "release"
 
-push-bot-latest-prod:
-  extends: push-bot-tagged-prod
-  resource_group: bot-latest-prod
-  variables:
-    PUSH_DESTINATION: "${ECR_MITUP_REPO_URI}:latest"
-
 push-migrations-lambda-prod:
   extends: push-bot-tagged-prod
   resource_group: migrations-tagged-prod
   variables:
     DOCKERFILE: Dockerfile.migrations
-    PUSH_DESTINATION: "${MIGRATIONS_IMAGE_TAG}"
-
-push-migrations-latest-prod:
-  extends: push-migrations-lambda-prod
-  resource_group: migrations-latest-prod
-  variables:
-    PUSH_DESTINATION: "${ECR_MIGRATIONS_REPO_URI}:latest"
+    PUSH_DESTINATION: $ECR_MIGRATIONS_REPO_URI
