@@ -29,7 +29,7 @@ build-docker-ci:
     DOCKERFILE: Dockerfile.ci
     # Push to the dynamically determined tag
     PUSH_DESTINATION: "${CI_REGISTRY_IMAGE}/ci-python:${CI_IMAGE_TAG}"
-  extends: .kaniko-build-push
+  extends: .docker-build
   rules:
     # Build automatically for MR-specific images (when CI files changed in MR)
     - if: '$CI_IMAGE_TAG =~ /^mr-/'
