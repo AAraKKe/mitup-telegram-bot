@@ -17,10 +17,8 @@
       "matchDatasources": [
         "docker"
       ],
-      "excludePackageNames": [
-        "postgres",
-        "python",
-        "public.ecr.aws/lambda/python"
+      "excludePackagePatterns": [
+        "^postgres$"
       ],
       "addLabels": [
         "scope::containers"
@@ -48,6 +46,17 @@
       ],
       "additionalBranchPrefix": "docker-postgres-",
       "groupName": "Postgres image"
+    },
+    {
+      "description": "Disable Docker updates for Python images as they are handled by a custom manager",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "python",
+        "public.ecr.aws/lambda/python"
+      ],
+      "enabled": false
     },
     {
       "matchFileNames": [
@@ -100,8 +109,10 @@
         "minor"
       ],
       "labels": [
-        "type::python-upgrade"
-      ]
+        "type::python-upgrade",
+        "scope::environment"
+      ],
+      "commitMessageTopic": "python"
     }
   ],
   "customManagers": [
