@@ -36,7 +36,7 @@
         --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}" \
         --tag "${COMMIT_DESTINATION}" \
         --tag "${LATEST_TAG}" \
-        --cache-from "type-registry,ref=${CACHE_TAG}" \
+        --cache-from "type=registry,ref=${CACHE_TAG}" \
         --cache-to "type=registry,ref=${CACHE_TAG},mode=max" \
         --provenance=false \
         --push \
