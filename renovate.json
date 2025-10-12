@@ -8,7 +8,7 @@
   "reviewers": [
     "@jparaque"
   ],
-  "commitMessagePrefix": "🚀 update:",
+  "commitMessagePrefix": "⬆️ ",
   "labels": [
     "type::dependency-upgrade"
   ],

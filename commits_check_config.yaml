@@ -10,7 +10,7 @@ additional_commit_types:
     emoji: 📚
   Style:
     description: Improve code style without affecting functionality.
-    emoji: 💎
+    emoji: 🎨
   Refactor:
     description: Refactor code without changing functionality.
     emoji: 🧹
@@ -37,7 +37,7 @@ additional_commit_types:
     emoji: 🔀
   Update:
     description: Update dependencies or other changes.
-    emoji: 🚀
+    emoji: ⬆️
   Monitoring:
     description: Add or update monitoring.
     emoji: 📈
