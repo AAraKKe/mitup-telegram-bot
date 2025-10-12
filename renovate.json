@@ -18,9 +18,6 @@
       "matchDatasources": [
         "docker"
       ],
-      "excludePackagePatterns": [
-        "^postgres$"
-      ],
       "addLabels": [
         "scope::containers"
       ],
@@ -29,7 +26,10 @@
         "minor"
       ],
       "additionalBranchPrefix": "docker-",
-      "groupName": "Docker images"
+      "groupName": "Docker images",
+      "matchPackageNames": [
+        "!/^postgres$/"
+      ]
     },
     {
       "matchDatasources": [
@@ -120,11 +120,11 @@
     {
       "customType": "regex",
       "description": "Update Python version across the codebase",
-      "fileMatch": [
-        "^pyproject\\.toml$",
-        "(^|/)Dockerfile(\\.ci|\\.dev|\\.migrations)?$",
-        "^dev/docker/Dockerfile$",
-        "^\\.gitlab/ci/test\\.yml$"
+      "managerFilePatterns": [
+        "/^pyproject\\.toml$/",
+        "/(^|/)Dockerfile(\\.ci|\\.dev|\\.migrations)?$/",
+        "/^dev/docker/Dockerfile$/",
+        "/^\\.gitlab/ci/test\\.yml$/"
       ],
       "matchStrings": [
         "requires-python = \">=(?<currentValue>[0-9]+\\.[0-9]+)\"",
