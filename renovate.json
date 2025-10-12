@@ -17,6 +17,9 @@
       "matchDatasources": [
         "docker"
       ],
+      "excludePackageNames": [
+        "postgres"
+      ],
       "addLabels": [
         "scope::containers"
       ],
@@ -26,6 +29,23 @@
       ],
       "additionalBranchPrefix": "docker-",
       "groupName": "Docker images"
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "addLabels": [
+        "scope::containers"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "additionalBranchPrefix": "docker-postgres-",
+      "groupName": "Postgres image"
     },
     {
       "matchFileNames": [
@@ -47,12 +67,19 @@
       "enabled": false
     },
     {
-      "matchPackageNames": ["ruff", "pyright"],
-      "matchUpdateTypes": ["patch"],
+      "matchPackageNames": [
+        "ruff",
+        "pyright"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "enabled": false
     },
     {
-      "matchFileNames": [".pre-commit-config.yaml"],
+      "matchFileNames": [
+        ".pre-commit-config.yaml"
+      ],
       "autoApprove": true,
       "reviewers": [],
       "automerge": true
