@@ -1,18 +1,9 @@
 # Main GitLab CI configuration file that includes all the components
 # Split into multiple files for better organization and maintainability
 
-# Centralized list of files that trigger deployment
-# Defined here so it's available to all included files
-.deployment-trigger-files: &deployment-trigger-files
-  - mitup_bot/**/*
-  - dev/docker/Dockerfile
-  - dev/docker/Dockerfile.ci
-  - dev/docker/Dockerfile.migrations
-  - pyproject.toml
-
 # Include all component files
 include:
-  # Base configuration
+  # Base configuration (must be first so other files can reference shared definitions)
   - local: .gitlab/ci/base.yml
   # Testing and validation
   - local: .gitlab/ci/test.yml

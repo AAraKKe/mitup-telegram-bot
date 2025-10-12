@@ -40,9 +40,11 @@ config-staging:
       when: on_success
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
-        - *deployment-trigger-files
-        - docs/**/*
-        - mkdocs.yml
+        paths:
+          - !reference [.deployment-files]
+          - docs/**/*
+          - mkdocs.yml
+      when: on_success
 
 config-prod:
   extends: .aws-config

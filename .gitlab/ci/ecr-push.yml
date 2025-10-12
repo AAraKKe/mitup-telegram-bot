@@ -56,7 +56,9 @@ push-bot-tagged-staging:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
       when: on_success
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: *deployment-trigger-files
+      changes:
+        paths: !reference [.deployment-files]
+      when: on_success
 
 push-bot-latest-staging:
   extends: push-bot-tagged-staging
