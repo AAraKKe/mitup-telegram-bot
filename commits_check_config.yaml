@@ -28,7 +28,7 @@ additional_commit_types:
     emoji: 👷
   Chore:
     description: Other changes that don't modify src or test files.
-    emoji: ♻️
+    emoji: ⚙️
   Revert:
     description: Revert changes.
     emoji: ⏪
