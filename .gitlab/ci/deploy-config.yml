@@ -40,10 +40,7 @@ config-staging:
       when: on_success
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
-        - mitup_bot/**/*
-        - dev/docker/Dockerfile
-        - dev/docker/Dockerfile.lambdas
-        - pyproject.toml
+        - *deployment-trigger-files
         - docs/**/*
         - mkdocs.yml
 

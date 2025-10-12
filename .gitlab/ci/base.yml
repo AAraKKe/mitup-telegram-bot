@@ -32,6 +32,15 @@ workflow:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_BRANCH == "release"'
 
+# Centralized list of files that trigger deployment
+# Use this anchor to keep deployment triggers consistent across jobs
+.deployment-trigger-files: &deployment-trigger-files
+  - mitup_bot/**/*
+  - dev/docker/Dockerfile
+  - dev/docker/Dockerfile.ci
+  - dev/docker/Dockerfile.migrations
+  - pyproject.toml
+
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
   - |

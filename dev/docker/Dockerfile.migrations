@@ -3,43 +3,51 @@
 # It uses the lambda image that contains the python runtime and the lambda
 # setup to be able to call the handler when a lambda is launched
 
-# Stage 1: Builder - Build wheel package
+# Stage 1: Builder - Build and install package with all dependencies
 FROM public.ecr.aws/lambda/python:3.13 AS builder
-
-# Install build dependencies
-RUN dnf install -y libpq-devel gcc && \
-  dnf clean all && \
-  rm -rf /var/cache/yum
-
-# Install Hatch for building
-RUN pip install --no-cache-dir hatch
-
-# Copy source files
-COPY mitup_bot /build/mitup_bot
-COPY alembic.ini /build/alembic.ini
-COPY pyproject.toml /build/pyproject.toml
-COPY LICENSE /build/LICENSE
 
 WORKDIR /build
 
-# Build wheel package
-RUN hatch build -t wheel
-
-# Stage 2: Runtime - Install only what's needed
-FROM public.ecr.aws/lambda/python:3.13 AS runtime
-
-# Install only runtime dependencies
-RUN dnf install -y libpq && \
+# Install build dependencies
+# Using --setopt=install_weak_deps=False to avoid unnecessary packages (dnf equivalent of apt's --no-install-recommends)
+RUN dnf install -y --setopt=install_weak_deps=False \
+  libpq-devel \
+  gcc && \
   dnf clean all && \
   rm -rf /var/cache/yum
 
-# Copy wheel and alembic config from builder
-COPY --from=builder /build/dist/*.whl /tmp/
-COPY --from=builder /build/alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
+# Copy only dependency files first for better layer caching
+COPY pyproject.toml /build/pyproject.toml
+COPY LICENSE /build/LICENSE
 
-# Install the wheel package
-RUN pip install --no-cache-dir /tmp/*.whl && \
-  rm -rf /tmp/*.whl
+# Create minimal structure and install dependencies
+# This layer will be cached unless pyproject.toml changes
+RUN mkdir -p /build/mitup_bot && \
+  echo '__version__ = "0.0.0"' > /build/mitup_bot/__about__.py && \
+  touch /build/mitup_bot/__init__.py && \
+  pip install --no-cache-dir --target=/install .
+
+# Now copy the actual source code
+COPY mitup_bot /build/mitup_bot
+COPY alembic.ini /build/alembic.ini
+
+# Remove source translation files (keep only compiled .mo files from CI)
+RUN find /build/mitup_bot/locales -type f \( -name "*.po" -o -name "*.pot" \) -delete
+
+# Reinstall with actual source code
+RUN pip install --no-cache-dir --target=/install .
+
+# Stage 2: Runtime - Copy installed package and dependencies
+FROM public.ecr.aws/lambda/python:3.13 AS runtime
+
+# Install only runtime dependencies
+RUN dnf install -y --setopt=install_weak_deps=False libpq && \
+  dnf clean all && \
+  rm -rf /var/cache/yum
+
+# Copy installed package and all dependencies from builder
+COPY --from=builder /install ${LAMBDA_TASK_ROOT}
+COPY --from=builder /build/alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
 
 # The CMD needs to be set to the lambda handler
 CMD ["mitup_bot.lambdas.migrations.run_migrations"]
