@@ -6,43 +6,41 @@
 # Stage 1: Builder - Build and install package with all dependencies
 FROM public.ecr.aws/lambda/python:3.13 AS builder
 
-WORKDIR /build
-
-# Install build dependencies
+# Install build-time system dependencies
 RUN dnf install -y --setopt=install_weak_deps=0 \
   libpq-devel \
   gcc && \
   dnf clean all && \
   rm -rf /var/cache/yum
 
-# Copy only dependency files first for better layer caching
-COPY pyproject.toml /build/pyproject.toml
-COPY LICENSE /build/LICENSE
+# Set the working directory
+WORKDIR /build
 
-# Create minimal structure and install dependencies
-# This layer will be cached unless pyproject.toml changes
-RUN mkdir -p /build/mitup_bot && \
-  echo '__version__ = "0.0.0"' > /build/mitup_bot/__about__.py && \
-  touch /build/mitup_bot/__init__.py && \
-  pip install --no-cache-dir --target=/install .
-
-# Now copy the actual source code
+# Copy all necessary files for installation
+COPY pyproject.toml LICENSE alembic.ini /build/
 COPY mitup_bot /build/mitup_bot
-COPY alembic.ini /build/alembic.ini
 
 # Remove source translation files (keep only compiled .mo files from CI)
 RUN find /build/mitup_bot/locales -type f \( -name "*.po" -o -name "*.pot" \) -delete
 
-# Reinstall with actual source code
+# Install all dependencies and the application in one step
+# This creates a clean installation in the /install directory
 RUN pip install --no-cache-dir --target=/install .
 
-# Stage 2: Runtime - Copy installed package and dependencies
+
+# Stage 2: Runtime - Create the final, lean image
 FROM public.ecr.aws/lambda/python:3.13 AS runtime
 
-# Install only runtime dependencies
+# Install only runtime system dependencies
 RUN dnf install -y --setopt=install_weak_deps=0 libpq && \
   dnf clean all && \
   rm -rf /var/cache/yum
+
+# Set the working directory to the default LAMBDA_TASK_ROOT
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Set the PYTHONPATH to ensure the handler can be found
+ENV PYTHONPATH="${LAMBDA_TASK_ROOT}"
 
 # Copy installed package and all dependencies from builder
 COPY --from=builder /install ${LAMBDA_TASK_ROOT}
