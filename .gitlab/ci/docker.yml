@@ -1,16 +1,27 @@
 # --------------------
 # Docker build and push images
 # ---------------------
-.kaniko-build-push: &kaniko
-  image:
-    name: gcr.io/kaniko-project/executor:v1.24.0-debug
-    entrypoint: [""]
+.docker-build-push: &docker-build
+  image: docker:27-cli
+  services:
+    - docker:27-dind
+  variables:
+    # Enable BuildKit for better multi-stage builds and caching
+    DOCKER_BUILDKIT: "1"
+    # Disable TLS for dind communication within GitLab runner
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    # Authenticate to GitLab Container Registry
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
-      --destination "${PUSH_DESTINATION}"
+    - docker buildx create --use --driver docker-container
+    - docker buildx build
+      --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
+      --tag "${PUSH_DESTINATION}"
+      --push
+      --progress=plain
+      "${CI_PROJECT_DIR}"
 
 build-docker-ci:
   stage: build-ci
