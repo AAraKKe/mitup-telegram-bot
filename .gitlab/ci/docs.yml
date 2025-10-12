@@ -12,8 +12,7 @@ build-docs:
       when: never
     # Only run if the doc files change
     - changes:
-      - docs/**/*
-      - mkdocs.yml
+        paths: !reference [.docs-files]
 
 ## -------------- Documentation ---------------
 # Run after deploy to be sure that documentation is not updated until the bot has been updated
@@ -41,8 +40,7 @@ push-docs-staging:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       # Only run if in the default branch and the doc files change
       changes:
-        - docs/**/*
-        - mkdocs.yml
+        paths: !reference [.docs-files]
 
 push-docs-production:
   extends: .push-docs

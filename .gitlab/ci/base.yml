@@ -33,7 +33,7 @@ workflow:
     - if: '$CI_COMMIT_BRANCH == "release"'
 
 # Centralized list of files that trigger deployment when changed
-# Use this anchor in rules to keep deployment triggers consistent
+# Use !reference [.deployment-files] in rules to keep triggers consistent
 .deployment-files: &deployment-files
   - mitup_bot/**/*
   - dev/docker/Dockerfile
@@ -41,10 +41,11 @@ workflow:
   - dev/docker/Dockerfile.migrations
   - pyproject.toml
 
-.docs-and-deployment-files: &docs-and-deployment-files
+# Centralized list of documentation files
+# Use !reference [.docs-files] in rules for documentation changes
+.docs-files: &docs-files
   - docs/**/*
   - mkdocs.yml
-  - *deployment-files
 
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep

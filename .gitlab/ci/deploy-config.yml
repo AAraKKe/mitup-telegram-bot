@@ -40,7 +40,11 @@ config-staging:
       when: on_success
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes:
-        paths: !reference [.docs-and-deployment-files]
+        paths: !reference [.deployment-files]
+      when: on_success
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        paths: !reference [.docs-files]
       when: on_success
 
 config-prod:
