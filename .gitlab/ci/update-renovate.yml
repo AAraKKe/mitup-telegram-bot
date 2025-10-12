@@ -1,0 +1,43 @@
+auto-format:
+  stage: pre-flight
+  rules:
+    # Never run if the commit that triggered the pipeline was this commit
+    - if: $CI_COMMIT_MESSAGE =~ /.*[fF]ix formatting after renovate update$/
+      when: never
+    # Only run in renovate branches
+    - if: $CI_COMMIT_BRANCH =~ /^renovate\//
+  before_script:
+    - pip install pre-commit
+    - pre-commit install --install-hooks
+  script:
+    - hatch run dev:fix
+    - |
+      # Only proceed if there are changes to commit
+      if ! git diff --quiet; then
+        echo "Formatting changes detected. Committing with Renovate's identity."
+
+        # Dynamically get the author details from the last commit (made by Renovate)
+        COMMIT_AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
+        COMMIT_AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+
+        echo "Setting git user to '${COMMIT_AUTHOR_NAME} <${COMMIT_AUTHOR_EMAIL}>'"
+
+        # Use these dynamic details for the new commit
+        git config user.name "${COMMIT_AUTHOR_NAME}"
+        git config user.email "${COMMIT_AUTHOR_EMAIL}"
+
+        git add -A
+        git commit -m "style: fix formatting after renovate update"
+
+        # Push the changes back to the same branch using the token
+        git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:${CI_COMMIT_BRANCH}
+
+        # If this has run, there is no point in running the rest of the pipeline
+        echo "Successfully pushed formatting changes. Failing job to stop pipeline."
+        exit 1
+      else
+        echo "No formatting changes needed."
+      fi
+  variables:
+    # GIT_STRATEGY: clone is required to have the git history to log and push
+    GIT_STRATEGY: clone

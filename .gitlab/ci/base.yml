@@ -82,6 +82,7 @@ sast:
   stage: analysis
 
 stages:
+  - pre-flight
   - analysis
   - build-ci
   - build

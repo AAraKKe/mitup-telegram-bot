@@ -5,6 +5,8 @@
 include:
   # Base configuration (must be first so other files can reference shared definitions)
   - local: .gitlab/ci/base.yml
+  # Update Renovate configuration
+  - local: .gitlab/ci/update-renovate.yml
   # Testing and validation
   - local: .gitlab/ci/test.yml
   # Docker build and push

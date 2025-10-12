@@ -12,6 +12,7 @@
   "labels": [
     "type::dependency-upgrade"
   ],
+  "configMigration": true,
   "packageRules": [
     {
       "matchDatasources": [
