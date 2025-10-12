@@ -40,12 +40,21 @@ workflow:
   - dev/docker/Dockerfile.ci
   - dev/docker/Dockerfile.migrations
   - pyproject.toml
+  # Include also gitlab yaml files related with deployments
+  - .gitlab-ci.yml
+  - .gitlab/ci/deploy.yml
+  - .gitlab/ci/deploy-config.yml
+  - .gitlab/ci/ecr-push.yml
 
 # Centralized list of documentation files
 # Use !reference [.docs-files] in rules for documentation changes
 .docs-files: &docs-files
   - docs/**/*
   - mkdocs.yml
+  # Include also gitlab yaml files related with documentation
+  - .gitlab-ci.yml
+  - .gitlab/ci/docs.yml
+  - .gitlab/ci/deploy-config.yml
 
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
