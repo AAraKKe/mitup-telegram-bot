@@ -9,8 +9,8 @@ FROM public.ecr.aws/lambda/python:3.13 AS builder
 WORKDIR /build
 
 # Install build dependencies
-# Using --setopt=install_weak_deps=False to avoid unnecessary packages (dnf equivalent of apt's --no-install-recommends)
-RUN dnf install -y --setopt=install_weak_deps=False \
+# Using --setopt=install_weak_deps=false to avoid unnecessary packages (dnf equivalent of apt's --no-install-recommends)
+RUN dnf install -y --setopt=install_weak_deps=false \
   libpq-devel \
   gcc && \
   dnf clean all && \
@@ -41,7 +41,7 @@ RUN pip install --no-cache-dir --target=/install .
 FROM public.ecr.aws/lambda/python:3.13 AS runtime
 
 # Install only runtime dependencies
-RUN dnf install -y --setopt=install_weak_deps=False libpq && \
+RUN dnf install -y --setopt=install_weak_deps=false libpq && \
   dnf clean all && \
   rm -rf /var/cache/yum
 
