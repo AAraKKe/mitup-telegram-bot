@@ -48,11 +48,7 @@ build-docker-ci:
     - if: '$CI_IMAGE_TAG =~ /^mr-/'
     # Build on main/release when CI files changed
     - if: '($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "release")'
-      changes:
-        - dev/docker/Dockerfile.ci
-        - pyproject.toml
-        - .gitlab-ci.yml
-        - .gitlab/ci/docker.yml
+      changes: !reference [.ci-docker-files]
     # Allow manual trigger with [build-ci] in commit message
     - if: '$CI_COMMIT_TITLE =~ /\[build-ci\]/'
     # Manual fallback for any other case
