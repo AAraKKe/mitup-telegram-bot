@@ -18,7 +18,9 @@
         "docker"
       ],
       "excludePackageNames": [
-        "postgres"
+        "postgres",
+        "python",
+        "public.ecr.aws/lambda/python"
       ],
       "addLabels": [
         "scope::containers"
@@ -83,6 +85,45 @@
       "autoApprove": true,
       "reviewers": [],
       "automerge": true
+    },
+    {
+      "description": "Group Python version updates",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
+      "groupName": "Python version",
+      "additionalBranchPrefix": "python-version-",
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "labels": [
+        "type::python-upgrade"
+      ]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Python version across the codebase",
+      "fileMatch": [
+        "^pyproject\\.toml$",
+        "(^|/)Dockerfile(\\.ci|\\.dev|\\.migrations)?$",
+        "^dev/docker/Dockerfile$",
+        "^\\.gitlab/ci/test\\.yml$"
+      ],
+      "matchStrings": [
+        "requires-python = \">=(?<currentValue>[0-9]+\\.[0-9]+)\"",
+        "Programming Language :: Python :: (?<currentValue>[0-9]+\\.[0-9]+)",
+        "FROM python:(?<currentValue>[0-9]+\\.[0-9]+)-slim-bookworm",
+        "FROM public\\.ecr\\.aws/lambda/python:(?<currentValue>[0-9]+\\.[0-9]+)",
+        "image: python:(?<currentValue>[0-9]+\\.[0-9]+)-bookworm"
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "python-version",
+      "versioningTemplate": "python"
     }
   ],
   "major": {
