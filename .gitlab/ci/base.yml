@@ -42,6 +42,7 @@ workflow:
   - pyproject.toml
   # Include also gitlab yaml files related with deployments
   - .gitlab-ci.yml
+  - .gitlab/ci/base.yml
   - .gitlab/ci/deploy.yml
   - .gitlab/ci/deploy-config.yml
   - .gitlab/ci/ecr-push.yml
@@ -53,6 +54,7 @@ workflow:
   - mkdocs.yml
   # Include also gitlab yaml files related with documentation
   - .gitlab-ci.yml
+  - .gitlab/ci/base.yml
   - .gitlab/ci/docs.yml
   - .gitlab/ci/deploy-config.yml
 
