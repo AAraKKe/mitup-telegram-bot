@@ -12,6 +12,8 @@
     DOCKER_BUILDKIT: "1"
     # Disable TLS for dind communication within GitLab runner
     DOCKER_TLS_CERTDIR: ""
+    # Connect to docker:dind service
+    DOCKER_HOST: tcp://docker:2375
   before_script:
     # Setup AWS credentials using OIDC
     - mkdir -p ~/.aws
@@ -22,15 +24,19 @@
     - export AWS_REGION=eu-west-1
     # Authenticate Docker to ECR
     - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
+    # Create and bootstrap buildx builder
+    - docker buildx create --use --driver docker-container --name builder
+    - docker buildx inspect --bootstrap
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
-    # Use default buildx builder (connected to dind)
     - docker buildx build
       --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --tag "${PUSH_DESTINATION}"
       --push
       --progress=plain
       "${CI_PROJECT_DIR}"
+  after_script:
+    - docker buildx rm builder
 
 ## -------------- Push to staging ---------------
 push-bot-tagged-staging:

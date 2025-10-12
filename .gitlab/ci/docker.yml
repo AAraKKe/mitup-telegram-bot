@@ -10,18 +10,24 @@
     DOCKER_BUILDKIT: "1"
     # Disable TLS for dind communication within GitLab runner
     DOCKER_TLS_CERTDIR: ""
+    # Connect to docker:dind service
+    DOCKER_HOST: tcp://docker:2375
   before_script:
     # Authenticate to GitLab Container Registry
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    # Create and bootstrap buildx builder
+    - docker buildx create --use --driver docker-container --name builder
+    - docker buildx inspect --bootstrap
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
-    - docker buildx create --use --driver docker-container
     - docker buildx build
       --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --tag "${PUSH_DESTINATION}"
       --push
       --progress=plain
       "${CI_PROJECT_DIR}"
+  after_script:
+    - docker buildx rm builder
 
 build-docker-ci:
   stage: build-ci
