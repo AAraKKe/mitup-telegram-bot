@@ -16,34 +16,35 @@
     # Setup AWS credentials using OIDC
     - mkdir -p ~/.aws
     - cp ${CI_PROJECT_DIR}/aws-config ~/.aws/config
-    - echo "✓ AWS config copied"
+    - echo "[OK] AWS config copied"
     # Extract ECR registry domain from destination
     - export ECR_REGISTRY=$(echo $PUSH_DESTINATION | cut -d'/' -f1)
     - export AWS_SDK_LOAD_CONFIG=1
     - export AWS_REGION=eu-west-1
-    - echo "📍 Target ECR registry: $ECR_REGISTRY"
-    - echo "📦 Full destination: $PUSH_DESTINATION"
+    - echo "[INFO] Target ECR registry - $ECR_REGISTRY"
+    - echo "[INFO] Full destination - $PUSH_DESTINATION"
     # Authenticate Docker to ECR
-    - echo "🔐 Authenticating to ECR..."
+    - echo "[INFO] Authenticating to ECR..."
     - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
-    - echo "✓ Successfully authenticated to ECR"
+    - echo "[OK] Successfully authenticated to ECR"
   script:
-    - echo "🏗️  Starting build process..."
-    - echo "📄 Dockerfile: dev/docker/$DOCKERFILE"
-    - echo "🏷️  Image tag: $PUSH_DESTINATION"
-    - echo ""
-    - echo "🔧 Creating buildx builder..."
+    - echo "======================================"
+    - echo "[BUILD] Starting build process"
+    - echo "[BUILD] Dockerfile - dev/docker/$DOCKERFILE"
+    - echo "[BUILD] Image tag - $PUSH_DESTINATION"
+    - echo "======================================"
+    - echo "[INFO] Creating buildx builder..."
     - docker buildx create --use --driver docker-container
-    - echo ""
-    - echo "🐳 Building and pushing image..."
+    - echo "[INFO] Building and pushing image..."
     - docker buildx build
       --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --tag "${PUSH_DESTINATION}"
       --push
       --progress=plain
       "${CI_PROJECT_DIR}"
-    - echo ""
-    - echo "✅ Build and push completed successfully!"
+    - echo "======================================"
+    - echo "[SUCCESS] Build and push completed!"
+    - echo "======================================"
 
 ## -------------- Push to staging ---------------
 push-bot-tagged-staging:
