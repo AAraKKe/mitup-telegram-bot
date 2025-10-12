@@ -24,20 +24,11 @@
     - export AWS_REGION=eu-west-1
     # Authenticate Docker to ECR
     - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
-    # Create and bootstrap buildx builder
-    - docker buildx create --use --driver docker-container --name builder
-    - docker buildx inspect --bootstrap
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
-    - docker buildx build
-      --platform linux/amd64
-      --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
-      --tag "${PUSH_DESTINATION}"
-      --push
-      --progress=plain
-      "${CI_PROJECT_DIR}"
-  after_script:
-    - docker buildx rm builder
+    - docker build --platform linux/amd64 --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}" --tag "${PUSH_DESTINATION}" "${CI_PROJECT_DIR}"
+    - docker push "${PUSH_DESTINATION}"
+  after_script: []
 
 ## -------------- Push to staging ---------------
 push-bot-tagged-staging:
