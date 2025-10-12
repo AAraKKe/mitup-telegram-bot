@@ -29,14 +29,17 @@
     - docker buildx inspect --bootstrap
   script:
     - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
+    - export CACHE_IMAGE=$(echo $PUSH_DESTINATION | cut -d':' -f1):latest
     - docker buildx build
       --platform linux/amd64
       --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}"
       --tag "${PUSH_DESTINATION}"
-      --load
+      --cache-from "type=registry,ref=${CACHE_IMAGE}"
+      --cache-to "type=registry,ref=${CACHE_IMAGE},mode=max"
+      --provenance=false
+      --push
       --progress=plain
       "${CI_PROJECT_DIR}"
-    - docker push "${PUSH_DESTINATION}"
   after_script:
     - docker buildx rm builder
 
