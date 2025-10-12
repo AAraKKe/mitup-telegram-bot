@@ -18,6 +18,9 @@
     # Setup AWS credentials using OIDC
     - mkdir -p ~/.aws
     - cp ${CI_PROJECT_DIR}/aws-config ~/.aws/config
+    # Login to AWS ECR
+    - ECR_REGISTRY=$(echo "$PUSH_DESTINATION" | cut -d'/' -f1)
+    - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin "$ECR_REGISTRY"
     # Create and bootstrap buildx builder
     - docker buildx create --use --driver docker-container --name builder
     - docker buildx inspect --bootstrap
