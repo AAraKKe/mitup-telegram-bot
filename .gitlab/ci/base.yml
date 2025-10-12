@@ -41,6 +41,11 @@ workflow:
   - dev/docker/Dockerfile.migrations
   - pyproject.toml
 
+.docs-and-deployment-files: &docs-and-deployment-files
+  - docs/**/*
+  - mkdocs.yml
+  - *deployment-files
+
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
   - |
