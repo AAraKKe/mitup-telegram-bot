@@ -16,7 +16,7 @@ auto-format:
 
       # If the last commit was already a formatting fix, do nothing.
       # The job should succeed and the pipeline should continue.
-      if [[ "${SOURCE_COMMIT_MESSAGE}" == *"fix formatting after renovate update"* ]]; then
+      if [[ "${SOURCE_COMMIT_MESSAGE}" == *"Fix formatting after renovate update"* ]]; then
         echo "Last commit on source branch was a formatting fix. Nothing to do."
         exit 0
       fi
