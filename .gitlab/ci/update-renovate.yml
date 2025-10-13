@@ -30,7 +30,7 @@ auto-format:
         git commit -m "style: fix formatting after renovate update"
 
         # Push the changes back to the same branch using the token
-        git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:${CI_COMMIT_BRANCH}
+        git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
 
         # If this has run, there is no point in running the rest of the pipeline
         echo "Successfully pushed formatting changes. Failing job to stop pipeline."
