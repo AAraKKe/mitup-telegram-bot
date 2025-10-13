@@ -9,6 +9,8 @@ auto-format:
   before_script:
     - pip install pre-commit
     - pre-commit install --install-hooks
+    # Merge request normally run on a merge with the target branch, so we need to checkout the source branch
+    - git checkout ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
   script:
     - hatch run dev:fix
     - |
