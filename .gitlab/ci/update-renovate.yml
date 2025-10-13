@@ -1,24 +1,37 @@
 auto-format:
   stage: pre-flight
   rules:
-    # Never run if the commit that triggered the pipeline was this commit
-    - if: $CI_COMMIT_MESSAGE =~ /.*[fF]ix formatting after renovate update$/
-      when: never
-    # Only run in renovate branches
-    - if: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\//
-  before_script:
-    - pip install pre-commit
-    - pre-commit install --install-hooks
-    - pre-commit install --hook-type commit-msg
-    # Merge request normally run on a merge with the target branch, so we need to checkout the source branch
-    - git fetch origin
-    - git checkout -b reformat origin/${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+    # Only run in renovate branches on merge requests
+    - if: '$CI_MERGE_REQUEST_ID && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\//'
   script:
-    - hatch run dev:fix
     - |
+      set -e
+
+      git fetch origin
+      git checkout -c reformat origin/${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+
+      # Now that we are on the correct branch, get its latest commit message.
+      SOURCE_COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+      echo "Source commit message: ${SOURCE_COMMIT_MESSAGE}"
+
+      # If the last commit was already a formatting fix, do nothing.
+      # The job should succeed and the pipeline should continue.
+      if [[ "${SOURCE_COMMIT_MESSAGE}" == *"fix formatting after renovate update"* ]]; then
+        echo "Last commit on source branch was a formatting fix. Nothing to do."
+        exit 0
+      fi
+
+      # Otherwise, run the formatters
+      hatch run dev:fix
+
       # Only proceed if there are changes to commit
       if ! git diff --quiet; then
         echo "Formatting changes detected. Committing with Renovate's identity."
+
+        # Install and configure pre-commit to ensure commit-msg hooks run
+        pip install pre-commit
+        pre-commit install
+        pre-commit install --hook-type commit-msg
 
         # Dynamically get the author details from the last commit (made by Renovate)
         COMMIT_AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
@@ -33,14 +46,15 @@ auto-format:
         git add -A
         git commit -m "style: fix formatting after renovate update"
 
-        # Push the changes back to the same branch using the token
-        git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+        # Push the changes back to the source branch using the token
+        git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
 
         # If this has run, there is no point in running the rest of the pipeline
         echo "Successfully pushed formatting changes. Failing job to stop pipeline."
         exit 1
       else
         echo "No formatting changes needed."
+        exit 0 # Exit successfully if no changes were needed
       fi
   variables:
     # GIT_STRATEGY: clone is required to have the git history to log and push
