@@ -82,9 +82,9 @@ sast:
   stage: analysis
 
 stages:
+  - build-ci
   - pre-flight
   - analysis
-  - build-ci
   - build
   - test
   - prepare-deployment

@@ -5,7 +5,7 @@ auto-format:
     - if: $CI_COMMIT_MESSAGE =~ /.*[fF]ix formatting after renovate update$/
       when: never
     # Only run in renovate branches
-    - if: $CI_COMMIT_BRANCH =~ /^renovate\//
+    - if: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^renovate\//
   before_script:
     - pip install pre-commit
     - pre-commit install --install-hooks

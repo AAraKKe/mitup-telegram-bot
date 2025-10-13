@@ -20,6 +20,7 @@ RUN apt-get update && \
     docker-buildx-plugin \
     libpq-dev \
     gcc \
+    git \
     libc-dev \
     groff \
     unzip \
