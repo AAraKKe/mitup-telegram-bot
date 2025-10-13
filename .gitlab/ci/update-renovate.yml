@@ -11,9 +11,6 @@ auto-format:
     - pre-commit install --install-hooks
     - pre-commit install --hook-type commit-msg
     # Merge request normally run on a merge with the target branch, so we need to checkout the source branch
-    - git remote show
-    # Add origin remote
-    - git remote add origin https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
     - git fetch origin
     - git checkout -b reformat origin/${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
   script:
