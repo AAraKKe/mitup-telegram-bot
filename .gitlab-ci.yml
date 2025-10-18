@@ -9,6 +9,7 @@ include:
   - local: .gitlab/ci/update-renovate.yml
   # Testing and validation
   - local: .gitlab/ci/test.yml
+  - local: .gitlab/ci/validate-docker-build.yml
   # Docker build and push
   - local: .gitlab/ci/docker.yml
   # Configuring the aws credentials and the ECR URIs
