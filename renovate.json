@@ -92,6 +92,10 @@
       "matchFileNames": [
         ".pre-commit-config.yaml"
       ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
       "autoApprove": true,
       "reviewers": [],
       "automerge": true
