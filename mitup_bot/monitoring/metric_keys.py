@@ -16,22 +16,26 @@ class CamelCaseStrEnum(StrEnum):
 
 
 class MetricKey(CamelCaseStrEnum):
+    """Metric to be emitted when the time is measured"""
+
     TIME = auto()
+    """Metric to be emitted when the count is measured"""
     COUNT = auto()
-    ERROR = auto()
     """This is a metric to be emitted when there is a processing error, user input error, etc."""
-    FAULT = auto()
+    ERROR = auto()
     """This is a metric to be emitted when there is a system fault, something that is not expected to happen."""
-    MEETING_NOT_OWNED = auto()
+    FAULT = auto()
     """Metric to be emitted when the user tries to do an action with a meeting that does not belong to them."""
-    MESSAGE_DELETED = auto()
+    MEETING_NOT_OWNED = auto()
     """Represents a message that has been deleted in Telegram and deleted from the database"""
-    STALE_MEETING_MESSAGE = auto()
+    MESSAGE_DELETED = auto()
     """This metrics is emitted when someone interacts with a message of a meeting that should not be available."""
-    INACTIVE_USER_SET = auto()
+    STALE_MEETING_MESSAGE = auto()
     """Metric emitted when an inactive user has been detected and is_active is set to False."""
-    INACTIVE_USERS_DELETED = auto()
+    INACTIVE_USER_SET = auto()
     """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
+    INACTIVE_USERS_DELETED = auto()
+    """Number of notifications failed to send"""
     NOTIFICATIONS_FAILED = auto()
     """Number of notifications sent when a meeting is about to start"""
     NOTIFICATIONS_SENT = auto()
@@ -45,6 +49,8 @@ class MetricKey(CamelCaseStrEnum):
     INVITED_USERS = auto()
     """Stat for the total number of active meetings"""
     ACTIVE_MEETINGS = auto()
+    """Stat for the total number of meetings with a datetime set"""
+    MEETINGS_WITH_DATETIME = auto()
     """Stat for the total number of inactive meetings"""
     INACTIVE_MEETINGS = auto()
     """Stat for the total number of incognito meetings"""

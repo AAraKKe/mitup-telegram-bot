@@ -68,6 +68,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     description: str | None = None
     created_time: dt.datetime | None = None
     updated_time: dt.datetime | None = None
+    expiration_time: dt.datetime | None = None
     datetime: dt.datetime | None = None
     max_members: int | None = None
     language: str | None = None
