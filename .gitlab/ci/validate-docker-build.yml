@@ -1,0 +1,39 @@
+.docker-build-template: &docker-build-template
+  stage: test
+  image: docker:24.0.5
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: "" # Disable TLS
+  script:
+    - docker build -f $DOCKERFILE_PATH -t mitup-$DOCKERFILE_NAME:test .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        - $DOCKERFILE_PATH
+
+build-docker-base:
+  <<: *docker-build-template
+  variables:
+    DOCKERFILE_PATH: dev/docker/Dockerfile
+    DOCKERFILE_NAME: base
+
+build-docker-ci:
+  <<: *docker-build-template
+  variables:
+    DOCKERFILE_PATH: dev/docker/Dockerfile.ci
+    DOCKERFILE_NAME: ci
+
+build-docker-dev:
+  <<: *docker-build-template
+  variables:
+    DOCKERFILE_PATH: dev/docker/Dockerfile.dev
+    DOCKERFILE_NAME: dev
+
+build-docker-migrations:
+  <<: *docker-build-template
+  variables:
+    DOCKERFILE_PATH: dev/docker/Dockerfile.migrations
+    DOCKERFILE_NAME: migrations
