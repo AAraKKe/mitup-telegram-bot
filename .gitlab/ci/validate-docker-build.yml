@@ -1,8 +1,8 @@
 .docker-build-template: &docker-build-template
   stage: test
-  image: docker:24.0.5
+  image: docker:24-cli
   services:
-    - name: docker:24.0.5-dind
+    - name: docker:24-dind
       alias: docker
   variables:
     DOCKER_HOST: tcp://docker:2375
