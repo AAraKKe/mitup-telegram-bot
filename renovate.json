@@ -106,14 +106,15 @@
       ],
       "groupName": "Python version",
       "additionalBranchPrefix": "python-version-",
-      "matchUpdateTypes": [
-        "minor"
-      ],
       "labels": [
         "type::python-upgrade",
         "scope::environment"
       ],
-      "commitMessageTopic": "python"
+      "commitMessageTopic": "python",
+      "ignoreUnstable": true,
+      "major": {
+        "enabled": false
+      }
     }
   ],
   "customManagers": [
