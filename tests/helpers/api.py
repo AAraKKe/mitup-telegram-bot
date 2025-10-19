@@ -66,9 +66,9 @@ class MockApi:
         self, context: mock.MagicMock | MitupContext, user: User, view: MitupView | str, times: int = 1
     ):
         if times == 1:
-            assert_awaited_once_with_diff(self.send_to_user_mock, context=context, user=user, view=view)
+            assert_awaited_once_with_diff(self.send_to_user_mock, context_or_bot=context, user=user, view=view)
         else:
-            assert_awaited_with_diff(self.send_to_user_mock, times, context=context, user=user, view=view)
+            assert_awaited_with_diff(self.send_to_user_mock, times, context_or_bot=context, user=user, view=view)
 
     def assert_answer_callback_query_called(
         self,

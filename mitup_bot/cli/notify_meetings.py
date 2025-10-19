@@ -12,7 +12,7 @@ from telegram.ext import ExtBot
 from mitup_bot import db
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 
 USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
@@ -71,7 +71,7 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
                 await joined_link.user.send_message(
                     bot,
                     MitupView(
-                        description=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(
+                        description=NotificationMessages.MEETING_STARTING.get(
                             lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
                         ),
                         keyboard=[],

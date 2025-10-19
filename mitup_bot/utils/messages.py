@@ -126,6 +126,9 @@ class ButtonMessages(MessageBase):
     MEETING_KICK_OUT = "Kick out"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
 
+    # Notification buttons
+    REACTIVATE_MEETING = "Reactivate meeting"
+
     def back(self, lang: str, full=True, **kwargs: str) -> str:
         return f"{self.GO_BACK} {self.get(lang=lang, full=full, plain=False, **kwargs)}"
 
@@ -254,8 +257,6 @@ class MeetingMessages(MessageBase):
         "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
     )
 
-    NOTIFICATION_MEETING_STARTING = "The meeting _*${meeting_title}*_ is starting soon!"
-
     # Edit title and description
     EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"
     EDIT_MEETING_DESCRIPTION = (
@@ -368,6 +369,19 @@ class MeetingMessages(MessageBase):
     ACTIVE_MEETINGS_PAGE = "These are all your active meetings."
     JOINED_MEETINGS_PAGE = "These are the meetings you have joined."
     NO_JOINED_MEETINGS = "_You have not joined any meeting yet._"
+
+
+class NotificationMessages(MessageBase):
+    MEETING_WILL_BE_PERMANENTLY_DELETED = (
+        "The meeting *${meeting_title}* will be permanently deleted in *${days_until_deletion} days*.\n\n"
+        "To prevent this from happening, you can reactivate the meeting by selecting "
+        "the *${reactivate_meeting_button}* button below.\n\n"
+        "Remember that you can always reactivate any past meeting from the *${past_meetings_button}* button in the "
+        "main menu.\n\n"
+        "If you do not want to reactivate the meeting, you can ignore this message."
+    )
+    MEETING_PERMANENTLY_DELETED = "The meeting *${meeting_title}* has been permanently deleted."
+    MEETING_STARTING = "The meeting _*${meeting_title}*_ is starting soon!"
 
 
 class Weekday(MessageBase):

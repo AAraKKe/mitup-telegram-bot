@@ -10,7 +10,7 @@ from mitup_bot.cli import notify_meetings
 from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.models import JoinedUsers
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import NotificationMessages
 from tests.helpers import MockDbSession, StubMetrics, create_meetup, create_settings, create_user
 
 
@@ -75,12 +75,12 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
         [
             mock.call(
                 chat_id=1,
-                text=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(lang=joined_1.lang, meeting_title=meeting.title),
+                text=NotificationMessages.MEETING_STARTING.get(lang=joined_1.lang, meeting_title=meeting.title),
                 reply_markup=InlineKeyboardMarkup([]),
             ),
             mock.call(
                 chat_id=2,
-                text=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(lang=joined_2.lang, meeting_title=meeting.title),
+                text=NotificationMessages.MEETING_STARTING.get(lang=joined_2.lang, meeting_title=meeting.title),
                 reply_markup=InlineKeyboardMarkup([]),
             ),
         ],
@@ -119,12 +119,12 @@ async def test_forbidden_message_sent(
         [
             mock.call(
                 chat_id=1,
-                text=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(lang=joined_1.lang, meeting_title=meeting.title),
+                text=NotificationMessages.MEETING_STARTING.get(lang=joined_1.lang, meeting_title=meeting.title),
                 reply_markup=InlineKeyboardMarkup([]),
             ),
             mock.call(
                 chat_id=2,
-                text=MeetingMessages.NOTIFICATION_MEETING_STARTING.get(lang=joined_2.lang, meeting_title=meeting.title),
+                text=NotificationMessages.MEETING_STARTING.get(lang=joined_2.lang, meeting_title=meeting.title),
                 reply_markup=InlineKeyboardMarkup([]),
             ),
         ],

@@ -118,9 +118,9 @@ async def user_leaves_meeting(
                 ]
 
                 await api.send_messages_to_users(
-                    context,
-                    promoted_users,
-                    views_to_send,
+                    context_or_bot=context,
+                    users=promoted_users,
+                    views=views_to_send,
                 )
 
             return MeetingMessages.LEFT_MEETING_SUCCESS

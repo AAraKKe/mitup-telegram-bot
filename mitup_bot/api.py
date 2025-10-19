@@ -1,15 +1,18 @@
 import logging
 import re
 from asyncio import gather
-from collections.abc import Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager, nullcontext
+from typing import Protocol
 
+from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import CallbackContext, ExtBot
 
 from mitup_bot import guards
+from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
@@ -31,6 +34,37 @@ MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
 
 
+class ContextOrBotAdapter(Protocol):
+    """
+    Protocl defining the interface for the object necessary to interact with the Telegram API.
+
+    This is used to support both MitupContext and ExtBot for flexibility. In case a bot is provided
+    to the methods instead of a MitupContext, the bot is turned into a BotAdapter that does not emit any metrics
+    but can be used to interact with the Telegram API.
+    """
+
+    @contextmanager
+    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]: ...
+
+    def emit_metric(
+        self,
+        name: str | MetricKey,
+        value: float = 1.0,
+        unit: Unit = Unit.COUNT,
+        *,
+        dimensions: dict[str, str] | None = None,
+        include_handler_dimensions: bool = True,
+        properties: dict[str, str | int | float | None] | None = None,
+        include_update_properties: bool = True,
+        emit_global: bool = False,
+    ): ...
+
+    async def flush_metrics(self): ...
+
+    @property
+    def bot(self) -> ExtBot: ...
+
+
 async def send_message(*, context: TMitupContext, update: Update, view: MitupView | str) -> Message | None:
     chat_id = guards.chat(update).id
 
@@ -45,7 +79,11 @@ async def send_message(*, context: TMitupContext, update: Update, view: MitupVie
         return await context.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
 
 
-async def send_message_to_user(*, context: TMitupContext, user: User, view: MitupView | str) -> Message | None:
+async def send_message_to_user(
+    *, context_or_bot: TMitupContext | ExtBot, user: User, view: MitupView | str
+) -> Message | None:
+    adapter = get_bot(context_or_bot=context_or_bot)
+
     if isinstance(view, str):
         message = view
         reply_markup = None
@@ -53,12 +91,11 @@ async def send_message_to_user(*, context: TMitupContext, user: User, view: Mitu
         message = view.description
         reply_markup = view.markup
 
-    with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+    with with_time_metrics_context(context_or_bot=context_or_bot):
         try:
-            return await context.bot.send_message(chat_id=user.tg_user_id, text=message, reply_markup=reply_markup)
+            return await adapter.bot.send_message(chat_id=user.tg_user_id, text=message, reply_markup=reply_markup)
         except Forbidden as e:
             logging.warning(f"User {user.tg_user_id} has blocked the bot.")
-            context.emit_metric(MetricKey.INACTIVE_USER_SET, include_handler_dimensions=False)
             raise InactiveUserInteraction(user.tg_user_id, private=True) from e
         except BadRequest as e:
             if "not found" in e.message:
@@ -67,7 +104,14 @@ async def send_message_to_user(*, context: TMitupContext, user: User, view: Mitu
             raise
 
 
-async def send_messages_to_users(context: TMitupContext, users: Sequence[User], views: Sequence[MitupView | str]):
+async def send_messages_to_users(
+    *,
+    context_or_bot: TMitupContext | ExtBot,
+    users: Sequence[User],
+    views: Sequence[MitupView | str],
+    on_success: Sequence[Callable[[User], None]] | None = None,
+    on_error: Sequence[Callable[[User], None]] | None = None,
+):
     """
     Sends messages to multiple users.
 
@@ -80,7 +124,7 @@ async def send_messages_to_users(context: TMitupContext, users: Sequence[User], 
 
     awaitables = [
         send_message_to_user(
-            context=context,
+            context_or_bot=context_or_bot,
             user=user,
             view=views[i],
         )
@@ -88,18 +132,28 @@ async def send_messages_to_users(context: TMitupContext, users: Sequence[User], 
     ]
 
     results = await gather(*awaitables, return_exceptions=True)
+    adapter = get_bot(context_or_bot=context_or_bot)
 
-    # Mark users as inactive if they have blocked the bot
-    for user, result in zip(users, results, strict=True):
+    for idx, (user, result) in enumerate(zip(users, results, strict=True)):
         if isinstance(result, InactiveUserInteraction):
+            # Handle inactive user different for other errors
+            # we do not want to error out but mark the user as inactive
             logging.info(f"Marking user {user.tg_user_id} as inactive")
             user.is_active = False
-            context.emit_metric(MetricKey.INACTIVE_USER_SET, include_handler_dimensions=False)
+            adapter.emit_metric(MetricKey.INACTIVE_USER_SET, include_handler_dimensions=False)
+            continue
+
+        # Handle Callbacks
+        if on_error and isinstance(result, Exception):
+            logging.exception(f"Error sending message to user {user.id}: {result}")
+            on_error[idx](user)
+        elif on_success:
+            on_success[idx](user)
 
 
 @contextmanager
 def handle_edit_errors(
-    message: MessageModel | None = None, session: Session | None = None, context: TMitupContext | None = None
+    adapter: ContextOrBotAdapter, message: MessageModel | None = None, session: Session | None = None
 ):
     try:
         yield
@@ -114,8 +168,7 @@ def handle_edit_errors(
             if session and message:
                 logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
                 session.delete(message)
-            if context:
-                context.emit_metric(MetricKey.MESSAGE_DELETED, include_handler_dimensions=False)
+            adapter.emit_metric(MetricKey.MESSAGE_DELETED, include_handler_dimensions=False)
             return
         raise
 
@@ -141,7 +194,7 @@ async def edit_message(*, context: TMitupContext, update: Update, view: MitupVie
         raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
     with context.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-        with handle_edit_errors():
+        with handle_edit_errors(adapter=context):
             return await context.bot.edit_message_text(
                 text=message,
                 chat_id=chat_id,
@@ -195,7 +248,7 @@ async def update_single_meeting_message(
         has_finished: If set to True, the meeting has finished and the messages will be updated to inform the user.
     """
     # Support both MitupContext and ExtBot for flexibility
-    bot = context_or_bot.bot if isinstance(context_or_bot, CallbackContext) else context_or_bot
+    adapter = get_bot(context_or_bot=context_or_bot)
 
     view = (
         meeting.inline_view
@@ -214,23 +267,17 @@ async def update_single_meeting_message(
         text = view.description
         reply_markup = MitupView.keyboard_to_markup(message.buttons.keyboard)
 
-    # Use context metrics if available, otherwise skip metrics
-    if isinstance(context_or_bot, CallbackContext):
-        metrics_context = context_or_bot.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX)
-    else:
-        metrics_context = nullcontext()
-
-    with metrics_context:
-        with handle_edit_errors(
-            message, session, context_or_bot if isinstance(context_or_bot, CallbackContext) else None
-        ):
-            await bot.edit_message_text(
-                text=text,
-                chat_id=message.chat_id,
-                message_id=message.message_id,
-                inline_message_id=message.inline_message_id,
-                reply_markup=reply_markup,
-            )
+    with (
+        adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX),
+        handle_edit_errors(adapter=adapter, message=message, session=session),
+    ):
+        await adapter.bot.edit_message_text(
+            text=text,
+            chat_id=message.chat_id,
+            message_id=message.message_id,
+            inline_message_id=message.inline_message_id,
+            reply_markup=reply_markup,
+        )
 
 
 async def update_meeting_messages(
@@ -270,3 +317,48 @@ async def update_meeting_messages(
         if message == current_message:
             continue
         await update_single_meeting_message(message, session, context_or_bot, meeting, was_deleted, has_finished)
+
+
+@contextmanager
+def with_time_metrics_context(*, context_or_bot: TMitupContext | ExtBot) -> Generator[None]:
+    """
+    Context manager that can be used either with a context or a bot. If a context is passed,
+    a metric will be emitted with the time it took to send the API call to Telegram.
+    """
+    context = (
+        context_or_bot.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX)
+        if isinstance(context_or_bot, CallbackContext)
+        else nullcontext()
+    )
+    with context:
+        yield
+
+
+def get_bot(context_or_bot: TMitupContext | ExtBot) -> ContextOrBotAdapter:
+    return context_or_bot if isinstance(context_or_bot, MitupContext) else BotAdapter(context_or_bot)
+
+
+class BotAdapter:
+    def __init__(self, bot: ExtBot):
+        self.bot = bot
+
+    @contextmanager
+    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
+        yield
+
+    def emit_metric(
+        self,
+        name: str | MetricKey,
+        value: float = 1.0,
+        unit: Unit = Unit.COUNT,
+        *,
+        dimensions: dict[str, str] | None = None,
+        include_handler_dimensions: bool = True,
+        properties: dict[str, str | int | float | None] | None = None,
+        include_update_properties: bool = True,
+        emit_global: bool = False,
+    ):
+        pass
+
+    async def flush_metrics(self):
+        pass

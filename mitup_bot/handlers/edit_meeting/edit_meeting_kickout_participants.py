@@ -191,9 +191,9 @@ async def edit_meeting_kickout_participant_confirm(session: Session, update: Upd
         for participant in promoted_participants
     ]
     await api.send_messages_to_users(
-        context,
-        users_to_notify,
-        views_to_send,
+        context_or_bot=context,
+        users=users_to_notify,
+        views=views_to_send,
     )
 
     # After all has been taken care of, we need to update all messages for the meeting

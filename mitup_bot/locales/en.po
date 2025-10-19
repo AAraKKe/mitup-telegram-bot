@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2025-10-18 11:09\n"
+"PO-Revision-Date: 2025-10-19 04:34\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -164,6 +164,9 @@ msgstr "Kick out"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Delete date"
 
+msgid "ButtonMessages.REACTIVATE_MEETING"
+msgstr "Reactivate meeting"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
 
@@ -290,9 +293,6 @@ msgstr "You have left the meeting, %{user}! It seems you have never used Mitup b
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
 
-msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "The meeting _*${meeting_title}*_ is starting soon!"
-
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"
 
@@ -418,6 +418,15 @@ msgstr "These are the meetings you have joined."
 
 msgid "MeetingMessages.NO_JOINED_MEETINGS"
 msgstr "_You have not joined any meeting yet._"
+
+msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
+msgstr "The meeting *${meeting_title}* will be permanently deleted in *${days_until_deletion} days*.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the *${reactivate_meeting_button}* button below.\n\nRemember that you can always reactivate any past meeting from the *${past_meetings_button}* button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."
+
+msgid "NotificationMessages.MEETING_PERMANENTLY_DELETED"
+msgstr "The meeting *${meeting_title}* has been permanently deleted."
+
+msgid "NotificationMessages.MEETING_STARTING"
+msgstr "The meeting _*${meeting_title}*_ is starting soon!"
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

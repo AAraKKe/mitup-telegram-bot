@@ -65,6 +65,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     allow_invitation: bool = Field(nullable=False)
     incognito: bool = Field(nullable=False)
     show_timezone: bool = Field(nullable=False)
+    expiration_notification_sent: bool = Field(nullable=False, default=False)
     description: str | None = None
     created_time: dt.datetime | None = None
     updated_time: dt.datetime | None = None

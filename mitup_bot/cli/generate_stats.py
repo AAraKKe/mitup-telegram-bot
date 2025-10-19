@@ -51,18 +51,18 @@ def meetings_stats(session: Session, metrics: MitupMetricsLogger):
         )
     ).first()
 
-    if result is None:
+    if result[1] is None:
         # It is more common that there are no meetings than there are no users, we still
         # consider this pretty rare and should emit a fault metric in case this happens.
         metrics.put_metric(MetricKey.FAULT.with_prefix(EMPTY_MEETINGS_TABLE_ERROR), 1, Unit.COUNT.value)
         return
 
-    metrics.put_metric(MetricKey.ACTIVE_MEETINGS.value, result[0], Unit.COUNT.value)
-    metrics.put_metric(MetricKey.INACTIVE_MEETINGS.value, result[1] - result[0], Unit.COUNT.value)
-    metrics.put_metric(MetricKey.INCOGNITO_MEETINGS.value, result[2], Unit.COUNT.value)
-    metrics.put_metric(MetricKey.PUBLIC_MEETINGS.value, result[3], Unit.COUNT.value)
-    metrics.put_metric(MetricKey.MEETINGS_WITH_INVITATION.value, result[4], Unit.COUNT.value)
-    metrics.put_metric(MetricKey.MEETINGS_WITH_DATETIME.value, result[5], Unit.COUNT.value)
+    metrics.put_metric(MetricKey.ACTIVE_MEETINGS.value, result[0] or 0, Unit.COUNT.value)
+    metrics.put_metric(MetricKey.INACTIVE_MEETINGS.value, (result[1] or 0) - (result[0] or 0), Unit.COUNT.value)
+    metrics.put_metric(MetricKey.INCOGNITO_MEETINGS.value, result[2] or 0, Unit.COUNT.value)
+    metrics.put_metric(MetricKey.PUBLIC_MEETINGS.value, result[3] or 0, Unit.COUNT.value)
+    metrics.put_metric(MetricKey.MEETINGS_WITH_INVITATION.value, result[4] or 0, Unit.COUNT.value)
+    metrics.put_metric(MetricKey.MEETINGS_WITH_DATETIME.value, result[5] or 0, Unit.COUNT.value)
     metrics.put_metric(MetricKey.FAULT.with_prefix(EMPTY_MEETINGS_TABLE_ERROR), 0, Unit.COUNT.value)
 
     # Get number of shared meetings through inline messages

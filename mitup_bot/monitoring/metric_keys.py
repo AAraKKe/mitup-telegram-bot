@@ -67,6 +67,10 @@ class MetricKey(CamelCaseStrEnum):
     MEETINGS_DEACTIVATED = auto()
     """Number of meetings that failed to be deactivated"""
     MEETINGS_DEACTIVATION_FAILED = auto()
+    """Number of meetings that should be deleted"""
+    MEETUPS_ABOUT_TO_BE_DELETED = auto()
+    """Number of meetings successfully deleted"""
+    MEETUPS_DELETED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
