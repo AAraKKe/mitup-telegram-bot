@@ -93,6 +93,15 @@
         ".pre-commit-config.yaml"
       ],
       "matchUpdateTypes": [
+        "patch"
+      ],
+      "enabled": false
+    },
+    {
+      "matchFileNames": [
+        ".pre-commit-config.yaml"
+      ],
+      "matchUpdateTypes": [
         "minor",
         "major"
       ],
