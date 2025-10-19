@@ -31,6 +31,15 @@ config-staging:
   resource_group: staging
   environment:
     name: staging
+  # Do not block deployment on formatting/style issues
+  needs:
+    - test
+    - type-check
+    - validate-locales
+    - validate-migrations
+    - semgrep-sast
+    - secret_detection
+
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
