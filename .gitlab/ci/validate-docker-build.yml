@@ -14,25 +14,25 @@
       changes:
         - $DOCKERFILE_PATH
 
-build-docker-base:
+validate-docker-base:
   <<: *docker-build-template
   variables:
     DOCKERFILE_PATH: dev/docker/Dockerfile
     DOCKERFILE_NAME: base
 
-build-docker-ci:
+validate-docker-ci:
   <<: *docker-build-template
   variables:
     DOCKERFILE_PATH: dev/docker/Dockerfile.ci
     DOCKERFILE_NAME: ci
 
-build-docker-dev:
+validate-docker-dev:
   <<: *docker-build-template
   variables:
     DOCKERFILE_PATH: dev/docker/Dockerfile.dev
     DOCKERFILE_NAME: dev
 
-build-docker-migrations:
+validate-docker-migrations:
   <<: *docker-build-template
   variables:
     DOCKERFILE_PATH: dev/docker/Dockerfile.migrations

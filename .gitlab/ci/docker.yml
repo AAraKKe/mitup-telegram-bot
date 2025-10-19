@@ -2,9 +2,9 @@
 # Docker build and push images
 # ---------------------
 .docker-build-push: &docker-build
-  image: docker:27-cli
+  image: docker:28-cli
   services:
-    - docker:27-dind
+    - docker:28-dind
   variables:
     # Enable BuildKit for better multi-stage builds and caching
     DOCKER_BUILDKIT: "1"
@@ -19,12 +19,11 @@
     - docker buildx create --use --driver docker-container --name builder
     - docker buildx inspect --bootstrap
   script:
+    - set -e
+    - echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
+    - IMAGE_BASE_URI=$(echo "$PUSH_DESTINATION" | cut -d':' -f1)
+    - CACHE_TAG="${IMAGE_BASE_URI}:build-cache"
     - |
-      set -e
-      echo "Building $DOCKERFILE and pushing to $PUSH_DESTINATION..."
-      IMAGE_BASE_URI=$(echo "$PUSH_DESTINATION" | cut -d':' -f1)
-      CACHE_TAG="${IMAGE_BASE_URI}:build-cache"
-
       docker buildx build \
         --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}" \
         --tag "${PUSH_DESTINATION}" \
