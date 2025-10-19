@@ -1,9 +1,10 @@
 import datetime as dt
 import logging
+from typing import cast
 
 from aws_embedded_metrics.unit import Unit
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import Session, and_, func, literal, null, or_, select, true
+from sqlmodel import Session, and_, delete, func, literal, null, or_, select, true
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.ext import ExtBot
 
@@ -48,15 +49,13 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
     meetings = session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT).all()
     deactivated = 0
     failed = 0
+    invited_users_ids: list[int] = []
 
     metrics.put_metric(MetricKey.MEETINGS_TO_DEACTIVATE.value, len(meetings), unit=Unit.COUNT.value)
     failed_details: list[str] = []
 
     for meeting in meetings:
         try:
-            meeting.active = False
-            meeting.expiration_time = dt.datetime.now(dt.UTC)
-
             # Update all messages using the existing API method
             await api.update_meeting_messages(
                 session=session,
@@ -65,7 +64,19 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
                 has_finished=True,
             )
 
+            meeting.active = False
+            meeting.expiration_time = dt.datetime.now(dt.UTC)
+
+            # Keep track of all invited users of the deactivated meetings to be deleted at the end
+            invited_users_ids.extend(
+                [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
+            )
+
             deactivated += 1
+
+            # Delete all users that were added to the meeting that were invited.
+            # These users exist only in the context of the current meeting.
+            session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
         except Exception:
             failed += 1
             logging.exception(f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id})")

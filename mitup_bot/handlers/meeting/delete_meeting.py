@@ -1,11 +1,13 @@
 import logging
+from typing import cast
 
-from sqlmodel import Session
+from sqlmodel import Session, delete
 from telegram import Update
 
 from mitup_bot import api, guards
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
+from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView
@@ -86,6 +88,9 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
 
     await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting, was_deleted=True)
 
+    # Keep all invited users ides to also delete them
+    invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
+    session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
     session.delete(meeting)
 
     view = MitupView(

@@ -13,6 +13,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers.fixtures import create_joined_link, create_user
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -314,3 +315,28 @@ async def test_decline_delete_meeting_failures(
     context, _ = await call_handler(update, app, MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK)
 
     assert_metrics_for_failure(1, error_type, context)
+
+
+# Test that when a meeting is deleted with invited users, those users are also deleted
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
+async def test_delete_meeting_with_invited_users_works(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    api: MockApi,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    invited_user_1 = create_joined_link(id=1, user=create_user(id=2, tg_user_id=-1), meetup=meeting)
+    invited_user_2 = create_joined_link(id=2, user=create_user(id=3, tg_user_id=-1), meetup=meeting)
+
+    # Make the owner join as well to ensure they are not deleted
+    meeting.joined_links.append(create_joined_link(user=user_with_settings, meetup=meeting))
+
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    context, _ = await call_handler(update, app, MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK)
+
+    expected_delete_query = f"DELETE FROM users WHERE users.id IN ({invited_user_1.user_id}, {invited_user_2.user_id})"
+    assert expected_delete_query in mock_session.queries_executed
