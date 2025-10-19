@@ -6,6 +6,8 @@ preparation:
     - pip --version
     - hatch --version
     - hatch run dev:pip list --local
+    - hatch env find
+    - echo $PWD
 
 build-translations:
   stage: build

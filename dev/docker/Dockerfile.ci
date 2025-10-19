@@ -3,8 +3,7 @@
 # The image is built by a manual job in any pipeline
 FROM python:3.13-slim-bookworm
 
-# Install build and runtime dependencies for CI/CD
-# First install tools needed to add Docker's official repository
+# Combine all installations into a single RUN command to reduce image layers
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -27,38 +26,38 @@ RUN apt-get update && \
     less \
     jq \
     gettext && \
+    # Install AWS CLI
+    mkdir -p /tmp/aws && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/aws/awscliv2.zip" && \
+    unzip /tmp/aws/awscliv2.zip -d /tmp/aws && \
+    /tmp/aws/aws/install && \
+    rm -rf /tmp/aws && \
+    # Install Hatch
+    pip install --no-cache-dir hatch && \
+    # Clean up apt cache
     rm -rf /var/lib/apt/lists/*
 
-# Install AWS CLI
-RUN mkdir aws && cd aws && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-    unzip awscliv2.zip && \
-    ./aws/install && \
-    cd .. && rm -rf aws
+# Configure hatch to use a persistent directory for virtual environments
+RUN hatch config set dirs.env.virtual /opt/hatch-venvs
 
-# Install Hatch
-RUN pip install --no-cache-dir hatch
-
-# Configure hatch to use local cache directory
-RUN hatch config set dirs.env.virtual .hatch
-
-# Set working directory for pre-installing dependencies
-WORKDIR /ci-build
+# Use the same project path as the CI job to ensure hatch finds the environment
+# The default GitLab CI checkout path is /builds/<group>/<project>
+ARG PROJECT_DIR="/builds/meetupbot/mitup-telegram-bot"
+RUN mkdir -p ${PROJECT_DIR}
+WORKDIR ${PROJECT_DIR}
 
 # Copy pyproject.toml to pre-install dependencies
-COPY pyproject.toml /ci-build/pyproject.toml
-COPY LICENSE /ci-build/LICENSE
+COPY pyproject.toml .
+COPY LICENSE .
 
 # Create minimal package structure to allow dependency installation
-RUN mkdir -p /ci-build/mitup_bot && \
-    echo '__version__ = "0.0.0"' > /ci-build/mitup_bot/__about__.py && \
-    touch /ci-build/mitup_bot/__init__.py
+RUN mkdir -p mitup_bot && \
+    echo '__version__ = "0.0.0"' > mitup_bot/__about__.py && \
+    touch mitup_bot/__init__.py
 
 # Pre-install dev environment with all dependencies
 # This caches all dependencies so CI jobs start faster
 RUN hatch env create dev
 
-# Clean up build files - actual code will be checked out in CI jobs
-RUN rm -rf /ci-build
-
-# Reset working directory
-WORKDIR /builds
+# Clean up build files, leaving the empty project directory for the CI job to clone into.
+RUN rm -rf pyproject.toml LICENSE mitup_bot
