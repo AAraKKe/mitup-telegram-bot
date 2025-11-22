@@ -532,28 +532,30 @@ def test_has_message(update: Update, meeting: Meetup, has_message: bool):
 
 
 @pytest.mark.parametrize(
-    "update,message_id,inline_message_id,chat_id",
+    "update,message_id,inline_message_id,chat_id,chat_instance",
     [
-        (UpdateRequest(message=True, callback_query=False), 123, None, 123),
-        (UpdateRequest(message=False, callback_query=True), 123, None, 123),
+        (UpdateRequest(message=True, callback_query=False), 123, None, 123, None),
+        (UpdateRequest(message=False, callback_query=True), 123, None, 123, None),
         (
             UpdateRequest(message=False, callback_query=CallbackData(entity="test"), inline_message_id="123"),
             None,
             "123",
             None,
+            "someinstance",
         ),
     ],
     ids=["message", "callback_query", "inline_query"],
     indirect=["update"],
 )
 def test_add_message_to_meeting_from_update(
-    meeting: Meetup, update: Update, message_id: int, inline_message_id: str, chat_id: int
+    meeting: Meetup, update: Update, message_id: int, inline_message_id: str, chat_id: int, chat_instance: str
 ):
     message = meeting.add_message(update, meeting.owner)
 
     assert message.inline_message_id == inline_message_id
     assert message.message_id == message_id
     assert message.chat_id == chat_id
+    assert message.chat_instance == chat_instance
 
 
 def test_add_message_does_nothing_if_message_exists():
