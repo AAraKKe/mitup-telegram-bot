@@ -184,7 +184,7 @@ Enviroment to be used for bot testing
 """
 installer = "uv"
 dependencies = [
-    "pytest~=8.0",
+    "pytest~=9.0",
     "pytest-asyncio~=1.0",
     "pytest-cov~=7.0",
     "pytest-xdist~=3.5",
