@@ -79,9 +79,9 @@ class Meetup(BaseModel, SQLModel, table=True):
     )
     active: bool = True
 
-    owner: "User" = Relationship(back_populates="meetups")
+    owner: User = Relationship(back_populates="meetups")
     messages: list[Message] = Relationship(back_populates="meetup")
-    joined_links: list["JoinedUsers"] = Relationship(back_populates="meetup", cascade_delete=True)
+    joined_links: list[JoinedUsers] = Relationship(back_populates="meetup", cascade_delete=True)
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
@@ -104,17 +104,17 @@ class Meetup(BaseModel, SQLModel, table=True):
         return False if self.max_members is None else self.n_participants >= self.max_members
 
     @property
-    def participants(self) -> list["JoinedUsers"]:
+    def participants(self) -> list[JoinedUsers]:
         """Get the users that have joined the meeting (not including the waiting list)"""
         return [link for link in self.joined_links if not link.is_waiting_list]
 
-    def participant(self, user_id: int) -> "JoinedUsers | None":
+    def participant(self, user_id: int) -> JoinedUsers | None:
         return next((link for link in self.participants if link.user.db_id == user_id), None)
 
     def has_participant(self, user_id: int) -> bool:
         return any(link.user.db_id == user_id for link in self.joined_links)
 
-    def remove_participant(self, participant: "JoinedUsers") -> list["JoinedUsers"]:
+    def remove_participant(self, participant: JoinedUsers) -> list[JoinedUsers]:
         """
         Remove a participant from the meeting. If there are users in the waiting list, they will be promoted to the
         joined list.
@@ -125,7 +125,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         # Check if someone in the waiting list can be promoted to the joined list
         return [] if self.full else self.promote_from_waiting_list()
 
-    def add_participant(self, user: "User") -> "JoinedUsers | None":
+    def add_participant(self, user: User) -> JoinedUsers | None:
         """
         Add the user to the meeting. If the meeting is full, the user will be added to the waiting list
         if it is enabled.
@@ -137,7 +137,7 @@ class Meetup(BaseModel, SQLModel, table=True):
             return self.create_joined_link(user, True) if self.waiting_list else None
         return self.create_joined_link(user, False)
 
-    def create_joined_link(self, user: "User", is_waiting_list: bool) -> "JoinedUsers":
+    def create_joined_link(self, user: User, is_waiting_list: bool) -> JoinedUsers:
         """
         Create a new JoinedUsers instance and add it to the meeting if it is not already in the list.
         """
@@ -150,7 +150,7 @@ class Meetup(BaseModel, SQLModel, table=True):
             self.joined_links.append(joined_link)  # pragma: no cover
         return joined_link
 
-    def promote_from_waiting_list(self) -> list["JoinedUsers"]:
+    def promote_from_waiting_list(self) -> list[JoinedUsers]:
         """
         Handle promotions from the waiting list to the joined list for the given meeting.
 
@@ -175,7 +175,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     def join_allowed(self) -> bool:
         return not self.full or self.waiting_list
 
-    def waiting_links(self) -> list["JoinedUsers"]:
+    def waiting_links(self) -> list[JoinedUsers]:
         """Get the joined links that are in the waiting list sorted by the time they joined"""
         return sorted((link for link in self.joined_links if link.is_waiting_list), key=lambda x: x.created_time)
 
@@ -183,7 +183,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         """Return True if the message where the update was sent from is linked to this meeting."""
         return self.message_from_update(update) is not None
 
-    def message_from_update(self, update: Update) -> "Message | None":
+    def message_from_update(self, update: Update) -> Message | None:
         """
         Get the message linked to this meeting that represents the message where the update was sent from.
         None if the message does not exist.
@@ -201,7 +201,7 @@ class Meetup(BaseModel, SQLModel, table=True):
             )
         return None
 
-    def add_message(self, update: Update, user: "User") -> Message:
+    def add_message(self, update: Update, user: User) -> Message:
         """
         Link a message to this meeting if it is not linked already and return the message object.
 

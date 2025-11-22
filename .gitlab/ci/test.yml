@@ -82,7 +82,7 @@ validate-locales:
 
 validate-local-setup:
   # This job avlidates the setup process for new contributors
-  image: python:3.13-bookworm
+  image: python:3.14-bookworm
   stage: test
   script:
     - ./bin/local-setup.sh

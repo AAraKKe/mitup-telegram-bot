@@ -62,7 +62,7 @@ class Dimensionality:
         self.hash = hash(tuple((k, v) for k, v in self.dimensions.items()))
 
     @staticmethod
-    def or_null(dimensions: dict[str, str] | None) -> "Dimensionality":
+    def or_null(dimensions: dict[str, str] | None) -> Dimensionality:
         return Dimensionality() if dimensions is None else Dimensionality(**dimensions)
 
     def __hash__(self) -> int:
@@ -71,7 +71,7 @@ class Dimensionality:
     def __eq__(self, value: object) -> bool:
         return self.hash == value.hash if isinstance(value, Dimensionality) else False
 
-    def __add__(self, other: "Dimensionality") -> "Dimensionality":
+    def __add__(self, other: Dimensionality) -> Dimensionality:
         return Dimensionality(**{**self.dimensions, **other.dimensions})
 
     def __str__(self) -> str:
@@ -171,13 +171,13 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
             await logger.flush()
 
     @contextmanager
-    def auto_flush(self) -> Generator["MitupMetricsEngine"]:
+    def auto_flush(self) -> Generator[MitupMetricsEngine]:
         """Context manager that allows using a logger and flush automatically from a synchronous context."""
         yield self
         asyncio.run(self.flush_metrics())
 
     @asynccontextmanager
-    async def async_auto_flush(self) -> AsyncGenerator["MitupMetricsEngine"]:
+    async def async_auto_flush(self) -> AsyncGenerator[MitupMetricsEngine]:
         """Async context manager that allows using a logger and flush automatically from an asynchronous context."""
         yield self
         await self.flush_metrics()

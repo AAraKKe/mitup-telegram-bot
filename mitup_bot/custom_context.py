@@ -329,7 +329,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
     @override
     def from_update(
         cls, update: object, application: Application, metrics_engine: MitupMetricsEngine | None = None
-    ) -> "MitupContext[TB, MitupMetricsEngine]":
+    ) -> MitupContext[TB, MitupMetricsEngine]:
         assert isinstance(update, Update), "This should never happen, type is always Update in Mitupbot"
 
         metrics_engine = metrics_engine or MitupMetricsEngine(logger_provider=lambda ep: MitupMetricsLogger(ep))

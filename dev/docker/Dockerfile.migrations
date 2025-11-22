@@ -4,7 +4,7 @@
 # setup to be able to call the handler when a lambda is launched
 
 # Stage 1: Builder - Build and install package with all dependencies
-FROM public.ecr.aws/lambda/python:3.13 AS builder
+FROM public.ecr.aws/lambda/python:3.14 AS builder
 
 # Install build-time system dependencies
 RUN dnf install -y --setopt=install_weak_deps=0 \
@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir --target=/install .
 
 
 # Stage 2: Runtime - Create the final, lean image
-FROM public.ecr.aws/lambda/python:3.13 AS runtime
+FROM public.ecr.aws/lambda/python:3.14 AS runtime
 
 # Install only runtime system dependencies
 RUN dnf install -y --setopt=install_weak_deps=0 libpq && \

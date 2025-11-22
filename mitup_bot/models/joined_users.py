@@ -19,8 +19,8 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
     is_waiting_list: bool = False
     notification_sent: bool = False
 
-    meetup: "Meetup" = Relationship(back_populates="joined_links")
-    user: "User" = Relationship(back_populates="joined_links")
+    meetup: Meetup = Relationship(back_populates="joined_links")
+    user: User = Relationship(back_populates="joined_links")
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))

@@ -35,7 +35,7 @@ class Settings(BaseModel, SQLModel, table=True):
     default_incognito: bool = False
     default_show_timezone: bool = True
 
-    user: "User" = Relationship(back_populates="settings")
+    user: User = Relationship(back_populates="settings")
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
