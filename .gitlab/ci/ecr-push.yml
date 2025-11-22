@@ -6,7 +6,7 @@
   # Use our CI image that has both Docker CLI and AWS CLI
   image: ${CI_REGISTRY_IMAGE}/ci-python
   services:
-    - docker:28-dind
+    - docker:29-dind
   variables:
     # Enable BuildKit for better multi-stage builds and caching
     DOCKER_BUILDKIT: "1"

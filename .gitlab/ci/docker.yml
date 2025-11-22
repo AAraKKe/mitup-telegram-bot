@@ -2,9 +2,9 @@
 # Docker build and push images
 # ---------------------
 .docker-build-push: &docker-build
-  image: docker:28-cli
+  image: docker:29-cli
   services:
-    - docker:28-dind
+    - docker:29-dind
   variables:
     # Enable BuildKit for better multi-stage builds and caching
     DOCKER_BUILDKIT: "1"
