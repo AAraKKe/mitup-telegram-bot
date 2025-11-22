@@ -39,7 +39,7 @@ services:
     command: hatch run dev:populate-db
 
   postgres:
-    image: postgres:17.6
+    image: postgres:18.1
     restart: always
     environment:
       POSTGRES_USER: mitupbot
