@@ -43,9 +43,10 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
         MetricKey.FAULT.with_prefix(error_type.__name__),
         MetricKey.FAULT,
         MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
     ]
-    expected_metric_values = [error_count, error_count, AnyFloat()]
-    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    expected_metric_values = [error_count, error_count, AnyFloat(), 0]
+    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_handler_metrics_emitted(
         expected_metric_names,

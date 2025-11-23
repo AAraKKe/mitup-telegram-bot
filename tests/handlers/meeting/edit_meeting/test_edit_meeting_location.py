@@ -45,9 +45,10 @@ def assert_metrics_for_failure(error_count: int, error_type: type[Exception], co
         MetricKey.FAULT.with_prefix(error_type.__name__),
         MetricKey.FAULT,
         MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
     ]
-    expected_metric_values = [error_count, error_count, AnyFloat()]
-    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    expected_metric_values = [error_count, error_count, AnyFloat(), 0]
+    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_handler_metrics_emitted(
         expected_metric_names,
@@ -123,9 +124,14 @@ async def test_edit_location_meeting_not_owned(
             _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_metrics_emited(
-        [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
-        [1, 0, AnyFloat()],
-        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        [
+            MetricKey.ERROR.with_prefix("MeetingNotOwned"),
+            MetricKey.FAULT,
+            MetricKey.TIME,
+            MetricKey.DB_CONNECTIONS_LEAKED,
+        ],
+        [1, 0, AnyFloat(), 0],
+        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
         add_handler_dimensions=True,
         add_update_properties=True,
     )
@@ -215,9 +221,14 @@ async def test_edit_location_name_not_owned(
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
     context.metrics_engine.assert_metrics_emited(
-        [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
-        [1, 0, AnyFloat()],
-        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        [
+            MetricKey.ERROR.with_prefix("MeetingNotOwned"),
+            MetricKey.FAULT,
+            MetricKey.TIME,
+            MetricKey.DB_CONNECTIONS_LEAKED,
+        ],
+        [1, 0, AnyFloat(), 0],
+        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
         add_handler_dimensions=True,
         add_update_properties=True,
     )
@@ -309,9 +320,14 @@ async def test_edit_location_coordinates_not_owned(
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
     context.metrics_engine.assert_metrics_emited(
-        [MetricKey.ERROR.with_prefix("MeetingNotOwned"), MetricKey.FAULT, MetricKey.TIME],
-        [1, 0, AnyFloat()],
-        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        [
+            MetricKey.ERROR.with_prefix("MeetingNotOwned"),
+            MetricKey.FAULT,
+            MetricKey.TIME,
+            MetricKey.DB_CONNECTIONS_LEAKED,
+        ],
+        [1, 0, AnyFloat(), 0],
+        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
         add_handler_dimensions=True,
         add_update_properties=True,
     )

@@ -1,5 +1,7 @@
+from collections import Counter
 from collections.abc import Callable, Coroutine, Generator
 from contextlib import contextmanager, suppress
+from contextvars import ContextVar
 from typing import Any, Concatenate, Protocol
 
 from pydantic import BaseModel, ValidationError
@@ -10,6 +12,8 @@ from mitup_bot.config import DbConfig
 from mitup_bot.models import MeetupLocation, MessageButtons
 
 __sessionmaker: sessionmaker[Session] | None = None
+__connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")
+__active_connections: Counter[str] = Counter()
 
 
 class DbNotInitializedError(RuntimeError):
@@ -42,6 +46,15 @@ def deserialize_pydantic_model(data: str) -> BaseModel | None:
     return None
 
 
+def set_connection_context(context: str) -> None:
+    __connection_context.set(context)
+
+
+def get_open_connections(context: str) -> int:
+    """Get the number of open connections for a specific context."""
+    return __active_connections[context]
+
+
 def configure_db(db_config: DbConfig, skip_if_initialized: bool = False) -> None:
     """Configure the db module by creating the engine and the session factory"""
     global __sessionmaker
@@ -63,12 +76,17 @@ def begin() -> Generator[Session]:
     if __sessionmaker is None:
         raise DbNotInitializedError()
 
-    session = __sessionmaker()
-    with session.begin():
-        # Anything in here is considered to be in a transaction
-        # Any fault raised when this context is handled will trigger a rollback
-        # in the ongoing transaction
-        yield session
+    with __sessionmaker() as session:
+        context = __connection_context.get()
+        __active_connections[context] += 1
+        try:
+            with session.begin():
+                # Anything in here is considered to be in a transaction
+                # Any fault raised when this context is handled will trigger a rollback
+                # in the ongoing transaction
+                yield session
+        finally:
+            __active_connections[context] -= 1
 
 
 def with_session[**P, R](func: Callable[Concatenate[Session, P], R]) -> Callable[P, R]:

@@ -301,9 +301,10 @@ async def test_callback_fails_when_meeting_not_accessible(
         MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
         MetricKey.FAULT,
         MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
     ]
-    metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat()]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,
@@ -338,9 +339,13 @@ async def test_callback_fails_when_meeting_not_found(
         context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
-    metric_names = test_context.metrics_emitted.metrics + [MetricKey.FAULT, MetricKey.TIME]
-    metric_values = test_context.metrics_emitted.values + [0, AnyFloat()]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS]
+    metric_names = test_context.metrics_emitted.metrics + [
+        MetricKey.FAULT,
+        MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
+    ]
+    metric_values = test_context.metrics_emitted.values + [0, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,
@@ -390,9 +395,10 @@ async def test_callback_fails_with_malformed_callback_data(
         MetricKey.FAULT.with_prefix("MalformedCallbackData"),
         MetricKey.FAULT,
         MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
     ]
-    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat()]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,
@@ -424,9 +430,10 @@ async def test_callback_fails_when_user_is_not_found(
         MetricKey.FAULT.with_prefix("UserNotFound"),
         MetricKey.FAULT,
         MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
     ]
-    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat()]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,
@@ -465,9 +472,10 @@ async def test_callback_fails_when_missing_necessary_user_data(
         MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"),
         MetricKey.FAULT,
         MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
     ]
-    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat()]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,

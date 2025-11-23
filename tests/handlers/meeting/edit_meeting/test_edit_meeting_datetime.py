@@ -272,9 +272,14 @@ async def test_edit_meeting_time_callback(
         api.assert_edit_message_called(context, update, expected_view)
 
     # StoredMeetingId is emitted only if the meeting is accessible
-    names = [MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), MetricKey.FAULT.value, MetricKey.TIME.value]
-    values = [1 if expected_response == ConversationHandler.END else 0, 0, AnyFloat()]
-    units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS]
+    names = [
+        MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
+        MetricKey.FAULT.value,
+        MetricKey.TIME.value,
+        MetricKey.DB_CONNECTIONS_LEAKED.value,
+    ]
+    values = [1 if expected_response == ConversationHandler.END else 0, 0, AnyFloat(), 0]
+    units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
     properties = None
     if expected_response == ConversationMeetingState.EDIT_TIME:
         names.append("StoredMeetingId")
@@ -349,9 +354,10 @@ async def test_set_time_message_with_valid_time(
             MetricKey.FAULT,
             "CleanUserData",
             MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
+            MetricKey.DB_CONNECTIONS_LEAKED,
         ],
-        values=[AnyFloat(), 0, 1, 0],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT],
+        values=[AnyFloat(), 0, 1, 0, 0],
+        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
         properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
         add_handler_dimensions=True,
         add_update_properties=True,
@@ -405,9 +411,10 @@ async def test_set_time_message_with_invalid_time(
             MetricKey.TIME,
             MetricKey.FAULT,
             MetricKey.ERROR.with_prefix("InvalidTime"),
+            MetricKey.DB_CONNECTIONS_LEAKED,
         ],
-        values=[AnyFloat(), 0, 1],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT],
+        values=[AnyFloat(), 0, 1, 0],
+        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT],
     )
 
 
@@ -467,9 +474,10 @@ async def test_conversation_fallback_with_wrong_message_format(
             MetricKey.TIME,
             MetricKey.FAULT,
             MetricKey.ERROR.with_prefix("WrongTimeFormat"),
+            MetricKey.DB_CONNECTIONS_LEAKED,
         ],
-        values=[AnyFloat(), 0, 1],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT],
+        values=[AnyFloat(), 0, 1, 0],
+        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT],
     )
 
 

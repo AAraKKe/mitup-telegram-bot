@@ -22,7 +22,7 @@ from telegram.ext import (
 from telegram.ext.filters import BaseFilter
 from telegram.warnings import PTBUserWarning
 
-from mitup_bot import guards
+from mitup_bot import db, guards
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
@@ -50,6 +50,10 @@ def callback_with_metrics(
         # Setting them as default dimensions so any flush does not remove them and we also
         # override aws default dimensions we are not interested in.
         context.prepare_handler_metrics({"Handler": handler_id.dimension, "HandlerType": handler_type})
+
+        # Keep the context for counter as Bot to differentiate this from the recurrent events
+        db.set_connection_context("Bot")
+
         start = perf_counter()
         return_value = None
         try:
@@ -66,6 +70,11 @@ def callback_with_metrics(
             latency = (perf_counter() - start) * 1000
             # Emit latency with handler dimensions and globally for aggregation
             context.emit_metric(MetricKey.TIME, latency, Unit.MILLISECONDS, emit_global=True)
+
+            # Emit leaked database connections (should be 0 if all connections were properly closed)
+            context.emit_metric(
+                MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), Unit.COUNT, emit_global=True
+            )
 
             # Make sure we flush the metrics after every callback to drain any buffered metrics
             await context.flush_metrics()

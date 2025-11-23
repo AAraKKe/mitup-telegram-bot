@@ -139,9 +139,9 @@ async def test_user_join_for_non_existing_meeting(
 
     # No feature metric has been emitted
     context.metrics_engine.assert_metrics_emited(
-        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME],
-        [1.0, 0.0, AnyFloat()],
-        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
+        [1.0, 0.0, AnyFloat(), 0],
+        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
         add_handler_dimensions=False,
     )
 
@@ -254,9 +254,9 @@ async def test_user_leave_for_non_existing_meeting(
 
     # No feature metric has been emitted
     context.metrics_engine.assert_metrics_emited(
-        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME],
-        [1.0, 0.0, AnyFloat()],
-        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS],
+        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
+        [1.0, 0.0, AnyFloat(), 0],
+        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
         add_handler_dimensions=False,
     )
 

@@ -52,12 +52,13 @@ def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
     with mock.patch("mitup_bot.db.sessionmaker") as maker_patch:
         mocked_session = MockDbSession()
         # Setup a factory that returns our mocked_session
-        maker_patch.return_value = lambda: mocked_session
+        maker_factory = mock.MagicMock(return_value=mocked_session)
+        maker_patch.return_value.return_value.__enter__ = maker_factory
 
         with mock.patch("mitup_bot.db.create_engine"):
             # Patch create_engine to and make sure we are not creating an engine while
             # testing
-            db.configure_db(db_config)
+            db.configure_db(db_config, skip_if_initialized=True)
             yield mocked_session
             # Unset the module level sessionmaker for the next test
             db.__sessionmaker = None  # type: ignore

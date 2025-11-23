@@ -102,6 +102,7 @@ async def handle_maintainance(event: MaintainanceEvent) -> None:
     start_time = perf_counter()
     fault = False
     try:
+        db.set_connection_context(event.event_type.value)
         await launch_event(event, bot, metrics)
     except Exception:
         fault = True
@@ -109,6 +110,11 @@ async def handle_maintainance(event: MaintainanceEvent) -> None:
     finally:
         metrics.put_metric(MetricKey.FAULT.value, 1 if fault else 0, unit=Unit.COUNT.value)
         metrics.put_metric(MetricKey.TIME.value, (perf_counter() - start_time) * 1000, unit=Unit.MILLISECONDS.value)
+        metrics.put_metric(
+            MetricKey.DB_CONNECTIONS_LEAKED.value,
+            db.get_open_connections(event.event_type.value),
+            unit=Unit.COUNT.value,
+        )
         await metrics.flush()
 
 

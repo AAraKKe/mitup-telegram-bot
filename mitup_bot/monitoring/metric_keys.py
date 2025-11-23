@@ -71,6 +71,8 @@ class MetricKey(CamelCaseStrEnum):
     MEETUPS_ABOUT_TO_BE_DELETED = auto()
     """Number of meetings successfully deleted"""
     MEETUPS_DELETED = auto()
+    """Number of database connections that were not properly closed (leaked connections)"""
+    DB_CONNECTIONS_LEAKED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
