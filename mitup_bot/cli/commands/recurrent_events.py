@@ -8,7 +8,6 @@ from typing import assert_never
 import click
 from aws_embedded_metrics.environment.environment_detector import resolve_environment
 from aws_embedded_metrics.unit import Unit
-from pydantic import BaseModel
 from telegram import constants
 from telegram.ext import AIORateLimiter, Defaults, ExtBot
 
@@ -56,11 +55,6 @@ class IntervalsConfiguration:
                 assert_never(never)
 
 
-class MaintainanceEvent(BaseModel):
-    event_type: EventType
-    env: Env = Env.PROD
-
-
 def build_bot(config: BotConfig) -> ExtBot:
     return ExtBot(
         token=config.token.get_secret_value(),
@@ -69,8 +63,8 @@ def build_bot(config: BotConfig) -> ExtBot:
     )
 
 
-async def launch_event(event: MaintainanceEvent, bot: ExtBot, metrics: MitupMetricsLogger) -> None:
-    match event.event_type:
+async def launch_event(event_type: EventType, bot: ExtBot, metrics: MitupMetricsLogger) -> None:
+    match event_type:
         case EventType.USER_CLEANUP:
             user_cleanup.run(bot, metrics)
         case EventType.NOTIFY_START_MEETING:
@@ -85,25 +79,15 @@ async def launch_event(event: MaintainanceEvent, bot: ExtBot, metrics: MitupMetr
             assert_never(never)
 
 
-async def handle_maintainance(event: MaintainanceEvent) -> None:
-    config = Config.from_providers(
-        EnvVariablesConfigProvider(),
-        TomlConfigProvider(env=event.env),
-    )
-
-    db.configure_db(config.db, skip_if_initialized=True)
-    configure_metrics(config.metrics)
-
+async def handle_maintainance(event_type: EventType, bot: ExtBot) -> None:
     metrics = MitupMetricsLogger(resolve_environment)
-    metrics.set_dimensions({"EventType": event.event_type.value})
-
-    bot = build_bot(config.bot)
+    metrics.set_dimensions({"EventType": event_type.value})
 
     start_time = perf_counter()
     fault = False
     try:
-        db.set_connection_context(event.event_type.value)
-        await launch_event(event, bot, metrics)
+        db.set_connection_context(event_type.value)
+        await launch_event(event_type, bot, metrics)
     except Exception:
         fault = True
         metrics.add_stack_trace("exception")
@@ -112,7 +96,7 @@ async def handle_maintainance(event: MaintainanceEvent) -> None:
         metrics.put_metric(MetricKey.TIME.value, (perf_counter() - start_time) * 1000, unit=Unit.MILLISECONDS.value)
         metrics.put_metric(
             MetricKey.DB_CONNECTIONS_LEAKED.value,
-            db.get_open_connections(event.event_type.value),
+            db.get_open_connections(event_type.value),
             unit=Unit.COUNT.value,
         )
         await metrics.flush()
@@ -120,7 +104,8 @@ async def handle_maintainance(event: MaintainanceEvent) -> None:
 
 async def run_periodic(
     interval: int,
-    event: MaintainanceEvent,
+    event_type: EventType,
+    bot: ExtBot,
     time_before_start: float | None = None,
 ):
     # If no time provided add 1% interval jitter
@@ -129,18 +114,19 @@ async def run_periodic(
 
     # Run the coroutine indefinitely
     while True:
-        await handle_maintainance(event)
+        await handle_maintainance(event_type, bot)
         await asyncio.sleep(interval)
 
 
-async def run_all_tasks(intervals: IntervalsConfiguration, env: Env, start_time: float):
+async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, start_time: float):
     async with asyncio.TaskGroup() as tg:
         for event_type in EventType:
             tg.create_task(
                 run_periodic(
                     intervals.get(event_type),
                     time_before_start=start_time,
-                    event=MaintainanceEvent(event_type=event_type, env=env),
+                    event_type=event_type,
+                    bot=bot,
                 )
             )
 
@@ -199,6 +185,16 @@ def cli(
     start_time: float,
 ):
     """Launch all recurrent events periodically"""
+    config = Config.from_providers(
+        EnvVariablesConfigProvider(),
+        TomlConfigProvider(env=env),
+    )
+
+    db.configure_db(config.db)
+    configure_metrics(config.metrics)
+
+    bot = build_bot(config.bot)
+
     intervals = IntervalsConfiguration(
         user_cleanup=user_cleanup_interval,
         notify_start_meeting=notify_meeting_interval,
@@ -206,4 +202,4 @@ def cli(
         deactivate_meetings=deactivate_meetings_interval,
         meetups_cleanup=meetups_cleanup_interval,
     )
-    asyncio.run(run_all_tasks(intervals, env, start_time))
+    asyncio.run(run_all_tasks(intervals, bot, start_time))
