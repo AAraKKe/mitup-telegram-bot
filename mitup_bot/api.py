@@ -256,6 +256,12 @@ async def update_single_meeting_message(
         else meeting.main_view
     )
 
+    # Update the stored buttons to match the current view to ensure they are persisted
+    # TODO: We might want to remove the persistency on this message. Not sure what was the
+    # reason to have it to begin with
+    message.buttons.keyboard = view.keyboard
+    session.add(message)
+
     # Determine the text and markup based on meeting state
     if was_deleted:
         text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang)
@@ -265,7 +271,7 @@ async def update_single_meeting_message(
         reply_markup = None
     else:
         text = view.description
-        reply_markup = MitupView.keyboard_to_markup(message.buttons.keyboard)
+        reply_markup = view.markup
 
     with (
         adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX),

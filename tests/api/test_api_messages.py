@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 from aws_embedded_metrics.unit import Unit
-from telegram import InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.error import BadRequest
 
 from mitup_bot.api import (
@@ -136,19 +136,27 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
         "chat_id": 123,
         "message_id": None,
         "inline_message_id": None,
-        "reply_markup": InlineKeyboardMarkup([]),
+        "reply_markup": meeting.inline_view.markup,
     }
 
     assert edit.call_count == 3
     edit.assert_has_calls(
         [
-            mock.call(**(expected_call_params | {"text": meeting.main_view.description, "message_id": 123})),
+            mock.call(
+                **(
+                    expected_call_params
+                    | {
+                        "text": meeting.main_view.description,
+                        "message_id": 123,
+                        "reply_markup": meeting.main_view.markup,
+                    }
+                )
+            ),
             mock.call(
                 **(
                     expected_call_params
                     | {
                         "inline_message_id": "456",
-                        "reply_markup": MitupView.keyboard_to_markup(buttons.keyboard),
                     }
                 )
             ),
@@ -159,7 +167,6 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
                         "text": meeting.inline_view.description,
                         "message_id": 123,
                         "chat_id": 234,
-                        "reply_markup": MitupView.keyboard_to_markup(buttons.keyboard),
                     }
                 )
             ),

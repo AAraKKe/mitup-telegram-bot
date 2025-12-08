@@ -17,6 +17,8 @@ pipx install pre-commit
 pre-commit install
 pre-commit run --all-files
 
-hatch run dev:validate
+# Since we are running most of the steps from validate, we will be skipping it to
+# speed up the process. Uncomment to add it back
+# hatch run dev:validate
 
 set +ex
