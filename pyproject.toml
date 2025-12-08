@@ -206,7 +206,7 @@ PYRIGHT_PYTHON_FORCE_VERSION = "latest"
 [tool.hatch.envs.dev.scripts]
 test = [
     "build-locales",
-    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests {args:}",
+    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered {args:tests}",
 ]
 test-cov = [
     "build-locales",

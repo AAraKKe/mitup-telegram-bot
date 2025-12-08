@@ -799,6 +799,21 @@ def test_participant_returns_specific_participant_by_user_id():
     assert participant.user == user1
 
 
+@pytest.mark.parametrize(
+    "is_public",
+    [True, False],
+    ids=["public_meeting", "private_meeting"],
+)
+def test_share_button_in_keyboard(is_public):
+    meetup = create_meetup(123, "Meeting", public=is_public)
+    keyboard = meetup.build_inline_keyboard()
+
+    if is_public:
+        assert keyboard[-1][-1].switch_inline_query == "123"
+    else:
+        assert keyboard[-1][-1].switch_inline_query is None
+
+
 def test_participant_returns_none_if_user_not_found():
     owner = create_user(id=1, first_name="John")
     meeting = create_meetup(id=1, owner=owner)

@@ -3,8 +3,9 @@ from telegram import Update
 
 from mitup_bot.api import answer_inline_query
 from mitup_bot.db import with_async_session
-from mitup_bot.guards import current_user, user_owns_meeting, valid_inline_query
+from mitup_bot.guards import current_user, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils.mitup_types import TMitupContext
 
@@ -23,7 +24,9 @@ async def share_meeting(session: Session, update: Update, context: TMitupContext
     query = valid_inline_query(update).query
     meeting_id = int(query)
     # Pass redirect false since an inline query does not have a message we can edit.
-    if meeting := await user_owns_meeting(user, meeting_id, "ShareMeeting", update, context, redirect=False):
+    meeting = Meetup.by_id(session, meeting_id)
+
+    if meeting and (meeting.public or meeting.is_owned_by(user)):
         view = meeting.inline_view
         await answer_inline_query(context, update, [view])
         context.put_feature_metric(Feature.SHARE_MEETING)

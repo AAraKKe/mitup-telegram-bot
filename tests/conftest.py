@@ -202,7 +202,10 @@ def update(
         )
         return Update(123, callback_query=query)
     if data.inline_query:
-        return Update(123, inline_query=tg_inline_query)
+        if isinstance(data.inline_query, InlineQuery):
+            return Update(123, inline_query=data.inline_query)
+        query_text = data.inline_query
+        return Update(123, inline_query=InlineQuery(id="123", from_user=tg_user, query=query_text, offset=""))
     if not (data.user and data.message and data.chat):
         # Any update that we manage in this bot has an associated user, chat or message:
         # - CallbackQuery

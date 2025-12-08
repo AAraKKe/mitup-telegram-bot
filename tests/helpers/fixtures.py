@@ -1,7 +1,7 @@
 import datetime as dt
 from dataclasses import dataclass
 
-from telegram import Location
+from telegram import InlineQuery, Location
 from telegram import User as TgUser
 
 from mitup_bot.callback_data import CallbackData
@@ -33,7 +33,7 @@ class UpdateRequest:
     location: Location | None = None
     callback_query: CallbackData | bool = False
     command: str | bool = False
-    inline_query: str = ""
+    inline_query: str | InlineQuery = ""
     inline_message_id: str | None = None
 
 
@@ -70,6 +70,9 @@ def create_meetup(
     )
 
     if owner:
+        meetup.owner = owner
+        if owner.id:
+            meetup.owner_id = owner.id
         owner.meetups.append(meetup)
 
     return meetup

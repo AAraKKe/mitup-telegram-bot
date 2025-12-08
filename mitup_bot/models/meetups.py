@@ -89,6 +89,9 @@ class Meetup(BaseModel, SQLModel, table=True):
     def __eq__(self, other: object) -> bool:
         return hash(self) == hash(other) if isinstance(other, Meetup) else NotImplemented
 
+    def is_owned_by(self, user: User) -> bool:
+        return self.owner_id == user.db_id
+
     @property
     def n_participants(self) -> int:
         """Number of participants in the meeting. Not counting the waiting list."""
@@ -615,6 +618,13 @@ class Meetup(BaseModel, SQLModel, table=True):
                         text=ButtonMessages.SHOW_IN_YOUR_TIMEZONE.get(lang=self.lang),
                         callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(self.db_id),
                     ),
+                ]
+            )
+
+        if self.public:
+            keyboard.append(
+                [
+                    ButtonConfig(text=ButtonMessages.SHARE.get(lang=self.lang), switch_inline_query=str(self.db_id)),
                 ]
             )
 
