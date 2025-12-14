@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.messages import MessagesId
@@ -43,8 +43,7 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
 
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=MitupView(
             description=MeetingMessages.EDIT_MEETING_TITLE.get(title=meeting.title),
@@ -77,8 +76,8 @@ async def edit_title_meeting_message_handler(session: Session, update: Update, c
         session.flush()
 
         view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=meeting.title))
-        await api.send_message(context=context, update=update, view=view)
-        await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+        await context.api.send_message(update=update, view=view)
+        await context.api.update_meeting_messages(session=session, meeting=meeting)
 
         return ConversationHandler.END
 

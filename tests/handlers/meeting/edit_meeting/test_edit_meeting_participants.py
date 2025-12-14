@@ -17,7 +17,6 @@ from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
 from tests.helpers import (
     AnyFloat,
-    MockApi,
     StubMitupApp,
     StubMitupContext,
     UpdateRequest,
@@ -26,12 +25,6 @@ from tests.helpers import (
     create_user,
 )
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_participants") as api:
-        yield api
 
 
 def failure_cases(callback_data: CallbackData):
@@ -76,7 +69,6 @@ async def test_edit_meeting_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -84,7 +76,7 @@ async def test_edit_meeting_participants_works(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_participants_view(user_with_settings.meetups[1]))
+    context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[1]))
 
 
 @pytest.mark.parametrize(
@@ -101,11 +93,10 @@ async def test_edit_meeting_participants_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        with MockApi.start("mitup_bot.guards") as _api:
-            context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+        context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
 
-            assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+        assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_metrics_emited(
         [
@@ -143,11 +134,10 @@ async def test_edit_meeting_participants_failures(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        with MockApi.start("mitup_bot.guards") as _api:
-            context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
-            if error_type is None:
-                assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
-                _api.assert_edit_message_called(context, update, factory.main_menu_view())
+        context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+        if error_type is None:
+            assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
+            context.api.assert_edit_message_called(update, factory.main_menu_view())
 
     assert_metrics_for_failure(error_count, error_type, context)
 
@@ -159,7 +149,6 @@ async def test_edit_meeting_max_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -167,7 +156,7 @@ async def test_edit_meeting_max_participants_works(
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
 
-    api.assert_send_message_called(context, update, edit_max_participants_view(user_with_settings.meetups[0]))
+    context.api.assert_send_message_called(update, edit_max_participants_view(user_with_settings.meetups[0]))
 
     assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
     with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS) as meeting_id:
@@ -195,9 +184,8 @@ async def test_edit_meeting_max_participants_failures(
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
-    with MockApi.start("mitup_bot.guards") as _api:
-        with caplog.at_level(logging.WARNING):
-            context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+    with caplog.at_level(logging.WARNING):
+        context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
 
     assert_metrics_for_failure(error_count, error_type, context)
 
@@ -216,14 +204,13 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        with MockApi.start("mitup_bot.guards") as _api:
-            context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
 
-            assert result is ConversationHandler.END
-            assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+        assert result is ConversationHandler.END
+        assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
-            assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+        assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
     context.metrics_engine.assert_metrics_emited(
         [
@@ -246,7 +233,6 @@ async def test_edit_meeting_no_limit_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -267,7 +253,7 @@ async def test_edit_meeting_no_limit_participants_works(
             max_participants=MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=user_with_settings.lang)
         )
     )
-    api.assert_send_message_called(context, update, response_view)
+    context.api.assert_send_message_called(update, response_view)
     assert result is ConversationHandler.END
 
 
@@ -292,17 +278,13 @@ async def test_edit_meeting_no_limit_participants_failures(
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
-    with MockApi.start("mitup_bot.guards") as _api:
-        with caplog.at_level(logging.WARNING):
-            context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+    with caplog.at_level(logging.WARNING):
+        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
 
-            if error_type is None:
-                assert result is ConversationHandler.END
-                assert (
-                    "User tried 'Edit no limit participants' with a meeting that does not belong to them."
-                    in caplog.text
-                )
-                _api.assert_edit_message_called(context, update, factory.main_menu_view())
+        if error_type is None:
+            assert result is ConversationHandler.END
+            assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
+            context.api.assert_edit_message_called(update, factory.main_menu_view())
 
     assert_metrics_for_failure(error_count, error_type, context)
 
@@ -321,12 +303,11 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        with MockApi.start("mitup_bot.guards") as _api:
-            context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
 
-            assert result is ConversationHandler.END
-            assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+        assert result is ConversationHandler.END
+        assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_metrics_emited(
         [
@@ -349,7 +330,6 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -357,7 +337,7 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_participants_view(user_with_settings.meetups[1]))
+    context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[1]))
     assert result is ConversationHandler.END
 
 
@@ -376,7 +356,6 @@ async def test_positive_filter_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -394,7 +373,6 @@ async def test_edit_meeting_max_participants_message_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -417,7 +395,7 @@ async def test_edit_meeting_max_participants_message_works(
 
     assert meeting.max_members == 4
     mock_session.assert_flushed()
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
@@ -429,7 +407,6 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -443,7 +420,7 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -460,7 +437,6 @@ async def test_edit_meeting_wrong_max_participants_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -473,7 +449,7 @@ async def test_edit_meeting_wrong_max_participants_works(
     response_view = edit_max_participants_view(user_with_settings.meetups[0], fail=True)
 
     assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
-    api.assert_send_message_called(context, update, response_view)
+    context.api.assert_send_message_called(update, response_view)
 
 
 @pytest.mark.parametrize("update", [(UpdateRequest(message_text="no number today"))], indirect=True)
@@ -482,7 +458,6 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -496,7 +471,7 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     assert meeting.max_members is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 def test_edit_meeting_participants_view_without_participants():

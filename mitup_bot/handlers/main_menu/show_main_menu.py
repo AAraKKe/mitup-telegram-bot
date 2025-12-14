@@ -3,7 +3,7 @@ import logging
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
@@ -24,4 +24,4 @@ async def callback_query_main_menu(session: Session, update: Update, context: Mi
     user = guards.current_user(update, session)
     view = views.factory.main_menu_view(lang=user.lang)
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)

@@ -12,15 +12,9 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.fixtures import create_joined_link, create_user
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.meeting.delete_meeting") as api:
-        yield api
 
 
 def failure_cases(callback_data: CallbackData):
@@ -62,7 +56,6 @@ async def test_delete_meeting_works(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -70,8 +63,7 @@ async def test_delete_meeting_works(
     context, _ = await call_handler(update, app, MeetingHandlerId.DELETE_MEETING_CALLBACK)
 
     mock_session.assert_not_deleted()
-    api.assert_send_message_called(
-        context,
+    context.api.assert_send_message_called(
         update,
         MitupView(
             description=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
@@ -124,28 +116,26 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.guards") as _api:
-        with caplog.at_level(logging.WARNING):
-            context, _ = await call_handler(update, app, handler_id)
+    with caplog.at_level(logging.WARNING):
+        context, _ = await call_handler(update, app, handler_id)
 
-            assert f"User tried '{action}' with a meeting that does not exist." in caplog.text
-            assert "Meeting id: 999, user id: 1" in caplog.text
+        assert f"User tried '{action}' with a meeting that does not exist." in caplog.text
+        assert "Meeting id: 999, user id: 1" in caplog.text
 
-            _api.assert_edit_message_called(
-                context,
-                update,
-                MitupView(
-                    description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
-                    keyboard=[
-                        [
-                            ButtonConfig(
-                                text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
-                                callback_data=cb.MAIN_MENU,
-                            )
-                        ]
-                    ],
-                ),
-            )
+        context.api.assert_edit_message_called(
+            update,
+            MitupView(
+                description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
+                keyboard=[
+                    [
+                        ButtonConfig(
+                            text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                            callback_data=cb.MAIN_MENU,
+                        )
+                    ]
+                ],
+            ),
+        )
 
 
 @pytest.mark.parametrize(
@@ -184,14 +174,13 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(meeting)
 
-    with MockApi.start("mitup_bot.guards") as api:
-        with caplog.at_level(logging.WARNING):
-            context, _ = await call_handler(update, app, handler_id)
+    with caplog.at_level(logging.WARNING):
+        context, _ = await call_handler(update, app, handler_id)
 
-            assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
-            assert "Meeting id: 111, user id: 1" in caplog.text
+        assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
+        assert "Meeting id: 111, user id: 1" in caplog.text
 
-            api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
@@ -200,7 +189,6 @@ async def test_confirm_delete_meeting_works(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
@@ -223,7 +211,7 @@ async def test_confirm_delete_meeting_works(
         ],
     )
 
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(1))], indirect=True)
@@ -232,7 +220,6 @@ async def test_decline_delete_meeting_works(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -240,8 +227,7 @@ async def test_decline_delete_meeting_works(
     context, _ = await call_handler(update, app, MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK)
 
     mock_session.assert_not_deleted()
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         user_with_settings.meetups[0].main_view.with_context(
             MeetingMessages.DELETE_MEETING_DECLINE.get(lang=user_with_settings.lang)
@@ -325,7 +311,6 @@ async def test_delete_meeting_with_invited_users_works(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     meeting = user_with_settings.meetups[0]

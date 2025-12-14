@@ -23,7 +23,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 MEETING_ID_NOT_OWNED = 99
@@ -293,8 +293,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED))
 
-    with MockApi.start("mitup_bot.guards") as api:
-        context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -315,7 +314,7 @@ async def test_callback_fails_when_meeting_not_accessible(
         add_update_properties=True,
     )
     # The user is sent to the main menu
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -335,8 +334,7 @@ async def test_callback_fails_when_meeting_not_found(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.guards") as api:
-        context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -364,8 +362,7 @@ async def test_callback_fails_when_meeting_not_found(
             )
         ]
     ]
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         MitupView(
             description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),

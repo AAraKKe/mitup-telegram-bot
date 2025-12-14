@@ -1,7 +1,6 @@
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot.api import answer_inline_query
 from mitup_bot.db import with_async_session
 from mitup_bot.guards import current_user, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -28,5 +27,5 @@ async def share_meeting(session: Session, update: Update, context: TMitupContext
 
     if meeting and (meeting.public or meeting.is_owned_by(user)):
         view = meeting.inline_view
-        await answer_inline_query(context, update, [view])
+        await context.api.answer_inline_query(update=update, results=[view])
         context.put_feature_metric(Feature.SHARE_MEETING)

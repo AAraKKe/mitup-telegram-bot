@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.messages import MessagesId
@@ -45,8 +45,7 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
 
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, callback_data.id)
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=MitupView(
             MeetingMessages.EDIT_MEETING_DESCRIPTION.get(lang=user.lang, description=meeting.description)
@@ -85,8 +84,8 @@ async def edit_description_meeting_message_handler(session: Session, update: Upd
         view = meeting.edit_view.with_context(
             MeetingMessages.DESCRIPTION_SET_SUCCESS.get(description=meeting.description)
         )
-        await api.send_message(context=context, update=update, view=view)
-        await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+        await context.api.send_message(update=update, view=view)
+        await context.api.update_meeting_messages(session=session, meeting=meeting)
 
         return ConversationHandler.END
 

@@ -5,7 +5,7 @@ from sqlmodel import Session
 from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards, timezone_api, views
+from mitup_bot import guards, timezone_api, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -28,7 +28,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationSettingsState.TIMEZONE
 
@@ -55,7 +55,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
                 ]
             ],
         )
-        await api.send_message(context=context, update=update, view=view)
+        await context.api.send_message(update=update, view=view)
 
         return ConversationSettingsState.TIMEZONE
 
@@ -66,7 +66,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
     message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationHandler.END
 
@@ -95,7 +95,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
                 ]
             ],
         )
-        await api.send_message(context=context, update=update, view=view)
+        await context.api.send_message(update=update, view=view)
 
         return ConversationSettingsState.TIMEZONE
 
@@ -106,7 +106,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
     message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationHandler.END
 

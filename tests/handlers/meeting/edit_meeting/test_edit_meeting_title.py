@@ -12,18 +12,12 @@ from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import MockApi, create_meetup
+from tests.helpers import create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_title") as api:
-        yield api
-
-
 async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store_meeting_id(
-    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession, update: Update, context: MitupContext, user_with_settings: User
 ):
     assert context.user_data is not None
 
@@ -50,7 +44,7 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
         ],
     )
 
-    api.assert_edit_message_called(context, update, view)
+    context.api.assert_edit_message_called(update, view)
     assert state == ConversationMeetingState.EDIT_TITLE
 
 

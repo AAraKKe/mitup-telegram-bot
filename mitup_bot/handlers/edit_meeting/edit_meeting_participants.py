@@ -5,7 +5,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
@@ -43,7 +43,7 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
     if meeting is None:
         return
 
-    await api.edit_message(context=context, update=update, view=edit_participants_view(meeting))
+    await context.api.edit_message(update=update, view=edit_participants_view(meeting))
 
 
 @HandlersRegistry.register_callback_query(
@@ -73,7 +73,7 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
 
     context.store_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, callback_data.id)
 
-    await api.send_message(context=context, update=update, view=edit_max_participants_view(meeting))
+    await context.api.send_message(update=update, view=edit_max_participants_view(meeting))
 
     return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
 
@@ -113,7 +113,7 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
         )
     )
 
-    await api.send_message(context=context, update=update, view=response_view)
+    await context.api.send_message(update=update, view=response_view)
 
     return ConversationHandler.END
 
@@ -151,7 +151,7 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
                 return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
     meeting.max_members = int(cast(str, number))
@@ -161,8 +161,8 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
         MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=meeting.max_members)
     )
 
-    await api.send_message(context=context, update=update, view=response_view)
-    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+    await context.api.send_message(update=update, view=response_view)
+    await context.api.update_meeting_messages(session=session, meeting=meeting)
 
     return ConversationHandler.END
 
@@ -182,10 +182,10 @@ async def edit_meeting_wrong_max_participants(session: Session, update: Update, 
             response_view = edit_max_participants_view(meeting, fail=True)
     except ContextPropertyNotSetError as exc:
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
-    await api.send_message(context=context, update=update, view=response_view)
+    await context.api.send_message(update=update, view=response_view)
 
     return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
 

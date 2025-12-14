@@ -11,7 +11,6 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import (
-    MockApi,
     MockDbSession,
     StubMitupApp,
     StubMitupContext,
@@ -21,19 +20,12 @@ from tests.helpers import (
 )
 
 
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.meeting.show_meeting") as api:
-        yield api
-
-
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1))]), indirect=True)
 async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     mock_session: MockDbSession,
     update: Update,
     app: StubMitupApp,
     user_with_settings: User,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
@@ -65,7 +57,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     context, _ = await call_handler(update, app, MeetingHandlerId.SHOW_MEETING_CALLBACK)
 
     expected_view = target_meeting.main_view
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
@@ -74,7 +66,6 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
-    api: MockApi,
 ):
     caplog.set_level(logging.WARNING)
 
@@ -98,8 +89,8 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     await callback_query_show_meeting(update, context)
 
     # Ensure that the only message sent was the edit for the main menu to avoid information flow
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang), times=1)
-    api.assert_send_message_not_called()
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang), times=1)
+    context.api.assert_send_message_not_called()
     assert (
         "User tried 'Show meeting' with a meeting that does not belong to them. "
         f"Meeting id: 4, user id: {user_with_settings.id}"

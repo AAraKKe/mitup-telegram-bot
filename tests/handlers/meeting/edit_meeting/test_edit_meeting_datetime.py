@@ -15,7 +15,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 TEST_MEETING_DATETIME_UTC = dt.datetime(2024, 12, 21, 12, 0, tzinfo=dt.UTC)
@@ -46,12 +46,6 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
 
 def update_meeting_view(meeting: Meetup, datetime: str) -> MitupView:
     return meeting.edit_view.with_context(MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=datetime))
-
-
-@pytest.fixture(scope="function")
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
-        yield api
 
 
 @pytest.fixture(autouse=True)
@@ -100,7 +94,6 @@ async def test_edit_meeting_date_callback(
     current_date: dt.date,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -108,8 +101,7 @@ async def test_edit_meeting_date_callback(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.DATE_CALLBACK)
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         factory.edit_meeting_date_view(
             lang=user_with_settings.lang,
@@ -147,7 +139,6 @@ async def test_set_meeting_date_callback(
     new: bool,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     show_timezone: bool,
 ):
     meeting = create_meetup(
@@ -177,12 +168,11 @@ async def test_set_meeting_date_callback(
     assert meeting.datetime == expected_datetime
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         expected_view,
     )
-    api.assert_update_meeting_messages_called(mock_session, context, meeting, None, True)
+    context.api.assert_update_meeting_messages_called(mock_session, meeting, None, True)
 
 
 @pytest.mark.parametrize(
@@ -202,7 +192,6 @@ async def test_delete_meeting_date(
     meeting: Meetup,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -213,8 +202,7 @@ async def test_delete_meeting_date(
     assert meeting.datetime is None
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=user_with_settings.lang)),
     )
@@ -250,8 +238,7 @@ async def test_edit_meeting_time_callback(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
-        context, response = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CALLBACK)
+    context, response = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CALLBACK)
 
     assert response == expected_response
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) or expected_response == ConversationHandler.END
@@ -269,7 +256,7 @@ async def test_edit_meeting_time_callback(
     )
 
     if expected_response == ConversationMeetingState.EDIT_TIME:
-        api.assert_edit_message_called(context, update, expected_view)
+        context.api.assert_edit_message_called(update, expected_view)
 
     # StoredMeetingId is emitted only if the meeting is accessible
     names = [
@@ -334,10 +321,9 @@ async def test_set_time_message_with_valid_time(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
-        context, response = await call_handler(
-            update, app, EditMeetingHandlerId.SET_TIME_MESSAGE, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
-        )
+    context, response = await call_handler(
+        update, app, EditMeetingHandlerId.SET_TIME_MESSAGE, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+    )
 
     assert response == ConversationHandler.END
     # Since the user provides 20:20 in Europ/Madrid, the UTC time stored in the meeting is one hour earlier
@@ -363,14 +349,13 @@ async def test_set_time_message_with_valid_time(
         add_update_properties=True,
     )
 
-    api.assert_send_message_called(
-        context,
+    context.api.assert_send_message_called(
         update,
         meeting.edit_view.with_context(
             MeetingMessages.EDIT_TIME_SUCCESS.get(lang=user_with_settings.lang, datetime=expected_time_displayed)
         ),
     )
-    api.assert_update_meeting_messages_called(mock_session, context, meeting)
+    context.api.assert_update_meeting_messages_called(mock_session, meeting)
 
 
 @pytest.mark.parametrize(
@@ -390,10 +375,9 @@ async def test_set_time_message_with_invalid_time(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
-        context, response = await call_handler(
-            update, app, EditMeetingHandlerId.SET_TIME_MESSAGE, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
-        )
+    context, response = await call_handler(
+        update, app, EditMeetingHandlerId.SET_TIME_MESSAGE, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+    )
 
     assert response == ConversationMeetingState.EDIT_TIME
     assert meeting.datetime == TEST_MEETING_DATETIME_UTC
@@ -404,7 +388,7 @@ async def test_set_time_message_with_invalid_time(
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
     # Message sent to retry
-    api.assert_send_message_called(context, update, MeetingMessages.INVALID_TIME.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(update, MeetingMessages.INVALID_TIME.get(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_handler_metrics_emitted(
         names=[
@@ -451,23 +435,24 @@ async def test_conversation_fallback_with_wrong_message_format(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
-        # Lets first trigger the conversation
-        context, _ = await call_handler(
-            entry_point_update(update),
-            app,
-            EditMeetingHandlerId.EDIT_TIME_CONVERSATION,
-            with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
-        )
+    # Lets first trigger the conversation
+    context, _ = await call_handler(
+        entry_point_update(update),
+        app,
+        EditMeetingHandlerId.EDIT_TIME_CONVERSATION,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
 
-        # Now answer with a wrong message format
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CONVERSATION)
+    # Now answer with a wrong message format
+    context, _ = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CONVERSATION)
 
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
     # Message sent to retry
-    api.assert_send_message_called(context, update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(
+        update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang), times=1
+    )
 
     context.metrics_engine.assert_handler_metrics_emitted(
         names=[
@@ -497,15 +482,14 @@ async def test_edit_time_can_be_cancelled(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_datetime") as api:
-        context, _ = await call_handler(
-            entry_point_update(update),
-            app,
-            EditMeetingHandlerId.EDIT_TIME_CONVERSATION,
-            with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
-        )
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CONVERSATION)
+    context, _ = await call_handler(
+        entry_point_update(update),
+        app,
+        EditMeetingHandlerId.EDIT_TIME_CONVERSATION,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+    context, _ = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CONVERSATION)
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    api.assert_edit_message_called(context, update, meeting.edit_view, times=2)
+    context.api.assert_edit_message_called(update, meeting.edit_view, times=1)

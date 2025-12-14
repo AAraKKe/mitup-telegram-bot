@@ -6,13 +6,7 @@ from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils.messages import MeetingMessages
-from tests.helpers import AnyFloat, HandlerContext, MockApi, MockDbSession, UpdateRequest, call_handler, create_meetup
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.join_leave") as api:
-        yield api
+from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler, create_meetup
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
@@ -20,7 +14,6 @@ async def test_existing_user_joins_own_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -43,17 +36,15 @@ async def test_existing_user_joins_own_meeting(
     context.metrics_engine.assert_feature_metrics_emitted(Feature.JOIN_MEETING)
 
     # The user has been notified
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=MeetingMessages.JOINED_MEETING_SUCCESS.get(lang=user_with_settings.lang, plain=True),
         show_alert=False,
     )
 
     # All messages have been updated
-    api.assert_update_meeting_messages_called(
+    context.api.assert_update_meeting_messages_called(
         session=mock_session,
-        context=context,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -64,7 +55,6 @@ async def test_user_already_join_does_not_join(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -86,8 +76,7 @@ async def test_user_already_join_does_not_join(
     context.metrics_engine.assert_feature_metrcs_not_emitted(Feature.JOIN_MEETING)
 
     # The user has been notified
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=MeetingMessages.JOINED_MEETING_ALREADY.get(lang=user_with_settings.lang),
         show_alert=False,
@@ -99,7 +88,6 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     owner = User(first_name="Owner", tg_user_id=1, settings=Settings())
     meeting = create_meetup(id=123, title="My Meeting", max_members=1, waiting_list=False, owner=owner)
@@ -117,8 +105,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     context.metrics_engine.assert_feature_metrcs_not_emitted(Feature.JOIN_MEETING)
 
     # The user has been notified
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=MeetingMessages.JOINED_MEETING_FULL.get(lang=user_with_settings.lang, plain=True),
         show_alert=False,
@@ -130,7 +117,6 @@ async def test_user_join_for_non_existing_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -146,8 +132,7 @@ async def test_user_join_for_non_existing_meeting(
     )
 
     # The user has been notified
-    api.assert_edit_message_called(
-        context=context,
+    context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user_with_settings.lang),
     )
@@ -158,7 +143,6 @@ async def test_non_existent_user_joins_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     # User is not in the database but meeting is
     mock_session.add_object(user_with_settings.meetups[0])
@@ -170,8 +154,7 @@ async def test_non_existent_user_joins_meeting(
     mock_session.assert_object_added(user)
 
     # Message has been updated
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=MeetingMessages.JOINED_MEETING_UNREGISTERED.get(plain=True),
         show_alert=True,
@@ -183,7 +166,6 @@ async def test_user_leaves_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -199,17 +181,15 @@ async def test_user_leaves_meeting(
     context.metrics_engine.assert_feature_metrics_emitted(Feature.LEAVE_MEETING)
 
     # The user has been notified
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=MeetingMessages.LEFT_MEETING_SUCCESS.get(lang=user_with_settings.lang, plain=True),
         show_alert=False,
     )
 
     # All messages have been updated
-    api.assert_update_meeting_messages_called(
+    context.api.assert_update_meeting_messages_called(
         session=mock_session,
-        context=context,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -220,7 +200,6 @@ async def test_non_existing_user_leaves_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     # User is not in the database but meeting is
     mock_session.add_object(user_with_settings.meetups[0])
@@ -232,8 +211,7 @@ async def test_non_existing_user_leaves_meeting(
     mock_session.assert_object_added(user)
 
     # Message has been updated
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=MeetingMessages.LEFT_MEETING_UNREGISTERED.get(plain=True),
         show_alert=True,
@@ -245,7 +223,6 @@ async def test_user_leave_for_non_existing_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -261,8 +238,7 @@ async def test_user_leave_for_non_existing_meeting(
     )
 
     # The user has been notified
-    api.assert_edit_message_called(
-        context=context,
+    context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user_with_settings.lang),
     )

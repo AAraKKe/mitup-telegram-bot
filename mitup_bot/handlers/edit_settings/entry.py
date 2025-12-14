@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -21,7 +21,7 @@ async def callback_query_settings(session: Session, update: Update, context: Mit
     user = guards.current_user(update, session)
     view = views.factory.settings_view(lang=user.lang)
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -34,6 +34,6 @@ async def callback_query_cancel_settings(session: Session, update: Update, conte
     user = guards.current_user(update, session)
     view = views.factory.settings_view(lang=user.lang)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationHandler.END

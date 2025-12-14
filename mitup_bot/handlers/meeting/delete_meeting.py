@@ -4,7 +4,7 @@ from typing import cast
 from sqlmodel import Session, delete
 from telegram import Update
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.models import User
@@ -40,8 +40,7 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
     if meeting is None:
         return
 
-    await api.send_message(
-        context=context,
+    await context.api.send_message(
         update=update,
         view=MitupView(
             description=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
@@ -86,7 +85,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
     if meeting is None:
         return
 
-    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting, was_deleted=True)
+    await context.api.update_meeting_messages(session=session, meeting=meeting, was_deleted=True)
 
     # Keep all invited users ides to also delete them
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
@@ -104,7 +103,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
             ]
         ],
     )
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -131,8 +130,7 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
     if meeting is None:
         return
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get(lang=user.lang)),
     )

@@ -15,7 +15,6 @@ from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import (
-    MockApi,
     StubMitupApp,
     StubMitupContext,
     UpdateRequest,
@@ -24,12 +23,6 @@ from tests.helpers import (
     create_meetup,
 )
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.main_menu.show_joined_meetings") as api:
-        yield api
 
 
 async def test_show_meetings_fails_without_callback_query_data(
@@ -53,7 +46,6 @@ async def test_show_meetings_use_correct_view(
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     # We add some meetings to the user joined_links so that the view is not empty
@@ -87,14 +79,14 @@ async def test_show_meetings_use_correct_view(
             ]
         ]
     )
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
 )
 async def test_show_meetings_without_meetings_to_show_works(
-    mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User, api: MockApi
+    mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     user_with_settings.meetups = []
@@ -106,4 +98,4 @@ async def test_show_meetings_without_meetings_to_show_works(
         message=MeetingMessages.NO_JOINED_MEETINGS.get(lang=user_with_settings.lang),
     )
 
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)

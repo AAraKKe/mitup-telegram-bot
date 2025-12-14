@@ -12,13 +12,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
-from tests.helpers import AnyFloat, MockApi, MockDbSession, StubMitupApp, UpdateRequest, call_handler
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_settings.edit_language") as api:
-        yield api
+from tests.helpers import AnyFloat, MockDbSession, StubMitupApp, UpdateRequest, call_handler
 
 
 def language_buttons(lang: str) -> list[ButtonConfig]:
@@ -33,7 +27,6 @@ async def test_edit_language(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -59,7 +52,7 @@ async def test_edit_language(
         ]
     )
 
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize(
@@ -75,7 +68,6 @@ async def test_set_language(
     update: Update,
     mock_session: MockDbSession,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
     language: str,
 ):
@@ -107,7 +99,7 @@ async def test_set_language(
     )
 
     assert user_with_settings.lang == language
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SET_LANGUAGE.with_id(999))], indirect=True)
@@ -115,7 +107,6 @@ async def test_set_language_fails_if_id_invalid(
     update: Update,
     mock_session: MockDbSession,
     user: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user, "tg_user_id")

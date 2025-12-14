@@ -11,13 +11,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
-from tests.helpers import MockApi, MockDbSession, StubMitupApp, UpdateRequest, call_handler
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.meeting.create_meeting") as mock_api:
-        yield mock_api
+from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler
 
 
 async def enter_conversation(chat: Chat, user: TelegramUser, app: StubMitupApp) -> tuple[MitupContext, Update]:
@@ -53,7 +47,6 @@ async def enter_conversation(chat: Chat, user: TelegramUser, app: StubMitupApp) 
     indirect=True,
 )
 async def test_meeting_creation_successful(
-    api: MockApi,
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
@@ -79,7 +72,7 @@ async def test_meeting_creation_successful(
 
     message = MeetingMessages.CREATED_SUCCESS.get(title=new_meeting.title, lang=user_with_settings.lang)
     view = new_meeting.edit_view.with_context(message)
-    api.assert_send_message_called(context, update, view)
+    context.api.assert_send_message_called(update, view)
 
 
 @pytest.mark.parametrize(
@@ -88,7 +81,6 @@ async def test_meeting_creation_successful(
     indirect=True,
 )
 async def test_meeting_creation_cancelled(
-    api: MockApi,
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
@@ -111,8 +103,7 @@ async def test_meeting_creation_cancelled(
     assert len(mock_session.objects_added) == 0
 
     # User sent to main menu
-    # Edit message was called twice, once to edit at the start of the conversation and the last one to the main menu
-    api.assert_edit_message_called(context, update, views_factory.main_menu_view(lang=user_with_settings.lang), times=2)
+    context.api.assert_edit_message_called(update, views_factory.main_menu_view(lang=user_with_settings.lang), times=1)
 
 
 @pytest.mark.parametrize(
@@ -125,7 +116,6 @@ async def test_meeting_creation_cancelled(
     ids=["command_message", "location_message"],
 )
 async def test_filter_messages_without_text_in_conversation(
-    api: MockApi,
     update: Update,
     app: StubMitupApp,
     user_with_settings: User,
@@ -147,7 +137,7 @@ async def test_filter_messages_without_text_in_conversation(
     entry_context, entry_update = await enter_conversation(chat, update_user, app)
 
     expected_entry_view = views_factory.create_meeting_view(lang=user_with_settings.lang)
-    api.assert_edit_message_called(context=entry_context, update=entry_update, view=expected_entry_view)
+    entry_context.api.assert_edit_message_called(update=entry_update, view=expected_entry_view)
 
     # --- Step 2: User sends an invalid message (command or location) ---
     invalid_msg_update = update
@@ -159,6 +149,4 @@ async def test_filter_messages_without_text_in_conversation(
     expected_invalid_title_view = views_factory.create_meeting_view(
         lang=user_with_settings.lang, message=expected_invalid_title_message
     )
-    api.assert_send_message_called(
-        context=invalid_title_context, update=invalid_msg_update, view=expected_invalid_title_view
-    )
+    invalid_title_context.api.assert_send_message_called(update=invalid_msg_update, view=expected_invalid_title_view)

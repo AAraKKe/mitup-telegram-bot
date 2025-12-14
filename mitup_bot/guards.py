@@ -4,7 +4,6 @@ from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 
-from mitup_bot import api
 from mitup_bot.callback_data import (
     CallbackData,
     DateCallbackData,
@@ -138,7 +137,7 @@ async def user_owns_meeting(
         )
         logging.warning(message)
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
     return None
 
 
@@ -172,8 +171,7 @@ async def meeting_accessible(
     )
     logging.warning(message)
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=MitupView(
             description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user.settings.language),

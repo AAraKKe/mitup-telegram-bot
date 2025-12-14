@@ -1,78 +1,114 @@
-from collections.abc import Generator
-from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Any
 from unittest import mock
 
+from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot.custom_context import MitupContext
+from mitup_bot.api_wrapper import TelegramApi
 from mitup_bot.models import Meetup, Message, User
-from mitup_bot.views import MitupView
+from mitup_bot.views import MitupInlineView, MitupView
 from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_diff
 from tests.helpers.stub_db import MockDbSession
 
-from .types import DEFAULT_CURRENT_MESSAGE
+from .constants import DEFAULT_CURRENT_MESSAGE, DEFAULT_FALSE, DEFAULT_NONE, DefaultValue
 
 
 @dataclass
-class MockApi:
+class MockApi(TelegramApi):
     """
-    This is a helper class that helps aserring if we have called api methods via patching those methods and exposing
-    easy to use assert methods.
-
-    We do not rely on testing the bot methods called but instead we assert calls on the methods in `mitup_bot.api`. The
-    intention is to keep testing at a higher abstraction level working with views instead of having to test the low
-    level telegram library methods.
-
-    The api is instantiated from the MockApi.start() method. The module path where the api module is being imported
-    needs to be provided to start to be able to start the patching. The method patching is released when out of context.
+    Drop-in replacement for the TelegramApi class used for testing. It overrides all methods with mocks
+    and provides helper methods to assert whenter the different api methods were called or not.
     """
 
-    send_message_mock: mock.AsyncMock
-    send_to_user_mock: mock.AsyncMock
-    edit_message_mock: mock.AsyncMock
-    update_meeting_messages_mock: mock.AsyncMock
-    answer_callback_query_mock: mock.AsyncMock
+    def __init__(self):
+        self.mock_mapping: dict[str, mock.AsyncMock] = {}
 
-    @classmethod
-    @contextmanager
-    def start(cls, module_path: str) -> Generator[MockApi]:
-        with (
-            mock.patch(f"{module_path}.api.edit_message") as edit_patch,
-            mock.patch(f"{module_path}.api.send_message") as send_patch,
-            mock.patch(f"{module_path}.api.send_message_to_user") as send__to_user_patch,
-            mock.patch(f"{module_path}.api.update_meeting_messages") as update_meeting_messages_patch,
-            mock.patch(f"{module_path}.api.answer_callback_query") as answer_callback_query_patch,
-        ):
-            yield MockApi(
-                send_message_mock=send_patch,
-                send_to_user_mock=send__to_user_patch,
-                edit_message_mock=edit_patch,
-                update_meeting_messages_mock=update_meeting_messages_patch,
-                answer_callback_query_mock=answer_callback_query_patch,
-            )
+    def send_message_to_user(self, user: User, view: MitupView | str):
+        return self.call_mock("send_message_to_user", user=user, view=view)
 
-    def assert_send_message_called(
-        self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
+    def send_message(self, update: Update, view: MitupView | str):
+        return self.call_mock("send_message", update=update, view=view)
+
+    def edit_message(self, update: Update, view: MitupView | str):
+        return self.call_mock("edit_message", update=update, view=view)
+
+    def update_meeting_messages(
+        self,
+        *,
+        session: Session,
+        meeting: Meetup,
+        current_message: Message | None = DEFAULT_NONE,  # type: ignore
+        skip_current: bool = DEFAULT_FALSE,  # type: ignore
+        was_deleted: bool = DEFAULT_FALSE,  # type: ignore
+        has_finished: bool = DEFAULT_FALSE,  # type: ignore
     ):
-        self.assert_method_called(self.send_message_mock, context, update, view, times)
+        return self.call_mock(
+            "update_meeting_messages",
+            session=session,
+            meeting=meeting,
+            current_message=current_message,
+            skip_current=skip_current,
+            was_deleted=was_deleted,
+            has_finished=has_finished,
+        )
 
-    def assert_edit_message_called(
-        self, context: mock.MagicMock | MitupContext, update: Update, view: MitupView | str, times: int = 1
+    def answer_callback_query(
+        self,
+        update: Update,
+        text: str | None = DEFAULT_NONE,  # type: ignore
+        show_alert: bool = DEFAULT_FALSE,  # type: ignore
     ):
-        self.assert_method_called(self.edit_message_mock, context, update, view, times)
+        return self.call_mock("answer_callback_query", update=update, text=text, show_alert=show_alert)
 
-    def assert_send_to_user_called(
-        self, context: mock.MagicMock | MitupContext, user: User, view: MitupView | str, times: int = 1
+    def answer_inline_query(
+        self,
+        update: Update,
+        results: list[MitupInlineView],
     ):
-        if times == 1:
-            assert_awaited_once_with_diff(self.send_to_user_mock, context_or_bot=context, user=user, view=view)
+        return self.call_mock("answer_inline_query", update=update, results=results)
+
+    def call_mock(self, name: str, **kwargs: DefaultValue | Any) -> mock.AsyncMock:
+        # Ensure we only make the call with the provided arguments, not with all of them even using the defaults
+        new_kwargs = {}
+        for arg, value in kwargs.items():
+            if not isinstance(value, DefaultValue):
+                new_kwargs[arg] = value
+        return self.mock_method(name)(**new_kwargs)
+
+    def mock_method(self, name: str) -> mock.AsyncMock:
+        method_mock = self.mock_mapping.setdefault(name, mock.AsyncMock(name=name))
+        return method_mock
+
+    def call_args_list(self, name: str) -> mock._CallList:
+        return self.mock_method(name).call_args_list
+
+    def call_args(self, name: str) -> mock._Call:
+        return self.mock_method(name).call_args
+
+    def assert_method_just_called(self, name: str, times: int = 1):
+        """Asserts that a given method has been called, no matter the arguments"""
+        mocked_method = self.mock_mapping.get(name)
+        if times == 0:
+            assert mocked_method is None
         else:
-            assert_awaited_with_diff(self.send_to_user_mock, times, context_or_bot=context, user=user, view=view)
+            assert mocked_method is not None
+            assert mocked_method.call_count == times
+
+    def assert_send_message_called(self, update: Update, view: MitupView | str, times: int = 1):
+        self.assert_method_called("send_message", update, view, times)
+
+    def assert_edit_message_called(self, update: Update, view: MitupView | str, times: int = 1):
+        self.assert_method_called("edit_message", update, view, times)
+
+    def assert_send_to_user_called(self, user: User, view: MitupView | str, times: int = 1):
+        if times == 1:
+            assert_awaited_once_with_diff(self.mock_method("send_message_to_user"), user=user, view=view)
+        else:
+            assert_awaited_with_diff(self.mock_method("send_message_to_user"), times, user=user, view=view)
 
     def assert_answer_callback_query_called(
         self,
-        context: mock.MagicMock | MitupContext,
         update: Update,
         text: str | None = None,
         show_alert: bool = False,
@@ -80,47 +116,55 @@ class MockApi:
     ):
         if times == 1:
             assert_awaited_once_with_diff(
-                self.answer_callback_query_mock, context=context, update=update, text=text, show_alert=show_alert
+                self.mock_method("answer_callback_query"), update=update, text=text, show_alert=show_alert
             )
         else:
             assert_awaited_with_diff(
-                self.answer_callback_query_mock, times, context=context, update=update, text=text, show_alert=show_alert
+                self.mock_method("answer_callback_query"), times, update=update, text=text, show_alert=show_alert
             )
+
+    def assert_answer_inline_query_called(
+        self,
+        update: Update,
+        results: list[MitupInlineView],
+        times: int = 1,
+    ):
+        if times == 1:
+            assert_awaited_once_with_diff(self.mock_method("answer_inline_query"), update=update, results=results)
+        else:
+            assert_awaited_with_diff(self.mock_method("answer_inline_query"), times, update=update, results=results)
 
     def assert_update_meeting_messages_called(
         self,
         session: MockDbSession,
-        context: mock.MagicMock | MitupContext,
         meeting: Meetup,
         current_message: Message | None = DEFAULT_CURRENT_MESSAGE,
-        skip_current: bool = False,
+        skip_current: bool | None = None,
         times: int = 1,
     ):
         arguments = {
             "session": session,
-            "context_or_bot": context,
             "meeting": meeting,
         }
         if current_message != DEFAULT_CURRENT_MESSAGE:
             arguments["current_message"] = current_message
-        if skip_current:
+        if skip_current is not None:
             arguments["skip_current"] = skip_current
 
         if times == 1:
-            assert_awaited_once_with_diff(self.update_meeting_messages_mock, **arguments)
+            assert_awaited_once_with_diff(self.mock_method("update_meeting_messages"), **arguments)
         else:
-            assert_awaited_with_diff(self.update_meeting_messages_mock, times, **arguments)
+            assert_awaited_with_diff(self.mock_method("update_meeting_messages"), times, **arguments)
 
     def assert_send_message_not_called(self):
-        self.send_message_mock.assert_not_called()
+        self.mock_method("send_message").assert_not_called()
 
     def assert_edit_message_not_called(self):
-        self.edit_message_mock.assert_not_called()
+        self.mock_method("edit_message").assert_not_called()
 
     def assert_method_called(
         self,
-        method: mock.AsyncMock,
-        context: mock.MagicMock | MitupContext,
+        method_name: str,
         update: Update,
         view: MitupView | str,
         times: int,
@@ -130,6 +174,6 @@ class MockApi:
         assert update.effective_message is not None
 
         if times == 1:
-            assert_awaited_once_with_diff(method, context=context, update=update, view=view)
+            assert_awaited_once_with_diff(self.mock_method(method_name), update=update, view=view)
         else:
-            assert_awaited_with_diff(method, times, context=context, update=update, view=view)
+            assert_awaited_with_diff(self.mock_method(method_name), times, update=update, view=view)

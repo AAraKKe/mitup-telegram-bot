@@ -1,6 +1,5 @@
 import re
 
-import pytest
 from telegram import Update
 
 from mitup_bot.custom_context import ContextId, MitupContext
@@ -17,40 +16,33 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
-from tests.helpers import MockApi, StubMitupContext
+from tests.helpers import StubMitupContext
 from tests.helpers.stub_db import MockDbSession
 
 
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.main_menu.show_main_menu") as api:
-        yield api
-
-
 async def test_settings_is_called_with_settings_view(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     await callback_query_settings(update, context)
 
-    api.assert_edit_message_called(context, update, factory.settings_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.settings_view(lang=user_with_settings.lang))
 
 
 async def test_show_main_menu(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     await callback_query_main_menu(update, context)
 
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
     update: Update,
     context: StubMitupContext,
-    api: MockApi,
     user_with_settings: User,
     mock_session: MockDbSession,
 ):
@@ -63,7 +55,7 @@ async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
     await callback_query_cancel_meeting(update, context)
     await context.flush_metrics()
 
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
     context.metrics_engine.assert_metrics_emited(
         names=["Cancel"],
         values=[1],
@@ -73,26 +65,26 @@ async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
 
 
 async def test_cancel_setting_calls_to_settings_view(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     await callback_query_cancel_settings(update, context)
 
-    api.assert_send_message_called(context, update, factory.settings_view(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(update, factory.settings_view(lang=user_with_settings.lang))
 
 
 async def test_create_meeting_calls_to_create_meeting_view(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     await callback_query_create_meeting(update, context)
 
-    api.assert_edit_message_called(context, update, factory.create_meeting_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.create_meeting_view(lang=user_with_settings.lang))
 
 
 async def test_create_meeting_return_the_correct_state(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     result = await callback_query_create_meeting(update, context)

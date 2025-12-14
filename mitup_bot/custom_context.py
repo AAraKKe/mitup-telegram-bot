@@ -4,12 +4,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import auto
 from time import perf_counter
-from typing import override
 
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 
+from mitup_bot.api_wrapper import TelegramApi, TelegramApiWrapper
 from mitup_bot.exceptions import (
     ContextPropertyConversionError,
     ContextPropertyNotSetError,
@@ -62,7 +62,9 @@ class MitupUserData:
         return context in self.registry and self.registry[context].meeting_id is not None
 
 
-class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, MitupUserData, dict, dict]):
+class MitupContext[TB: ExtBot, TAPI: TelegramApiWrapper, TME: MitupMetricsEngine](
+    CallbackContext[TB, MitupUserData, dict, dict]
+):
     """
     Custom context for the Mitup bot that includes several utilities.
 
@@ -78,6 +80,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         update: Update,
         # Python does not yet support generic of generics, until then we can keep this as TME
         metrics_engine: TME,
+        api: TAPI,
     ):
         self.metrics_engine = metrics_engine
         self.telegram_update = update
@@ -88,6 +91,9 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         user_id = update.effective_user.id if update and update.effective_user else None
 
         super().__init__(application=application, chat_id=chat_id, user_id=user_id)
+
+        self.api = api
+        api.adapter = self
 
     def get_update(self) -> Update:
         return self.__update
@@ -121,7 +127,7 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         try:
             value = property_type(value)
         except ValueError as exc:
-            raise ContextPropertyConversionError(context.name, property, value) from exc
+            raise ContextPropertyConversionError(context.name, property, value, property_type) from exc
 
         try:
             yield value
@@ -326,11 +332,13 @@ class MitupContext[TB: ExtBot, TME: MitupMetricsEngine](CallbackContext[TB, Mitu
         await self.metrics_engine.flush_metrics()
 
     @classmethod
-    @override
     def from_update(
-        cls, update: object, application: Application, metrics_engine: MitupMetricsEngine | None = None
-    ) -> MitupContext[TB, MitupMetricsEngine]:
+        cls,
+        update: object,
+        application: Application,
+    ) -> MitupContext:
         assert isinstance(update, Update), "This should never happen, type is always Update in Mitupbot"
 
-        metrics_engine = metrics_engine or MitupMetricsEngine(logger_provider=lambda ep: MitupMetricsLogger(ep))
-        return MitupContext(application, update=update, metrics_engine=metrics_engine)
+        engine = MitupMetricsEngine[MitupMetricsLogger](logger_provider=lambda ep: MitupMetricsLogger(ep))
+
+        return MitupContext(application, update=update, metrics_engine=engine, api=TelegramApi())

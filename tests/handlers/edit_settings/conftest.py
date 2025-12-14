@@ -2,14 +2,6 @@ from unittest import mock
 
 import pytest
 
-from tests.helpers import MockApi
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.messages") as api:
-        yield api
-
 
 @pytest.fixture
 def get_timezone_from_api():

@@ -7,6 +7,7 @@ from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 
+from .api import MockApi
 from .monitoring import StubMetrics, StubMetricsEngine
 from .types import StubMitupApp, StubMitupContext
 
@@ -22,9 +23,10 @@ def build_context(
     # Build test metrics engine
     metrics_engine = StubMetricsEngine(logger_provider=lambda _: StubMetrics())
 
-    context = cast(
-        StubMitupContext, MitupContext.from_update(update=update, application=app, metrics_engine=metrics_engine)
-    )
+    context = MitupContext.from_update(update=update, application=app)
+    context.api = MockApi()
+    context.api.adapter = context
+    context.metrics_engine = metrics_engine
 
     # Allow the engine to access the context
     metrics_engine.parent_context = context
@@ -33,7 +35,7 @@ def build_context(
         assert context.user_data is not None
         context.user_data.store_meeting_id(context_id, meeting_id)
 
-    return context
+    return cast(StubMitupContext, context)
 
 
 async def call_handler(

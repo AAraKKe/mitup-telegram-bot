@@ -17,7 +17,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -26,7 +26,6 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     mock_session: MockDbSession,
     update: Update,
     app: StubMitupApp,
-    api: MockApi,
     get_timezone_from_api: mock.MagicMock,
     user_with_settings: User,
 ):
@@ -46,7 +45,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     mock_session.assert_flushed()
 
     assert user_with_settings.settings.timezone == cast(Message, update.effective_message).text
-    api.assert_send_message_called(context, update, view)
+    context.api.assert_send_message_called(update, view)
     assert result == ConversationHandler.END
     context.metrics_engine.assert_metrics_emited(
         names=[MetricKey.COUNT, MetricKey.ERROR],
@@ -67,7 +66,6 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
 async def test_registration_timezone_message_handler_log_with_incorrect_timezone(
     mock_session: MockDbSession,
     update: Update,
-    api: MockApi,
     app: StubMitupApp,
     get_timezone_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
@@ -86,8 +84,8 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
         in caplog.text
     )
 
-    api.assert_send_message_called(
-        context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
+    context.api.assert_send_message_called(
+        update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
     context.metrics_engine.assert_metrics_emited(
@@ -109,7 +107,6 @@ async def test_registration_timezone_with_location_update_correctly(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    api: MockApi,
     get_location_from_api: mock.MagicMock,
     user_with_settings: User,
 ):
@@ -127,7 +124,7 @@ async def test_registration_timezone_with_location_update_correctly(
     mock_session.assert_added(user_with_settings)
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == "Europe/Dublin"
-    api.assert_send_message_called(context, update, view)
+    context.api.assert_send_message_called(update, view)
     assert result == ConversationHandler.END
 
 
@@ -136,7 +133,6 @@ async def test_registration_timezone_message_handler_log_with_incorrect_coordina
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    api: MockApi,
     get_location_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
@@ -155,7 +151,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_coordina
         "Trying again" in caplog.text
     )
 
-    api.assert_send_message_called(
-        context, update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
+    context.api.assert_send_message_called(
+        update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE

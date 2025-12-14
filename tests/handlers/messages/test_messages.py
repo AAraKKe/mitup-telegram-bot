@@ -10,30 +10,24 @@ from mitup_bot.handlers.messages import filter_messages_without_text
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, StubMitupContext, UpdateRequest
+from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
 
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.messages") as api:
-        yield api
-
-
 async def test_filter_messages_without_text_handler_with_correct_view(
-    update: Update, context: StubMitupContext, api: MockApi, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     result = await filter_messages_without_text(update, context)
 
-    api.assert_send_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
     assert result == -1
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_edit_title_message_handler_update_the_title_and_send_correct_view(
-    mock_session: MockDbSession, update: Update, context: mock.MagicMock, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession, update: Update, context: mock.MagicMock, user_with_settings: User
 ):
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
@@ -52,12 +46,12 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
     mock_session.assert_flushed()
 
     view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=update.effective_message.text))
-    api.assert_send_message_called(context, update, view)
+    context.api.assert_send_message_called(update, view)
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
 async def test_edit_description_message_handler_update_the_description_and_send_correct_view(
-    mock_session: MockDbSession, update: Update, context: MitupContext, api: MockApi, user_with_settings: User
+    mock_session: MockDbSession, update: Update, context: MitupContext, user_with_settings: User
 ):
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, 1)
@@ -78,7 +72,7 @@ async def test_edit_description_message_handler_update_the_description_and_send_
     view = meeting.edit_view.with_context(
         MeetingMessages.DESCRIPTION_SET_SUCCESS.get(description=update.effective_message.text)
     )
-    api.assert_send_message_called(context, update, view)
+    context.api.assert_send_message_called(update, view)
 
 
 async def test_filter_messages_without_text_delete_user_data_related_with_edit_meetings(

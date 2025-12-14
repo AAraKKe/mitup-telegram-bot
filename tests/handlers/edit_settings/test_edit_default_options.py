@@ -4,27 +4,21 @@ from telegram import Update
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import MockApi, MockDbSession, StubMitupApp, UpdateRequest, call_handler
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_settings.edit_default_options") as api:
-        yield api
+from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_DEFAULT_OPTIONS)], indirect=True)
 async def test_edit_default_options_view(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     settings = user_with_settings.settings
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     expected_view = settings.default_meeting_settings_view()
 
-    contex, _ = await call_handler(update, app, EditSettingsHandlerId.DEFAULT_OPTIONS_CALLBACK)
+    context, _ = await call_handler(update, app, EditSettingsHandlerId.DEFAULT_OPTIONS_CALLBACK)
 
-    api.assert_edit_message_called(contex, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 def assert_default_options_value(
@@ -81,7 +75,6 @@ async def test_callbacks_to_set_default_option(
     incognito: bool,
     show_timezone: bool,
     app: StubMitupApp,
-    api: MockApi,
 ):
     settings = user_with_settings.settings
     settings.default_allow_invitation = invitation
@@ -92,9 +85,9 @@ async def test_callbacks_to_set_default_option(
 
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    contex, _ = await call_handler(update, app, handler_id)
+    context, _ = await call_handler(update, app, handler_id)
 
     expected_view = settings.default_meeting_settings_view()
 
-    api.assert_edit_message_called(contex, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
     assert_default_options_value(settings, handler_id, waiting_list, public, invitation, incognito, show_timezone)

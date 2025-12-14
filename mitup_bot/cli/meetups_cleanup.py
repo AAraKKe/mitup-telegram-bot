@@ -7,7 +7,8 @@ from sqlmodel import Session, and_, delete, false, func, literal, null, select, 
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.ext import ExtBot
 
-from mitup_bot import api, db
+from mitup_bot import db
+from mitup_bot.api_wrapper import build_api
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger, Unit
 from mitup_bot.utils import callbacks as cb
@@ -80,7 +81,8 @@ async def notify_meetups_about_to_be_deleted(session: Session, bot: ExtBot, metr
 
     if views:
         # Avoid doing anything at all if there are no messages to send
-        await api.send_messages_to_users(context_or_bot=bot, users=users, views=views, on_success=callbacks)
+        api = build_api(bot)
+        await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
     metrics.put_metric(MetricKey.MEETUPS_ABOUT_TO_BE_DELETED.value, len(meetups), unit=Unit.COUNT.value)
 
 
@@ -115,7 +117,8 @@ async def delete_meetups(session: Session, bot: ExtBot, metrics: MitupMetricsLog
 
     if views:
         # Avoid doing anything at all if there are no messages to send
-        await api.send_messages_to_users(context_or_bot=bot, users=users, views=views, on_success=callbacks)
+        api = build_api(bot)
+        await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
 
     session.exec(delete(Meetup).where(Meetup.id.in_(meeting_ids)))  # type: ignore
     session.exec(delete(User).where(User.id.in_(outside_user_ids)))  # type: ignore

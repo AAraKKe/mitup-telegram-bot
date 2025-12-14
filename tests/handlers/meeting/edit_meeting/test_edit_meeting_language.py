@@ -8,14 +8,8 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture(scope="function")
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_language") as api:
-        yield api
 
 
 @pytest.mark.parametrize(
@@ -29,7 +23,6 @@ async def test_callback_edit_meeting_language(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     """Test that the edit meeting language callback displays the language selection view."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", language="en")
@@ -39,8 +32,7 @@ async def test_callback_edit_meeting_language(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.LANGUAGE_CALLBACK)
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         factory.meeting_set_language_view(meeting=meeting),
     )
@@ -61,7 +53,6 @@ async def test_callback_set_meeting_language(
     new_language_idx: int,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     """Test that setting a meeting language updates the meeting and its messages."""
     # Start with a meeting in English
@@ -89,8 +80,7 @@ async def test_callback_set_meeting_language(
     mock_session.assert_flushed()
 
     # Verify the success message was shown
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         factory.meeting_set_language_view(meeting=meeting).with_context(
             MeetingMessages.LANGUAGE_SET_SUCCESS.get(lang=meeting.user_language)
@@ -98,7 +88,7 @@ async def test_callback_set_meeting_language(
     )
 
     # Verify meeting messages were updated
-    api.assert_update_meeting_messages_called(mock_session, context, meeting)
+    context.api.assert_update_meeting_messages_called(mock_session, meeting)
 
     # Verify feature metric was emitted
     context.metrics_engine.assert_feature_metrics_emitted(Feature.MEETING_LANGUAGE_SET)
@@ -119,7 +109,6 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
     initial_language: str,
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
 ):
     """Test that changing language updates all message keyboards with the new language."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", language=initial_language)
@@ -144,4 +133,4 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
         assert new_keyboard == meeting.build_inline_keyboard()
 
     # Verify meeting messages were updated via API
-    api.assert_update_meeting_messages_called(mock_session, context, meeting)
+    context.api.assert_update_meeting_messages_called(mock_session, meeting)

@@ -15,14 +15,8 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, MockApi, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_location") as api:
-        yield api
 
 
 def failure_cases(callback_data: CallbackData):
@@ -92,7 +86,6 @@ async def test_edit_location_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -100,7 +93,7 @@ async def test_edit_location_works(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_location_view(user_with_settings.meetups[0]))
+    context.api.assert_edit_message_called(update, edit_location_view(user_with_settings.meetups[0]))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(999))], indirect=True)
@@ -117,11 +110,10 @@ async def test_edit_location_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        with MockApi.start("mitup_bot.guards") as _api:
-            context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
-            # For the test case where we don´t fail but log a warning and go to main menu
-            assert "User tried 'Edit location' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
+        # For the test case where we don´t fail but log a warning and go to main menu
+        assert "User tried 'Edit location' with a meeting that does not belong to them." in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     context.metrics_engine.assert_metrics_emited(
         [
@@ -159,8 +151,7 @@ async def test_edit_location_failures(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        with MockApi.start("mitup_bot.guards") as _api:
-            context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
+        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -172,7 +163,6 @@ async def test_edit_location_name_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -190,7 +180,7 @@ async def test_edit_location_name_works(
         ],
     )
 
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationMeetingState.EDIT_LOCATION_NAME
     with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME) as meeting_id:
         assert meeting_id == 1
@@ -210,13 +200,12 @@ async def test_edit_location_name_not_owned(
     # For the test case where we give a meeting that does not belong to the user
     mock_session.add_object(create_meetup(999))
 
-    with MockApi.start("mitup_bot.guards") as _api:
-        with caplog.at_level(logging.WARNING):
-            context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
-            # If the meeting id is not found, check we have ended the conversation
-            assert result is ConversationHandler.END
-            assert "User tried 'Edit location name' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    with caplog.at_level(logging.WARNING):
+        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
+        # If the meeting id is not found, check we have ended the conversation
+        assert result is ConversationHandler.END
+        assert "User tried 'Edit location name' with a meeting that does not belong to them." in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
@@ -253,9 +242,8 @@ async def test_edit_location_name_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    with MockApi.start("mitup_bot.guards") as _api:
-        with caplog.at_level(logging.WARNING):
-            context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
+    with caplog.at_level(logging.WARNING):
+        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
 
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -270,7 +258,6 @@ async def test_edit_location_coordinates_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -288,7 +275,7 @@ async def test_edit_location_coordinates_works(
         ],
     )
 
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationMeetingState.EDIT_LOCATION_COORDIANTES
     with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES) as meeting_id:
         assert meeting_id == 1
@@ -308,13 +295,12 @@ async def test_edit_location_coordinates_not_owned(
     # For the test case where we give a meeting that does not belong to the user
     mock_session.add_object(create_meetup(999))
 
-    with MockApi.start("mitup_bot.guards") as _api:
-        with caplog.at_level(logging.WARNING):
-            context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK)
-            # If the meeting id is not found, check we have ended the conversation
-            assert result is ConversationHandler.END
-            assert "User tried 'Edit location coordinates' with a meeting that does not belong to them." in caplog.text
-            _api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    with caplog.at_level(logging.WARNING):
+        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK)
+        # If the meeting id is not found, check we have ended the conversation
+        assert result is ConversationHandler.END
+        assert "User tried 'Edit location coordinates' with a meeting that does not belong to them." in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
@@ -366,7 +352,6 @@ async def test_edit_location_name_message_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -385,7 +370,7 @@ async def test_edit_location_name_message_works(
 
     assert meeting.location.name == "My Location"
     mock_session.assert_flushed()
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
     # Meeting id has been cleaned from the context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -397,7 +382,6 @@ async def test_edit_location_name_message_fails_if_context_not_saved(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -411,7 +395,7 @@ async def test_edit_location_name_message_fails_if_context_not_saved(
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)
@@ -419,7 +403,6 @@ async def test_edit_location_coordinates_message_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -438,7 +421,7 @@ async def test_edit_location_coordinates_message_works(
 
     assert meeting.location.coordinates == (123.4, 567.8)
     mock_session.assert_flushed()
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
     # Meeting id has been cleaned from the context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
@@ -450,7 +433,6 @@ async def test_edit_location_coordinates_message_fails_if_context_not_saved(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -464,7 +446,7 @@ async def test_edit_location_coordinates_message_fails_if_context_not_saved(
     assert meeting.location.coordinates is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="Message instead of coordinates")], indirect=True)
@@ -472,7 +454,6 @@ async def test_edit_location_coordinates_message_with_wrong_message(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -500,7 +481,7 @@ async def test_edit_location_coordinates_message_with_wrong_message(
 
     assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
     assert result is ConversationMeetingState.EDIT_LOCATION_COORDIANTES
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="Message instead of coordinates")], indirect=True)
@@ -509,7 +490,6 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -521,7 +501,7 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
         assert "User data 'meeting_id' requested but not set" in caplog.text
 
     assert result is ConversationHandler.END
-    api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -531,7 +511,6 @@ async def test_cancel_edit_meeting_location_property_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -539,5 +518,5 @@ async def test_cancel_edit_meeting_location_property_works(
 
     context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_location_view(user_with_settings.meetups[0]))
+    context.api.assert_edit_message_called(update, edit_location_view(user_with_settings.meetups[0]))
     assert result is ConversationHandler.END

@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
@@ -44,7 +44,7 @@ async def callback_edit_meeting_location(session: Session, update: Update, conte
     if meeting is None:
         return
 
-    await api.edit_message(context=context, update=update, view=edit_location_view(meeting))
+    await context.api.edit_message(update=update, view=edit_location_view(meeting))
 
 
 @HandlersRegistry.register_callback_query(
@@ -72,8 +72,7 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
     # Lets keep track of the meeting we are asking the name of the location for
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, callback_data.id)
 
-    await api.send_message(
-        context=context,
+    await context.api.send_message(
         update=update,
         view=MitupView(
             description=MeetingMessages.EDIT_MEETING_LOCATION_NAME.get(lang=user.lang),
@@ -133,8 +132,7 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
     # Lets keep track of the meeting we are asking the name of the location for
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, callback_data.id)
 
-    await api.send_message(
-        context=context,
+    await context.api.send_message(
         update=update,
         view=MitupView(
             description=MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES.get(lang=user.lang),
@@ -167,7 +165,7 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
     meeting.location.name = update.effective_message.text
@@ -177,8 +175,8 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
     response_view = edit_location_view(meeting).with_context(
         MeetingMessages.LOCATION_NAME_SET_SUCCESS.get(name=meeting.location.name)
     )
-    await api.send_message(context=context, update=update, view=response_view)
-    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+    await context.api.send_message(update=update, view=response_view)
+    await context.api.update_meeting_messages(session=session, meeting=meeting)
 
     return ConversationHandler.END
 
@@ -200,7 +198,7 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
     tg_location = update.effective_message.location
@@ -213,8 +211,8 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
     response_view = edit_location_view(meeting).with_context(
         MeetingMessages.LOCATION_COORDINATES_SUCCESS.get(lang=user.lang)
     )
-    await api.send_message(context=context, update=update, view=response_view)
-    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+    await context.api.send_message(update=update, view=response_view)
+    await context.api.update_meeting_messages(session=session, meeting=meeting)
 
     return ConversationHandler.END
 
@@ -242,10 +240,10 @@ async def edit_coordinates_without_location(session: Session, update: Update, co
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
     return ConversationMeetingState.EDIT_LOCATION_COORDIANTES
 
 

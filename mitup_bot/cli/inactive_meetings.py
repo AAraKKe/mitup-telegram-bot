@@ -8,7 +8,8 @@ from sqlmodel import Session, and_, delete, func, literal, null, or_, select, tr
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.ext import ExtBot
 
-from mitup_bot import api, db
+from mitup_bot import db
+from mitup_bot.api_wrapper import build_api
 from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
 
@@ -57,9 +58,9 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
     for meeting in meetings:
         try:
             # Update all messages using the existing API method
+            api = build_api(bot)
             await api.update_meeting_messages(
                 session=session,
-                context_or_bot=bot,
                 meeting=meeting,
                 has_finished=True,
             )

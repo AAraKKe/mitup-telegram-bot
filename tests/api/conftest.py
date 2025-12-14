@@ -1,6 +1,5 @@
 import pytest
 
-from mitup_bot.api import edit_message, send_message
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.views import MitupView
 from mitup_bot.views.mitup_view import ButtonConfig
@@ -16,8 +15,3 @@ def default_view() -> MitupView:
             ],
         ],
     )
-
-
-@pytest.fixture(params=[send_message, edit_message])
-def api_method(request):
-    return request.param

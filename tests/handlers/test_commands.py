@@ -30,12 +30,6 @@ from tests.helpers import MockApi, StubMetrics, StubMitupApp, StubMitupContext, 
 from tests.helpers.stub_db import MockDbSession
 
 
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.commands") as api:
-        yield api
-
-
 class CommandsTestId(HandlerId):
     COMMAND_EXAMPLE = "my_command"
     COMMAND_CUSTOM_NAME = "the_custom_command_name"
@@ -60,7 +54,7 @@ async def test_command_registry_can_register_command_handlers(update: Update):
 
     callback_return = await handler.callback(
         update,
-        MitupContext(mock.MagicMock(), update, MitupMetricsEngine(logger_provider=lambda ep: StubMetrics())),
+        MitupContext(mock.MagicMock(), update, MitupMetricsEngine(logger_provider=lambda ep: StubMetrics()), MockApi()),
     )
     assert callback_return == "Done!"
 
@@ -133,15 +127,13 @@ async def test_command_start_with_new_user(
     mock_session: MockDbSession,
     update: Update,
     app: StubMitupApp,
-    api: MockApi,
 ):
     context, result = await call_handler(update, app, RegistrationProcessHandlerId.TIMEZONE_COMMAND)
 
     assert update.effective_user is not None
 
     mock_session.assert_added()
-    api.assert_send_message_called(
-        context,
+    context.api.assert_send_message_called(
         update,
         SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=update.effective_user.first_name),
     )
@@ -172,7 +164,6 @@ async def test_commands_to_show_main_menu(
     command: Callable[[Update, MitupContext], Awaitable[None]],
     update: Update,
     context: StubMitupContext,
-    api: MockApi,
     user_with_settings: User,
     mock_session: MockDbSession,
 ):
@@ -181,4 +172,4 @@ async def test_commands_to_show_main_menu(
     await command(update, context)
 
     expected_view = main_menu_view(lang=user_with_settings.lang)
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)

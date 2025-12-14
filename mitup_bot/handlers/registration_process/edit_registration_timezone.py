@@ -5,7 +5,7 @@ from sqlmodel import Session
 from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards, timezone_api
+from mitup_bot import guards, timezone_api
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import EffectiveUserNotSet
@@ -42,7 +42,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
     session.add(user)
     message = SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=user.first_name)
 
-    await api.send_message(context=context, update=update, view=message)
+    await context.api.send_message(update=update, view=message)
 
     context.put_feature_metric(Feature.NEW_LANDING)
     return ConversationRegistrationProcessState.TIMEZONE
@@ -62,8 +62,8 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
         logging.warning(f"The user {user.db_id} tried to set a timezone {address} that is not correct. Trying again")
 
-        await api.send_message(
-            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
+        await context.api.send_message(
+            update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
         )
 
         context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
@@ -78,7 +78,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.main_menu_view(lang=user.lang).with_context(message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     context.put_feature_metric(Feature.NEW_USER_REGISTERED)
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=0)
@@ -99,8 +99,8 @@ async def registration_timezone_location_message_handler(session: Session, updat
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
         logging.warning(f"The user {user.db_id} tried to set a location {location} that is not correct. Trying again")
 
-        await api.send_message(
-            context=context, update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
+        await context.api.send_message(
+            update=update, view=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang)
         )
 
         context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=1)
@@ -114,7 +114,7 @@ async def registration_timezone_location_message_handler(session: Session, updat
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.main_menu_view(lang=user.lang).with_context(message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     context.put_feature_metric(Feature.NEW_USER_REGISTERED)
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=0)

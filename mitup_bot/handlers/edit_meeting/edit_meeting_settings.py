@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
@@ -35,7 +35,7 @@ async def callback_query_edit_meeting_settings(session: Session, update: Update,
             context=context,
         )
     ) is not None:
-        await api.edit_message(context=context, update=update, view=meeting.settings_view)
+        await context.api.edit_message(update=update, view=meeting.settings_view)
 
 
 @asynccontextmanager
@@ -63,12 +63,11 @@ async def toggle_meeting_setting(
         yield meeting
         session.flush()
 
-        await api.edit_message(context=context, update=update, view=meeting.settings_view)
+        await context.api.edit_message(update=update, view=meeting.settings_view)
         # Update all messages to ensure any visible message contains the new changes but skip current one
         # if preseento to stay in the settings view.
-        await api.update_meeting_messages(
+        await context.api.update_meeting_messages(
             session=session,
-            context_or_bot=context,
             meeting=meeting,
             current_message=meeting.message_from_update(update),
             skip_current=True,

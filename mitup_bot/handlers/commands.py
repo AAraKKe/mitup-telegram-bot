@@ -3,7 +3,7 @@ from enum import auto
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handler_id import HandlerId
@@ -27,7 +27,7 @@ async def command_start_with_existing_user(session: Session, update: Update, con
     user = guards.current_user(update, session)
     view = views.factory.main_menu_view(lang=user.lang)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
 
 @HandlersRegistry.register_command(CommandsId.MAIN_MENU, command="main_menu")

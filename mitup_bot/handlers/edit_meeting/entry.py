@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
@@ -42,7 +42,7 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
         return
 
     # Only allow editing the meeting if the meeting belongs to the user
-    await api.edit_message(context=context, update=update, view=meeting.edit_view)
+    await context.api.edit_message(update=update, view=meeting.edit_view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -62,7 +62,7 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
         # Cleanup, log error and end possible conversation
         cleanup_states(context)
         logging.error(exc)
-        await api.edit_message(context=context, update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
     logging.debug(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
@@ -71,7 +71,7 @@ async def cancel_edit_meeting(session: Session, update: Update, context: MitupCo
     if meetup is None:
         return ConversationHandler.END
 
-    await api.edit_message(context=context, update=update, view=meetup.edit_view)
+    await context.api.edit_message(update=update, view=meetup.edit_view)
 
     # Cleanup any possible state set by any handler related with editing the meeting
     cleanup_states(context)

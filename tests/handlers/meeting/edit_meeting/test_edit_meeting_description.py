@@ -14,14 +14,8 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import MockApi, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import StubMitupApp, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_description") as api:
-        yield api
 
 
 @pytest.mark.parametrize(
@@ -44,7 +38,6 @@ async def test_callback_query_edit_meeting_description_works(
     update: Update,
     expected_description: Callable[[str], str],
     user_with_settings: User,
-    api: MockApi,
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -75,7 +68,7 @@ async def test_callback_query_edit_meeting_description_works(
         ],
     )
 
-    api.assert_edit_message_called(context, update, view)
+    context.api.assert_edit_message_called(update, view)
     assert result == ConversationMeetingState.EDIT_DESCRIPTION
 
 

@@ -3,7 +3,7 @@ import logging
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import InvalidLanguageError
@@ -24,7 +24,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
 
     view = views.factory.settings_set_language_view(lang=user.lang)
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_LANGUAGE)
@@ -49,4 +49,4 @@ async def callback_query_set_timezone(session: Session, update: Update, context:
         SettingsMessages.LANGUAGE_SET_SUCCESS.get(lang=new_language)
     )
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)

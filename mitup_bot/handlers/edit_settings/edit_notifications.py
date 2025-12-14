@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
@@ -50,7 +50,7 @@ def edit_notification_view(user: User) -> MitupView:
 async def callback_query_notifications(session: Session, update: Update, context: MitupContext):
     user = guards.current_user(update, session)
 
-    await api.edit_message(context=context, update=update, view=edit_notification_view(user))
+    await context.api.edit_message(update=update, view=edit_notification_view(user))
 
 
 @HandlersRegistry.register_callback_query(
@@ -64,7 +64,7 @@ async def callback_query_toggle_notifications(session: Session, update: Update, 
     user.settings.notification = not user.settings.notification
     session.flush()
 
-    await api.edit_message(context=context, update=update, view=edit_notification_view(user))
+    await context.api.edit_message(update=update, view=edit_notification_view(user))
 
 
 @HandlersRegistry.register_callback_query(
@@ -79,7 +79,7 @@ async def callback_query_set_notification_time(session: Session, update: Update,
         lang=user.lang, message=message, callback_data=cb.EDIT_NOTIFICATIONS
     )
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationSettingsState.NOTIFICATION_TIME
 
@@ -102,7 +102,7 @@ async def settings_notification_time_text_message_handler(session: Session, upda
     )
     view = edit_notification_view(user).with_context(message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationHandler.END
 
@@ -119,7 +119,7 @@ async def settings_notification_time_invalid_input_handler(session: Session, upd
         lang=user.lang, message=message, callback_data=cb.EDIT_NOTIFICATIONS
     )
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationSettingsState.NOTIFICATION_TIME
 

@@ -4,7 +4,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
@@ -24,7 +24,7 @@ async def callback_query_timeout(session: Session, update: Update, context: Mitu
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationSettingsState.TIMEOUT
 
@@ -45,7 +45,7 @@ async def settings_timeout_text_message_handler(session: Session, update: Update
     message = SettingsMessages.TIMEOUT_SET_SUCCESS.get(lang=user.lang, timeout=user.settings.timeout)
     view = views.factory.settings_view(lang=user.lang, message=message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationHandler.END
 
@@ -58,7 +58,7 @@ async def settings_timeout_invalid_input_handler(session: Session, update: Updat
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     return ConversationSettingsState.TIMEOUT
 

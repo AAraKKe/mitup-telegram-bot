@@ -7,13 +7,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import MockApi, MockDbSession, StubMitupApp, UpdateRequest, call_handler, telegram_user_from_user
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_settings.edit_notifications") as api:
-        yield api
+from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler, telegram_user_from_user
 
 
 def expected_view(user: User, notifications_enabled: bool, notifications_time: int) -> MitupView:
@@ -53,7 +47,6 @@ async def test_callback_query_notifications(
     user_with_settings: User,
     update: Update,
     app: StubMitupApp,
-    api: MockApi,
     notifications_enabled: bool,
 ):
     user_with_settings.settings.notification = notifications_enabled
@@ -61,8 +54,7 @@ async def test_callback_query_notifications(
 
     context, result = await call_handler(update, app, EditSettingsHandlerId.NOTIFICATIONS_CALLBACK)
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         expected_view(user_with_settings, notifications_enabled, user_with_settings.settings.notification_time),
     )
@@ -80,7 +72,6 @@ async def test_callback_query_toggle_notifications(
     user_with_settings: User,
     update: Update,
     app: StubMitupApp,
-    api: MockApi,
     notifications_enabled: bool,
 ):
     user_with_settings.settings.notification = notifications_enabled
@@ -91,8 +82,7 @@ async def test_callback_query_toggle_notifications(
     user_with_settings.settings.notification = not notifications_enabled
     mock_session.assert_flushed()
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         expected_view(user_with_settings, not notifications_enabled, user_with_settings.settings.notification_time),
     )
@@ -101,7 +91,7 @@ async def test_callback_query_toggle_notifications(
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SET_NOTIFICATION_TIME)], indirect=True)
 async def test_callback_query_set_notification_time(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -113,13 +103,13 @@ async def test_callback_query_set_notification_time(
         callback_data=cb.EDIT_NOTIFICATIONS,
     )
 
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
     assert result == ConversationSettingsState.NOTIFICATION_TIME
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="10")], indirect=True)
 async def test_settings_notification_time_text_message_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -133,7 +123,7 @@ async def test_settings_notification_time_text_message_handler(
 
     mock_session.assert_flushed()
     assert user_with_settings.settings.notification_time == 10
-    api.assert_send_message_called(context, update, expected_success_view)
+    context.api.assert_send_message_called(update, expected_success_view)
     assert result == ConversationHandler.END
 
 
@@ -144,7 +134,7 @@ async def test_settings_notification_time_text_message_handler(
     indirect=True,
 )
 async def test_settings_notification_time_invalid_input_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -174,7 +164,7 @@ async def test_settings_notification_time_invalid_input_handler(
         message=SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user_with_settings.lang),
         callback_data=cb.EDIT_NOTIFICATIONS,
     )
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
 
     # After failing we should still be on the proper state, send now a valid message
     assert update.effective_message is not None

@@ -3,7 +3,7 @@ import logging
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
@@ -61,4 +61,4 @@ async def callback_query_show_meetings(session: Session, update: Update, context
             ),
         )
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)

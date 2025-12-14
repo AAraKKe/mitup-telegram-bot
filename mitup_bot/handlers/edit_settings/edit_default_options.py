@@ -1,7 +1,6 @@
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.guards import current_user
@@ -18,9 +17,8 @@ from .entry import EditSettingsHandlerId
 async def callback_query_edit_default_meeting_options(session: Session, update: Update, context: MitupContext):
     user = current_user(update, session)
 
-    await api.edit_message(
+    await context.api.edit_message(
         update=update,
-        context=context,
         view=user.settings.default_meeting_settings_view(),
     )
 
@@ -34,8 +32,7 @@ async def callback_query_toggle_default_waiting_list(session: Session, update: U
     user.settings.default_waiting_list = not user.settings.default_waiting_list
     session.flush()
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=user.settings.default_meeting_settings_view(),
     )
@@ -48,9 +45,8 @@ async def callback_query_toggle_default_public(session: Session, update: Update,
     user.settings.default_public = not user.settings.default_public
     session.flush()
 
-    await api.edit_message(
+    await context.api.edit_message(
         update=update,
-        context=context,
         view=user.settings.default_meeting_settings_view(),
     )
 
@@ -64,9 +60,8 @@ async def callback_query_toggle_default_invitations(session: Session, update: Up
     user.settings.default_allow_invitation = not user.settings.default_allow_invitation
     session.flush()
 
-    await api.edit_message(
+    await context.api.edit_message(
         update=update,
-        context=context,
         view=user.settings.default_meeting_settings_view(),
     )
 
@@ -80,9 +75,8 @@ async def callback_query_toggle_default_incognito(session: Session, update: Upda
     user.settings.default_incognito = not user.settings.default_incognito
     session.flush()
 
-    await api.edit_message(
+    await context.api.edit_message(
         update=update,
-        context=context,
         view=user.settings.default_meeting_settings_view(),
     )
 
@@ -96,8 +90,7 @@ async def callback_query_toggle_default_show_timezone(session: Session, update: 
     user.settings.default_show_timezone = not user.settings.default_show_timezone
     session.flush()
 
-    await api.edit_message(
+    await context.api.edit_message(
         update=update,
-        context=context,
         view=user.settings.default_meeting_settings_view(),
     )

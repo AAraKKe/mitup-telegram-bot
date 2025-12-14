@@ -8,7 +8,6 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from tests.helpers import (
     HandlerContext,
-    MockApi,
     MockDbSession,
     UpdateRequest,
     call_handler,
@@ -16,12 +15,6 @@ from tests.helpers import (
     create_meetup,
     create_user,
 )
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.join_leave") as api:
-        yield api
 
 
 @pytest.fixture
@@ -43,7 +36,6 @@ async def test_user_joins_waiting_list_with_full_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
     is_full: bool,
     response: MeetingMessages,
 ):
@@ -65,17 +57,15 @@ async def test_user_joins_waiting_list_with_full_meeting(
     mock_session.assert_flushed()
 
     # The user has been notified
-    api.assert_answer_callback_query_called(
-        context=context,
+    context.api.assert_answer_callback_query_called(
         update=handler_context.update,
         text=response.get(lang=user_with_settings.lang, plain=True),
         show_alert=False,
     )
 
     # All messages have been updated
-    api.assert_update_meeting_messages_called(
+    context.api.assert_update_meeting_messages_called(
         session=mock_session,
-        context=context,
         meeting=full_meeting,
         current_message=full_meeting.message_from_update(handler_context.update),
     )
@@ -87,7 +77,6 @@ async def test_user_leaves_and_waiting_list_promotes(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     # Setup the meeting to have a second user on the waiting list and user with settings is going to leave
     full_meeting.max_members = 2
@@ -118,8 +107,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     mock_session.assert_flushed()
 
     # The user who was promoted has been notified
-    api.assert_send_to_user_called(
-        context=context,
+    context.api.assert_send_to_user_called(
         user=second_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=second_user.lang, meeting_title=full_meeting.title
@@ -133,7 +121,6 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     # Setup the meeting to have two users on the waiting list and user with settings is going to leave
     full_meeting.max_members = 2
@@ -186,8 +173,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     mock_session.assert_flushed()
 
     # The user who was promoted has been notified
-    api.assert_send_to_user_called(
-        context=context,
+    context.api.assert_send_to_user_called(
         user=second_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
@@ -201,7 +187,6 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
-    api: MockApi,
 ):
     # Setup the meeting to have three users on the waiting list and user with settings is going to leave
     full_meeting.max_members = 3
@@ -240,16 +225,14 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     mock_session.assert_flushed()
 
     # The users who were promoted have been notified
-    api.assert_send_to_user_called(
-        context=context,
+    context.api.assert_send_to_user_called(
         user=first_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,
     )
-    api.assert_send_to_user_called(
-        context=context,
+    context.api.assert_send_to_user_called(
         user=second_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=second_waiting_user.lang, meeting_title=full_meeting.title

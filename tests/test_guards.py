@@ -32,14 +32,8 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
-from tests.helpers import MockApi, StubMitupContext, UpdateRequest, create_meetup
+from tests.helpers import StubMitupContext, UpdateRequest, create_meetup
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.guards") as api:
-        yield api
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
@@ -98,7 +92,6 @@ async def test_meeting_accesible_works_with_a_meeting_that_belong_to_an_user(
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
-    api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -110,8 +103,8 @@ async def test_meeting_accesible_works_with_a_meeting_that_belong_to_an_user(
         assert user_with_settings.meetups[0] == result
         assert caplog.text == ""
 
-    api.assert_edit_message_not_called()
-    api.assert_send_message_not_called()
+    context.api.assert_edit_message_not_called()
+    context.api.assert_send_message_not_called()
 
 
 @pytest.mark.parametrize(
@@ -135,7 +128,6 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
     context: StubMitupContext,
     user_with_settings: User,
     keyboard: Callable[[str], Keyboard | None],
-    api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -157,8 +149,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
         assert "Meeting id: 999, user id: 1" in caplog.text
         assert result is None
 
-        api.assert_edit_message_called(
-            context,
+        context.api.assert_edit_message_called(
             update,
             MitupView(
                 description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
@@ -180,7 +171,6 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
-    api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
     meeting = create_meetup(999, "Meeting!", description="Description")
@@ -196,7 +186,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
         assert "Meeting id: 999, user id: 1" in caplog.text
         assert result is None
 
-        api.assert_edit_message_called(context, update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
         context.metrics_engine.assert_metrics_emited(
             [MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT]
         )

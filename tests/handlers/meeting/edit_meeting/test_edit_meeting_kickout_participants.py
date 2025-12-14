@@ -10,7 +10,6 @@ from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views.factory import confirmation_view
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
-    MockApi,
     StubMitupApp,
     UpdateRequest,
     call_handler,
@@ -19,12 +18,6 @@ from tests.helpers import (
     create_user,
 )
 from tests.helpers.stub_db import MockDbSession
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_meeting.edit_meeting_location") as api:
-        yield api
 
 
 def participants_list(num_participants: int):
@@ -93,7 +86,6 @@ def prepare_meeting(mock_session: MockDbSession, user_with_settings: User):
 async def test_edit_meeting_kickout_participants_sends_list_of_participants(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
     page_number: int,
@@ -103,8 +95,7 @@ async def test_edit_meeting_kickout_participants_sends_list_of_participants(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK)
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         kick_out_users_view(
             meeting=user_with_settings.meetups[0],
@@ -113,7 +104,7 @@ async def test_edit_meeting_kickout_participants_sends_list_of_participants(
         ),
     )
 
-    actual_view: MitupView = api.edit_message_mock.call_args_list[0].kwargs["view"]
+    actual_view: MitupView = context.api.call_args_list("edit_message")[0].kwargs["view"]
     all_buttons_text = {button.text for row in actual_view.keyboard for button in row}
     # Current user is not present in the button list
     assert "joined_user_1" not in all_buttons_text
@@ -130,7 +121,6 @@ async def test_edit_meeting_kickout_participants_sends_list_of_participants(
 async def test_edit_meeting_kickout_participants_ignores_waiting_list(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -143,7 +133,9 @@ async def test_edit_meeting_kickout_participants_ignores_waiting_list(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK)
 
-    actual_view = api.edit_message_mock.call_args_list[0].kwargs["view"]
+    args_list = context.api.call_args_list("edit_message")
+    assert len(args_list) == 1
+    actual_view = args_list[0].kwargs["view"]
     all_buttons_text = {button.text for row in actual_view.keyboard for button in row}
     assert "joined_user_13" not in all_buttons_text
     assert "joined_user_14" not in all_buttons_text
@@ -155,7 +147,6 @@ async def test_edit_meeting_kickout_participants_ignores_waiting_list(
 async def test_edit_meeting_kickout_participants_with_no_participants(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -164,7 +155,7 @@ async def test_edit_meeting_kickout_participants_with_no_participants(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK)
 
-    api.assert_edit_message_called(context, update, edit_participants_view(user_with_settings.meetups[0]))
+    context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[0]))
 
 
 @pytest.mark.parametrize(
@@ -175,14 +166,12 @@ async def test_edit_meeting_kickout_participants_with_no_participants(
 async def test_edit_meeting_kickout_given_participant(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK)
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         confirmation_view(
             lang=user_with_settings.lang,
@@ -203,14 +192,12 @@ async def test_edit_meeting_kickout_given_participant(
 async def test_edit_meeting_kickout_participant_no_longer_in_meeting(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK)
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         edit_participants_view(user_with_settings.meetups[0]).with_context(
             MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING.get(lang=user_with_settings.lang)
@@ -226,7 +213,6 @@ async def test_edit_meeting_kickout_participant_no_longer_in_meeting(
 async def test_edit_meeting_kickout_participant_confirm(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -246,8 +232,7 @@ async def test_edit_meeting_kickout_participant_confirm(
         MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
     )
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         expected_view,
     )
@@ -257,9 +242,8 @@ async def test_edit_meeting_kickout_participant_confirm(
     assert "joined_user_10" not in all_buttons_text
 
     # Kickout should trigger meeting messages update
-    api.assert_update_meeting_messages_called(
+    context.api.assert_update_meeting_messages_called(
         session=mock_session,
-        context=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -274,7 +258,6 @@ async def test_edit_meeting_kickout_participant_confirm(
 async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -298,11 +281,10 @@ async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
         MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
     )
 
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
 
     # The promoted user has been notified
-    api.assert_send_to_user_called(
-        context=context,
+    context.api.assert_send_to_user_called(
         user=participant_in_waiting_list.user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=participant_in_waiting_list.user.lang, meeting_title=meeting.title
@@ -318,7 +300,6 @@ async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
 async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -330,8 +311,7 @@ async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
 
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK)
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         edit_participants_view(meeting).with_context(
             MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS.get(
@@ -349,15 +329,13 @@ async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
 async def test_edit_meeting_kickout_participant_confirm_no_longer_in_meeting(
     user_with_settings: User,
     app: StubMitupApp,
-    api: MockApi,
     mock_session: MockDbSession,
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
     context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK)
 
-    api.assert_edit_message_called(
-        context,
+    context.api.assert_edit_message_called(
         update,
         edit_participants_view(user_with_settings.meetups[0]).with_context(
             MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING.get(lang=user_with_settings.lang)

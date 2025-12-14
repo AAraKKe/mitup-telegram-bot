@@ -17,7 +17,7 @@ from tests.helpers.stub_db import MockDbSession
         (UpdateRequest(inline_query="789"), 789, False, False, False),
     ],
     indirect=["update"],
-    ids=["owned_meeting", "public_non_owned", "private_non_owned"],
+    ids=["owned_meeting", "public_non_owned", "private_not_owned"],
 )
 async def test_share_meeting(
     update: Update,
@@ -40,14 +40,14 @@ async def test_share_meeting(
     mock_session.add_object(meetup)
     mock_session.commit()
 
-    await call_handler(update, app, InlineQueryId.SHARE_MEETING)
+    context, _ = await call_handler(update, app, InlineQueryId.SHARE_MEETING)
 
     if should_share:
-        assert app.bot.answer_inline_query.called
-        args, kwargs = app.bot.answer_inline_query.call_args
+        context.api.assert_method_just_called("answer_inline_query")
+        args, kwargs = context.api.call_args("answer_inline_query")
         results = kwargs.get("results")
         assert results is not None
         assert len(results) == 1
         assert results[0].id == str(meeting_id)
     else:
-        assert not app.bot.answer_inline_query.called
+        context.api.assert_method_just_called("answer_inline_query", times=0)

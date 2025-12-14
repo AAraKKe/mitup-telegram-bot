@@ -3,7 +3,7 @@ import logging
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -52,7 +52,7 @@ async def edit_meeting_kickout_participants(session: Session, update: Update, co
     participants = [participant for participant in meeting.participants if participant.user.db_id != current_user.db_id]
 
     if not participants:
-        await api.edit_message(context=context, update=update, view=edit_participants_view(meeting))
+        await context.api.edit_message(update=update, view=edit_participants_view(meeting))
         return
 
     # Use a paginated view in case there are many participants so it does not turn into
@@ -63,7 +63,7 @@ async def edit_meeting_kickout_participants(session: Session, update: Update, co
         current_user=current_user,
     )
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -113,8 +113,7 @@ async def edit_meeting_kickout_participant(session: Session, update: Update, con
     )
     decline_callback_data = cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=meeting.db_id, id=1)
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=factory.confirmation_view(
             lang=current_user.lang,
@@ -128,8 +127,7 @@ async def edit_meeting_kickout_participant(session: Session, update: Update, con
 
 async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, context: MitupContext, current_user: User):
     participant_no_longer_exists = MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING.get(lang=current_user.lang)
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=edit_participants_view(meeting).with_context(participant_no_longer_exists),
     )
@@ -190,17 +188,15 @@ async def edit_meeting_kickout_participant_confirm(session: Session, update: Upd
         MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=participant.user.lang, meeting_title=meeting.title)
         for participant in promoted_participants
     ]
-    await api.send_messages_to_users(
-        context_or_bot=context,
+    await context.api.send_messages_to_users(
         users=users_to_notify,
         views=views_to_send,
     )
 
     # After all has been taken care of, we need to update all messages for the meeting
     # Avoid editing current message since we have done that already
-    await api.update_meeting_messages(
+    await context.api.update_meeting_messages(
         session=session,
-        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -215,8 +211,7 @@ async def kickout_user_to_edit_participants(
     success_message = MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS.get(
         lang=current_user.lang, participant=participant.user.inline_name
     )
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=edit_participants_view(meeting).with_context(success_message),
     )
@@ -229,8 +224,7 @@ async def kickout_user_to_kickout_participants(
     success_message = MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS.get(
         lang=current_user.lang, participant=participant.user.inline_name
     )
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=kick_out_users_view(meeting=meeting, current_user=current_user, page_number=1).with_context(
             success_message

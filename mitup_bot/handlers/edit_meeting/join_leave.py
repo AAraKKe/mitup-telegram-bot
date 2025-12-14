@@ -3,7 +3,7 @@ from collections.abc import Awaitable, Callable
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -78,8 +78,7 @@ async def handle_non_existing_user_join(session: Session, update: Update, contex
     """
     user = register_default_user(session, update)
     await user_joins_meeting(session, update, context, user, with_notification=False)
-    await api.answer_callback_query(
-        context=context,
+    await context.api.answer_callback_query(
         update=update,
         text=MeetingMessages.JOINED_MEETING_UNREGISTERED.get(plain=True),
         show_alert=True,
@@ -117,8 +116,7 @@ async def user_leaves_meeting(
                     for user in promoted_users
                 ]
 
-                await api.send_messages_to_users(
-                    context_or_bot=context,
+                await context.api.send_messages_to_users(
                     users=promoted_users,
                     views=views_to_send,
                 )
@@ -137,8 +135,7 @@ async def handle_non_existing_user_leave(session: Session, update: Update, conte
     """
     user = register_default_user(session, update)
     await user_leaves_meeting(session, update, context, user, with_notification=False)
-    await api.answer_callback_query(
-        context=context,
+    await context.api.answer_callback_query(
         update=update,
         text=MeetingMessages.LEFT_MEETING_UNREGISTERED.get(plain=True),
         show_alert=True,
@@ -165,8 +162,7 @@ async def handle_join_leave_operation(
         notification_key = await operation(meeting, user)
 
         if with_notification:
-            await api.answer_callback_query(
-                context=context,
+            await context.api.answer_callback_query(
                 update=update,
                 text=notification_key.get(lang=user.lang, plain=True),
                 show_alert=False,
@@ -174,13 +170,9 @@ async def handle_join_leave_operation(
 
         session.flush()
 
-        await api.update_meeting_messages(
-            session=session, context_or_bot=context, meeting=meeting, current_message=current_message
-        )
+        await context.api.update_meeting_messages(session=session, meeting=meeting, current_message=current_message)
     else:
         # The meeting was not found, update the message to inform the user
         # This should never happen because when the meeting is deleted all messages are updated
-        await api.edit_message(
-            context=context, update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang)
-        )
+        await context.api.edit_message(update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang))
         context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_dimensions=False)

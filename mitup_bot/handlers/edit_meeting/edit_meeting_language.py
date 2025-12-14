@@ -1,7 +1,7 @@
 from sqlmodel import Session
 from telegram import Update
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -28,8 +28,7 @@ async def callback_edit_meeting_language(session: Session, update: Update, conte
     if meeting is None:
         return
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=views.factory.meeting_set_language_view(meeting=meeting),
     )
@@ -60,8 +59,7 @@ async def callback_set_meeting_language(session: Session, update: Update, contex
         message.buttons.keyboard = meeting.build_inline_keyboard()
     session.flush()
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=views.factory.meeting_set_language_view(meeting=meeting).with_context(
             MeetingMessages.LANGUAGE_SET_SUCCESS.get(lang=meeting.user_language)
@@ -69,6 +67,6 @@ async def callback_set_meeting_language(session: Session, update: Update, contex
     )
 
     # Since the language has changed, we need to update the messages of the meeting
-    await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+    await context.api.update_meeting_messages(session=session, meeting=meeting)
 
     context.put_feature_metric(Feature.MEETING_LANGUAGE_SET)

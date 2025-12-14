@@ -23,7 +23,8 @@ __all__ = [
     "telegram_user_from_user",
 ]
 
-from .types import AnyFloat, StubMitupApp, StubMitupContext, DEFAULT_CURRENT_MESSAGE, CliRunner
+from .constants import DEFAULT_CURRENT_MESSAGE
+from .types import AnyFloat, StubMitupApp, StubMitupContext, CliRunner
 from .monitoring import StubMetrics, StubMetricsEngine
 from .context import build_context, call_handler
 from .api import MockApi

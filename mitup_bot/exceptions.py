@@ -65,9 +65,9 @@ class ContextPropertyNotSetError(ValueError): ...
 
 
 class ContextPropertyConversionError(ValueError):
-    def __init__(self, context: str, property: str, value: str):
+    def __init__(self, context: str, property: str, value: str | int | bool, expected_type: type):
         super().__init__(
-            f"Failed to convert property {property!r} in context {context!r} to the expected type. "
+            f"Failed to convert property {property!r} in context {context!r} to the expected type {expected_type!r}. "
             f"Value received: {value!r}"
         )
 

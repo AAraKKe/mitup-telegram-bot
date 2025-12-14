@@ -7,7 +7,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards
+from mitup_bot import guards
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -68,8 +68,7 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
         f"Callback date: {callback_data.date}"
     )
 
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=factory.edit_meeting_date_view(
             lang=user.lang,
@@ -108,10 +107,9 @@ async def callback_delete_date_time(session: Session, update: Update, context: M
     session.flush()
 
     view = meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=user.lang))
-    await api.edit_message(context=context, update=update, view=view)
-    await api.update_meeting_messages(
+    await context.api.edit_message(update=update, view=view)
+    await context.api.update_meeting_messages(
         session=session,
-        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -146,10 +144,9 @@ async def handle_first_datetime_set(
         ),
         keyboard=[keyboard],
     )
-    await api.edit_message(context=context, update=update, view=view)
-    await api.update_meeting_messages(
+    await context.api.edit_message(update=update, view=view)
+    await context.api.update_meeting_messages(
         session=session,
-        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -169,16 +166,14 @@ async def handle_datetime_update(
     session.flush()
 
     # Once the date has been updated, send back to edit the edit meeting view
-    await api.edit_message(
-        context=context,
+    await context.api.edit_message(
         update=update,
         view=meeting.edit_view.with_context(
             MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=meeting.full_str_datetime)
         ),
     )
-    await api.update_meeting_messages(
+    await context.api.update_meeting_messages(
         session=session,
-        context_or_bot=context,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -253,7 +248,7 @@ async def callback_set_meeting_time(session: Session, update: Update, context: M
         ],
     )
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationMeetingState.EDIT_TIME
 
@@ -276,8 +271,7 @@ async def set_time_message(session: Session, update: Update, context: MitupConte
     # If the time is not valid (hour or minutes are not in the valid range), ask the user to send a valid time
     if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
         current_user = guards.current_user(update, session)
-        await api.send_message(
-            context=context,
+        await context.api.send_message(
             update=update,
             view=MeetingMessages.INVALID_TIME.get(lang=current_user.settings.language),
         )
@@ -311,8 +305,8 @@ async def set_time_message(session: Session, update: Update, context: MitupConte
             )
         )
 
-        await api.send_message(context=context, update=update, view=view)
-        await api.update_meeting_messages(session=session, context_or_bot=context, meeting=meeting)
+        await context.api.send_message(update=update, view=view)
+        await context.api.update_meeting_messages(session=session, meeting=meeting)
 
         return ConversationHandler.END
 
@@ -323,8 +317,7 @@ async def fallback_answer(session: Session, update: Update, context: MitupContex
     """
     current_user = guards.current_user(update, session)
 
-    await api.send_message(
-        context=context,
+    await context.api.send_message(
         update=update,
         view=MeetingMessages.WRONG_TIME_FORMAT.get(lang=current_user.settings.language),
     )

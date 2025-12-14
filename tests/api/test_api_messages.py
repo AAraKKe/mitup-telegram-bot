@@ -1,4 +1,3 @@
-from typing import cast
 from unittest import mock
 
 import pytest
@@ -6,19 +5,30 @@ from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.error import BadRequest
 
-from mitup_bot.api import (
+from mitup_bot.api_wrapper import (
     EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS,
     MESSAGE_NOT_FOUND_ERROR_PATTERNS,
-    edit_message,
-    send_message,
-    update_meeting_messages,
+    TelegramApi,
 )
-from mitup_bot.exceptions import EffectiveChatNotSet, NoMessageAvailable
+from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
-from tests.helpers import AnyFloat, MockDbSession, StubMitupContext, UpdateRequest, create_meetup
+from tests.helpers import AnyFloat, MockDbSession, StubMitupContext, create_meetup
+from tests.helpers.context import build_context
+
+
+@pytest.fixture
+def context(app, update):
+    """Override the global context fixture and inject real API wrapper."""
+    context = build_context(update, app)
+    # We want to test the real wrapper here, not the mock
+    api = TelegramApi()
+    api.adapter = context
+    # Ignoring the type below because the context type is expected to use mock api
+    # but in this case we want to use the real one
+    context.api = api  # type: ignore
+    return context
 
 
 async def assert_time_metric_emitted(context: StubMitupContext):
@@ -32,8 +42,7 @@ async def assert_time_metric_emitted(context: StubMitupContext):
     )
 
 
-async def test_edit_message_without_message_available(context: StubMitupContext, update: Update):
-    context = mock.AsyncMock()
+async def test_edit_message_without_message_available(context: StubMitupContext):
     update = mock.MagicMock()
 
     message = "Hello, World"
@@ -41,11 +50,10 @@ async def test_edit_message_without_message_available(context: StubMitupContext,
     update.callback_query = None
 
     with pytest.raises(NoMessageAvailable):
-        await edit_message(context=context, update=update, view=message)
+        await context.api.edit_message(update=update, view=message)
 
 
-async def test_edit_message_without_inline_message_id(context: StubMitupContext, update: Update):
-    context = mock.AsyncMock()
+async def test_edit_message_without_inline_message_id(context: StubMitupContext):
     update = mock.MagicMock()
 
     message = "Hello, World"
@@ -53,13 +61,13 @@ async def test_edit_message_without_inline_message_id(context: StubMitupContext,
     update.callback_query.inline_message_id = None
 
     with pytest.raises(NoMessageAvailable):
-        await edit_message(context=context, update=update, view=message)
+        await context.api.edit_message(update=update, view=message)
 
 
 async def test_send_message_with_a_view(context: StubMitupContext, update: Update, default_view: MitupView):
     assert context.telegram_update.effective_chat is not None
 
-    await send_message(context=cast(TMitupContext, context), update=update, view=default_view)
+    await context.api.send_message(update=update, view=default_view)
 
     context.bot.send_message.assert_called_once_with(
         chat_id=context.telegram_update.effective_chat.id,
@@ -73,7 +81,7 @@ async def test_send_message_with_a_view(context: StubMitupContext, update: Updat
 async def test_send_message_without_view(context: StubMitupContext, update: Update):
     assert context.telegram_update.effective_chat is not None
 
-    await send_message(context=cast(TMitupContext, context), update=update, view="Hello, World")
+    await context.api.send_message(update=update, view="Hello, World")
 
     context.bot.send_message.assert_called_once_with(
         chat_id=context.telegram_update.effective_chat.id, text="Hello, World", reply_markup=None
@@ -85,7 +93,7 @@ async def test_send_message_without_view(context: StubMitupContext, update: Upda
 async def test_edit_message_with_a_view(default_view: MitupView, update: Update, context: StubMitupContext):
     assert update.effective_message is not None
 
-    await edit_message(context=cast(TMitupContext, context), update=update, view=default_view)
+    await context.api.edit_message(update=update, view=default_view)
 
     context.bot.edit_message_text.assert_called_once_with(
         text=default_view.description,
@@ -99,21 +107,13 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
 
 
 async def test_edit_message_without_view(update: Update, context: StubMitupContext):
-    await edit_message(context=cast(TMitupContext, context), update=update, view="Hello, World")
+    await context.api.edit_message(update=update, view="Hello, World")
 
     context.bot.edit_message_text.assert_called_once_with(
         text="Hello, World", chat_id=123, message_id=123, inline_message_id=None, reply_markup=None
     )
 
     await assert_time_metric_emitted(context)
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(message=False)], indirect=True)
-async def test_send_message_fails_without_effective_chat(
-    default_view: MitupView, update: Update, context: StubMitupContext
-):
-    with pytest.raises(EffectiveChatNotSet):
-        await send_message(context=cast(TMitupContext, context), update=update, view=default_view)
 
 
 async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession):
@@ -128,7 +128,7 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
     # Message in the chat of someone who is not the owner
     meeting.messages.append(Message(id=456, message_id=123, chat_id=234, buttons=buttons))
 
-    await update_meeting_messages(session=mock_session, context_or_bot=cast(TMitupContext, context), meeting=meeting)
+    await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
 
     edit: mock.MagicMock = context.bot.edit_message_text
     expected_call_params = {
@@ -198,7 +198,7 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 
     edit.side_effect = raise_error
 
-    await update_meeting_messages(session=mock_session, context_or_bot=cast(TMitupContext, context), meeting=meeting)
+    await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
     # Since this is outside a callback, make sure we flush metrics
     await context.flush_metrics()
 
@@ -234,7 +234,7 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
 
     edit.side_effect = raise_error
 
-    await update_meeting_messages(session=mock_session, context_or_bot=cast(TMitupContext, context), meeting=meeting)
+    await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
 
     assert edit.call_count == 2
 

@@ -7,18 +7,12 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
 from mitup_bot.views import factory
-from tests.helpers import MockApi, MockDbSession, StubMitupApp, UpdateRequest, call_handler, telegram_user_from_user
-
-
-@pytest.fixture
-def api():
-    with MockApi.start("mitup_bot.handlers.edit_settings.edit_timeout") as api:
-        yield api
+from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler, telegram_user_from_user
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_TIMEOUT)], indirect=True)
 async def test_callback_query_timeout(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -31,13 +25,13 @@ async def test_callback_query_timeout(
         ),
     )
 
-    api.assert_edit_message_called(context, update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
     assert result == ConversationSettingsState.TIMEOUT
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="10")], indirect=True)
 async def test_settings_timeout_text_message_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -50,7 +44,7 @@ async def test_settings_timeout_text_message_handler(
 
     mock_session.assert_flushed()
     assert user_with_settings.settings.timeout == 10
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationHandler.END
 
 
@@ -61,7 +55,7 @@ async def test_settings_timeout_text_message_handler(
     indirect=True,
 )
 async def test_settings_timeout_invalid_input_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp, api: MockApi
+    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -91,7 +85,7 @@ async def test_settings_timeout_invalid_input_handler(
     )
 
     # Tow messages are sent, one to request the timeout and another one to inform the user that the input was invalid
-    api.assert_send_message_called(context, update, expected_view)
+    context.api.assert_send_message_called(update, expected_view)
 
     # After failing we should still be on the proper state, send now a valid message
     assert update.effective_message is not None

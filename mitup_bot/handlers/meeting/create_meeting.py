@@ -5,7 +5,7 @@ from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import api, guards, views
+from mitup_bot import guards, views
 from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
@@ -32,7 +32,7 @@ async def callback_query_create_meeting(session: Session, update: Update, contex
     user = guards.current_user(update, session)
     view = views.factory.create_meeting_view(lang=user.lang)
 
-    await api.edit_message(context=context, update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationMeetingState.TITLE
 
@@ -64,7 +64,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
     message = MeetingMessages.CREATED_SUCCESS.get(title=meetup.title, lang=user.lang)
     view = meetup.edit_view.with_context(message)
 
-    await api.send_message(context=context, update=update, view=view)
+    await context.api.send_message(update=update, view=view)
 
     context.put_feature_metric(Feature.CREATE_MEETING)
 
@@ -91,8 +91,7 @@ async def callback_query_cancel_meeting(update: Update, context: MitupContext):
 async def filter_messages_without_text(session: Session, update: Update, context: MitupContext):
     user = guards.current_user(update, session)
 
-    await api.send_message(
-        context=context,
+    await context.api.send_message(
         update=update,
         view=views.factory.create_meeting_view(
             lang=user.lang, message=MeetingMessages.INVALID_TITLE.get(lang=user.lang)
