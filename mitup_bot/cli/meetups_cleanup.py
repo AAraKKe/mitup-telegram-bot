@@ -5,10 +5,9 @@ from typing import cast
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, delete, false, func, literal, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
-from telegram.ext import ExtBot
 
 from mitup_bot import db
-from mitup_bot.api_wrapper import build_api
+from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger, Unit
 from mitup_bot.utils import callbacks as cb
@@ -39,7 +38,7 @@ MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
 )
 
 
-async def notify_meetups_about_to_be_deleted(session: Session, bot: ExtBot, metrics: MitupMetricsLogger):
+async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger):
     meetups = session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT).all()
 
     views: list[MitupView] = []
@@ -80,13 +79,11 @@ async def notify_meetups_about_to_be_deleted(session: Session, bot: ExtBot, metr
         callbacks.append(partial(on_success_callback, meetup_to_update=meetup))
 
     if views:
-        # Avoid doing anything at all if there are no messages to send
-        api = build_api(bot)
         await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
     metrics.put_metric(MetricKey.MEETUPS_ABOUT_TO_BE_DELETED.value, len(meetups), unit=Unit.COUNT.value)
 
 
-async def delete_meetups(session: Session, bot: ExtBot, metrics: MitupMetricsLogger):
+async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger):
     meetups = session.exec(MEETUPS_TO_DELETE_STATEMENT).all()
 
     views: list[MitupView] = []
@@ -116,8 +113,6 @@ async def delete_meetups(session: Session, bot: ExtBot, metrics: MitupMetricsLog
         callbacks.append(partial(on_success_callback, meetup_to_update=meetup))
 
     if views:
-        # Avoid doing anything at all if there are no messages to send
-        api = build_api(bot)
         await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
 
     session.exec(delete(Meetup).where(Meetup.id.in_(meeting_ids)))  # type: ignore
@@ -131,6 +126,6 @@ async def delete_meetups(session: Session, bot: ExtBot, metrics: MitupMetricsLog
 
 
 @db.with_async_session
-async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> None:
-    await notify_meetups_about_to_be_deleted(session, bot, metrics)
-    await delete_meetups(session, bot, metrics)
+async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
+    await notify_meetups_about_to_be_deleted(session, api, metrics)
+    await delete_meetups(session, api, metrics)

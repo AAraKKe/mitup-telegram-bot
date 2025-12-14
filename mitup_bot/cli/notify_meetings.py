@@ -1,4 +1,5 @@
 import logging
+from asyncio import gather
 from collections.abc import Sequence
 from contextlib import contextmanager
 
@@ -7,9 +8,9 @@ from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, false, func, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.error import Forbidden
-from telegram.ext import ExtBot
 
 from mitup_bot import db
+from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
 from mitup_bot.utils.messages import NotificationMessages
@@ -24,6 +25,7 @@ USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
         and_(
             Meetup.datetime != null(),
             User.is_active == true(),
+            Settings.notification == true(),
             JoinedUsers.is_waiting_list == false(),
             JoinedUsers.notification_sent == false(),
             func.now().between(
@@ -55,8 +57,21 @@ def handle_forbidden(link: JoinedUsers):
         link.notification_sent = True
 
 
+async def send_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
+    view = MitupView(
+        description=NotificationMessages.MEETING_STARTING.get(
+            lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
+        ),
+        keyboard=[],
+    )
+    with handle_forbidden(joined_link):
+        await api.send_message_to_user(joined_link.user, view)
+
+    joined_link.notification_sent = True
+
+
 @db.with_async_session
-async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> None:
+async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
     """Send a notification to all users that have joined a meeting that is about to start"""
     joined_links = joined_links_to_notify(session)
     deactivated_users = 0
@@ -65,28 +80,29 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
 
     metrics.put_metric(MetricKey.NOTIFICATIONS_TO_SEND.value, len(joined_links), unit=Unit.COUNT.value)
 
+    notifications = []
+
     for joined_link in joined_links:
-        try:
-            with handle_forbidden(joined_link):
-                await joined_link.user.send_message(
-                    bot,
-                    MitupView(
-                        description=NotificationMessages.MEETING_STARTING.get(
-                            lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
-                        ),
-                        keyboard=[],
-                    ),
-                )
-                joined_link.notification_sent = True
-            # If we have deactivated the user, incremenet deactivate_users
-            deactivated_users += not joined_link.user.is_active
-            sent += 1
-        except Exception as e:
+        notifications.append(send_notification(joined_link, api))
+
+    results = await gather(*notifications, return_exceptions=True)
+
+    for joined_link, result in zip(joined_links, results, strict=False):
+        if isinstance(result, Exception):
             failed += 1
-            logging.exception(
-                f"Failed to send notification (user: {joined_link.user_id}, meeting: {joined_link.meetup_id}): {e}"
+            logging.error(
+                f"Failed to send notification (user: {joined_link.user_id}, "
+                f"meeting: {joined_link.meetup_id}): {result}",
+                exc_info=result,
             )
+        else:
+            sent += 1
+
+    deactivated_users = sum(not link.user.is_active for link in joined_links)
 
     metrics.put_metric(MetricKey.NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.NOTIFICATIONS_FAILED.value, failed, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.INACTIVE_USER_SET.value, deactivated_users, unit=Unit.COUNT.value)
+
+    if failed:
+        raise RuntimeError(f"Failed to send notification to {failed} users. Check logs for more details.")

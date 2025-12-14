@@ -1,7 +1,7 @@
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Integer, Session, cast, distinct, func, null, select
-from telegram.ext import ExtBot
 
+from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.db import with_session
 from mitup_bot.models import Meetup, Message, Settings, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
@@ -77,6 +77,6 @@ def meetings_stats(session: Session, metrics: MitupMetricsLogger):
 
 
 @with_session
-def run(session: Session, _: ExtBot, metrics: MitupMetricsLogger):
+def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger):
     users_stats(session, metrics)
     meetings_stats(session, metrics)

@@ -97,6 +97,8 @@ class BotAdapter:
 
 
 def build_api(context_or_bot: MitupContext | ExtBot) -> TelegramApiWrapper:
+    from mitup_bot.custom_context import MitupContext
+
     adapter = context_or_bot if isinstance(context_or_bot, MitupContext) else BotAdapter(context_or_bot)
     api = TelegramApi()
     api.adapter = adapter

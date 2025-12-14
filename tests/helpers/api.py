@@ -96,10 +96,16 @@ class MockApi(TelegramApi):
             assert mocked_method.call_count == times
 
     def assert_send_message_called(self, update: Update, view: MitupView | str, times: int = 1):
-        self.assert_method_called("send_message", update, view, times)
+        self.assert_method_called("send_message", update=update, view=view, times=times)
+
+    def assert_send_message_to_user_called(self, user: User, view: MitupView | str, times: int = 1):
+        if times == 1:
+            assert_awaited_once_with_diff(self.mock_method("send_message_to_user"), user=user, view=view)
+        else:
+            assert_awaited_with_diff(self.mock_method("send_message_to_user"), times, user=user, view=view)
 
     def assert_edit_message_called(self, update: Update, view: MitupView | str, times: int = 1):
-        self.assert_method_called("edit_message", update, view, times)
+        self.assert_method_called("edit_message", update=update, view=view, times=times)
 
     def assert_send_to_user_called(self, user: User, view: MitupView | str, times: int = 1):
         if times == 1:

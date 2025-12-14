@@ -1,16 +1,16 @@
 import datetime as dt
 import logging
+import traceback
 from typing import cast
 
 from aws_embedded_metrics.unit import Unit
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, delete, func, literal, null, or_, select, true
 from sqlmodel.sql.expression import SelectOfScalar
-from telegram.ext import ExtBot
 
 from mitup_bot import db
-from mitup_bot.api_wrapper import build_api
-from mitup_bot.models import Meetup, Settings, User
+from mitup_bot.api_wrapper import TelegramApiWrapper
+from mitup_bot.models import Meetup, Message, Settings, User
 from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
 
 # The amount of time a meeting stays active after it has been created when there is no datetime set
@@ -45,7 +45,7 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
 
 
 @db.with_async_session
-async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> None:
+async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
     """Mark meetings as inactive when they've been finished for longer than the configured timeout"""
     meetings = session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT).all()
     deactivated = 0
@@ -58,7 +58,6 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
     for meeting in meetings:
         try:
             # Update all messages using the existing API method
-            api = build_api(bot)
             await api.update_meeting_messages(
                 session=session,
                 meeting=meeting,
@@ -78,12 +77,25 @@ async def run(session: Session, bot: ExtBot, metrics: MitupMetricsLogger) -> Non
             # Delete all users that were added to the meeting that were invited.
             # These users exist only in the context of the current meeting.
             session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
-        except Exception:
+
+            # Same with messages, any messagea attached to this meeting is left untracked as the
+            # meeting is now considered over
+            session.exec(delete(Message).where(Message.meetup_id == meeting.id))  # type: ignore
+        except Exception as e:
             failed += 1
             logging.exception(f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id})")
-            failed_details.append(f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id})")
+            failed_details.append(
+                f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id}). Error: {e}.\n"
+                f"Stack trace: {traceback.format_exc()}"
+            )
 
     if failed_details:
         metrics.set_property("failed_details", failed_details)
+
     metrics.put_metric(MetricKey.MEETINGS_DEACTIVATED.value, deactivated, unit=Unit.COUNT.value)
     metrics.put_metric(MetricKey.MEETINGS_DEACTIVATION_FAILED.value, failed, unit=Unit.COUNT.value)
+
+    if failed:
+        raise RuntimeError(
+            f"Failed to deactivate {failed} meetings. Check individual failed_details for more information."
+        )
