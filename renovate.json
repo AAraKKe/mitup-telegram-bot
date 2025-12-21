@@ -8,7 +8,7 @@
   "reviewers": [
     "@jparaque"
   ],
-  "commitMessagePrefix": "⬆️ ",
+  "commitMessagePrefix": "⬆️ [renovate] ",
   "labels": [
     "type::dependency-upgrade"
   ],
