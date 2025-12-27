@@ -33,7 +33,7 @@ RUN find /build/mitup_bot/locales -type f \( -name "*.po" -o -name "*.pot" \) -d
 RUN pip install --no-cache-dir --prefix=/install .
 
 # Stage 2: Runtime - Copy only what's needed
-FROM python:3.14-slim-bookworm AS runtime
+FROM python:3.14.0-slim-bookworm AS runtime
 
 WORKDIR /mitup-telegram-bot
 
