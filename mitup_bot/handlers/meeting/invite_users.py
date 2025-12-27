@@ -212,7 +212,10 @@ async def confirm_user_invitation(session: Session, update: Update, context: TMi
                 lang=user.lang, name=invited_user_name, meeting_title=meeting.title
             )
 
-        await context.api.send_message_to_user(user, meeting.view_for(user).with_context(message=message))
+        await context.api.edit_message(
+            update=update,
+            view=meeting.view_for(user).with_context(message=message),
+        )
 
         # Clean the stored data related to the conversation
         context.clean_user_data([ContextId.INVITE_USERS])
@@ -231,10 +234,25 @@ async def decline_user_invitation(session: Session, update: Update, context: TMi
     context.clean_user_data([ContextId.INVITE_USERS])
 
     message = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user.lang)
-    view = main_menu_view(lang=user.lang, message=message)
+
+    # If the user owns the meeting, go back to the meeting, if they do not
+    # send to main menu
+    meeting_id = guards.valid_callback_data(
+        cb.CANCEL_INVITE_USER.parse(context.match), MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK
+    ).id
+    meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
+    if meeting is None:
+        # Edit message to send to the main menu
+        view = main_menu_view(lang=user.lang, message=message)
+        await context.api.edit_message(update, view)
+        return ConversationHandler.END
+
+    if user.own_meeting(meeting_id):
+        view = meeting.view_for(user).with_context(message=message)
+    else:
+        view = main_menu_view(lang=user.lang, message=message)
 
     await context.api.edit_message(update, view)
-
     return ConversationHandler.END
 
 

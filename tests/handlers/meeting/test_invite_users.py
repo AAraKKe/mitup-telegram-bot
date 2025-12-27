@@ -203,7 +203,7 @@ async def test_cancel_name_request(
     [123, 456],
     ids=["by_owner", "by_other_user"],
 )
-async def test_full_user_invitation(
+async def test_complete_user_invitation(
     mock_session: MockDbSession,
     user_with_settings: User,
     conversation: ConversationTester,
@@ -240,7 +240,7 @@ async def test_full_user_invitation(
         )
     )
 
-    confirm_context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
+    confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
 
     # The meeting now has one invited user
     assert len(meeting.joined_links) == 1
@@ -283,11 +283,15 @@ async def test_invite_user_decline_confirmation(
 
     cancel_context = result.last_context
 
-    # User has been sent back to the main menu
-    expected_view = views.factory.main_menu_view(
-        lang=user_with_settings.lang,
-        message=MeetingMessages.INVITE_USERS_CANCELED.get(lang=user_with_settings.lang),
-    )
+    message = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user_with_settings.lang)
+
+    if owner_id == 123:
+        expected_view = meeting.view_for(user_with_settings).with_context(message)
+    else:
+        expected_view = views.factory.main_menu_view(
+            lang=user_with_settings.lang,
+            message=message,
+        )
 
     cancel_context.api.assert_edit_message_called(
         update=cancel_context.get_update(),
@@ -337,7 +341,7 @@ async def test_invite_user_adds_to_the_waiting_list(
         )
     )
 
-    confirm_context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
+    confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
 
     # The meeting now has one invited user in the waiting list
     assert len(meeting.joined_links) == 2
