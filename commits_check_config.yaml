@@ -8,15 +8,9 @@ additional_commit_types:
   Docs:
     description: Add or update documentation.
     emoji: 📚
-  Style:
-    description: Improve code style without affecting functionality.
-    emoji: 🎨
   Refactor:
     description: Refactor code without changing functionality.
     emoji: 🧹
-  Perf:
-    description: Improve performance.
-    emoji: 🚀
   Test:
     description: Add or update tests.
     emoji: 🧪

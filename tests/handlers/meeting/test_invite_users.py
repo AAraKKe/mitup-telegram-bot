@@ -447,15 +447,59 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 
     # In all these cases the user should have been sent to the main menu with the expected message
     final_context = result.last_context
-    expected_view = views.factory.main_menu_view(
-        lang=user_with_settings.lang,
-        message=expected_message.get(lang=user_with_settings.lang),
+    expected_view = views.factory.main_menu_view(lang=user_with_settings.lang)
+
+    final_context.api.assert_answer_callback_query_called(
+        update=final_context.get_update(),
+        text=expected_message.get(lang=user_with_settings.lang, plain=True),
+        show_alert=True,
     )
 
-    final_context.api.assert_send_message_to_user_called(
-        user=user_with_settings,
+    final_context.api.assert_edit_message_called(
+        update=final_context.get_update(),
         view=expected_view,
     )
+
     assert len(meeting.joined_links) == 0
     assert final_context.user_data is not None
     assert len(final_context.user_data.registry) == 0
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(callback_query=cb.INVITE.with_id(MEETING_ID), from_bot_chat=False),
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "meeting_modifier, expected_message",
+    [
+        [disable_invitations, MeetingMessages.INVITE_USER_INVITES_DISABLED],
+        [fill_meeting, MeetingMessages.INVITE_USER_MEETING_FULL],
+        [deacivate_meeting, MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK],
+    ],
+    ids=[
+        "invitations_disabled",
+        "meeting_full",
+        "meeting_inactive",
+    ],
+)
+async def test_meeting_not_allowing_invitations_on_callback_query(
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    meeting: Meetup,
+    meeting_modifier: Callable[[Meetup], None],
+    expected_message: MeetingMessages,
+):
+    setup_db(mock_session, user_with_settings, meeting)
+    meeting_modifier(meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_CONVERSATION, handler_context=handler_context)
+
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=expected_message.get(lang=user_with_settings.lang, plain=True),
+        show_alert=True,
+    )

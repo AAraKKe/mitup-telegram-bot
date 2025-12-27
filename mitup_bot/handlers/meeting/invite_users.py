@@ -50,30 +50,34 @@ async def ensure_meeting_still_allows_invitations(
     context: TMitupContext,
     user: User,
     meeting_id: int,
+    on_callback: bool = True,
 ) -> Meetup | None:
     """
     Ensure that the meeting still allows invitations.
     If not, send a message to the user and return False.
     """
     meeting = Meetup.by_id(session, meeting_id, include_inactive=False)
+    update = context.get_update()
+
     if meeting is None:
-        view = main_menu_view(
-            lang=user.lang, message=MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND.get(lang=user.lang)
-        )
-        await context.api.send_message_to_user(user, view)
+        if on_callback:
+            message = MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK
+        else:
+            message = MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND
+
+        await context.api.answer_callback_query(update, text=message.get(lang=user.lang, plain=True), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
     if not meeting.join_allowed():
-        message = MeetingMessages.INVITE_USER_MEETING_FULL.get(lang=user.lang)
-        view = main_menu_view(lang=user.lang, message=message)
-        await context.api.send_message_to_user(user, view)
+        message = MeetingMessages.INVITE_USER_MEETING_FULL
+        await context.api.answer_callback_query(update, text=message.get(lang=user.lang, plain=True), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
-    elif not meeting.allow_invitation:
-        message = MeetingMessages.INVITE_USER_INVITES_DISABLED.get(lang=user.lang)
-        view = main_menu_view(lang=user.lang, message=message)
-        await context.api.send_message_to_user(user, view)
+
+    if not meeting.allow_invitation:
+        message = MeetingMessages.INVITE_USER_INVITES_DISABLED
+        await context.api.answer_callback_query(update, text=message.get(lang=user.lang, plain=True), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
@@ -86,20 +90,15 @@ async def ensure_meeting_still_allows_invitations(
 @with_async_session
 async def callback_query_invite_users(session: Session, update: Update, context: TMitupContext):
     # This action can be called by unsubscribed users
+    callback_data = guards.valid_callback_data(cb.INVITE.parse(context.match), MeetingHandlerId.INVITE_USERS_CALLBACK)
+    meeting_id = callback_data.id
+
     user = await guards.user_registered(update, session, context, MeetingMessages.INVITE_USER_OPEN_CHAT)
     if user is None:
         return ConversationHandler.END
 
-    callback_data = guards.valid_callback_data(cb.INVITE.parse(context.match), MeetingHandlerId.INVITE_USERS_CALLBACK)
-    meeting_id = callback_data.id
-
-    meeting = Meetup.by_id(session, meeting_id)
+    meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id, on_callback=True)
     if meeting is None:
-        await context.api.answer_callback_query(
-            update,
-            text=MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK.get(lang=user.lang, plain=True),
-            show_alert=True,
-        )
         return ConversationHandler.END
 
     if update.effective_chat is None:
@@ -148,8 +147,13 @@ async def message_invite_users_name(session: Session, update: Update, context: T
         return ConversationHandler.END
 
     with context.meeting_id(ContextId.INVITE_USERS, ensure_clean=False) as meeting_id:
-        meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
+        meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id, on_callback=False)
         if meeting is None:
+            # If the user cannot continue mid conversation, go back to the main menu
+            await context.api.edit_message(
+                update=update,
+                view=main_menu_view(lang=user.lang),
+            )
             return ConversationHandler.END
 
         context.store_text(ContextId.INVITE_USERS, invited_user_name)
@@ -181,11 +185,16 @@ async def confirm_user_invitation(session: Session, update: Update, context: TMi
     meeting_id = callback_data.id
 
     with context.text(ContextId.INVITE_USERS, ensure_clean=True) as invited_user_name:
-        meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
+        meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id, on_callback=False)
         if meeting is None:
+            # If the user cannot continue mid conversation, go back to the main menu
+            await context.api.edit_message(
+                update=update,
+                view=main_menu_view(lang=user.lang),
+            )
             return ConversationHandler.END
 
-        invited_user = User(first_name=invited_user_name, tg_user_id=-1)
+        invited_user = User(first_name=invited_user_name, tg_user_id=-1, is_active=False)
         joined_link = meeting.add_participant(invited_user, invited_by=user)
 
         if joined_link is None:  # pragma: no cover
