@@ -186,19 +186,9 @@ async def edit_meeting_kickout_participant_confirm(session: Session, update: Upd
         await kickout_user_to_edit_participants(meeting, update, context, current_user, participant)
 
     # Send messages to any user that has been promoted from the waiting list
-    users_to_notify = [
-        promoted_participant.user
-        for promoted_participant in promoted_participants
-        if promoted_participant.invited_by is None
-    ]
-    views_to_send = [
-        MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=participant.user.lang, meeting_title=meeting.title)
-        for participant in promoted_participants
-        if participant.invited_by is None
-    ]
-    await context.api.send_messages_to_users(
-        users=users_to_notify,
-        views=views_to_send,
+    await context.api.notify_users_promoted_from_waiting_list(
+        joined_users=promoted_participants,
+        meeting=meeting,
     )
 
     # After all has been taken care of, we need to update all messages for the meeting

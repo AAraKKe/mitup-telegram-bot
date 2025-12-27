@@ -108,18 +108,10 @@ async def user_leaves_meeting(
             promoted_links = meeting.remove_participant(joined_link)
             context.put_feature_metric(Feature.LEAVE_MEETING)
 
-            promoted_users = [link.user for link in promoted_links]
-
-            if promoted_users:
-                views_to_send = [
-                    MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title)
-                    for user in promoted_users
-                ]
-
-                await context.api.send_messages_to_users(
-                    users=promoted_users,
-                    views=views_to_send,
-                )
+            await context.api.notify_users_promoted_from_waiting_list(
+                joined_users=promoted_links,
+                meeting=meeting,
+            )
 
             return MeetingMessages.LEFT_MEETING_SUCCESS
 

@@ -19,6 +19,7 @@ from mitup_bot.exceptions import (
 )
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
+from mitup_bot.models.joined_users import JoinedUsers
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import MitupInlineView, MitupView
@@ -162,6 +163,11 @@ class TelegramApiWrapper(Protocol):
         was_deleted: bool = False,
         has_finished: bool = False,
     ) -> None: ...
+    async def notify_users_promoted_from_waiting_list(
+        self,
+        joined_users: Sequence[JoinedUsers],
+        meeting: Meetup,
+    ) -> None: ...
 
 
 class TelegramApi:
@@ -271,6 +277,21 @@ class TelegramApi:
                 on_error[idx](user, result)
             elif on_success:
                 on_success[idx](user)
+
+    async def notify_users_promoted_from_waiting_list(
+        self,
+        joined_users: Sequence[JoinedUsers],
+        meeting: Meetup,
+    ):
+        users = [link.user for link in joined_users if link.invited_by is None]
+        views_to_send = [
+            MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title)
+            for user in users
+        ]
+        await self.send_messages_to_users(
+            users=users,
+            views=views_to_send,
+        )
 
     async def edit_message(self, update: Update, view: MitupView | str) -> Message | bool:
         if isinstance(view, str):
