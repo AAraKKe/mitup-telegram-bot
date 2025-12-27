@@ -78,7 +78,11 @@ class MitupView:
 
 @dataclass
 class MitupInlineView(MitupView):
-    """MitupView that represent an inline view with a title and an id."""
+    """
+    MitupView that represent an inline view with a title and an id.
+
+    Intended to be used as the representation of a meeting when using inline queries.
+    """
 
     title: str
     inline_description: str

@@ -5,11 +5,11 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import EditMeetingHandlerId
 
@@ -18,7 +18,7 @@ from .enums import EditMeetingHandlerId
     EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK, callback_data=cb.EDIT_MEETING_SETTINGS
 )
 @with_async_session
-async def callback_query_edit_meeting_settings(session: Session, update: Update, context: MitupContext):
+async def callback_query_edit_meeting_settings(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
 
     meeting_id = guards.valid_callback_data(
@@ -42,7 +42,7 @@ async def callback_query_edit_meeting_settings(session: Session, update: Update,
 async def toggle_meeting_setting(
     session: Session,
     update: Update,
-    context: MitupContext,
+    context: TMitupContext,
     handler_id: EditMeetingHandlerId,
     callback_data: cb.CallbackData,
 ) -> AsyncGenerator[Meetup | None]:
@@ -81,7 +81,7 @@ def create_meeting_settings_toggle_handler(
 ):
     @HandlersRegistry.register_callback_query(handler_id, callback_data=callback_data)
     @with_async_session
-    async def handler(session: Session, update: Update, context: MitupContext):
+    async def handler(session: Session, update: Update, context: TMitupContext):
         async with toggle_meeting_setting(
             session=session,
             update=update,

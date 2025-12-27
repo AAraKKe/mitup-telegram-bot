@@ -16,6 +16,17 @@ class ValidCallbackData(BaseModel):
 
 
 class CallbackData(BaseModel):
+    """
+    Represents the callback data used in Telegram inline keyboards. It encodes an action,
+    an entity, and an optional ID.
+
+    The action represents what is to be done, the entity represents on what it is to be done,
+    and the ID represents the specific subject over which the action is to be performed.
+
+    Format string: {action};{entity}:{id}
+    Example: "edit;meet_title:42"
+    """
+
     entity: str
     action: str = "show"
     id: int | None = Field(default=None, ge=0)
@@ -69,8 +80,10 @@ class ValidDateCallbackData(ValidCallbackData):
 
 class DateCallbackData(CallbackData):
     """
-    A CallbackData that appends ';date:YYYY-MM-DD' to the end of the callback data
-    and handles the pattern accordingly
+    This callback data extends the basic CallbackData with a date field.
+
+    Format string: {action};{entity}:{id};date:{YYYY-MM-DD}
+    Example: "set_date;meeting:0;date:2023-10-15"
     """
 
     date: dt.date | None = None
@@ -98,6 +111,19 @@ class ValidMeetingCallbackData(ValidCallbackData):
 
 
 class MeetingCallbackData(CallbackData):
+    """
+    This is the same as a CallbackData but with an additional meeting_id field.
+
+    This CallbackData implementation can be used when the subject of the action is nto the meeting
+    itself but the action is tied to a sepecific meeting. For example, kick out a user from a meeting.
+
+    The id in the callback is the subject, i.e. the user to kick out, but the meeting_id is provided
+    as well as needed context.
+
+    Format string: {action};{entity}:{id}:{meeting_id}
+    Example: "kickout;user:15:42" (kick out user with id 15 from meeting with id 42)
+    """
+
     meeting_id: int | None = None
 
     def __str__(self):

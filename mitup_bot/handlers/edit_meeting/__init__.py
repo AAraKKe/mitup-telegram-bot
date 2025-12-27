@@ -9,7 +9,6 @@ __all__ = [
     "edit_meeting_settings",
     "edit_meeting_language",
     "enums",
-    "join_leave",
 ]
 
 from . import (
@@ -23,5 +22,4 @@ from . import (
     edit_meeting_settings,
     edit_meeting_language,
     enums,
-    join_leave,
 )

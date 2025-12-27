@@ -6,7 +6,7 @@ from typing import cast
 import pytest
 from telegram import CallbackQuery, Update
 
-from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.edit_meeting.edit_meeting_description import callback_query_edit_meeting_description
 from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
@@ -14,7 +14,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -47,7 +47,7 @@ async def test_callback_query_edit_meeting_description_works(
 
     mock_session.add_object(user_with_settings.meetups[int(meeting_id) - 1])
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.DESCRIPTION_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.DESCRIPTION_CALLBACK, update=update, app=app)
 
     assert context.user_data is not None
     assert context.has_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION)
@@ -75,7 +75,7 @@ async def test_callback_query_edit_meeting_description_works(
 async def test_callback_query_edit_meeting_description_fails_without_callback_query_data(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext,
+    context: StubMitupContext,
 ):
     match = re.match(cb.EDIT_MEETING_DESCRIPTION.pattern, "edit;meet_desc:")
     assert match is not None
@@ -89,7 +89,7 @@ async def test_callback_query_edit_meeting_description_fails_without_callback_qu
 async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session: MockDbSession,
     update: Update,
-    context: MitupContext,
+    context: StubMitupContext,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
     meeting: Meetup,

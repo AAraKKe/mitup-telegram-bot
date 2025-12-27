@@ -5,12 +5,12 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId
@@ -47,7 +47,7 @@ def edit_notification_view(user: User) -> MitupView:
     callback_data=cb.EDIT_NOTIFICATIONS,
 )
 @with_async_session
-async def callback_query_notifications(session: Session, update: Update, context: MitupContext):
+async def callback_query_notifications(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
 
     await context.api.edit_message(update=update, view=edit_notification_view(user))
@@ -58,7 +58,7 @@ async def callback_query_notifications(session: Session, update: Update, context
     callback_data=cb.TOGGLE_NOTIFICATIONS,
 )
 @with_async_session
-async def callback_query_toggle_notifications(session: Session, update: Update, context: MitupContext):
+async def callback_query_toggle_notifications(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
 
     user.settings.notification = not user.settings.notification
@@ -71,7 +71,7 @@ async def callback_query_toggle_notifications(session: Session, update: Update, 
     EditSettingsHandlerId.SET_NOTIFICATION_TIME, callback_data=cb.SET_NOTIFICATION_TIME, bindable=False
 )
 @with_async_session
-async def callback_query_set_notification_time(session: Session, update: Update, context: MitupContext):
+async def callback_query_set_notification_time(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
     message = SettingsMessages.NOTIFICATION_SET_TIME.get(lang=user.lang)
 
@@ -88,7 +88,7 @@ async def callback_query_set_notification_time(session: Session, update: Update,
     EditSettingsHandlerId.NOTIFICATION_TIME_MESSAGE_WITH_TEXT, PositiveNumberFilter(), bindable=False
 )
 @with_async_session
-async def settings_notification_time_text_message_handler(session: Session, update: Update, context: MitupContext):
+async def settings_notification_time_text_message_handler(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
     notification_time_str = cast(str, guards.message(update).text)
 
@@ -111,7 +111,7 @@ async def settings_notification_time_text_message_handler(session: Session, upda
     EditSettingsHandlerId.NOTIFICATION_TIME_INVALID_INPUT, filters=filters.ALL, bindable=False
 )
 @with_async_session
-async def settings_notification_time_invalid_input_handler(session: Session, update: Update, context: MitupContext):
+async def settings_notification_time_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
     message = SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user.lang)
 

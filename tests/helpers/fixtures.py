@@ -1,11 +1,20 @@
 import datetime as dt
 from dataclasses import dataclass
+from unittest import mock
 
-from telegram import InlineQuery, Location
+from telegram import CallbackQuery, Chat, InlineQuery, Location, Message, MessageEntity, Update
 from telegram import User as TgUser
+from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Settings, User
+from tests.helpers.constants import (
+    DEFAULT_CHAT_ID,
+    DEFAULT_MESSAGE_ID,
+    DEFAULT_TEST_DATE,
+    DEFAULT_TG_USER_PARAMS,
+)
 
 
 @dataclass
@@ -34,7 +43,8 @@ class UpdateRequest:
     callback_query: CallbackData | bool = False
     command: str | bool = False
     inline_query: str | InlineQuery = ""
-    inline_message_id: str | None = None
+    inline_message_id: str = "some_inline_message_id"
+    from_bot_chat: bool = True
 
 
 def create_meetup(
@@ -134,6 +144,7 @@ def create_joined_link(
     created_time: dt.datetime | None = None,
     is_waiting_list: bool = False,
     notification_sent: bool = False,
+    invited_by: User | None = None,
 ) -> JoinedUsers:
     return JoinedUsers(
         id=id,
@@ -144,6 +155,7 @@ def create_joined_link(
         created_time=created_time or dt.datetime.now(dt.UTC),
         is_waiting_list=is_waiting_list,
         notification_sent=notification_sent,
+        invited_by=invited_by,
     )
 
 
@@ -154,4 +166,107 @@ def telegram_user_from_user(user: User) -> TgUser:
         last_name=user.last_name,
         username=user.username,
         is_bot=False,
+    )
+
+
+def callback_query_from_callback_data(
+    data: CallbackData, user: TgUser, message: Message, inline_message_id: str | None, is_bot_chat: bool
+) -> CallbackQuery:
+    if is_bot_chat:
+        # Bot chats have a message attached to it. Inline messages from outside the bot chat do not
+        return CallbackQuery(
+            id=str(DEFAULT_MESSAGE_ID), from_user=user, data=str(data), chat_instance="someinstance", message=message
+        )
+    return CallbackQuery(
+        id=str(DEFAULT_MESSAGE_ID),
+        from_user=user,
+        data=str(data),
+        chat_instance="someinstance",
+        inline_message_id=inline_message_id,
+    )
+
+
+def create_test_app() -> Application:
+    builder = ApplicationBuilder()
+    # The bot needs to be set but we canont allow it to have defaults or
+    # extra configurations will be set for the scheduler. Lets force it to not
+    # have any configuration to make sure the schedulers use default values.
+    bot = mock.MagicMock(spec=ExtBot)
+    bot.defaults = None
+    builder.bot(bot)
+    builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
+    return builder.build()
+
+
+def create_update(
+    request: UpdateRequest,
+    tg_chat: Chat | None = None,
+    tg_user: TgUser | None = None,
+    tg_message: Message | None = None,
+    tg_callback_query: CallbackQuery | None = None,
+) -> Update:
+    # Use defaults if not provided to make fixture injection easier
+    chat = tg_chat or Chat(id=DEFAULT_CHAT_ID, type="private")
+    user = tg_user or TgUser(**DEFAULT_TG_USER_PARAMS)
+
+    if request.command:
+        bot_command = request.command if isinstance(request.command, str) else "test_command"
+        message = Message(
+            DEFAULT_MESSAGE_ID,
+            date=DEFAULT_TEST_DATE,
+            chat=chat,
+            from_user=user,
+            entities=[MessageEntity(type=MessageEntity.BOT_COMMAND, offset=0, length=len(bot_command) + 1, user=user)],
+            text=f"/{bot_command}",
+        )
+        return Update(DEFAULT_MESSAGE_ID, message=message)
+
+    if request.callback_query:
+        # If no message provided for callback, create a minimal one
+        msg = tg_message or Message(DEFAULT_MESSAGE_ID, date=DEFAULT_TEST_DATE, chat=chat, from_user=user, text="")
+
+        # If no default callback query provided, create one
+        default_cb = tg_callback_query or CallbackQuery(
+            id=str(DEFAULT_MESSAGE_ID), from_user=user, message=msg, chat_instance="inst"
+        )
+
+        query = (
+            callback_query_from_callback_data(
+                request.callback_query, user, msg, request.inline_message_id, request.from_bot_chat
+            )
+            if isinstance(request.callback_query, CallbackData)
+            else default_cb
+        )
+        return Update(DEFAULT_MESSAGE_ID, callback_query=query)
+    if request.inline_query:
+        if isinstance(request.inline_query, InlineQuery):
+            return Update(DEFAULT_MESSAGE_ID, inline_query=request.inline_query)
+
+        # If a string is provided for inline_query but no tg_inline_query object, construct one
+        query_text = request.inline_query
+        return Update(
+            DEFAULT_MESSAGE_ID,
+            inline_query=InlineQuery(id=str(DEFAULT_MESSAGE_ID), from_user=user, query=query_text, offset=""),
+        )
+    if not (request.user and request.message and request.chat):
+        # Any update that we manage in this bot has an associated user, chat or message:
+        # - CallbackQuery
+        # - Message
+        # - Inlinequery
+        # - Location
+        # If we want to validate that the update doesn't have an user we need to provide an empty update
+        return Update(DEFAULT_MESSAGE_ID)
+
+    # If we have a message we will al ways have a chat and a user
+    # We are not dealing yet with types of updates that can have a chat without a message
+    return Update(
+        DEFAULT_MESSAGE_ID,
+        Message(
+            DEFAULT_MESSAGE_ID,
+            date=DEFAULT_TEST_DATE,
+            chat=chat,
+            from_user=user,
+            text=request.message_text,
+            location=request.location,
+        ),
     )

@@ -64,10 +64,6 @@ class EditMeetingHandlerId(HandlerId):
     # Cancel button during edit
     CANCEL = auto()
 
-    # Join and leave actions
-    JOIN = auto()
-    LEAVE = auto()
-
 
 class ConversationMeetingState(Enum):
     EDIT_TITLE = auto()

@@ -1,4 +1,4 @@
-FROM python:3.14-slim-bookworm
+FROM python:3.14.0-slim-bookworm
 
 # Install libraries needed to run psycopg2 and build packages
 # Keep build dependencies in dev image for faster iteration

@@ -2,7 +2,7 @@ import datetime as dt
 
 import pytest
 
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
@@ -47,7 +47,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
     assert len(full_meeting.joined_links) == 1
 
     # Call the handler
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # The user should have joined the meeting
     assert len(full_meeting.joined_links) == 2
@@ -95,7 +95,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     mock_session.delete.side_effect = lambda link: full_meeting.joined_links.remove(link)
 
     # Call the handler for the user leaving
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # The user should have left the meeting and the waiting list user should be promoted
     assert full_meeting.n_participants == 2
@@ -107,7 +107,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     mock_session.assert_flushed()
 
     # The user who was promoted has been notified
-    context.api.assert_send_to_user_called(
+    context.api.assert_send_message_to_user_called(
         user=second_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=second_user.lang, meeting_title=full_meeting.title
@@ -161,7 +161,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     mock_session.delete.side_effect = lambda link: full_meeting.joined_links.remove(link)
 
     # Call the handler for the user leaving
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # The user should have left the meeting and the first waiting list user should be promoted
     assert full_meeting.n_participants == 2
@@ -173,7 +173,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     mock_session.assert_flushed()
 
     # The user who was promoted has been notified
-    context.api.assert_send_to_user_called(
+    context.api.assert_send_message_to_user_called(
         user=second_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
@@ -212,7 +212,7 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     assert full_meeting.n_waiting == 3
 
     # Call the handler for the user leaving
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # The user should have left the meeting and the first two waiting list users should be promoted
     assert full_meeting.n_participants == 3
@@ -225,14 +225,14 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     mock_session.assert_flushed()
 
     # The users who were promoted have been notified
-    context.api.assert_send_to_user_called(
+    context.api.assert_send_message_to_user_called(
         user=first_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,
     )
-    context.api.assert_send_to_user_called(
+    context.api.assert_send_message_to_user_called(
         user=second_waiting_user,
         view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
             lang=second_waiting_user.lang, meeting_title=full_meeting.title

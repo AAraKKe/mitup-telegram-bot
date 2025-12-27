@@ -34,7 +34,9 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
 
     assert user_with_settings.settings.timezone != cast(Message, update.effective_message).text
 
-    context, result = await call_handler(update, app, RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT)
+    context, result = await call_handler(
+        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app
+    )
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(
         timezone=cast(Message, update.effective_message).text
@@ -77,7 +79,9 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
 
     assert update.effective_message is not None
 
-    context, result = await call_handler(update, app, RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT)
+    context, result = await call_handler(
+        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app
+    )
 
     assert (
         f"The user {user_with_settings.id} tried to set a timezone some text that is not correct. Trying again"

@@ -69,16 +69,11 @@ class MockApi(TelegramApi):
         return self.call_mock("answer_inline_query", update=update, results=results)
 
     def call_mock(self, name: str, **kwargs: DefaultValue | Any) -> mock.AsyncMock:
-        # Ensure we only make the call with the provided arguments, not with all of them even using the defaults
-        new_kwargs = {}
-        for arg, value in kwargs.items():
-            if not isinstance(value, DefaultValue):
-                new_kwargs[arg] = value
+        new_kwargs = {arg: value for arg, value in kwargs.items() if not isinstance(value, DefaultValue)}
         return self.mock_method(name)(**new_kwargs)
 
     def mock_method(self, name: str) -> mock.AsyncMock:
-        method_mock = self.mock_mapping.setdefault(name, mock.AsyncMock(name=name))
-        return method_mock
+        return self.mock_mapping.setdefault(name, mock.AsyncMock(name=name))
 
     def call_args_list(self, name: str) -> mock._CallList:
         return self.mock_method(name).call_args_list
@@ -106,12 +101,6 @@ class MockApi(TelegramApi):
 
     def assert_edit_message_called(self, update: Update, view: MitupView | str, times: int = 1):
         self.assert_method_called("edit_message", update=update, view=view, times=times)
-
-    def assert_send_to_user_called(self, user: User, view: MitupView | str, times: int = 1):
-        if times == 1:
-            assert_awaited_once_with_diff(self.mock_method("send_message_to_user"), user=user, view=view)
-        else:
-            assert_awaited_with_diff(self.mock_method("send_message_to_user"), times, user=user, view=view)
 
     def assert_answer_callback_query_called(
         self,

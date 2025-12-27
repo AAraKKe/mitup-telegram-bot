@@ -2,7 +2,7 @@ import pytest
 from aws_embedded_metrics.unit import Unit
 
 import mitup_bot.utils.callbacks as cb
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils.messages import MeetingMessages
@@ -24,7 +24,7 @@ async def test_existing_user_joins_own_meeting(
     assert len(meeting.messages) == 0
 
     # Call the handler
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # The user should have joined the meeting
     assert len(meeting.joined_links) == 1
@@ -65,7 +65,7 @@ async def test_user_already_join_does_not_join(
     assert len(meeting.joined_links) == 1
     assert len(meeting.messages) == 0
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     assert len(meeting.joined_links) == 1
     # The mssage has been registered
@@ -95,7 +95,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # The user should not have joined the meeting
     assert len(meeting.joined_links) == 1
@@ -121,7 +121,7 @@ async def test_user_join_for_non_existing_meeting(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # No feature metric has been emitted
     context.metrics_engine.assert_metrics_emited(
@@ -147,7 +147,7 @@ async def test_non_existent_user_joins_meeting(
     # User is not in the database but meeting is
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.JOIN)
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # Assert user has been registered
     user = utils.user_from_update(handler_context.update)
@@ -172,7 +172,7 @@ async def test_user_leaves_meeting(
     meeting = user_with_settings.meetups[0]
     JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # The user is no longer in the meeting
     assert not meeting.has_participant(user_with_settings.db_id)
@@ -204,7 +204,7 @@ async def test_non_existing_user_leaves_meeting(
     # User is not in the database but meeting is
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # Assert user has been registered
     user = utils.user_from_update(handler_context.update)
@@ -227,7 +227,7 @@ async def test_user_leave_for_non_existing_meeting(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(handler_context.update, handler_context.app, EditMeetingHandlerId.LEAVE)
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # No feature metric has been emitted
     context.metrics_engine.assert_metrics_emited(

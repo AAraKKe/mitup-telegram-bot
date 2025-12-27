@@ -6,11 +6,11 @@ from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, timezone_api, views
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId
@@ -20,7 +20,7 @@ from .enums import ConversationSettingsState, EditSettingsHandlerId
     EditSettingsHandlerId.TIMEZONE_CALLBACK, callback_data=cb.EDIT_TIEMZONE, bindable=False
 )
 @with_async_session
-async def callback_query_timezone(session: Session, update: Update, context: MitupContext):
+async def callback_query_timezone(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_settings_timezone")
 
     user = guards.current_user(update, session)
@@ -35,7 +35,7 @@ async def callback_query_timezone(session: Session, update: Update, context: Mit
 
 @HandlersRegistry.register_message(EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT, bindable=False)
 @with_async_session
-async def settings_timezone_text_message_handler(session: Session, update: Update, context: MitupContext):
+async def settings_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into settings_timezone_text_message_handler")
 
     user = guards.current_user(update, session)
@@ -75,7 +75,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
     EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION, filters.LOCATION, bindable=False
 )
 @with_async_session
-async def settings_timezone_location_message_handler(session: Session, update: Update, context: MitupContext):
+async def settings_timezone_location_message_handler(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into settings_timezone_location_message_handler")
 
     user = guards.current_user(update, session)

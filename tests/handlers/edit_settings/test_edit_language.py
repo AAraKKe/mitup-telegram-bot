@@ -30,7 +30,7 @@ async def test_edit_language(
     app: StubMitupApp,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    context, _ = await call_handler(update, app, EditSettingsHandlerId.LANGUAGE_CALLBACK)
+    context, _ = await call_handler(EditSettingsHandlerId.LANGUAGE_CALLBACK, update=update, app=app)
 
     expected_view = PaginatedMitupView(
         description=SettingsMessages.SELECT_LANGUAGE.get(
@@ -72,7 +72,7 @@ async def test_set_language(
     language: str,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    context, _ = await call_handler(update, app, EditSettingsHandlerId.SET_LANGUAGE_CALLBACK)
+    context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
 
     expected_view = (
         PaginatedMitupView(
@@ -111,7 +111,7 @@ async def test_set_language_fails_if_id_invalid(
 ):
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, EditSettingsHandlerId.SET_LANGUAGE_CALLBACK)
+    context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
 
     context.metrics_engine.assert_metrics_emited(
         [

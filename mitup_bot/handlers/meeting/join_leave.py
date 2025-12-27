@@ -13,10 +13,10 @@ from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 
-from .enums import EditMeetingHandlerId
+from .enums import MeetingHandlerId
 
 
-@HandlersRegistry.register_callback_query(EditMeetingHandlerId.JOIN, callback_data=cb.JOIN)
+@HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
 @with_async_session
 async def join_meetup(session: Session, update: Update, context: TMitupContext):
     """
@@ -85,7 +85,7 @@ async def handle_non_existing_user_join(session: Session, update: Update, contex
     )
 
 
-@HandlersRegistry.register_callback_query(EditMeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
+@HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
 @with_async_session
 async def leave_meetup(session: Session, update: Update, context: TMitupContext):
     """
@@ -151,7 +151,7 @@ async def handle_join_leave_operation(
     with_notification: bool = True,
 ):
     """Handle common infrastructure for meeting operations (join/leave)."""
-    data = guards.valid_callback_data(cb.JOIN.parse(context.match), EditMeetingHandlerId.JOIN)
+    data = guards.valid_callback_data(cb.JOIN.parse(context.match), MeetingHandlerId.JOIN)
     if meeting := Meetup.by_id(session, data.id):
         # Common message handling
         if (current_message := meeting.message_from_update(update)) is None:

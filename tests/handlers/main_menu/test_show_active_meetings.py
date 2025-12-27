@@ -88,7 +88,7 @@ async def test_show_meetings_without_meetings_to_show_works(
     user_with_settings.meetups = [create_meetup(10, active=False)]
 
     # Use MainMenuHandlerId for call_handler
-    context, _ = await call_handler(update, app, MainMenuHandlerId.SHOW_MEETINGS_CALLBACK)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, update=update, app=app)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,

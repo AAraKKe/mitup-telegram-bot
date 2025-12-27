@@ -4,10 +4,10 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards, views
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import MainMenuHandlerId
 
@@ -16,7 +16,7 @@ from .enums import MainMenuHandlerId
     MainMenuHandlerId.MAIN_MENU_CALLBACK, callback_data=cb.MAIN_MENU, bindable=True
 )
 @with_async_session
-async def callback_query_main_menu(session: Session, update: Update, context: MitupContext):
+async def callback_query_main_menu(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_main_menu")
 
     context.clean_all_user_data()

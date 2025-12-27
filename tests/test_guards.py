@@ -23,6 +23,7 @@ from mitup_bot.guards import (
     current_user,
     meeting_accessible,
     message,
+    user_registered,
     valid_callback_data,
 )
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
@@ -32,7 +33,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
-from tests.helpers import StubMitupContext, UpdateRequest, create_meetup
+from tests.helpers import StubMitupContext, UpdateRequest, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -212,3 +213,37 @@ def test_valid_callback_data_failed_states(match: re.Match | None):
 def test_valid_date_callback_data_failed_states(match: re.Match | None):
     with pytest.raises(MalformedCallbackData):
         valid_callback_data(CallbackData.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+
+
+@pytest.mark.parametrize(
+    "update, user_id, expectation",
+    [
+        [UpdateRequest(callback_query=CallbackData(entity="m", action="show", id=1)), 123, nullcontext()],
+        [UpdateRequest(callback_query=CallbackData(entity="m", action="show", id=1)), 456, nullcontext()],
+        [UpdateRequest(callback_query=False), 456, pytest.raises(CallbackQueryNotSet)],
+    ],
+    ids=["user_registered", "user_not_registered", "no_callback"],
+    indirect=["update"],
+)
+async def test_context_manager_for_registered_user(
+    mock_session: MockDbSession,
+    update: Update,
+    user_id: int,
+    expectation: AbstractContextManager,
+    context: StubMitupContext,
+):
+    # The update is created with a user with tg_user_id=123
+    mock_session.add_user(create_user(1, tg_user_id=user_id))
+    is_registered = user_id == 123
+
+    with expectation:
+        user = await user_registered(update, mock_session, context, MeetingMessages.INVITE_USER_OPEN_CHAT)
+        if is_registered:
+            assert user is not None
+            assert user.tg_user_id == user_id
+        else:
+            context.api.assert_answer_callback_query_called(
+                update,
+                MeetingMessages.INVITE_USER_OPEN_CHAT.get(lang="en"),
+                show_alert=True,
+            )

@@ -2,7 +2,7 @@ import re
 
 from telegram import Update
 
-from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
 
 # Updated imports for handlers and enums:
@@ -93,7 +93,7 @@ async def test_create_meeting_return_the_correct_state(
 
 
 async def test_main_menu_delete_user_data_related_with_edit_meetings(
-    update: Update, context: MitupContext, user_with_settings: User, mock_session: MockDbSession
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 

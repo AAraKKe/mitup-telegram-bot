@@ -29,6 +29,7 @@ def test_query_for_users_to_notify_about_meeting_start(mock_session: MockDbSessi
     joined_users.id,
     joined_users.user_id,
     joined_users.meetup_id,
+    joined_users.invited_by_id,
     joined_users.created_time,
     joined_users.is_waiting_list,
     joined_users.notification_sent

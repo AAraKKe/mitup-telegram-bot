@@ -2,7 +2,7 @@ import asyncio
 import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from contextlib import asynccontextmanager, contextmanager
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from aws_embedded_metrics.config import get_config
 from aws_embedded_metrics.environment import Environment
@@ -83,8 +83,10 @@ class Dimensionality:
 
 NULL_DIMENSIONALITY = Dimensionality()
 
+TML = TypeVar("TML", bound=MitupMetricsLogger, covariant=True)
 
-class MitupMetricsEngine[TML: MitupMetricsLogger]:
+
+class MitupMetricsEngine(Generic[TML]):  # noqa: UP046
     """
     The MitupMetricsEngine is the entity responsible for managing metrics with different dimensionalities and
     properties.
@@ -117,10 +119,10 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
 
     def __prepare_logger(
         self,
-        logger: TML,
         dimensionality: Dimensionality | None = None,
         properties: dict[str, Any] | None = None,
-    ) -> MitupMetricsLogger:
+    ) -> TML:
+        logger = self.logger_provider(self.resolve_environment)
         # Always remove the default dimensions, we don't want to include dimensions we don't control
         logger.set_dimensions(use_default=False)
         logger.context.set_default_dimensions({})
@@ -149,8 +151,7 @@ class MitupMetricsEngine[TML: MitupMetricsLogger]:
                 self.loggers[dimensionality].set_property(key, value)
             return self.loggers[dimensionality]
 
-        logger = self.logger_provider(self.resolve_environment)
-        self.__prepare_logger(logger, dimensions, properties)
+        logger = self.__prepare_logger(dimensions, properties)
 
         self.loggers[dimensionality] = logger
         return logger
@@ -236,8 +237,3 @@ def configure_metrics(config: MetricsConfig):
         EnvironmentCache.environment = RichEnvironment()
 
     metrics_config.environment = config.environment.value
-
-
-# def create_metrics_from_update(update: Update) -> MitupMetricsLogger:
-#     """Create a MetricsLogger with the provided Update."""
-#     return __prepare_logger(properties=properties_from_update(update))

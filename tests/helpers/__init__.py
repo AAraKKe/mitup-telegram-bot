@@ -21,6 +21,8 @@ __all__ = [
     "Result",
     "calendar_july_2024",
     "telegram_user_from_user",
+    "ConversationTester",
+    "ConversationStep",
 ]
 
 from .constants import DEFAULT_CURRENT_MESSAGE
@@ -40,3 +42,4 @@ from .stub_db import MockDbSession, Result
 from .filesystem import MITUP_DIR
 from . import console, calendar_july_2024
 from .handler_context import HandlerContext
+from .conversation import ConversationTester, ConversationStep

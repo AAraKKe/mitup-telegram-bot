@@ -99,7 +99,7 @@ async def test_edit_meeting_date_callback(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.DATE_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.DATE_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(
         update,
@@ -150,7 +150,7 @@ async def test_set_meeting_date_callback(
     # Lets add a message to validate it has been updated
     Message(message_id=111, chat_id=111, meetup=meeting)
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.SET_DATE_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, update=update, app=app)
 
     expected_view = (
         set_new_date_view(user_with_settings.lang, 10, "2024-12-21 23:59 (Europe/Madrid)")
@@ -197,7 +197,7 @@ async def test_delete_meeting_date(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, update=update, app=app)
 
     assert meeting.datetime is None
     mock_session.assert_added(meeting)
@@ -238,7 +238,7 @@ async def test_edit_meeting_time_callback(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CALLBACK)
+    context, response = await call_handler(EditMeetingHandlerId.EDIT_TIME_CALLBACK, update=update, app=app)
 
     assert response == expected_response
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) or expected_response == ConversationHandler.END
@@ -322,7 +322,7 @@ async def test_set_time_message_with_valid_time(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, response = await call_handler(
-        update, app, EditMeetingHandlerId.SET_TIME_MESSAGE, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+        EditMeetingHandlerId.SET_TIME_MESSAGE, update=update, app=app, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
     )
 
     assert response == ConversationHandler.END
@@ -376,7 +376,7 @@ async def test_set_time_message_with_invalid_time(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, response = await call_handler(
-        update, app, EditMeetingHandlerId.SET_TIME_MESSAGE, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+        EditMeetingHandlerId.SET_TIME_MESSAGE, update=update, app=app, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
     )
 
     assert response == ConversationMeetingState.EDIT_TIME
@@ -437,14 +437,15 @@ async def test_conversation_fallback_with_wrong_message_format(
 
     # Lets first trigger the conversation
     context, _ = await call_handler(
-        entry_point_update(update),
-        app,
         EditMeetingHandlerId.EDIT_TIME_CONVERSATION,
+        update=entry_point_update(update),
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
 
     # Now answer with a wrong message format
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CONVERSATION)
+    # Now answer with a wrong message format
+    context, _ = await call_handler(EditMeetingHandlerId.EDIT_TIME_CONVERSATION, update=update, app=app)
 
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
@@ -483,12 +484,12 @@ async def test_edit_time_can_be_cancelled(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(
-        entry_point_update(update),
-        app,
         EditMeetingHandlerId.EDIT_TIME_CONVERSATION,
+        update=entry_point_update(update),
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.EDIT_TIME_CONVERSATION)
+    context, _ = await call_handler(EditMeetingHandlerId.EDIT_TIME_CONVERSATION, update=update, app=app)
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 

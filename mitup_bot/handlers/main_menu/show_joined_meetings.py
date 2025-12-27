@@ -2,11 +2,11 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
 
 from .enums import MainMenuHandlerId
@@ -16,7 +16,7 @@ from .enums import MainMenuHandlerId
     MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, callback_data=cb.SHOW_JOINED_MEETINGS_PAGE, bindable=True
 )
 @with_async_session
-async def callback_query_show_joined_meetings(session: Session, update: Update, context: MitupContext):
+async def callback_query_show_joined_meetings(session: Session, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.SHOW_JOINED_MEETINGS_PAGE.parse(context.match), MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK
     )

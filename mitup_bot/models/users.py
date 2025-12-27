@@ -28,7 +28,11 @@ class User(BaseModel, SQLModel, table=True):
     username: str | None = None
     settings: Settings = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
     meetups: list[Meetup] = Relationship(back_populates="owner", cascade_delete=True)
-    joined_links: list[JoinedUsers] = Relationship(back_populates="user", cascade_delete=True)
+    joined_links: list[JoinedUsers] = Relationship(
+        back_populates="user",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "JoinedUsers.user_id"},
+    )
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
@@ -57,6 +61,11 @@ class User(BaseModel, SQLModel, table=True):
 
     @property
     def inline_name(self) -> str:
+        """
+        Name to use for the user in inline messages.
+
+        If the user has a username, use that, otherwise fall back to first name.
+        """
         return self.username or self.first_name
 
     @property

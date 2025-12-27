@@ -55,7 +55,7 @@ async def test_show_meetings_use_correct_view(
     ]
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, _ = await call_handler(update, app, MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
 
     user_meetings_buttons: list[ButtonConfig] = [
         ButtonConfig(text=str(link.meetup.title), callback_data=cb.SHOW_MEETING.with_id(link.meetup.db_id))
@@ -91,7 +91,7 @@ async def test_show_meetings_without_meetings_to_show_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     user_with_settings.meetups = []
 
-    context, _ = await call_handler(update, app, MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,

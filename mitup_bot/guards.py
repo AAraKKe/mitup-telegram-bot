@@ -1,8 +1,10 @@
 import logging
+from typing import cast
 
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
+from telegram import User as TgUser
 
 from mitup_bot.callback_data import (
     CallbackData,
@@ -12,7 +14,6 @@ from mitup_bot.callback_data import (
     ValidDateCallbackData,
     ValidMeetingCallbackData,
 )
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -26,7 +27,7 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, MessageBase
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
@@ -147,7 +148,7 @@ async def meeting_accessible(
     meeting_id: int,
     action: str,
     update: Update,
-    context: MitupContext,
+    context: TMitupContext,
     custom_keyboard: Keyboard | None = None,
 ) -> Meetup | None:
     """
@@ -187,3 +188,22 @@ async def meeting_accessible(
         ),
     )
     return None
+
+
+async def user_registered(
+    update: Update, session: Session, context: TMitupContext, alert_message: MessageBase
+) -> User | None:
+    """
+    Context manager that yields the current user if they are subscribed to the bot.
+    If the user is not subscribed, the callback query is answered with an allert showing the `alert_message`.
+    """
+    try:
+        return current_user(update, session)
+    except UserNotFound as e:
+        user = cast(TgUser, update.effective_user)  # We know the user exists here
+        if update.callback_query is None:
+            raise CallbackQueryNotSet(update) from e
+
+        await context.api.answer_callback_query(
+            update=update, text=alert_message.get(lang=user.language_code or "en"), show_alert=True
+        )

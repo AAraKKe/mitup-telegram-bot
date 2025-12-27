@@ -230,7 +230,7 @@ class HandlersRegistry:
             if handler_id in cls.handlers:
                 raise HandlerRegisteredError(handler_id)
 
-            async def inner_wrapper(update: Update, context: MitupContext):
+            async def inner_wrapper(update: Update, context: TMitupContext):
                 result = await callback(update, context)
                 if auto_answer:
                     assert update.callback_query is not None

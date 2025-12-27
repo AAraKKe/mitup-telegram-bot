@@ -74,7 +74,7 @@ async def test_edit_meeting_participants_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[1])
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[1]))
 
@@ -93,7 +93,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app)
 
         assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
@@ -134,7 +134,7 @@ async def test_edit_meeting_participants_failures(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app)
         if error_type is None:
             assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
             context.api.assert_edit_message_called(update, factory.main_menu_view())
@@ -154,7 +154,7 @@ async def test_edit_meeting_max_participants_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app)
 
     context.api.assert_send_message_called(update, edit_max_participants_view(user_with_settings.meetups[0]))
 
@@ -185,7 +185,7 @@ async def test_edit_meeting_max_participants_failures(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app)
 
     assert_metrics_for_failure(error_count, error_type, context)
 
@@ -204,7 +204,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK)
+        context, result = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app)
 
         assert result is ConversationHandler.END
         assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
@@ -243,7 +243,7 @@ async def test_edit_meeting_no_limit_participants_works(
     # Default value to assert that it has been changed
     meeting.max_members = 10
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app)
 
     mock_session.assert_flushed()
     assert not meeting.max_members
@@ -279,7 +279,9 @@ async def test_edit_meeting_no_limit_participants_failures(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+        context, result = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app
+        )
 
         if error_type is None:
             assert result is ConversationHandler.END
@@ -303,7 +305,9 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK)
+        context, result = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app
+        )
 
         assert result is ConversationHandler.END
         assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
@@ -335,7 +339,7 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[1])
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[1]))
     assert result is ConversationHandler.END
@@ -364,7 +368,7 @@ async def test_positive_filter_works(
     with pytest.raises(AssertionError):
         with caplog.at_level(logging.ERROR):
             # If the update is not a positive number, the handler should not be able to process it
-            _, _ = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE)
+            _, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE, update=update, app=app)
             assert "This update would not be processed by the handler!" in caplog.text
 
 
@@ -383,9 +387,9 @@ async def test_edit_meeting_max_participants_message_works(
     meeting.max_members = 10
 
     context, result = await call_handler(
-        update,
-        app,
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        update=update,
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
@@ -414,7 +418,7 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE)
+        context, result = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE, update=update, app=app)
         assert "User data 'meeting_id' requested but not set" in caplog.text
 
     assert meeting.location.name is None
@@ -441,9 +445,9 @@ async def test_edit_meeting_wrong_max_participants_works(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     context, result = await call_handler(
-        update,
-        app,
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
+        update=update,
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
     response_view = edit_max_participants_view(user_with_settings.meetups[0], fail=True)
@@ -465,7 +469,9 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE)
+        context, result = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE, update=update, app=app
+        )
         assert "User data 'meeting_id' requested but not set" in caplog.text
 
     assert meeting.max_members is None

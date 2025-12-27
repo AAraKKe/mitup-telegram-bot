@@ -5,11 +5,11 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId
 
@@ -18,7 +18,7 @@ from .enums import ConversationSettingsState, EditSettingsHandlerId
     EditSettingsHandlerId.TIMEOUT_CALLBACK, callback_data=cb.EDIT_TIMEOUT, bindable=False
 )
 @with_async_session
-async def callback_query_timeout(session: Session, update: Update, context: MitupContext):
+async def callback_query_timeout(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
     message = SettingsMessages.SET_TIMEOUT_SETTINGS.get(lang=user.lang, timeout=user.settings.timeout)
 
@@ -33,7 +33,7 @@ async def callback_query_timeout(session: Session, update: Update, context: Mitu
     EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT, PositiveNumberFilter(), bindable=False
 )
 @with_async_session
-async def settings_timeout_text_message_handler(session: Session, update: Update, context: MitupContext):
+async def settings_timeout_text_message_handler(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
     timeout_str = cast(str, guards.message(update).text)
 
@@ -52,7 +52,7 @@ async def settings_timeout_text_message_handler(session: Session, update: Update
 
 @HandlersRegistry.register_message(EditSettingsHandlerId.TIMEOUT_INVALID_INPUT, filters=filters.ALL, bindable=False)
 @with_async_session
-async def settings_timeout_invalid_input_handler(session: Session, update: Update, context: MitupContext):
+async def settings_timeout_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
     message = SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user.lang)
 

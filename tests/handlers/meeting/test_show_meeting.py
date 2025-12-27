@@ -54,7 +54,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
 
     mock_session.add_object(target_meeting)
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.SHOW_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, update=update, app=app)
 
     expected_view = target_meeting.main_view
     context.api.assert_edit_message_called(update, expected_view)

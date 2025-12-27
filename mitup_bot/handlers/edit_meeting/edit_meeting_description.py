@@ -5,13 +5,14 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
-from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
@@ -21,7 +22,7 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
     EditMeetingHandlerId.DESCRIPTION_CALLBACK, callback_data=cb.EDIT_MEETING_DESCRIPTION, bindable=False
 )
 @with_async_session
-async def callback_query_edit_meeting_description(session: Session, update: Update, context: MitupContext):
+async def callback_query_edit_meeting_description(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_edit_description_meeting")
 
     assert context.matches is not None
@@ -69,7 +70,7 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
 
 @HandlersRegistry.register_message(EditMeetingHandlerId.DESCRIPTION_MESSAGE, filters.TEXT, bindable=False)
 @with_async_session
-async def edit_description_meeting_message_handler(session: Session, update: Update, context: MitupContext):
+async def edit_description_meeting_message_handler(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into edit_description_meeting_message_handler")
 
     assert update.effective_message is not None

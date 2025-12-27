@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
-from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.messages import MessagesId
@@ -13,6 +13,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
@@ -23,7 +24,7 @@ from .views import edit_location_view
     EditMeetingHandlerId.LOCATION_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION, bindable=True
 )
 @with_async_session
-async def callback_edit_meeting_location(session: Session, update: Update, context: MitupContext):
+async def callback_edit_meeting_location(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_edit_meeting_location")
 
     callback_data = guards.valid_callback_data(
@@ -51,7 +52,7 @@ async def callback_edit_meeting_location(session: Session, update: Update, conte
     EditMeetingHandlerId.LOCATION_NAME_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION_NAME, bindable=False
 )
 @with_async_session
-async def callback_edit_meeting_location_name(session: Session, update: Update, context: MitupContext):
+async def callback_edit_meeting_location_name(session: Session, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_LOCATION_NAME.parse(context.match), EditMeetingHandlerId.LOCATION_NAME_CALLBACK
     )
@@ -96,7 +97,7 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
     bindable=False,
 )
 @with_async_session
-async def callback_cancel_edit_meeting_location_property(session: Session, update: Update, context: MitupContext):
+async def callback_cancel_edit_meeting_location_property(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_cancel_edit_meeting_location_property")
 
     await callback_edit_meeting_location(update, context)
@@ -110,7 +111,7 @@ async def callback_cancel_edit_meeting_location_property(session: Session, updat
     bindable=False,
 )
 @with_async_session
-async def callback_edit_meeting_location_coordinates(session: Session, update: Update, context: MitupContext):
+async def callback_edit_meeting_location_coordinates(session: Session, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_LOCATION_COORDINATES.parse(context.match),
         EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK,
@@ -154,7 +155,7 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
     EditMeetingHandlerId.LOCATION_NAME_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
 )
 @with_async_session
-async def edit_meeting_location_name(session: Session, update: Update, context: MitupContext):
+async def edit_meeting_location_name(session: Session, update: Update, context: TMitupContext):
     assert update.effective_message is not None
 
     user = guards.current_user(update, session)
@@ -183,7 +184,7 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
 
 @HandlersRegistry.register_message(EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE, filters.LOCATION, bindable=False)
 @with_async_session
-async def edit_meeting_location_coordinates(session: Session, update: Update, context: MitupContext):
+async def edit_meeting_location_coordinates(session: Session, update: Update, context: TMitupContext):
     assert update.effective_message is not None
 
     user = guards.current_user(update, session)
@@ -221,7 +222,7 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
     EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE, ~filters.LOCATION, bindable=False
 )
 @with_async_session
-async def edit_coordinates_without_location(session: Session, update: Update, context: MitupContext):
+async def edit_coordinates_without_location(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
 
     try:

@@ -22,7 +22,7 @@ async def test_cancel_edit_meeting_works(
     mock_session.add_object(meeting.owner, "tg_user_id")
 
     context, result = await call_handler(
-        update, app, EditMeetingHandlerId.CANCEL, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
+        EditMeetingHandlerId.CANCEL, update=update, app=app, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
     )
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -43,7 +43,10 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
 
     with caplog.at_level(logging.ERROR):
         context, result = await call_handler(
-            update, app, EditMeetingHandlerId.CANCEL, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
+            EditMeetingHandlerId.CANCEL,
+            update=update,
+            app=app,
+            with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123},
         )
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)

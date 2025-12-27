@@ -1,5 +1,5 @@
 # Stage 1: Builder - Install dependencies and build the package
-FROM python:3.14-slim-bookworm AS builder
+FROM python:3.14.0-slim-bookworm AS builder
 
 WORKDIR /build
 

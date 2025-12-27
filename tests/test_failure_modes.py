@@ -293,7 +293,9 @@ async def test_callback_fails_when_meeting_not_accessible(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED))
 
-    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -334,7 +336,9 @@ async def test_callback_fails_when_meeting_not_found(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -385,7 +389,9 @@ async def test_callback_fails_with_malformed_callback_data(
     update: Update,
     app: StubMitupApp,
 ):
-    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -420,7 +426,9 @@ async def test_callback_fails_when_user_is_not_found(
     app: StubMitupApp,
 ):
     # Do not register the user in the db and call the handler
-    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [
@@ -462,7 +470,9 @@ async def test_callback_fails_when_missing_necessary_user_data(
     # there is no need to add any.
     # If this test fails because the an object is not found in the database, it means that the
     # validation is not happening in the right place and the callback needs to be updated.
-    context, _ = await call_handler(update, app, test_context.handler_id, test_context.meeting_id)
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
 
     # This does not raise an exception but logs an error
     metric_names = test_context.metrics_emitted.metrics + [

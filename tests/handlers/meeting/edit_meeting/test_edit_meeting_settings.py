@@ -17,7 +17,7 @@ async def test_edit_default_options_view(
 
     expected_view = meeting.settings_view
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(update, expected_view)
 
@@ -106,7 +106,7 @@ async def test_callbacks_to_set_meeting_setting(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(meeting, query_field="id")
 
-    context, _ = await call_handler(update, app, handler_id)
+    context, _ = await call_handler(handler_id, update=update, app=app)
 
     expected_view = meeting.settings_view
 

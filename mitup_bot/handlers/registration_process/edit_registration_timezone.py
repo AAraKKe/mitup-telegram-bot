@@ -6,7 +6,6 @@ from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, timezone_api
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import EffectiveUserNotSet
 from mitup_bot.handlers.personal_filters import UserExistFilter
@@ -14,6 +13,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Settings, User
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import SettingsMessages
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
 from .enums import ConversationRegistrationProcessState, RegistrationProcessHandlerId
@@ -26,7 +26,7 @@ from .enums import ConversationRegistrationProcessState, RegistrationProcessHand
     bindable=False,
 )
 @with_async_session
-async def command_start_with_new_user(session: Session, update: Update, context: MitupContext):
+async def command_start_with_new_user(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into command_start_with_new_user")
 
     if update.effective_user is None:
@@ -52,7 +52,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
     RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT, bindable=False
 )
 @with_async_session
-async def registration_timezone_text_message_handler(session: Session, update: Update, context: MitupContext):
+async def registration_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into registration_timezone_text_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
 
@@ -89,7 +89,7 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION, filters.LOCATION, bindable=False
 )
 @with_async_session
-async def registration_timezone_location_message_handler(session: Session, update: Update, context: MitupContext):
+async def registration_timezone_location_message_handler(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into registration_timezone_location_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
 

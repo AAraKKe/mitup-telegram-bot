@@ -2,13 +2,13 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards, views
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import EditMeetingHandlerId
 
@@ -17,7 +17,7 @@ from .enums import EditMeetingHandlerId
     EditMeetingHandlerId.LANGUAGE_CALLBACK, callback_data=cb.EDIT_MEETING_LANGUAGE
 )
 @with_async_session
-async def callback_edit_meeting_language(session: Session, update: Update, context: MitupContext):
+async def callback_edit_meeting_language(session: Session, update: Update, context: TMitupContext):
     valid_data = guards.valid_callback_data(
         cb.EDIT_MEETING_LANGUAGE.parse(context.match), EditMeetingHandlerId.LANGUAGE_CALLBACK
     )
@@ -38,7 +38,7 @@ async def callback_edit_meeting_language(session: Session, update: Update, conte
     EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_MEETING_LANGUAGE
 )
 @with_async_session
-async def callback_set_meeting_language(session: Session, update: Update, context: MitupContext):
+async def callback_set_meeting_language(session: Session, update: Update, context: TMitupContext):
     valid_data = guards.valid_meeting_callback_data(
         cb.SET_MEETING_LANGUAGE.parse(context.match), EditMeetingHandlerId.SET_LANGUAGE_CALLBACK
     )

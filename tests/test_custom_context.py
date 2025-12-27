@@ -6,14 +6,13 @@ from aws_embedded_metrics.unit import Unit
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
-    MitupContext,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
 from mitup_bot.monitoring import Feature
 from tests.helpers import AnyFloat, StubMitupContext
 
 
-def test_add_and_remove_context(context: MitupContext):
+def test_add_and_remove_context(context: StubMitupContext):
     assert context.user_data is not None
 
     assert ContextId.EDIT_MEETING_LOCATION_NAME not in context.user_data.registry
@@ -25,7 +24,7 @@ def test_add_and_remove_context(context: MitupContext):
     assert ContextId.EDIT_MEETING_LOCATION_NAME not in context.user_data.registry
 
 
-def test_get_user_data_property_invalid_type(context: MitupContext):
+def test_get_user_data_property_invalid_type(context: StubMitupContext):
     context.user_data.registry[ContextId.EDIT_MEETING_LOCATION_NAME] = ContextData(meeting_id="broken")  # type: ignore
 
     with pytest.raises(ContextPropertyConversionError):
@@ -33,7 +32,7 @@ def test_get_user_data_property_invalid_type(context: MitupContext):
             pass
 
 
-def test_meeting_id_context_manager(context: MitupContext):
+def test_meeting_id_context_manager(context: StubMitupContext):
     assert context.user_data is not None
 
     # Set values before context manager
@@ -48,7 +47,7 @@ def test_meeting_id_context_manager(context: MitupContext):
     assert ContextId.EDIT_MEETING_LOCATION_NAME not in context.user_data.registry
 
 
-def test_error_raised_if_property_requested_but_not_set(context: MitupContext):
+def test_error_raised_if_property_requested_but_not_set(context: StubMitupContext):
     assert context.user_data is not None
 
     context.user_data.registry[ContextId.EDIT_MEETING_LOCATION_NAME] = ContextData()
@@ -58,7 +57,7 @@ def test_error_raised_if_property_requested_but_not_set(context: MitupContext):
             pass
 
 
-def test_context_manager_error_clean_user_data(context: MitupContext):
+def test_context_manager_error_clean_user_data(context: StubMitupContext):
     assert context.user_data is not None
 
     # Set values before context manager
@@ -74,7 +73,7 @@ def test_context_manager_error_clean_user_data(context: MitupContext):
     assert ContextId.EDIT_MEETING_LOCATION_NAME not in context.user_data.registry
 
 
-def test_context_manager_error_does_not_clean_data_if_requested(context: MitupContext):
+def test_context_manager_error_does_not_clean_data_if_requested(context: StubMitupContext):
     assert context.user_data is not None
 
     # Set values before context manager
@@ -90,7 +89,7 @@ def test_context_manager_error_does_not_clean_data_if_requested(context: MitupCo
     assert ContextId.EDIT_MEETING_LOCATION_NAME in context.user_data.registry
 
 
-def test_context_manager_error_does_not_clean_data_if_not_requested(context: MitupContext):
+def test_context_manager_error_does_not_clean_data_if_not_requested(context: StubMitupContext):
     assert context.user_data is not None
 
     # Set values before context manager
@@ -105,7 +104,7 @@ def test_context_manager_error_does_not_clean_data_if_not_requested(context: Mit
     assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
 
-def test_context_has_meeting_id(context: MitupContext):
+def test_context_has_meeting_id(context: StubMitupContext):
     assert context.user_data is not None
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)

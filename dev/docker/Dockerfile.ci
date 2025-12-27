@@ -1,7 +1,7 @@
 # This Dockerfile builds an image that includes the Python:3.13 image
 # with Hatch to allow executing pipeline jobs.
 # The image is built by a manual job in any pipeline
-FROM python:3.14-slim-bookworm
+FROM python:3.14.0-slim-bookworm
 
 # Combine all installations into a single RUN command to reduce image layers
 RUN apt-get update && \

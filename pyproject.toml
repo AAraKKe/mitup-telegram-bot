@@ -16,18 +16,18 @@ classifiers = [
 ]
 dependencies = [
     "python-telegram-bot[ext]==22.5",
-    "click~=8.3.0",
-    "python-dateutil",
-    "sqlalchemy~=2.0.25",
-    "psycopg2~=2.9",
-    "sqlmodel~=0.0.14",
-    "pydantic~=2.12.0",
-    "alembic~=1.6",
-    "rich~=14.0",
-    "tzdata~=2025.1",
-    "googlemaps~=4.10.0",
-    "aws-embedded-metrics~=3.3.0",
-    "pyyaml~=6.0",
+    "click==8.3.1",
+    "python-dateutil==2.9.0",
+    "sqlalchemy==2.0.45",
+    "psycopg2==2.9.11",
+    "sqlmodel==0.0.30",
+    "pydantic==2.12.5",
+    "alembic==1.17.2",
+    "rich==14.2.0",
+    "tzdata==2025.3",
+    "googlemaps==4.10.0",
+    "aws-embedded-metrics==3.3.1",
+    "pyyaml==6.0.3",
 ]
 
 [project.urls]
@@ -66,6 +66,7 @@ exclude = [
     "**/.mypy_cache/**",
     "**/.pytest_cache/**",
     "**/.hatch/**",
+    "**/.docker_hatch/**",
     "**/*.egg-info/**",
     "aws",
     "site",
@@ -174,6 +175,10 @@ quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
 
+[tool.ruff.lint.pyupgrade]
+# Preserves types for libraries (like Pydantic/SLQModel) that
+# rely on runtime type evaluation.
+keep-runtime-typing = true
 
 # --------------------------
 # Development/CI environment

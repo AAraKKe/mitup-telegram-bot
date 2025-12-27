@@ -5,7 +5,7 @@ preparation:
     - python --version
     - pip --version
     - hatch --version
-    - hatch run dev:pip list --local
+    - hatch run dev:uv tree
     - hatch env find
     - echo $PWD
 

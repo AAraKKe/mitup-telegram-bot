@@ -60,7 +60,7 @@ async def test_delete_meeting_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app)
 
     mock_session.assert_not_deleted()
     context.api.assert_send_message_called(
@@ -117,7 +117,7 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, handler_id)
+        context, _ = await call_handler(handler_id, update=update, app=app)
 
         assert f"User tried '{action}' with a meeting that does not exist." in caplog.text
         assert "Meeting id: 999, user id: 1" in caplog.text
@@ -175,7 +175,7 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     mock_session.add_object(meeting)
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, handler_id)
+        context, _ = await call_handler(handler_id, update=update, app=app)
 
         assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
         assert "Meeting id: 111, user id: 1" in caplog.text
@@ -195,7 +195,7 @@ async def test_confirm_delete_meeting_works(
     meeting_deleted = user_with_settings.meetups[0]
     mock_session.add_object(meeting_deleted)
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app)
 
     mock_session.assert_deleted(meeting_deleted)
 
@@ -224,7 +224,7 @@ async def test_decline_delete_meeting_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, update=update, app=app)
 
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
@@ -253,7 +253,7 @@ async def test_delete_meeting_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -276,7 +276,7 @@ async def test_confirm_delete_meeting_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -299,7 +299,7 @@ async def test_decline_delete_meeting_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, update=update, app=app)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -322,7 +322,7 @@ async def test_delete_meeting_with_invited_users_works(
 
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(update, app, MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK)
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app)
 
     expected_delete_query = f"DELETE FROM users WHERE users.id IN ({invited_user_1.user_id}, {invited_user_2.user_id})"
     assert expected_delete_query in mock_session.queries_executed

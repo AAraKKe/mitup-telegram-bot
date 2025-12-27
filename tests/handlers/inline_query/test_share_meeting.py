@@ -40,7 +40,7 @@ async def test_share_meeting(
     mock_session.add_object(meetup)
     mock_session.commit()
 
-    context, _ = await call_handler(update, app, InlineQueryId.SHARE_MEETING)
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, update=update, app=app)
 
     if should_share:
         context.api.assert_method_just_called("answer_inline_query")

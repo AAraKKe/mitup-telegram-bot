@@ -30,7 +30,7 @@ async def test_callback_edit_meeting_language(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.LANGUAGE_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.LANGUAGE_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(
         update,
@@ -66,7 +66,7 @@ async def test_callback_set_meeting_language(
     message2 = Message(message_id=222, chat_id=222, meetup=meeting)
     meeting.messages.extend([message1, message2])
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.SET_LANGUAGE_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
 
     # Verify the language was updated
     expected_language = SUPPORTED_LANGUAGES[new_language_idx]
@@ -124,7 +124,7 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
     ]
     meeting.messages.extend(messages)
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.SET_LANGUAGE_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
 
     # Verify all message keyboards were updated
     for message in messages:

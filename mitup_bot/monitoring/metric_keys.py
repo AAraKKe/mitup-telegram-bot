@@ -89,3 +89,4 @@ class Feature(CamelCaseStrEnum):
     LEAVE_MEETING = auto()
     KICK_OUT_PARTICIPANT = auto()
     MEETING_LANGUAGE_SET = auto()
+    INVITE_USERS = auto()

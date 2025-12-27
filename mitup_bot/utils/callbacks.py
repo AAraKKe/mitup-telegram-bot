@@ -29,6 +29,8 @@ DECLINE_DELETE_MEETING = CallbackData(action="decline_delete", entity="meeting")
 SHARE = CallbackData(action="share", entity="meeting")
 SHOW_IN_VIEWER_TIMEZONE = CallbackData(action="show", entity="meeting_in_tz")
 REACTIVATE_MEETING = CallbackData(action="reac", entity="meeting")
+CONFIRM_INVITE_USER = CallbackData(action="confirm", entity="invite")
+CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
 
 # ----------------------------------------
 # Edit meeting callbacks

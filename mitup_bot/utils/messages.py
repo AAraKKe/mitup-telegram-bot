@@ -231,6 +231,7 @@ class MeetingMessages(MessageBase):
     PARTICIPANT = "Participant"
     PARTICIPANTS = "Participants"
     MAX_PARTICIPANTS = "\\(Max: ${max_participants}\\)"
+    INVITED_BY_USER = "_\\(invited by ${user}\\)_"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
 
@@ -256,6 +257,32 @@ class MeetingMessages(MessageBase):
     PROMOTED_FROM_THE_WAITING_LIST = (
         "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
     )
+
+    # Invite users
+    INVITE_USER_PROMPT = "*Add to Guest List*\n\nPlease reply with the name of the person you want to add."
+    INVITE_USER_CONFIRMATION = (
+        "*Confirm Addition*\n\nAre you sure you want to add *${name}* to the meeting *${meeting_title}*?"
+    )
+    INVITE_USER_OPEN_CHAT = "Start Private Chat\n\nTo add participants, you need to open a chat with me first."
+    INVITE_USER_GO_PRIVATE = "Continue in Private\n\nPlease switch to our private chat to send me the name."
+    INVITE_USER_SUCCESS = "*List Updated*\n\nUser *${name}* has been added to the meeting *${meeting_title}*."
+    INVITE_USER_MEETING_FULL = (
+        "*No Spots Left*\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
+    )
+    INVITE_USER_INVITES_DISABLED = (
+        "*Guest List Closed*\n\n"
+        "New additions are no longer allowed for this meeting. The organizer has closed the list."
+    )
+    INVITE_USERS_MEETING_NOT_FOUND = (
+        "*That Was Unexpected...*\n\n"
+        "I suddenly lost track of the meeting details. This shouldn't happen.\n\n"
+        "Please try sending the name again."
+    )
+    INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK = (
+        "*Meeting Not Found*\n\nThe meeting you are trying to invite someone to does not exist anymore."
+    )
+    INVITE_USERS_CANCELED = "The invitation process has been canceled."
+    INVITE_USERS_UNEXPECTED_UPDATES = "Something unexpected happened while adding the invited user. Please try again."
 
     # Edit title and description
     EDIT_MEETING_TITLE = "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"

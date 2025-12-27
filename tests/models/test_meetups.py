@@ -41,8 +41,13 @@ def expected_location_name(lang: str, expected_name: str | None, expected_coordi
     )
 
 
-def expected_participants_message(max_participants: bool, lang: str) -> str:
-    total_participants = f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)}"
+def expected_participants_message(max_participants: bool, lang: str, n_participants: int) -> str:
+    participants = (
+        MeetingMessages.PARTICIPANT.get(lang=lang)
+        if n_participants == 1
+        else MeetingMessages.PARTICIPANTS.get(lang=lang)
+    )
+    total_participants = f"{n_participants} {participants}"
     max_participants_text = (
         f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5)}"
         if max_participants
@@ -61,6 +66,7 @@ def expected_message(
     coordinates: bool,
     max_participants: bool,
     incognito: bool,
+    invited_user: bool = False,
 ) -> str:
     str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang)
     str_date = "1987\\-07\\-17 01:59 \\(Europe/Madrid\\)" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
@@ -70,9 +76,13 @@ def expected_message(
         expected_name="Test Location" if location_name else None,
         expected_coordinates="\\[📍\\]" if coordinates else None,
     )
-    str_participants = expected_participants_message(max_participants, lang=lang)
+    str_participants = expected_participants_message(
+        max_participants, lang=lang, n_participants=2 if invited_user else 1
+    )
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
     str_participants = f"{incognito_prefix}{str_participants}\n  {owner}"
+    if invited_user:
+        str_participants += f"\n  invited\\_user {MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner)}"
 
     return (
         f"*Test Meeting* \\({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner)}\\)\n\n"
@@ -92,11 +102,16 @@ def expected_inline_message(
     coordinates: bool,
     max_participants: bool,
     incognito: bool,
+    invited_user: bool = False,
 ) -> str:
     owner = "john\\_doe" if username else "John"
-    str_participants = expected_participants_message(max_participants, lang=lang)
+    str_participants = expected_participants_message(
+        max_participants, lang=lang, n_participants=2 if invited_user else 1
+    )
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
     participants_list = "" if incognito else f"\n  {owner}"
+    if invited_user and not incognito:
+        participants_list += f"\n  invited\\_user {MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner)}"
     str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
 
     str_location = expected_location_name(
@@ -194,6 +209,7 @@ def test_meetup_location_string_conversion(
     ids=["inline_message", "normal_message"],
 )
 @pytest.mark.parametrize("incognito", [True, False], ids=["incognito", "no_incognito"])
+@pytest.mark.parametrize("invited_user", [True, False], ids=["with_invited_user", "without_invited_user"])
 def test_meetup_message(
     settings: Settings,
     description: bool,
@@ -203,9 +219,10 @@ def test_meetup_message(
     location_coordinates: bool,
     max_participants: bool,
     is_inline: bool,
-    expected_method: Callable[[str, bool, bool, bool, bool, bool, bool, bool], str],
+    expected_method: Callable[[str, bool, bool, bool, bool, bool, bool, bool, bool], str],
     lang: str,
     incognito: bool,
+    invited_user: bool,
 ):
     location = MeetupLocation(
         name="Test Location" if location_name else None,
@@ -229,6 +246,16 @@ def test_meetup_message(
     # Have at least one user joined to evaluate the list of user joined
     JoinedUsers(user=owner, meetup=meeting)
 
+    if invited_user:
+        invited = create_user(
+            id=2,
+            tg_user_id=2,
+            first_name="invited_user",
+            username="invited_user",
+            settings=settings,
+        )
+        JoinedUsers(user=invited, meetup=meeting, invited_by=owner)
+
     expected = expected_method(
         lang,
         description,
@@ -238,6 +265,7 @@ def test_meetup_message(
         location_coordinates,
         max_participants,
         incognito,
+        invited_user,
     )
 
     actual = meeting.inline_message if is_inline else meeting.message
@@ -537,14 +565,14 @@ def test_has_message(update: Update, meeting: Meetup, has_message: bool):
         (UpdateRequest(message=True, callback_query=False), 123, None, 123, None),
         (UpdateRequest(message=False, callback_query=True), 123, None, 123, None),
         (
-            UpdateRequest(message=False, callback_query=CallbackData(entity="test"), inline_message_id="123"),
+            UpdateRequest(message=False, callback_query=CallbackData(entity="test"), from_bot_chat=False),
             None,
-            "123",
+            "some_inline_message_id",
             None,
             "someinstance",
         ),
     ],
-    ids=["message", "callback_query", "inline_query"],
+    ids=["message", "callback_query_within_bot_chat", "callback_query_outside_bot_chat"],
     indirect=["update"],
 )
 def test_add_message_to_meeting_from_update(

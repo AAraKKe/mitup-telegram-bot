@@ -1,28 +1,35 @@
 import datetime as dt
 import os
 from collections.abc import Generator, Mapping
+from typing import cast
 from unittest import mock
 
 import pytest
 from click.testing import CliRunner, Result
 from pydantic import SecretStr
-from telegram import CallbackQuery, Chat, InlineQuery, Message, MessageEntity, Update, User
-from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
+from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
+from telegram.ext import Application
 
 from mitup_bot import db
-from mitup_bot.callback_data import CallbackData
 from mitup_bot.cli.cli_commands import MitupCliCommand
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
-from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring.metrics import configure_metrics
 from mitup_bot.translations import SUPPORTED_LANGUAGES
+from tests.helpers.constants import (
+    DEFAULT_CHAT_ID,
+    DEFAULT_MESSAGE_ID,
+    DEFAULT_TEST_DATE,
+    DEFAULT_TG_USER_PARAMS,
+)
 from tests.helpers.context import build_context
-from tests.helpers.fixtures import UpdateRequest, create_meetup
+from tests.helpers.conversation import ConversationTester
+from tests.helpers.fixtures import UpdateRequest, create_meetup, create_test_app, create_update
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.stub_db import MockDbSession
 from tests.helpers.types import CliRunner as TypeRunner
+from tests.helpers.types import StubMitupContext
 
 
 @pytest.fixture
@@ -130,45 +137,49 @@ def meeting(user_with_settings: UserModel) -> Meetup:
 
 @pytest.fixture(scope="session")
 def tg_chat() -> Chat:
-    return Chat(id=123, type="private")
+    return Chat(id=DEFAULT_CHAT_ID, type="private")
 
 
-@pytest.fixture(scope="session")
-def tg_user() -> User:
-    return User(id=123, first_name="MitupUser", is_bot=False, username="mitupsername")
-
-
-@pytest.fixture(scope="session")
-def tg_inline_query(tg_user: User) -> InlineQuery:
-    return InlineQuery(id="123", from_user=tg_user, query="example_query", offset="")
-
-
-@pytest.fixture(scope="session")
-def tg_message(tg_user: User, tg_chat: Chat) -> Message:
-    return Message(123, date=dt.datetime.now(), chat=tg_chat, from_user=tg_user, text="some text")
-
-
-@pytest.fixture(scope="session")
-def tg_callback_query(tg_user: User, tg_message: Message) -> CallbackQuery:
-    return CallbackQuery(id="123", from_user=tg_user, message=tg_message, chat_instance="someinstance")
-
-
-def callback_query_from_callback_data(
-    data: CallbackData, user: User, message: Message, inline_message_id: str | None
-) -> CallbackQuery:
-    if inline_message_id:
-        # If the request comes with inline_message_id, the update is requested form an inline sent message
-        return CallbackQuery(
-            id="123", from_user=user, data=str(data), chat_instance="someinstance", inline_message_id=inline_message_id
+# User is not a session fixture because the language can change trom test to test
+@pytest.fixture
+def tg_user(request: pytest.FixtureRequest) -> User:
+    # If we have requested the user_with_settings fixture
+    # set the user values to the samea s the one produced
+    # by the user model
+    if "user_with_settings" in request.fixturenames:
+        user_model = cast(UserModel, request.getfixturevalue("user_with_settings"))
+        return User(
+            id=user_model.tg_user_id,
+            first_name=user_model.first_name,
+            last_name=user_model.last_name,
+            username=user_model.username,
+            is_bot=False,
+            language_code=user_model.lang,
         )
-    return CallbackQuery(id="123", from_user=user, data=str(data), chat_instance="someinstance", message=message)
+    return User(**DEFAULT_TG_USER_PARAMS)
+
+
+@pytest.fixture
+def tg_inline_query(tg_user: User) -> InlineQuery:
+    return InlineQuery(id=str(DEFAULT_MESSAGE_ID), from_user=tg_user, query="example_query", offset="")
+
+
+@pytest.fixture
+def tg_message(tg_user: User, tg_chat: Chat) -> Message:
+    return Message(DEFAULT_MESSAGE_ID, date=DEFAULT_TEST_DATE, chat=tg_chat, from_user=tg_user, text="some text")
+
+
+@pytest.fixture
+def tg_callback_query(tg_user: User, tg_message: Message) -> CallbackQuery:
+    return CallbackQuery(
+        id=str(DEFAULT_MESSAGE_ID), from_user=tg_user, message=tg_message, chat_instance="someinstance"
+    )
 
 
 @pytest.fixture
 def update(
     tg_chat: Chat,
     tg_user: User,
-    tg_inline_query: InlineQuery,
     tg_message: Message,
     tg_callback_query: CallbackQuery,
     request: pytest.FixtureRequest,
@@ -176,71 +187,20 @@ def update(
     # Validate the request to include the necessary data
     if hasattr(request, "param"):
         data: UpdateRequest = request.param
+        return create_update(data, tg_chat, tg_user, tg_message, tg_callback_query)
     else:
         # If we are not passing a parameter to the fixture lets return a message update
-        return Update(123, message=tg_message)
-
-    if data.command:
-        bot_command = data.command if isinstance(data.command, str) else "test_command"
-        message = Message(
-            123,
-            date=dt.datetime.now(),
-            chat=tg_chat,
-            from_user=tg_user,
-            entities=[
-                MessageEntity(type=MessageEntity.BOT_COMMAND, offset=0, length=len(bot_command) + 1, user=tg_user)
-            ],
-            text=f"/{bot_command}",
-        )
-        return Update(123, message=message)
-
-    if data.callback_query:
-        query = (
-            callback_query_from_callback_data(data.callback_query, tg_user, tg_message, data.inline_message_id)
-            if isinstance(data.callback_query, CallbackData)
-            else tg_callback_query
-        )
-        return Update(123, callback_query=query)
-    if data.inline_query:
-        if isinstance(data.inline_query, InlineQuery):
-            return Update(123, inline_query=data.inline_query)
-        query_text = data.inline_query
-        return Update(123, inline_query=InlineQuery(id="123", from_user=tg_user, query=query_text, offset=""))
-    if not (data.user and data.message and data.chat):
-        # Any update that we manage in this bot has an associated user, chat or message:
-        # - CallbackQuery
-        # - Message
-        # - Inlinequery
-        # - Location
-        # If we want to validate that the update doesn't have an user we need to provide an empty update
-        return Update(123)
-
-    # If we have a message we will al ways have a chat and a user
-    # We are not dealing yet with types of updates that can have a chat without a message
-    return Update(
-        123,
-        Message(
-            123,
-            date=dt.datetime.now(),
-            chat=tg_chat,
-            from_user=tg_user,
-            text=data.message_text,
-            location=data.location,
-        ),
-    )
+        return Update(DEFAULT_MESSAGE_ID, message=tg_message)
 
 
 @pytest.fixture
 def app() -> Application:
-    builder = ApplicationBuilder()
-    # The bot needs to be set but we canont allow it to have defaults or
-    # extra configurations will be set for the scheduler. Lets force it to not
-    # have any configuration to make sure the schedulers use default values.
-    bot = mock.MagicMock(spec=ExtBot)
-    bot.defaults = None
-    builder.bot(bot)
-    builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
-    return builder.build()
+    return create_test_app()
+
+
+@pytest.fixture
+def conversation(app: Application, tg_user: User, tg_chat: Chat) -> ConversationTester:
+    return ConversationTester(app=app, user=tg_user, chat=tg_chat)
 
 
 @pytest.fixture
@@ -258,7 +218,7 @@ def cli() -> TypeRunner:
 
 
 @pytest.fixture
-def context(app: Application, update: Update) -> MitupContext:
+def context(app: Application, update: Update) -> StubMitupContext:
     return build_context(update, app)
 
 

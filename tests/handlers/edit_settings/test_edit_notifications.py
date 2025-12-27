@@ -52,7 +52,7 @@ async def test_callback_query_notifications(
     user_with_settings.settings.notification = notifications_enabled
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(update, app, EditSettingsHandlerId.NOTIFICATIONS_CALLBACK)
+    context, result = await call_handler(EditSettingsHandlerId.NOTIFICATIONS_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(
         update,
@@ -77,7 +77,7 @@ async def test_callback_query_toggle_notifications(
     user_with_settings.settings.notification = notifications_enabled
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(update, app, EditSettingsHandlerId.TOGGLE_NOTIFICATIONS)
+    context, result = await call_handler(EditSettingsHandlerId.TOGGLE_NOTIFICATIONS, update=update, app=app)
 
     user_with_settings.settings.notification = not notifications_enabled
     mock_session.assert_flushed()
@@ -95,7 +95,7 @@ async def test_callback_query_set_notification_time(
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(update, app, EditSettingsHandlerId.SET_NOTIFICATION_TIME)
+    context, result = await call_handler(EditSettingsHandlerId.SET_NOTIFICATION_TIME, update=update, app=app)
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
@@ -113,7 +113,9 @@ async def test_settings_notification_time_text_message_handler(
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(update, app, EditSettingsHandlerId.NOTIFICATION_TIME_MESSAGE_WITH_TEXT)
+    context, result = await call_handler(
+        EditSettingsHandlerId.NOTIFICATION_TIME_MESSAGE_WITH_TEXT, update=update, app=app
+    )
 
     expected_success_view = expected_view(
         user_with_settings, user_with_settings.settings.notification, 10
@@ -141,7 +143,8 @@ async def test_settings_notification_time_invalid_input_handler(
     # First call the conversation handler with the valid callback
     telegram_user = telegram_user_from_user(user_with_settings)
     context, _ = await call_handler(
-        Update(
+        EditSettingsHandlerId.NOTIFICATION_CONVERSATION,
+        update=Update(
             1,
             callback_query=CallbackQuery(
                 id="123",
@@ -151,12 +154,11 @@ async def test_settings_notification_time_invalid_input_handler(
                 message=update.effective_message,
             ),
         ),
-        app,
-        EditSettingsHandlerId.NOTIFICATION_CONVERSATION,
+        app=app,
     )
 
     # Now that we are in the conversation, we will call the conversation handler with a text message with invalid input
-    context, _ = await call_handler(update, app, EditSettingsHandlerId.NOTIFICATION_CONVERSATION)
+    context, _ = await call_handler(EditSettingsHandlerId.NOTIFICATION_CONVERSATION, update=update, app=app)
 
     # Check we have sent the proper message
     expected_view = factory.change_settings_element_view(
@@ -177,7 +179,7 @@ async def test_settings_notification_time_invalid_input_handler(
     )
 
     context, _ = await call_handler(
-        Update(1, message=correct_message), app, EditSettingsHandlerId.NOTIFICATION_CONVERSATION
+        EditSettingsHandlerId.NOTIFICATION_CONVERSATION, update=Update(1, message=correct_message), app=app
     )
 
     assert user_with_settings.settings.notification_time == 10

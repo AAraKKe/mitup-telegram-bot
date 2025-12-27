@@ -5,16 +5,15 @@ import pytest
 from telegram import CallbackQuery, Chat, Location, Message, Update
 from telegram import User as TelegramUser
 
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
-from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import MockDbSession, StubMitupApp, StubMitupContext, UpdateRequest, call_handler
 
 
-async def enter_conversation(chat: Chat, user: TelegramUser, app: StubMitupApp) -> tuple[MitupContext, Update]:
+async def enter_conversation(chat: Chat, user: TelegramUser, app: StubMitupApp) -> tuple[StubMitupContext, Update]:
     # Start the conversation for meeting creation
 
     entry_callback_data_str = str(cb.CREATE_MEETING)
@@ -36,7 +35,7 @@ async def enter_conversation(chat: Chat, user: TelegramUser, app: StubMitupApp) 
     )
     entry_update = Update(update_id=1001, callback_query=entry_callback_query)
 
-    entry_context, _ = await call_handler(entry_update, app, MeetingHandlerId.CREATE_MEETING_CONVERSATION)
+    entry_context, _ = await call_handler(MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=entry_update, app=app)
 
     return entry_context, entry_update
 
@@ -63,7 +62,7 @@ async def test_meeting_creation_successful(
     entry_context, entry_update = await enter_conversation(chat, user, app)
 
     # We now process the new update with the title of the meeting
-    context, _ = await call_handler(update, app, MeetingHandlerId.CREATE_MEETING_CONVERSATION)
+    context, _ = await call_handler(MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=update, app=app)
 
     # We should have created a new meeting
     assert len(mock_session.objects_added) == 1
@@ -97,7 +96,7 @@ async def test_meeting_creation_cancelled(
     await enter_conversation(chat, user, app)
 
     # We now process the new update with the title of the meeting
-    context, _ = await call_handler(update, app, MeetingHandlerId.CREATE_MEETING_CONVERSATION)
+    context, _ = await call_handler(MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=update, app=app)
 
     # No meeting has been crated
     assert len(mock_session.objects_added) == 0
@@ -144,7 +143,9 @@ async def test_filter_messages_without_text_in_conversation(
 
     expected_invalid_title_message = MeetingMessages.INVALID_TITLE.get(lang=user_with_settings.lang)
 
-    invalid_title_context, _ = await call_handler(invalid_msg_update, app, MeetingHandlerId.CREATE_MEETING_CONVERSATION)
+    invalid_title_context, _ = await call_handler(
+        MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=invalid_msg_update, app=app
+    )
 
     expected_invalid_title_view = views_factory.create_meeting_view(
         lang=user_with_settings.lang, message=expected_invalid_title_message

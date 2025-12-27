@@ -6,7 +6,7 @@ from typing import Any, TypeVar, Union
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot, JobQueue
 
-from mitup_bot.api_wrapper import TelegramApi
+from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.monitoring import MitupMetricsEngine, MitupMetricsLogger
 
@@ -27,7 +27,7 @@ UT = TypeVar("UT", bound=Update)
 HandlerCallback = Callable[[Update, MitupContext], Coroutine[Any, Any, RT]]
 """Type to define the callback of a given handler"""
 
-TMitupContext = MitupContext[ExtBot, TelegramApi, MitupMetricsEngine[MitupMetricsLogger]]
+TMitupContext = MitupContext[ExtBot, TelegramApiWrapper, MitupMetricsEngine[MitupMetricsLogger]]
 """Standard type of MitupContext used through the project"""
 
 TMitupEngine = MitupMetricsEngine[MitupMetricsLogger]

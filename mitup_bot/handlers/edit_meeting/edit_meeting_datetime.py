@@ -8,13 +8,14 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
-from mitup_bot.custom_context import ContextId, MitupContext
+from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
@@ -33,7 +34,7 @@ def safe_anchor_date(meeting_datetime: dt.datetime | None, user_now: dt.datetime
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.DATE_CALLBACK, callback_data=cb.EDIT_MEETING_DATE)
 @with_async_session
-async def callback_edit_meeting_date(session: Session, update: Update, context: MitupContext):
+async def callback_edit_meeting_date(session: Session, update: Update, context: TMitupContext):
     """
     This callback is called whenever we either tap on the edit date button in the meeting edit view or when we
     navigate through the calendar view.
@@ -84,7 +85,7 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
     EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, callback_data=cb.DELETE_MEETING_DATE
 )
 @with_async_session
-async def callback_delete_date_time(session: Session, update: Update, context: MitupContext):
+async def callback_delete_date_time(session: Session, update: Update, context: TMitupContext):
     """
     This callback is called when the user wants to delete the date and time of the meeting.
     """
@@ -117,7 +118,7 @@ async def callback_delete_date_time(session: Session, update: Update, context: M
 
 
 async def handle_first_datetime_set(
-    session: Session, context: MitupContext, update: Update, meeting: Meetup, cb_date: dt.date
+    session: Session, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ):
     # If the meeting already has a datetime, update the date
     meeting.datetime = dt.datetime.combine(cb_date, dt.time(23, 59, tzinfo=meeting.timezone)).astimezone(dt.UTC)
@@ -154,7 +155,7 @@ async def handle_first_datetime_set(
 
 
 async def handle_datetime_update(
-    session: Session, context: MitupContext, update: Update, meeting: Meetup, cb_date: dt.date
+    session: Session, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ):
     # If the meeting already has a datetime, update the date
     meeting.datetime = dt.datetime.combine(
@@ -182,7 +183,7 @@ async def handle_datetime_update(
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.SET_DATE_CALLBACK, callback_data=cb.SET_MEETING_DATE)
 @with_async_session
-async def callback_set_meeting_date(session: Session, update: Update, context: MitupContext):
+async def callback_set_meeting_date(session: Session, update: Update, context: TMitupContext):
     """
     The `SET_MEETING_DATE` callback is used only when a given date wants to be set
     on the meeting by tapping on a specific date on the calendar.
@@ -209,7 +210,7 @@ async def callback_set_meeting_date(session: Session, update: Update, context: M
     EditMeetingHandlerId.EDIT_TIME_CALLBACK, callback_data=cb.EDIT_MEETING_TIME, bindable=False
 )
 @with_async_session
-async def callback_set_meeting_time(session: Session, update: Update, context: MitupContext):
+async def callback_set_meeting_time(session: Session, update: Update, context: TMitupContext):
     """
     This callback method is the entry point for a conversation to set the time of the meeting. This can happen
     either by taping on the edit time button on the edit meeting view or by setting the time after setting the date.
@@ -259,7 +260,7 @@ async def callback_set_meeting_time(session: Session, update: Update, context: M
     filters=filters.Regex(r"^(?P<hour>\d{2}):(?P<minutes>\d{2})$"),
 )
 @with_async_session
-async def set_time_message(session: Session, update: Update, context: MitupContext):
+async def set_time_message(session: Session, update: Update, context: TMitupContext):
     """
     This is the callback that should read the time from the user and set it on the meeting. Only messages with the
     format HH:MM are accepted.
@@ -311,7 +312,7 @@ async def set_time_message(session: Session, update: Update, context: MitupConte
         return ConversationHandler.END
 
 
-async def fallback_answer(session: Session, update: Update, context: MitupContext):
+async def fallback_answer(session: Session, update: Update, context: TMitupContext):
     """
     This is the fallback answer when the user sends a message that does not match the expected format for the time.
     """
@@ -332,7 +333,7 @@ async def fallback_answer(session: Session, update: Update, context: MitupContex
     filters=filters.TEXT,
 )
 @with_async_session
-async def wrong_message_sent_for_time(session: Session, update: Update, context: MitupContext):
+async def wrong_message_sent_for_time(session: Session, update: Update, context: TMitupContext):
     """
     This handler is intended as a fallback on the conversation when a text not matching the expected format is sent.
     """
@@ -347,7 +348,7 @@ async def wrong_message_sent_for_time(session: Session, update: Update, context:
     filters=~filters.TEXT,
 )
 @with_async_session
-async def wrong_message_type_sent_for_time(session: Session, update: Update, context: MitupContext):
+async def wrong_message_type_sent_for_time(session: Session, update: Update, context: TMitupContext):
     """
     This handler is intended as a fallback on the conversation when a message that is not text is sent
     """

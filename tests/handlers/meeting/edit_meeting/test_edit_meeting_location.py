@@ -91,7 +91,7 @@ async def test_edit_location_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
+    context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(update, edit_location_view(user_with_settings.meetups[0]))
 
@@ -110,7 +110,7 @@ async def test_edit_location_meeting_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, update=update, app=app)
         # For the test case where we don´t fail but log a warning and go to main menu
         assert "User tried 'Edit location' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
@@ -151,7 +151,7 @@ async def test_edit_location_failures(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, update=update, app=app)
 
     assert_metrics_for_failure(1, error_type, context)
 
@@ -167,7 +167,7 @@ async def test_edit_location_name_works(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, update=update, app=app)
     expected_view = MitupView(
         description=MeetingMessages.EDIT_MEETING_LOCATION_NAME.get(lang=user_with_settings.lang),
         keyboard=[
@@ -201,7 +201,7 @@ async def test_edit_location_name_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
+        context, result = await call_handler(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, update=update, app=app)
         # If the meeting id is not found, check we have ended the conversation
         assert result is ConversationHandler.END
         assert "User tried 'Edit location name' with a meeting that does not belong to them." in caplog.text
@@ -243,7 +243,7 @@ async def test_edit_location_name_failures(
     mock_session.add_object(user, "tg_user_id")
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, update=update, app=app)
 
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -262,7 +262,7 @@ async def test_edit_location_coordinates_works(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, update=update, app=app)
     expected_view = MitupView(
         description=MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES.get(lang=user_with_settings.lang),
         keyboard=[
@@ -296,7 +296,7 @@ async def test_edit_location_coordinates_not_owned(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK)
+        context, result = await call_handler(EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, update=update, app=app)
         # If the meeting id is not found, check we have ended the conversation
         assert result is ConversationHandler.END
         assert "User tried 'Edit location coordinates' with a meeting that does not belong to them." in caplog.text
@@ -339,7 +339,7 @@ async def test_edit_location_coordinates_failures(
     mock_session.add_object(user, "tg_user_id")
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK)
+        context, _ = await call_handler(EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, update=update, app=app)
 
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
@@ -359,9 +359,9 @@ async def test_edit_location_name_message_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, result = await call_handler(
-        update,
-        app,
         EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
+        update=update,
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 1},
     )
     expected_view = edit_location_view(meeting).with_context(
@@ -389,7 +389,7 @@ async def test_edit_location_name_message_fails_if_context_not_saved(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_NAME_MESSAGE)
+        context, result = await call_handler(EditMeetingHandlerId.LOCATION_NAME_MESSAGE, update=update, app=app)
         assert "User data 'meeting_id' requested but not set" in caplog.text
 
     assert meeting.location.name is None
@@ -410,9 +410,9 @@ async def test_edit_location_coordinates_message_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, result = await call_handler(
-        update,
-        app,
         EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
+        update=update,
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
     expected_view = edit_location_view(meeting).with_context(
@@ -440,7 +440,7 @@ async def test_edit_location_coordinates_message_fails_if_context_not_saved(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE)
+        context, result = await call_handler(EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE, update=update, app=app)
         assert "User data 'meeting_id' requested but not set" in caplog.text
 
     assert meeting.location.coordinates is None
@@ -461,9 +461,9 @@ async def test_edit_location_coordinates_message_with_wrong_message(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, result = await call_handler(
-        update,
-        app,
         EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE,
+        update=update,
+        app=app,
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
 
@@ -497,7 +497,9 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
-        context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE)
+        context, result = await call_handler(
+            EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE, update=update, app=app
+        )
         assert "User data 'meeting_id' requested but not set" in caplog.text
 
     assert result is ConversationHandler.END
@@ -516,7 +518,7 @@ async def test_cancel_edit_meeting_location_property_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, result = await call_handler(update, app, EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK)
+    context, result = await call_handler(EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK, update=update, app=app)
 
     context.api.assert_edit_message_called(update, edit_location_view(user_with_settings.meetups[0]))
     assert result is ConversationHandler.END

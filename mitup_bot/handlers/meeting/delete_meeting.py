@@ -5,11 +5,11 @@ from sqlmodel import Session, delete
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
 
 from ..registry import HandlersRegistry
@@ -20,7 +20,7 @@ from .enums import MeetingHandlerId
     MeetingHandlerId.DELETE_MEETING_CALLBACK, callback_data=cb.DELETE_MEETING, bindable=True
 )
 @with_async_session
-async def callback_query_delete_meeting(session: Session, update: Update, context: MitupContext):
+async def callback_query_delete_meeting(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_delete_meeting")
 
     callback_data = guards.valid_callback_data(
@@ -64,7 +64,7 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
     MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, callback_data=cb.CONFIRM_DELETE_MEETING, bindable=True
 )
 @with_async_session
-async def callback_query_confirm_delete_meeting(session: Session, update: Update, context: MitupContext):
+async def callback_query_confirm_delete_meeting(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_confirm_delete_meeting")
 
     callback_data = guards.valid_callback_data(
@@ -110,7 +110,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
     MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, callback_data=cb.DECLINE_DELETE_MEETING, bindable=True
 )
 @with_async_session
-async def callback_query_decline_delete_meeting(session: Session, update: Update, context: MitupContext):
+async def callback_query_decline_delete_meeting(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_decline_delete_meeting")
 
     callback_data = guards.valid_callback_data(

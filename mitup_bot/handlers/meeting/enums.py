@@ -1,4 +1,4 @@
-from enum import auto
+from enum import Enum, auto
 
 from mitup_bot.handler_id import HandlerId
 
@@ -13,3 +13,21 @@ class MeetingHandlerId(HandlerId):
     DELETE_MEETING_CALLBACK = auto()
     CONFIRM_DELETE_MEETING_CALLBACK = auto()
     DECLINE_DELETE_MEETING_CALLBACK = auto()
+
+    # Join and leave actions
+    JOIN = auto()
+    LEAVE = auto()
+
+    # Invite users
+    INVITE_USERS_CALLBACK = auto()
+    INVITE_USERS_CONVERSATION = auto()
+    INVITE_USERS_NAME_MESSAGE = auto()
+    INVITE_USERS_CONFIRM_CALLBACK = auto()
+    INVITE_USERS_DECLINE_CALLBACK = auto()
+    INVITE_USERS_CANCEL_CALLBACK = auto()
+    INVITE_USERS_FALLBACK = auto()
+
+
+class ConversationInviteState(Enum):
+    NAME = auto()
+    CONFIRMATION = auto()

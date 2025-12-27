@@ -36,7 +36,7 @@ def assert_awaited_with_diff(method: mock.AsyncMock, times: int, *args, **kwargs
             f"Expected '{method._mock_name}' to be awaited {times} times, but was awaited {method.await_count} times."
         )
 
-    if expected_call not in method.await_args_list:
+    if expected_call not in method.await_args_list and times > 0:
         diffs = [
             DeepDiff(
                 (expected_call.args, expected_call.kwargs),

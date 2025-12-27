@@ -90,7 +90,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         return hash(self) == hash(other) if isinstance(other, Meetup) else NotImplemented
 
     def is_owned_by(self, user: User) -> bool:
-        return self.owner_id == user.db_id
+        return self.owner.db_id == user.db_id
 
     @property
     def n_participants(self) -> int:
@@ -128,7 +128,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         # Check if someone in the waiting list can be promoted to the joined list
         return [] if self.full else self.promote_from_waiting_list()
 
-    def add_participant(self, user: User) -> JoinedUsers | None:
+    def add_participant(self, user: User, invited_by: User | None = None) -> JoinedUsers | None:
         """
         Add the user to the meeting. If the meeting is full, the user will be added to the waiting list
         if it is enabled.
@@ -137,16 +137,16 @@ class Meetup(BaseModel, SQLModel, table=True):
         """
 
         if self.full:
-            return self.create_joined_link(user, True) if self.waiting_list else None
-        return self.create_joined_link(user, False)
+            return self.create_joined_link(user, True, invited_by) if self.waiting_list else None
+        return self.create_joined_link(user, False, invited_by)
 
-    def create_joined_link(self, user: User, is_waiting_list: bool) -> JoinedUsers:
+    def create_joined_link(self, user: User, is_waiting_list: bool, invited_by: User | None = None) -> JoinedUsers:
         """
         Create a new JoinedUsers instance and add it to the meeting if it is not already in the list.
         """
         from mitup_bot.models import JoinedUsers
 
-        joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=is_waiting_list)
+        joined_link = JoinedUsers(user=user, meetup=self, is_waiting_list=is_waiting_list, invited_by=invited_by)
         # This check is done explicitly to avoid duplicates which chan happen during tests
         # or depending on how the session is being used
         if joined_link not in self.joined_links:
@@ -286,12 +286,8 @@ class Meetup(BaseModel, SQLModel, table=True):
 
         If there are users in the waiting list, they are shown after the participants with a separator and a title.
         """
-        participant_list = [
-            sanitize(link.user.inline_name, full=True) for link in self.joined_links if not link.is_waiting_list
-        ]
-        waiting_list = [
-            sanitize(link.user.inline_name, full=True) for link in self.joined_links if link.is_waiting_list
-        ]
+        participant_list = [link.participant_name for link in self.joined_links if not link.is_waiting_list]
+        waiting_list = [link.participant_name for link in self.joined_links if link.is_waiting_list]
         final_list = f"\n  {'\n  '.join(participant_list)}" if participant_list else ""
 
         if waiting_list:
@@ -485,6 +481,10 @@ class Meetup(BaseModel, SQLModel, table=True):
             ],
         )
 
+    def view_for(self, user: User) -> MitupView:
+        """Get the appropriate view for the given user depending on whether they own the meeting or not."""
+        return self.main_view if self.is_owned_by(user) else self.external_view
+
     @property
     def edit_view(self) -> MitupView:
         now_in_tz: dt.datetime = self.datetime_in_tz or self.owner.now_in_tz()
@@ -611,6 +611,17 @@ class Meetup(BaseModel, SQLModel, table=True):
                 ),
             ],
         ]
+
+        # Invite should appear in between join and leave
+        if self.allow_invitation:
+            keyboard[0].insert(
+                1,
+                ButtonConfig(
+                    text=ButtonMessages.INVITE.get(lang=self.lang),
+                    callback_data=cb.INVITE.with_id(self.db_id),
+                ),
+            )
+
         if self.show_timezone:
             keyboard.append(
                 [
@@ -632,16 +643,26 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @overload
     @classmethod
-    def by_id(cls, session: Session, meetup_id: int, must_exist: Literal[True]) -> Self: ...  # pragma: no cover
+    def by_id(
+        cls, session: Session, meetup_id: int, must_exist: Literal[True], include_inactive: bool = False
+    ) -> Self: ...  # pragma: no cover
 
     @overload
     @classmethod
-    def by_id(cls, session: Session, meetup_id: int, must_exist: bool = ...) -> Self | None: ...  # pragma: no cover
+    def by_id(
+        cls, session: Session, meetup_id: int, must_exist: bool = ..., include_inactive: bool = False
+    ) -> Self | None: ...  # pragma: no cover
 
     @classmethod
-    def by_id(cls, session: Session, meetup_id: int, must_exist: bool = False) -> Self | None:
+    def by_id(
+        cls,
+        session: Session,
+        meetup_id: int,
+        must_exist: bool = False,
+        include_inactive: bool = True,
+    ) -> Self | None:
         statement = select(cls).where(cls.id == meetup_id)
-        if (found_meetup := session.exec(statement).first()) is not None:
+        if (found_meetup := session.exec(statement).first()) is not None and (found_meetup.active or include_inactive):
             return found_meetup
 
         if must_exist:

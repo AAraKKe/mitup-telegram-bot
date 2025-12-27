@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import auto
 from time import perf_counter
+from typing import Generic, TypeVar
 
 from aws_embedded_metrics.unit import Unit
 from telegram import Update
@@ -30,6 +31,7 @@ from mitup_bot.monitoring import (
 class ContextId(CamelCaseStrEnum):
     """Enum that identifies the different contexts that can be stored in the MitupUserData registry."""
 
+    # Edit Meeting Contexts
     EDIT_MEETING_TITLE = auto()
     EDIT_MEETING_DESCRIPTION = auto()
     EDIT_MEETING_LOCATION_NAME = auto()
@@ -38,12 +40,16 @@ class ContextId(CamelCaseStrEnum):
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = auto()
     EDIT_MEETING_TIME = auto()
 
+    # Invite users
+    INVITE_USERS = auto()
+
 
 @dataclass
 class ContextData:
     """Data class that represents the data to be stored per user in the MitupUserData registry."""
 
     meeting_id: int | None = None
+    text: str | None = None
 
 
 @dataclass
@@ -58,12 +64,22 @@ class MitupUserData:
     def store_meeting_id(self, context: ContextId, meeting_id: int):
         self.registry.setdefault(context, ContextData()).meeting_id = meeting_id
 
+    def store_text(self, context: ContextId, text: str):
+        self.registry.setdefault(context, ContextData()).text = text
+
     def has_meeting_id(self, context: ContextId) -> bool:
         return context in self.registry and self.registry[context].meeting_id is not None
 
 
-class MitupContext[TB: ExtBot, TAPI: TelegramApiWrapper, TME: MitupMetricsEngine](
-    CallbackContext[TB, MitupUserData, dict, dict]
+# Use old syntax to allow defining covariance
+TB = TypeVar("TB", bound=ExtBot, covariant=True)
+TAPI = TypeVar("TAPI", bound=TelegramApiWrapper, covariant=True)
+TME = TypeVar("TME", bound=MitupMetricsEngine, covariant=True)
+
+
+class MitupContext(
+    CallbackContext[TB, MitupUserData, dict, dict],  # type: ignore (ignore TB)
+    Generic[TB, TAPI, TME],  # noqa: UP046
 ):
     """
     Custom context for the Mitup bot that includes several utilities.
@@ -146,6 +162,11 @@ class MitupContext[TB: ExtBot, TAPI: TelegramApiWrapper, TME: MitupMetricsEngine
         """Retrive the meeting id stored in given context and remove it once out of the context manager"""
         yield from self.__get_user_data_property(context, "meeting_id", int, ensure_clean=ensure_clean)
 
+    @contextmanager
+    def text(self, context: ContextId, ensure_clean=True) -> Generator[str]:
+        """Retrive the text stored in given context and remove it once out of the context manager"""
+        yield from self.__get_user_data_property(context, "text", str, ensure_clean=ensure_clean)
+
     def has_meeting_id(self, context: ContextId) -> bool:
         if self.user_data is None:  # pragma: no cover
             return False
@@ -159,6 +180,15 @@ class MitupContext[TB: ExtBot, TAPI: TelegramApiWrapper, TME: MitupMetricsEngine
         self.handler_metrics_logger.set_property("StoredMeetingId", meeting_id)
         self.handler_metrics_logger.set_property("ContextId", context.value)
         self.emit_metric("StoredMeetingId", 1, unit=Unit.COUNT)
+
+    def store_text(self, context: ContextId, text: str):
+        if self.user_data is None:  # pragma: no cover
+            raise InvalidUserData("User data requested but not set")
+
+        self.user_data.store_text(context, text)
+        self.handler_metrics_logger.set_property("ContextId", context.value)
+        self.handler_metrics_logger.set_property("StoredText", text)
+        self.emit_metric("StoredContextText", 1, unit=Unit.COUNT)
 
     def clean_user_data(self, contexts: list[ContextId]):
         if self.user_data is None:  # pragma: no cover

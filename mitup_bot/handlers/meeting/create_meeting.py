@@ -6,13 +6,13 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
-from mitup_bot.custom_context import MitupContext
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.mitup_types import TMitupContext
 
 from ..main_menu.show_main_menu import callback_query_main_menu
 from .enums import MeetingHandlerId
@@ -26,7 +26,7 @@ class ConversationMeetingState(Enum):
     MeetingHandlerId.CREATE_MEETING_CALLBACK, callback_data=cb.CREATE_MEETING, bindable=False
 )
 @with_async_session
-async def callback_query_create_meeting(session: Session, update: Update, context: MitupContext):
+async def callback_query_create_meeting(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_create_meeting")
 
     user = guards.current_user(update, session)
@@ -41,7 +41,7 @@ async def callback_query_create_meeting(session: Session, update: Update, contex
     MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
 )
 @with_async_session
-async def create_meeting_message_handler(session: Session, update: Update, context: MitupContext):
+async def create_meeting_message_handler(session: Session, update: Update, context: TMitupContext):
     assert update.effective_chat is not None
 
     title = guards.message(update).text
@@ -74,7 +74,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK, callback_data=cb.CANCEL_CREATE_MEETING, bindable=False
 )
-async def callback_query_cancel_meeting(update: Update, context: MitupContext):
+async def callback_query_cancel_meeting(update: Update, context: TMitupContext):
     logging.debug("Enter into callback_query_cancel_meeting")
 
     # Just send the user to the main menu
@@ -88,7 +88,7 @@ async def callback_query_cancel_meeting(update: Update, context: MitupContext):
     MeetingHandlerId.CREATE_MEETING_TITLE_INVALID, ~filters.TEXT | filters.COMMAND, bindable=False
 )
 @with_async_session
-async def filter_messages_without_text(session: Session, update: Update, context: MitupContext):
+async def filter_messages_without_text(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
 
     await context.api.send_message(

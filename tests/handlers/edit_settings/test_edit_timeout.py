@@ -16,7 +16,7 @@ async def test_callback_query_timeout(
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(update, app, EditSettingsHandlerId.TIMEOUT_CALLBACK)
+    context, result = await call_handler(EditSettingsHandlerId.TIMEOUT_CALLBACK, update=update, app=app)
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
@@ -35,7 +35,7 @@ async def test_settings_timeout_text_message_handler(
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(update, app, EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT)
+    context, result = await call_handler(EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT, update=update, app=app)
 
     expected_view = factory.settings_view(
         lang=user_with_settings.lang,
@@ -62,7 +62,8 @@ async def test_settings_timeout_invalid_input_handler(
     # Frist call the conversation handler with the valid callback
     telegram_user = telegram_user_from_user(user_with_settings)
     context, _ = await call_handler(
-        Update(
+        EditSettingsHandlerId.TIMEOUT_CONVERSATION,
+        update=Update(
             1,
             callback_query=CallbackQuery(
                 id="123",
@@ -72,12 +73,11 @@ async def test_settings_timeout_invalid_input_handler(
                 message=update.effective_message,
             ),
         ),
-        app,
-        EditSettingsHandlerId.TIMEOUT_CONVERSATION,
+        app=app,
     )
 
     # Now that we are in the conversation, we will call the conversation handler with a text message with invalid input
-    context, _ = await call_handler(update, app, EditSettingsHandlerId.TIMEOUT_CONVERSATION)
+    context, _ = await call_handler(EditSettingsHandlerId.TIMEOUT_CONVERSATION, update=update, app=app)
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
@@ -97,6 +97,8 @@ async def test_settings_timeout_invalid_input_handler(
         text="10",
     )
 
-    context, _ = await call_handler(Update(1, message=correct_message), app, EditSettingsHandlerId.TIMEOUT_CONVERSATION)
+    context, _ = await call_handler(
+        EditSettingsHandlerId.TIMEOUT_CONVERSATION, update=Update(1, message=correct_message), app=app
+    )
 
     assert user_with_settings.settings.timeout == 10
