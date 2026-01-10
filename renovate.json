@@ -107,7 +107,10 @@
       ],
       "autoApprove": true,
       "reviewers": [],
-      "automerge": true
+      "automerge": true,
+      "schedule": [
+        "every weekend"
+      ]
     },
     {
       "description": "Group Python version updates",
