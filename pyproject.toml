@@ -15,15 +15,15 @@ classifiers = [
     "Topic :: Communications :: Chat",
 ]
 dependencies = [
-    "python-telegram-bot[ext]==22.5",
+    "python-telegram-bot[ext]==22.6",
     "click==8.3.1",
     "python-dateutil==2.9.0.post0",
-    "sqlalchemy==2.0.45",
+    "sqlalchemy==2.0.46",
     "psycopg2==2.9.11",
     "sqlmodel==0.0.31",
     "pydantic==2.12.5",
     "alembic==1.18.1",
-    "rich==14.2.0",
+    "rich==14.3.0",
     "tzdata==2025.3",
     "googlemaps==4.10.0",
     "aws-embedded-metrics==3.3.1",
