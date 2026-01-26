@@ -23,7 +23,7 @@ dependencies = [
     "sqlmodel==0.0.31",
     "pydantic==2.12.5",
     "alembic==1.18.1",
-    "rich==14.3.0",
+    "rich==14.3.1",
     "tzdata==2025.3",
     "googlemaps==4.10.0",
     "aws-embedded-metrics==3.3.1",
