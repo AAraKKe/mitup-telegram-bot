@@ -89,17 +89,17 @@ class CalendarKeyboard:
         month = self.current_date.month
         year = self.current_date.year
 
-        match (month, year, by):
-            case (1, _, "month"):
+        if by == "month":
+            if month == 1:
                 # If we are in January, we go back to December of the previous year
                 month = 12
                 year -= 1
-            case (_, _, "month"):
+            else:
                 month -= 1
-            case (_, _, "year"):
-                year -= 1
-            case (_, _, _) as unreachable:
-                assert_never(unreachable)
+        elif by == "year":
+            year -= 1
+        else:
+            assert_never(by)
 
         date_back = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
@@ -111,17 +111,17 @@ class CalendarKeyboard:
         month = self.current_date.month
         year = self.current_date.year
 
-        match (month, year, by):
-            case (12, _, "month"):
+        if by == "month":
+            if month == 12:
                 # If we are in December, we go forward to January of the next year
                 month = 1
                 year += 1
-            case (_, _, "year"):
-                year += 1
-            case (_, _, "month"):
+            else:
                 month += 1
-            case (_, _, _) as unreachable:
-                assert_never(unreachable)
+        elif by == "year":
+            year += 1
+        else:
+            assert_never(by)
 
         date_forward = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(

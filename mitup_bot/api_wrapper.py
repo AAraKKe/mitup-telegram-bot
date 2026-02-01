@@ -3,7 +3,7 @@ import re
 from asyncio import gather
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
@@ -21,6 +21,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.joined_users import JoinedUsers
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.views import MitupInlineView, MitupView
 
@@ -35,35 +36,6 @@ if TYPE_CHECKING:
     from mitup_bot.custom_context import MitupContext
 
 
-class ContextOrBotAdapter(Protocol):
-    """
-    Protocol defining the interface for the object necessary to interact with the Telegram API.
-
-    This is used to support both MitupContext and ExtBot for flexibility.
-    """
-
-    @contextmanager
-    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]: ...
-
-    def emit_metric(
-        self,
-        name: str | MetricKey,
-        value: float = 1.0,
-        unit: Unit = Unit.COUNT,
-        *,
-        dimensions: dict[str, str] | None = None,
-        include_handler_dimensions: bool = True,
-        properties: dict[str, str | int | float | None] | None = None,
-        include_update_properties: bool = True,
-        emit_global: bool = False,
-    ): ...
-
-    async def flush_metrics(self): ...
-
-    @property
-    def bot(self) -> ExtBot: ...
-
-
 class BotAdapter:
     """
     This class is used to be able to use the TelegramApi classes with a bot instead of a MitupContext.
@@ -73,7 +45,11 @@ class BotAdapter:
     """
 
     def __init__(self, bot: ExtBot):
-        self.bot = bot
+        self._bot = bot
+
+    @property
+    def bot(self) -> ExtBot:
+        return self._bot
 
     @contextmanager
     def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
@@ -102,7 +78,9 @@ def build_api(context_or_bot: MitupContext | ExtBot) -> TelegramApiWrapper:
 
     adapter = context_or_bot if isinstance(context_or_bot, MitupContext) else BotAdapter(context_or_bot)
     api = TelegramApi()
-    api.adapter = adapter
+    # ty seems to be having issues finding that the adapter is of conforming type for now
+    # https://github.com/astral-sh/ty/issues/2692
+    api.adapter = cast(ContextOrBotAdapter, adapter)
     return api
 
 

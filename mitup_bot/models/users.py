@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class User(BaseModel, SQLModel, table=True):
     # Until better configuration is available through SQLModel (https://github.com/tiangolo/sqlmodel/issues/159)
-    __tablename__: str = "users"  # type: ignore
+    __tablename__: str = "users"
 
     first_name: str
     tg_user_id: int
@@ -76,7 +76,7 @@ class User(BaseModel, SQLModel, table=True):
         joined_links = [joined for joined in self.joined_links if joined.meetup_id == meeting_id]
         return joined_links[0] if joined_links else None
 
-    def own_meeting(self, meeting_id: int) -> Meetup | None:  # type: ignore
+    def own_meeting(self, meeting_id: int) -> Meetup | None:
         return next((meetup for meetup in self.meetups if meetup.db_id == meeting_id), None)
 
     def datetime_in_tz(self, datetime: dt.datetime) -> dt.datetime:

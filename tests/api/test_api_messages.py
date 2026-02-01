@@ -1,3 +1,4 @@
+from typing import cast
 from unittest import mock
 
 import pytest
@@ -8,6 +9,7 @@ from telegram.error import BadRequest
 from mitup_bot.api_wrapper import (
     EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS,
     MESSAGE_NOT_FOUND_ERROR_PATTERNS,
+    ContextOrBotAdapter,
     TelegramApi,
 )
 from mitup_bot.exceptions import NoMessageAvailable
@@ -24,10 +26,10 @@ def context(app, update):
     context = build_context(update, app)
     # We want to test the real wrapper here, not the mock
     api = TelegramApi()
-    api.adapter = context
+    api.adapter = cast(ContextOrBotAdapter, context)
     # Ignoring the type below because the context type is expected to use mock api
     # but in this case we want to use the real one
-    context.api = api  # type: ignore
+    context.api = api
     return context
 
 

@@ -127,8 +127,11 @@ class PaginatedMitupView(MitupView):
         self.column_size = column_size
         self.page_size = row_size * column_size
         self.page_number = page_number
-        self.total_pages = ceil(len(buttons) / self.page_size)
+        # Specify type, ty does nto deal well yet with generic protocols (implemented in ceil typing)
+        self.total_pages: int = ceil(len(buttons) / self.page_size)
         self.buttons = buttons
+        # Define type as any position so type checkers do not need to infer it
+        self.position: PaginatedViewPosition
 
         if self.total_pages == 1:
             self.position = PaginatedViewPosition.UNIQUE

@@ -21,7 +21,7 @@ class MessageButtons(MutableModel):
 
 
 class Message(BaseModel, SQLModel, table=True):
-    __tablename__ = "messages"  # type: ignore
+    __tablename__ = "messages"
 
     id: int = Field(default=None, primary_key=True)
     message_id: int | None = None

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Self
 
 import click
 from alembic.config import Config
@@ -14,7 +13,7 @@ console = Console(width=90)
 class Revision:
     revision: str
     description: str
-    child_revisions: list[Self] = field(default_factory=list)
+    child_revisions: list[Revision] = field(default_factory=list)
 
     def __str__(self) -> str:
         color = "red" if len(self.child_revisions) > 1 else "green"

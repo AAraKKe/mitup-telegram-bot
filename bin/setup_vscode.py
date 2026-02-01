@@ -13,6 +13,7 @@ SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
     "files.exclude": {"__pycache__": True, ".*_cache": True, ".docker_hatch": True},
     "python.testing.unittestEnabled": False,
     "python.testing.pytestEnabled": True,
+    "python.languageServer": "Default",
     "python.analysis.inlayHints.pytestParameters": True,
     "python.testing.pytestPath": "XXX",
     "editor.tabSize": 4,
@@ -27,7 +28,9 @@ SETTINGS_TEMPLATE: dict[str, TSettingValue] = {
             "source.organizeImports": True,
         },
     },
-    "search.exclude": {".hatch": True, "postgres-data": True},
+    "search.exclude": {"postgres-data": True},
+    "ty.disableLanguageServices": False,
+    "ty.diagnosticMode": "workspace",
 }
 
 

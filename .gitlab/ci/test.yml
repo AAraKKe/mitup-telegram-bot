@@ -65,7 +65,7 @@ linter:
 type-check:
   stage: test
   script: |
-    hatch run dev:pyright --version
+    hatch run dev:ty version
     hatch run dev:type-check
   needs: [preparation]
 

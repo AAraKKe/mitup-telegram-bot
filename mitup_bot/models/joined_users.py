@@ -12,7 +12,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class JoinedUsers(BaseModel, SQLModel, table=True):
-    __tablename__ = "joined_users"  # type: ignore
+    __tablename__ = "joined_users"
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")

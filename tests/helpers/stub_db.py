@@ -61,7 +61,7 @@ class MockDbSession(mock.MagicMock):
     def __add_side_effect(self, obj: SQLModel):
         self.objects_added.append(obj)
         # Some times the id field is only generated after storing int he db.
-        if hasattr(obj, "id") and obj.id is None:  # type: ignore
+        if hasattr(obj, "id") and obj.id is None:
             self.__last_id += 1
             obj.id = self.__last_id
 

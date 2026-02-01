@@ -1,5 +1,6 @@
 import datetime as dt
 from dataclasses import dataclass
+from typing import TypedDict
 
 from mitup_bot.models import Message
 
@@ -11,7 +12,16 @@ DEFAULT_TEST_DATE = dt.datetime(2023, 1, 1, 12, 00, tzinfo=dt.UTC)
 DEFAULT_USER_ID = 123
 DEFAULT_CHAT_ID = 123
 DEFAULT_MESSAGE_ID = 123
-DEFAULT_TG_USER_PARAMS = {
+
+
+class _TgUserParams(TypedDict):
+    id: int
+    first_name: str
+    is_bot: bool
+    username: str
+
+
+DEFAULT_TG_USER_PARAMS: _TgUserParams = {
     "id": DEFAULT_USER_ID,
     "first_name": "Test User",
     "is_bot": False,

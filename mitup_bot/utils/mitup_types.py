@@ -1,7 +1,8 @@
 """This module contains custom types to be used through the project for type hinting"""
 
 from collections.abc import Callable, Collection, Coroutine
-from typing import Any, TypeVar, Union
+from types import FunctionType
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot, JobQueue
@@ -15,7 +16,7 @@ T = TypeVar("T")
 RT = TypeVar("RT")
 """References the return type of a handler callback"""
 
-OneOrMany = Union[T, Collection[T]]  # noqa: UP007
+OneOrMany = T | Collection[T]
 """Type that defines one or a collection of T objects"""
 
 CCT = TypeVar("CCT", bound=CallbackContext[Any, Any, Any, Any])
@@ -24,8 +25,6 @@ CCT = TypeVar("CCT", bound=CallbackContext[Any, Any, Any, Any])
 UT = TypeVar("UT", bound=Update)
 """Type that defines and Update objects or a subclass of it"""
 
-HandlerCallback = Callable[[Update, MitupContext], Coroutine[Any, Any, RT]]
-"""Type to define the callback of a given handler"""
 
 TMitupContext = MitupContext[ExtBot, TelegramApiWrapper, MitupMetricsEngine[MitupMetricsLogger]]
 """Standard type of MitupContext used through the project"""
@@ -36,3 +35,13 @@ TMitupEngine = MitupMetricsEngine[MitupMetricsLogger]
 JQ = TypeVar("JQ", bound=JobQueue | None)
 MitupApp = Application[ExtBot, TMitupContext, MitupUserData, dict, dict, JQ]
 """Standard application type for the MitupBot"""
+
+
+if TYPE_CHECKING:
+    from ty_extensions import Intersection
+
+    # Intersection is only available during type checking
+    HandlerCallback = Intersection[Callable[[Update, MitupContext], Coroutine[Any, Any, RT]], FunctionType]
+    """Type to define the callback of a given handler"""
+else:
+    HandlerCallback = Callable[[Update, MitupContext], Coroutine[Any, Any, RT]]

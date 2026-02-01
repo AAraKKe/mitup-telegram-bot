@@ -78,7 +78,7 @@ TME = TypeVar("TME", bound=MitupMetricsEngine, covariant=True)
 
 
 class MitupContext(
-    CallbackContext[TB, MitupUserData, dict, dict],  # type: ignore (ignore TB)
+    CallbackContext[TB, MitupUserData, dict, dict],
     Generic[TB, TAPI, TME],  # noqa: UP046
 ):
     """

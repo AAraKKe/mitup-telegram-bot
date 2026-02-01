@@ -68,7 +68,7 @@ def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
             db.configure_db(db_config, skip_if_initialized=True)
             yield mocked_session
             # Unset the module level sessionmaker for the next test
-            db.__sessionmaker = None  # type: ignore
+            db.__sessionmaker = None
 
 
 @pytest.fixture(scope="session")

@@ -57,8 +57,8 @@ def timezone_client():
 @pytest.fixture(autouse=True)
 def reset_clients():
     yield
-    timezone_api.__geocode_client = None  # type: ignore
-    timezone_api.__timezone_client = None  # type: ignore
+    timezone_api.__geocode_client = None
+    timezone_api.__timezone_client = None
 
 
 def assert_time_metrics_emitted(context: StubMitupContext, *metrics: str):

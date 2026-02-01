@@ -17,7 +17,7 @@ def reset_db():
     # Make sure to reset the db configuration after each test so we can
     # validate its behavior
     yield
-    db.__sessionmaker = None  # type: ignore
+    db.__sessionmaker = None
 
 
 @pytest.fixture(

@@ -4,6 +4,7 @@ from typing import Any, cast, overload
 from telegram import Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot.api_wrapper import ContextOrBotAdapter
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
@@ -27,7 +28,7 @@ def build_context(
 
     context = MitupContext.from_update(update=update, application=app)
     context.api = MockApi()
-    context.api.adapter = context
+    context.api.adapter = cast(ContextOrBotAdapter, context)
     context.metrics_engine = metrics_engine
 
     # Allow the engine to access the context

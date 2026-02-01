@@ -55,7 +55,7 @@ class MeetupLocation(MutableModel):
 
 
 class Meetup(BaseModel, SQLModel, table=True):
-    __tablename__: str = "meetups"  # type: ignore
+    __tablename__: str = "meetups"
 
     id: int | None = Field(default=None, primary_key=True)
     owner_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
