@@ -44,7 +44,7 @@ auto-format:
         git config user.email "${COMMIT_AUTHOR_EMAIL}"
 
         git add -A
-        git commit -m "style: fix formatting after renovate update"
+        git commit -m "refactor: fix formatting after renovate update"
 
         # Push the changes back to the source branch using the token
         git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
