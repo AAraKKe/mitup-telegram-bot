@@ -81,9 +81,10 @@ validate-locales:
     - hatch run dev:validate-locales
 
 validate-local-setup:
-  # This job avlidates the setup process for new contributors
+  # This job validates the setup process for new contributors
   image: python:3.14-bookworm
   stage: test
+  needs: []  # Run immediately without waiting for previous stages
   script:
     - ./bin/local-setup.sh
   rules:
