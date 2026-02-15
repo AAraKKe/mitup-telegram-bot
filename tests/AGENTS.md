@@ -1,138 +1,117 @@
-# Python Tests
-
-## Parameterizing tests
-
-When there are multiple tests that do basically the same thing, try combining them with a pytest parameterization to avoid code duplication.
+# Testing
 
 ## Running tests
 
-Tests are always run through a hatch command. All commands we run while developing are part of the `dev` environmen in hatch. To run tests:
+All test commands run through Hatch in the `dev` environment:
 
 ```bash
-hatch run dev:test {extra arguments}
+hatch run dev:test {extra arguments}       # Run tests with parallel workers
+hatch run dev:test-cov {extra arguments}   # Run tests with coverage (outputs report.json, coverage.xml)
 ```
 
-### Command to run to check coverage
+## Test structure
 
-If we want to check the coverage of a given test we run it with hatch command:
+Test modules mirror the `mitup_bot/` package structure. Example:
 
-```bash
-hatch run dev:test-cov {extra arguments}
+```
+mitup_bot/handlers/main_menu/create_meeting.py
+  →  tests/handlers/main_menu/test_create_meeting.py
 ```
 
-This will output the coverage into the file `report.json` with the output of the coverage python package.
+## Parameterization
 
-## Tests structure
-
-Tests should be defined in modules that mimic the structure of the ones under mitup_bot.
-
-For example, if I want to test code wriyten in the mitup_bot.handlers.main_menu.create_meeting.py, the tests should be located under tests.handlers.main_menu.test_create_meeting.py
+When multiple tests exercise the same logic with different inputs, combine them using `@pytest.mark.parametrize` to avoid duplication.
 
 ## Mocking
 
-We never use real external service outside the test environment. This means that the database interaction is mocked as well as the telegram bot api. Tools are provided for this.
+No real external services are used in tests. Both the database and the Telegram Bot API are mocked.
 
-The database interaction is mocked through the `mock_session` fixture available to all tests and the api interaction is mocked with the `api` fixture which is available through every module conftest.
+### Database
 
-The `api` fixture is a bit special because we are mocking the import of the `api` package on a specefic module. For this reason we define it in every test file were we need it. For example, to test
-the `mitup_bot.handlers.meeting.edit_meeting` file, the `api` fixture is defined in the `tests.handlers.meeting.test_edit_meeting.py` file. This, of course, depends on the use case. If a given test module
-does not require the api fixture for most of the tests, we could use the mock api just on the test we need it too instead of using it as a fixture. It is important to note that the api is mocked through the `MockApi` class and not through
-a simple mock.
+Use the `mock_session` fixture (globally available). It provides a mock `Session` object that can be configured per test.
+
+### Telegram API
+
+Use the `api` fixture, backed by the `MockApi` class (not a plain `mock.Mock`). The `api` fixture patches the API import for a specific module, so it is defined in each test file (or module `conftest.py`) where it is needed:
+
+```python
+@pytest.fixture()
+def api(mocker):
+    mock_api = MockApi()
+    mocker.patch("mitup_bot.handlers.meeting.show_meeting.api", mock_api)
+    return mock_api
+```
+
+If only a few tests in a file need API mocking, use `mocker.patch` inline instead of a fixture.
 
 ## Calling handlers
 
-Avoid calling handler methods directly, this skips some verifications done at the registry level that could be important when testing that a request is properly handled. Instead, use the call_handler method under tests.helpers.context.
-
-This allows to also mimic conversations with a given user, as an example check the tests in tests/handlers/meeting/edit_meeting/test_edit_meeting_datetime.py
-
-## Providing updates to the tests
-
-When we need to use the Telegram.Update object on a given test, we can provide this through a parameter of type UpdateRequest (under tests.helpers.fixtures). This UpdateRequest object is used as an indirect parameter to the `update` fixture
-that is globally available. We do not need to mock every update in every test. See, again, `tests/handlers/meeting/edit_meeting/test_edit_meeting_datetime.py` foran example about how UpdateRequest is used.
-
-## Creating models
-When you need to create a model (e.g. User, Meetup, etc.) you can use the create_* helper methods that are available in tests.helpers module. For example, to create a user you can do:
+Never call handler functions directly — this skips the registry's argument injection and metrics tracking. Use the `call_handler` helper from `tests.helpers.context`:
 
 ```python
-from tests.helpers import create_user
+from tests.helpers.context import call_handler
+
+result = await call_handler(MyHandlerId.SHOW, update, context)
+```
+
+This also supports simulating multi-step conversations. See `tests/handlers/meeting/edit_meeting/test_edit_meeting_datetime.py` for examples.
+
+## Updates
+
+Use the `UpdateRequest` dataclass (from `tests.helpers.fixtures`) as an indirect parameter to the globally available `update` fixture. This avoids manually constructing `telegram.Update` objects in every test:
+
+```python
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1))], indirect=True)
+async def test_show_meeting(update, context, mock_session):
+    ...
+```
+
+## Creating models
+
+Use the `create_*` helpers from `tests.helpers` to construct model instances:
+
+```python
+from tests.helpers import create_user, create_meetup
 
 user = create_user(id=1, first_name="John", tg_user_id=123)
 ```
 
-This will create a user with the given id, first name and telegram user id.
+For handler tests that need a fully configured user, use the `user_with_settings` fixture — it creates a `User` with an associated `Settings` object ready for handler invocations.
 
-There are specific fixtures to create models that work right away when testing handlers. The fixture `user_with_settings` will create a user with a settings object associated to it. Use this fixture in a test where
-we need to call a handler because the user has all the properties needed to operate as a real user.
+## Failure mode tests
 
-## Failure Mode Tests
+Common error scenarios (user not found, meeting not owned, malformed callback data, etc.) are tested centrally in `tests/test_failure_modes.py`. This avoids repeating the same assertions across every handler test file.
 
-To avoid repeating the same failure tests for every handler, we have a centralized failure mode testing system in `tests/test_failure_modes.py`. This file contains parameterized tests that automatically test common error scenarios for all registered handlers.
+### When to register a handler
 
-### When to Add Handlers to Failure Mode Tests
+**Every new handler** that uses any of these guards must be added to the `CONTEXTS` list in `test_failure_modes.py`:
 
-**IMPORTANT**: Whenever you create a new handler that uses any of the following:
-- `guards.current_user()` - to get the current user
-- `guards.meeting_accessible()` - to check meeting ownership
-- `guards.valid_callback_data()` or `guards.valid_meeting_callback_data()` - to parse callback data
-- Context data (e.g., `context.get_meeting_id()`) - to retrieve stored meeting IDs
+- `guards.current_user()` → `ErrorMode.USER_NOT_FOUND`
+- `guards.meeting_accessible()` → `ErrorMode.MEETING_NOT_OWNED`, `ErrorMode.MEETING_NOT_FOUND`
+- `guards.valid_callback_data()` / `guards.valid_meeting_callback_data()` → `ErrorMode.MALFORMED_CALLBACK_DATA`
+- Context data access (e.g., `context.get_meeting_id()`) → `ErrorMode.MISSING_USER_DATA`
 
-You **must** add it to the `CONTEXTS` list in `tests/test_failure_modes.py`.
-
-### Available Error Modes
-
-The following error modes are available and should be used based on what your handler validates:
-
-- `ErrorMode.MEETING_NOT_OWNED` - User tries to access a meeting they don't own
-- `ErrorMode.MEETING_NOT_FOUND` - Meeting doesn't exist in the database
-- `ErrorMode.USER_NOT_FOUND` - User is not registered in the database
-- `ErrorMode.MALFORMED_CALLBACK_DATA` - Callback data is missing required parameters
-- `ErrorMode.MISSING_USER_DATA` - Required context data is not set
-
-### How to Add a Handler
-
-Add a `Context` object to the `CONTEXTS` list with the appropriate error modes:
+### Adding a handler
 
 ```python
 Context(
-    handler_id=EditMeetingHandlerId.YOUR_HANDLER_CALLBACK,
+    handler_id=EditMeetingHandlerId.YOUR_HANDLER,
     update_request=UpdateRequest(callback_query=cb.YOUR_CALLBACK.with_id(MEETING_ID_NOT_OWNED)),
     error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
     id="your_handler_name",
 ),
 ```
 
-### Example: Adding Language Handlers
+### Optional `Context` parameters
 
-Here's an example of how the language handlers were added:
+| Parameter | Purpose |
+|-----------|---------|
+| `custom_keyboard` | Custom inline keyboard expected in the error view |
+| `meeting_id` | `dict[ContextId, int]` to pre-populate context data for conversation handlers |
+| `metrics_emitted` | `MetricsProperties` for additional metrics expected during the test |
+| `metrics_properties` | `dict` of dimension key-values to attach to emitted metrics |
 
-```python
-# Handler that checks meeting ownership
-Context(
-    handler_id=EditMeetingHandlerId.LANGUAGE_CALLBACK,
-    update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LANGUAGE.with_id(MEETING_ID_NOT_OWNED)),
-    error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-    id="edit_meeting_language",
-),
-
-# Handler that validates callback data
-Context(
-    handler_id=EditMeetingHandlerId.LANGUAGE_CALLBACK,
-    update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LANGUAGE),
-    error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-    id="edit_meeting_language_malformed",
-),
-```
-
-### Special Cases
-
-Some handlers may need additional configuration:
-
-- **Custom keyboards**: Use `custom_keyboard` parameter if the error view has a custom keyboard
-- **Context data**: Use `meeting_id` parameter to pre-populate context data (e.g., for conversation handlers)
-- **Additional metrics**: Use `metrics_emitted` to specify extra metrics that should be emitted during the test
-- **Metrics properties**: Use `metrics_properties` to add properties to the emitted metrics
-
-Example with context data:
+### Example with context data
 
 ```python
 Context(
@@ -144,16 +123,8 @@ Context(
     metrics_emitted=MetricsProperties(
         metrics=["CleanUserData"],
         values=[1],
-        units=[Unit.COUNT]
+        units=[Unit.COUNT],
     ),
     metrics_properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
 ),
 ```
-
-### Benefits
-
-By adding your handlers to the centralized failure mode tests, you ensure:
-1. Consistent error handling across all handlers
-2. Proper metrics emission for all failure scenarios
-3. Reduced test code duplication
-4. Easy maintenance when error handling patterns change

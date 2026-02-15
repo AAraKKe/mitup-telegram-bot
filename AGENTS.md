@@ -1,41 +1,122 @@
 # Agents
 
-This file contains the rules that were previously in the `.cursor` folder.
+## Role
 
-## Repo Info
+Act as an experienced Python engineer. Write idiomatic, modern Python using features available in the version declared in `pyproject.toml` (see `requires-python`). Before writing code, check `pyproject.toml` for the exact minimum Python version and use the latest syntax and stdlib capabilities available in that version. Examples of preferred patterns include the native `type X = ...` and generics syntax (`def f[T](x: T) -> T`), `StrEnum`, `match` statements, `TaskGroup`, `ExceptionGroup`, `tomllib`, f-strings, and walrus operators where they improve clarity. Avoid backports, `from __future__ import annotations`, and deprecated patterns.
 
-### Information about the Mitup repo
+When requested to write code, always second guess the user's request and look for ways to improve it. If the request is vague, ask clarifying questions. If the request is a code snippet, review it for correctness, style, and adherence to project conventions before accepting it. If you identify issues or areas for improvement, rewrite the code snippet with explanations of your changes. Any time you decide to deviate from the user's original request, provide a clear rationale for your choices and wait for user confirmation before proceeding.
 
-If at any point a link to the mitup repo needs to be added somewhere, the repo is located here: <https://gitlab.com/meetupbot/mitup-telegram-bot>. Any link needs to follow gitlab url rules, not githubs.
+## Maintaining these instructions
 
-If a quick link to a new issue wants to be added, use the issue templates under `.gitlab/issue_templates` to know which ones can be used and add it the link.
+Agent instructions are split across multiple files (see "Detailed guidelines" below). When editing any of them, follow these rules to keep them accurate over time:
 
-### Folder structure
+1. **Never hardcode versions.** Refer to the source of truth instead (e.g., "`requires-python` in `pyproject.toml`", "version pinned in `[tool.hatch.envs.dev] dependencies`"). This avoids stale version numbers in prose.
+2. **Never enumerate things that change.** Instead of listing every model, handler, or template, point to the file or directory where the canonical list lives (e.g., "see `mitup_bot/models/__init__.py`"). Describe the *patterns* and *conventions* that are stable.
+3. **Describe rules, not snapshots.** Instructions should capture *how* to do something and *why*, not a frozen picture of the current state. If a section would go stale when a file is added or removed, it needs a reference instead of an enumeration.
+4. **Keep instructions co-located.** Rules specific to one area belong in the `AGENTS.md` next to that code (e.g., `tests/AGENTS.md`). Cross-cutting concerns go in `.agents/`. Only general rules and the index go in the root `AGENTS.md`.
+5. **Update instructions when changing conventions.** If your change alters a pattern described in an agents file (new decorator, renamed directory, new CI job), update the relevant instructions file in the same commit.
 
-The bot is a python Telegram bot and the main codebase is placed on the mitup_bot folder that contains several submodules.
+## Repository
 
-- cli: Contains the cli tooling used to operate the bot and its CI
-- environments: hold the different configuration files for each environment we want to run the bot in
-- handlers: this is where most of the logic of the bot is. We use [Telegram Python Bot](mdc:https:/docs.python-telegram-bot.org/en/stable/index.html) (PTB) as the sdk to develop the bot and all the bot behavior is defined through handlers.
-  - Handlers are organized in submodules semantically defined. We have submodules roughly referencing each part of the bot features or areas.
-  - Each sub module in the handlers module contains 2 main modules: `enums` and `entry`. These reference all enums used to identify handlers or conversations and the callback that is the entry point for that feature.
-  - These do not have any runtime implication and is just a way of being able to quickly identify where a piece of code can be.
-- The lambdas module contains the code that is run as a lambda function in AWS
-- locales: contains all translations of the bot
-- migrations: this is a folder used to run [alembic](mdc:https:/alembic.sqlalchemy.org/en/latest) which is the database migrations tool we use
-- models: this contains all the database models used in the bot
-- monitoring: includes the necessary tooling to emit metrics to CloudWatch
--- utils: this contains several utilities used around the bot. The most important ones are `messages` and `callbacks`. Messages contain the english version of any text that appears in the bot and `callbacks` contains general callbacks that represent the callback data of a request to PTB
-- views: contains all the views defined in the bot. In order to abstract the api calls from what we want to show in the bot, we define different views
+- **Hosted on GitLab** at <https://gitlab.com/meetupbot/mitup-telegram-bot>. All URLs (issues, MRs, links in docs) must follow GitLab URL conventions, not GitHub's.
+- **Issue templates** are in `.gitlab/issue_templates/`. To link to a new issue, use: `https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/new?issuable_template=TemplateName`. Available templates: `Bug`, `Feature Proposal`, `Task`, `New Language Request`, `Improve Documentation`, `Translation`, `Service Desk Request`.
 
-The rest of the modules in the root of the mitup_bot folder reference direct utilities:
+## Tech stack
 
-- api: methods to interact with the bot api
-- app: defines the PTB app that is run when the bot is launched
-- callback_data contains the centralized definition of how callback data is handled in a request. All callbacks in the utils.callbacks module are instances of this callback data
-- handler_id contains the definition of a handler id, used to identify each handler.
-- custom_context contains the custom PTB context for the bot. This defines methods to access telemetry and emit it among other things
-- db contains the necessary tooling to interact with the database
-- guards are a set of methods that are used to validate input received by a handler
-- timezone_api contains the logic to interact with the google timezone api
-- translations defines the translations engine, a wrapper around gettext to translate text
+Versions and pins are defined in `pyproject.toml`. Always check that file for the current values — do not rely on version numbers written in documentation.
+
+| Component | Tool |
+|-----------|------|
+| Language | Python (version in `requires-python`) |
+| Bot SDK | [python-telegram-bot](https://docs.python-telegram-bot.org/en/stable/index.html) (PTB) |
+| ORM | SQLModel (SQLAlchemy + Pydantic) |
+| Migrations | Alembic |
+| Build system | Hatch (with uv as installer) |
+| Type checker | [ty](https://github.com/astral-sh/ty) (version pinned in `[tool.hatch.envs.dev] dependencies`) |
+| Linter / formatter | Ruff |
+| Testing | pytest + pytest-asyncio |
+| CI/CD | GitLab CI |
+| Infrastructure | AWS (Lambda, ECS, CloudWatch, ECR) |
+
+## Development commands
+
+All dev commands run through Hatch in the `dev` environment:
+
+```bash
+hatch run dev:validate        # Run all checks (format, lint, type-check, test)
+hatch run dev:test             # Run tests
+hatch run dev:type-check       # Run ty type checker
+hatch run dev:format           # Format code with ruff
+hatch run dev:lint             # Lint with ruff
+hatch run dev:fix              # Auto-fix formatting + lint issues
+```
+
+## Detailed guidelines
+
+Domain-specific rules are maintained in separate files to keep this document focused. Read the relevant file before working in that area:
+
+| Topic | File |
+|-------|------|
+| Type checking, `ty: ignore` conventions, suppression tracking | `.agents/type-checking.md` |
+| Database layer, session decorators, models, migrations | `.agents/database.md` |
+| CI pipeline, jobs, validation, issue/MR templates | `.agents/ci-pipeline.md` |
+| Translations, locales, message definitions | `.agents/translations.md` |
+| Monitoring, metrics emission, MetricKey/Feature enums | `.agents/monitoring.md` |
+| Error handling, exception hierarchy, error flow | `.agents/error-handling.md` |
+| Configuration system, providers, environments | `.agents/config.md` |
+| Telegram API wrapper, BotAdapter, edit error handling | `.agents/api-wrapper.md` |
+| Building and registering handlers | `mitup_bot/handlers/AGENTS.md` |
+| View layer, MitupView, ButtonConfig, factory, calendar | `mitup_bot/views/AGENTS.md` |
+| CLI commands, auto-discovery, operational scripts | `mitup_bot/cli/AGENTS.md` |
+| Lambda functions, constraints, adding new lambdas | `mitup_bot/lambdas/AGENTS.md` |
+| Testing conventions, fixtures, failure modes | `tests/AGENTS.md` |
+
+## Project structure
+
+```
+mitup_bot/                     # Main package
+├── app.py                     # PTB application entry point (MitupRuntime)
+├── config.py                  # Configuration system (see .agents/config.md)
+├── db.py                      # Database engine and session decorators (see .agents/database.md)
+├── exceptions.py              # Custom exception hierarchy (see .agents/error-handling.md)
+├── guards.py                  # Input validation for handlers
+├── cli/                       # Production CLI commands (see cli/AGENTS.md)
+├── environments/              # Per-environment TOML config files
+├── handlers/                  # Bot logic by feature area (see handlers/AGENTS.md)
+├── lambdas/                   # AWS Lambda functions (see lambdas/AGENTS.md)
+├── locales/                   # Compiled gettext translation files (see .agents/translations.md)
+├── migrations/                # Alembic migration scripts (see .agents/database.md)
+├── models/                    # SQLModel database models (see models/__init__.py for exports)
+├── monitoring/                # CloudWatch metrics emission (see .agents/monitoring.md)
+├── utils/                     # Shared utilities (callbacks, messages, emojis, types)
+└── views/                     # View layer (see views/AGENTS.md)
+
+bin/                           # CI scripts and dev utilities (not shipped in the wheel)
+tests/                         # Test suite (see tests/AGENTS.md)
+```
+
+For the full list of files within each directory, explore the directory itself. The co-located `AGENTS.md` files (linked in the table above) describe the patterns and conventions for each area.
+
+## Core patterns
+
+### Callback data
+
+All button interactions use `CallbackData` (Pydantic model in `callback_data.py`). Format: `{action};{entity}:{id}`. Predefined instances live in `mitup_bot/utils/callbacks.py`. Variants include `DateCallbackData` and `MeetingCallbackData` for richer payloads.
+
+### Guards
+
+Functions in `guards.py` validate handler inputs and raise domain exceptions (`UserNotFound`, `MeetupNotFound`, `MalformedCallbackData`). Always use guards instead of manual validation. Key guards: `current_user()`, `meeting_accessible()`, `valid_callback_data()`, `valid_meeting_callback_data()`.
+
+### Views
+
+Views in `mitup_bot/views/` abstract Telegram API calls from presentation. `MitupView` renders a message with an inline keyboard. `PaginatedMitupView` adds pagination. `MitupInlineView` is for inline query results. Use `views/factory.py` to construct views for standard screens.
+
+### Custom context
+
+`MitupContext` (in `custom_context.py`) extends PTB's `CallbackContext` with:
+- **User data registry** — `ContextId` enum keys mapping to `ContextData` (meeting ID + text). Access via context managers: `context.meeting_id()`, `context.text()`.
+- **Metrics engine** — `emit_metric()`, `put_feature_metric()`, `with_time_metric()` for CloudWatch metrics. Handler metrics are prepared automatically by the registry.
+
+### Configuration
+
+Config is loaded from TOML files in `mitup_bot/environments/` and optionally overridden by environment variables. Pydantic models validate all config values. See `config.py` for the full schema.

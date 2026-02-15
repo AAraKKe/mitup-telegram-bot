@@ -1,0 +1,108 @@
+# Error Handling
+
+The bot uses a structured exception hierarchy combined with a centralized error handler. All exceptions are defined in `mitup_bot/exceptions.py`; the error handler lives in `mitup_bot/handlers/error_handler.py`.
+
+## Error flow
+
+1. A handler raises an exception (usually via a guard).
+2. `callback_with_metrics()` in the registry catches it and calls `error_handler.handler()`.
+3. The error handler decides whether to suppress, handle specially, or emit fault metrics.
+4. Metrics are flushed regardless of outcome (in the `finally` block of `callback_with_metrics()`).
+
+Errors are **not** routed through PTB's built-in error handler — they are caught directly in the registry wrapper so that the handler's metrics context (dimensions, properties) is preserved.
+
+## Exception categories
+
+### Guard exceptions
+
+Raised by functions in `guards.py` when handler inputs are invalid. These are the most common exceptions:
+
+| Exception | Guard | Meaning |
+|-----------|-------|---------|
+| `UserNotFound` | `current_user()` | Telegram user not in the database |
+| `MeetupNotFound` | `meeting_accessible()` | Meeting ID doesn't exist |
+| `MalformedCallbackData` | `valid_callback_data()`, `valid_meeting_callback_data()` | Callback data missing required `id` |
+| `EffectiveUserNotSet` | `current_user()` | Telegram update has no `effective_user` |
+| `EffectiveChatNotSet` | `chat()` | Telegram update has no `effective_chat` |
+| `EffectiveMessageNotSet` | `message()` | Telegram update has no `effective_message` |
+| `CallbackQueryNotSet` | `callback_query()` | Update has no callback query |
+
+### Context exceptions
+
+| Exception | Meaning |
+|-----------|---------|
+| `ContextPropertyNotSetError` | User data property (meeting ID, text) not found in context registry |
+| `ContextPropertyConversionError` | Stored value can't be converted to expected type |
+| `InvalidUserData` | `user_data` is `None` (should never happen in practice) |
+
+### Telegram interaction exceptions
+
+| Exception | Meaning |
+|-----------|---------|
+| `InactiveUserInteraction` | A blocked/deleted user interacted with the bot |
+| `CallbackQueryTextTooLong` | Callback query answer text exceeds 200 chars |
+| `NoMessageAvailable` | Cannot edit — neither `message_id` nor `inline_message_id` present |
+
+### Registration exceptions
+
+| Exception | Meaning |
+|-----------|---------|
+| `HandlerRegisteredError` | Duplicate `HandlerId` in the registry |
+| `HandlerNotRegistered` | Referenced handler not found during conversation handler composition |
+| `WrongCommandNameError` | Command handler function doesn't follow naming convention |
+
+## The error handler
+
+`error_handler.handler()` in `mitup_bot/handlers/error_handler.py` processes all caught exceptions:
+
+### Suppressed errors
+
+Some errors are harmless and suppressed silently. The `SUPPRESSED_EXCEPTIONS` dict maps exception types to sets of known-harmless message strings:
+
+```python
+SUPPRESSED_EXCEPTIONS = {
+    BadRequest: {"Message to edit not found"},
+}
+```
+
+`should_ignore_error()` checks this mapping. Add entries here (not try/except in handlers) when a new Telegram API error should be silently ignored.
+
+### Inactive user handling
+
+`InactiveUserInteraction` with `private=True` triggers `handle_inactive_user()`, which marks the user as `is_active = False` in the database and emits `INACTIVE_USER_SET`. This happens when:
+- A user has blocked the bot (raises `Forbidden`)
+- A user's account is deleted (raises `BadRequest` with "not found")
+
+The `private` flag distinguishes private chat errors (where we should mark inactive) from group chat errors (where we should not). The `TelegramApi` methods in `api_wrapper.py` raise `InactiveUserInteraction` with the appropriate `private` value.
+
+### Fault metrics
+
+For all other (unexpected) errors:
+1. A specific fault metric is emitted: `FAULT/<ErrorClassName>` (e.g., `FAULT/ValueError`)
+2. A global `FAULT` metric is emitted for aggregate monitoring
+3. Stack traces are attached to all loggers via `add_stack_trace()`
+4. In `DEV` mode, the exception is logged with Rich formatting
+
+## The `handle_edit_errors` context manager
+
+`api_wrapper.py` provides `handle_edit_errors()` for safe message editing:
+
+```python
+with handle_edit_errors(adapter=self.adapter, message=message, session=session):
+    await self.adapter.bot.edit_message_text(...)
+```
+
+It handles two cases:
+- **Message not modified** (content unchanged) — silently ignored via `EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS`
+- **Message not found** (deleted by user) — deletes the `Message` record from the database and emits `MESSAGE_DELETED`
+
+All `edit_message` calls in `TelegramApi` already use this. Do not add custom try/except blocks for these errors.
+
+## Adding new exceptions
+
+1. Define the exception in `mitup_bot/exceptions.py`.
+2. Include contextual data (user IDs, handler IDs, callback data) in the constructor — this aids debugging.
+3. If the exception should be suppressed, add it to `SUPPRESSED_EXCEPTIONS` in the error handler.
+4. If the exception needs special handling (like `InactiveUserInteraction`), add a branch in `error_handler.handler()`.
+5. If guards raise the new exception, register affected handlers in `tests/test_failure_modes.py` (see `tests/AGENTS.md`).
+6. Always keep this file updated with any new exceptions and their handling patterns.

@@ -39,10 +39,10 @@ test:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     # run only when the mitupbot, dev or tests folders are updated
     - changes:
-      - mitup_bot/**/*
-      - pyproject.toml
-      - dev/**/*
-      - tests/**/*
+        - mitup_bot/**/*
+        - pyproject.toml
+        - dev/**/*
+        - tests/**/*
 
 format-check:
   stage: test
@@ -93,7 +93,7 @@ validate-local-setup:
   # This job validates the setup process for new contributors
   image: python:3.14-bookworm
   stage: test
-  needs: []  # Run immediately without waiting for previous stages
+  needs: [] # Run immediately without waiting for previous stages
   script:
     - ./bin/local-setup.sh
   rules:

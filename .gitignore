@@ -39,3 +39,6 @@ site
 
 # AWS folder
 aws
+
+# Any dev file in environments
+mitup_bot/environments/dev*
