@@ -42,6 +42,7 @@ class Emojis(Enum):
     TIME = "🌐"
     ATTACH = "⬇"
     DEATTACH = "⬆"
+    SEARCH = "🔍"
     HOURGLASS = "⌛"
     NOTIF = "⏰"
     LANG = "🔣"

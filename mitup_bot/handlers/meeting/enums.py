@@ -18,6 +18,9 @@ class MeetingHandlerId(HandlerId):
     JOIN = auto()
     LEAVE = auto()
 
+    # Attach to chat
+    ATTACH_TO_CHAT = auto()
+
     # Invite users
     INVITE_USERS_CALLBACK = auto()
     INVITE_USERS_CONVERSATION = auto()

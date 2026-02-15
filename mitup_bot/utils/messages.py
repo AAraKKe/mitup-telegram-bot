@@ -125,6 +125,7 @@ class ButtonMessages(MessageBase):
     MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
     MEETING_KICK_OUT = "Kick out"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
+    MAKE_SEARCHABLE = "Make it searchable"
 
     # Notification buttons
     REACTIVATE_MEETING = "Reactivate meeting"
@@ -385,6 +386,20 @@ class MeetingMessages(MessageBase):
         "*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. "
         "If you don't need this information displayed on the meeting message you can disable it here. "
         "This will also disable the _Timezone_ button shown when the meeting is shared."
+    )
+
+    # Attachment status (searchable via inline mode)
+    NOT_SEARCHABLE_FOOTNOTE = f"{Emojis.SEARCH} Make this meeting searchable in this chat\\."
+    SEARCHABLE_FOOTNOTE = f"{Emojis.CHECK} This meeting is now searchable in this chat\\."
+    NOW_SEARCHABLE_ALERT = (
+        f"{Emojis.CHECK} Now Searchable!\n\n"
+        "This meeting is now attached to this chat. It will be included in your search "
+        "results when you look for meetings using the bot's inline mode."
+    )
+    ALREADY_SEARCHABLE_ALERT = (
+        f"{Emojis.CHECK} Already Searchable!\n\n"
+        "This meeting was already attached to this chat from a previous share. "
+        "It is already included in your search results."
     )
 
     # Show meeting list

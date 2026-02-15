@@ -26,6 +26,6 @@ async def share_meeting(session: Session, update: Update, context: TMitupContext
     meeting = Meetup.by_id(session, meeting_id)
 
     if meeting and (meeting.public or meeting.is_owned_by(user)):
-        view = meeting.inline_view
+        view = meeting.inline_view()
         await context.api.answer_inline_query(update=update, results=[view])
         context.put_feature_metric(Feature.SHARE_MEETING)

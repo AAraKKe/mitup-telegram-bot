@@ -681,7 +681,7 @@ def test_default_meeting_options_view(
     assert expected_view == view
 
 
-def expected_inline_keyboard(language: str, with_timezone: bool) -> Keyboard:
+def expected_inline_keyboard(language: str, with_timezone: bool, *, chat_instance: str | None = None) -> Keyboard:
     expected_keyboard = [
         [
             ButtonConfig(
@@ -704,6 +704,16 @@ def expected_inline_keyboard(language: str, with_timezone: bool) -> Keyboard:
             ],
         )
 
+    if not chat_instance:
+        expected_keyboard.append(
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAKE_SEARCHABLE.get(lang=language),
+                    callback_data=cb.ATTACH_TO_CHAT.with_id(123),
+                ),
+            ],
+        )
+
     return expected_keyboard
 
 
@@ -719,7 +729,7 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None, with_timezon
     meeting.language = meeting_language
     meeting.show_timezone = with_timezone
     used_language = meeting_language or meeting.owner.lang
-    view = meeting.inline_view
+    view = meeting.inline_view()
 
     expected_view = MitupInlineView(
         description=meeting.inline_message,
@@ -727,7 +737,33 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None, with_timezon
         id="123",
         title=meeting.title,
         inline_description=meeting.inline_query_message,
-    )
+    ).with_footnote(MeetingMessages.NOT_SEARCHABLE_FOOTNOTE.get(lang=used_language))
+
+    assert expected_view == view
+
+
+@pytest.mark.parametrize(
+    "meeting_language",
+    SUPPORTED_LANGUAGES + [None],
+    ids=[f"meeting_language_{lang}" for lang in SUPPORTED_LANGUAGES] + ["meeting_language_none"],
+)
+@pytest.mark.parametrize("with_timezone", [True, False], ids=["with_timezone", "without_timezone"])
+def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None, with_timezone: bool):
+    meeting.language = meeting_language
+    meeting.show_timezone = with_timezone
+    used_language = meeting_language or meeting.owner.lang
+
+    view = meeting.inline_view(chat_instance="some_chat_instance")
+
+    expected_view = MitupInlineView(
+        description=meeting.inline_message,
+        keyboard=expected_inline_keyboard(
+            language=used_language, with_timezone=with_timezone, chat_instance="some_chat_instance"
+        ),
+        id="123",
+        title=meeting.title,
+        inline_description=meeting.inline_query_message,
+    ).with_footnote(MeetingMessages.SEARCHABLE_FOOTNOTE.get(lang=used_language))
 
     assert expected_view == view
 
@@ -843,10 +879,12 @@ def test_share_button_in_keyboard(is_public):
     meetup = create_meetup(123, "Meeting", public=is_public)
     keyboard = meetup.build_inline_keyboard()
 
+    share_buttons = [btn for row in keyboard for btn in row if btn.switch_inline_query is not None]
     if is_public:
-        assert keyboard[-1][-1].switch_inline_query == "123"
+        assert len(share_buttons) == 1
+        assert share_buttons[0].switch_inline_query == "123"
     else:
-        assert keyboard[-1][-1].switch_inline_query is None
+        assert len(share_buttons) == 0
 
 
 def test_participant_returns_none_if_user_not_found():

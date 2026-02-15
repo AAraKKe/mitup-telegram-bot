@@ -348,7 +348,7 @@ class StubMetricsEngine(MitupMetricsEngine[StubMetrics]):
             times=times,
         )
 
-    def assert_feature_metrcs_not_emitted(
+    def assert_feature_metrics_not_emitted(
         self,
         feature: Feature,
     ):

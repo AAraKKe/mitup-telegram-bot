@@ -9,6 +9,7 @@ from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Settings, User
+from mitup_bot.models import Message as MeetupMessage
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
     DEFAULT_MESSAGE_ID,
@@ -156,6 +157,24 @@ def create_joined_link(
         is_waiting_list=is_waiting_list,
         notification_sent=notification_sent,
         invited_by=invited_by,
+    )
+
+
+def create_message(
+    id: int = 1,
+    inline_message_id: str = "some_inline_message_id",
+    chat_instance: str | None = None,
+    meetup_id: int = 1,
+    message_id: int | None = None,
+    chat_id: int | None = None,
+) -> MeetupMessage:
+    return MeetupMessage(
+        id=id,
+        inline_message_id=inline_message_id,
+        chat_instance=chat_instance,
+        meetup_id=meetup_id,
+        message_id=message_id,
+        chat_id=chat_id,
     )
 
 

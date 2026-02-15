@@ -588,17 +588,23 @@ class Meetup(BaseModel, SQLModel, table=True):
             keyboard=keyboard,
         ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(self.db_id))
 
-    @property
-    def inline_view(self) -> MitupInlineView:
-        return MitupInlineView(
+    def inline_view(self, *, chat_instance: str | None = None) -> MitupInlineView:
+        is_searchable = chat_instance is not None
+        footnote = (
+            MeetingMessages.SEARCHABLE_FOOTNOTE.get(lang=self.lang)
+            if is_searchable
+            else MeetingMessages.NOT_SEARCHABLE_FOOTNOTE.get(lang=self.lang)
+        )
+        view = MitupInlineView(
             description=self.inline_message,
-            keyboard=self.build_inline_keyboard(),
+            keyboard=self.build_inline_keyboard(is_searchable=is_searchable),
             id=str(self.db_id),
             title=str(self.title),
             inline_description=self.inline_query_message,
         )
+        return view.with_footnote(footnote)
 
-    def build_inline_keyboard(self) -> Keyboard:
+    def build_inline_keyboard(self, *, is_searchable: bool = False) -> Keyboard:
         keyboard = [
             [
                 ButtonConfig(
@@ -636,6 +642,16 @@ class Meetup(BaseModel, SQLModel, table=True):
             keyboard.append(
                 [
                     ButtonConfig(text=ButtonMessages.SHARE.get(lang=self.lang), switch_inline_query=str(self.db_id)),
+                ]
+            )
+
+        if not is_searchable:
+            keyboard.append(
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.MAKE_SEARCHABLE.get(lang=self.lang),
+                        callback_data=cb.ATTACH_TO_CHAT.with_id(self.db_id),
+                    ),
                 ]
             )
 

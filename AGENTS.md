@@ -20,6 +20,19 @@ Agent instructions are split across multiple files (see "Detailed guidelines" be
 
 - **Hosted on GitLab** at <https://gitlab.com/meetupbot/mitup-telegram-bot>. All URLs (issues, MRs, links in docs) must follow GitLab URL conventions, not GitHub's.
 - **Issue templates** are in `.gitlab/issue_templates/`. To link to a new issue, use: `https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/new?issuable_template=TemplateName`. Available templates: `Bug`, `Feature Proposal`, `Task`, `New Language Request`, `Improve Documentation`, `Translation`, `Service Desk Request`.
+- **Merge request template** is at `.gitlab/merge_request_templates/Default.md`. When asked to produce an MR description, always follow that template structure and output plain Markdown the user can copy-paste directly.
+- **Commit message format** — Every commit message must be prepended with an emoji that matches the commit type. The mapping of types to emojis is defined in `commits_check_config.yaml`. See `docs/collaborate/commit_message_format.md` for full rules and examples.
+  - **With pre-commit hooks installed** (local dev): Write commits in conventional format (`Type[(scope)][!]: description`). The hook automatically replaces the type with the corresponding emoji.
+  - **Without pre-commit hooks** (CI agents, GitLab Duo, etc.): Build the final message directly using the emoji from `commits_check_config.yaml` instead of the type prefix (e.g., `✨ Add user authentication` instead of `feat: add user authentication`).
+
+## External documentation
+
+When validating Telegram API behaviour (field availability, method parameters, object structure), consult the official sources:
+
+- **Telegram Bot API** — <https://core.telegram.org/bots/api>
+- **python-telegram-bot (PTB)** — <https://docs.python-telegram-bot.org/en/stable/index.html>
+
+Do not rely on assumptions or cached knowledge. Always verify against the current API specification before documenting field semantics.
 
 ## Tech stack
 

@@ -66,3 +66,15 @@ The `enums.py` → `entry.py` convention is organizational only — it has no ru
 3. Add `@with_async_session` if database access is needed.
 4. Register the handler in `tests/test_failure_modes.py` if it uses guards (`current_user`, `meeting_accessible`, `valid_callback_data`, etc.) — see `tests/AGENTS.md` for details.
 5. Import the handler module in `mitup_bot/handlers/__init__.py` so the registry picks it up.
+
+## Localization
+
+**Never hard-code a language** (e.g., `lang="en"`) when rendering user-facing messages. Always derive the language from the user (`user.lang`) or the meeting (`meeting.lang`). Fetch the user early in the handler (before branching on meeting existence) so `user.lang` is available in every code path, including error/fallback branches where the meeting may not exist.
+
+## `chat_instance`
+
+`chat_instance` is a **required** field on every `CallbackQuery` — Telegram always provides it, regardless of whether the button was clicked in a bot-chat or on a shared (inline) message. Per the [Telegram Bot API](https://core.telegram.org/bots/api#callbackquery), it is a "global identifier, uniquely corresponding to the chat to which the message with the callback button was sent."
+
+In this project, `chat_instance` is only **stored** on `Message` records for inline (shared) messages (see `Message.from_update` in `models/messages.py`). It serves as the mechanism to associate a meeting with a specific chat for searchability. For bot-chat callback queries the value exists but is not persisted because it is not meaningful for meeting association.
+
+Access it via `update.callback_query.chat_instance`.

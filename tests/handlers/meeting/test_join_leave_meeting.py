@@ -73,7 +73,7 @@ async def test_user_already_join_does_not_join(
     mock_session.assert_flushed()
 
     # No feature metric has been emitted
-    context.metrics_engine.assert_feature_metrcs_not_emitted(Feature.JOIN_MEETING)
+    context.metrics_engine.assert_feature_metrics_not_emitted(Feature.JOIN_MEETING)
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
@@ -102,7 +102,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     mock_session.assert_flushed()
 
     # No feature metric has been emitted
-    context.metrics_engine.assert_feature_metrcs_not_emitted(Feature.JOIN_MEETING)
+    context.metrics_engine.assert_feature_metrics_not_emitted(Feature.JOIN_MEETING)
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(

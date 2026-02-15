@@ -90,3 +90,4 @@ class Feature(CamelCaseStrEnum):
     KICK_OUT_PARTICIPANT = auto()
     MEETING_LANGUAGE_SET = auto()
     INVITE_USERS = auto()
+    ATTACH_TO_CHAT = auto()

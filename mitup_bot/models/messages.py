@@ -47,7 +47,7 @@ class Message(BaseModel, SQLModel, table=True):
         message_id = None
         inline_message_id = None
         chat_instance = None
-        keyboard = meeting.inline_view.keyboard
+        keyboard = meeting.inline_view().keyboard
         if update.effective_message:
             message_id = update.effective_message.message_id
             # This is a message from the chat with the bot. Either by the user that owns it
@@ -57,7 +57,8 @@ class Message(BaseModel, SQLModel, table=True):
             inline_message_id = update.callback_query.inline_message_id
             chat_instance = update.callback_query.chat_instance
             # This is a message from a shared meeting outside the chat with the bot
-            # The keyboard must be a simple inline keyboard. Leave the default
+            # Rebuild the keyboard with the now-known chat_instance
+            keyboard = meeting.inline_view(chat_instance=chat_instance).keyboard
         chat_id = update.effective_chat.id if update.effective_chat else None
         if message_id is None and inline_message_id is None:
             raise NoMessageAvailable("No message_id or inline_message_id found in the update")

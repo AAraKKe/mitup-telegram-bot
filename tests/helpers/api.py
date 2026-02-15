@@ -164,9 +164,15 @@ class MockApi(TelegramApi):
         view: MitupView | str,
         times: int,
     ):
-        # Validate that the update has been properly generated
-        assert update.effective_chat is not None
-        assert update.effective_message is not None
+        # Validate that the update has been properly generated.
+        # Bot-chat updates have effective_chat + effective_message.
+        # Inline message updates have callback_query.inline_message_id instead.
+        is_bot_chat = update.effective_chat is not None and update.effective_message is not None
+        is_inline = update.callback_query is not None and update.callback_query.inline_message_id is not None
+        assert is_bot_chat or is_inline, (
+            "Update must have either (effective_chat + effective_message) or "
+            "(callback_query.inline_message_id) to call API methods"
+        )
 
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method(method_name), update=update, view=view)

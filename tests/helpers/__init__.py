@@ -13,6 +13,7 @@ __all__ = [
     "create_meetup",
     "create_user",
     "create_settings",
+    "create_message",
     "create_joined_link",
     "MockDbSession",
     "MITUP_DIR",
@@ -33,6 +34,7 @@ from .api import MockApi
 from .fixtures import (
     UpdateRequest,
     create_meetup,
+    create_message,
     create_user,
     create_settings,
     telegram_user_from_user,

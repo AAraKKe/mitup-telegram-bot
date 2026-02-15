@@ -348,7 +348,7 @@ class TelegramApi:
         """
 
         view = (
-            meeting.inline_view
+            meeting.inline_view(chat_instance=message.chat_instance)
             if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
             else meeting.main_view
         )

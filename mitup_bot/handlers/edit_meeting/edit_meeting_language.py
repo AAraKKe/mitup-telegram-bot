@@ -56,7 +56,7 @@ async def callback_set_meeting_language(session: Session, update: Update, contex
     # everywhere
     meeting.language = SUPPORTED_LANGUAGES[valid_data.id]
     for message in meeting.messages:
-        message.buttons.keyboard = meeting.build_inline_keyboard()
+        message.buttons.keyboard = meeting.build_inline_keyboard(is_searchable=message.chat_instance is not None)
     session.flush()
 
     await context.api.edit_message(

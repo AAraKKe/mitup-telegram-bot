@@ -57,6 +57,12 @@ class MitupView:
 
         return self
 
+    def with_footnote(self, text: str) -> Self:
+        """Append a footnote at the end of the view's description."""
+        self.description = f"{self.description}\n\n{text}"
+
+        return self
+
     def with_context_menu(self, keyboard: Keyboard) -> Self:
         """Add a keyboard to be attached below the view keyboard. This can be used to add back buttons to views"""
         self.keyboard += keyboard

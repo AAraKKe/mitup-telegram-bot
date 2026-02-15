@@ -68,15 +68,51 @@ async def test_show_meeting(update, context, mock_session):
 
 ## Creating models
 
-Use the `create_*` helpers from `tests.helpers` to construct model instances:
+Use the `create_*` helpers from `tests.helpers` to construct model instances. **Never instantiate models directly** — always use the corresponding factory function so tests specify only the fields relevant to the scenario:
+
+| Helper | Model |
+|--------|-------|
+| `create_user()` | `User` |
+| `create_meetup()` | `Meetup` |
+| `create_settings()` | `Settings` |
+| `create_joined_link()` | `JoinedUsers` |
+| `create_message()` | `Message` (the DB model, not `telegram.Message`) |
 
 ```python
-from tests.helpers import create_user, create_meetup
+from tests.helpers import create_user, create_meetup, create_message
 
 user = create_user(id=1, first_name="John", tg_user_id=123)
+message = create_message(inline_message_id="msg_1", chat_instance="someinstance")
 ```
 
 For handler tests that need a fully configured user, use the `user_with_settings` fixture — it creates a `User` with an associated `Settings` object ready for handler invocations.
+
+> **Name collision:** `tests/helpers/fixtures.py` imports `Message` from `telegram`. The DB model is imported as `MeetupMessage` there. When adding new helpers that work with the DB `Message`, use the alias.
+
+## Inline message tests
+
+`UpdateRequest(from_bot_chat=False)` creates a callback query with `inline_message_id` and no `effective_chat`/`effective_message`. This is how shared (inline) messages work in Telegram.
+
+Key differences from bot-chat tests:
+
+- `chat_instance` defaults to `"someinstance"` in the test fixtures.
+- `inline_message_id` defaults to `"some_inline_message_id"`.
+- `MockApi` assertion helpers (e.g. `assert_edit_message_called`) support both bot-chat and inline updates.
+
+## Metric assertions
+
+When asserting metrics that include `MetricKey.TIME`, always pass the `units` parameter explicitly. `TIME` uses `Unit.MILLISECONDS`, while the other standard metrics use `Unit.COUNT`:
+
+```python
+context.metrics_engine.assert_metrics_emited(
+    [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
+    [1.0, 0.0, AnyFloat(), 0],
+    [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
+    add_handler_dimensions=False,
+)
+```
+
+Omitting `units` causes a silent mismatch because the default unit is `Count` and `Time` is emitted as `Milliseconds`.
 
 ## Failure mode tests
 

@@ -18,6 +18,7 @@ from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackDa
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
+from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
@@ -234,6 +235,12 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_LANGUAGE),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="set_meeting_language_malformed",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.ATTACH_TO_CHAT,
+        update_request=UpdateRequest(callback_query=cb.ATTACH_TO_CHAT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="attach_to_chat_malformed",
     ),
 ]
 

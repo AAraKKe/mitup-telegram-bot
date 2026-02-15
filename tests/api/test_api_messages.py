@@ -134,11 +134,11 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
 
     edit: mock.MagicMock = context.bot.edit_message_text
     expected_call_params = {
-        "text": meeting.inline_view.description,
+        "text": meeting.inline_view().description,
         "chat_id": 123,
         "message_id": None,
         "inline_message_id": None,
-        "reply_markup": meeting.inline_view.markup,
+        "reply_markup": meeting.inline_view().markup,
     }
 
     assert edit.call_count == 3
@@ -166,7 +166,7 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
                 **(
                     expected_call_params
                     | {
-                        "text": meeting.inline_view.description,
+                        "text": meeting.inline_view().description,
                         "message_id": 123,
                         "chat_id": 234,
                     }
