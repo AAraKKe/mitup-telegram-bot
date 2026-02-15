@@ -95,6 +95,18 @@ class MitupInlineView(MitupView):
     id: str
 
 
+@dataclass
+class InlineResultsButton:
+    """Button shown above inline query results.
+
+    Abstracts the Telegram ``InlineQueryResultsButton`` so handlers never
+    depend on the PTB type directly.
+    """
+
+    text: str
+    start_parameter: str | None = None
+
+
 class PaginatedViewPosition(Enum):
     UNIQUE = auto()
     FIRST = auto()

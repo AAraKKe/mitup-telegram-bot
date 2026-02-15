@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
-from telegram import InlineQueryResultArticle, InputTextMessageContent, Message, Update
+from telegram import InlineQueryResultArticle, InlineQueryResultsButton, InputTextMessageContent, Message, Update
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import CallbackContext, ExtBot
 
@@ -23,7 +23,7 @@ from mitup_bot.models.joined_users import JoinedUsers
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingMessages
-from mitup_bot.views import MitupInlineView, MitupView
+from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 
 TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
@@ -121,7 +121,9 @@ class TelegramApiWrapper(Protocol):
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
     ) -> None: ...
     async def edit_message(self, update: Update, view: MitupView | str) -> Message | bool: ...
-    async def answer_inline_query(self, update: Update, results: list[MitupInlineView]) -> None: ...
+    async def answer_inline_query(
+        self, update: Update, results: list[MitupInlineView], button: InlineResultsButton | None = None
+    ) -> None: ...
     async def answer_callback_query(self, update: Update, text: str, show_alert: bool) -> None: ...
     async def update_single_meeting_message(
         self,
@@ -301,7 +303,12 @@ class TelegramApi:
                     reply_markup=reply_markup,
                 )
 
-    async def answer_inline_query(self, update: Update, results: list[MitupInlineView]):
+    async def answer_inline_query(
+        self,
+        update: Update,
+        results: list[MitupInlineView],
+        button: InlineResultsButton | None = None,
+    ):
         from mitup_bot import guards
 
         query = guards.valid_inline_query(update)
@@ -315,7 +322,10 @@ class TelegramApi:
             )
             for view in results
         ]
-        if await self.adapter.bot.answer_inline_query(query.id, results=inline_results):
+        tg_button = (
+            InlineQueryResultsButton(text=button.text, start_parameter=button.start_parameter) if button else None
+        )
+        if await self.adapter.bot.answer_inline_query(query.id, results=inline_results, button=tg_button):
             return
         raise AnswerInlineQueryError(query.query)
 

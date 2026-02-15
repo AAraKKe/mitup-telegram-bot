@@ -2,6 +2,7 @@ __all__ = (
     "ButtonMessages",
     "callbacks",
     "Emojis",
+    "InlineViewMessages",
     "MeetingMessages",
     "Messages",
     "Month",
@@ -16,6 +17,7 @@ from . import callbacks
 from .emojis import Emojis
 from .messages import (
     ButtonMessages,
+    InlineViewMessages,
     MeetingMessages,
     Messages,
     SettingsMessages,

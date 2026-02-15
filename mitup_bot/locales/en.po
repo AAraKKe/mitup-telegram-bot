@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-15 14:28\n"
+"PO-Revision-Date: 2026-02-15 16:04\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -469,6 +469,18 @@ msgstr "These are the meetings you have joined."
 
 msgid "MeetingMessages.NO_JOINED_MEETINGS"
 msgstr "_You have not joined any meeting yet._"
+
+msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
+msgstr "➕ Create a new meeting"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE"
+msgstr "🔍 Meetings in this chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION"
+msgstr "Search for meetings shared in this chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE"
+msgstr "Use the inline mode to search for meetings in this chat\\."
 
 msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
 msgstr "The meeting *${meeting_title}* will be permanently deleted in *${days_until_deletion} days*.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the *${reactivate_meeting_button}* button below.\n\nRemember that you can always reactivate any past meeting from the *${past_meetings_button}* button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."

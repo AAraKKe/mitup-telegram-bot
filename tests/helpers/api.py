@@ -7,7 +7,7 @@ from telegram import Update
 
 from mitup_bot.api_wrapper import TelegramApi
 from mitup_bot.models import Meetup, Message, User
-from mitup_bot.views import MitupInlineView, MitupView
+from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_diff
 from tests.helpers.stub_db import MockDbSession
 
@@ -61,12 +61,13 @@ class MockApi(TelegramApi):
     ):
         return self.call_mock("answer_callback_query", update=update, text=text, show_alert=show_alert)
 
-    def answer_inline_query(
+    async def answer_inline_query(
         self,
         update: Update,
         results: list[MitupInlineView],
+        button: InlineResultsButton | None = DEFAULT_NONE,  # type: ignore
     ):
-        return self.call_mock("answer_inline_query", update=update, results=results)
+        return self.call_mock("answer_inline_query", update=update, results=results, button=button)
 
     def call_mock(self, name: str, **kwargs: DefaultValue | Any) -> mock.AsyncMock:
         new_kwargs = {arg: value for arg, value in kwargs.items() if not isinstance(value, DefaultValue)}
@@ -122,12 +123,16 @@ class MockApi(TelegramApi):
         self,
         update: Update,
         results: list[MitupInlineView],
+        button: object | None = None,
         times: int = 1,
     ):
+        kwargs: dict[str, object] = {"update": update, "results": results}
+        if button is not None:
+            kwargs["button"] = button
         if times == 1:
-            assert_awaited_once_with_diff(self.mock_method("answer_inline_query"), update=update, results=results)
+            assert_awaited_once_with_diff(self.mock_method("answer_inline_query"), **kwargs)
         else:
-            assert_awaited_with_diff(self.mock_method("answer_inline_query"), times, update=update, results=results)
+            assert_awaited_with_diff(self.mock_method("answer_inline_query"), times, **kwargs)
 
     def assert_update_meeting_messages_called(
         self,

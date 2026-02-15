@@ -413,6 +413,13 @@ class MeetingMessages(MessageBase):
     NO_JOINED_MEETINGS = "_You have not joined any meeting yet._"
 
 
+class InlineViewMessages(MessageBase):
+    CREATE_NEW_MEETING_BUTTON = f"{Emojis.NEW_MEETING} Create a new meeting"
+    MEETINGS_IN_THIS_CHAT_TITLE = f"{Emojis.SEARCH} Meetings in this chat"
+    MEETINGS_IN_THIS_CHAT_DESCRIPTION = "Search for meetings shared in this chat"
+    MEETINGS_IN_THIS_CHAT_MESSAGE = r"Use the inline mode to search for meetings in this chat\."
+
+
 class NotificationMessages(MessageBase):
     MEETING_WILL_BE_PERMANENTLY_DELETED = (
         "The meeting *${meeting_title}* will be permanently deleted in *${days_until_deletion} days*.\n\n"

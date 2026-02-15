@@ -26,6 +26,7 @@ from mitup_bot.exceptions import (
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, MessageBase
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -42,6 +43,13 @@ def current_user(update: Update, session: Session) -> User:
         return user
     else:
         raise UserNotFound(update.effective_user.id)
+
+
+def user_language(update: Update, session: Session) -> str:
+    """Return the preferred language for the effective user, or the fallback language if unregistered."""
+    if (tg_user := update.effective_user) and (user := User.by_tg_user_id(session, tg_user.id)):
+        return user.lang
+    return TranslationEngine.FALLBACK_LANG
 
 
 def valid_inline_query(update: Update) -> InlineQuery:

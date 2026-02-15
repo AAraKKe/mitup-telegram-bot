@@ -23,12 +23,14 @@ from mitup_bot.guards import (
     current_user,
     meeting_accessible,
     message,
+    user_language,
     user_registered,
     valid_callback_data,
 )
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
@@ -52,6 +54,21 @@ def test_current_user_succeeds(mock_session: MockDbSession, update: Update, user
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     assert user_with_settings == current_user(update, mock_session)
+
+
+def test_user_language_returns_user_lang(mock_session: MockDbSession, update: Update, user_with_settings: User):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    assert user_language(update, mock_session) == user_with_settings.lang
+
+
+def test_user_language_falls_back_for_unknown_user(mock_session: MockDbSession, update: Update):
+    assert user_language(update, mock_session) == TranslationEngine.FALLBACK_LANG
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
+def test_user_language_falls_back_without_effective_user(mock_session: MockDbSession, update: Update):
+    assert user_language(update, mock_session) == TranslationEngine.FALLBACK_LANG
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(chat=False)], indirect=True)
