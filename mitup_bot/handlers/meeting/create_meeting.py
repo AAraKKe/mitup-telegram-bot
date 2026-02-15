@@ -1,5 +1,4 @@
 import logging
-from enum import Enum, auto
 
 from sqlmodel import Session
 from telegram import Update
@@ -14,12 +13,9 @@ from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 
+from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
-from .enums import MeetingHandlerId
-
-
-class ConversationMeetingState(Enum):
-    TITLE = auto()
+from .enums import ConversationMeetingState, MeetingHandlerId
 
 
 @HandlersRegistry.register_callback_query(
@@ -103,7 +99,10 @@ async def filter_messages_without_text(session: Session, update: Update, context
 
 HandlersRegistry.register_conversation_handler(
     MeetingHandlerId.CREATE_MEETING_CONVERSATION,
-    entry_points_handler_names=[MeetingHandlerId.CREATE_MEETING_CALLBACK],
+    entry_points_handler_names=[
+        MeetingHandlerId.CREATE_MEETING_CALLBACK,
+        CommandsId.START_WITH_EXISTING_USER,  # deep link from inline mode "Create a new meeting" button
+    ],
     states={
         ConversationMeetingState.TITLE: [
             MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,

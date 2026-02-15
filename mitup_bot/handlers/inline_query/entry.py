@@ -2,10 +2,11 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot.db import with_async_session
-from mitup_bot.guards import current_user, user_language, valid_inline_query
+from mitup_bot.guards import current_user, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import ButtonMessages, InlineViewMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -23,10 +24,12 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
     This handler can be triggered by any Telegram user, whether or not they have a mitup profile.
     If the user is registered, their preferred language is used; otherwise the fallback language is applied.
     """
-    lang = user_language(update, session)
+    user = User.by_tg_user_id(session, update.effective_user.id) if update.effective_user else None
+    lang = user.lang if user else TranslationEngine.FALLBACK_LANG
 
+    button_text = InlineViewMessages.CREATE_NEW_MEETING_BUTTON if user else InlineViewMessages.EXPLORE_MITUP_BUTTON
     button = InlineResultsButton(
-        text=InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get(lang=lang, plain=True),
+        text=button_text.get(lang=lang, plain=True),
         start_parameter="inline",
     )
 
@@ -47,11 +50,7 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
         ),
     ]
 
-    if (
-        (tg_user := update.effective_user)
-        and (user := User.by_tg_user_id(session, tg_user.id))
-        and (active_meetings := [m for m in user.meetups if m.active])
-    ):
+    if user and (active_meetings := [m for m in user.meetups if m.active]):
         results.extend(meeting.inline_view() for meeting in sort_meetings(active_meetings))
 
     await context.api.answer_inline_query(update=update, results=results, button=button, cache_time=0)

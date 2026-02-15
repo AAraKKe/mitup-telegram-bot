@@ -417,6 +417,7 @@ class MeetingMessages(MessageBase):
 
 class InlineViewMessages(MessageBase):
     CREATE_NEW_MEETING_BUTTON = f"{Emojis.NEW_MEETING} Create a new meeting"
+    EXPLORE_MITUP_BUTTON = f"{Emojis.ROCKET} Explore Mitup"
     MEETINGS_IN_THIS_CHAT_TITLE = f"{Emojis.SEARCH} Meetings in this chat"
     MEETINGS_IN_THIS_CHAT_DESCRIPTION = "Search for meetings shared in this chat"
     MEETINGS_IN_THIS_CHAT_MESSAGE = "Tap the button below to load meetings shared in this chat."

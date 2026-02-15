@@ -24,6 +24,10 @@ Each method accepts a `handler_id` (a `HandlerId` enum member) that uniquely ide
 - `states` — `dict[Enum, list[HandlerId]]` mapping state keys to handlers.
 - `fallbacks` — handlers used when no state matches the incoming update.
 
+**Entry points must be registered before the conversation.** The registry looks up each handler ID at registration time, so if a handler referenced in `entry_points_handler_names` hasn't been registered yet, `HandlerNotRegistered` is raised. When adding cross-module entry points (e.g., a command from `commands.py` as an entry point in `meeting/create_meeting.py`), verify that `handlers/__init__.py` imports the entry-point module before the module that calls `register_conversation_handler`.
+
+**Circular imports between handler modules.** If module A needs an enum from module B and vice versa, extract shared enums into standalone files (e.g., `command_enums.py`, `enums.py`) or use a local import inside the function body to defer the import until runtime. See `command_enums.py` (extracted `CommandsId`) and `commands.py` (local import of `ConversationMeetingState`) for examples of both patterns.
+
 ### Filters
 
 Handlers accept PTB `BaseFilter` instances to narrow which updates they process. Custom filters are in `personal_filters.py` (e.g., `UserExistFilter`, `PositiveNumberFilter`).

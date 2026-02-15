@@ -43,6 +43,7 @@ class UpdateRequest:
     location: Location | None = None
     callback_query: CallbackData | bool = False
     command: str | bool = False
+    command_args: str | None = None
     inline_query: str | InlineQuery = ""
     inline_message_id: str = "some_inline_message_id"
     from_bot_chat: bool = True
@@ -232,13 +233,16 @@ def create_update(
 
     if request.command:
         bot_command = request.command if isinstance(request.command, str) else "test_command"
+        text = f"/{bot_command}"
+        if request.command_args:
+            text = f"{text} {request.command_args}"
         message = Message(
             DEFAULT_MESSAGE_ID,
             date=DEFAULT_TEST_DATE,
             chat=chat,
             from_user=user,
             entities=[MessageEntity(type=MessageEntity.BOT_COMMAND, offset=0, length=len(bot_command) + 1, user=user)],
-            text=f"/{bot_command}",
+            text=text,
         )
         return Update(DEFAULT_MESSAGE_ID, message=message)
 

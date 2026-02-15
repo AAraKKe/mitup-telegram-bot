@@ -31,6 +31,10 @@ class MeetingHandlerId(HandlerId):
     INVITE_USERS_FALLBACK = auto()
 
 
+class ConversationMeetingState(Enum):
+    TITLE = auto()
+
+
 class ConversationInviteState(Enum):
     NAME = auto()
     CONFIRMATION = auto()

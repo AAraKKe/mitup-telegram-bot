@@ -41,6 +41,13 @@ def _inline_button(lang: str) -> InlineResultsButton:
     )
 
 
+def _explore_button(lang: str) -> InlineResultsButton:
+    return InlineResultsButton(
+        text=InlineViewMessages.EXPLORE_MITUP_BUTTON.get(lang=lang, plain=True),
+        start_parameter="inline",
+    )
+
+
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)
 async def test_inline_view_returns_results_and_button(
     update: Update,
@@ -108,7 +115,7 @@ async def test_inline_view_falls_back_to_default_language_for_unknown_user(
     context.api.assert_answer_inline_query_called(
         update=update,
         results=[_chat_card(default_lang)],
-        button=_inline_button(default_lang),
+        button=_explore_button(default_lang),
         cache_time=0,
     )
 

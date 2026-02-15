@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 from telegram import Update
-from telegram.ext import CommandHandler
+from telegram.ext import CommandHandler, ConversationHandler
 from telegram.ext.filters import CAPTION, PHOTO
 
 from mitup_bot.exceptions import (
@@ -15,7 +15,8 @@ from mitup_bot.exceptions import (
 )
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.handlers.commands import command_go_to_main_menu, command_start_with_existing_user
+from mitup_bot.handlers.commands import CommandsId, command_go_to_main_menu, command_start_with_existing_user
+from mitup_bot.handlers.meeting.enums import ConversationMeetingState
 from mitup_bot.handlers.registration_process.edit_registration_timezone import command_start_with_new_user
 from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
@@ -24,7 +25,7 @@ from mitup_bot.handlers.registration_process.enums import (
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import SettingsMessages
-from mitup_bot.views.factory import main_menu_view
+from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
     MockApi,
     StubMetrics,
@@ -178,7 +179,24 @@ async def test_commands_to_show_main_menu(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    await command(update, context)
+    result = await command(update, context)
 
     expected_view = main_menu_view(lang=user_with_settings.lang)
     context.api.assert_send_message_called(update, expected_view)
+    assert result == ConversationHandler.END
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(command="start", command_args="inline")], indirect=True)
+async def test_start_inline_deep_link_sends_create_meeting_view(
+    update: Update,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: StubMitupApp,
+):
+    mock_session.add_user(user_with_settings)
+
+    context, result = await call_handler(CommandsId.START_WITH_EXISTING_USER, update=update, app=app)
+
+    expected_view = create_meeting_view(lang=user_with_settings.lang)
+    context.api.assert_send_message_called(update, expected_view)
+    assert result == ConversationMeetingState.TITLE

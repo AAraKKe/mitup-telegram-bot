@@ -56,6 +56,7 @@ class Emojis(Enum):
     THINK = "🤔"
     UFO = "🛸"
     BRAIN = "🧠"
+    ROCKET = "🚀"
 
     def __str__(self):
         return self.value

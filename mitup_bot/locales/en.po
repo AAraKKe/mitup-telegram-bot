@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-15 22:31\n"
+"PO-Revision-Date: 2026-02-15 23:07\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -478,6 +478,9 @@ msgstr "_You have not joined any meeting yet._"
 
 msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
 msgstr "➕ Create a new meeting"
+
+msgid "InlineViewMessages.EXPLORE_MITUP_BUTTON"
+msgstr "🚀 Explore Mitup"
 
 msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE"
 msgstr "🔍 Meetings in this chat"

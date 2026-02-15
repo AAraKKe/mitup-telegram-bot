@@ -103,6 +103,8 @@ result = await call_handler(MyHandlerId.SHOW, update, context)
 
 This also supports simulating multi-step conversations. See `tests/handlers/meeting/edit_meeting/test_edit_meeting_datetime.py` for examples.
 
+**Testing conversation entry points:** When testing a handler that is an entry point of a conversation, pass the **individual handler ID** (e.g., `CommandsId.START_WITH_EXISTING_USER`), not the conversation handler ID. `call_handler` retrieves the conversation state using `(user_id,)` as the key, but `ConversationHandler` internally stores state under `(chat_id, user_id)`. This key mismatch causes the state lookup to return `None` when calling via the conversation handler ID.
+
 ## Updates
 
 Use the `UpdateRequest` dataclass (from `tests.helpers.fixtures`) as an indirect parameter to the globally available `update` fixture. This avoids manually constructing `telegram.Update` objects in every test:

@@ -1,5 +1,6 @@
 # Export all handlers available to make sure we register them
 __all__ = (
+    "command_enums",
     "commands",
     "HandlersRegistry",
     "messages",
