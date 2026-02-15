@@ -19,6 +19,7 @@ class ButtonConfig(BaseModel):
     # the future
     callback_data: CallbackData | str | None = None
     switch_inline_query: str | None = None
+    switch_inline_query_current_chat: str | None = None
 
     @field_validator("callback_data")
     @classmethod
@@ -35,6 +36,7 @@ class ButtonConfig(BaseModel):
             text=self.text,
             callback_data=str(self.callback_data) if self.callback_data else None,
             switch_inline_query=self.switch_inline_query,
+            switch_inline_query_current_chat=self.switch_inline_query_current_chat,
         )
 
 

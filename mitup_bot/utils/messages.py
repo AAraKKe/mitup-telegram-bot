@@ -126,6 +126,8 @@ class ButtonMessages(MessageBase):
     MEETING_KICK_OUT = "Kick out"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
     MAKE_SEARCHABLE = "Make it searchable"
+    LOAD_CHAT_MEETINGS = f"{Emojis.SEARCH} Load meetings"
+    SEARCH_CHAT_MEETINGS = f"{Emojis.SEARCH} Search meetings"
 
     # Notification buttons
     REACTIVATE_MEETING = "Reactivate meeting"
@@ -320,7 +322,7 @@ class MeetingMessages(MessageBase):
         "or press in _No limit_ to allow an unlimited number of participants."
     )
     MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *${max_participants}*"
-    NO_LIMIT_PARTICIPANTS = "\\(No limit\\)"
+    NO_LIMIT_PARTICIPANTS = "No limit"
     MAX_PARTICIPANTS_SET_FAIL = "The maximum number of participants must be a number greater than 0. Please, try again"
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
     KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE = (
@@ -417,7 +419,11 @@ class InlineViewMessages(MessageBase):
     CREATE_NEW_MEETING_BUTTON = f"{Emojis.NEW_MEETING} Create a new meeting"
     MEETINGS_IN_THIS_CHAT_TITLE = f"{Emojis.SEARCH} Meetings in this chat"
     MEETINGS_IN_THIS_CHAT_DESCRIPTION = "Search for meetings shared in this chat"
-    MEETINGS_IN_THIS_CHAT_MESSAGE = r"Use the inline mode to search for meetings in this chat\."
+    MEETINGS_IN_THIS_CHAT_MESSAGE = "Tap the button below to load meetings shared in this chat."
+    READY_TO_SEARCH_MESSAGE = "Tap the button below to search for meetings shared in this chat."
+    NO_MEETINGS_FOUND_TITLE = "No meetings found"
+    NO_MEETINGS_FOUND_DESCRIPTION = "No meetings have been shared in this chat yet"
+    NO_MEETINGS_FOUND_MESSAGE = "_No meetings have been shared in this chat yet._"
 
 
 class NotificationMessages(MessageBase):

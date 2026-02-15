@@ -122,7 +122,11 @@ class TelegramApiWrapper(Protocol):
     ) -> None: ...
     async def edit_message(self, update: Update, view: MitupView | str) -> Message | bool: ...
     async def answer_inline_query(
-        self, update: Update, results: list[MitupInlineView], button: InlineResultsButton | None = None
+        self,
+        update: Update,
+        results: list[MitupInlineView],
+        button: InlineResultsButton | None = None,
+        cache_time: int = 60,
     ) -> None: ...
     async def answer_callback_query(self, update: Update, text: str, show_alert: bool) -> None: ...
     async def update_single_meeting_message(
@@ -308,6 +312,7 @@ class TelegramApi:
         update: Update,
         results: list[MitupInlineView],
         button: InlineResultsButton | None = None,
+        cache_time: int = 60,
     ):
         from mitup_bot import guards
 
@@ -325,7 +330,9 @@ class TelegramApi:
         tg_button = (
             InlineQueryResultsButton(text=button.text, start_parameter=button.start_parameter) if button else None
         )
-        if await self.adapter.bot.answer_inline_query(query.id, results=inline_results, button=tg_button):
+        if await self.adapter.bot.answer_inline_query(
+            query.id, results=inline_results, button=tg_button, cache_time=cache_time
+        ):
             return
         raise AnswerInlineQueryError(query.query)
 

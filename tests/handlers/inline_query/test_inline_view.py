@@ -2,10 +2,11 @@ import pytest
 from telegram import Update
 from telegram.ext import Application
 
+import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.models import User
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import InlineViewMessages
+from mitup_bot.utils.messages import ButtonMessages, InlineViewMessages
 from mitup_bot.views import InlineResultsButton
 from tests.helpers.context import call_handler
 from tests.helpers.fixtures import UpdateRequest
@@ -31,11 +32,18 @@ async def test_inline_view_returns_results_and_button(
     assert isinstance(button, InlineResultsButton)
     assert button.start_parameter == "inline"
 
-    # Verify results contain the dummy "meetings in this chat" article
+    # Verify results contain the "meetings in this chat" article with a load button
     results = kwargs.get("results")
     assert results is not None
     assert len(results) == 1
     assert results[0].id == "meetings_in_this_chat"
+
+    # The inline result should have a keyboard with the "Load meetings" button
+    keyboard = results[0].keyboard
+    assert len(keyboard) == 1
+    load_button = keyboard[0][0]
+    assert load_button.callback_data == cb.LOAD_CHAT_MEETINGS
+    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=user_with_settings.lang, plain=True)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)

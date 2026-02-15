@@ -262,10 +262,10 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def participants_badge(self) -> str:
-        """Shwos a badge with participants information when the meeting is shown in an inline query results"""
-        empty = MeetingMessages.EMPTY.get(lang=self.lang)
+        """Plain-text badge shown in inline query result descriptions."""
+        empty = MeetingMessages.EMPTY.get(lang=self.lang, plain=True)
         joined_count = len(self.joined_links)
-        no_limit = f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language)})"
+        no_limit = f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language, plain=True)})"
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
 
@@ -325,7 +325,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         max_participants = (
             MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
             if self.max_members
-            else f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)}"
+            else f"\\({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)}\\)"
         )
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
@@ -387,25 +387,12 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def inline_query_message(self) -> str:
-        """
-        Textual representation of the meeting when it is shown in an inline query.
-        """
-        result: list[str] = []
+        """Plain-text preview shown below the title in inline query results."""
+        result: list[str] = [f"{Emojis.JOINED} {self.participants_badge}"]
 
-        if self.description:
-            result.append(f"{Emojis.DESCRIPTION} {self.short_description}")
-
-        result.append(f"{Emojis.JOINED} {self.participants_badge}")
-
-        time_location = ""
         if self.datetime:
-            time_location += f"{Emojis.CLOCK} {self.str_datetime}"
-        if self.location.name:
-            time_location += f" {Emojis.PIN} {str(self.location.name)}"
+            result.append(f"{Emojis.CLOCK} {self.str_datetime}")
 
-        result.append(time_location.strip())
-
-        # No need to sanitize as this is the message shown in the inline result and markdown is not supported
         return "\n".join(result)
 
     @property

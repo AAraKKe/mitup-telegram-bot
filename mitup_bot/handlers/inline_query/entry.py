@@ -6,14 +6,15 @@ from mitup_bot.guards import current_user, user_language, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils import InlineViewMessages
+from mitup_bot.utils import ButtonMessages, InlineViewMessages
+from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import InlineResultsButton, MitupInlineView
+from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
 
 from .enums import InlineQueryId
 
 
-@HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW)
+@HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW, pattern=r"^\s*$")
 @with_async_session
 async def inline_view(session: Session, update: Update, context: TMitupContext):
     """Show the default inline view when a user invokes the bot in any chat without a specific query.
@@ -31,7 +32,14 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
     results: list[MitupInlineView] = [
         MitupInlineView(
             description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE.get(lang=lang),
-            keyboard=[],
+            keyboard=[
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang, plain=True),
+                        callback_data=cb.LOAD_CHAT_MEETINGS,
+                    )
+                ],
+            ],
             id="meetings_in_this_chat",
             title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang, plain=True),
             inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang, plain=True),

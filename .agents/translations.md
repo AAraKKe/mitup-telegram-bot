@@ -31,6 +31,25 @@ Or do both in one step:
 hatch run dev:update-locales
 ```
 
+## Message content vs formatting
+
+Messages should contain **semantic content only** — not MarkdownV2 escaping or formatting characters. Callers are responsible for adding formatting appropriate to their context:
+
+```python
+# Good — plain semantic content
+NO_LIMIT_PARTICIPANTS = "No limit"
+
+# Bad — bakes MarkdownV2 escaping into the message
+NO_LIMIT_PARTICIPANTS = "\\(No limit\\)"
+```
+
+When the same message is used in different contexts, callers wrap it accordingly:
+
+- **MarkdownV2** (meeting messages): `f"\\({MeetingMessages.NO_LIMIT.get(lang=lang)}\\)"` → renders `(No limit)`
+- **Plain text** (inline descriptions): `f"({MeetingMessages.NO_LIMIT.get(lang=lang, plain=True)})"` → displays `(No limit)`
+
+Use `.get(plain=True)` when rendering messages in plain-text contexts (e.g. inline query result descriptions, button text) where MarkdownV2 is not supported.
+
 ## CI enforcement
 
 The `validate-locales` job runs `hatch run dev:validate-locales` to ensure every message defined in code has a corresponding entry in the English translations file. Missing entries cause the job to fail.

@@ -35,6 +35,20 @@ The issue URL allows automated tracking: the CI job `check-ty-ignores` queries t
 4. If the version is not the same, update the environment by running `hatch env prune && hatch env create dev`.
 5. If it is, restore the comment (the issue may not be fully fixed in the installed `ty` version).
 
+## Prefer `cast` over `# type: ignore`
+
+When you have already narrowed a type through control flow (e.g., filtered `None` values in a loop or conditional), use `typing.cast` instead of `# type: ignore[arg-type]`. This communicates intent and avoids masking real errors:
+
+```python
+# Bad — suppresses all arg-type errors on this line
+future.sort(key=lambda m: m.datetime)  # type: ignore[arg-type]
+
+# Good — documents that datetime is known non-None here
+future.sort(key=lambda m: cast(dt.datetime, m.datetime))
+```
+
+Reserve `# type: ignore` (and `# ty: ignore`) for genuine false positives in the type checker, not for type narrowing that the checker cannot infer.
+
 ## Known false positives
 
 This section documents `ty` bugs that currently require `# ty: ignore` suppressions in the codebase.

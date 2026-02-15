@@ -91,3 +91,4 @@ class Feature(CamelCaseStrEnum):
     MEETING_LANGUAGE_SET = auto()
     INVITE_USERS = auto()
     ATTACH_TO_CHAT = auto()
+    SEARCH_CHAT_MEETINGS = auto()

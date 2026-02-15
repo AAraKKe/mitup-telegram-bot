@@ -51,7 +51,7 @@ def expected_participants_message(max_participants: bool, lang: str, n_participa
     max_participants_text = (
         f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5)}"
         if max_participants
-        else f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}"
+        else f"\\({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}\\)"
     )
 
     return sanitize(f"{total_participants} {max_participants_text}", full=True)
@@ -388,51 +388,24 @@ def test_short_description(description: str | None, expected_description: str | 
     assert expected_description == meeting.short_description
 
 
-def build_inline_message(
-    lang: str, description: str | None, datetime: datetime | None, location: MeetupLocation
-) -> str:
-    message = ""
-    if description:
-        message += f"{Emojis.DESCRIPTION} {description}\n"
-    message += f"{Emojis.JOINED} {MeetingMessages.EMPTY.get(lang=lang)}\n"
-    if datetime:
-        message += f"{Emojis.CLOCK} 2024-01-12 13:30 (Europe/Madrid)"
-        if location.name:
-            message += f" {Emojis.PIN} {location.name}"
-    elif location.name:
-        message += f"{Emojis.PIN} {location.name}"
-
-    return message
+def build_inline_message(lang: str, meeting_datetime: datetime | None) -> str:
+    result = [f"{Emojis.JOINED} {MeetingMessages.EMPTY.get(lang=lang, plain=True)}"]
+    if meeting_datetime:
+        result.append(f"{Emojis.CLOCK} 2024-01-12 13:30 (Europe/Madrid)")
+    return "\n".join(result)
 
 
 @pytest.mark.parametrize(
-    "description",
-    ["A short description", None],
-    ids=["with_description", "without_description"],
-)
-@pytest.mark.parametrize(
-    "datetime",
+    "meeting_datetime",
     [datetime(2024, 1, 12, 12, 30, tzinfo=UTC), None],
     ids=["with_datetime", "without_datetime"],
 )
-@pytest.mark.parametrize(
-    "location",
-    [
-        MeetupLocation(name="My Location", coordinates=(123, 123)),
-        MeetupLocation(),
-        MeetupLocation(name="My Location"),
-        MeetupLocation(coordinates=(123, 123)),
-    ],
-    ids=["with_location", "without_location", "with_location_name", "with_location_coordinates"],
-)
-def test_inline_query_message(
-    user_with_settings: User, description: str | None, datetime: datetime | None, location: MeetupLocation
-):
+def test_inline_query_message(user_with_settings: User, meeting_datetime: datetime | None):
     meeting = Meetup(
         title="Test Meeting",
-        description=description,
-        datetime=datetime,
-        location=location,
+        description="A description that should not appear in the inline preview",
+        datetime=meeting_datetime,
+        location=MeetupLocation(name="A location that should not appear"),
         owner=user_with_settings,
         waiting_list=False,
         public=False,
@@ -441,9 +414,9 @@ def test_inline_query_message(
         show_timezone=True,
     )
 
-    message = build_inline_message(user_with_settings.lang, description, datetime, location)
+    expected = build_inline_message(user_with_settings.lang, meeting_datetime)
 
-    assert message == meeting.inline_query_message
+    assert expected == meeting.inline_query_message
 
 
 @pytest.mark.parametrize(
@@ -453,7 +426,7 @@ def test_inline_query_message(
             0,
             None,
             lambda lang: (
-                f"{MeetingMessages.EMPTY.get(lang=lang)} {MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}"
+                f"{MeetingMessages.EMPTY.get(lang=lang)} \\({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}\\)"
             ),
         ),
         (
@@ -461,7 +434,7 @@ def test_inline_query_message(
             None,
             lambda lang: (
                 f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-                f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}|\n  Joined\\_0"
+                f"\\({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}\\)|\n  Joined\\_0"
             ),
         ),
         (

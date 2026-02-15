@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-15 16:04\n"
+"PO-Revision-Date: 2026-02-15 21:21\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -166,6 +166,12 @@ msgstr "🗑️ Delete date"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Make it searchable"
+
+msgid "ButtonMessages.LOAD_CHAT_MEETINGS"
+msgstr "🔍 Load meetings"
+
+msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
+msgstr "🔍 Search meetings"
 
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivate meeting"
@@ -372,7 +378,7 @@ msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
 msgstr "The maximum number of participants has been set to: *${max_participants}*"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
-msgstr "\\(No limit\\)"
+msgstr "No limit"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
 msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
@@ -480,7 +486,19 @@ msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION"
 msgstr "Search for meetings shared in this chat"
 
 msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE"
-msgstr "Use the inline mode to search for meetings in this chat\\."
+msgstr "Tap the button below to load meetings shared in this chat."
+
+msgid "InlineViewMessages.READY_TO_SEARCH_MESSAGE"
+msgstr "Tap the button below to search for meetings shared in this chat."
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_TITLE"
+msgstr "No meetings found"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION"
+msgstr "No meetings have been shared in this chat yet"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE"
+msgstr "_No meetings have been shared in this chat yet._"
 
 msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
 msgstr "The meeting *${meeting_title}* will be permanently deleted in *${days_until_deletion} days*.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the *${reactivate_meeting_button}* button below.\n\nRemember that you can always reactivate any past meeting from the *${past_meetings_button}* button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."

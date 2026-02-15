@@ -356,7 +356,7 @@ msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
 msgstr "Se ha establecido correctamente un máximo de *${max_participants}* participantes"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
-msgstr "\\(Sin límite\\)"
+msgstr "Sin límite"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
 msgstr "El número máximo de participantes debe ser superior a 0. Por favor, inténtalo de nuevo"

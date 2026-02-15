@@ -64,7 +64,7 @@ Note that `BotAdapter` does not emit metrics. If metrics are needed from non-han
 | `send_message_to_user()` | Send a message to a user by their `tg_user_id` |
 | `send_messages_to_users()` | Batch send to multiple users with error handling |
 | `edit_message()` | Edit an existing message (handles inline messages too) |
-| `answer_inline_query()` | Respond to an inline query with results |
+| `answer_inline_query()` | Respond to an inline query with results (`cache_time` defaults to 60s; pass `0` for dynamic results) |
 | `answer_callback_query()` | Acknowledge a button press |
 | `update_single_meeting_message()` | Update one stored meeting message |
 | `update_meeting_messages()` | Broadcast meeting state to all stored messages |

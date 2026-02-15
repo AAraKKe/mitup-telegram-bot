@@ -37,7 +37,11 @@ Use `PaginatedMitupView` when the button list could grow beyond ~8 items.
 
 ### `ButtonConfig`
 
-A Pydantic model wrapping `text` + `callback_data` (or `switch_inline_query`). The `.button` property converts to a PTB `InlineKeyboardButton`.
+A Pydantic model wrapping `text` + one action field. The `.button` property converts to a PTB `InlineKeyboardButton`. Supported action fields (mutually exclusive per Telegram API):
+
+- `callback_data` — triggers a callback query when pressed.
+- `switch_inline_query` — prompts the user to select a chat and opens inline mode with the given query.
+- `switch_inline_query_current_chat` — opens inline mode in the **current** chat with the given query (no chat selection prompt).
 
 **Critical constraint:** Telegram limits callback data to **64 bytes**. `ButtonConfig` validates this at the Pydantic level — construction fails if the encoded callback data exceeds 64 bytes. This is why `CallbackData` uses a compact `{action};{entity}:{id}` format.
 

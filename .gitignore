@@ -21,9 +21,8 @@ report.xml
 # Database files
 postgres-data
 
-# Ignroe dev.toml for local configuration to avoid
-# secrets in commits
-dev.toml
+# Ignroe idea folder
+.idea
 
 # Ignore build dist
 dist
@@ -42,3 +41,6 @@ aws
 
 # Any dev file in environments
 mitup_bot/environments/dev*
+
+# Ignore agent local files
+.claude

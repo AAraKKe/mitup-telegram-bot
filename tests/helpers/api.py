@@ -61,13 +61,16 @@ class MockApi(TelegramApi):
     ):
         return self.call_mock("answer_callback_query", update=update, text=text, show_alert=show_alert)
 
-    async def answer_inline_query(
+    def answer_inline_query(
         self,
         update: Update,
         results: list[MitupInlineView],
         button: InlineResultsButton | None = DEFAULT_NONE,  # type: ignore
+        cache_time: int = DEFAULT_NONE,  # type: ignore
     ):
-        return self.call_mock("answer_inline_query", update=update, results=results, button=button)
+        return self.call_mock(
+            "answer_inline_query", update=update, results=results, button=button, cache_time=cache_time
+        )
 
     def call_mock(self, name: str, **kwargs: DefaultValue | Any) -> mock.AsyncMock:
         new_kwargs = {arg: value for arg, value in kwargs.items() if not isinstance(value, DefaultValue)}
@@ -124,11 +127,14 @@ class MockApi(TelegramApi):
         update: Update,
         results: list[MitupInlineView],
         button: object | None = None,
+        cache_time: int | None = None,
         times: int = 1,
     ):
         kwargs: dict[str, object] = {"update": update, "results": results}
         if button is not None:
             kwargs["button"] = button
+        if cache_time is not None:
+            kwargs["cache_time"] = cache_time
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method("answer_inline_query"), **kwargs)
         else:

@@ -20,7 +20,38 @@ mitup_bot/handlers/main_menu/create_meeting.py
 
 ## Parameterization
 
-When multiple tests exercise the same logic with different inputs, combine them using `@pytest.mark.parametrize` to avoid duplication.
+When multiple tests exercise the same logic with different inputs, combine them using `@pytest.mark.parametrize` to avoid duplication. Always look for parameterization opportunities — they reduce the amount of code to review and maintain.
+
+Beyond simple scalar parameters, use **callable factories** when each scenario needs different model setup but shares the same assertion logic. Define private functions that accept shared dependencies (e.g., `owner`) and return the test data, then pass them as parameters:
+
+```python
+def _scenario_a(owner: User) -> tuple[list[Message], Meetup]:
+    ...
+    return messages, expected_meeting
+
+def _scenario_b(owner: User) -> tuple[list[Message], Meetup]:
+    ...
+    return messages, expected_meeting
+
+@pytest.mark.parametrize(
+    "update, build_scenario",
+    [
+        (UpdateRequest(inline_query="search:abc"), _scenario_a),
+        (UpdateRequest(inline_query="search:abc"), _scenario_b),
+    ],
+    indirect=["update"],
+    ids=["scenario_a", "scenario_b"],
+)
+async def test_search_filters(
+    update: Update,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    build_scenario: Callable[[User], tuple[list[Message], Meetup]],
+):
+    messages, expected = build_scenario(user_with_settings)
+    ...
+```
 
 ## Mocking
 
@@ -43,6 +74,22 @@ def api(mocker):
 ```
 
 If only a few tests in a file need API mocking, use `mocker.patch` inline instead of a fixture.
+
+### API assertion helpers
+
+`MockApi` provides typed assertion helpers for each API method. **Always prefer these** over raw `assert_method_just_called` + `call_args` — they produce better diffs on failure and keep tests concise:
+
+- `assert_edit_message_called(update, view)`
+- `assert_send_message_called(update, view)`
+- `assert_answer_inline_query_called(update, results, button=, cache_time=)`
+- `assert_answer_callback_query_called(update, text=, show_alert=)`
+- `assert_update_meeting_messages_called(session=, meeting=, current_message=)`
+
+Use `assert_method_just_called(name, times=0)` only when you need to verify a method was **not** called.
+
+### MockApi method signatures
+
+Overridden methods in `MockApi` must be **regular functions** (not `async def`). The methods delegate to `call_mock`, which returns the `AsyncMock` coroutine directly. If the method is `async`, the coroutine gets double-wrapped and `await_count` stays at 0, breaking `assert_awaited_*` assertions.
 
 ## Calling handlers
 
