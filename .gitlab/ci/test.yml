@@ -69,6 +69,15 @@ type-check:
     hatch run dev:type-check
   needs: [preparation]
 
+check-ty-ignores:
+  stage: test
+  script:
+    - hatch run dev:python bin/check_ty_ignores.py
+  needs: [preparation]
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
 validate-migrations:
   stage: test
   script: hatch run dev:validate-migrations

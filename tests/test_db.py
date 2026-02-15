@@ -77,7 +77,7 @@ def test_decorator_with_async(mock_session: MockDbSession):
     async def f(s: Session) -> int:
         return 1
 
-    wrapped = db.with_async_session(f)()
+    wrapped = db.with_async_session(f)()  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
     assert inspect.iscoroutine(wrapped)
 
@@ -88,7 +88,7 @@ def test_decorator_with_method(mock_session: MockDbSession):
     def f(s: Session) -> int:
         return 1
 
-    wrapped = db.with_session(f)()
+    wrapped = db.with_session(f)()  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
     assert not inspect.iscoroutine(wrapped)
 

@@ -67,15 +67,15 @@ def build_bot(config: BotConfig) -> ExtBot:
 async def launch_event(event_type: EventType, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
     match event_type:
         case EventType.USER_CLEANUP:
-            user_cleanup.run(api, metrics)
+            user_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.NOTIFY_START_MEETING:
-            await notify_meetings.run(api, metrics)
+            await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.GENERATE_STATS:
-            generate_stats.run(api, metrics)
+            generate_stats.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.DEACTIVATE_MEETINGS:
-            await inactive_meetings.run(api, metrics)
+            await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.MEETUPS_CLEANUP:
-            await meetups_cleanup.run(api, metrics)
+            await meetups_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case never:
             assert_never(never)
 

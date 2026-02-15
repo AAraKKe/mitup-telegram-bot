@@ -452,26 +452,33 @@ def test_inline_query_message(
         (
             0,
             None,
-            lambda lang: f"{MeetingMessages.EMPTY.get(lang=lang)} "
-            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}",
+            lambda lang: (
+                f"{MeetingMessages.EMPTY.get(lang=lang)} {MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}"
+            ),
         ),
         (
             1,
             None,
-            lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-            f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}|\n  Joined\\_0",
+            lambda lang: (
+                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
+                f"{MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}|\n  Joined\\_0"
+            ),
         ),
         (
             2,
             2,
-            lambda lang: f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang)} "
-            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n  Joined\\_0\n  Joined\\_1",
+            lambda lang: (
+                f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang)} "
+                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n  Joined\\_0\n  Joined\\_1"
+            ),
         ),
         (
             1,
             2,
-            lambda lang: f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
-            f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n  Joined\\_0",
+            lambda lang: (
+                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang)} "
+                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}|\n  Joined\\_0"
+            ),
         ),
     ],
     ids=["empty", "no_limit", "limit_reached", "limit_not_reached"],

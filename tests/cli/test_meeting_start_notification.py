@@ -58,7 +58,7 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
     link_2 = JoinedUsers(user=joined_2, meetup=meeting)
 
     mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link_1, link_2))
-    await notify_meetings.run(api, metrics)
+    await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
     await metrics.flush()
 
     assert link_1.notification_sent
@@ -100,7 +100,7 @@ async def test_forbidden_message_sent(mock_session: MockDbSession, metrics: Stub
     # Need to access low level mock, still do not have a way of mocking the api call directly
     send_message_mock = api.mock_method("send_message_to_user")
     send_message_mock.side_effect = [Forbidden("Nope"), None]
-    await notify_meetings.run(api, metrics)
+    await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
     await metrics.flush()
 
     assert link_1.notification_sent
