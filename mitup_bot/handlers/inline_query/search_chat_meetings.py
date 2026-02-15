@@ -1,6 +1,3 @@
-import datetime as dt
-from typing import cast
-
 from sqlmodel import Session, select
 from telegram import Update
 
@@ -14,29 +11,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView
 
 from .enums import SEARCH_QUERY_PREFIX, InlineQueryId
-
-
-def _sort_meetings(meetings: list[Meetup]) -> list[Meetup]:
-    """Sort meetings by relevance: future first, then no datetime, then past."""
-    now = dt.datetime.now(tz=dt.UTC)
-
-    future: list[Meetup] = []
-    no_datetime: list[Meetup] = []
-    past: list[Meetup] = []
-
-    for meeting in meetings:
-        if meeting.datetime is None:
-            no_datetime.append(meeting)
-        elif meeting.datetime >= now:
-            future.append(meeting)
-        else:
-            past.append(meeting)
-
-    future.sort(key=lambda m: cast(dt.datetime, m.datetime))
-    no_datetime.sort(key=lambda m: cast(dt.datetime, m.created_time))
-    past.sort(key=lambda m: cast(dt.datetime, m.datetime))
-
-    return [*future, *no_datetime, *past]
+from .utils import sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, pattern=r"search:.+")
@@ -67,7 +42,7 @@ async def search_chat_meetings(session: Session, update: Update, context: TMitup
             meetings.append(meeting)
 
     if meetings:
-        sorted_meetings = _sort_meetings(meetings)
+        sorted_meetings = sort_meetings(meetings)
         results = [meeting.inline_view(chat_instance=chat_instance) for meeting in sorted_meetings]
     else:
         results = [

@@ -67,3 +67,9 @@ hatch run dev:validate-migrations   # Validate migration graph integrity
 ```
 
 When adding or modifying a model, generate a new migration and verify the upgrade/downgrade paths work correctly.
+
+## Automatic timestamps
+
+`created_time` and `updated_time` are populated by **PostgreSQL trigger functions** defined in migration `65b4c46d9141`. The triggers (`set_created_time()` and `set_updated_time()`) set `CURRENT_TIMESTAMP` on insert/update respectively.
+
+Because the triggers handle this at the database level, model classes declare these fields as `dt.datetime | None = None` — they don't need to be set in application code. However, they are **never `None` in production** for any row that has been persisted. Test fixtures (e.g., `create_meetup`) set a default `created_time` to mirror this behavior.

@@ -4,7 +4,7 @@ from telegram import Update
 from mitup_bot.db import with_async_session
 from mitup_bot.guards import current_user, user_language, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.models import Meetup
+from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, InlineViewMessages
 from mitup_bot.utils import callbacks as cb
@@ -12,6 +12,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
 
 from .enums import InlineQueryId
+from .utils import sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW, pattern=r"^\s*$")
@@ -46,7 +47,14 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
         ),
     ]
 
-    await context.api.answer_inline_query(update=update, results=results, button=button)
+    if (
+        (tg_user := update.effective_user)
+        and (user := User.by_tg_user_id(session, tg_user.id))
+        and (active_meetings := [m for m in user.meetups if m.active])
+    ):
+        results.extend(meeting.inline_view() for meeting in sort_meetings(active_meetings))
+
+    await context.api.answer_inline_query(update=update, results=results, button=button, cache_time=0)
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SHARE_MEETING, pattern=r"\d+")

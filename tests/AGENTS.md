@@ -136,6 +136,30 @@ For handler tests that need a fully configured user, use the `user_with_settings
 
 > **Name collision:** `tests/helpers/fixtures.py` imports `Message` from `telegram`. The DB model is imported as `MeetupMessage` there. When adding new helpers that work with the DB `Message`, use the alias.
 
+### `create_meetup` and owner relationships
+
+**Do not pass `owner=user` to `create_meetup` when the user already exists.** The `create_meetup` helper both sets `meetup.owner = user` (which triggers SQLModel's `back_populates`, adding the meetup to `user.meetups`) and explicitly calls `user.meetups.append(meetup)`. This causes **duplicate entries** in `user.meetups`.
+
+Instead, create meetings without `owner` and pass them via `create_user(owned_meetings=[...])`:
+
+```python
+# ✅ Correct — no duplicates
+m1 = create_meetup(10, "Meeting A")
+m2 = create_meetup(11, "Meeting B")
+user = create_user(id=1, tg_user_id=123, owned_meetings=[m1, m2])
+
+# ❌ Wrong — each meeting appears twice in user.meetups
+user = create_user(id=1, tg_user_id=123)
+m1 = create_meetup(10, "Meeting A", owner=user)
+m2 = create_meetup(11, "Meeting B", owner=user)
+```
+
+This is the same pattern the `user_with_settings` fixture uses.
+
+### Update fixture and user identity
+
+The `update` fixture uses `DEFAULT_TG_USER_PARAMS` (which sets `tg_user_id=123`) as the Telegram user sending the update. When creating test users that should match the update sender, use the same `tg_user_id=123`. The `user_with_settings` fixture already follows this convention.
+
 ## Inline message tests
 
 `UpdateRequest(from_bot_chat=False)` creates a callback query with `inline_message_id` and no `effective_chat`/`effective_message`. This is how shared (inline) messages work in Telegram.

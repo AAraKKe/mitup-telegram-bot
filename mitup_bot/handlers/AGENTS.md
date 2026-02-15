@@ -67,6 +67,10 @@ The `enums.py` → `entry.py` convention is organizational only — it has no ru
 4. Register the handler in `tests/test_failure_modes.py` if it uses guards (`current_user`, `meeting_accessible`, `valid_callback_data`, etc.) — see `tests/AGENTS.md` for details.
 5. Import the handler module in `mitup_bot/handlers/__init__.py` so the registry picks it up.
 
+## Shared utilities within handler packages
+
+**Do not import functions from one handler module into another** (e.g., importing a private helper from `search_chat_meetings.py` into `entry.py`). If multiple handlers in the same package need shared logic, extract it into a `utils.py` within that package. See `mitup_bot/handlers/inline_query/utils.py` for an example (`sort_meetings` is used by both `entry.py` and `search_chat_meetings.py`).
+
 ## Localization
 
 **Never hard-code a language** (e.g., `lang="en"`) when rendering user-facing messages. Always derive the language from the user (`user.lang`) or the meeting (`meeting.lang`). Fetch the user early in the handler (before branching on meeting existence) so `user.lang` is available in every code path, including error/fallback branches where the meeting may not exist.
