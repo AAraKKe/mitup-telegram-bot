@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-24 20:09\n"
+"PO-Revision-Date: 2026-02-24 23:04\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -403,6 +403,12 @@ msgstr "Choose the language of your meeting. This will change the language used 
 
 msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
 msgstr "The language has been set successfully."
+
+msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
+msgstr "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
+
+msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
+msgstr "The meeting has been reactivated. You can now edit and share it again."
 
 msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Are you sure you want to delete this meeting?"

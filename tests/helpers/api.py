@@ -146,6 +146,7 @@ class MockApi(TelegramApi):
         meeting: Meetup,
         current_message: Message | None = DEFAULT_CURRENT_MESSAGE,
         skip_current: bool | None = None,
+        was_deleted: bool | None = None,
         times: int = 1,
     ):
         arguments = {
@@ -156,6 +157,8 @@ class MockApi(TelegramApi):
             arguments["current_message"] = current_message
         if skip_current is not None:
             arguments["skip_current"] = skip_current
+        if was_deleted is not None:
+            arguments["was_deleted"] = was_deleted
 
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method("update_meeting_messages"), **arguments)

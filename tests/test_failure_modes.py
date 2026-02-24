@@ -261,6 +261,54 @@ CONTEXTS = [
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="show_past_meeting_page_malformed",
     ),
+    Context(
+        handler_id=MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="show_past_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_PAST_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="show_past_meeting_malformed",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.REACTIVATE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="reactivate_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.REACTIVATE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.REACTIVATE_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="reactivate_meeting_malformed",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_delete_past_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_PAST_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_delete_past_meeting_malformed",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_delete_past_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_PAST_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_delete_past_meeting_malformed",
+    ),
 ]
 
 

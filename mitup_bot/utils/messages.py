@@ -341,6 +341,12 @@ class MeetingMessages(MessageBase):
     )
     LANGUAGE_SET_SUCCESS = "The language has been set successfully."
 
+    # Past meeting
+    PAST_MEETING_DESCRIPTION = (
+        "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
+    )
+    REACTIVATE_MEETING_SUCCESS = "The meeting has been reactivated. You can now edit and share it again."
+
     # Delete meeting
     DELETE_MEETING = "Are you sure you want to delete this meeting?"
     DELETE_MEETING_SUCCESS = "The meeting has been deleted successfully"

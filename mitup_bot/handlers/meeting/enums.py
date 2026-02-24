@@ -14,6 +14,13 @@ class MeetingHandlerId(HandlerId):
     CONFIRM_DELETE_MEETING_CALLBACK = auto()
     DECLINE_DELETE_MEETING_CALLBACK = auto()
 
+    # Past meeting handlers
+    SHOW_PAST_MEETING_CALLBACK = auto()
+    REACTIVATE_MEETING_CALLBACK = auto()
+    DELETE_PAST_MEETING_CALLBACK = auto()
+    CONFIRM_DELETE_PAST_MEETING_CALLBACK = auto()
+    DECLINE_DELETE_PAST_MEETING_CALLBACK = auto()
+
     # Join and leave actions
     JOIN = auto()
     LEAVE = auto()
