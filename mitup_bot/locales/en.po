@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-15 23:07\n"
+"PO-Revision-Date: 2026-02-24 20:09\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -475,6 +475,12 @@ msgstr "These are the meetings you have joined."
 
 msgid "MeetingMessages.NO_JOINED_MEETINGS"
 msgstr "_You have not joined any meeting yet._"
+
+msgid "MeetingMessages.PAST_MEETINGS_PAGE"
+msgstr "These are all your past meetings."
+
+msgid "MeetingMessages.NO_PAST_MEETINGS"
+msgstr "_You have no past meetings yet._"
 
 msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
 msgstr "➕ Create a new meeting"

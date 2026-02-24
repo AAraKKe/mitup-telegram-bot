@@ -423,6 +423,21 @@ msgstr "_You don't have any meetings yet.\n\n"
 msgid "MeetingMessages.ACTIVE"
 msgstr "Estes são seus eventos ativos."
 
+msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
+msgstr "Estes são todos os seus eventos ativos."
+
+msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
+msgstr "Estes são os eventos dos quais você participou."
+
+msgid "MeetingMessages.NO_JOINED_MEETINGS"
+msgstr "_Você ainda não participou de nenhum evento._"
+
+msgid "MeetingMessages.PAST_MEETINGS_PAGE"
+msgstr "Estes são todos os seus eventos anteriores."
+
+msgid "MeetingMessages.NO_PAST_MEETINGS"
+msgstr "_Você ainda não tem nenhum evento anterior._"
+
 msgid "Weekday.MONDAY"
 msgstr "Seg"
 

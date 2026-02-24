@@ -1,0 +1,149 @@
+import re
+
+import pytest
+from telegram import Update
+
+from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
+from mitup_bot.handlers.main_menu.show_past_meetings import callback_query_show_past_meeting_page
+from mitup_bot.models import User
+from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import ButtonMessages
+from mitup_bot.views import factory
+from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
+from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers.stub_db import MockDbSession
+
+
+async def test_show_past_meeting_page_fails_without_callback_query_data(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+):
+    match = re.match(cb.SHOW_PAST_MEETING_PAGE.pattern, "show;past_meeting_page:")
+    assert match is not None
+
+    context.matches = [match]
+    with pytest.raises(MalformedCallbackData):
+        await callback_query_show_past_meeting_page(update, context)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.PAST_MEETINGS)], indirect=True)
+async def test_show_past_meetings_entry_shows_correct_view(
+    mock_session: MockDbSession,
+    update: Update,
+    app: StubMitupApp,
+    user_with_settings: User,
+):
+    past_meetings = [create_meetup(id=i, active=False) for i in range(10, 14)]
+    user_with_settings.meetups = past_meetings + [create_meetup(id=20, active=True)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, update=update, app=app)
+
+    expected_buttons = [
+        ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
+    ]
+    expected_view = PaginatedMitupView(
+        description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        buttons=expected_buttons,
+        page_number=1,
+        navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SHOW_PAST_MEETING_PAGE.with_id(1))], indirect=True)
+async def test_show_past_meetings_page_navigation_shows_correct_view(
+    mock_session: MockDbSession,
+    update: Update,
+    app: StubMitupApp,
+    user_with_settings: User,
+):
+    past_meetings = [create_meetup(id=i, active=False) for i in range(10, 14)]
+    user_with_settings.meetups = past_meetings
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK, update=update, app=app)
+
+    expected_buttons = [
+        ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
+    ]
+    expected_view = PaginatedMitupView(
+        description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        buttons=expected_buttons,
+        page_number=1,
+        navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.PAST_MEETINGS)], indirect=True)
+async def test_show_past_meetings_excludes_active_meetings(
+    mock_session: MockDbSession,
+    update: Update,
+    app: StubMitupApp,
+    user_with_settings: User,
+):
+    """Active meetings must not appear in the past meetings list."""
+    past = create_meetup(id=10, active=False)
+    active = create_meetup(id=11, active=True)
+    user_with_settings.meetups = [past, active]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, update=update, app=app)
+
+    expected_view = PaginatedMitupView(
+        description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        buttons=[ButtonConfig(text=str(past.title), callback_data=cb.SHOW_PAST_MEETING.with_id(past.db_id))],
+        page_number=1,
+        navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.PAST_MEETINGS)], indirect=True)
+async def test_show_past_meetings_without_past_meetings_shows_main_menu(
+    mock_session: MockDbSession,
+    update: Update,
+    app: StubMitupApp,
+    user_with_settings: User,
+):
+    user_with_settings.meetups = [create_meetup(id=10, active=True)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, update=update, app=app)
+
+    expected_view = factory.main_menu_view(
+        lang=user_with_settings.lang,
+        message=MeetingMessages.NO_PAST_MEETINGS.get(lang=user_with_settings.lang),
+    )
+    context.api.assert_edit_message_called(update, expected_view)

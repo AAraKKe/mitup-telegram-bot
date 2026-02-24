@@ -413,6 +413,8 @@ class MeetingMessages(MessageBase):
     ACTIVE_MEETINGS_PAGE = "These are all your active meetings."
     JOINED_MEETINGS_PAGE = "These are the meetings you have joined."
     NO_JOINED_MEETINGS = "_You have not joined any meeting yet._"
+    PAST_MEETINGS_PAGE = "These are all your past meetings."
+    NO_PAST_MEETINGS = "_You have no past meetings yet._"
 
 
 class InlineViewMessages(MessageBase):

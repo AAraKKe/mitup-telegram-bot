@@ -423,6 +423,21 @@ msgstr "_Aún no tienes ninguna quedada.\n\n"
 msgid "MeetingMessages.ACTIVE"
 msgstr "Estas son tus quedadas activas."
 
+msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
+msgstr "Estas son todas tus quedadas activas."
+
+msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
+msgstr "Estas son las quedadas a las que te has unido."
+
+msgid "MeetingMessages.NO_JOINED_MEETINGS"
+msgstr "_Todavía no te has unido a ninguna quedada._"
+
+msgid "MeetingMessages.PAST_MEETINGS_PAGE"
+msgstr "Estas son todas tus quedadas pasadas."
+
+msgid "MeetingMessages.NO_PAST_MEETINGS"
+msgstr "_Todavía no tienes ninguna quedada pasada._"
+
 msgid "Weekday.MONDAY"
 msgstr "Lun"
 

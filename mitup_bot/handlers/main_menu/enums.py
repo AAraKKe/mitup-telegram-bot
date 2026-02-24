@@ -9,3 +9,6 @@ class MainMenuHandlerId(HandlerId):
     SHOW_MEETINGS_CALLBACK = auto()
     # Show meetings I have joined
     SHOW_JOINED_MEETINGS_CALLBACK = auto()
+    # Show past meetings
+    SHOW_PAST_MEETINGS_CALLBACK = auto()
+    SHOW_PAST_MEETING_PAGE_CALLBACK = auto()

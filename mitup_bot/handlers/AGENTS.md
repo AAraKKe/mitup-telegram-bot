@@ -69,7 +69,12 @@ The `enums.py` → `entry.py` convention is organizational only — it has no ru
 2. Write the handler function with the `@HandlersRegistry.register_*` decorator.
 3. Add `@with_async_session` if database access is needed.
 4. Register the handler in `tests/test_failure_modes.py` if it uses guards (`current_user`, `meeting_accessible`, `valid_callback_data`, etc.) — see `tests/AGENTS.md` for details.
-5. Import the handler module in `mitup_bot/handlers/__init__.py` so the registry picks it up.
+5. Create a dedicated test file at `tests/handlers/<package>/test_<module>.py` covering at minimum:
+   - The happy path: expected view when data exists.
+   - The empty/no-data fallback path.
+   - Any filtering logic (e.g., active vs inactive records).
+   See `tests/handlers/main_menu/test_show_active_meetings.py` and `test_show_joined_meetings.py` for reference.
+6. Import the handler module in `mitup_bot/handlers/__init__.py` so the registry picks it up.
 
 ## Shared utilities within handler packages
 

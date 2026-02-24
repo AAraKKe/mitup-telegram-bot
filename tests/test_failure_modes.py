@@ -18,6 +18,7 @@ from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackDa
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
+from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
@@ -241,6 +242,24 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.ATTACH_TO_CHAT),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="attach_to_chat_malformed",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.PAST_MEETINGS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="show_past_meetings",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_PAST_MEETING_PAGE.with_id(1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="show_past_meeting_page",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_PAST_MEETING_PAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="show_past_meeting_page_malformed",
     ),
 ]
 
