@@ -1,3 +1,9 @@
+---
+name: api-wrapper
+description: Telegram API wrapper conventions. Auto-load when using TelegramApiWrapper, BotAdapter, ContextOrBotAdapter, or sending/editing messages.
+user-invocable: false
+---
+
 # Telegram API Wrapper
 
 The API abstraction layer lives in `mitup_bot/api_wrapper.py`. It decouples handler logic from raw Telegram Bot API calls and provides a consistent interface for both handler and non-handler contexts.
@@ -54,7 +60,7 @@ api = TelegramApi()
 api.adapter = adapter
 ```
 
-Note that `BotAdapter` does not emit metrics. If metrics are needed from non-handler code, use `MitupMetricsEngine` directly (see `.agents/monitoring.md`).
+Note that `BotAdapter` does not emit metrics. If metrics are needed from non-handler code, use `MitupMetricsEngine` directly (see the `monitoring` reference skill).
 
 ## Key methods
 

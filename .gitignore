@@ -42,5 +42,5 @@ aws
 # Any dev file in environments
 mitup_bot/environments/dev*
 
-# Ignore agent local files
-.claude
+# Claude Code local settings (user-specific permissions)
+.claude/settings.local.json

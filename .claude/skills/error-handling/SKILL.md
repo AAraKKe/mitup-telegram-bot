@@ -1,3 +1,9 @@
+---
+name: error-handling
+description: Exception hierarchy and error handler conventions. Auto-load when adding new exceptions, guard errors, or modifying error_handler.py.
+user-invocable: false
+---
+
 # Error Handling
 
 The bot uses a structured exception hierarchy combined with a centralized error handler. All exceptions are defined in `mitup_bot/exceptions.py`; the error handler lives in `mitup_bot/handlers/error_handler.py`.
@@ -104,5 +110,5 @@ All `edit_message` calls in `TelegramApi` already use this. Do not add custom tr
 2. Include contextual data (user IDs, handler IDs, callback data) in the constructor — this aids debugging.
 3. If the exception should be suppressed, add it to `SUPPRESSED_EXCEPTIONS` in the error handler.
 4. If the exception needs special handling (like `InactiveUserInteraction`), add a branch in `error_handler.handler()`.
-5. If guards raise the new exception, register affected handlers in `tests/test_failure_modes.py` (see `tests/AGENTS.md`).
+5. If guards raise the new exception, register affected handlers in `tests/test_failure_modes.py` (see `tests/CLAUDE.md`).
 6. Always keep this file updated with any new exceptions and their handling patterns.

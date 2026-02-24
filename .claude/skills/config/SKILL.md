@@ -1,3 +1,9 @@
+---
+name: config
+description: Configuration provider system. Auto-load when adding config fields, new environments, or SecretStr values.
+user-invocable: false
+---
+
 # Configuration
 
 The configuration system lives in `mitup_bot/config.py`. It uses a multi-provider merge strategy with Pydantic validation.

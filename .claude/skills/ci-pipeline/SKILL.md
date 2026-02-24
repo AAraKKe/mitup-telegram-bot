@@ -1,3 +1,9 @@
+---
+name: ci-pipeline
+description: GitLab CI pipeline structure and validation jobs. Auto-load when working on .gitlab-ci.yml, CI scripts, or understanding pipeline stages.
+user-invocable: false
+---
+
 # CI Pipeline
 
 The CI runs on GitLab CI/CD. The root `.gitlab-ci.yml` includes component files from `.gitlab/ci/`.

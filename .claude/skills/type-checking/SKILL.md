@@ -1,3 +1,9 @@
+---
+name: type-checking
+description: ty type checker rules for this project. Auto-load when writing code that may have type errors, suppressing ty diagnostics, or working with session decorators. Covers suppression format, the Concatenate/ParamSpec false positive, and the check-ty-ignores CI job.
+user-invocable: false
+---
+
 # Type Checking
 
 This project uses [ty](https://github.com/astral-sh/ty) as its type checker. The pinned version is in `pyproject.toml` under `[tool.hatch.envs.dev] dependencies`. Run it via:

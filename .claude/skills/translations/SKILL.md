@@ -1,3 +1,9 @@
+---
+name: translations
+description: GNU gettext translation conventions. Auto-load when adding user-facing strings, modifying messages.py, or working with locale files.
+user-invocable: false
+---
+
 # Translations
 
 The bot supports multiple languages via GNU gettext. The list of supported languages is defined in `SUPPORTED_LANGUAGES` in `mitup_bot/translations.py` — check that file for the current set.
