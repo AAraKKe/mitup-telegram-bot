@@ -12,6 +12,8 @@ PIPX_BIN=$(pipx environment --value PIPX_BIN_DIR)
 export PATH=$PIPX_BIN:$PATH
 
 pipx install hatch
+# Workaround for virtualenv 21.0.0 breaking changes: https://github.com/pypa/hatch/issues/2193
+pipx inject hatch "virtualenv<21.0.0" --force
 pipx install pre-commit
 
 pre-commit install
