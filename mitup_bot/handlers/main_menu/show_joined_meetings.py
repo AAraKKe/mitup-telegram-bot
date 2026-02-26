@@ -22,7 +22,10 @@ async def callback_query_show_joined_meetings(session: Session, update: Update, 
     )
 
     user = guards.current_user(update, session)
-    joined_meetings = sorted((link.meetup for link in user.joined_links), key=lambda meetup: meetup.db_id)
+    joined_meetings = sorted(
+        (link.meetup for link in user.joined_links if link.meetup.active),
+        key=lambda meetup: meetup.db_id,
+    )
 
     if user_meetings_buttons := [
         ButtonConfig(

@@ -85,6 +85,74 @@ async def test_show_meetings_use_correct_view(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
 )
+async def test_show_meetings_filters_out_inactive_meetings(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+):
+    active_meetup = create_meetup(id=10, title="Active Meeting")
+    inactive_meetup = create_meetup(id=11, title="Inactive Meeting", active=False)
+    user_with_settings.joined_links = [
+        create_joined_link(user=user_with_settings, meetup=active_meetup),
+        create_joined_link(user=user_with_settings, meetup=inactive_meetup),
+    ]
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
+
+    expected_view = PaginatedMitupView(
+        description=MeetingMessages.JOINED_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        buttons=[
+            ButtonConfig(
+                text=str(active_meetup.title),
+                callback_data=cb.SHOW_MEETING.with_id(active_meetup.db_id),
+            )
+        ],
+        page_number=1,
+        column_size=2,
+        row_size=2,
+        navigation_callback_data=cb.SHOW_JOINED_MEETINGS_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
+)
+async def test_show_meetings_shows_empty_state_when_all_joined_meetings_inactive(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+):
+    inactive_meetups = [create_meetup(id=i, title=f"Inactive {i}", active=False) for i in range(10, 13)]
+    user_with_settings.joined_links = [
+        create_joined_link(user=user_with_settings, meetup=meetup) for meetup in inactive_meetups
+    ]
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
+
+    expected_view = factory.main_menu_view(
+        lang=user_with_settings.lang,
+        message=MeetingMessages.NO_JOINED_MEETINGS.get(lang=user_with_settings.lang),
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
+)
 async def test_show_meetings_without_meetings_to_show_works(
     mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User
 ):
