@@ -109,6 +109,11 @@ async def callback_query_invite_users(session: Session, update: Update, context:
 
     # Keep track of the meeting id to follow up the conversation
     context.store_meeting_id(ContextId.INVITE_USERS, meeting_id)
+    context.store_on_exit(
+        ContextId.INVITE_USERS,
+        MeetingMessages.INVITE_USER_ON_EXIT.get(lang=user.lang),
+        cb.CANCEL_INVITE_USER.with_id(meeting_id),
+    )
 
     return ConversationInviteState.NAME
 

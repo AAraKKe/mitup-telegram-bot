@@ -308,6 +308,30 @@ msgstr "¡Has abandonado la quedada, %{user}! Parece que es la primera vez que u
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "Hay un espacio libre en la quedada ${meeting_title}. ¡Te has unido desde la lista de espera!"
 
+msgid "MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT"
+msgstr "Perdona, estaba esperando el título de tu quedada. ¿Te gustaría enviarlo? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION_ON_EXIT"
+msgstr "Perdona, estaba esperando la descripción de tu quedada. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT"
+msgstr "Perdona, estaba esperando el nombre del lugar. ¿Te gustaría enviarlo? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT"
+msgstr "Perdona, estaba esperando la ubicación de tu quedada. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT"
+msgstr "Perdona, estaba esperando el número máximo de participantes. ¿Te gustaría enviarlo? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_ON_EXIT"
+msgstr "Perdona, estaba esperando tu selección para eliminar a un participante. Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.EDIT_MEETING_TIME_ON_EXIT"
+msgstr "Perdona, estaba esperando la nueva hora para tu quedada. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.INVITE_USER_ON_EXIT"
+msgstr "Perdona, estaba esperando el nombre de la persona que quieres invitar. ¿Te gustaría enviarlo? Si no, toca Cancelar para salir."
+
 msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
 msgstr "¡La quedada _*${meeting_title}*_ comenzará pronto!"
 

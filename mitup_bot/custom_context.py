@@ -11,6 +11,7 @@ from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 
 from mitup_bot.api_wrapper import TelegramApi, TelegramApiWrapper
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import (
     ContextPropertyConversionError,
     ContextPropertyNotSetError,
@@ -45,11 +46,20 @@ class ContextId(CamelCaseStrEnum):
 
 
 @dataclass
+class OnExit:
+    """Data class that holds the information to show when a conversation is unexpectedly interrupted."""
+
+    message: str
+    cancel_callback: CallbackData
+
+
+@dataclass
 class ContextData:
     """Data class that represents the data to be stored per user in the MitupUserData registry."""
 
     meeting_id: int | None = None
     text: str | None = None
+    on_exit: OnExit | None = None
 
 
 @dataclass
@@ -57,9 +67,12 @@ class MitupUserData:
     """Class that represents the user data type of MitupContext"""
 
     registry: dict[ContextId, ContextData] = field(default_factory=dict)
+    active_context: ContextId | None = None
 
     def remove_context(self, context: ContextId):
         self.registry.pop(context, None)
+        if self.active_context == context:
+            self.active_context = None
 
     def store_meeting_id(self, context: ContextId, meeting_id: int):
         self.registry.setdefault(context, ContextData()).meeting_id = meeting_id
@@ -69,6 +82,18 @@ class MitupUserData:
 
     def has_meeting_id(self, context: ContextId) -> bool:
         return context in self.registry and self.registry[context].meeting_id is not None
+
+    def store_on_exit(self, context: ContextId, message: str, cancel_callback: CallbackData) -> None:
+        entry = self.registry.setdefault(context, ContextData())
+        entry.on_exit = OnExit(message=message, cancel_callback=cancel_callback)
+        self.active_context = context
+
+    def get_active_on_exit(self) -> OnExit | None:
+        """Return the on-exit data for the most recently entered conversation, if any."""
+        if self.active_context is None:
+            return None
+        entry = self.registry.get(self.active_context)
+        return entry.on_exit if entry is not None else None
 
 
 # Use old syntax to allow defining covariance
@@ -190,6 +215,17 @@ class MitupContext(
         self.handler_metrics_logger.set_property("StoredText", text)
         self.emit_metric("StoredContextText", 1, unit=Unit.COUNT)
 
+    def store_on_exit(self, context: ContextId, message: str, cancel_callback: CallbackData) -> None:
+        if self.user_data is None:  # pragma: no cover
+            raise InvalidUserData("User data requested but not set")
+        self.user_data.store_on_exit(context, message, cancel_callback)
+
+    def get_active_on_exit(self) -> OnExit | None:
+        """Return the on-exit data for the most recently entered conversation, if any."""
+        if self.user_data is None:  # pragma: no cover
+            return None
+        return self.user_data.get_active_on_exit()
+
     def clean_user_data(self, contexts: list[ContextId]):
         if self.user_data is None:  # pragma: no cover
             logging.warning("User data requested but not set when trying to clean user data. Not doing anything.")
@@ -206,6 +242,7 @@ class MitupContext(
             return
 
         self.user_data.registry.clear()
+        self.user_data.active_context = None
 
     def prepare_handler_metrics(
         self,

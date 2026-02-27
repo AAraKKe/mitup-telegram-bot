@@ -73,6 +73,11 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
         return ConversationHandler.END
 
     context.store_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, callback_data.id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_MAX_PARTICIPANTS,
+        MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT.get(lang=user.lang),
+        cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(callback_data.id),
+    )
 
     await context.api.send_message(update=update, view=edit_max_participants_view(meeting))
 

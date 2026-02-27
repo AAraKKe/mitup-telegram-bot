@@ -21,11 +21,18 @@ class MessagesId(HandlerId):
 @HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT | filters.COMMAND, bindable=False)
 @with_async_session
 async def filter_messages_without_text(session: Session, update: Update, context: TMitupContext):
-    context.clean_all_user_data()
-
     user = guards.current_user(update, session)
+
+    if on_exit := context.get_active_on_exit():
+        view = factory.conversation_interrupted_view(
+            lang=user.lang,
+            message=on_exit.message,
+            cancel_callback=on_exit.cancel_callback,
+        )
+        await context.api.send_message(update=update, view=view)
+        return None
+
+    context.clean_all_user_data()
     view = factory.main_menu_view(lang=user.lang)
-
     await context.api.send_message(update=update, view=view)
-
     return ConversationHandler.END

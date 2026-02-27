@@ -233,6 +233,14 @@ def confirmation_view(
     )
 
 
+def conversation_interrupted_view(*, lang: str, message: str, cancel_callback: CallbackData) -> MitupView:
+    """Shown when a conversation is unexpectedly interrupted. Lets the user resume or cancel."""
+    return MitupView(
+        message,
+        [[ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=cancel_callback)]],
+    )
+
+
 def reactivation_prompt_view(*, lang: str, meeting_id: int, back_rows: Keyboard | None = None) -> MitupView:
     """
     View shown to the owner when they try to access a meeting that is no longer active.

@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-27 00:53\n"
+"PO-Revision-Date: 2026-02-27 02:05\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -304,6 +304,30 @@ msgstr "You have left the meeting, %{user}! It seems you have never used Mitup b
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+
+msgid "MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT"
+msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION_ON_EXIT"
+msgstr "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT"
+msgstr "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT"
+msgstr "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT"
+msgstr "Sorry, I was expecting the maximum number of participants. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_ON_EXIT"
+msgstr "Sorry, I was expecting your selection for removing a participant. If not, tap Cancel to exit."
+
+msgid "MeetingMessages.EDIT_MEETING_TIME_ON_EXIT"
+msgstr "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingMessages.INVITE_USER_ON_EXIT"
+msgstr "Sorry, I was expecting the name of the person you want to invite. Would you like to send it? If not, tap Cancel to exit."
 
 msgid "MeetingMessages.INVITE_USER_PROMPT"
 msgstr "*Add to Guest List*\n\nPlease reply with the name of the person you want to add."

@@ -261,6 +261,34 @@ class MeetingMessages(MessageBase):
         "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
     )
 
+    # On-exit prompts shown when an unexpected message interrupts a conversation
+    EDIT_MEETING_TITLE_ON_EXIT = (
+        "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
+    )
+    EDIT_MEETING_DESCRIPTION_ON_EXIT = (
+        "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+    )
+    EDIT_MEETING_LOCATION_NAME_ON_EXIT = (
+        "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+    )
+    EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT = (
+        "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."
+    )
+    EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT = (
+        "Sorry, I was expecting the maximum number of participants. "
+        "Would you like to send it? If not, tap Cancel to exit."
+    )
+    EDIT_MEETING_KICK_OUT_ON_EXIT = (
+        "Sorry, I was expecting your selection for removing a participant. If not, tap Cancel to exit."
+    )
+    EDIT_MEETING_TIME_ON_EXIT = (
+        "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
+    )
+    INVITE_USER_ON_EXIT = (
+        "Sorry, I was expecting the name of the person you want to invite. "
+        "Would you like to send it? If not, tap Cancel to exit."
+    )
+
     # Invite users
     INVITE_USER_PROMPT = "*Add to Guest List*\n\nPlease reply with the name of the person you want to add."
     INVITE_USER_CONFIRMATION = (

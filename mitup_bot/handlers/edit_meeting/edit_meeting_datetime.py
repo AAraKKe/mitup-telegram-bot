@@ -221,10 +221,12 @@ async def callback_set_meeting_time(session: Session, update: Update, context: T
         cb.EDIT_MEETING_TIME.parse(context.match), EditMeetingHandlerId.EDIT_TIME_CALLBACK
     )
 
+    user = guards.current_user(update, session)
+
     # Validate that the meeting is accessible before continuing with the operation
     meeting = await guards.meeting_accessible(
         session,
-        guards.current_user(update, session),
+        user,
         callback_data.id,
         "Edit time",
         update,
@@ -236,6 +238,11 @@ async def callback_set_meeting_time(session: Session, update: Update, context: T
 
     # Set the meeting id to the context
     context.store_meeting_id(ContextId.EDIT_MEETING_TIME, callback_data.id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_TIME,
+        MeetingMessages.EDIT_MEETING_TIME_ON_EXIT.get(lang=user.lang),
+        cb.EDIT_MEETING_CANCEL.with_id(callback_data.id),
+    )
 
     view = MitupView(
         description=MeetingMessages.EDIT_TIME.get(lang=meeting.owner.settings.language),

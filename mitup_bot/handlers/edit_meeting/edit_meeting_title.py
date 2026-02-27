@@ -43,6 +43,11 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
         return ConversationHandler.END
 
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_TITLE,
+        MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT.get(lang=user.lang),
+        cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
+    )
 
     await context.api.edit_message(
         update=update,

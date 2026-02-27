@@ -13,8 +13,10 @@ set -euo pipefail
 
 command="$1"
 
-# Skip if the working tree is clean (no modified, staged, or new files).
-if git diff --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+# Skip if no tracked files have been modified or staged.
+# Untracked files are intentionally ignored — persistent local files (.env,
+# uv.lock, etc.) would otherwise defeat the early-exit on every turn.
+if git diff --quiet HEAD; then
     exit 0
 fi
 

@@ -72,6 +72,11 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
 
     # Lets keep track of the meeting we are asking the name of the location for
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, callback_data.id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_LOCATION_NAME,
+        MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT.get(lang=user.lang),
+        cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
+    )
 
     await context.api.send_message(
         update=update,
@@ -132,6 +137,11 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
 
     # Lets keep track of the meeting we are asking the name of the location for
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, callback_data.id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_LOCATION_COORDINATES,
+        MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT.get(lang=user.lang),
+        cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
+    )
 
     await context.api.send_message(
         update=update,

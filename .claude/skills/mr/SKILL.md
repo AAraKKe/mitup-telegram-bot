@@ -15,4 +15,25 @@ allowed-tools: Bash, Read, mcp__GitLab__create_merge_request, mcp__GitLab__get_m
    - **How to set up and validate locally**: Numbered steps to test.
    - **MR acceptance checklist**: Check off what applies.
 6. Output the complete description as plain Markdown.
-7. Ask the user if they want to create the MR via the GitLab MCP tool or copy-paste it manually.
+7. Create the MR using `glab mr create` with the following flags:
+   - `--title` — commit-style title (emoji prefix matching the commit type)
+   - `--description` — the full Markdown body via `"$(cat <<'EOF' ... EOF)"`
+   - `--source-branch` — current branch (`git branch --show-current`)
+   - `--target-branch main`
+   - `--no-editor`
+
+   Example:
+   ```bash
+   glab mr create \
+     --title "🧪 Add tests for X" \
+     --description "$(cat <<'EOF'
+   ## What does this MR do and why?
+   ...
+   /assign me
+   EOF
+   )" \
+     --source-branch my-branch \
+     --target-branch main \
+     --no-editor
+   ```
+8. Output the MR URL returned by `glab`.

@@ -9,6 +9,7 @@ from mitup_bot.handlers.edit_meeting.edit_meeting_title import edit_title_meetin
 from mitup_bot.handlers.messages import filter_messages_without_text
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
@@ -75,7 +76,7 @@ async def test_edit_description_message_handler_update_the_description_and_send_
     context.api.assert_send_message_called(update, view)
 
 
-async def test_filter_messages_without_text_delete_user_data_related_with_edit_meetings(
+async def test_filter_messages_without_text_shows_main_menu_when_no_on_exit_is_set(
     update: Update, context: MitupContext, user_with_settings: User, mock_session: MockDbSession
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -88,3 +89,29 @@ async def test_filter_messages_without_text_delete_user_data_related_with_edit_m
     await filter_messages_without_text(update, context)
 
     assert context.user_data.registry == {}
+
+
+async def test_filter_messages_without_text_shows_on_exit_prompt_when_active_context_has_on_exit(
+    update: Update, context: MitupContext, user_with_settings: User, mock_session: MockDbSession
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    assert context.user_data is not None
+
+    cancel_callback = cb.EDIT_MEETING_CANCEL.with_id(1)
+    on_exit_message = MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT.get(lang=user_with_settings.lang)
+    context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
+    context.store_on_exit(ContextId.EDIT_MEETING_TITLE, on_exit_message, cancel_callback)
+
+    result = await filter_messages_without_text(update, context)
+
+    context.api.assert_send_message_called(
+        update,
+        factory.conversation_interrupted_view(
+            lang=user_with_settings.lang,
+            message=on_exit_message,
+            cancel_callback=cancel_callback,
+        ),
+    )
+    assert result is None
+    assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
