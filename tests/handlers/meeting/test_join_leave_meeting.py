@@ -1,11 +1,13 @@
 import pytest
 from aws_embedded_metrics.unit import Unit
+from telegram import Update
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.views import MitupView
 from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler, create_meetup
 
 
@@ -242,3 +244,39 @@ async def test_user_leave_for_non_existing_meeting(
         update=handler_context.update,
         view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user_with_settings.lang),
     )
+
+
+@pytest.mark.parametrize(
+    "update, handler_id",
+    [
+        (UpdateRequest(callback_query=cb.JOIN.with_id(50)), MeetingHandlerId.JOIN),
+        (UpdateRequest(callback_query=cb.LEAVE.with_id(50)), MeetingHandlerId.LEAVE),
+    ],
+    indirect=["update"],
+    ids=["join", "leave"],
+)
+async def test_action_on_inactive_meeting_shows_finished_message(
+    update: Update,
+    handler_id: MeetingHandlerId,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    inactive_meeting = create_meetup(id=50, title="Past Meeting", active=False, owner=user_with_settings)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
+
+    # The "meeting has finished" message is shown with no buttons
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=MitupView(
+            description=MeetingMessages.MEETING_HAS_FINISHED.get(lang=inactive_meeting.lang),
+            keyboard=[],
+        ),
+    )
+
+    # No join/leave operation was performed
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_method_just_called("update_meeting_messages", times=0)

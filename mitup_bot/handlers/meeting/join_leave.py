@@ -12,6 +12,7 @@ from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import MitupView
 
 from .enums import MeetingHandlerId
 
@@ -145,6 +146,16 @@ async def handle_join_leave_operation(
     """Handle common infrastructure for meeting operations (join/leave)."""
     data = guards.valid_callback_data(cb.JOIN.parse(context.match), MeetingHandlerId.JOIN)
     if meeting := Meetup.by_id(session, data.id):
+        if not meeting.active:
+            await context.api.edit_message(
+                update=update,
+                view=MitupView(
+                    description=MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang),
+                    keyboard=[],
+                ),
+            )
+            return
+
         # Common message handling
         if (current_message := meeting.message_from_update(update)) is None:
             current_message = Message.from_update(update, meeting, user)

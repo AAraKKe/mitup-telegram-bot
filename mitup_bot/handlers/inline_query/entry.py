@@ -70,7 +70,7 @@ async def share_meeting(session: Session, update: Update, context: TMitupContext
     # Pass redirect false since an inline query does not have a message we can edit.
     meeting = Meetup.by_id(session, meeting_id)
 
-    if meeting and (meeting.public or meeting.is_owned_by(user)):
+    if meeting and meeting.active and (meeting.public or meeting.is_owned_by(user)):
         view = meeting.inline_view()
         await context.api.answer_inline_query(update=update, results=[view])
         context.put_feature_metric(Feature.SHARE_MEETING)
