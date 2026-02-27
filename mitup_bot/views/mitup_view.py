@@ -4,7 +4,7 @@ from itertools import batched
 from math import ceil
 from typing import Self, assert_never
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from mitup_bot.callback_data import CallbackData
@@ -25,10 +25,26 @@ class ButtonConfig(BaseModel):
     @classmethod
     def validate_callback_data(cls, value: CallbackData | str | None) -> CallbackData | str | None:
         str_value = str(value)
-        assert len(str_value.encode()) <= 64, (
-            f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram"
-        )
+        if len(str_value.encode("utf-8")) > 64:
+            raise ValueError(f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram")
         return value
+
+    @model_validator(mode="after")
+    def validate_exactly_one_action(self) -> Self:
+        action_count = sum(
+            1
+            for f in [
+                self.callback_data,
+                self.switch_inline_query,
+                self.switch_inline_query_current_chat,
+            ]
+            if f is not None
+        )
+        if action_count != 1:
+            raise ValueError(
+                "Exactly one of callback_data, switch_inline_query, or switch_inline_query_current_chat must be set"
+            )
+        return self
 
     @property
     def button(self) -> InlineKeyboardButton:

@@ -417,6 +417,8 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
     expected = build_inline_message(user_with_settings.lang, meeting_datetime)
 
     assert expected == meeting.inline_query_message
+    assert "A description that should not appear in the inline preview" not in meeting.inline_query_message
+    assert "A location that should not appear" not in meeting.inline_query_message
 
 
 @pytest.mark.parametrize(
