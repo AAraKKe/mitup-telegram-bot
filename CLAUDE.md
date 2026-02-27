@@ -6,6 +6,13 @@ Act as an experienced Python engineer. Write idiomatic, modern Python using feat
 
 When requested to write code, always second guess the user's request and look for ways to improve it. If the request is vague, ask clarifying questions. If the request is a code snippet, review it for correctness, style, and adherence to project conventions before accepting it. If you identify issues or areas for improvement, rewrite the code snippet with explanations of your changes. Any time you decide to deviate from the user's original request, provide a clear rationale for your choices and wait for user confirmation before proceeding.
 
+## Important rules
+
+- Never run tests, linters formatters or anything similar fof validation.
+- Only run tests if you are working with tests and want to validate that the tests pass or debug a failing test.
+- Run tests with `hatch run:dev -- <pytest args>`. Always specify the test you want to run as much as possible avoiding full runs if possible.
+- Formatters and linters are run by hooks after each modification. No need for you to run them.
+
 ## Maintaining these instructions
 
 When editing any instruction file, follow these rules:
@@ -28,12 +35,14 @@ When editing any instruction file, follow these rules:
 
 ## External documentation
 
-When validating Telegram API behaviour, consult:
+When validating Telegram API behaviour or the PTB library, consult:
 
 - **Telegram Bot API** — <https://core.telegram.org/bots/api>
 - **python-telegram-bot (PTB)** — <https://docs.python-telegram-bot.org/en/stable/index.html>
 
 Do not rely on assumptions or cached knowledge. Always verify against the current API specification.
+
+**Importanat**: only access those urls when necessary and when you need further knowledge. Avoid loading them on context if not needed.
 
 ## Tech stack
 
@@ -51,19 +60,6 @@ Versions and pins are defined in `pyproject.toml`. Always check that file — do
 | Testing | pytest + pytest-asyncio |
 | CI/CD | GitLab CI |
 | Infrastructure | AWS (Lambda, ECS, CloudWatch, ECR) |
-
-## Development commands
-
-All dev commands run through Hatch in the `dev` environment:
-
-```bash
-hatch run dev:validate         # Run all checks (format, lint, type-check, test)
-hatch run dev:test             # Run tests
-hatch run dev:type-check       # Run ty type checker
-hatch run dev:format           # Format code with ruff
-hatch run dev:lint             # Lint with ruff
-hatch run dev:fix              # Auto-fix formatting + lint issues
-```
 
 ## Project structure
 

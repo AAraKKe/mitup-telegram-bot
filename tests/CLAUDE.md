@@ -1,13 +1,13 @@
 # Testing
 
-## Running tests
+## Important rules
 
-All test commands run through Hatch in the `dev` environment:
-
-```bash
-hatch run dev:test {extra arguments}       # Run tests with parallel workers
-hatch run dev:test-cov {extra arguments}   # Run tests with coverage (outputs report.json, coverage.xml)
-```
+- Tests built with pytest in pure pytest style. **No test classes**
+- Avoid repeating code as much as possible, use parametrization (see below)
+- When building complex fixtures that return a data structure, avoid plain dictionaries and use dataclasses instead. Much more readable and type validated.
+- Use the `tests.helpers` module for reusable test utilities, including model factories and assertion helpers.
+- Always use available fixtures and override them if the behavior of a fixture is not suitable for a specific test. Always prefer to override a fixture in the module or conftest scope instead of implementing different behavior.
+- Tests can be coroutines (async def) and there is no need to mark them with `@pytest.mark.asyncio` — the `pytest-asyncio` plugin is configured to handle all async tests by default.
 
 ## Test structure
 
@@ -59,7 +59,9 @@ No real external services are used in tests. Both the database and the Telegram 
 
 ### Database
 
-Use the `mock_session` fixture (globally available). It provides a mock `Session` object that can be configured per test.
+Use the `mock_session` fixture (globally available). It provides a mock `Session` object that can be configured per test. It works by using a fixture `cb_config` that generates a database configuration with test values and patching the methods necessary in the `db.py` module to generate a session with that configuration.
+
+Use any time database is required.
 
 ### Telegram API
 
