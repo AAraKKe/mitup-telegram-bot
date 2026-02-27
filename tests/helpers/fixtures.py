@@ -165,7 +165,7 @@ def create_joined_link(
 
 def create_message(
     id: int = 1,
-    inline_message_id: str = "some_inline_message_id",
+    inline_message_id: str | None = "some_inline_message_id",
     chat_instance: str | None = None,
     meetup_id: int = 1,
     message_id: int | None = None,

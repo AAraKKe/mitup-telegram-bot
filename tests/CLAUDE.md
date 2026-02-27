@@ -8,6 +8,7 @@
 - Use the `tests.helpers` module for reusable test utilities, including model factories and assertion helpers.
 - Always use available fixtures and override them if the behavior of a fixture is not suitable for a specific test. Always prefer to override a fixture in the module or conftest scope instead of implementing different behavior.
 - Tests can be coroutines (async def) and there is no need to mark them with `@pytest.mark.asyncio` — the `pytest-asyncio` plugin is configured to handle all async tests by default.
+- Never write obvious tests. For example, tests that validate that when creating a class with a given argument the class has that argument. Any etst that evaluates basic python functionality is not useful. Only test actual logic.
 
 ## Test structure
 

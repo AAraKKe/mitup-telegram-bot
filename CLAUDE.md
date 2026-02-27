@@ -9,8 +9,8 @@ When requested to write code, always second guess the user's request and look fo
 ## Important rules
 
 - Never run tests, linters formatters or anything similar fof validation.
-- Only run tests if you are working with tests and want to validate that the tests pass or debug a failing test.
-- Run tests with `hatch run:dev -- <pytest args>`. Always specify the test you want to run as much as possible avoiding full runs if possible.
+- Tests are run by a hook when you are done, if you want to get feedback at the end of your work, allow the hook to run them.
+- If you want to run tests in the middle of the work to validate a specific test only, run tests with `hatch run:dev -- <pytest args>`. Always specify the test you want to run as much as possible avoiding full runs if possible.
 - Formatters and linters are run by hooks after each modification. No need for you to run them.
 
 ## Maintaining these instructions

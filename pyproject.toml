@@ -200,7 +200,7 @@ test = [
 ]
 test-cov = [
     "build-locales",
-    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered tests/ --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json {args:}",
+    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json {args:tests}",
 ]
 format = "ruff format  ."
 format-check = "ruff format --diff --check ."

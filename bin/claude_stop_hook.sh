@@ -20,7 +20,8 @@ if git diff --quiet HEAD; then
     exit 0
 fi
 
-output=$(hatch run "$command" 2>&1)
-code=$?
+if output=$(hatch run "$command" 2>&1); then
+    exit 0
+fi
 
-[ $code -eq 0 ] || jq -n --arg reason "$output" '{"decision":"block","reason":$reason}'
+jq -n --arg reason "$output" '{"decision":"block","reason":$reason}'
