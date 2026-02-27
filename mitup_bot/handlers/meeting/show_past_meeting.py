@@ -53,14 +53,7 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Delete past meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Delete past meeting", update, context)
     if meeting is None:
         return
 
@@ -97,14 +90,7 @@ async def callback_query_show_past_meeting(session: Session, update: Update, con
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Show past meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Show past meeting", update, context)
     if meeting is None:
         return
 
@@ -131,14 +117,7 @@ async def callback_query_confirm_delete_past_meeting(session: Session, update: U
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Confirm delete past meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Confirm delete past meeting", update, context)
     if meeting is None:
         return
 
@@ -180,14 +159,7 @@ async def callback_query_decline_delete_past_meeting(session: Session, update: U
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Decline delete past meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Decline delete past meeting", update, context)
     if meeting is None:
         return
 

@@ -56,7 +56,7 @@ Versions and pins are defined in `pyproject.toml`. Always check that file — do
 All dev commands run through Hatch in the `dev` environment:
 
 ```bash
-hatch run dev:validate        # Run all checks (format, lint, type-check, test)
+hatch run dev:validate         # Run all checks (format, lint, type-check, test)
 hatch run dev:test             # Run tests
 hatch run dev:type-check       # Run ty type checker
 hatch run dev:format           # Format code with ruff

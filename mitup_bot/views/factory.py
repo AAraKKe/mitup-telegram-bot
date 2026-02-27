@@ -9,7 +9,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import Languages, SettingsMessages
-from mitup_bot.views import ButtonConfig, CalendarKeyboard, MitupView, PaginatedMitupView
+from mitup_bot.views import ButtonConfig, CalendarKeyboard, Keyboard, MitupView, PaginatedMitupView
 
 if TYPE_CHECKING:
     from mitup_bot.models import Meetup, User
@@ -229,5 +229,33 @@ def confirmation_view(
         [
             [ButtonConfig(text=ButtonMessages.CONFIRM.get(lang=lang), callback_data=confirm_callback_data)],
             [ButtonConfig(text=ButtonMessages.DECLINE.get(lang=lang), callback_data=decline_callback_data)],
+        ],
+    )
+
+
+def reactivation_prompt_view(*, lang: str, meeting_id: int, back_rows: Keyboard | None = None) -> MitupView:
+    """
+    View shown to the owner when they try to access a meeting that is no longer active.
+
+    If `back_rows` is provided it is used as the back-navigation row(s) below the action buttons.
+    Otherwise a single "Back to main menu" row is rendered.
+    """
+    resolved_back_rows: Keyboard = back_rows or [
+        [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]
+    ]
+    return MitupView(
+        description=MeetingMessages.PAST_MEETING_DESCRIPTION.get(lang=lang),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.REACTIVATE_MEETING.get(lang=lang),
+                    callback_data=cb.REACTIVATE_MEETING.with_id(meeting_id),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.DELETE.get(lang=lang),
+                    callback_data=cb.DELETE_MEETING.with_id(meeting_id),
+                ),
+            ],
+            *resolved_back_rows,
         ],
     )

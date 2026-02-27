@@ -6,6 +6,7 @@ We just need to update the factory methods that produces the parameters for each
 """
 
 import datetime as dt
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -30,6 +31,7 @@ from tests.helpers.stub_db import MockDbSession
 
 MEETING_ID_NOT_OWNED = 99
 MEETING_ID_NOT_FOUND = 9999
+MEETING_ID_INACTIVE = 88
 
 
 class ErrorMode(Enum):
@@ -42,6 +44,7 @@ class ErrorMode(Enum):
     MEETING_NOT_FOUND = "MeetingNotFound"
     MALFORMED_CALLBACK_DATA = "MalformedCallbackData"
     MISSING_USER_DATA = "MissingUserData"
+    MEETING_INACTIVE_OWNER = "MeetingInactiveOwner"
 
 
 @dataclass
@@ -61,6 +64,10 @@ class Context:
     exception: Exception | None = None
     fault_count: int = 0  # This is the value of the fault metric (both with and without prefix)
     custom_keyboard: Keyboard | None = None  # Used when the meeting does not exist and the message is edited
+    reactivation_back_keyboard_factory: Callable[[str], Keyboard] | None = (
+        None  # Lang-dependent back row for the reactivation prompt
+    )
+    shows_deleted_message_when_not_found: bool = True  # False for handlers using user_owns_meeting directly
     meeting_id: dict[ContextId, int] | None = None  # Meeting id to store in the context data
     metrics_emitted: MetricsProperties = field(default_factory=MetricsProperties)
     metrics_properties: dict[str, str] | None = None
@@ -266,6 +273,7 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.SHOW_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="show_past_meeting",
+        shows_deleted_message_when_not_found=False,
     ),
     Context(
         handler_id=MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK,
@@ -278,6 +286,7 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="reactivate_meeting",
+        shows_deleted_message_when_not_found=False,
     ),
     Context(
         handler_id=MeetingHandlerId.REACTIVATE_MEETING_CALLBACK,
@@ -290,6 +299,7 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="confirm_delete_past_meeting",
+        shows_deleted_message_when_not_found=False,
     ),
     Context(
         handler_id=MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK,
@@ -302,12 +312,94 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="decline_delete_past_meeting",
+        shows_deleted_message_when_not_found=False,
     ),
     Context(
         handler_id=MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_PAST_MEETING),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="decline_delete_past_meeting_malformed",
+    ),
+    # --- Inactive meeting accessed by owner (meeting_accessible handlers) ---
+    Context(
+        handler_id=MeetingHandlerId.SHOW_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="show_inactive_meeting",
+        reactivation_back_keyboard_factory=lambda lang: [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
+                )
+            ]
+        ],
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.EDIT,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="edit_inactive_meeting",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.TITLE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TITLE.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="edit_inactive_meeting_title",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="edit_inactive_meeting_settings",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATE_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_DATE.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
+        ),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="edit_inactive_meeting_date",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.SET_MEETING_DATE.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
+        ),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="set_inactive_meeting_date",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="edit_inactive_meeting_time",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="delete_inactive_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(MEETING_ID_INACTIVE, 1)
+        ),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="kickout_inactive_meeting",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_WAITING_LIST.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="set_inactive_meeting_waiting_list",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_MEETING_PUBLIC_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_PUBLIC.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="set_inactive_meeting_public",
     ),
 ]
 
@@ -347,6 +439,14 @@ def handler_stops_due_to_malformed_callback_data() -> list[Context]:
     Provides context with callback data that would fail when being parsed
     """
     return [context for context in CONTEXTS if ErrorMode.MALFORMED_CALLBACK_DATA in context.error_modes]
+
+
+def handler_shows_reactivation_prompt_for_inactive_meeting() -> list[Context]:
+    """
+    Provides context where the owner accesses an inactive meeting from the bot chat.
+    The handler should show a reactivation prompt instead of the normal view.
+    """
+    return [context for context in CONTEXTS if ErrorMode.MEETING_INACTIVE_OWNER in context.error_modes]
 
 
 @pytest.mark.parametrize(
@@ -398,6 +498,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     [
         pytest.param(context, context.update_request, id=context.id)
         for context in handler_stop_for_accessing_meeting_not_owned_factory()
+        if context.shows_deleted_message_when_not_found
     ],
     indirect=["update"],
 )
@@ -567,3 +668,100 @@ async def test_callback_fails_when_missing_necessary_user_data(
         add_handler_dimensions=True,
         add_update_properties=True,
     )
+
+
+@pytest.mark.parametrize(
+    "test_context, update",
+    [
+        pytest.param(context, context.update_request, id=context.id)
+        for context in handler_shows_reactivation_prompt_for_inactive_meeting()
+    ],
+    indirect=["update"],
+)
+async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
+    mock_session: MockDbSession,
+    test_context: Context,
+    update: Update,
+    app: StubMitupApp,
+    user_with_settings: User,
+):
+    inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False)
+    user_with_settings.meetups.append(inactive_meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
+
+    metric_names = test_context.metrics_emitted.metrics + [
+        MetricKey.FAULT,
+        MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
+    ]
+    metric_values = test_context.metrics_emitted.values + [0, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
+
+    context.metrics_engine.assert_metrics_emited(
+        names=metric_names,
+        values=metric_values,
+        units=metric_units,
+        properties=test_context.metrics_properties,
+        add_handler_dimensions=True,
+        add_update_properties=True,
+    )
+    back_rows = (
+        test_context.reactivation_back_keyboard_factory(user_with_settings.lang)
+        if test_context.reactivation_back_keyboard_factory
+        else None
+    )
+    context.api.assert_edit_message_called(
+        update,
+        factory.reactivation_prompt_view(
+            lang=user_with_settings.lang, meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "test_context, update",
+    [
+        pytest.param(context, context.update_request, id=context.id)
+        for context in handler_shows_reactivation_prompt_for_inactive_meeting()
+    ],
+    indirect=["update"],
+)
+async def test_non_owner_sees_main_menu_for_inactive_meeting(
+    mock_session: MockDbSession,
+    test_context: Context,
+    update: Update,
+    app: StubMitupApp,
+    user_with_settings: User,
+):
+    """Non-owner accessing an inactive meeting is redirected to main menu (not-owned behavior)."""
+    inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(
+        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    )
+
+    metric_names = test_context.metrics_emitted.metrics + [
+        MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
+        MetricKey.FAULT,
+        MetricKey.TIME,
+        MetricKey.DB_CONNECTIONS_LEAKED,
+    ]
+    metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat(), 0]
+    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
+
+    context.metrics_engine.assert_metrics_emited(
+        names=metric_names,
+        values=metric_values,
+        units=metric_units,
+        properties=test_context.metrics_properties,
+        add_handler_dimensions=True,
+        add_update_properties=True,
+    )
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))

@@ -1,0 +1,32 @@
+{
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "output=$(hatch run dev:fix 2>&1); code=$?; [ $code -eq 0 ] || { echo \"$output\" >&2; exit 2; }"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bin/claude_stop_hook.sh dev:test"
+          },
+          {
+            "type": "command",
+            "command": "bin/claude_stop_hook.sh dev:type-check"
+          }
+        ]
+      }
+    ]
+  }
+}

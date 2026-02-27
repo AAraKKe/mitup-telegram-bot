@@ -119,23 +119,10 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(handler_id, update=update, app=app)
 
-        assert f"User tried '{action}' with a meeting that does not exist." in caplog.text
+        assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
         assert "Meeting id: 999, user id: 1" in caplog.text
 
-        context.api.assert_edit_message_called(
-            update,
-            MitupView(
-                description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
-                keyboard=[
-                    [
-                        ButtonConfig(
-                            text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
-                            callback_data=cb.MAIN_MENU,
-                        )
-                    ]
-                ],
-            ),
-        )
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(

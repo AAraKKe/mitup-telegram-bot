@@ -27,14 +27,7 @@ async def callback_query_reactivate_meeting(session: Session, update: Update, co
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Reactivate meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Reactivate meeting", update, context)
     if meeting is None:
         return
 

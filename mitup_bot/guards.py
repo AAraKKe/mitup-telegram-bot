@@ -166,13 +166,29 @@ async def meeting_accessible(
 
     If the meeting does not exist, the user is warned that the meeting has been removed.
 
-    If `custom_keyboard` is provided, it is attached to the message shown the user. Otherwise, a
-    a keyboard with a back button to the main menu is shown.
+    If the meeting exists but is inactive, the owner is shown a reactivation prompt instead of
+    the normal view. Non-owners fall through to the ownership check.
+
+    If `custom_keyboard` is provided, it is used as the back-navigation row(s) in both the
+    "meeting deleted" message and the reactivation prompt. Otherwise, a back button to the
+    main menu is shown.
 
     **Note**: this method can only be used when a meeting is being accessed from the bot chat.
     """
 
-    if Meetup.by_id(session, meeting_id):
+    meeting = Meetup.by_id(session, meeting_id)
+
+    if meeting is not None:
+        if not meeting.active and user.own_meeting(meeting_id):
+            await context.api.edit_message(
+                update=update,
+                view=factory.reactivation_prompt_view(
+                    lang=user.settings.language,
+                    meeting_id=meeting_id,
+                    back_rows=custom_keyboard,
+                ),
+            )
+            return None
         return await user_owns_meeting(user, meeting_id, action, update, context)
 
     message = (

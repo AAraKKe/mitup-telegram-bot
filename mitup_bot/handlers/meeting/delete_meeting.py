@@ -29,14 +29,7 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Delete meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Delete meeting", update, context)
     if meeting is None:
         return
 
@@ -74,14 +67,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
 
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Confirm delete meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Confirm delete meeting", update, context)
     if meeting is None:
         return
 
@@ -119,14 +105,7 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
     )
     user = guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session,
-        user,
-        callback_data.id,
-        "Decline delete meeting",
-        update,
-        context,
-    )
+    meeting = await guards.user_owns_meeting(user, callback_data.id, "Decline delete meeting", update, context)
     if meeting is None:
         return
 
