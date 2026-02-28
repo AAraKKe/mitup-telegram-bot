@@ -5,8 +5,10 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
+from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature
 from mitup_bot.utils import MeetingMessages
@@ -27,6 +29,12 @@ async def callback_query_create_meeting(session: Session, update: Update, contex
 
     user = guards.current_user(update, session)
     view = views.factory.create_meeting_view(lang=user.lang)
+
+    context.store_on_exit(
+        ContextId.CREATE_MEETING,
+        MeetingMessages.CREATE_MEETING_ON_EXIT.get(lang=user.lang),
+        cb.CANCEL_CREATE_MEETING,
+    )
 
     await context.api.edit_message(update=update, view=view)
 
@@ -80,23 +88,6 @@ async def callback_query_cancel_meeting(update: Update, context: TMitupContext):
     return ConversationHandler.END
 
 
-@HandlersRegistry.register_message(
-    MeetingHandlerId.CREATE_MEETING_TITLE_INVALID, ~filters.TEXT | filters.COMMAND, bindable=False
-)
-@with_async_session
-async def filter_messages_without_text(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
-
-    await context.api.send_message(
-        update=update,
-        view=views.factory.create_meeting_view(
-            lang=user.lang, message=MeetingMessages.INVALID_TITLE.get(lang=user.lang)
-        ),
-    )
-
-    return ConversationMeetingState.TITLE
-
-
 HandlersRegistry.register_conversation_handler(
     MeetingHandlerId.CREATE_MEETING_CONVERSATION,
     entry_points_handler_names=[
@@ -107,8 +98,7 @@ HandlersRegistry.register_conversation_handler(
         ConversationMeetingState.TITLE: [
             MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
             MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK,
-            MeetingHandlerId.CREATE_MEETING_TITLE_INVALID,
         ],
     },
-    fallbacks=[],
+    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
 )

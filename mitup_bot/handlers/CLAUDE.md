@@ -28,6 +28,12 @@ Each method accepts a `handler_id` (a `HandlerId` enum member) that uniquely ide
 
 **Circular imports between handler modules.** If module A needs an enum from module B and vice versa, extract shared enums into standalone files (e.g., `command_enums.py`, `enums.py`) or use a local import inside the function body to defer the import until runtime. See `command_enums.py` (extracted `CommandsId`) and `commands.py` (local import of `ConversationMeetingState`) for examples of both patterns.
 
+**Fallbacks and exit handling.** Any update that does not match a state handler is treated as the user exiting the conversation.
+
+- **When the user can exit**: call `context.store_on_exit(ContextId.<X>, message, cancel_callback)` in the entry handler and set `fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT]`. `MESSAGE_WITHOUT_TEXT` will show an interruption view with context and keep the user in state (returning `None`) so they can cancel explicitly.
+- **When the user cannot exit** (e.g. registration flows): use a dedicated fallback handler (filter `~filters.TEXT | filters.COMMAND`, registered with `bindable=False`) that informs the user and returns the same state.
+- **Text handlers in conversations** must use `filters.TEXT & ~filters.COMMAND` so that commands (like `/cancel`) fall through to the fallback rather than being processed as user input.
+
 ### Filters
 
 Handlers accept PTB `BaseFilter` instances to narrow which updates they process. Custom filters are in `personal_filters.py` (e.g., `UserExistFilter`, `PositiveNumberFilter`).

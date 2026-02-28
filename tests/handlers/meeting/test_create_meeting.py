@@ -2,9 +2,11 @@ import datetime as dt
 from typing import cast
 
 import pytest
-from telegram import CallbackQuery, Chat, Location, Message, Update
+from telegram import CallbackQuery, Chat, Message, Update
 from telegram import User as TelegramUser
 
+from mitup_bot.custom_context import ContextId
+from mitup_bot.handlers.meeting.create_meeting import callback_query_create_meeting
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import MeetingMessages
@@ -105,49 +107,18 @@ async def test_meeting_creation_cancelled(
     context.api.assert_edit_message_called(update, views_factory.main_menu_view(lang=user_with_settings.lang), times=1)
 
 
-@pytest.mark.parametrize(
-    "update",
-    [
-        UpdateRequest(command="/start"),
-        UpdateRequest(location=Location(latitude=1.0, longitude=1.0)),
-    ],
-    indirect=True,
-    ids=["command_message", "location_message"],
-)
-async def test_filter_messages_without_text_in_conversation(
+async def test_callback_query_create_meeting_stores_on_exit(
     update: Update,
-    app: StubMitupApp,
+    context: StubMitupContext,
     user_with_settings: User,
     mock_session: MockDbSession,
 ):
-    """
-    Test that after starting meeting creation, sending a non-text message (command or location)
-    prompts the invalid title message and keeps the conversation in the TITLE state.
-    """
-    update_user = update.effective_user
-    chat = update.effective_chat
-    assert chat is not None
-    assert update_user is not None
+    mock_session.add_object(user_with_settings, "tg_user_id")
 
-    mock_session.add_user(user_with_settings)
+    await callback_query_create_meeting(update, context)
 
-    # --- Step 1: Call the entry point to start the conversation ---
-    # Construct the Update object for the entry point (callback query)
-    entry_context, entry_update = await enter_conversation(chat, update_user, app)
-
-    expected_entry_view = views_factory.create_meeting_view(lang=user_with_settings.lang)
-    entry_context.api.assert_edit_message_called(update=entry_update, view=expected_entry_view)
-
-    # --- Step 2: User sends an invalid message (command or location) ---
-    invalid_msg_update = update
-
-    expected_invalid_title_message = MeetingMessages.INVALID_TITLE.get(lang=user_with_settings.lang)
-
-    invalid_title_context, _ = await call_handler(
-        MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=invalid_msg_update, app=app
-    )
-
-    expected_invalid_title_view = views_factory.create_meeting_view(
-        lang=user_with_settings.lang, message=expected_invalid_title_message
-    )
-    invalid_title_context.api.assert_send_message_called(update=invalid_msg_update, view=expected_invalid_title_view)
+    assert context.user_data is not None
+    on_exit = context.user_data.registry[ContextId.CREATE_MEETING].on_exit
+    assert on_exit is not None
+    assert on_exit.message == MeetingMessages.CREATE_MEETING_ON_EXIT.get(lang=user_with_settings.lang)
+    assert on_exit.cancel_callback == cb.CANCEL_CREATE_MEETING

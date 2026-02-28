@@ -3,6 +3,7 @@ name: mr
 description: Generate a GitLab merge request description following the project template.
 user-invocable: true
 allowed-tools: Bash, Read, mcp__GitLab__create_merge_request, mcp__GitLab__get_merge_request
+model: haiku
 ---
 
 1. Read `.gitlab/merge_request_templates/Default.md` for the template structure.

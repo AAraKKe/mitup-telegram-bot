@@ -49,7 +49,7 @@ async def command_start_with_new_user(session: Session, update: Update, context:
 
 
 @HandlersRegistry.register_message(
-    RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT, bindable=False
+    RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT & ~filters.COMMAND, bindable=False
 )
 @with_async_session
 async def registration_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
@@ -69,7 +69,6 @@ async def registration_timezone_text_message_handler(session: Session, update: U
         context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
         return ConversationRegistrationProcessState.TIMEZONE
 
-    print(f"\n\n\n {new_timezone} \n\n\n")
     user.settings.timezone = new_timezone
 
     session.add(user)
@@ -121,6 +120,21 @@ async def registration_timezone_location_message_handler(session: Session, updat
     return ConversationHandler.END
 
 
+@HandlersRegistry.register_message(
+    RegistrationProcessHandlerId.TIMEZONE_INVALID_INPUT,
+    ~filters.TEXT | filters.COMMAND,
+    bindable=False,
+)
+@with_async_session
+async def registration_timezone_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
+    user = guards.current_user(update, session)
+    await context.api.send_message(
+        update=update,
+        view=SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT.get(lang=user.lang),
+    )
+    return ConversationRegistrationProcessState.TIMEZONE
+
+
 HandlersRegistry.register_conversation_handler(
     RegistrationProcessHandlerId.TIMEZONE_CONVERSATION,
     entry_points_handler_names=[RegistrationProcessHandlerId.TIMEZONE_COMMAND],
@@ -130,5 +144,5 @@ HandlersRegistry.register_conversation_handler(
             RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION,
         ],
     },
-    fallbacks=[],
+    fallbacks=[RegistrationProcessHandlerId.TIMEZONE_INVALID_INPUT],
 )

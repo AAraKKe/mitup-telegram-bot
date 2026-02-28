@@ -6,6 +6,7 @@ import pytest
 from telegram import Location, Message, Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.edit_settings.edit_timezone import (
     callback_query_timezone,
     settings_timezone_location_message_handler,
@@ -50,6 +51,23 @@ async def test_callback_query_timezone_with_correct_view(
 
     context.api.assert_send_message_called(update, view)
     assert result == ConversationSettingsState.TIMEZONE
+
+
+async def test_callback_query_timezone_stores_on_exit(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    await callback_query_timezone(update, context)
+
+    assert context.user_data is not None
+    on_exit = context.user_data.registry[ContextId.EDIT_SETTINGS_TIMEZONE].on_exit
+    assert on_exit is not None
+    assert on_exit.message == SettingsMessages.EDIT_TIMEZONE_ON_EXIT.get(lang=user_with_settings.lang)
+    assert on_exit.cancel_callback == cb.CANCEL_SETTINGS
 
 
 async def test_callback_query_timezone_without_found_user(

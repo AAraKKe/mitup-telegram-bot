@@ -189,6 +189,12 @@ msgstr "Perfect! Your timezone is ${timezone}"
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
 msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
 
+msgid "SettingsMessages.EDIT_TIMEZONE_ON_EXIT"
+msgstr "Du warst dabei, deine Zeitzone zu ändern. Sende mir den Namen deiner Stadt oder deinen Standort, um fortzufahren. Wenn du nicht fortfahren möchtest, tippe auf Abbrechen, um zu beenden."
+
+msgid "SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT"
+msgstr "Bitte sende den Namen deiner Stadt als Text oder teile deinen Standort."
+
 msgid "SettingsMessages.SELECT_LANGUAGE"
 msgstr "Current language: *${language}*.\n\n"
 "Select a language."
@@ -307,6 +313,9 @@ msgstr "You have left the meeting, %{user}! It seems you have never used Mitup b
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+
+msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
+msgstr "Du warst dabei, ein Treffen zu erstellen. Sende den Titel des Treffens, um fortzufahren. Wenn du nicht fortfahren möchtest, tippe auf Abbrechen, um zu beenden."
 
 msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
 msgstr "The meeting _*${meeting_title}*_ is starting soon!"

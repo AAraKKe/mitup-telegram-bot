@@ -6,7 +6,9 @@ from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, timezone_api, views
+from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
+from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
@@ -26,6 +28,12 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
     user = guards.current_user(update, session)
     message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(lang=user.lang, timezone=user.settings.timezone)
 
+    context.store_on_exit(
+        ContextId.EDIT_SETTINGS_TIMEZONE,
+        SettingsMessages.EDIT_TIMEZONE_ON_EXIT.get(lang=user.lang),
+        cb.CANCEL_SETTINGS,
+    )
+
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
     await context.api.send_message(update=update, view=view)
@@ -33,7 +41,9 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
     return ConversationSettingsState.TIMEZONE
 
 
-@HandlersRegistry.register_message(EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT, bindable=False)
+@HandlersRegistry.register_message(
+    EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT & ~filters.COMMAND, bindable=False
+)
 @with_async_session
 async def settings_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
     logging.debug("Enter into settings_timezone_text_message_handler")
@@ -121,5 +131,5 @@ HandlersRegistry.register_conversation_handler(
             EditSettingsHandlerId.CANCEL,
         ],
     },
-    fallbacks=[],
+    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
 )

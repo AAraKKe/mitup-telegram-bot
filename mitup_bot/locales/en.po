@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-28 15:35\n"
+"PO-Revision-Date: 2026-02-28 17:58\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -197,6 +197,12 @@ msgstr "Perfect! Your timezone is ${timezone}"
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
 msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
 
+msgid "SettingsMessages.EDIT_TIMEZONE_ON_EXIT"
+msgstr "You were in the middle of changing your timezone. Send me either the name of your city or your location to continue.  If you don't want to continue, tap Cancel to exit."
+
+msgid "SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT"
+msgstr "Please send your city name as text or share your location."
+
 msgid "SettingsMessages.SELECT_LANGUAGE"
 msgstr "Current language: *${language}*.\n\nSelect a language."
 
@@ -304,6 +310,9 @@ msgstr "You have left the meeting, %{user}! It seems you have never used Mitup b
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+
+msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
+msgstr "You were in the middle of creating a meeting. Send the title of the meeting to continue. If you would not like to continue, tap Cancel to exit."
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT"
 msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."

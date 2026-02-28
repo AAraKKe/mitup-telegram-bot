@@ -160,6 +160,16 @@ class SettingsMessages(MessageBase):
     REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is ${timezone}"
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
 
+    # On-exit prompt shown when an unexpected message interrupts timezone edit
+    EDIT_TIMEZONE_ON_EXIT = (
+        "You were in the middle of changing your timezone. "
+        "Send me either the name of your city or your location to continue.  "
+        "If you don't want to continue, tap Cancel to exit."
+    )
+
+    # Fallback shown during registration when a non-text, non-location message is sent
+    REGISTRATION_TIMEZONE_INVALID_INPUT = "Please send your city name as text or share your location."
+
     # Language settings
     SELECT_LANGUAGE = "Current language: *${language}*.\n\nSelect a language."
     LANGUAGE_SET_SUCCESS = "The language has been set successfully."
@@ -259,6 +269,12 @@ class MeetingMessages(MessageBase):
     )
     PROMOTED_FROM_THE_WAITING_LIST = (
         "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+    )
+
+    # On-exit prompt shown when an unexpected message interrupts create-meeting
+    CREATE_MEETING_ON_EXIT = (
+        "You were in the middle of creating a meeting. Send the title of the meeting to continue. "
+        "If you would not like to continue, tap Cancel to exit."
     )
 
     # On-exit prompts shown when an unexpected message interrupts a conversation

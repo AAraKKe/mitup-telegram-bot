@@ -8,6 +8,7 @@ class RegistrationProcessHandlerId(HandlerId):
     TIMEZONE_COMMAND = auto()
     TIMEZONE_MESSAGE_WITH_TEXT = auto()
     TIMEZONE_MESSAGE_WITH_LOCATION = auto()
+    TIMEZONE_INVALID_INPUT = auto()
     TIMEZONE_CONVERSATION = auto()
 
 
