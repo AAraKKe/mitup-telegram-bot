@@ -48,6 +48,8 @@ class EditMeetingHandlerId(HandlerId):
     WRONG_TIME_FORMAT = auto()
     WRONG_TIME_MESSAGE = auto()
     DELETE_DATE_TIME_CALLBACK = auto()
+    CONFIRM_DELETE_DATE_TIME_CALLBACK = auto()
+    DECLINE_DELETE_DATE_TIME_CALLBACK = auto()
 
     # Edit meeting language
     LANGUAGE_CALLBACK = auto()

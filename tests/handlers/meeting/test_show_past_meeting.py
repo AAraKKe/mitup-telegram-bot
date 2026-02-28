@@ -5,7 +5,7 @@ from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
     MockDbSession,
     StubMitupApp,
@@ -46,6 +46,33 @@ def _expected_past_meeting_view(meeting, user: User) -> MitupView:
             ],
         ],
     ).with_context(description)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.DELETE_PAST_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_delete_past_meeting_shows_confirmation(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting,
+    app: StubMitupApp,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK, update=update, app=app)
+
+    mock_session.assert_not_deleted()
+    context.api.assert_send_message_called(
+        update,
+        factory.confirmation_view(
+            lang=user_with_settings.lang,
+            message=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
+            confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID),
+            decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID),
+        ),
+    )
 
 
 @pytest.mark.parametrize(

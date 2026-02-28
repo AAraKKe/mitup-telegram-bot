@@ -103,6 +103,18 @@ CONTEXTS = [
         id="delete_meeting_datetime",
     ),
     Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_delete_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_delete_meeting_datetime",
+    ),
+    Context(
         handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
@@ -153,6 +165,18 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="delete_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_delete_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_delete_meeting_datetime",
     ),
     Context(
         handler_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
@@ -214,9 +238,7 @@ CONTEXTS = [
     ),
     Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
-        update_request=UpdateRequest(
-            callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(MEETING_ID_NOT_OWNED, 1)
-        ),
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(MEETING_ID_NOT_OWNED, 1)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="edit_meeting_participants_kick_out_confirm",
     ),
@@ -293,6 +315,19 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.REACTIVATE_MEETING),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="reactivate_meeting_malformed",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="delete_past_meeting",
+        shows_deleted_message_when_not_found=False,
+    ),
+    Context(
+        handler_id=MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_PAST_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="delete_past_meeting_malformed",
     ),
     Context(
         handler_id=MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK,
@@ -380,6 +415,18 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="delete_inactive_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_delete_inactive_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_delete_inactive_meeting_datetime",
     ),
     Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,

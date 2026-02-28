@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-02-27 02:05\n"
+"PO-Revision-Date: 2026-02-28 15:35\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -469,6 +469,12 @@ msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the 
 
 msgid "MeetingMessages.INVALID_TIME"
 msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), I am sure I can work with that 🧠."
+
+msgid "MeetingMessages.DELETE_DATE_CONFIRMATION"
+msgstr "Are you sure you want to delete the date and time of the meeting?"
+
+msgid "MeetingMessages.DELETE_DATE_DECLINE"
+msgstr "The date and time won't be deleted"
 
 msgid "MeetingMessages.DATE_TIME_DELETED"
 msgstr "The date and time of the meeting have been deleted successfully"

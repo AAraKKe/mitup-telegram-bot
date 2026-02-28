@@ -199,6 +199,46 @@ async def test_delete_meeting_date(
 
     context, _ = await call_handler(EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, update=update, app=app)
 
+    assert meeting.datetime == TEST_MEETING_DATETIME_UTC
+    mock_session.assert_not_added()
+    mock_session.assert_not_flushed()
+    context.api.assert_edit_message_called(
+        update,
+        factory.confirmation_view(
+            lang=user_with_settings.lang,
+            message=MeetingMessages.DELETE_DATE_CONFIRMATION.get(lang=user_with_settings.lang),
+            confirm_callback_data=cb.CONFIRM_DELETE_MEETING_DATE.with_id(10),
+            decline_callback_data=cb.DECLINE_DELETE_MEETING_DATE.with_id(10),
+        ),
+    )
+    context.api.assert_update_meeting_messages_not_called()
+
+
+@pytest.mark.parametrize(
+    "update,meeting",
+    [
+        (
+            UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(10)),
+            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
+        ),
+    ],
+    indirect=["update"],
+    ids=["confirm_delete_meeting_date"],
+)
+async def test_confirm_delete_meeting_date(
+    mock_session: MockDbSession,
+    update: Update,
+    meeting: Meetup,
+    user_with_settings: User,
+    app: StubMitupApp,
+):
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    Message(message_id=111, chat_id=111, meetup=meeting)
+
+    context, _ = await call_handler(EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK, update=update, app=app)
+
     assert meeting.datetime is None
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
@@ -206,6 +246,41 @@ async def test_delete_meeting_date(
         update,
         meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=user_with_settings.lang)),
     )
+    context.api.assert_update_meeting_messages_called(mock_session, meeting, None, True)
+
+
+@pytest.mark.parametrize(
+    "update,meeting",
+    [
+        (
+            UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(10)),
+            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
+        ),
+    ],
+    indirect=["update"],
+    ids=["decline_delete_meeting_date"],
+)
+async def test_decline_delete_meeting_date(
+    mock_session: MockDbSession,
+    update: Update,
+    meeting: Meetup,
+    user_with_settings: User,
+    app: StubMitupApp,
+):
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK, update=update, app=app)
+
+    assert meeting.datetime == TEST_MEETING_DATETIME_UTC
+    mock_session.assert_not_added()
+    mock_session.assert_not_flushed()
+    context.api.assert_edit_message_called(
+        update,
+        meeting.edit_view.with_context(MeetingMessages.DELETE_DATE_DECLINE.get(lang=user_with_settings.lang)),
+    )
+    context.api.assert_update_meeting_messages_not_called()
 
 
 @pytest.mark.parametrize(

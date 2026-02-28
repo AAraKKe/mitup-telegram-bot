@@ -165,6 +165,9 @@ class MockApi(TelegramApi):
         else:
             assert_awaited_with_diff(self.mock_method("update_meeting_messages"), times, **arguments)
 
+    def assert_update_meeting_messages_not_called(self):
+        self.assert_method_just_called("update_meeting_messages", times=0)
+
     def assert_send_message_not_called(self):
         self.mock_method("send_message").assert_not_called()
 

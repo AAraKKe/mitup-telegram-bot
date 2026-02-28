@@ -227,8 +227,10 @@ def confirmation_view(
     return MitupView(
         message,
         [
-            [ButtonConfig(text=ButtonMessages.CONFIRM.get(lang=lang), callback_data=confirm_callback_data)],
-            [ButtonConfig(text=ButtonMessages.DECLINE.get(lang=lang), callback_data=decline_callback_data)],
+            [
+                ButtonConfig(text=ButtonMessages.CONFIRM.get(lang=lang), callback_data=confirm_callback_data),
+                ButtonConfig(text=ButtonMessages.DECLINE.get(lang=lang), callback_data=decline_callback_data),
+            ],
         ],
     )
 

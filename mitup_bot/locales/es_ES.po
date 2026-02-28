@@ -426,6 +426,12 @@ msgid "MeetingMessages.INVALID_TIME"
 msgstr "Mi reloj interno es un poco antiguo y no entiende esa hora tan futurista 🛸.\n\n"
 "Intenta de nuevo con una hora que tenga horas válidas (00-23) y minutos (00-59), ¡seguro que así me ubico mejor 🧠!"
 
+msgid "MeetingMessages.DELETE_DATE_CONFIRMATION"
+msgstr "¿Estás seguro de que quieres eliminar la fecha y hora de la quedada?"
+
+msgid "MeetingMessages.DELETE_DATE_DECLINE"
+msgstr "La fecha y hora no se eliminarán"
+
 msgid "MeetingMessages.DATE_TIME_DELETED"
 msgstr "La fecha y hora de la quedada se han eliminado"
 

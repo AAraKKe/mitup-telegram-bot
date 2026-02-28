@@ -9,7 +9,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import ButtonMessages, MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -59,20 +59,11 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
 
     await context.api.send_message(
         update=update,
-        view=MitupView(
-            description=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
-            keyboard=[
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.CONFIRM.get(lang=user.lang),
-                        callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(callback_data.id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.DECLINE.get(lang=user.lang),
-                        callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(callback_data.id),
-                    ),
-                ]
-            ],
+        view=factory.confirmation_view(
+            lang=user.lang,
+            message=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
+            confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(callback_data.id),
+            decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(callback_data.id),
         ),
     )
 

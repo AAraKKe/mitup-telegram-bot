@@ -2,6 +2,11 @@
 
 The view layer in `mitup_bot/views/` abstracts Telegram message presentation from handler logic. Views pair MarkdownV2 text with inline keyboards.
 
+## Important rules
+
+- Whenever we want to create a view to accept or decline any choice made by the user, we MUST use the `confirmation_view` factory method. This ensures a consistent user experience across the bot and centralizes the logic for confirmation dialogs.
+- All callbacks that trigger a destructive action, confirm it, or decline it must follow the naming convention: `DELETE_<DESCRIPTION>` (trigger), `CONFIRM_<DESCRIPTION>` (confirm), `DECLINE_<DESCRIPTION>` (decline). This maintains consistency and clarity across the codebase.
+
 ## Core types
 
 ### `MitupView`

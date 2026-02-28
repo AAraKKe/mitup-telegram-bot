@@ -403,6 +403,8 @@ class MeetingMessages(MessageBase):
         "Try again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), "
         f"I am sure I can work with that {Emojis.BRAIN}."
     )
+    DELETE_DATE_CONFIRMATION = "Are you sure you want to delete the date and time of the meeting?"
+    DELETE_DATE_DECLINE = "The date and time won't be deleted"
     DATE_TIME_DELETED = "The date and time of the meeting have been deleted successfully"
     MEETING_HAS_BEEN_DELETED = f"{Emojis.PROHIB} This meeting has been deleted {Emojis.PROHIB}"
     MEETING_HAS_FINISHED = f"{Emojis.CHECK} This meeting has finished {Emojis.CHECK}"

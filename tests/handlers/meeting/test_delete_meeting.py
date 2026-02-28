@@ -65,20 +65,11 @@ async def test_delete_meeting_works(
     mock_session.assert_not_deleted()
     context.api.assert_send_message_called(
         update,
-        MitupView(
-            description=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
-            keyboard=[
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.CONFIRM.get(lang=user_with_settings.lang),
-                        callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.DECLINE.get(lang=user_with_settings.lang),
-                        callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
-                    ),
-                ]
-            ],
+        factory.confirmation_view(
+            lang=user_with_settings.lang,
+            message=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
+            confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
+            decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
         ),
     )
 

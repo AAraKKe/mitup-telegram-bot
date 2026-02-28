@@ -88,6 +88,7 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
 async def callback_delete_date_time(session: Session, update: Update, context: TMitupContext):
     """
     This callback is called when the user wants to delete the date and time of the meeting.
+    It shows a confirmation dialog instead of deleting immediately.
     """
     logging.debug("Enter into callback_delete_date_time")
 
@@ -97,8 +98,37 @@ async def callback_delete_date_time(session: Session, update: Update, context: T
 
     user = guards.current_user(update, session)
     if (
+        await guards.meeting_accessible(session, user, callback_data.id, "Delete date and time", update, context)
+    ) is None:
+        return
+
+    view = factory.confirmation_view(
+        lang=user.lang,
+        message=MeetingMessages.DELETE_DATE_CONFIRMATION.get(lang=user.lang),
+        confirm_callback_data=cb.CONFIRM_DELETE_MEETING_DATE.with_id(callback_data.id),
+        decline_callback_data=cb.DECLINE_DELETE_MEETING_DATE.with_id(callback_data.id),
+    )
+    await context.api.edit_message(update=update, view=view)
+
+
+@HandlersRegistry.register_callback_query(
+    EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK, callback_data=cb.CONFIRM_DELETE_MEETING_DATE
+)
+@with_async_session
+async def callback_confirm_delete_date_time(session: Session, update: Update, context: TMitupContext):
+    """
+    This callback is called when the user confirms the deletion of the date and time of the meeting.
+    """
+    logging.debug("Enter into callback_confirm_delete_date_time")
+
+    callback_data = guards.valid_callback_data(
+        cb.CONFIRM_DELETE_MEETING_DATE.parse(context.match), EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK
+    )
+
+    user = guards.current_user(update, session)
+    if (
         meeting := await guards.meeting_accessible(
-            session, user, callback_data.id, "Delete date and time", update, context
+            session, user, callback_data.id, "Confirm delete date and time", update, context
         )
     ) is None:
         return
@@ -115,6 +145,32 @@ async def callback_delete_date_time(session: Session, update: Update, context: T
         current_message=meeting.message_from_update(update),
         skip_current=True,
     )
+
+
+@HandlersRegistry.register_callback_query(
+    EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK, callback_data=cb.DECLINE_DELETE_MEETING_DATE
+)
+@with_async_session
+async def callback_decline_delete_date_time(session: Session, update: Update, context: TMitupContext):
+    """
+    This callback is called when the user declines the deletion of the date and time of the meeting.
+    """
+    logging.debug("Enter into callback_decline_delete_date_time")
+
+    callback_data = guards.valid_callback_data(
+        cb.DECLINE_DELETE_MEETING_DATE.parse(context.match), EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK
+    )
+
+    user = guards.current_user(update, session)
+    if (
+        meeting := await guards.meeting_accessible(
+            session, user, callback_data.id, "Decline delete date and time", update, context
+        )
+    ) is None:
+        return
+
+    view = meeting.edit_view.with_context(MeetingMessages.DELETE_DATE_DECLINE.get(lang=user.lang))
+    await context.api.edit_message(update=update, view=view)
 
 
 async def handle_first_datetime_set(

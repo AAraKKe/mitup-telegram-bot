@@ -37,7 +37,7 @@ DELETE_PAST_MEETING = CallbackData(action="delete", entity="past_meeting")
 CONFIRM_DELETE_PAST_MEETING = CallbackData(action="confirm_delete", entity="past_meeting")
 DECLINE_DELETE_PAST_MEETING = CallbackData(action="decline_delete", entity="past_meeting")
 CONFIRM_INVITE_USER = CallbackData(action="confirm", entity="invite")
-CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
+DECLINE_INVITE_USER = CallbackData(action="decline", entity="invite")
 
 # ----------------------------------------
 # Edit meeting callbacks
@@ -51,6 +51,8 @@ EDIT_MEETING_DATE = DateCallbackData(action="edit", entity="meet_date")
 # This callback is part of the calendar view, the one above is part of the menu
 SET_MEETING_DATE = DateCallbackData(action="set", entity="md")
 DELETE_MEETING_DATE = CallbackData(action="delete", entity="meet_date")
+CONFIRM_DELETE_MEETING_DATE = CallbackData(action="confirm_delete", entity="meet_date")
+DECLINE_DELETE_MEETING_DATE = CallbackData(action="decline_delete", entity="meet_date")
 EDIT_MEETING_TIME = CallbackData(action="edit", entity="meet_time")
 # ---- Participants
 EDIT_MEETING_PARTICIPANTS = CallbackData(action="edit", entity="meet_part")
@@ -58,7 +60,7 @@ EDIT_MEETING_MAX_PARTICIPANTS = CallbackData(action="edit", entity="meet_max_par
 EDIT_MEETING_NO_LIMIT_PARTICIPANTS = CallbackData(action="edit", entity="meet_nl_part")
 EDIT_MEETING_KICK_OUT_PARTICIPANTS = MeetingCallbackData(action="show", entity="kickout_page")
 EDIT_MEETING_KICK_OUT_ACTION = MeetingCallbackData(action="kickout", entity="user")
-EDIT_MEETING_KICK_OUT_ACTION_CONFIRM = MeetingCallbackData(action="confirm", entity="kickout")
+CONFIRM_KICK_OUT = MeetingCallbackData(action="confirm", entity="kickout")
 CANCEL_EDIT_MEETING_PARTICIPANS = CallbackData(action="cancel", entity="meet_part")
 # ---- Location
 EDIT_MEETING_LOCATION = CallbackData(action="edit", entity="meet_loc")

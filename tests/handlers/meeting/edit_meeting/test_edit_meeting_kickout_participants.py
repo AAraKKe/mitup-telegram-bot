@@ -179,7 +179,7 @@ async def test_edit_meeting_kickout_given_participant(
             message=MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE.get(
                 lang=user_with_settings.lang, participant="joined_user_15", meeting_title="Test Meeting 1"
             ),
-            confirm_callback_data=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(meeting_id=1, id=15),
+            confirm_callback_data=cb.CONFIRM_KICK_OUT.with_ids(meeting_id=1, id=15),
             decline_callback_data=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=1, id=1),
         ),
     )
@@ -208,7 +208,7 @@ async def test_edit_meeting_kickout_participant_no_longer_in_meeting(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(1, 10))],
+    [UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(1, 10))],
     indirect=["update"],
 )
 async def test_edit_meeting_kickout_participant_confirm(
@@ -256,8 +256,8 @@ async def test_edit_meeting_kickout_participant_confirm(
 @pytest.mark.parametrize(
     "update, is_invited",
     [
-        [UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(1, 10)), False],
-        [UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(1, 10)), True],
+        [UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(1, 10)), False],
+        [UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(1, 10)), True],
     ],
     indirect=["update"],
     ids=["normal_participant", "invited_participant"],
@@ -316,7 +316,7 @@ async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(1, 5))],
+    [UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(1, 5))],
     indirect=["update"],
 )
 async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
@@ -347,7 +347,7 @@ async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(1, 5))],
+    [UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(1, 5))],
     indirect=["update"],
 )
 async def test_edit_meeting_kickout_participant_confirm_no_longer_in_meeting(
@@ -371,7 +371,7 @@ async def test_edit_meeting_kickout_participant_confirm_no_longer_in_meeting(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(1, 200))],
+    [UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(1, 200))],
     indirect=["update"],
 )
 async def test_kick_out_invited_participant(

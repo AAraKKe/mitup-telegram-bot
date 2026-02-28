@@ -108,9 +108,7 @@ async def edit_meeting_kickout_participant(session: Session, update: Update, con
     confirmation_message = MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE.get(
         lang=current_user.lang, participant=participant_name, meeting_title=meeting.title
     )
-    confirmation_callback_data = cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.with_ids(
-        meeting_id=meeting.db_id, id=callback_data.id
-    )
+    confirmation_callback_data = cb.CONFIRM_KICK_OUT.with_ids(meeting_id=meeting.db_id, id=callback_data.id)
     decline_callback_data = cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=meeting.db_id, id=1)
 
     await context.api.edit_message(
@@ -136,7 +134,7 @@ async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, cont
 
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
-    callback_data=cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM,
+    callback_data=cb.CONFIRM_KICK_OUT,
     bindable=True,
 )
 @with_async_session
@@ -144,7 +142,7 @@ async def edit_meeting_kickout_participant_confirm(session: Session, update: Upd
     logging.debug("Enter into edit_meeting_kickout_participant_confirm")
 
     callback_data = guards.valid_meeting_callback_data(
-        cb.EDIT_MEETING_KICK_OUT_ACTION_CONFIRM.parse(context.match),
+        cb.CONFIRM_KICK_OUT.parse(context.match),
         EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
     )
 
