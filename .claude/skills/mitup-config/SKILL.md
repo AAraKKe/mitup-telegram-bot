@@ -1,6 +1,6 @@
 ---
 name: config
-description: Configuration provider system. Auto-load when adding config fields, new environments, or SecretStr values.
+description: Configuration provider system. Auto-load when dealing with config fields, new environments, or SecretStr values.
 user-invocable: false
 ---
 

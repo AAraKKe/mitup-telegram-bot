@@ -1,6 +1,7 @@
 import datetime as dt
 from typing import TYPE_CHECKING, Literal, Self, overload
 
+from sqlalchemy import Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, Session, SQLModel, select
 from telegram.ext import ExtBot
 
@@ -21,12 +22,19 @@ class User(BaseModel, SQLModel, table=True):
     first_name: str
     tg_user_id: int
     id: int | None = Field(default=None, primary_key=True)
-    created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
-    updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
+    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    updated_time: dt.datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+    )
     is_active: bool = True
     last_name: str | None = None
     username: str | None = None
-    settings: Settings = Relationship(back_populates="user", sa_relationship_kwargs={"uselist": False})
+    settings: Settings = Relationship(
+        back_populates="user",
+        cascade_delete=True,
+        sa_relationship_kwargs={"uselist": False},
+    )
     meetups: list[Meetup] = Relationship(back_populates="owner", cascade_delete=True)
     joined_links: list[JoinedUsers] = Relationship(
         back_populates="user",

@@ -3,6 +3,7 @@ from string import Template
 from alembic import op
 
 CREATED_TRIGGER_TEMPLATE = """
+DROP TRIGGER IF EXISTS ${table_name}_created_time_timestamp ON $table_name;
 CREATE TRIGGER ${table_name}_created_time_timestamp
 BEFORE INSERT ON $table_name
 FOR EACH ROW
@@ -10,8 +11,9 @@ EXECUTE PROCEDURE set_created_time();
 """
 
 UPDATED_TRIGGER_TEMPLATE = """
+DROP TRIGGER IF EXISTS ${table_name}_updated_time_timestamp ON $table_name;
 CREATE TRIGGER ${table_name}_updated_time_timestamp
-BEFORE UPDATE ON $table_name
+BEFORE INSERT OR UPDATE ON $table_name
 FOR EACH ROW
 EXECUTE PROCEDURE set_updated_time();
 """

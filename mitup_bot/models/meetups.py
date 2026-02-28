@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, Session, SQLModel, select
 from telegram import Update
 
@@ -67,8 +67,11 @@ class Meetup(BaseModel, SQLModel, table=True):
     show_timezone: bool = Field(nullable=False)
     expiration_notification_sent: bool = Field(nullable=False, default=False)
     description: str | None = None
-    created_time: dt.datetime | None = None
-    updated_time: dt.datetime | None = None
+    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    updated_time: dt.datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+    )
     expiration_time: dt.datetime | None = None
     datetime: dt.datetime | None = None
     max_members: int | None = None

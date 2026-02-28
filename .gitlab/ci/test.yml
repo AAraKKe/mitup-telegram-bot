@@ -89,6 +89,22 @@ validate-locales:
   script:
     - hatch run dev:validate-locales
 
+test-db:
+  stage: test
+  services:
+    - name: docker:29-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - hatch run dev:test-db
+  needs: [preparation]
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
 validate-local-setup:
   # This job validates the setup process for new contributors
   image: python:3.14-bookworm

@@ -3,6 +3,7 @@ import logging
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
 
 from mitup_bot.translations import TranslationEngine
@@ -22,8 +23,11 @@ class Settings(BaseModel, SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
-    created_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
-    updated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
+    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    updated_time: dt.datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+    )
     language: str = TranslationEngine.FALLBACK_LANG
     timezone: str = "UTC"
     notification: bool = True

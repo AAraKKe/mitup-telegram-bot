@@ -56,6 +56,10 @@ filterwarnings = [
     'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*',
 ]
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "db_test: marks tests requiring a live Postgres container (deselected unless --db-tests is given)",
+]
+env_files = [".env"]
 
 [tool.ty.src]
 include = ["mitup_bot", "tests", "bin"]
@@ -176,14 +180,14 @@ Enviroment to be used for bot testing
 """
 installer = "uv"
 dependencies = [
-    "pytest~=9.0",
-    "pytest-asyncio~=1.0",
-    "pytest-cov~=7.0",
-    "pytest-xdist~=3.5",
-    "pytest-asyncio",
-    "pytest-json-report",
+    "pytest~=9.0.2",
+    "pytest-asyncio~=1.3.0",
+    "pytest-cov~=7.0.0",
+    "pytest-xdist~=3.8.0",
+    "pytest-dotenv~=0.5.2",
+    "pytest-json-report~=1.5.0",
     "ty==0.0.19",
-    "freezegun",
+    "freezegun~=1.5.5",
     "ruff==0.15.0",
     "boto3~=1.34",
     "debugpy",
@@ -191,12 +195,17 @@ dependencies = [
     "mkdocs-material",
     "deepdiff",
     "boto3-stubs[essential,ecs,cloudfront]",
+    "testcontainers[postgres]==4.14.1",
 ]
 
 [tool.hatch.envs.dev.scripts]
 test = [
     "build-locales",
     "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered {args:tests}",
+]
+test-db = [
+    "build-locales",
+    "FORCE_COLOR=1 pytest --db-tests --dist no --junitxml=report.xml {args:tests/db/}",
 ]
 test-cov = [
     "build-locales",
