@@ -99,5 +99,4 @@ class User(BaseModel, SQLModel, table=True):
             text=view.description.text,
             entities=view.description.entities or None,
             reply_markup=view.markup,
-            parse_mode=None,
         )

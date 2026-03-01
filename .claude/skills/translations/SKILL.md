@@ -37,24 +37,31 @@ Or do both in one step:
 hatch run dev:update-locales
 ```
 
-## Message content vs formatting
+## Message content and formatting
 
-Messages should contain **semantic content only** — not MarkdownV2 escaping or formatting characters. Callers are responsible for adding formatting appropriate to their context:
+Messages contain **semantic content and inline format tags** — not MarkdownV2 syntax, not raw escaping.
+
+Inline formatting uses HTML-like tags that translators keep intact:
 
 ```python
-# Good — plain semantic content
-NO_LIMIT_PARTICIPANTS = "No limit"
+# Good — semantic content with explicit tags
+MEETING_TITLE_LABEL = "<b>Title:</b> ${title}"
+INVITED_BY_USER = "<i>invited by ${user}</i>"
 
-# Bad — bakes MarkdownV2 escaping into the message
+# Bad — MarkdownV2 syntax (never use this)
+MEETING_TITLE_LABEL = "*Title:* ${title}"
+
+# Bad — bakes escaping into the message
 NO_LIMIT_PARTICIPANTS = "\\(No limit\\)"
 ```
 
-When the same message is used in different contexts, callers wrap it accordingly:
+Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be nested. Template placeholders use `${variable_name}` syntax.
 
-- **MarkdownV2** (meeting messages): `f"\\({MeetingMessages.NO_LIMIT.get(lang=lang)}\\)"` → renders `(No limit)`
-- **Plain text** (inline descriptions): `f"({MeetingMessages.NO_LIMIT.get(lang=lang, plain=True)})"` → displays `(No limit)`
+`MessageBase.get()` returns a `FormattedText` (plain text + `MessageEntity` list). The entities are computed from the tags; the `.po` translation file contains the tag-annotated string.
 
-Use `.get(plain=True)` when rendering messages in plain-text contexts (e.g. inline query result descriptions, button text) where MarkdownV2 is not supported.
+### Translators must preserve format tags
+
+When translating strings that contain `<b>`, `<i>`, or `${var}` markers, the translated string must keep those markers intact — they are not HTML for display, they are formatting instructions parsed at runtime.
 
 ## CI enforcement
 

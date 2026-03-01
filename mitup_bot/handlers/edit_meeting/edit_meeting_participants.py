@@ -113,10 +113,9 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
     meeting.max_members = None
     session.flush()
 
+    no_limit_text = MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=user.lang)
     response_view = edit_participants_view(meeting).with_context(
-        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(
-            max_participants=MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=user.lang)
-        )
+        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=no_limit_text)
     )
 
     await context.api.send_message(update=update, view=response_view)

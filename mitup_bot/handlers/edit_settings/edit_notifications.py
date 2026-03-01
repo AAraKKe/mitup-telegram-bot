@@ -9,6 +9,7 @@ from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
@@ -16,7 +17,7 @@ from mitup_bot.views import ButtonConfig, MitupView
 from .enums import ConversationSettingsState, EditSettingsHandlerId
 
 
-def notification_status(user: User) -> str:
+def notification_status(user: User) -> FormattedText:
     if user.settings.notification:
         return SettingsMessages.ENABLED.get(lang=user.lang)
     return SettingsMessages.DISABLED.get(lang=user.lang)

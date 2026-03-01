@@ -55,7 +55,7 @@ def test_build_bot(mock_ext_bot: MagicMock):
     call_kwargs = mock_ext_bot.call_args.kwargs
     assert call_kwargs["token"] == "test-token"
     assert call_kwargs["rate_limiter"] is not None
-    assert call_kwargs["defaults"] is not None
+    assert "defaults" not in call_kwargs
 
 
 # Async event types use `await module.run(...)`, sync ones call directly.

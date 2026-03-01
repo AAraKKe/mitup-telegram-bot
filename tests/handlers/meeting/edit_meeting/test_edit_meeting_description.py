@@ -56,7 +56,7 @@ async def test_callback_query_edit_meeting_description_works(
 
     view = MitupView(
         description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
-            lang=user_with_settings.lang, full=False, description=expected_description(user_with_settings.lang)
+            lang=user_with_settings.lang, description=expected_description(user_with_settings.lang)
         ),
         keyboard=[
             [

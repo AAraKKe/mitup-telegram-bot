@@ -7,6 +7,7 @@ from telegram import Update
 
 from mitup_bot.api_wrapper import TelegramApi
 from mitup_bot.models import Meetup, Message, User
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_diff
 from tests.helpers.stub_db import MockDbSession
@@ -24,13 +25,13 @@ class MockApi(TelegramApi):
     def __init__(self):
         self.mock_mapping: dict[str, mock.AsyncMock] = {}
 
-    def send_message_to_user(self, user: User, view: MitupView | str):
+    def send_message_to_user(self, user: User, view: MitupView | FormattedText | str):
         return self.call_mock("send_message_to_user", user=user, view=view)
 
-    def send_message(self, update: Update, view: MitupView | str):
+    def send_message(self, update: Update, view: MitupView | FormattedText | str):
         return self.call_mock("send_message", update=update, view=view)
 
-    def edit_message(self, update: Update, view: MitupView | str):
+    def edit_message(self, update: Update, view: MitupView | FormattedText | str):
         return self.call_mock("edit_message", update=update, view=view)
 
     def update_meeting_messages(
@@ -56,7 +57,7 @@ class MockApi(TelegramApi):
     def answer_callback_query(
         self,
         update: Update,
-        text: str | None = DEFAULT_NONE,  # type: ignore
+        text: str | FormattedText | None = DEFAULT_NONE,  # type: ignore
         show_alert: bool = DEFAULT_FALSE,  # type: ignore
     ):
         return self.call_mock("answer_callback_query", update=update, text=text, show_alert=show_alert)
@@ -94,22 +95,22 @@ class MockApi(TelegramApi):
             assert mocked_method is not None
             assert mocked_method.call_count == times
 
-    def assert_send_message_called(self, update: Update, view: MitupView | str, times: int = 1):
+    def assert_send_message_called(self, update: Update, view: MitupView | FormattedText | str, times: int = 1):
         self.assert_method_called("send_message", update=update, view=view, times=times)
 
-    def assert_send_message_to_user_called(self, user: User, view: MitupView | str, times: int = 1):
+    def assert_send_message_to_user_called(self, user: User, view: MitupView | FormattedText | str, times: int = 1):
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method("send_message_to_user"), user=user, view=view)
         else:
             assert_awaited_with_diff(self.mock_method("send_message_to_user"), times, user=user, view=view)
 
-    def assert_edit_message_called(self, update: Update, view: MitupView | str, times: int = 1):
+    def assert_edit_message_called(self, update: Update, view: MitupView | FormattedText | str, times: int = 1):
         self.assert_method_called("edit_message", update=update, view=view, times=times)
 
     def assert_answer_callback_query_called(
         self,
         update: Update,
-        text: str | None = None,
+        text: str | FormattedText | None = None,
         show_alert: bool = False,
         times: int = 1,
     ):
@@ -178,7 +179,7 @@ class MockApi(TelegramApi):
         self,
         method_name: str,
         update: Update,
-        view: MitupView | str,
+        view: MitupView | FormattedText | str,
         times: int,
     ):
         # Validate that the update has been properly generated.

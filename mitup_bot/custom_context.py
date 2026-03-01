@@ -27,6 +27,7 @@ from mitup_bot.monitoring import (
     MitupMetricsLogger,
     properties_from_update,
 )
+from mitup_bot.utils.entities import FormattedText
 
 
 class ContextId(CamelCaseStrEnum):
@@ -55,7 +56,7 @@ class ContextId(CamelCaseStrEnum):
 class OnExit:
     """Data class that holds the information to show when a conversation is unexpectedly interrupted."""
 
-    message: str
+    message: FormattedText
     cancel_callback: CallbackData
 
 
@@ -64,7 +65,7 @@ class ContextData:
     """Data class that represents the data to be stored per user in the MitupUserData registry."""
 
     meeting_id: int | None = None
-    text: str | None = None
+    text: FormattedText | None = None
     on_exit: OnExit | None = None
 
 
@@ -83,15 +84,17 @@ class MitupUserData:
     def store_meeting_id(self, context: ContextId, meeting_id: int):
         self.registry.setdefault(context, ContextData()).meeting_id = meeting_id
 
-    def store_text(self, context: ContextId, text: str):
-        self.registry.setdefault(context, ContextData()).text = text
+    def store_text(self, context: ContextId, text: str | FormattedText):
+        ftext = text if isinstance(text, FormattedText) else FormattedText(text)
+        self.registry.setdefault(context, ContextData()).text = ftext
 
     def has_meeting_id(self, context: ContextId) -> bool:
         return context in self.registry and self.registry[context].meeting_id is not None
 
-    def store_on_exit(self, context: ContextId, message: str, cancel_callback: CallbackData) -> None:
+    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData) -> None:
+        fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
         entry = self.registry.setdefault(context, ContextData())
-        entry.on_exit = OnExit(message=message, cancel_callback=cancel_callback)
+        entry.on_exit = OnExit(message=fmessage, cancel_callback=cancel_callback)
         self.active_context = context
 
     def get_active_on_exit(self) -> OnExit | None:
@@ -212,25 +215,25 @@ class MitupContext(
         self.handler_metrics_logger.set_property("ContextId", context.value)
         self.emit_metric("StoredMeetingId", 1, unit=Unit.COUNT)
 
-    def store_text(self, context: ContextId, text: str):
+    def store_text(self, context: ContextId, text: str | FormattedText):
         if self.user_data is None:  # pragma: no cover
             raise InvalidUserData("User data requested but not set")
 
-        self.user_data.store_text(context, text)
+        ftext = text if isinstance(text, FormattedText) else FormattedText(text)
+        self.user_data.store_text(context, ftext)
         self.handler_metrics_logger.set_property("ContextId", context.value)
-        self.handler_metrics_logger.set_property("StoredText", text)
+        self.handler_metrics_logger.set_property("StoredText", ftext.text)
         self.emit_metric("StoredContextText", 1, unit=Unit.COUNT)
 
-    def store_on_exit(self, context: ContextId, message: str, cancel_callback: CallbackData) -> None:
+    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData) -> None:
+        fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
         if self.user_data is None:  # pragma: no cover
             raise InvalidUserData("User data requested but not set")
-        self.user_data.store_on_exit(context, message, cancel_callback)
+        self.user_data.store_on_exit(context, fmessage, cancel_callback)
 
     def get_active_on_exit(self) -> OnExit | None:
         """Return the on-exit data for the most recently entered conversation, if any."""
-        if self.user_data is None:  # pragma: no cover
-            return None
-        return self.user_data.get_active_on_exit()
+        return None if self.user_data is None else self.user_data.get_active_on_exit()
 
     def clean_user_data(self, contexts: list[ContextId]):
         if self.user_data is None:  # pragma: no cover

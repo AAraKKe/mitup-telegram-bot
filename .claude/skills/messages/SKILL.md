@@ -25,62 +25,59 @@ All user-facing strings are defined in `mitup_bot/utils/messages.py` as `StrEnum
 
 <critical_rules>
   <rule>NEVER hardcode the `lang` argument (e.g., `lang="en"`). Always derive it from `user.lang` or `meeting.lang`.</rule>
+  <rule>NEVER call `.get(...).text` and pass the result to `with_context`, `with_footnote`, or any view description — this strips entities. Pass the full `FormattedText`.</rule>
 </critical_rules>
 
-The primary access method:
+`get()` translates the message, substitutes `${varname}` placeholders, parses formatting tags, and returns a `FormattedText`:
 
 ```python
-def get(
-    self,
-    *,
-    lang: str = TranslationEngine.FALLBACK_LANG,
-    full: bool = True,
-    plain: bool = False,
-    **kwargs: MessageParams,
-) -> str:
-```
-
-- `lang` — the language code. Always pass `user.lang` or `meeting.lang`.
-- `full=True` — performs full MarkdownV2 sanitization on template substitution values.
-- `plain=True` — returns the message without MarkdownV2 sanitization. Use for inline query result descriptions and other plain-text contexts.
-- `**kwargs` — template substitution values. Uses Python `string.Template` syntax (`${variable}`).
-
-```python
-# Translated, with substitution
+# Translated message — returns FormattedText
 MeetingMessages.INVITE.get(lang=user.lang, title=meeting.title)
 
-# Plain text (no MarkdownV2 escaping)
-MeetingMessages.DESCRIPTION.get(lang=user.lang, plain=True)
+# Pass directly to with_context — never extract .text first
+view.with_context(MeetingMessages.SUCCESS.get(lang=user.lang))
 ```
+
+Substitution values (`**kwargs`) accept `str`, `int`, `float`, `None`, or `FormattedText`. Passing a `FormattedText` preserves its entities at the correct offset in the resulting string — this is the mechanism for embedding one formatted message inside another:
+
+```python
+invited_by = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=inviter.inline_name)
+# invited_by is FormattedText with an italic entity
+full_name = render(t"{name} ({invited_by})")  # entities preserved
+```
+
+## `MessageBase.get_text()`
+
+Use only when you genuinely need a plain string and know no entities will be present — e.g. a callback alert text. Raises `ValueError` if the result has entities, preventing silent entity loss:
+
+```python
+# Safe: alert text cannot carry formatting
+await api.answer_callback_query(update, text=MeetingMessages.NOT_FOUND.get_text(lang=lang), show_alert=True)
+```
+
+## Inline formatting in messages
+
+Format tags are embedded directly in the message string using HTML-like syntax. `parse_format_tags` strips the tags and emits the corresponding `MessageEntity` objects:
+
+```python
+INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK = "<b>Meeting Not Found</b>\n\nThe meeting ... does not exist anymore."
+INVITED_BY_USER = "<i>invited by ${user}</i>"
+```
+
+Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be arbitrarily nested. Unclosed tags are silently dropped.
+
+<critical_rules>
+  <rule>NEVER put MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use `<b>`, `<i>` tags instead.</rule>
+  <rule>Template placeholders use `${variable_name}` syntax — not `{variable_name}` or `%s`.</rule>
+</critical_rules>
 
 ## `ButtonMessages.back()`
 
-For back-button labels, use `.back(lang=...)` which prepends the "←" arrow:
+For back-button labels, use `.back(lang=...)` which prepends the "←" arrow and returns a plain `str` (button labels need no entities):
 
 ```python
 ButtonMessages.MAIN_MENU.back(lang=user.lang)  # → "← Main Menu"
 ```
-
-## Template syntax
-
-Template placeholders use Python's `string.Template` syntax:
-
-```python
-# In messages.py
-INVITE = "You've been invited to ${title}"
-
-# Usage
-MeetingMessages.INVITE.get(lang=lang, title=meeting.title)
-```
-
-## Content rules
-
-<critical_rules>
-  <rule>Messages must contain semantic content only — no MarkdownV2 escaping or formatting in the enum value.</rule>
-  <rule>Callers handle formatting. NEVER put `\*bold\*`, `\_italic\_`, or any MarkdownV2 syntax inside a message value.</rule>
-</critical_rules>
-
-The enum value is the English source text and serves as the gettext msgid.
 
 ## After adding messages
 

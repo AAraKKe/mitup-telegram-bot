@@ -59,7 +59,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=response.get(lang=user_with_settings.lang, plain=True),
+        text=response.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 

@@ -1,4 +1,5 @@
 import datetime as dt
+from string.templatelib import Template
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, overload
 from zoneinfo import ZoneInfo
 
@@ -40,14 +41,14 @@ class MeetupLocation(MutableModel):
 
         return None if len(self.name.strip()) == 0 else self.name
 
-    def description(self, lang: str) -> str:
+    def description(self, lang: str) -> FormattedText:
         match self.coerced_name, self.coordinates:
             case (None, None):
                 return MeetingMessages.LOCATION_NOT_SET.get(lang=lang)
             case _:
                 name_section = f"{self.coerced_name}" if self.coerced_name else ""
                 coordinates_section = f"[{Emojis.PIN}]" if self.coordinates else ""
-                return f"{name_section} {coordinates_section}".strip()
+                return FormattedText(f"{name_section} {coordinates_section}".strip())
 
     def empty(self) -> bool:
         return self.coerced_name is None and self.coordinates is None
@@ -246,42 +247,42 @@ class Meetup(BaseModel, SQLModel, table=True):
         return self.owner.datetime_in_tz(self.datetime) if self.datetime else None
 
     @property
-    def str_datetime(self) -> str:
+    def str_datetime(self) -> FormattedText:
         if self.datetime:
             datetime_str = f"{self.datetime_in_tz:%Y-%m-%d %H:%M}"
             if self.show_timezone:
                 datetime_str += f" ({self.timezone.key})"
-            return datetime_str
+            return FormattedText(datetime_str)
         return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
 
     @property
-    def full_str_datetime(self) -> str:
+    def full_str_datetime(self) -> FormattedText:
         """Alawyas shows the time with the timezone"""
         if self.datetime:
-            return f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})"
+            return FormattedText(f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})")
         return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
 
     @property
-    def participants_badge(self) -> str:
+    def participants_badge(self) -> Template:
         """Plain-text badge shown in inline query result descriptions."""
-        empty = MeetingMessages.EMPTY.get(lang=self.lang, plain=True)
+        empty = MeetingMessages.EMPTY.get(lang=self.lang)
         joined_count = len(self.joined_links)
-        no_limit = f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language, plain=True)})"
+        no_limit = t"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language)})"
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
 
         if self.max_members is None:
-            result_badged = empty if joined_count == 0 else f"{len(self.joined_links)} {no_limit}"
-            return f"{incognito_prefix}{result_badged}"
+            result_badged = empty if joined_count == 0 else t"{len(self.joined_links)} {no_limit}"
+            return t"{incognito_prefix}{result_badged}"
 
         empty_with_max = (
-            f"{empty} {MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)}"
+            t"{empty} {MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)}"
         )
-        result_badged = empty_with_max if joined_count == 0 else f"({joined_count}/{self.max_members})"
-        return f"{incognito_prefix}{result_badged}"
+        result_badged = empty_with_max if joined_count == 0 else t"({joined_count}/{self.max_members})"
+        return t"{incognito_prefix}{result_badged}"
 
     @property
-    def participants_list_text(self) -> str:
+    def participants_list_text(self) -> FormattedText:
         """
         Textual representation of the list of participants in the meeting with one line per participant.
 
@@ -289,16 +290,25 @@ class Meetup(BaseModel, SQLModel, table=True):
         """
         participant_list = [link.participant_name for link in self.joined_links if not link.is_waiting_list]
         waiting_list = [link.participant_name for link in self.joined_links if link.is_waiting_list]
-        final_list = f"\n  {'\n  '.join(participant_list)}" if participant_list else ""
+
+        participants_part = (
+            FormattedText("\n  ").append(FormattedText.join("\n  ", participant_list))
+            if participant_list
+            else FormattedText("")
+        )
 
         if waiting_list:
-            final_list += f"\n--- {Emojis.WAITING} {ButtonMessages.WAITING_LIST.get(lang=self.lang)} \n  "
-            final_list += "\n  ".join(waiting_list)
+            waiting_header = ButtonMessages.WAITING_LIST.get(lang=self.lang)
+            waiting_names = FormattedText.join("\n  ", waiting_list)
+            waiting_section = (
+                FormattedText(f"\n--- {Emojis.WAITING} ").append(waiting_header).append(" \n  ").append(waiting_names)
+            )
+            return participants_part.append(waiting_section)
 
-        return final_list
+        return participants_part
 
     @property
-    def participants_text(self) -> str:
+    def participants_text(self) -> Template:
         """
         Textual representation of the participants information of the meeting. The list of participants is not included
         for incognito meetings.
@@ -306,45 +316,46 @@ class Meetup(BaseModel, SQLModel, table=True):
         To get the participants text ignoring whether the meeting is incognito or not,
         use `participants_text_with_list`.
         """
-        participant_list = "" if self.incognito else self.participants_list_text
-        return f"{self.participants_text_title}{participant_list}".strip()
+        participant_list: Template | FormattedText | str = t"" if self.incognito else self.participants_list_text
+        return t"{self.participants_text_title}{participant_list}"
 
     @property
-    def participants_text_title(self) -> str:
+    def participants_text_title(self) -> Template:
         """
         This is the title of the participants section of the meeting.
 
         It includes things like the number of participants, the maximum number of participants, etc.
         """
         if len(self.joined_links) == 0:
-            total_participants = MeetingMessages.EMPTY.get(lang=self.lang)
+            total_participants: FormattedText | Template = MeetingMessages.EMPTY.get(lang=self.lang)
         elif len(self.joined_links) == 1:
-            total_participants = f"1 {MeetingMessages.PARTICIPANT.get(lang=self.lang)}"
+            total_participants = t"1 {MeetingMessages.PARTICIPANT.get(lang=self.lang)}"
         else:
-            total_participants = f"{len(self.joined_links)} {MeetingMessages.PARTICIPANTS.get(lang=self.lang)}"
+            n = len(self.joined_links)
+            total_participants = t"{n} {MeetingMessages.PARTICIPANTS.get(lang=self.lang)}"
 
-        max_participants = (
+        max_participants: FormattedText | Template = (
             MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
             if self.max_members
-            else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)})"
+            else t"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)})"
         )
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
-        return f"{incognito_prefix}{total_participants} {max_participants}".strip()
+        return t"{incognito_prefix}{total_participants} {max_participants}"
 
     @property
-    def participants_text_with_list(self) -> str:
+    def participants_text_with_list(self) -> Template:
         """
         Textual representation of the participants section of the meeting. The list of participants is always included.
         """
-        return f"{self.participants_text_title}{self.participants_list_text}".strip()
+        return t"{self.participants_text_title}{self.participants_list_text}"
 
     @property
-    def _datetime_display(self) -> str | EntityDateTime:
+    def _datetime_display(self) -> FormattedText | EntityDateTime:
         """Datetime field for the meeting message — entity-typed when a datetime is set."""
         if self.datetime is None:
             return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
-        return EntityDateTime(self.str_datetime, int(self.datetime.timestamp()))
+        return EntityDateTime(self.str_datetime.text, int(self.datetime.timestamp()))
 
     @property
     def message(self) -> FormattedText:
@@ -368,35 +379,37 @@ class Meetup(BaseModel, SQLModel, table=True):
         Properties that are not set are omitted.
         """
         created_by = MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
-        description_section = f"\n--- {Emojis.DESCRIPTION} {self.description}" if self.description else ""
+        description_section: Template | str = (
+            t"\n--- {Emojis.DESCRIPTION} {self.description}" if self.description else ""
+        )
         datetime_display = self._datetime_display if self.datetime else None
-        location_section = (
-            "" if self.location.empty() else f"\n--- {Emojis.MAP} {self.location.description(lang=self.lang)}"
+        location_section: Template | str = (
+            "" if self.location.empty() else t"\n--- {Emojis.MAP} {self.location.description(lang=self.lang)}"
         )
         participants_text = self.participants_text
         if datetime_display is not None:
             return render(
-                t"{Bold(self.title)} ({created_by})\n"
+                t"{Bold(self.title)} ({created_by})"
                 t"{description_section}"
                 t"\n--- {Emojis.CLOCK} {datetime_display}"
                 t"{location_section}"
                 t"\n--- {Emojis.JOINED} {participants_text}"
             )
         return render(
-            t"{Bold(self.title)} ({created_by})\n"
+            t"{Bold(self.title)} ({created_by})"
             t"{description_section}{location_section}"
             t"\n--- {Emojis.JOINED} {participants_text}"
         )
 
     @property
-    def inline_query_message(self) -> str:
+    def inline_query_message(self) -> FormattedText:
         """Plain-text preview shown below the title in inline query results."""
-        result: list[str] = [f"{Emojis.JOINED} {self.participants_badge}"]
+        result = t"{Emojis.JOINED} {self.participants_badge}"
 
         if self.datetime:
-            result.append(f"{Emojis.CLOCK} {self.str_datetime}")
+            return render(t"{result}\n{Emojis.CLOCK} {self.str_datetime}")
 
-        return "\n".join(result)
+        return render(result)
 
     @property
     def main_view(self) -> MitupView:

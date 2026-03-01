@@ -8,8 +8,7 @@ from typing import assert_never
 import click
 from aws_embedded_metrics.environment.environment_detector import resolve_environment
 from aws_embedded_metrics.unit import Unit
-from telegram import constants
-from telegram.ext import AIORateLimiter, Defaults, ExtBot
+from telegram.ext import AIORateLimiter, ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper, build_api
@@ -60,7 +59,6 @@ def build_bot(config: BotConfig) -> ExtBot:
     return ExtBot(
         token=config.token.get_secret_value(),
         rate_limiter=AIORateLimiter(max_retries=config.retries_on_throttle),
-        defaults=Defaults(parse_mode=constants.ParseMode.MARKDOWN_V2),
     )
 
 

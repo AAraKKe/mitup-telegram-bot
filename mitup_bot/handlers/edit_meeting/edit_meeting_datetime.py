@@ -195,9 +195,9 @@ async def handle_first_datetime_set(
     view = MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
             lang=meeting.owner.settings.language,
-            datetime=meeting.full_str_datetime,
+            datetime=meeting.full_str_datetime.text,
             back_edit_button=ButtonMessages.EDIT.back(lang=meeting.owner.settings.language),
-            set_time_button=ButtonMessages.SET_TIME.get(lang=meeting.owner.settings.language),
+            set_time_button=ButtonMessages.SET_TIME.get_text(lang=meeting.owner.settings.language),
         ),
         keyboard=[keyboard],
     )
@@ -226,7 +226,7 @@ async def handle_datetime_update(
     await context.api.edit_message(
         update=update,
         view=meeting.edit_view.with_context(
-            MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=meeting.full_str_datetime)
+            MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=meeting.full_str_datetime.text)
         ),
     )
     await context.api.update_meeting_messages(
@@ -365,7 +365,7 @@ async def set_time_message(session: Session, update: Update, context: TMitupCont
 
         view = meeting.edit_view.with_context(
             MeetingMessages.EDIT_TIME_SUCCESS.get(
-                lang=current_user.settings.language, datetime=meeting.full_str_datetime
+                lang=current_user.settings.language, datetime=meeting.full_str_datetime.text
             )
         )
 
@@ -385,6 +385,7 @@ async def fallback_answer(session: Session, update: Update, context: TMitupConte
         update=update,
         view=MeetingMessages.WRONG_TIME_FORMAT.get(lang=current_user.settings.language),
     )
+
     context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
 
     return ConversationMeetingState.EDIT_TIME

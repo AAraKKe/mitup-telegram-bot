@@ -28,7 +28,7 @@ async def handle_invite_from_external_chat(
     """
     await send_request_for_invite_name(context, user, meeting_id)
     await context.api.answer_callback_query(
-        update, text=MeetingMessages.INVITE_USER_GO_PRIVATE.get(lang=user.lang, plain=True), show_alert=True
+        update, text=MeetingMessages.INVITE_USER_GO_PRIVATE.get(lang=user.lang), show_alert=True
     )
 
 
@@ -65,19 +65,19 @@ async def ensure_meeting_still_allows_invitations(
         else:
             message = MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND
 
-        await context.api.answer_callback_query(update, text=message.get(lang=user.lang, plain=True), show_alert=True)
+        await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
     if not meeting.join_allowed():
         message = MeetingMessages.INVITE_USER_MEETING_FULL
-        await context.api.answer_callback_query(update, text=message.get(lang=user.lang, plain=True), show_alert=True)
+        await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
     if not meeting.allow_invitation:
         message = MeetingMessages.INVITE_USER_INVITES_DISABLED
-        await context.api.answer_callback_query(update, text=message.get(lang=user.lang, plain=True), show_alert=True)
+        await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
@@ -239,6 +239,7 @@ async def decline_user_invitation(session: Session, update: Update, context: TMi
     context.clean_user_data([ContextId.INVITE_USERS])
 
     message = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user.lang)
+    message_text = message.text
 
     # If the user owns the meeting, go back to the meeting, if they do not
     # send to main menu
@@ -253,7 +254,7 @@ async def decline_user_invitation(session: Session, update: Update, context: TMi
         return ConversationHandler.END
 
     if user.own_meeting(meeting_id):
-        view = meeting.view_for(user).with_context(message=message)
+        view = meeting.view_for(user).with_context(message=message_text)
     else:
         view = main_menu_view(lang=user.lang, message=message)
 

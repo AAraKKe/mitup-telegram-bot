@@ -47,7 +47,7 @@ async def attach_to_chat(session: Session, update: Update, context: TMitupContex
         alert = MeetingMessages.ALREADY_SEARCHABLE_ALERT if already_attached else MeetingMessages.NOW_SEARCHABLE_ALERT
         await context.api.answer_callback_query(
             update=update,
-            text=alert.get(plain=True),
+            text=alert.get(),
             show_alert=True,
         )
 

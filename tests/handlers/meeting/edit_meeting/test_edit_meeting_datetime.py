@@ -29,12 +29,13 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
             lang=lang,
             datetime=datetime,
             back_edit_button=ButtonMessages.EDIT.back(lang=lang),
-            set_time_button=ButtonMessages.SET_TIME.get(lang=lang),
+            set_time_button=ButtonMessages.SET_TIME.get(lang=lang).text,
         ),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.SET_TIME.get(lang=lang), callback_data=cb.EDIT_MEETING_TIME.with_id(meeting_id)
+                    text=ButtonMessages.SET_TIME.get(lang=lang),
+                    callback_data=cb.EDIT_MEETING_TIME.with_id(meeting_id),
                 ),
                 ButtonConfig(
                     text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)

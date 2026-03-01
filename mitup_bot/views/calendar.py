@@ -6,6 +6,7 @@ from typing import Literal, assert_never
 from mitup_bot.callback_data import CallbackData, DateCallbackData
 from mitup_bot.utils import ButtonMessages, Emojis, MonthList, Weekday
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import FormattedText
 
 from .mitup_view import ButtonConfig, ButtonRow, Keyboard
 
@@ -103,7 +104,7 @@ class CalendarKeyboard:
 
         date_back = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
-            text=str(ButtonMessages.GO_BACK.get()),
+            text=ButtonMessages.GO_BACK.get(),
             callback_data=self.navigation_callback_data.with_date(date_back),
         )
 
@@ -125,7 +126,7 @@ class CalendarKeyboard:
 
         date_forward = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
-            text=str(ButtonMessages.GO_FORWARD.get()),
+            text=ButtonMessages.GO_FORWARD.get(),
             callback_data=self.navigation_callback_data.with_date(date_forward),
         )
 
@@ -145,12 +146,12 @@ class CalendarKeyboard:
 
         # We can always go forward. We add the current label and the navigation forward buttons.
         current_label = (
-            self.current_date.year if by == "year" else MonthList[self.current_date.month - 1].get(lang=self.lang)
+            str(self.current_date.year) if by == "year" else MonthList[self.current_date.month - 1].get(lang=self.lang)
         )
         row.extend(
             (
                 ButtonConfig(
-                    text=str(current_label),
+                    text=current_label,
                     callback_data=cb.EMPTY,
                 ),
                 self.__navigation_forward_buttons(by),
@@ -159,4 +160,6 @@ class CalendarKeyboard:
         return row
 
     def __str__(self) -> str:
-        return "".join(" | ".join(button.text for button in row) + "\n" for row in self.keyboard)
+        return FormattedText.join(
+            "\n", [FormattedText.join(" | ", [button.text for button in row]) for row in self.keyboard]
+        ).text

@@ -147,12 +147,6 @@ def test_builder_called_with_token(_patch_runtime_deps: RuntimeDeps):
     _patch_runtime_deps.builder_instance.token.assert_called_once_with("fake-bot-token")
 
 
-def test_builder_sets_defaults(_patch_runtime_deps: RuntimeDeps):
-    MitupRuntime(Env.DEV)
-
-    _patch_runtime_deps.builder_instance.defaults.assert_called_once()
-
-
 def test_builder_sets_context_types(_patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 

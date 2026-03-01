@@ -11,9 +11,10 @@ from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, MessageButtons, Settings, User
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils import render
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.entities import DateTimeMessageEntity, FormattedText
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, sanitize
+from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
 from tests.helpers import UpdateRequest, create_meetup, create_user
@@ -34,28 +35,24 @@ EXAMPLE_MEETING = Meetup(
 COORDINATES = (123.1, -321.1)
 
 
-def expected_location_name(lang: str, expected_name: str | None, expected_coordinates: str | None):
-    return (
-        MeetingMessages.LOCATION_NOT_SET.get(lang=lang)
-        if expected_coordinates is None and expected_name is None
-        else f"{expected_name or ''} {expected_coordinates or ''}".strip()
-    )
+def expected_location_name(lang: str, expected_name: str | None, expected_coordinates: str | None) -> FormattedText:
+    if expected_name is None and expected_coordinates is None:
+        return MeetingMessages.LOCATION_NOT_SET.get(lang=lang)
+    return FormattedText(f"{expected_name or ''} {expected_coordinates or ''}".strip())
 
 
 def expected_participants_message(max_participants: bool, lang: str, n_participants: int) -> str:
-    participants = (
-        MeetingMessages.PARTICIPANT.get(lang=lang, plain=True)
+    participant_label = (
+        MeetingMessages.PARTICIPANT.get(lang=lang).text
         if n_participants == 1
-        else MeetingMessages.PARTICIPANTS.get(lang=lang, plain=True)
+        else MeetingMessages.PARTICIPANTS.get(lang=lang).text
     )
-    total_participants = f"{n_participants} {participants}"
-    max_participants_text = (
-        MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5, plain=True)
+    max_text = (
+        MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5).text
         if max_participants
-        else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang, plain=True)})"
+        else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})"
     )
-
-    return f"{total_participants} {max_participants_text}"
+    return f"{n_participants} {participant_label} {max_text}"
 
 
 def expected_message(
@@ -69,17 +66,9 @@ def expected_message(
     incognito: bool,
     invited_user: bool = False,
 ) -> str:
-    # Plain-text expected value — no MarkdownV2 escaping.
-    str_description = (
-        "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang, plain=True)
-    )
-    str_date = (
-        "1987-07-17 01:59 (Europe/Madrid)" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang, plain=True)
-    )
-    # owner in created_by is sanitized (full=True) by MeetingMessages.CREATED_BY.get(), so john_doe -> john\_doe there.
-    # But in the participant list, inline_name is used directly (no sanitization).
+    str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang)
+    str_date = "1987-07-17 01:59 (Europe/Madrid)" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
     owner_inline = "john_doe" if username else "John"
-    owner_sanitized = sanitize(owner_inline, full=True)  # used in CREATED_BY
     location = expected_location_name(
         lang=lang,
         expected_name="Test Location" if location_name else None,
@@ -89,19 +78,18 @@ def expected_message(
         max_participants, lang=lang, n_participants=2 if invited_user else 1
     )
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
-    # participant list uses inline_name directly (no sanitization)
     str_participants = f"{incognito_prefix}{str_participants}\n  {owner_inline}"
     if invited_user:
-        invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner_sanitized)
+        invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner_inline).text
         str_participants += f"\n  invited_user ({invited_by_text})"
 
-    return (
-        f"Test Meeting ({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner_sanitized)})\n\n"
-        f"--- {Emojis.DESCRIPTION} {str_description}\n"
-        f"--- {Emojis.CLOCK} {str_date}\n"
-        f"--- {Emojis.MAP} {location}\n"
-        f"--- {Emojis.JOINED} {str_participants}"
-    )
+    return render(
+        t"Test Meeting ({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner_inline)})\n\n"
+        t"--- {Emojis.DESCRIPTION} {str_description}\n"
+        t"--- {Emojis.CLOCK} {str_date}\n"
+        t"--- {Emojis.MAP} {location}\n"
+        t"--- {Emojis.JOINED} {str_participants}"
+    ).text
 
 
 def expected_inline_message(
@@ -115,37 +103,33 @@ def expected_inline_message(
     incognito: bool,
     invited_user: bool = False,
 ) -> str:
-    # Plain-text expected value — no MarkdownV2 escaping.
-    # owner in created_by is sanitized (full=True) by MeetingMessages.CREATED_BY.get(), so john_doe -> john\_doe there.
-    # But in the participant list, inline_name is used directly (no sanitization).
     owner_inline = "john_doe" if username else "John"
-    owner_sanitized = sanitize(owner_inline, full=True)  # used in CREATED_BY
+    created_by = MeetingMessages.CREATED_BY.get(lang=lang, owner=owner_inline).text
+
     str_participants = expected_participants_message(
         max_participants, lang=lang, n_participants=2 if invited_user else 1
     )
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
-    # participant list uses inline_name directly (no sanitization)
     participants_list = "" if incognito else f"\n  {owner_inline}"
     if invited_user and not incognito:
-        invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner_sanitized)
+        invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner_inline).text
         participants_list += f"\n  invited_user ({invited_by_text})"
     str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
 
-    str_location = expected_location_name(
-        lang=lang,
-        expected_name="Test Location" if location_name else None,
-        expected_coordinates=f"[{Emojis.PIN}]" if coordinates else None,
-    )
-    result = f"Test Meeting ({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner_sanitized)})\n"
+    lines = [f"Test Meeting ({created_by})"]
     if description:
-        result += f"\n--- {Emojis.DESCRIPTION} Test Description"
+        lines.append(f"--- {Emojis.DESCRIPTION} Test Description")
     if datetime:
-        result += f"\n--- {Emojis.CLOCK} 1987-07-17 01:59 (Europe/Madrid)"
-    if str_location != MeetingMessages.LOCATION_NOT_SET.get(lang=lang, plain=True):
-        result += f"\n--- {Emojis.MAP} {str_location}"
-
-    result += f"\n--- {Emojis.JOINED} {str_participants}"
-    return result
+        lines.append(f"--- {Emojis.CLOCK} 1987-07-17 01:59 (Europe/Madrid)")
+    if location_name or coordinates:
+        location_text = expected_location_name(
+            lang=lang,
+            expected_name="Test Location" if location_name else None,
+            expected_coordinates=f"[{Emojis.PIN}]" if coordinates else None,
+        ).text
+        lines.append(f"--- {Emojis.MAP} {location_text}")
+    lines.append(f"--- {Emojis.JOINED} {str_participants}")
+    return "\n".join(lines)
 
 
 @pytest.mark.parametrize("mock_meeting", [EXAMPLE_MEETING, None], ids=["meeting_exist", "meeting_does_not_exist"])
@@ -300,7 +284,7 @@ def test_meetup_message(
         assert len(dt_entities) == 1
         assert dt_entities[0].unix_time == int(datetime(1987, 7, 16, 23, 59, tzinfo=UTC).timestamp())
     else:
-        assert len(dt_entities) == 0
+        assert not dt_entities
 
 
 def test_time_properly_converted_for_timezone(settings: Settings):
@@ -320,13 +304,13 @@ def test_time_properly_converted_for_timezone(settings: Settings):
     # Europe/Madrid
     expected_time = "2024-01-12 13:30 (Europe/Madrid)"
 
-    assert expected_time == meeting.str_datetime
+    assert expected_time == meeting.str_datetime.text
 
     # Updatingt he timezone to Europe/Dublin in January the date should be the same but the time should be 12:30
     # since Dublin is in the same timezone as UTC
     settings.timezone = "Europe/Dublin"
     expected_time = "2024-01-12 12:30 (Europe/Dublin)"
-    assert expected_time == meeting.str_datetime
+    assert expected_time == meeting.str_datetime.text
 
 
 @pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
@@ -342,18 +326,18 @@ def test_timezone_not_included_when_show_timezone_disabled(show_timezone: bool, 
 
     expected_time = "2024-01-12 13:30 (Europe/Madrid)" if show_timezone else "2024-01-12 13:30"
 
-    assert expected_time == meeting.str_datetime
+    assert expected_time == meeting.str_datetime.text
 
 
 @pytest.mark.parametrize(
     "meeting_datetime, expected",
     [
-        (datetime(2024, 1, 12, 12, 30, tzinfo=UTC), "2024-01-12 12:30 (UTC)"),
+        (datetime(2024, 1, 12, 12, 30, tzinfo=UTC), FormattedText("2024-01-12 12:30 (UTC)")),
         (None, MeetingMessages.DATE_NOT_SET.get(lang="en")),
     ],
     ids=["with_datetime", "without_datetime"],
 )
-def test_meetup_full_datetime_string(meeting_datetime: datetime | None, expected: str):
+def test_meetup_full_datetime_string(meeting_datetime: datetime | None, expected: FormattedText):
     # Settings() defaults to timezone="UTC"; full_str_datetime always shows the timezone.
     meeting = create_meetup(
         id=1,
@@ -366,14 +350,14 @@ def test_meetup_full_datetime_string(meeting_datetime: datetime | None, expected
 @pytest.mark.parametrize(
     "participants,max_participants,expected",
     [
-        (1, None, lambda lang: f"1 ({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)})"),
-        (0, None, lambda lang: f"{MeetingMessages.EMPTY.get(lang=lang)}"),
+        (1, None, lambda lang: f"1 ({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})"),
+        (0, None, lambda lang: MeetingMessages.EMPTY.get(lang=lang).text),
         (
             0,
             2,
             lambda lang: (
-                f"{MeetingMessages.EMPTY.get(lang=lang)} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2)}"
+                f"{MeetingMessages.EMPTY.get(lang=lang).text} "
+                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2).text}"
             ),
         ),
         (1, 2, lambda lang: "(1/2)"),
@@ -406,7 +390,7 @@ def test_participants_badge(
         user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=user, meetup=meeting)
 
-    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == meeting.participants_badge
+    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == render(meeting.participants_badge).text
 
 
 @pytest.mark.parametrize(
@@ -438,7 +422,7 @@ def test_short_description(description: str | None, expected_description: str | 
 
 
 def build_inline_message(lang: str, meeting_datetime: datetime | None) -> str:
-    result = [f"{Emojis.JOINED} {MeetingMessages.EMPTY.get(lang=lang, plain=True)}"]
+    result = [f"{Emojis.JOINED} {MeetingMessages.EMPTY.get(lang=lang).text}"]
     if meeting_datetime:
         result.append(f"{Emojis.CLOCK} 2024-01-12 13:30 (Europe/Madrid)")
     return "\n".join(result)
@@ -464,10 +448,11 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
     )
 
     expected = build_inline_message(user_with_settings.lang, meeting_datetime)
+    inline_query_text = meeting.inline_query_message.text
 
-    assert expected == meeting.inline_query_message
-    assert "A description that should not appear in the inline preview" not in meeting.inline_query_message
-    assert "A location that should not appear" not in meeting.inline_query_message
+    assert expected == inline_query_text
+    assert "A description that should not appear in the inline preview" not in inline_query_text
+    assert "A location that should not appear" not in inline_query_text
 
 
 @pytest.mark.parametrize(
@@ -477,24 +462,24 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
             0,
             None,
             lambda lang: (
-                f"{MeetingMessages.EMPTY.get(lang=lang, plain=True)}"
-                f" ({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang, plain=True)})"
+                f"{MeetingMessages.EMPTY.get(lang=lang).text} "
+                f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})"
             ),
         ),
         (
             1,
             None,
             lambda lang: (
-                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang, plain=True)} "
-                f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang, plain=True)})|\n  Joined_0"
+                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang).text} "
+                f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})|\n  Joined_0"
             ),
         ),
         (
             2,
             2,
             lambda lang: (
-                f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang, plain=True)} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2, plain=True)}"
+                f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang).text} "
+                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2).text}"
                 f"|\n  Joined_0\n  Joined_1"
             ),
         ),
@@ -502,8 +487,8 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
             1,
             2,
             lambda lang: (
-                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang, plain=True)} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2, plain=True)}|\n  Joined_0"
+                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang).text} "
+                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2).text}|\n  Joined_0"
             ),
         ),
     ],
@@ -549,7 +534,7 @@ def test_participants_text(
         else expected(user_with_settings.lang).replace("|", "")
     )
     participants_text = meeting.participants_text_with_list if with_list else meeting.participants_text
-    assert f"{expected_incognito}{expected_text}" == participants_text
+    assert f"{expected_incognito}{expected_text}" == render(participants_text).text
 
 
 @pytest.mark.parametrize(
@@ -1182,11 +1167,11 @@ def test_participants_list_text_includes_waiting_list_section():
         f"\n  Bob"
         f"\n  Alice"
         f"\n  Charlie"
-        f"\n--- {Emojis.WAITING} {ButtonMessages.WAITING_LIST.get(lang=meeting.lang, plain=True)} \n  "
+        f"\n--- {Emojis.WAITING} {ButtonMessages.WAITING_LIST.get(lang=meeting.lang).text} \n  "
         f"Dave"
     )
 
-    assert expected == meeting.participants_list_text
+    assert expected == meeting.participants_list_text.text
 
 
 def test_participants_list_text_without_waiting_list():
@@ -1201,7 +1186,22 @@ def test_participants_list_text_without_waiting_list():
 
     expected = "\n  Bob\n  Alice"
 
-    assert expected == meeting.participants_list_text
+    assert expected == meeting.participants_list_text.text
+
+
+def test_participants_list_text_preserves_entities_from_participant_name():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    invited = create_user(id=2, first_name="Bob")
+    inviter = create_user(id=3, first_name="Alice")
+    meeting.create_joined_link(invited, is_waiting_list=False, invited_by=inviter)
+
+    result = meeting.participants_list_text
+    # The text must include the participant name and the invited-by annotation.
+    assert "Bob" in result.text
+    assert "Alice" in result.text
+    # Entities from the invited-by FormattedText must survive into the list.
+    assert result.entities, "expected formatting entities from the invited-by text to be present"
 
 
 def test_external_view():

@@ -1,8 +1,7 @@
-from typing import cast
 from unittest import mock
 
 import pytest
-from telegram import Location, Message, Update
+from telegram import Location, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.handlers.registration_process.edit_registration_timezone import (
@@ -65,7 +64,7 @@ async def test_registration_timezone_text_message_handler_sets_timezone_and_ends
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     assert update.effective_message is not None
-    get_timezone_from_api.return_value = cast(Message, update.effective_message).text
+    get_timezone_from_api.return_value = update.effective_message.text
 
     result = await registration_timezone_text_message_handler(update, context)
 

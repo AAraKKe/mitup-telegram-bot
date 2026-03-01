@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-03-01 18:51\n"
+"PO-Revision-Date: 2026-03-01 23:32\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -183,13 +183,13 @@ msgid "Messages.DEFAULT_SETTINGS_DESCRIPTION"
 msgstr "Configure MitUp."
 
 msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
-msgstr "Your timezone is set to *${timezone}*. \nSend me the name of your city or your location to set your timezone or touch in *Cancel* to go back."
+msgstr "Your timezone is set to <b>${timezone}</b>. \nSend me the name of your city or your location to set your timezone or touch in <b>Cancel</b> to go back."
 
 msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
-msgstr "Your timezone has been set to: *${timezone}* "
+msgstr "Your timezone has been set to: <b>${timezone}</b> "
 
 msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
-msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n*Important*: we do not store your location and this information is only used to configure your timezone."
+msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
 msgstr "Perfect! Your timezone is ${timezone}"
@@ -204,31 +204,31 @@ msgid "SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT"
 msgstr "Please send your city name as text or share your location."
 
 msgid "SettingsMessages.SELECT_LANGUAGE"
-msgstr "Current language: *${language}*.\n\nSelect a language."
+msgstr "Current language: <b>${language}</b>.\n\nSelect a language."
 
 msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
 msgstr "The language has been set successfully."
 
 msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
-msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the <i>Timezone</i> button shown when the meeting is shared."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
-msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your *Past meetings menu*.\n\nThe curent timeout is *${timeout} minutes*\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back."
+msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your <b>Past meetings menu</b>.\n\nThe curent timeout is <b>${timeout} minutes</b>\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back."
 
 msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
 msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
 
 msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
-msgstr "The timeout has been set to: *${timeout} minutes*"
+msgstr "The timeout has been set to: <b>${timeout} minutes</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
-msgstr "Configure MeetUp notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, MeetUp will notify you *${notifications_time} minutes* before a meeting starts."
+msgstr "Configure MeetUp notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, MeetUp will notify you <b>${notifications_time} minutes</b> before a meeting starts."
 
 msgid "SettingsMessages.NOTIFICATION_SET_TIME"
 msgstr "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
 
 msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
-msgstr "The notification time has been set to *${notifications_time} minutes*."
+msgstr "The notification time has been set to <b>${notifications_time} minutes</b>."
 
 msgid "SettingsMessages.ENABLED"
 msgstr "Enabled ✅"
@@ -240,10 +240,10 @@ msgid "MeetingMessages.CREATE"
 msgstr "Lets create a meeting. What is the title?"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
-msgstr "A meeting has been created with the title: *${title}*\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
+msgstr "A meeting has been created with the title: <b>${title}</b>\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
 
 msgid "MeetingMessages.INVALID_TITLE"
-msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on *Cancel*."
+msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on <b>Cancel</b>."
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Created by: ${owner}"
@@ -270,13 +270,13 @@ msgid "MeetingMessages.MAX_PARTICIPANTS"
 msgstr "(Max: ${max_participants})"
 
 msgid "MeetingMessages.INVITED_BY_USER"
-msgstr "_(invited by ${user})_"
+msgstr "<i>invited by ${user}</i>"
 
 msgid "MeetingMessages.MEETING_WITHOUT_DESCRIPTION"
-msgstr "_This meeting has no description yet_"
+msgstr "<i>This meeting has no description yet</i>"
 
 msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
-msgstr "_This meeting has no participants yet_"
+msgstr "<i>This meeting has no participants yet</i>"
 
 msgid "MeetingMessages.JOINED_MEETING_SUCCESS"
 msgstr "You joined the meeting!"
@@ -309,7 +309,7 @@ msgid "MeetingMessages.LEFT_MEETING_UNREGISTERED"
 msgstr "You have left the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to receive notifications and create new meetings!"
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
-msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+msgstr "There is an open spot in the meeting <b>${meeting_title}</b>. You have now been promoted from the waiting list!"
 
 msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
 msgstr "You were in the middle of creating a meeting. Send the title of the meeting to continue. If you would not like to continue, tap Cancel to exit."
@@ -339,10 +339,10 @@ msgid "MeetingMessages.INVITE_USER_ON_EXIT"
 msgstr "Sorry, I was expecting the name of the person you want to invite. Would you like to send it? If not, tap Cancel to exit."
 
 msgid "MeetingMessages.INVITE_USER_PROMPT"
-msgstr "*Add to Guest List*\n\nPlease reply with the name of the person you want to add."
+msgstr "<b>Add to Guest List</b>\n\nPlease reply with the name of the person you want to add."
 
 msgid "MeetingMessages.INVITE_USER_CONFIRMATION"
-msgstr "*Confirm Addition*\n\nAre you sure you want to add *${name}* to the meeting *${meeting_title}*?"
+msgstr "<b>Confirm Addition</b>\n\nAre you sure you want to add <b>${name}</b> to the meeting <b>${meeting_title}</b>?"
 
 msgid "MeetingMessages.INVITE_USER_OPEN_CHAT"
 msgstr "Start Private Chat\n\nTo add participants, you need to open a chat with me first."
@@ -351,19 +351,19 @@ msgid "MeetingMessages.INVITE_USER_GO_PRIVATE"
 msgstr "Continue in Private\n\nPlease switch to our private chat to send me the name."
 
 msgid "MeetingMessages.INVITE_USER_SUCCESS"
-msgstr "*List Updated*\n\nUser *${name}* has been added to the meeting *${meeting_title}*."
+msgstr "<b>List Updated</b>\n\nUser <b>${name}</b> has been added to the meeting <b>${meeting_title}</b>."
 
 msgid "MeetingMessages.INVITE_USER_MEETING_FULL"
-msgstr "*No Spots Left*\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
+msgstr "<b>No Spots Left</b>\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
 
 msgid "MeetingMessages.INVITE_USER_INVITES_DISABLED"
-msgstr "*Guest List Closed*\n\nNew additions are no longer allowed for this meeting. The organizer has closed the list."
+msgstr "<b>Guest List Closed</b>\n\nNew additions are no longer allowed for this meeting. The organizer has closed the list."
 
 msgid "MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND"
-msgstr "*That Was Unexpected...*\n\nI suddenly lost track of the meeting details. This shouldn't happen.\n\nPlease try sending the name again."
+msgstr "<b>That Was Unexpected...</b>\n\nI suddenly lost track of the meeting details. This shouldn't happen.\n\nPlease try sending the name again."
 
 msgid "MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK"
-msgstr "*Meeting Not Found*\n\nThe meeting you are trying to invite someone to does not exist anymore."
+msgstr "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
 
 msgid "MeetingMessages.INVITE_USERS_CANCELED"
 msgstr "The invitation process has been canceled."
@@ -372,16 +372,16 @@ msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
 msgstr "Something unexpected happened while adding the invited user. Please try again."
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
-msgstr "This is the current title of your meeting:\n*${title}*\n\n Send me the new one"
+msgstr "This is the current title of your meeting:\n<b>${title}</b>\n\n Send me the new one"
 
 msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
 msgstr "This is the current description of your meeting:\n${description}\n\n Send me the new one"
 
 msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "The title has been properly set to: *${title}*"
+msgstr "The title has been properly set to: <b>${title}</b>"
 
 msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "The description has been properly set to: *${description}*"
+msgstr "The description has been properly set to: <b>${description}</b>"
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION"
 msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
@@ -390,10 +390,10 @@ msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME"
 msgstr "Send me the name of the place."
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
-msgstr "_Only from the phone 📱_\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
+msgstr "<i>Only from the phone 📱</i>\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
 
 msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "The name of the location has been set to: *${name}*"
+msgstr "The name of the location has been set to: <b>${name}</b>"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
 msgstr "The location has been saved successfuly"
@@ -405,10 +405,10 @@ msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
 msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
 
 msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
-msgstr "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) or press in _No limit_ to allow an unlimited number of participants."
+msgstr "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) or press in <i>No limit</i> to allow an unlimited number of participants."
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
-msgstr "The maximum number of participants has been set to: *${max_participants}*"
+msgstr "The maximum number of participants has been set to: <b>${max_participants}</b>"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
 msgstr "No limit"
@@ -420,19 +420,19 @@ msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
 msgstr "These are the users that joined the meeting. Choose who you want to kick out."
 
 msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
-msgstr "Are you sure you want to kick out *${participant}* from the meeting *${meeting_title}*?"
+msgstr "Are you sure you want to kick out <b>${participant}</b> from the meeting <b>${meeting_title}</b>?"
 
 msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
 msgstr "The participant you tried to kick out is no longer in the meeting."
 
 msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
-msgstr "The participant *${participant}* has been kicked out successfully."
+msgstr "The participant <b>${participant}</b> has been kicked out successfully."
 
 msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
-msgstr "The participant *${participant}* has been kicked out successfully. There are no more participants to kick out."
+msgstr "The participant <b>${participant}</b> has been kicked out successfully. There are no more participants to kick out."
 
 msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
-msgstr "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\nCurrent language: *${language}*."
+msgstr "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\nCurrent language: <b>${language}</b>."
 
 msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
 msgstr "The language has been set successfully."
@@ -456,25 +456,25 @@ msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "This meeting has been deleted"
 
 msgid "MeetingMessages.EDIT_DATE"
-msgstr "Select the new date. Press *🗑️ Delete date* if you want to unset the date and time of the meeting."
+msgstr "Select the new date. Press <b>🗑️ Delete date</b> if you want to unset the date and time of the meeting."
 
 msgid "MeetingMessages.ADD_DATE"
 msgstr "Select the date."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to: *${datetime}*. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
+msgstr "The date has been set to: <b>${datetime}</b>. To set the time press <i>${set_time_button}</i>, othwerise press <i>${back_edit_button}</i> to go back to editing the meeting."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "The date has been set to: *${datetime}*"
+msgstr "The date has been set to: <b>${datetime}</b>"
 
 msgid "MeetingMessages.EDIT_TIME"
-msgstr "Send me the time of the meeting in the format _HH:MM_"
+msgstr "Send me the time of the meeting in the format <i>HH:MM</i>"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "The time of the meeting has been set to *${datetime}*"
+msgstr "The time of the meeting has been set to <b>${datetime}</b>"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
-msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"
+msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"
 
 msgid "MeetingMessages.INVALID_TIME"
 msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours (00-23) and minutes (00-59), I am sure I can work with that 🧠."
@@ -495,7 +495,7 @@ msgid "MeetingMessages.MEETING_HAS_FINISHED"
 msgstr "✅ This meeting has finished ✅"
 
 msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
-msgstr "You can configure different aspects of your meeting:\n\n*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+msgstr "You can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the <i>Timezone</i> button shown when the meeting is shared."
 
 msgid "MeetingMessages.NOT_SEARCHABLE_FOOTNOTE"
 msgstr "🔍 Make this meeting searchable in this chat."
@@ -510,7 +510,7 @@ msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
 msgstr "✅ Already Searchable!\n\nThis meeting was already attached to this chat from a previous share. It is already included in your search results."
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
-msgstr "You don't have any meetings yet.\n\nClick on *${new_meeting_button}* in the main menu to create one."
+msgstr "You don't have any meetings yet.\n\nClick on <b>${new_meeting_button}</b> in the main menu to create one."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "These are all your active meetings."
@@ -519,13 +519,13 @@ msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
 msgstr "These are the meetings you have joined."
 
 msgid "MeetingMessages.NO_JOINED_MEETINGS"
-msgstr "_You have not joined any meeting yet._"
+msgstr "<i>You have not joined any meeting yet.</i>"
 
 msgid "MeetingMessages.PAST_MEETINGS_PAGE"
 msgstr "These are all your past meetings."
 
 msgid "MeetingMessages.NO_PAST_MEETINGS"
-msgstr "_You have no past meetings yet._"
+msgstr "<i>You have no past meetings yet.</i>"
 
 msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
 msgstr "➕ Create a new meeting"
@@ -552,16 +552,16 @@ msgid "InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION"
 msgstr "No meetings have been shared in this chat yet"
 
 msgid "InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE"
-msgstr "_No meetings have been shared in this chat yet._"
+msgstr "<i>No meetings have been shared in this chat yet.</i>"
 
 msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
-msgstr "The meeting *${meeting_title}* will be permanently deleted in *${days_until_deletion} days*.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the *${reactivate_meeting_button}* button below.\n\nRemember that you can always reactivate any past meeting from the *${past_meetings_button}* button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."
+msgstr "The meeting <b>${meeting_title}</b> will be permanently deleted in <b>${days_until_deletion} days</b>.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the <b>${reactivate_meeting_button}</b> button below.\n\nRemember that you can always reactivate any past meeting from the <b>${past_meetings_button}</b> button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."
 
 msgid "NotificationMessages.MEETING_PERMANENTLY_DELETED"
-msgstr "The meeting *${meeting_title}* has been permanently deleted."
+msgstr "The meeting <b>${meeting_title}</b> has been permanently deleted."
 
 msgid "NotificationMessages.MEETING_STARTING"
-msgstr "The meeting *${meeting_title}* is starting soon!"
+msgstr "The meeting <b>${meeting_title}</b> is starting soon!"
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

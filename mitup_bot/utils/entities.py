@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import StrEnum
 from string.templatelib import Interpolation, Template
 
 from telegram import MessageEntity
@@ -33,15 +33,37 @@ class FormattedText:
         """Return the entity list (empty when there are none)."""
         return self._entities
 
-    def prepend(self, prefix: str) -> FormattedText:
+    def prepend(self, prefix: str | FormattedText) -> FormattedText:
         """Return a new ``FormattedText`` with *prefix* prepended, shifting entity offsets."""
-        offset = utf16_len(prefix)
+        prefix_text = prefix if isinstance(prefix, str) else prefix.text
+        prefix_entities = [] if isinstance(prefix, str) else prefix.entities
+        offset = utf16_len(prefix_text)
         shifted = [_shift_entity(e, offset) for e in self._entities]
-        return FormattedText(prefix + self._text, shifted)
+        return FormattedText(prefix_text + self._text, list(prefix_entities) + shifted)
 
-    def append(self, suffix: str) -> FormattedText:
-        """Return a new ``FormattedText`` with *suffix* appended (entities are unaffected)."""
-        return FormattedText(self._text + suffix, self._entities)
+    def append(self, suffix: str | FormattedText) -> FormattedText:
+        """Return a new ``FormattedText`` with *suffix* appended, merging entities."""
+        suffix_text = suffix if isinstance(suffix, str) else suffix.text
+        suffix_entities = [] if isinstance(suffix, str) else suffix.entities
+        offset = utf16_len(self._text)
+        shifted_suffix = [_shift_entity(e, offset) for e in suffix_entities]
+        return FormattedText(self._text + suffix_text, self._entities + shifted_suffix)
+
+    @classmethod
+    def join(cls, separator: str, parts: Iterable[str | FormattedText]) -> FormattedText:
+        """Join *parts* with *separator*, preserving entities from each part.
+
+        Analogous to ``str.join`` but entity offsets are recalculated as parts
+        are concatenated so the final object is always consistent.
+        """
+        result: FormattedText | None = None
+        for part in parts:
+            ft = part if isinstance(part, FormattedText) else FormattedText(part)
+            result = ft if result is None else result.append(separator).append(ft)
+        return result if result is not None else FormattedText("")
+
+    def __str__(self) -> str:
+        return self._text
 
     def __repr__(self) -> str:
         return f"FormattedText({self._text!r}, entities={self._entities!r})"
@@ -213,233 +235,86 @@ def render(template: Template) -> FormattedText:
             case EntityDateTime():
                 entities.extend(_render_entity_datetime(plain, value))
                 plain += value.text
+            case FormattedText():
+                prefix_len = utf16_len(plain)
+                entities.extend(_shift_entity(e, prefix_len) for e in value.entities)
+                plain += value.text
+            case Template():
+                nested = render(value)
+                prefix_len = utf16_len(plain)
+                entities.extend(_shift_entity(e, prefix_len) for e in nested.entities)
+                plain += nested.text
             case _:
                 plain += str(value)
 
     return FormattedText(plain, entities)
 
 
-# --- parse_md_markers() ---
+# --- parse_format_tags() ---
 
-_MD_ESCAPE_RE = re.compile(r"\\(.)")
-_VAR_RE = re.compile(r"\$\{(\w+)\}")
-_BOLD_RE = re.compile(r"\*([^*]+)\*")
-_ITALIC_RE = re.compile(r"_([^_]+)_")
-# Non-greedy to allow ${var} placeholders with underscores inside _*…*_ spans.
-_BOLD_ITALIC_RE = re.compile(r"_\*(.+?)\*_")
+_TOKEN_RE = re.compile(r"<(/?[a-z]+)>|\$\{(\w+)\}")
 
-
-class EntityType(StrEnum):
-    BOLD = "bold"
-    ITALIC = "italic"
-
-
-@dataclass
-class _MarkerSpan:
-    outer_start: int
-    outer_end: int
-    inner_start: int
-    inner_end: int
-    types: list[EntityType]
+STYLE_MAP: dict[str, str] = {
+    "b": "bold",
+    "i": "italic",
+    "u": "underline",
+    "s": "strikethrough",
+    "code": "code",
+    "pre": "pre",
+    "spoiler": "spoiler",
+}
 
 
-@dataclass
-class _VarSpan:
-    start: int
-    end: int
-    name: str
-    replacement: str
+def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) -> FormattedText:
+    """Parse a tag-annotated translated string into a ``FormattedText``.
 
+    Supported formatting tags: ``<b>``, ``<i>``, ``<u>``, ``<s>``, ``<code>``,
+    ``<pre>``, ``<spoiler>``. Variable placeholders use ``${varname}`` syntax.
 
-@dataclass
-class _EscapeSpan:
-    start: int
-    end: int
-    char: str
+    Substitution values may be plain ``str`` or ``FormattedText``.  When a
+    ``FormattedText`` value is substituted its entities are preserved with
+    offsets adjusted to their final position.  Plain-string values are never
+    scanned for tags, so user-supplied content cannot introduce spurious entities.
 
-
-def _collect_marker_spans(text: str, escaped_positions: set[int]) -> list[_MarkerSpan]:
+    Tags may be arbitrarily nested; each style tracks its own start offset
+    independently.  Unclosed tags are silently dropped.  To add a new entity
+    type, insert an entry into ``STYLE_MAP``.
     """
-    Scan *text* for *…*, _…_, and _*…*_ marker spans.
-
-    *escaped_positions* is the set of character indices whose preceding backslash
-    has already been identified by ``_MD_ESCAPE_RE``. Any marker match whose opening
-    or closing delimiter lands on one of these positions is skipped — the character
-    is a literal, not a formatting marker.
-
-    We only use bold, italic and bold-italic spans. If something else needs to be supported,
-    it needs to be implemented as well.
-    """
-    spans: list[_MarkerSpan] = []
-    visited: set[int] = set()
-
-    # _*…*_ must be found first to avoid double-counting the inner * and _ markers.
-    for m in _BOLD_ITALIC_RE.finditer(text):
-        if m.start() in escaped_positions or m.end() - 1 in escaped_positions:
-            continue
-        spans.append(
-            _MarkerSpan(
-                outer_start=m.start(),
-                outer_end=m.end(),
-                inner_start=m.start(1),
-                inner_end=m.end(1),
-                types=[EntityType.BOLD, EntityType.ITALIC],
-            )
-        )
-        visited.add(m.start())
-
-    for m in _BOLD_RE.finditer(text):
-        if m.start() in escaped_positions or m.end() - 1 in escaped_positions:
-            continue
-        if m.start() not in visited and m.start() - 1 not in visited:
-            spans.append(
-                _MarkerSpan(
-                    outer_start=m.start(),
-                    outer_end=m.end(),
-                    inner_start=m.start(1),
-                    inner_end=m.end(1),
-                    types=[EntityType.BOLD],
-                )
-            )
-            visited.add(m.start())
-
-    for m in _ITALIC_RE.finditer(text):
-        if m.start() in escaped_positions or m.end() - 1 in escaped_positions:
-            continue
-        if m.start() not in visited:
-            spans.append(
-                _MarkerSpan(
-                    outer_start=m.start(),
-                    outer_end=m.end(),
-                    inner_start=m.start(1),
-                    inner_end=m.end(1),
-                    types=[EntityType.ITALIC],
-                )
-            )
-            visited.add(m.start())
-
-    spans.sort(key=lambda s: s.outer_start)
-    return spans
-
-
-def _collect_var_spans(text: str, substitutions: dict[str, str]) -> list[_VarSpan]:
-    """Find every ``${varname}`` placeholder and resolve it against *substitutions*.
-
-    Unknown variables are left as-is (``${name}``), so the output length is always
-    predictable for offset calculations even when a key is missing.
-    """
-    return [
-        _VarSpan(
-            start=m.start(),
-            end=m.end(),
-            name=m.group(1),
-            replacement=substitutions.get(m.group(1), f"${{{m.group(1)}}}"),
-        )
-        for m in _VAR_RE.finditer(text)
-    ]
-
-
-def _build_skip_positions(
-    raw_spans: list[_MarkerSpan],
-    escape_spans: list[_EscapeSpan],
-) -> set[int]:
-    """Collect template character indices that must be silently dropped from the output.
-
-    Marker delimiters (``*``, ``_``) and backslashes from MarkdownV2 escape sequences
-    are structural — they convey formatting intent but must not appear in the plain text
-    sent to Telegram alongside the entity list.
-    """
-    skip: set[int] = set()
-    for span in raw_spans:
-        # _*…*_ — drop both the outer _ and inner * on each side.
-        skip.add(span.outer_start)
-        if len(span.types) == 2:
-            skip.add(span.outer_start + 1)
-            skip.add(span.outer_end - 2)
-        skip.add(span.outer_end - 1)
-    for es in escape_spans:
-        skip.add(es.start)
-    return skip
-
-
-def _build_template_to_utf16(
-    text: str,
-    skip_positions: set[int],
-    var_spans: list[_VarSpan],
-) -> tuple[str, dict[int, int]]:
-    """Single-pass walk: produce the plain output and map each template index to a UTF-16 offset."""
-    var_start_map: dict[int, _VarSpan] = {vs.start: vs for vs in var_spans}
-    mapping: dict[int, int] = {}
-    output = ""
-    i = 0
-    n = len(text)
-
-    while i < n:
-        mapping[i] = utf16_len(output)
-
-        if i in var_start_map:
-            vs = var_start_map[i]
-            output += vs.replacement
-            i = vs.end
-            continue
-
-        if i in skip_positions:
-            i += 1
-            continue
-
-        output += text[i]
-        i += 1
-
-    mapping[n] = utf16_len(output)
-    return output, mapping
-
-
-def _spans_to_entities(
-    raw_spans: list[_MarkerSpan],
-    template_to_utf16: dict[int, int],
-) -> list[MessageEntity]:
-    """Convert collected marker spans to ``MessageEntity`` objects using the UTF-16 offset map.
-
-    Each span's inner bounds are looked up in *template_to_utf16* to get the correct
-    offset and length in the final plain text. Bold-italic spans produce two entities
-    at the same position.
-    """
+    plain = ""
+    utf16_offset = 0
     entities: list[MessageEntity] = []
-    for span in raw_spans:
-        offset_utf16 = _nearest_utf16(template_to_utf16, span.inner_start)
-        end_utf16 = _nearest_utf16(template_to_utf16, span.inner_end)
-        length_utf16 = end_utf16 - offset_utf16
-        if length_utf16 <= 0:
-            continue
-        entities.extend(
-            MessageEntity(type=entity_type, offset=offset_utf16, length=length_utf16) for entity_type in span.types
-        )
+    active: dict[str, int] = {}  # style → UTF-16 offset where the opening tag appeared
+    cursor = 0
+
+    def flush(s: str) -> None:
+        nonlocal plain, utf16_offset
+        plain += s
+        utf16_offset += utf16_len(s)
+
+    for m in _TOKEN_RE.finditer(text):
+        flush(text[cursor : m.start()])
+        cursor = m.end()
+
+        tag, var = m.group(1), m.group(2)
+
+        if var is not None:
+            value = substitutions.get(var, m.group(0))
+            if isinstance(value, FormattedText):
+                for e in value.entities:
+                    entities.append(_shift_entity(e, utf16_offset))
+                flush(value.text)
+            else:
+                flush(value)
+        elif tag.startswith("/"):
+            style = tag[1:]
+            if style in active:
+                start = active.pop(style)
+                length = utf16_offset - start
+                if length > 0 and (etype := STYLE_MAP.get(style)):
+                    entities.append(MessageEntity(type=etype, offset=start, length=length))
+        else:
+            active[tag] = utf16_offset
+
+    flush(text[cursor:])
     entities.sort(key=lambda e: (e.offset, e.type))
-    return entities
-
-
-def parse_md_markers(
-    text: str,
-    substitutions: dict[str, str],
-) -> FormattedText:
-    """Parse a MarkdownV2-annotated translated string into a ``FormattedText``.
-
-    *text* is a plain ``str`` from the gettext catalogue — not a t-string. Markers are
-    scanned before variable substitution so that user-supplied values never produce spurious
-    entities, with offsets adjusted for each substitution's length afterward.
-    """
-    escape_spans = [_EscapeSpan(start=m.start(), end=m.end(), char=m.group(1)) for m in _MD_ESCAPE_RE.finditer(text)]
-    escaped_positions = {es.start + 1 for es in escape_spans}
-    raw_spans = _collect_marker_spans(text, escaped_positions)
-    var_spans = _collect_var_spans(text, substitutions)
-    skip_positions = _build_skip_positions(raw_spans, escape_spans)
-    output, template_to_utf16 = _build_template_to_utf16(text, skip_positions, var_spans)
-    entities = _spans_to_entities(raw_spans, template_to_utf16)
-    return FormattedText(output, entities)
-
-
-def _nearest_utf16(mapping: dict[int, int], pos: int) -> int:
-    """Fall back to the nearest recorded position when *pos* was consumed mid-sequence."""
-    if pos in mapping:
-        return mapping[pos]
-    return next((mapping[p] for p in range(pos - 1, -1, -1) if p in mapping), 0)
+    return FormattedText(plain, entities)

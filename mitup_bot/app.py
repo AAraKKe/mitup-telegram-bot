@@ -6,8 +6,7 @@ import telegram
 import telegram.ext
 from rich.console import Console
 from rich.logging import RichHandler
-from telegram import constants
-from telegram.ext import AIORateLimiter, Application, ContextTypes, Defaults
+from telegram.ext import AIORateLimiter, Application, ContextTypes
 
 from mitup_bot import db, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
@@ -75,9 +74,6 @@ class MitupRuntime:
     def __build_application(self) -> Application:
         builder = Application.builder()
         builder.token(self.config.bot.token.get_secret_value())
-
-        # Set markdown as default
-        builder.defaults(Defaults(parse_mode=constants.ParseMode.MARKDOWN_V2))
 
         # Set custom context type
         builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))

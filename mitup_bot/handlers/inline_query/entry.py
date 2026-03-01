@@ -29,7 +29,7 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
 
     button_text = InlineViewMessages.CREATE_NEW_MEETING_BUTTON if user else InlineViewMessages.EXPLORE_MITUP_BUTTON
     button = InlineResultsButton(
-        text=button_text.get(lang=lang, plain=True),
+        text=button_text.get_text(lang=lang),
         start_parameter="inline",
     )
 
@@ -39,14 +39,14 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang, plain=True),
+                        text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang),
                         callback_data=cb.LOAD_CHAT_MEETINGS,
                     )
                 ],
             ],
             id="meetings_in_this_chat",
-            title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang, plain=True),
-            inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang, plain=True),
+            title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang),
+            inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang),
         ),
     ]
 

@@ -46,7 +46,11 @@ def test_full_calendar_markup(lang: str):
         (
             dt.date(2024, 7, 22),
             lambda lang: [
-                [ButtonMessages.GO_BACK.get(), Month.JULY.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
+                [
+                    ButtonMessages.GO_BACK.get(),
+                    Month.JULY.get(lang=lang),
+                    ButtonMessages.GO_FORWARD.get(),
+                ],
                 ["2024", ButtonMessages.GO_FORWARD.get()],
             ],
         ),

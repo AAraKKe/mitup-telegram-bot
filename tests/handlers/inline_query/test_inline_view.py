@@ -23,27 +23,27 @@ def _chat_card(lang: str) -> MitupInlineView:
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang, plain=True),
+                    text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang),
                     callback_data=cb.LOAD_CHAT_MEETINGS,
                 )
             ],
         ],
         id="meetings_in_this_chat",
-        title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang, plain=True),
-        inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang, plain=True),
+        title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang),
+        inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang),
     )
 
 
 def _inline_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
-        text=InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get(lang=lang, plain=True),
+        text=InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get_text(lang=lang),
         start_parameter="inline",
     )
 
 
 def _explore_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
-        text=InlineViewMessages.EXPLORE_MITUP_BUTTON.get(lang=lang, plain=True),
+        text=InlineViewMessages.EXPLORE_MITUP_BUTTON.get_text(lang=lang),
         start_parameter="inline",
     )
 
@@ -77,7 +77,7 @@ async def test_inline_view_returns_results_and_button(
     assert len(keyboard) == 1
     load_button = keyboard[0][0]
     assert load_button.callback_data == cb.LOAD_CHAT_MEETINGS
-    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=user_with_settings.lang, plain=True)
+    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=user_with_settings.lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)
@@ -95,10 +95,10 @@ async def test_inline_view_uses_user_language(
 
     _, kwargs = context.api.call_args("answer_inline_query")
     button = kwargs["button"]
-    assert button.text == InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get(lang=lang, plain=True)
+    assert button.text == InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get_text(lang=lang)
 
     results = kwargs["results"]
-    assert results[0].title == InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang, plain=True)
+    assert results[0].title == InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get_text(lang=lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)

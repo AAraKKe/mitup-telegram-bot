@@ -50,8 +50,8 @@ async def search_chat_meetings(session: Session, update: Update, context: TMitup
                 description=InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE.get(lang=lang),
                 keyboard=[],
                 id="no_meetings_found",
-                title=InlineViewMessages.NO_MEETINGS_FOUND_TITLE.get(lang=lang, plain=True),
-                inline_description=InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION.get(lang=lang, plain=True),
+                title=InlineViewMessages.NO_MEETINGS_FOUND_TITLE.get(lang=lang),
+                inline_description=InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION.get(lang=lang),
             ),
         ]
 

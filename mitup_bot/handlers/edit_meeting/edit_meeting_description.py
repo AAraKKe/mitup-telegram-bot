@@ -51,14 +51,13 @@ async def callback_query_edit_meeting_description(session: Session, update: Upda
         cb.EDIT_MEETING_CANCEL.with_id(callback_data.id),
     )
 
+    description = (
+        meeting.description if meeting.description else MeetingMessages.MEETING_WITHOUT_DESCRIPTION.get(lang=user.lang)
+    )
     await context.api.edit_message(
         update=update,
         view=MitupView(
-            MeetingMessages.EDIT_MEETING_DESCRIPTION.get(lang=user.lang, description=meeting.description)
-            if meeting.description
-            else MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
-                lang=user.lang, full=False, description=MeetingMessages.MEETING_WITHOUT_DESCRIPTION.get(lang=user.lang)
-            ),
+            MeetingMessages.EDIT_MEETING_DESCRIPTION.get(lang=user.lang, description=description),
             keyboard=[
                 [
                     ButtonConfig(

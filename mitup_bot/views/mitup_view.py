@@ -4,7 +4,7 @@ from itertools import batched
 from math import ceil
 from typing import Self, assert_never
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_serializer, field_validator, model_validator
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from mitup_bot.callback_data import CallbackData
@@ -14,7 +14,7 @@ from mitup_bot.utils.entities import FormattedText
 
 
 class ButtonConfig(BaseModel):
-    text: str
+    text: str | FormattedText
     # Allow str as type as an intermediate step for backward compatibility
     # will be moving this to CallbackData to make sure we have safeguards in
     # the future
@@ -22,12 +22,25 @@ class ButtonConfig(BaseModel):
     switch_inline_query: str | None = None
     switch_inline_query_current_chat: str | None = None
 
+    model_config = {
+        "arbitrary_types_allowed": True,
+    }
+
     @field_validator("callback_data")
     @classmethod
     def validate_callback_data(cls, value: CallbackData | str | None) -> CallbackData | str | None:
         str_value = str(value)
         if len(str_value.encode("utf-8")) > 64:
             raise ValueError(f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram")
+        return value
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str | FormattedText) -> str | FormattedText:
+        if isinstance(value, FormattedText):
+            if value.entities:
+                raise ValueError("ButtonConfig text should not contain entities")
+            return value
         return value
 
     @model_validator(mode="after")
@@ -46,10 +59,15 @@ class ButtonConfig(BaseModel):
             )
         return self
 
+    @field_serializer("text")
+    def serialize_text(self, value: str | FormattedText) -> str:
+        return value if isinstance(value, str) else value.text
+
     @property
     def button(self) -> InlineKeyboardButton:
+        text = self.text if isinstance(self.text, str) else self.text.text
         return InlineKeyboardButton(
-            text=self.text,
+            text=text,
             callback_data=str(self.callback_data) if self.callback_data else None,
             switch_inline_query=self.switch_inline_query,
             switch_inline_query_current_chat=self.switch_inline_query_current_chat,
@@ -71,14 +89,15 @@ class MitupView:
     def markup(self) -> InlineKeyboardMarkup | None:
         return self.keyboard_to_markup(self.keyboard) if self.keyboard else None
 
-    def with_context(self, message: str) -> Self:
+    def with_context(self, message: str | FormattedText) -> Self:
         """Prepend *message* to the description, adjusting entity offsets when needed."""
-        self.description = self.description.prepend(f"{message}\n\n")
+        ftext = message if isinstance(message, FormattedText) else FormattedText(message)
+        self.description = self.description.prepend(ftext.append("\n\n"))
         return self
 
-    def with_footnote(self, text: str) -> Self:
-        """Append a footnote at the end of the view's description."""
-        self.description = self.description.append(f"\n\n{text}")
+    def with_footnote(self, text: str | FormattedText) -> Self:
+        """Append a footnote at the end of the view's description, preserving its entities."""
+        self.description = self.description.append("\n\n").append(text)
         return self
 
     def with_context_menu(self, keyboard: Keyboard) -> Self:
@@ -118,13 +137,13 @@ class MitupInlineView(MitupView):
         *,
         description: str | FormattedText,
         keyboard: Keyboard,
-        title: str,
-        inline_description: str,
+        title: str | FormattedText,
+        inline_description: str | FormattedText,
         id: str,
     ) -> None:
         super().__init__(description, keyboard)
-        self.title = title
-        self.inline_description = inline_description
+        self.title = title if isinstance(title, str) else title.text
+        self.inline_description = inline_description if isinstance(inline_description, str) else inline_description.text
         self.id = id
 
     def __eq__(self, other: object) -> bool:

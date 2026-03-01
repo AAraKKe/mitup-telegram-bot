@@ -8,6 +8,7 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import Languages, SettingsMessages
 from mitup_bot.views import ButtonConfig, CalendarKeyboard, Keyboard, MitupView, PaginatedMitupView
 
@@ -25,7 +26,7 @@ LANGUAGE_BUTTONS = {
 }
 
 
-def main_menu_view(*, lang: str, message: str | None = None) -> MitupView:
+def main_menu_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
     return MitupView(
         message or Messages.DEFAULT_MAIN_MENU_DESCRIPTION.get(lang=lang),
         keyboard=[
@@ -56,7 +57,7 @@ def main_menu_view(*, lang: str, message: str | None = None) -> MitupView:
     )
 
 
-def settings_view(*, lang: str, message: str | None = None) -> MitupView:
+def settings_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
     return MitupView(
         message or Messages.DEFAULT_SETTINGS_DESCRIPTION.get(lang=lang),
         [
@@ -93,7 +94,9 @@ def create_meeting_view(*, lang: str, message: str | None = None) -> MitupView:
     )
 
 
-def request_information_with_cancel_view(*, lang: str, message: str, callback_data: cb.CallbackData) -> MitupView:
+def request_information_with_cancel_view(
+    *, lang: str, message: str | FormattedText, callback_data: cb.CallbackData
+) -> MitupView:
     """
     Use this wen we want to ask the user for information and give them the option to cancel the action.
 
@@ -109,7 +112,9 @@ def request_information_with_cancel_view(*, lang: str, message: str, callback_da
     )
 
 
-def change_settings_element_view(*, lang: str, message: str, callback_data=cb.CANCEL_SETTINGS) -> MitupView:
+def change_settings_element_view(
+    *, lang: str, message: str | FormattedText, callback_data=cb.CANCEL_SETTINGS
+) -> MitupView:
     """
     This view is used when in order to change a setting the user is asked for a message and we want to give
     them the option to Cancel the action and go back to settings.
@@ -117,24 +122,24 @@ def change_settings_element_view(*, lang: str, message: str, callback_data=cb.CA
     return request_information_with_cancel_view(lang=lang, message=message, callback_data=callback_data)
 
 
-def settings_set_language_view(*, lang: str, message: str | None = None) -> MitupView:
-    message = message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=LANGUAGE_BUTTONS[lang].get(lang=lang))
+def settings_set_language_view(*, lang: str, message: FormattedText | None = None) -> MitupView:
+    language_text = LANGUAGE_BUTTONS[lang].get(lang=lang)
+    message = message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=language_text)
     return set_language_view(lang, message, cb.SET_LANGUAGE).with_back_button(
         ButtonMessages.SETTINGS, lang, cb.SETTINGS
     )
 
 
 def meeting_set_language_view(*, meeting: Meetup) -> MitupView:
-    message = MeetingMessages.EDIT_MEETING_LANGUAGE.get(
-        lang=meeting.user_language, language=LANGUAGE_BUTTONS[meeting.lang].get(lang=meeting.user_language)
-    )
+    language_text = LANGUAGE_BUTTONS[meeting.lang].get(lang=meeting.user_language)
+    message = MeetingMessages.EDIT_MEETING_LANGUAGE.get(lang=meeting.user_language, language=language_text)
 
     return set_language_view(
         meeting.user_language, message, cb.SET_MEETING_LANGUAGE.with_ids(meeting.db_id, 0)
     ).with_back_button(ButtonMessages.EDIT, meeting.user_language, cb.EDIT_MEETING.with_id(meeting.db_id))
 
 
-def set_language_view(lang: str, message: str, callback_data: CallbackData) -> PaginatedMitupView:
+def set_language_view(lang: str, message: str | FormattedText, callback_data: CallbackData) -> PaginatedMitupView:
     n_languages = len(SUPPORTED_LANGUAGES)
     n_columns = min(n_languages, 3)
     buttons = [
@@ -154,7 +159,7 @@ def set_language_view(lang: str, message: str, callback_data: CallbackData) -> P
 def edit_meeting_property_view(
     *,
     lang: str,
-    message: str,
+    message: str | FormattedText,
     meeting_id: int,
     extra_buttons: list[list[ButtonConfig]] | None = None,
     back_button: ButtonConfig | None = None,
@@ -206,11 +211,10 @@ def edit_meeting_date_view(
     return MitupView(description=message, keyboard=calendar_keyboard)
 
 
-def options_button(callback_data: CallbackData, text: str, option: bool) -> ButtonConfig:
+def options_button(callback_data: CallbackData, text: str | FormattedText, option: bool) -> ButtonConfig:
     boolean_emojin = Emojis.boolean(option)
-    text = f"{boolean_emojin} {text}"
-
-    return ButtonConfig(text=text, callback_data=callback_data)
+    text_str = text.text if isinstance(text, FormattedText) else text
+    return ButtonConfig(text=f"{boolean_emojin} {text_str}", callback_data=callback_data)
 
 
 def user_button(user: User, callback_data: CallbackData) -> ButtonConfig:
@@ -220,7 +224,7 @@ def user_button(user: User, callback_data: CallbackData) -> ButtonConfig:
 def confirmation_view(
     *,
     lang: str,
-    message: str,
+    message: str | FormattedText,
     confirm_callback_data: CallbackData,
     decline_callback_data: CallbackData,
 ) -> MitupView:
@@ -235,7 +239,9 @@ def confirmation_view(
     )
 
 
-def conversation_interrupted_view(*, lang: str, message: str, cancel_callback: CallbackData) -> MitupView:
+def conversation_interrupted_view(
+    *, lang: str, message: str | FormattedText, cancel_callback: CallbackData
+) -> MitupView:
     """Shown when a conversation is unexpectedly interrupted. Lets the user resume or cancel."""
     return MitupView(
         message,

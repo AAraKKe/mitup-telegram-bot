@@ -62,7 +62,7 @@ async def test_invite_users_by_registered_user(
     if external_chat:
         context.api.assert_answer_callback_query_called(
             handler_context.update,
-            text=MeetingMessages.INVITE_USER_GO_PRIVATE.get(lang=user_with_settings.lang, plain=True),
+            text=MeetingMessages.INVITE_USER_GO_PRIVATE.get(lang=user_with_settings.lang),
             show_alert=True,
         )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
@@ -111,7 +111,7 @@ async def test_invite_with_id_of_meeting_does_not_exist(
 
     result.last_context.api.assert_answer_callback_query_called(
         update=result.last_context.get_update(),
-        text=MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK.get(lang=user_with_settings.lang, plain=True),
+        text=MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK.get(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -455,7 +455,7 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 
     final_context.api.assert_answer_callback_query_called(
         update=final_context.get_update(),
-        text=expected_message.get(lang=user_with_settings.lang, plain=True),
+        text=expected_message.get(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -504,6 +504,6 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=expected_message.get(lang=user_with_settings.lang, plain=True),
+        text=expected_message.get(lang=user_with_settings.lang),
         show_alert=True,
     )

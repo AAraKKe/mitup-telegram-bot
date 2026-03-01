@@ -15,7 +15,7 @@ def _expected_view(lang: str) -> MitupView:
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.SEARCH_CHAT_MEETINGS.get(lang=lang, plain=True),
+                    text=ButtonMessages.SEARCH_CHAT_MEETINGS.get(lang=lang),
                     switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}someinstance",
                 )
             ],

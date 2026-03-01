@@ -6,7 +6,7 @@ user-invocable: false
 
 # View Conventions
 
-The view layer in `mitup_bot/views/` abstracts Telegram message presentation from handler logic. Views pair MarkdownV2 text with inline keyboards.
+The view layer in `mitup_bot/views/` abstracts Telegram message presentation from handler logic. Views pair a `FormattedText` description with inline keyboards.
 
 ## Important rules
 
@@ -19,7 +19,9 @@ The view layer in `mitup_bot/views/` abstracts Telegram message presentation fro
 
 ### `MitupView`
 
-The fundamental unit — a dataclass with `description` (MarkdownV2 string) and `keyboard` (list of `ButtonRow`). The `.markup` property converts the keyboard to a PTB `InlineKeyboardMarkup`.
+The fundamental unit — a dataclass with `description` (`FormattedText`) and `keyboard` (list of `ButtonRow`). The `.markup` property converts the keyboard to a PTB `InlineKeyboardMarkup`.
+
+`description` is always a `FormattedText`. Pass `MessageBase.get()` output directly — never extract `.text` first, as that strips formatting entities.
 
 Builder methods modify the view in-place and return `self` for chaining:
 

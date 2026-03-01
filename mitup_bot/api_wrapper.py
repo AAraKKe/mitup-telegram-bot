@@ -29,6 +29,7 @@ from mitup_bot.models.joined_users import JoinedUsers
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 
 TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
@@ -113,21 +114,29 @@ def handle_edit_errors(
         raise
 
 
+def _resolve_view(view: MitupView | FormattedText | str) -> MitupView:
+    if isinstance(view, MitupView):
+        return view
+    if isinstance(view, FormattedText):
+        return MitupView(view, keyboard=[])
+    return MitupView(view, keyboard=[])
+
+
 class TelegramApiWrapper(Protocol):
     @property
     def adapter(self) -> ContextOrBotAdapter: ...
     @adapter.setter
     def adapter(self, adapter: ContextOrBotAdapter): ...
-    async def send_message(self, update: Update, view: MitupView | str) -> Message | None: ...
-    async def send_message_to_user(self, user: User, view: MitupView | str) -> Message | None: ...
+    async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None: ...
+    async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_messages_to_users(
         self,
         users: Sequence[User],
-        views: Sequence[MitupView | str],
+        views: Sequence[MitupView | FormattedText | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
     ) -> None: ...
-    async def edit_message(self, update: Update, view: MitupView | str) -> Message | bool: ...
+    async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool: ...
     async def answer_inline_query(
         self,
         update: Update,
@@ -135,7 +144,7 @@ class TelegramApiWrapper(Protocol):
         button: InlineResultsButton | None = None,
         cache_time: int = 60,
     ) -> None: ...
-    async def answer_callback_query(self, update: Update, text: str, show_alert: bool) -> None: ...
+    async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool) -> None: ...
     async def update_single_meeting_message(
         self,
         message: MessageModel,
@@ -175,11 +184,11 @@ class TelegramApi:
     def adapter(self, adapter: ContextOrBotAdapter):
         self._adapter = adapter
 
-    async def send_message(self, update: Update, view: MitupView | str) -> Message | None:
+    async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None:
         from mitup_bot import guards
 
         chat_id = guards.chat(update).id
-        resolved = MitupView(view, keyboard=[]) if isinstance(view, str) else view
+        resolved = _resolve_view(view)
 
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             return await self.adapter.bot.send_message(
@@ -187,7 +196,6 @@ class TelegramApi:
                 text=resolved.description.text,
                 entities=resolved.description.entities or None,
                 reply_markup=resolved.markup,
-                parse_mode=None,
             )
 
     @contextmanager
@@ -204,8 +212,8 @@ class TelegramApi:
         else:
             yield
 
-    async def send_message_to_user(self, user: User, view: MitupView | str) -> Message | None:
-        resolved = MitupView(view, keyboard=[]) if isinstance(view, str) else view
+    async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
+        resolved = _resolve_view(view)
 
         with self._with_time_metrics_context():
             try:
@@ -214,7 +222,6 @@ class TelegramApi:
                     text=resolved.description.text,
                     entities=resolved.description.entities or None,
                     reply_markup=resolved.markup,
-                    parse_mode=None,
                 )
             except Forbidden as e:
                 logging.warning(f"User {user.tg_user_id} has blocked the bot.")
@@ -228,7 +235,7 @@ class TelegramApi:
     async def send_messages_to_users(
         self,
         users: Sequence[User],
-        views: Sequence[MitupView | str],
+        views: Sequence[MitupView | FormattedText | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
     ):
@@ -283,8 +290,8 @@ class TelegramApi:
             views=views_to_send,
         )
 
-    async def edit_message(self, update: Update, view: MitupView | str) -> Message | bool:
-        resolved = MitupView(view, keyboard=[]) if isinstance(view, str) else view
+    async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool:
+        resolved = _resolve_view(view)
 
         chat_id = None
         message_id = None
@@ -307,7 +314,6 @@ class TelegramApi:
                     message_id=message_id,
                     inline_message_id=inline_message_id,
                     reply_markup=resolved.markup,
-                    parse_mode=None,
                 )
 
     async def answer_inline_query(
@@ -328,7 +334,6 @@ class TelegramApi:
                 input_message_content=InputTextMessageContent(
                     message_text=view.description.text,
                     entities=view.description.entities or None,
-                    parse_mode=None,
                 ),
                 reply_markup=view.markup,
             )
@@ -343,13 +348,18 @@ class TelegramApi:
             return
         raise AnswerInlineQueryError(query.query)
 
-    async def answer_callback_query(self, update: Update, text: str, show_alert: bool):
+    async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool):
         from mitup_bot import guards
 
-        if len(text) > 200:
-            CallbackQueryTextTooLong(text)
+        if isinstance(text, FormattedText) and text.entities:
+            raise ValueError("Callback query text should not contain entities")
+
+        _text = text.text if isinstance(text, FormattedText) else text
+
+        if len(_text) > 200:
+            CallbackQueryTextTooLong(_text)
         query = guards.valid_callback_query(update)
-        await self.adapter.bot.answer_callback_query(query.id, text=text, show_alert=show_alert)
+        await self.adapter.bot.answer_callback_query(query.id, text=_text, show_alert=show_alert)
 
     async def update_single_meeting_message(
         self,
@@ -385,8 +395,9 @@ class TelegramApi:
 
         # Determine the text, entities and markup based on meeting state
         if was_deleted:
-            text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang)
-            entities = None
+            ftext = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang)
+            text = ftext.text
+            entities = ftext.entities or None
             reply_markup = None
         elif has_finished:
             finished_view = view.with_context(MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang))
@@ -409,7 +420,6 @@ class TelegramApi:
                 message_id=message.message_id,
                 inline_message_id=message.inline_message_id,
                 reply_markup=reply_markup,
-                parse_mode=None,
             )
 
     async def update_meeting_messages(

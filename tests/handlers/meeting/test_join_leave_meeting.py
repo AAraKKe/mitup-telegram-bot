@@ -40,7 +40,7 @@ async def test_existing_user_joins_own_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_SUCCESS.get(lang=user_with_settings.lang, plain=True),
+        text=MeetingMessages.JOINED_MEETING_SUCCESS.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -109,7 +109,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_FULL.get(lang=user_with_settings.lang, plain=True),
+        text=MeetingMessages.JOINED_MEETING_FULL.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -158,7 +158,7 @@ async def test_non_existent_user_joins_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_UNREGISTERED.get(plain=True),
+        text=MeetingMessages.JOINED_MEETING_UNREGISTERED.get(),
         show_alert=True,
     )
 
@@ -185,7 +185,7 @@ async def test_user_leaves_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.LEFT_MEETING_SUCCESS.get(lang=user_with_settings.lang, plain=True),
+        text=MeetingMessages.LEFT_MEETING_SUCCESS.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -215,7 +215,7 @@ async def test_non_existing_user_leaves_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.LEFT_MEETING_UNREGISTERED.get(plain=True),
+        text=MeetingMessages.LEFT_MEETING_UNREGISTERED.get(),
         show_alert=True,
     )
 
