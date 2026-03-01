@@ -1,7 +1,7 @@
 ---
 name: lambda-expert
 description: Expert agent for writing and maintaining AWS Lambda functions in mitup_bot/lambdas/. Delegate to this agent whenever the work involves Lambda handlers, BotAdapter usage outside PTB, or cold-start constraints.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
   - lambda-conventions

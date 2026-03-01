@@ -1,7 +1,7 @@
 ---
 name: handler-expert
 description: Expert agent for writing, reviewing, and updating Telegram handlers for mitup_bot. Delegate to this agent whenever the work is related with mitup_bot handlers.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
   - handler-conventions

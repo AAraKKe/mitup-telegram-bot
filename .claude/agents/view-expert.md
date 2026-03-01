@@ -1,7 +1,7 @@
 ---
 name: view-expert
 description: Expert agent for building, reviewing, and modifying screens in mitup_bot/views/. Delegate to this agent whenever the work involves MitupView, PaginatedMitupView, ButtonConfig, factory functions, or inline keyboards.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
   - view-conventions

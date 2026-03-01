@@ -1,7 +1,7 @@
 ---
 name: cli-expert
 description: Expert agent for writing and maintaining CLI commands in mitup_bot/cli/. Delegate to this agent whenever the work involves Click commands, the mitup CLI, or operational scripts.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
   - cli-conventions

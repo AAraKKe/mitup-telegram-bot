@@ -22,4 +22,4 @@ class MutableModel(BaseModel, Mutable):
         if isinstance(value, dict):
             return cls(**value)
 
-        super().coerce(key, value)
+        return super().coerce(key, value)

@@ -18,6 +18,20 @@ Run `/project-guide` for a full reference of all available agents and skills.
 - Tests are run by a hook when you are done. If you want feedback mid-work, run a specific test with `hatch run dev -- <pytest args>`. Avoid full runs.
 - Formatters and linters are run by hooks after each modification. No need to run them manually.
 
+## When hooks fail
+
+Hooks run automatically after work is complete (type checker, tests, linter/formatter). If any hook fails, do NOT attempt to fix it yourself.
+
+**If the work was done by a specialist agent:** resume that agent's session with the error output. The resumed agent retains full context of every change it made.
+
+**If the work was done directly:** delegate to the appropriate specialist and provide the full `git diff` of the changes alongside the error output — not a prose summary. A diff gives the specialist the exact state of the code.
+
+| Failing hook | Delegate to |
+|--------------|-------------|
+| Type checker (`ty`) | type-checking agent |
+| Tests (`pytest`) | test-expert agent |
+| Linter (`ruff`) | convention-reviewer agent |
+
 ## Maintaining these instructions
 
 When editing any instruction file, follow these rules:

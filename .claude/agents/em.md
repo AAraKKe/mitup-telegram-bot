@@ -1,7 +1,7 @@
 ---
 name: em
 description: Engineering manager in charge of the development of the project. Claude must delegate to this agent any multi-domain work that spans more than one area of expertise, requires a migration, involves coordinating multiple specialist agents, or risks significant architectural impact.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 
