@@ -4,6 +4,7 @@ description: Expert agent for writing and maintaining AWS Lambda functions in mi
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
+  - coding-standards
   - lambda-conventions
   - database
   - monitoring

@@ -4,6 +4,7 @@ description: Expert agent for writing and maintaining CLI commands in mitup_bot/
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
+  - coding-standards
   - cli-conventions
   - database
   - api-wrapper

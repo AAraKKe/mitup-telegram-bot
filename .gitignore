@@ -50,3 +50,6 @@ validate.po
 
 # Local environment variables
 .env
+
+# Ignore planning folder with plans done by em
+.plans/

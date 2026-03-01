@@ -1,20 +1,42 @@
 __all__ = (
+    "Bold",
+    "BoldItalic",
     "ButtonMessages",
     "callbacks",
+    "DateTimeMessageEntity",
     "Emojis",
+    "EntityDateTime",
+    "EntityType",
     "InlineViewMessages",
+    "Italic",
+    "Link",
     "MeetingMessages",
     "Messages",
     "Month",
     "MonthList",
     "MonthShort",
     "MonthShortList",
+    "parse_md_markers",
+    "render",
     "SettingsMessages",
+    "utf16_len",
     "Weekday",
 )
 
 from . import callbacks
 from .emojis import Emojis
+from .entities import (
+    Bold,
+    BoldItalic,
+    DateTimeMessageEntity,
+    EntityDateTime,
+    EntityType,
+    Italic,
+    Link,
+    parse_md_markers,
+    render,
+    utf16_len,
+)
 from .messages import (
     ButtonMessages,
     InlineViewMessages,

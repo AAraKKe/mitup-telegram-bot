@@ -4,6 +4,7 @@ description: Review code for compliance with project-specific conventions. Use a
 tools: Read, Grep, Glob, Bash
 model: claude-haiku-4-5-20251001
 skills:
+  - coding-standards
   - handler-conventions
   - view-conventions
   - guards

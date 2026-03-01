@@ -16,13 +16,7 @@ This guide covers all agents and skills available in this project, when to use e
 
 ## Agents
 
-Agents are specialist AI assistants that work in isolated contexts with preloaded domain knowledge. Invoke them by name (e.g., `@handler-expert`) or let the `em` agent coordinate them for multi-domain tasks.
-
-### `em` — Engineering Manager
-
-Coordinates complex, multi-domain work. Clarifies requirements, forms phased plans, delegates to specialists, and checkpoints with you after each phase.
-
-**Use when:** a feature spans more than one area (e.g., handler + migration + tests + translations), or when you want a plan before implementation starts.
+Agents are specialist AI assistants that work in isolated contexts with preloaded domain knowledge. For multi-domain work, use `/em` (a skill that turns the main agent into an orchestrator). For targeted work, invoke a specialist agent directly by name in natural language.
 
 ### `handler-expert`
 
@@ -110,6 +104,7 @@ Skills are knowledge documents that Claude loads automatically when relevant. Yo
 
 | Skill | Purpose |
 |-------|---------|
+| `/em <task>` | Orchestration mode — clarify, plan, delegate, checkpoint across multiple agents |
 | `/git` | Branching, staging, committing, pushing, rebasing |
 | `/mr` | Generate a GitLab MR description from the project template |
 | `/new-handler` | Scaffold a new bot handler package |
@@ -129,16 +124,17 @@ Skills are knowledge documents that Claude loads automatically when relevant. Yo
 
 Describe the outcome. Claude loads the relevant skills and delegates automatically. No need to name agents or describe steps.
 
-### Multi-domain feature — use the EM
+### Multi-domain feature — use `/em`
 
-> Add a feature where users can set a recurring meeting.
-> It needs a new handler, a DB migration, tests, and translations for EN/ES.
+```
+/em Add recurring meetings — needs a handler, DB migration, tests, and EN/ES translations.
+```
 
-Give the full feature intent upfront. State constraints that matter:
+Give the full feature intent after `/em`. State constraints that matter:
 - "Keep the conversation flow consistent with how `create_meeting` works."
 - "The migration must be reversible."
 
-Let the EM form phases, pick agents, and surface questions.
+The main agent enters orchestration mode: clarifies, forms a phased plan, presents it for approval, then delegates to specialist agents with checkpoints.
 
 ### Targeted fix — invoke an agent directly
 

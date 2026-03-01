@@ -4,6 +4,7 @@ description: Expert agent for building, reviewing, and modifying screens in mitu
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
 model: sonnet
 skills:
+  - coding-standards
   - view-conventions
   - view-factory
   - bot-copy-style

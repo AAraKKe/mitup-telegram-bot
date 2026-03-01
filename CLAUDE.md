@@ -6,7 +6,11 @@ Act as an experienced Python engineer. Write idiomatic, modern Python using feat
 
 ## Working with agents
 
-For complex tasks that span multiple areas (handler + migration + tests + translations, etc.), delegate to the `em` agent rather than implementing directly. The `em` agent clarifies requirements, forms a phased plan, presents it for approval, then coordinates specialist agents with checkpoints between phases.
+For complex tasks that span multiple areas (handler + migration + tests + translations, etc.), use the `/em` skill to enter orchestration mode. It clarifies requirements, forms a phased plan, presents it for approval, then delegates to specialist agents with checkpoints between phases:
+
+```
+/em Add recurring meetings — needs a handler, DB migration, tests, and EN/ES translations.
+```
 
 For single-domain tasks or targeted fixes, invoke a specialist agent directly with natural language: "Use the handler-expert agent to...".
 

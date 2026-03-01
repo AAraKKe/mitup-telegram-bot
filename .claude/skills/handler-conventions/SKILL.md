@@ -73,6 +73,53 @@ Handlers are organized into submodules by feature area. Each submodule typically
 | `entry.py` | Entry-point callback (usually the conversation entry or main action) |
 | Other files | Supporting handlers, views, and utilities for the feature |
 
+## Callback data
+
+All button interactions use `CallbackData` — a Pydantic model defined in `mitup_bot/callback_data.py`. Predefined instances for the whole bot live in `mitup_bot/utils/callbacks.py`. When adding a new handler that needs a button action, add its callback instance there.
+
+### Formats
+
+| Class | Format | Use when |
+|-------|--------|----------|
+| `CallbackData` | `{action};{entity}:{id}` | Standard action on an entity |
+| `DateCallbackData` | `{action};{entity}:{id};date:{YYYY-MM-DD}` | Action involves a date (e.g., setting a meeting date) |
+| `MeetingCallbackData` | `{action};{entity}:{id}:{meeting_id}` | Action targets a subject (id) within a specific meeting |
+
+### Defining a new callback
+
+```python
+# In mitup_bot/utils/callbacks.py
+from mitup_bot.callback_data import CallbackData
+
+MY_ACTION = CallbackData(action="my_action", entity="my_entity")
+```
+
+Use `.with_id(id)` at call sites to attach a specific record ID:
+
+```python
+cb.MY_ACTION.with_id(meeting.db_id)
+```
+
+### Naming conventions
+
+- Destructive flows must follow: `DELETE_<X>` (trigger) → `CONFIRM_<X>` (confirm) → `DECLINE_<X>` (decline).
+- Action names use `snake_case`; entity names use `snake_case`.
+- Keep action and entity strings short — callback data is limited to **64 bytes** total when encoded.
+
+### Using callbacks in handlers
+
+Pass the predefined instance directly to `ButtonConfig` or as a filter pattern for `register_callback_query`:
+
+```python
+from mitup_bot.utils import callbacks as cb
+
+# As a filter
+@HandlersRegistry.register_callback_query(handler_id=MyId.SHOW, callback_data=cb.SHOW_MEETING)
+
+# In a ButtonConfig
+ButtonConfig(text=ButtonMessages.SHOW.get(lang=lang), callback_data=cb.SHOW_MEETING.with_id(meeting_id))
+```
+
 ## Adding a new handler — checklist
 
 1. Define a `HandlerId` member in the appropriate `enums.py` (or create a new submodule).
