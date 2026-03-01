@@ -71,11 +71,9 @@ Review before staging — never blindly `git add .`:
    | Revert | ⏪ | Reverting a previous commit |
 
 4. Ask for the commit description if not provided via `$ARGUMENTS`.
-5. Build the message: `{emoji} {description}` — emoji only, no conventional type prefix.
-6. Run `git commit -m "{emoji} {description}"`.
+5. Build the message: `{type}: {description}`, using conventional type prefix and description.
+6. Run `git commit -m "{type}: {description}"`.
 7. Run `git status` to confirm the working tree is clean.
-
-**Pre-commit hooks note:** Hooks are installed locally and auto-convert `Type: description` → emoji. When hooks are absent (CI agents), use the emoji directly.
 
 ---
 
