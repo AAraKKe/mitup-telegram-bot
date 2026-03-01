@@ -10,6 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import FormattedText
 
 
 class ButtonConfig(BaseModel):
@@ -32,13 +33,12 @@ class ButtonConfig(BaseModel):
     @model_validator(mode="after")
     def validate_exactly_one_action(self) -> Self:
         action_count = sum(
-            1
+            f is not None
             for f in [
                 self.callback_data,
                 self.switch_inline_query,
                 self.switch_inline_query_current_chat,
             ]
-            if f is not None
         )
         if action_count != 1:
             raise ValueError(
@@ -60,39 +60,45 @@ ButtonRow = list[ButtonConfig]
 Keyboard = list[ButtonRow]
 
 
-@dataclass
 class MitupView:
-    description: str
-    keyboard: Keyboard
+    def __init__(self, description: str | FormattedText, keyboard: Keyboard) -> None:
+        self.description: FormattedText = (
+            description if isinstance(description, FormattedText) else FormattedText(description)
+        )
+        self.keyboard = keyboard
 
     @property
-    def markup(self) -> InlineKeyboardMarkup:
-        return self.keyboard_to_markup(self.keyboard)
+    def markup(self) -> InlineKeyboardMarkup | None:
+        return self.keyboard_to_markup(self.keyboard) if self.keyboard else None
 
     def with_context(self, message: str) -> Self:
-        """Add a message to the context of the view. This is useful to add information about the view"""
-        self.description = f"{message}\n\n{self.description}"
-
+        """Prepend *message* to the description, adjusting entity offsets when needed."""
+        self.description = self.description.prepend(f"{message}\n\n")
         return self
 
     def with_footnote(self, text: str) -> Self:
         """Append a footnote at the end of the view's description."""
-        self.description = f"{self.description}\n\n{text}"
-
+        self.description = self.description.append(f"\n\n{text}")
         return self
 
     def with_context_menu(self, keyboard: Keyboard) -> Self:
         """Add a keyboard to be attached below the view keyboard. This can be used to add back buttons to views"""
         self.keyboard += keyboard
-
         return self
 
     def with_back_button(self, text: ButtonMessages, lang: str, callback_data: CallbackData) -> Self:
         """Add a back button to the view"""
         back_text = text.back(lang=lang)
         self.keyboard += [[ButtonConfig(text=back_text, callback_data=callback_data)]]
-
         return self
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.description == other.description and self.keyboard == other.keyboard
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(description={self.description!r}, keyboard={self.keyboard!r})"
 
     @staticmethod
     def keyboard_to_markup(keyboard: Keyboard) -> InlineKeyboardMarkup:
@@ -100,7 +106,6 @@ class MitupView:
         return InlineKeyboardMarkup(inline_keyboard)
 
 
-@dataclass
 class MitupInlineView(MitupView):
     """
     MitupView that represent an inline view with a title and an id.
@@ -108,9 +113,30 @@ class MitupInlineView(MitupView):
     Intended to be used as the representation of a meeting when using inline queries.
     """
 
-    title: str
-    inline_description: str
-    id: str
+    def __init__(
+        self,
+        *,
+        description: str | FormattedText,
+        keyboard: Keyboard,
+        title: str,
+        inline_description: str,
+        id: str,
+    ) -> None:
+        super().__init__(description, keyboard)
+        self.title = title
+        self.inline_description = inline_description
+        self.id = id
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, MitupInlineView):
+            return NotImplemented
+        return (
+            self.description == other.description
+            and self.keyboard == other.keyboard
+            and self.title == other.title
+            and self.inline_description == other.inline_description
+            and self.id == other.id
+        )
 
 
 @dataclass
@@ -152,7 +178,7 @@ class PaginatedMitupView(MitupView):
     def __init__(
         self,
         *,
-        description: str,
+        description: str | FormattedText,
         buttons: list[ButtonConfig],
         page_number: int,
         navigation_callback_data: cb.CallbackData | None = None,

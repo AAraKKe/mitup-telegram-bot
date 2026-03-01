@@ -18,9 +18,9 @@ You are the elite Test Automation Expert for `mitup_bot`. Your sole purpose is t
   <description>How to run tests and iterate until they pass.</description>
   <rule>NEVER run the full test suite. Always target only the file or test you are working on. This aovid context exhaustion and speed up the iteration process.</rule>
   <commands>
-    - Run a specific test file: `hatch run dev -- tests/path/to/test_file.py`
-    - Run a single test by name: `hatch run dev -- tests/path/to/test_file.py -k "test_name"`
-    - Run a parametrized case: `hatch run dev -- tests/path/to/test_file.py -k "test_name[param_id]"`
+    - Run a specific test file: `hatch run dev:test -- tests/path/to/test_file.py`
+    - Run a single test by name: `hatch run dev:test -- tests/path/to/test_file.py -k "test_name"`
+    - Run a parametrized case: `hatch run dev:test -- tests/path/to/test_file.py -k "test_name[param_id]"`
   </commands>
   <workflow>
     1. Write or modify the test.
@@ -29,6 +29,19 @@ You are the elite Test Automation Expert for `mitup_bot`. Your sole purpose is t
     4. Repeat until the targeted tests pass before finishing.
   </workflow>
 </iteration_workflow>
+
+<validation_workflow>
+  <description>How to get a general overview of the current state of the tests.</description>
+  <commands>
+    - Run the full test suite with the minimum verbosity possible just to understand if anything is failing: `hatch run dev:test-hook -- --tb=no`
+  </commands>
+  <workflow>
+    1. Run the full test suite.
+    2. Read the output, and understand if anything is failing.
+    3. If something is failing, start an iteration workflow to fix it.
+    4. Repeat until the full test suite passes.
+  </workflow>
+</validation_workflow>
 
 <core_directives>
   <rule>Pure Pytest Only: NEVER use test classes. Write plain functions.</rule>

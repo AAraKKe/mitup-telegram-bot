@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
-from telegram import InlineQueryResultArticle, InlineQueryResultsButton, InputTextMessageContent, Message, Update
+from telegram import (
+    InlineQueryResultArticle,
+    InlineQueryResultsButton,
+    InputTextMessageContent,
+    Message,
+    Update,
+)
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import CallbackContext, ExtBot
 
@@ -31,6 +37,7 @@ MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Message to edit not found"),
 ]
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
+
 
 if TYPE_CHECKING:
     from mitup_bot.custom_context import MitupContext
@@ -172,16 +179,16 @@ class TelegramApi:
         from mitup_bot import guards
 
         chat_id = guards.chat(update).id
-
-        if isinstance(view, str):
-            message = view
-            reply_markup = None
-        else:
-            message = view.description
-            reply_markup = view.markup
+        resolved = MitupView(view, keyboard=[]) if isinstance(view, str) else view
 
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            return await self.adapter.bot.send_message(chat_id=chat_id, text=message, reply_markup=reply_markup)
+            return await self.adapter.bot.send_message(
+                chat_id=chat_id,
+                text=resolved.description.text,
+                entities=resolved.description.entities or None,
+                reply_markup=resolved.markup,
+                parse_mode=None,
+            )
 
     @contextmanager
     def _with_time_metrics_context(self) -> Generator[None]:
@@ -198,17 +205,16 @@ class TelegramApi:
             yield
 
     async def send_message_to_user(self, user: User, view: MitupView | str) -> Message | None:
-        if isinstance(view, str):
-            message = view
-            reply_markup = None
-        else:
-            message = view.description
-            reply_markup = view.markup
+        resolved = MitupView(view, keyboard=[]) if isinstance(view, str) else view
 
         with self._with_time_metrics_context():
             try:
                 return await self.adapter.bot.send_message(
-                    chat_id=user.tg_user_id, text=message, reply_markup=reply_markup
+                    chat_id=user.tg_user_id,
+                    text=resolved.description.text,
+                    entities=resolved.description.entities or None,
+                    reply_markup=resolved.markup,
+                    parse_mode=None,
                 )
             except Forbidden as e:
                 logging.warning(f"User {user.tg_user_id} has blocked the bot.")
@@ -278,12 +284,7 @@ class TelegramApi:
         )
 
     async def edit_message(self, update: Update, view: MitupView | str) -> Message | bool:
-        if isinstance(view, str):
-            message = view
-            reply_markup = None
-        else:
-            message = view.description
-            reply_markup = view.markup
+        resolved = MitupView(view, keyboard=[]) if isinstance(view, str) else view
 
         chat_id = None
         message_id = None
@@ -300,11 +301,13 @@ class TelegramApi:
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             with handle_edit_errors(adapter=self.adapter):
                 return await self.adapter.bot.edit_message_text(
-                    text=message,
+                    text=resolved.description.text,
+                    entities=resolved.description.entities or None,
                     chat_id=chat_id,
                     message_id=message_id,
                     inline_message_id=inline_message_id,
-                    reply_markup=reply_markup,
+                    reply_markup=resolved.markup,
+                    parse_mode=None,
                 )
 
     async def answer_inline_query(
@@ -322,7 +325,11 @@ class TelegramApi:
                 id=view.id,
                 title=view.title,
                 description=view.inline_description,
-                input_message_content=InputTextMessageContent(message_text=view.description),
+                input_message_content=InputTextMessageContent(
+                    message_text=view.description.text,
+                    entities=view.description.entities or None,
+                    parse_mode=None,
+                ),
                 reply_markup=view.markup,
             )
             for view in results
@@ -376,15 +383,19 @@ class TelegramApi:
         message.buttons.keyboard = view.keyboard
         session.add(message)
 
-        # Determine the text and markup based on meeting state
+        # Determine the text, entities and markup based on meeting state
         if was_deleted:
             text = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang)
+            entities = None
             reply_markup = None
         elif has_finished:
-            text = view.with_context(MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang)).description
+            finished_view = view.with_context(MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang))
+            text = finished_view.description.text
+            entities = finished_view.description.entities or None
             reply_markup = None
         else:
-            text = view.description
+            text = view.description.text
+            entities = view.description.entities or None
             reply_markup = view.markup
 
         with (
@@ -393,10 +404,12 @@ class TelegramApi:
         ):
             await self.adapter.bot.edit_message_text(
                 text=text,
+                entities=entities,
                 chat_id=message.chat_id,
                 message_id=message.message_id,
                 inline_message_id=message.inline_message_id,
                 reply_markup=reply_markup,
+                parse_mode=None,
             )
 
     async def update_meeting_messages(

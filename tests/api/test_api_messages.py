@@ -73,7 +73,8 @@ async def test_send_message_with_a_view(context: StubMitupContext, update: Updat
 
     context.bot.send_message.assert_called_once_with(
         chat_id=context.telegram_update.effective_chat.id,
-        text=default_view.description,
+        text=default_view.description.text,
+        entities=None,
         reply_markup=default_view.markup,
     )
 
@@ -86,7 +87,39 @@ async def test_send_message_without_view(context: StubMitupContext, update: Upda
     await context.api.send_message(update=update, view="Hello, World")
 
     context.bot.send_message.assert_called_once_with(
-        chat_id=context.telegram_update.effective_chat.id, text="Hello, World", reply_markup=None
+        chat_id=context.telegram_update.effective_chat.id, text="Hello, World", entities=None, reply_markup=None
+    )
+
+    await assert_time_metric_emitted(context)
+
+
+async def test_send_message_with_entities(context: StubMitupContext, update: Update, view_with_entities: MitupView):
+    assert context.telegram_update.effective_chat is not None
+
+    await context.api.send_message(update=update, view=view_with_entities)
+
+    context.bot.send_message.assert_called_once_with(
+        chat_id=context.telegram_update.effective_chat.id,
+        text=view_with_entities.description.text,
+        entities=view_with_entities.description.entities,
+        reply_markup=view_with_entities.markup,
+    )
+
+    await assert_time_metric_emitted(context)
+
+
+async def test_edit_message_with_entities(view_with_entities: MitupView, update: Update, context: StubMitupContext):
+    assert update.effective_message is not None
+
+    await context.api.edit_message(update=update, view=view_with_entities)
+
+    context.bot.edit_message_text.assert_called_once_with(
+        text=view_with_entities.description.text,
+        entities=view_with_entities.description.entities,
+        chat_id=123,
+        message_id=123,
+        inline_message_id=None,
+        reply_markup=view_with_entities.markup,
     )
 
     await assert_time_metric_emitted(context)
@@ -98,7 +131,8 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
     await context.api.edit_message(update=update, view=default_view)
 
     context.bot.edit_message_text.assert_called_once_with(
-        text=default_view.description,
+        text=default_view.description.text,
+        entities=None,
         chat_id=123,
         message_id=123,
         inline_message_id=None,
@@ -112,7 +146,7 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
     await context.api.edit_message(update=update, view="Hello, World")
 
     context.bot.edit_message_text.assert_called_once_with(
-        text="Hello, World", chat_id=123, message_id=123, inline_message_id=None, reply_markup=None
+        text="Hello, World", entities=None, chat_id=123, message_id=123, inline_message_id=None, reply_markup=None
     )
 
     await assert_time_metric_emitted(context)
@@ -133,12 +167,15 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
     await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
 
     edit: mock.MagicMock = context.bot.edit_message_text
+    inline_view = meeting.inline_view()
+    main_view = meeting.main_view
     expected_call_params = {
-        "text": meeting.inline_view().description,
+        "text": inline_view.description.text,
+        "entities": inline_view.description.entities or None,
         "chat_id": 123,
         "message_id": None,
         "inline_message_id": None,
-        "reply_markup": meeting.inline_view().markup,
+        "reply_markup": inline_view.markup,
     }
 
     assert edit.call_count == 3
@@ -148,9 +185,10 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
                 **(
                     expected_call_params
                     | {
-                        "text": meeting.main_view.description,
+                        "text": main_view.description.text,
+                        "entities": main_view.description.entities or None,
                         "message_id": 123,
-                        "reply_markup": meeting.main_view.markup,
+                        "reply_markup": main_view.markup,
                     }
                 )
             ),
@@ -166,7 +204,8 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
                 **(
                     expected_call_params
                     | {
-                        "text": meeting.inline_view().description,
+                        "text": inline_view.description.text,
+                        "entities": inline_view.description.entities or None,
                         "message_id": 123,
                         "chat_id": 234,
                     }

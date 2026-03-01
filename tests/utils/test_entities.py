@@ -1,12 +1,15 @@
 import pytest
+from telegram import MessageEntity
 
 from mitup_bot.utils.entities import (
     Bold,
     BoldItalic,
     DateTimeMessageEntity,
     EntityDateTime,
+    FormattedText,
     Italic,
     Link,
+    _nearest_utf16,
     parse_md_markers,
     render,
     utf16_len,
@@ -37,22 +40,22 @@ def test_utf16_len(text: str, expected: int):
 
 
 def test_render_empty_template():
-    text, entities = render(t"")
-    assert text == ""
-    assert entities == []
+    result = render(t"")
+    assert result.text == ""
+    assert result.entities == []
 
 
 def test_render_plain_string_literal():
-    text, entities = render(t"Hello, world!")
-    assert text == "Hello, world!"
-    assert entities == []
+    result = render(t"Hello, world!")
+    assert result.text == "Hello, world!"
+    assert result.entities == []
 
 
 def test_render_plain_str_interpolation():
     name = "Alice"
-    text, entities = render(t"Hello {name}!")
-    assert text == "Hello Alice!"
-    assert entities == []
+    result = render(t"Hello {name}!")
+    assert result.text == "Hello Alice!"
+    assert result.entities == []
 
 
 @pytest.mark.parametrize(
@@ -64,10 +67,10 @@ def test_render_plain_str_interpolation():
     ids=["bold_ascii", "italic"],
 )
 def test_render_single_entity(t_string, expected_text, expected_type, expected_offset, expected_length):
-    text, entities = render(t_string)
-    assert text == expected_text
-    assert len(entities) == 1
-    e = entities[0]
+    result = render(t_string)
+    assert result.text == expected_text
+    assert len(result.entities) == 1
+    e = result.entities[0]
     assert e.type == expected_type
     assert e.offset == expected_offset
     assert e.length == expected_length
@@ -75,30 +78,30 @@ def test_render_single_entity(t_string, expected_text, expected_type, expected_o
 
 def test_render_bold_emoji_offset():
     # 🎉 is 2 UTF-16 code units, so "🎉 " is 3 — offset of "Party" must be 3
-    text, entities = render(t"🎉 {Bold('Party')}!")
-    assert text == "🎉 Party!"
-    assert len(entities) == 1
-    e = entities[0]
+    result = render(t"🎉 {Bold('Party')}!")
+    assert result.text == "🎉 Party!"
+    assert len(result.entities) == 1
+    e = result.entities[0]
     assert e.type == "bold"
     assert e.offset == 3
     assert e.length == 5
 
 
 def test_render_bold_italic_produces_two_entities_at_same_span():
-    text, entities = render(t"{BoldItalic('both')}")
-    assert text == "both"
-    assert len(entities) == 2
-    assert {e.type for e in entities} == {"bold", "italic"}
-    for e in entities:
+    result = render(t"{BoldItalic('both')}")
+    assert result.text == "both"
+    assert len(result.entities) == 2
+    assert {e.type for e in result.entities} == {"bold", "italic"}
+    for e in result.entities:
         assert e.offset == 0
         assert e.length == 4
 
 
 def test_render_link():
-    text, entities = render(t"{Link('Mitup', 'https://example.com')}")
-    assert text == "Mitup"
-    assert len(entities) == 1
-    e = entities[0]
+    result = render(t"{Link('Mitup', 'https://example.com')}")
+    assert result.text == "Mitup"
+    assert len(result.entities) == 1
+    e = result.entities[0]
     assert e.type == "text_link"
     assert e.url == "https://example.com"
     assert e.offset == 0
@@ -106,10 +109,10 @@ def test_render_link():
 
 
 def test_render_entity_datetime():
-    text, entities = render(t"{EntityDateTime('tomorrow', unix_time=9999999)}")
-    assert text == "tomorrow"
-    assert len(entities) == 1
-    e = entities[0]
+    result = render(t"{EntityDateTime('tomorrow', unix_time=9999999)}")
+    assert result.text == "tomorrow"
+    assert len(result.entities) == 1
+    e = result.entities[0]
     assert isinstance(e, DateTimeMessageEntity)
     assert e.offset == 0
     assert e.length == 8
@@ -117,19 +120,19 @@ def test_render_entity_datetime():
 
 
 def test_render_entity_datetime_with_format():
-    text, entities = render(t"{EntityDateTime('now', unix_time=1, date_time_format='date')}")
-    assert text == "now"
-    e = entities[0]
+    result = render(t"{EntityDateTime('now', unix_time=1, date_time_format='date')}")
+    assert result.text == "now"
+    e = result.entities[0]
     assert isinstance(e, DateTimeMessageEntity)
     assert e.date_time_format == "date"
 
 
 def test_render_multiple_non_overlapping_entities():
-    text, entities = render(t"Hello {Bold('world')} and {Italic('there')}")
-    assert text == "Hello world and there"
-    assert len(entities) == 2
-    bold_e = next(e for e in entities if e.type == "bold")
-    italic_e = next(e for e in entities if e.type == "italic")
+    result = render(t"Hello {Bold('world')} and {Italic('there')}")
+    assert result.text == "Hello world and there"
+    assert len(result.entities) == 2
+    bold_e = next(e for e in result.entities if e.type == "bold")
+    italic_e = next(e for e in result.entities if e.type == "italic")
     assert bold_e.offset == 6  # "Hello " = 6 code units
     assert bold_e.length == 5  # "world"
     assert italic_e.offset == 16  # "Hello world and " = 16 code units
@@ -178,12 +181,12 @@ def test_date_time_message_entity_to_dict_format(date_time_format: str | None, e
     ids=["bold", "italic"],
 )
 def test_parse_md_markers_single_entity(text, expected_text, expected_type, expected_offset, expected_length):
-    result_text, entities = parse_md_markers(text, {})
-    assert result_text == expected_text
-    assert len(entities) == 1
-    assert entities[0].type == expected_type
-    assert entities[0].offset == expected_offset
-    assert entities[0].length == expected_length
+    result = parse_md_markers(text, {})
+    assert result.text == expected_text
+    assert len(result.entities) == 1
+    assert result.entities[0].type == expected_type
+    assert result.entities[0].offset == expected_offset
+    assert result.entities[0].length == expected_length
 
 
 @pytest.mark.parametrize(
@@ -195,17 +198,17 @@ def test_parse_md_markers_single_entity(text, expected_text, expected_type, expe
     ids=["plain_text", "empty_string"],
 )
 def test_parse_md_markers_no_entities(text: str, expected_text: str):
-    result_text, entities = parse_md_markers(text, {})
-    assert result_text == expected_text
-    assert entities == []
+    result = parse_md_markers(text, {})
+    assert result.text == expected_text
+    assert result.entities == []
 
 
 def test_parse_md_markers_bold_and_italic_non_overlapping():
-    text, entities = parse_md_markers("*bold* and _italic_", {})
-    assert text == "bold and italic"
-    assert len(entities) == 2
-    bold_e = next(e for e in entities if e.type == "bold")
-    italic_e = next(e for e in entities if e.type == "italic")
+    result = parse_md_markers("*bold* and _italic_", {})
+    assert result.text == "bold and italic"
+    assert len(result.entities) == 2
+    bold_e = next(e for e in result.entities if e.type == "bold")
+    italic_e = next(e for e in result.entities if e.type == "italic")
     assert bold_e.offset == 0
     assert bold_e.length == 4  # "bold"
     assert italic_e.offset == 9  # "bold and " = 9 code units
@@ -214,27 +217,27 @@ def test_parse_md_markers_bold_and_italic_non_overlapping():
 
 def test_parse_md_markers_bold_italic_nested_same_span():
     # _*both*_ must produce two overlapping entities at the same offset/length
-    text, entities = parse_md_markers("_*both*_", {})
-    assert text == "both"
-    assert len(entities) == 2
-    assert {e.type for e in entities} == {"bold", "italic"}
-    for e in entities:
+    result = parse_md_markers("_*both*_", {})
+    assert result.text == "both"
+    assert len(result.entities) == 2
+    assert {e.type for e in result.entities} == {"bold", "italic"}
+    for e in result.entities:
         assert e.offset == 0
         assert e.length == 4
 
 
 def test_parse_md_markers_variable_substitution():
-    text, entities = parse_md_markers("Hello ${name}!", {"name": "Juan"})
-    assert text == "Hello Juan!"
-    assert entities == []
+    result = parse_md_markers("Hello ${name}!", {"name": "Juan"})
+    assert result.text == "Hello Juan!"
+    assert result.entities == []
 
 
 def test_parse_md_markers_bold_with_variable_correct_offset():
     # Entity offset must reflect the substituted value's length, not the placeholder length
-    text, entities = parse_md_markers("Hello *${name}*", {"name": "Juan"})
-    assert text == "Hello Juan"
-    assert len(entities) == 1
-    e = entities[0]
+    result = parse_md_markers("Hello *${name}*", {"name": "Juan"})
+    assert result.text == "Hello Juan"
+    assert len(result.entities) == 1
+    e = result.entities[0]
     assert e.type == "bold"
     assert e.offset == 6  # "Hello " = 6 code units
     assert e.length == 4  # "Juan"
@@ -242,27 +245,27 @@ def test_parse_md_markers_bold_with_variable_correct_offset():
 
 def test_parse_md_markers_backslash_escape_strips_backslash():
     # \( → ( and \) → ) — backslashes must be stripped from output
-    text, entities = parse_md_markers("\\(foo\\)", {})
-    assert text == "(foo)"
-    assert entities == []
+    result = parse_md_markers("\\(foo\\)", {})
+    assert result.text == "(foo)"
+    assert result.entities == []
 
 
 def test_parse_md_markers_escaped_marker_chars_do_not_create_entities():
     # \* → * and \_ → _ — escaped marker characters are unescaped but do not create entities
-    text, entities = parse_md_markers("\\*not bold\\*", {})
-    assert text == "*not bold*"
-    assert entities == []
+    result = parse_md_markers("\\*not bold\\*", {})
+    assert result.text == "*not bold*"
+    assert result.entities == []
 
 
 def test_parse_md_markers_meeting_starting_nesting():
     # The MEETING_STARTING message uses _*${meeting_title}*_ — bold-italic nesting
     template = "The meeting _*${meeting_title}*_ is starting soon!"
-    text, entities = parse_md_markers(template, {"meeting_title": "Board meeting"})
-    assert "Board meeting" in text
-    assert len(entities) == 2
-    assert {e.type for e in entities} == {"bold", "italic"}
-    offsets = {e.offset for e in entities}
-    lengths = {e.length for e in entities}
+    result = parse_md_markers(template, {"meeting_title": "Board meeting"})
+    assert "Board meeting" in result.text
+    assert len(result.entities) == 2
+    assert {e.type for e in result.entities} == {"bold", "italic"}
+    offsets = {e.offset for e in result.entities}
+    lengths = {e.length for e in result.entities}
     assert len(offsets) == 1
     assert len(lengths) == 1
     assert offsets.pop() == 12  # "The meeting " = 12 code units
@@ -271,9 +274,9 @@ def test_parse_md_markers_meeting_starting_nesting():
 
 def test_parse_md_markers_unpaired_star_produces_no_entity():
     # A lone * that is not paired must not produce an entity
-    text, entities = parse_md_markers("Price: 5*3 = 15", {})
-    assert text == "Price: 5*3 = 15"
-    assert entities == []
+    result = parse_md_markers("Price: 5*3 = 15", {})
+    assert result.text == "Price: 5*3 = 15"
+    assert result.entities == []
 
 
 # ---------------------------------------------------------------------------
@@ -283,27 +286,27 @@ def test_parse_md_markers_unpaired_star_produces_no_entity():
 
 def test_render_bold_with_emoji_in_entity_text():
     # Entity length must be in UTF-16 units, not Unicode code points
-    text, entities = render(t"Join {Bold('🎉 Party')}")
-    assert text == "Join 🎉 Party"
-    e = entities[0]
+    result = render(t"Join {Bold('🎉 Party')}")
+    assert result.text == "Join 🎉 Party"
+    e = result.entities[0]
     assert e.offset == 5  # "Join " = 5 code units
     assert e.length == 8  # "🎉 Party": emoji=2 + space+5 chars = 8 code units
 
 
 def test_parse_md_markers_emoji_prefix_shifts_entity_offset():
     # Emoji appearing as plain text before a marker — offset must count UTF-16 units
-    text, entities = parse_md_markers("🎉 *bold*", {})
-    assert text == "🎉 bold"
-    e = entities[0]
+    result = parse_md_markers("🎉 *bold*", {})
+    assert result.text == "🎉 bold"
+    e = result.entities[0]
     assert e.offset == 3  # "🎉 ": emoji=2 + space=1, not 2 (code points)
     assert e.length == 4
 
 
 def test_parse_md_markers_emoji_in_variable_value_entity_length():
     # Entity spanning a variable whose substituted value contains emoji — length in UTF-16 units
-    text, entities = parse_md_markers("Meeting: *${title}*", {"title": "🎉 Kickoff"})
-    assert text == "Meeting: 🎉 Kickoff"
-    e = entities[0]
+    result = parse_md_markers("Meeting: *${title}*", {"title": "🎉 Kickoff"})
+    assert result.text == "Meeting: 🎉 Kickoff"
+    e = result.entities[0]
     assert e.offset == 9  # "Meeting: " = 9 code units
     assert e.length == 10  # "🎉 Kickoff": emoji=2 + space+7 chars = 10 code units
 
@@ -311,8 +314,96 @@ def test_parse_md_markers_emoji_in_variable_value_entity_length():
 def test_parse_md_markers_emoji_variable_shifts_subsequent_entity_offset():
     # A user-supplied flag emoji shifts the offset of a subsequent formatting entity.
     # 🇪🇸 is 2 regional indicator symbols → 4 UTF-16 code units, so "🇪🇸 " = 5.
-    text, entities = parse_md_markers("${name} *is ready*", {"name": "🇪🇸"})
-    assert text == "🇪🇸 is ready"
-    e = entities[0]
+    result = parse_md_markers("${name} *is ready*", {"name": "🇪🇸"})
+    assert result.text == "🇪🇸 is ready"
+    e = result.entities[0]
     assert e.offset == 5  # "🇪🇸 ": 2 regional indicators × 2 units each + space = 5, not 2
     assert e.length == 8  # "is ready" = 8 code units
+
+
+# ---------------------------------------------------------------------------
+# FormattedText — offset manipulation
+# ---------------------------------------------------------------------------
+
+
+def test_formatted_text_append_returns_new_instance_with_same_entities():
+    e = MessageEntity(type="bold", offset=0, length=4)
+    ft = FormattedText("word", [e])
+    result = ft.append(" more text")
+    assert result.entities == [e]
+    assert result is not ft
+    assert result.text == "word more text"
+
+
+def test_formatted_text_prepend_shifts_existing_entities():
+    e = MessageEntity(type="bold", offset=0, length=5)
+    ft = FormattedText("world", [e])
+    result = ft.prepend("Hello ")
+    assert result.text == "Hello world"
+    assert len(result.entities) == 1
+    assert result.entities[0].offset == 6  # "Hello " = 6 UTF-16 code units
+
+
+def test_formatted_text_prepend_preserves_url_on_link_entity():
+    # Exercises the `if entity.url` branch in _shift_entity.
+    e = MessageEntity(type="text_link", offset=0, length=5, url="https://example.com")
+    ft = FormattedText("Mitup", [e])
+    result = ft.prepend("prefix ")
+    assert len(result.entities) == 1
+    assert result.entities[0].url == "https://example.com"
+    assert result.entities[0].offset == 7  # "prefix " = 7 UTF-16 code units
+
+
+def test_formatted_text_prepend_no_entities():
+    ft = FormattedText("hello")
+    result = ft.prepend("Say: ")
+    assert result.text == "Say: hello"
+    assert result.entities == []
+
+
+# ---------------------------------------------------------------------------
+# _nearest_utf16 — fallback branch
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "mapping, pos, expected",
+    [
+        ({0: 0, 1: 2, 5: 10}, 3, 2),  # falls back to mapping[1]
+        ({5: 10}, 3, 0),  # no smaller key → default 0
+    ],
+    ids=["fallback_to_nearest", "fallback_to_zero"],
+)
+def test_nearest_utf16_fallback(mapping: dict, pos: int, expected: int):
+    assert _nearest_utf16(mapping, pos) == expected
+
+
+# ---------------------------------------------------------------------------
+# Zero-length span — skipped in _spans_to_entities
+# ---------------------------------------------------------------------------
+
+
+def test_parse_md_markers_empty_variable_in_bold_produces_no_entity():
+    # An empty substitution collapses the bold span to zero length; must be skipped.
+    result = parse_md_markers("*${title}*", {"title": ""})
+    assert result.text == ""
+    assert result.entities == []
+
+
+# ---------------------------------------------------------------------------
+# Escaped italic markers — skipped in _collect_marker_spans
+# ---------------------------------------------------------------------------
+
+
+def test_parse_md_markers_escaped_italic_chars_do_not_create_entities():
+    # \_ → _ — escaped marker characters are unescaped but do not create entities
+    result = parse_md_markers("\\_not italic\\_", {})
+    assert result.text == "_not italic_"
+    assert result.entities == []
+
+
+def test_parse_md_markers_escaped_closing_bold_marker_produces_no_entity():
+    # The closing \* is escaped; the * pair is incomplete, so no bold entity is created.
+    result = parse_md_markers("*almost bold\\*", {})
+    assert result.text == "*almost bold*"
+    assert result.entities == []

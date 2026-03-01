@@ -21,6 +21,7 @@ Run `/project-guide` for a full reference of all available agents and skills.
 - Never run tests, linters, formatters, or anything similar for validation.
 - Tests are run by a hook when you are done. If you want feedback mid-work, run a specific test with `hatch run dev -- <pytest args>`. Avoid full runs.
 - Formatters and linters are run by hooks after each modification. No need to run them manually.
+- **Never run `python` directly.** The system Python has no project dependencies. Always use `hatch run dev:python python <args>` to execute Python within the project's managed environment.
 
 ## When hooks fail
 

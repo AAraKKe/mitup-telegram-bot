@@ -96,6 +96,8 @@ class User(BaseModel, SQLModel, table=True):
     async def send_message(self, bot: ExtBot, view: MitupView):
         await bot.send_message(
             chat_id=self.tg_user_id,
-            text=view.description,
+            text=view.description.text,
+            entities=view.description.entities or None,
             reply_markup=view.markup,
+            parse_mode=None,
         )

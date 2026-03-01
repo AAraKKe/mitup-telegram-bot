@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
 
-from mitup_bot.utils.messages import MeetingMessages, sanitize
+from mitup_bot.utils.messages import MeetingMessages
 
 from .base_model import BaseModel
 
@@ -37,11 +37,9 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
 
     @property
     def participant_name(self) -> str:
-        name = sanitize(self.user.inline_name, full=True)
+        name = self.user.inline_name
         if self.invited_by is not None:
             language = self.meetup.lang
-            invited_by_str = MeetingMessages.INVITED_BY_USER.get(
-                lang=language, user=sanitize(self.invited_by.inline_name, full=True)
-            )
-            name += f" {invited_by_str}"
+            invited_by_str = MeetingMessages.INVITED_BY_USER.get(lang=language, user=self.invited_by.inline_name)
+            name += f" ({invited_by_str})"
         return name

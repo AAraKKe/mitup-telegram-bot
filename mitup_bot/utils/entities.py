@@ -9,6 +9,49 @@ from string.templatelib import Interpolation, Template
 
 from telegram import MessageEntity
 
+
+class FormattedText:
+    """Immutable plain-text + entity pair for Telegram messages.
+
+    Wraps the ``(text, entities)`` pair that Telegram expects and provides
+    mutation-free helpers for composing messages without manually tracking
+    UTF-16 entity offsets.
+    """
+
+    __slots__ = ("_entities", "_text")
+
+    def __init__(self, text: str, entities: list[MessageEntity] | None = None) -> None:
+        self._text = text
+        self._entities: list[MessageEntity] = list(entities) if entities else []
+
+    @property
+    def text(self) -> str:
+        return self._text
+
+    @property
+    def entities(self) -> list[MessageEntity]:
+        """Return the entity list (empty when there are none)."""
+        return self._entities
+
+    def prepend(self, prefix: str) -> FormattedText:
+        """Return a new ``FormattedText`` with *prefix* prepended, shifting entity offsets."""
+        offset = utf16_len(prefix)
+        shifted = [_shift_entity(e, offset) for e in self._entities]
+        return FormattedText(prefix + self._text, shifted)
+
+    def append(self, suffix: str) -> FormattedText:
+        """Return a new ``FormattedText`` with *suffix* appended (entities are unaffected)."""
+        return FormattedText(self._text + suffix, self._entities)
+
+    def __repr__(self) -> str:
+        return f"FormattedText({self._text!r}, entities={self._entities!r})"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FormattedText):
+            return NotImplemented
+        return self._text == other._text and self._entities == other._entities
+
+
 # --- Typed wrapper dataclasses ---
 
 
@@ -73,6 +116,22 @@ class DateTimeMessageEntity(MessageEntity):
         return d
 
 
+def _shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
+    """Return a copy of *entity* with its offset shifted by *offset* UTF-16 code units."""
+    if isinstance(entity, DateTimeMessageEntity):
+        return DateTimeMessageEntity(
+            offset=entity.offset + offset,
+            length=entity.length,
+            unix_time=entity.unix_time,
+            date_time_format=entity.date_time_format,
+        )
+    # MessageEntity is frozen; construct a new instance with the adjusted offset.
+    kwargs: dict = {"type": entity.type, "offset": entity.offset + offset, "length": entity.length}
+    if entity.url:
+        kwargs["url"] = entity.url
+    return MessageEntity(**kwargs)
+
+
 # --- UTF-16 helper ---
 
 
@@ -123,8 +182,8 @@ def _render_entity_datetime(plain: str, value: EntityDateTime) -> list[MessageEn
     ]
 
 
-def render(template: Template) -> tuple[str, list[MessageEntity]]:
-    """Convert a t-string into a ``(plain_text, entities)`` pair with UTF-16 offsets."""
+def render(template: Template) -> FormattedText:
+    """Convert a t-string into a ``FormattedText`` with UTF-16 entity offsets."""
     plain = ""
     entities: list[MessageEntity] = []
 
@@ -157,7 +216,7 @@ def render(template: Template) -> tuple[str, list[MessageEntity]]:
             case _:
                 plain += str(value)
 
-    return plain, entities
+    return FormattedText(plain, entities)
 
 
 # --- parse_md_markers() ---
@@ -362,8 +421,8 @@ def _spans_to_entities(
 def parse_md_markers(
     text: str,
     substitutions: dict[str, str],
-) -> tuple[str, list[MessageEntity]]:
-    """Parse a MarkdownV2-annotated translated string into a ``(plain_text, entities)`` pair.
+) -> FormattedText:
+    """Parse a MarkdownV2-annotated translated string into a ``FormattedText``.
 
     *text* is a plain ``str`` from the gettext catalogue — not a t-string. Markers are
     scanned before variable substitution so that user-supplied values never produce spurious
@@ -376,7 +435,7 @@ def parse_md_markers(
     skip_positions = _build_skip_positions(raw_spans, escape_spans)
     output, template_to_utf16 = _build_template_to_utf16(text, skip_positions, var_spans)
     entities = _spans_to_entities(raw_spans, template_to_utf16)
-    return output, entities
+    return FormattedText(output, entities)
 
 
 def _nearest_utf16(mapping: dict[int, int], pos: int) -> int:

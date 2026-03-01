@@ -1,5 +1,4 @@
 import datetime as dt
-from string import Template
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, overload
 from zoneinfo import ZoneInfo
 
@@ -12,7 +11,7 @@ from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.models import Message
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import sanitize
+from mitup_bot.utils.entities import Bold, EntityDateTime, FormattedText, render
 from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
@@ -247,20 +246,19 @@ class Meetup(BaseModel, SQLModel, table=True):
         return self.owner.datetime_in_tz(self.datetime) if self.datetime else None
 
     @property
-    def full_str_datetime(self) -> str:
-        """Alawyas shows the time with the timezone"""
-        if self.datetime:
-            return f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})"
-
-        return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
-
-    @property
     def str_datetime(self) -> str:
         if self.datetime:
             datetime_str = f"{self.datetime_in_tz:%Y-%m-%d %H:%M}"
             if self.show_timezone:
                 datetime_str += f" ({self.timezone.key})"
             return datetime_str
+        return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
+
+    @property
+    def full_str_datetime(self) -> str:
+        """Alawyas shows the time with the timezone"""
+        if self.datetime:
+            return f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})"
         return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
 
     @property
@@ -294,7 +292,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         final_list = f"\n  {'\n  '.join(participant_list)}" if participant_list else ""
 
         if waiting_list:
-            final_list += f"\n--- {Emojis.WAITING} _{ButtonMessages.WAITING_LIST.get(lang=self.lang)}_ \n  "
+            final_list += f"\n--- {Emojis.WAITING} {ButtonMessages.WAITING_LIST.get(lang=self.lang)} \n  "
             final_list += "\n  ".join(waiting_list)
 
         return final_list
@@ -328,7 +326,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         max_participants = (
             MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
             if self.max_members
-            else f"\\({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)}\\)"
+            else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)})"
         )
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
@@ -342,51 +340,53 @@ class Meetup(BaseModel, SQLModel, table=True):
         return f"{self.participants_text_title}{self.participants_list_text}".strip()
 
     @property
-    def message(self) -> str:
-        template = Template(
-            f"*$title* \\({MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)}\\)\n\n"
-            f"--- {Emojis.DESCRIPTION} $description\n"
-            f"--- {Emojis.CLOCK} $datetime\n"
-            f"--- {Emojis.MAP} $location\n"
-            f"--- {Emojis.JOINED} $participants_text_with_list"
-        )
+    def _datetime_display(self) -> str | EntityDateTime:
+        """Datetime field for the meeting message — entity-typed when a datetime is set."""
+        if self.datetime is None:
+            return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
+        return EntityDateTime(self.str_datetime, int(self.datetime.timestamp()))
 
-        return self.process_message_template(template)
-
-    def process_message_template(self, template: Template) -> str:
-        return sanitize(
-            template.substitute(
-                title=sanitize(self.title or "", full=True),
-                description=sanitize(
-                    self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang), full=True
-                ),
-                datetime=sanitize(self.str_datetime, full=True),
-                location=sanitize(self.location.description(lang=self.lang), full=True),
-                participants_text_with_list=self.participants_text_with_list,
-                participants_text=self.participants_text,
-            )
+    @property
+    def message(self) -> FormattedText:
+        description = self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang)
+        created_by = MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
+        location = self.location.description(lang=self.lang)
+        datetime_display = self._datetime_display
+        participants_text_with_list = self.participants_text_with_list
+        return render(
+            t"{Bold(self.title)} ({created_by})\n\n"
+            t"--- {Emojis.DESCRIPTION} {description}\n"
+            t"--- {Emojis.CLOCK} {datetime_display}\n"
+            t"--- {Emojis.MAP} {location}\n"
+            t"--- {Emojis.JOINED} {participants_text_with_list}"
         )
 
     @property
-    def inline_message(self) -> str:
+    def inline_message(self) -> FormattedText:
         """
-        This is similar to the message itself but used when the meeting is shared.
-        In this case, property that are not set are not shown.
+        Similar to message but used when the meeting is shared inline.
+        Properties that are not set are omitted.
         """
-        message_lines = [
-            f"*$title* \\({MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)}\\)\n",
-        ]
-        if self.description:
-            message_lines.append(f"--- {Emojis.DESCRIPTION} $description")
-        if self.datetime:
-            message_lines.append(f"--- {Emojis.CLOCK} $datetime")
-        if not self.location.empty():
-            message_lines.append(f"--- {Emojis.MAP} $location")
-        message_lines.append(f"--- {Emojis.JOINED} $participants_text")
-
-        template = Template("\n".join(message_lines))
-
-        return self.process_message_template(template)
+        created_by = MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
+        description_section = f"\n--- {Emojis.DESCRIPTION} {self.description}" if self.description else ""
+        datetime_display = self._datetime_display if self.datetime else None
+        location_section = (
+            "" if self.location.empty() else f"\n--- {Emojis.MAP} {self.location.description(lang=self.lang)}"
+        )
+        participants_text = self.participants_text
+        if datetime_display is not None:
+            return render(
+                t"{Bold(self.title)} ({created_by})\n"
+                t"{description_section}"
+                t"\n--- {Emojis.CLOCK} {datetime_display}"
+                t"{location_section}"
+                t"\n--- {Emojis.JOINED} {participants_text}"
+            )
+        return render(
+            t"{Bold(self.title)} ({created_by})\n"
+            t"{description_section}{location_section}"
+            t"\n--- {Emojis.JOINED} {participants_text}"
+        )
 
     @property
     def inline_query_message(self) -> str:
@@ -478,7 +478,6 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def edit_view(self) -> MitupView:
         now_in_tz: dt.datetime = self.datetime_in_tz or self.owner.now_in_tz()
-
         return MitupView(
             self.message,
             [
