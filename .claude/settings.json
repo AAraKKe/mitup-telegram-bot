@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bin/claude_stop_hook.sh dev:test"
+            "command": "bin/claude_stop_hook.sh dev:test-hook"
           },
           {
             "type": "command",

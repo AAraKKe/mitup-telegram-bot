@@ -203,6 +203,10 @@ test = [
     "build-locales",
     "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered {args:tests}",
 ]
+test-hook = [
+    "build-locales",
+    "pytest -n 4 --no-cov --tb=short -q {args:tests}",
+]
 test-db = [
     "build-locales",
     "FORCE_COLOR=1 pytest --db-tests --dist no --junitxml=report.xml {args:tests/db/}",
