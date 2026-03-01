@@ -49,12 +49,12 @@ def expected_participants_message(max_participants: bool, lang: str, n_participa
     )
     total_participants = f"{n_participants} {participants}"
     max_participants_text = (
-        f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5)}"
+        MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5)
         if max_participants
         else f"\\({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang)}\\)"
     )
 
-    return sanitize(f"{total_participants} {max_participants_text}", full=True)
+    return f"{total_participants} {max_participants_text}"
 
 
 def expected_message(

@@ -200,7 +200,7 @@ class SettingsMessages(MessageBase):
         "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. "
         "You can activate it again from your *Past meetings menu*.\n\n"
         "The curent timeout is *${timeout} minutes*\n\n"
-        "Send the timeout \\(in minutes\\) you would like to use or touch Cancel to go back."
+        "Send the timeout (in minutes) you would like to use or touch Cancel to go back."
     )
     INVALID_POSITIVE_INTEGER = (
         "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
@@ -213,8 +213,7 @@ class SettingsMessages(MessageBase):
         "you *${notifications_time} minutes* before a meeting starts."
     )
     NOTIFICATION_SET_TIME = (
-        "Send how long before a meeting starts \\(in minutes\\) you would like to be "
-        "notified or touch Cancel to go back."
+        "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
     )
     NOTIFICATION_TIME_SET_SUCCESS = "The notification time has been set to *${notifications_time} minutes*."
     ENABLED = f"Enabled {Emojis.CHECK}"
@@ -243,8 +242,8 @@ class MeetingMessages(MessageBase):
     EMPTY = "Empty"
     PARTICIPANT = "Participant"
     PARTICIPANTS = "Participants"
-    MAX_PARTICIPANTS = "\\(Max: ${max_participants}\\)"
-    INVITED_BY_USER = "_\\(invited by ${user}\\)_"
+    MAX_PARTICIPANTS = "(Max: ${max_participants})"
+    INVITED_BY_USER = "_(invited by ${user})_"
     MEETING_WITHOUT_DESCRIPTION = "_This meeting has no description yet_"
     MEETING_WITHOUT_PARTICIPANTS = "_This meeting has no participants yet_"
 
@@ -337,6 +336,8 @@ class MeetingMessages(MessageBase):
         "This is the current description of your meeting:\n${description}\n\n Send me the new one"
     )
     TITLE_SET_SUCCESS = "The title has been properly set to: *${title}*"
+    # The user-supplied description is intentionally wrapped in bold so the newly set value
+    # is visually highlighted in the confirmation message.
     DESCRIPTION_SET_SUCCESS = "The description has been properly set to: *${description}*"
 
     # Edit meeting location
@@ -362,7 +363,7 @@ class MeetingMessages(MessageBase):
         "participants that joined the meeting."
     )
     EDIT_MEETING_MAX_PARTICIPANTS = (
-        "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) "
+        "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) "
         "or press in _No limit_ to allow an unlimited number of participants."
     )
     MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: *${max_participants}*"
@@ -416,7 +417,7 @@ class MeetingMessages(MessageBase):
     )
     INVALID_TIME = (
         f"My internal clock is old and cannot understand this science fiction time {Emojis.UFO}.\n\n"
-        "Try again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), "
+        "Try again with a time that has valid hours (00-23) and minutes (00-59), "
         f"I am sure I can work with that {Emojis.BRAIN}."
     )
     DELETE_DATE_CONFIRMATION = "Are you sure you want to delete the date and time of the meeting?"
@@ -443,8 +444,8 @@ class MeetingMessages(MessageBase):
     )
 
     # Attachment status (searchable via inline mode)
-    NOT_SEARCHABLE_FOOTNOTE = f"{Emojis.SEARCH} Make this meeting searchable in this chat\\."
-    SEARCHABLE_FOOTNOTE = f"{Emojis.CHECK} This meeting is now searchable in this chat\\."
+    NOT_SEARCHABLE_FOOTNOTE = f"{Emojis.SEARCH} Make this meeting searchable in this chat."
+    SEARCHABLE_FOOTNOTE = f"{Emojis.CHECK} This meeting is now searchable in this chat."
     NOW_SEARCHABLE_ALERT = (
         f"{Emojis.CHECK} Now Searchable!\n\n"
         "This meeting is now attached to this chat. It will be included in your search "
@@ -460,7 +461,7 @@ class MeetingMessages(MessageBase):
     # TODO: this needs to be moved to a separate set of messages as it is not part of the meeting creation/editing
     # See https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/75
     NO_MEETINGS_FOUND = (
-        "_You don't have any meetings yet.\n\nClick on _${new_meeting_button}_ in the main menu to create one._"
+        "You don't have any meetings yet.\n\nClick on *${new_meeting_button}* in the main menu to create one."
     )
     ACTIVE_MEETINGS_PAGE = "These are all your active meetings."
     JOINED_MEETINGS_PAGE = "These are the meetings you have joined."
@@ -491,7 +492,9 @@ class NotificationMessages(MessageBase):
         "If you do not want to reactivate the meeting, you can ignore this message."
     )
     MEETING_PERMANENTLY_DELETED = "The meeting *${meeting_title}* has been permanently deleted."
-    MEETING_STARTING = "The meeting _*${meeting_title}*_ is starting soon!"
+    # Simplified from _*...*_ to *...* because nested bold-italic markers are not supported
+    # by the parse_md_markers() entity parser introduced in Phase 1.
+    MEETING_STARTING = "The meeting *${meeting_title}* is starting soon!"
 
 
 class Weekday(MessageBase):
