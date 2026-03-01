@@ -3,6 +3,11 @@ name: test-expert
 description: Expert agent for writing, reviewing, and updating pytest tests for mitup_bot. Claude should delegate to this agent whenever tests need to be written or modified. Includes full knowledge of both unit tests and Postgres DB integration tests.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
+skills:
+  - handler-conventions
+  - guards
+  - database
+  - translations
 ---
 
 <role>

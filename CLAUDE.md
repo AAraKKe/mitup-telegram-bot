@@ -2,29 +2,21 @@
 
 ## Role
 
-Act as an experienced Python engineer. Write idiomatic, modern Python using features available in the version declared in `pyproject.toml` (see `requires-python`). Before writing code, check `pyproject.toml` for the exact minimum Python version and use the latest syntax and stdlib capabilities available in that version. Examples of preferred patterns include the native `type X = ...` and generics syntax (`def f[T](x: T) -> T`), `StrEnum`, `match` statements, `TaskGroup`, `ExceptionGroup`, `tomllib`, f-strings, and walrus operators where they improve clarity. Avoid backports, `from __future__ import annotations`, and deprecated patterns.
+Act as an experienced Python engineer. Write idiomatic, modern Python using features available in the version declared in `pyproject.toml` (see `requires-python`).
 
-When requested to write code, always second guess the user's request and look for ways to improve it. If the request is vague, ask clarifying questions. If the request is a code snippet, review it for correctness, style, and adherence to project conventions before accepting it. If you identify issues or areas for improvement, rewrite the code snippet with explanations of your changes. Any time you decide to deviate from the user's original request, provide a clear rationale for your choices and wait for user confirmation before proceeding.
+## Working with agents
 
-## Planning
+For complex tasks that span multiple areas (handler + migration + tests + translations, etc.), delegate to the `em` agent rather than implementing directly. The `em` agent clarifies requirements, forms a phased plan, presents it for approval, then coordinates specialist agents with checkpoints between phases.
 
-When writing a plan, always open with an **Agent delegation** section before any implementation details. Use prohibitive language for each delegated responsibility so it reads as a constraint, not background information. Example structure:
+For single-domain tasks or targeted fixes, invoke a specialist agent directly with natural language: "Use the handler-expert agent to...".
 
-```
-## Agent delegation
-
-- Do NOT write or modify any tests yourself — delegate all test work to the `test-expert` agent.
-- Do NOT translate new strings yourself — delegate to the `translator` agent.
-```
-
-Only after this section should the plan continue with file maps, code changes, and implementation steps.
+Run `/project-guide` for a full reference of all available agents and skills.
 
 ## Important rules
 
 - Never run tests, linters, formatters, or anything similar for validation.
-- Tests are run by a hook when you are done, if you want to get feedback at the end of your work, allow the hook to run them.
-- If you want to run tests in the middle of the work to validate a specific test only, run tests with `hatch run:dev -- <pytest args>`. Always specify the test you want to run as much as possible avoiding full runs if possible.
-- Formatters and linters are run by hooks after each modification. No need for you to run them.
+- Tests are run by a hook when you are done. If you want feedback mid-work, run a specific test with `hatch run dev -- <pytest args>`. Avoid full runs.
+- Formatters and linters are run by hooks after each modification. No need to run them manually.
 
 ## Maintaining these instructions
 
@@ -33,8 +25,8 @@ When editing any instruction file, follow these rules:
 1. **Never hardcode versions.** Refer to the source of truth instead (e.g., "`requires-python` in `pyproject.toml`").
 2. **Never enumerate things that change.** Point to the canonical file/directory instead of listing items.
 3. **Describe rules, not snapshots.** Capture *how* to do something and *why*, not a frozen state.
-4. **Keep instructions co-located.** Rules specific to one area belong in the `CLAUDE.md` next to that code.
-5. **Update instructions when changing conventions.** If your change alters a documented pattern, update the relevant file in the same commit.
+4. **Keep domain knowledge in skills.** Rules specific to one area belong in the appropriate skill under `.claude/skills/`, not in CLAUDE.md files.
+5. **Update instructions when changing conventions.** If your change alters a documented pattern, update the relevant skill in the same commit.
 
 ## Repository
 
@@ -53,9 +45,7 @@ When validating Telegram API behaviour or the PTB library, consult:
 - **Telegram Bot API** — <https://core.telegram.org/bots/api>
 - **python-telegram-bot (PTB)** — <https://docs.python-telegram-bot.org/en/stable/index.html>
 
-Do not rely on assumptions or cached knowledge. Always verify against the current API specification.
-
-**Importanat**: only access those urls when necessary and when you need further knowledge. Avoid loading them on context if not needed.
+Only access those URLs when necessary. Avoid loading them into context if not needed.
 
 ## Tech stack
 
@@ -77,66 +67,25 @@ Versions and pins are defined in `pyproject.toml`. Always check that file — do
 ## Project structure
 
 ```
-mitup_bot/                     # Main package
-├── app.py                     # PTB application entry point (MitupRuntime)
-├── config.py                  # Configuration system
-├── db.py                      # Database engine and session decorators
-├── exceptions.py              # Custom exception hierarchy
-├── guards.py                  # Input validation for handlers
-├── cli/                       # Production CLI commands
-├── environments/              # Per-environment TOML config files
-├── handlers/                  # Bot logic by feature area
-├── lambdas/                   # AWS Lambda functions
-├── locales/                   # Compiled gettext translation files
-├── migrations/                # Alembic migration scripts
-├── models/                    # SQLModel database models (see models/__init__.py for exports)
-├── monitoring/                # CloudWatch metrics emission
-├── utils/                     # Shared utilities (callbacks, messages, emojis, types)
-└── views/                     # View layer
+mitup_bot/              # Main package
+├── app.py              # PTB application entry point (MitupRuntime)
+├── config.py           # Configuration system
+├── db.py               # Database engine and session decorators
+├── exceptions.py       # Custom exception hierarchy
+├── guards.py           # Input validation for handlers
+├── cli/                # Production CLI commands
+├── environments/       # Per-environment TOML config files
+├── handlers/           # Bot logic by feature area
+├── lambdas/            # AWS Lambda functions
+├── locales/            # Compiled gettext translation files
+├── migrations/         # Alembic migration scripts
+├── models/             # SQLModel database models
+├── monitoring/         # CloudWatch metrics emission
+├── utils/              # Shared utilities (callbacks, messages, emojis, types)
+└── views/              # View layer
 
-bin/                           # CI scripts and dev utilities (not shipped in the wheel)
-tests/                         # Test suite
+bin/                    # CI scripts and dev utilities (not shipped in the wheel)
+tests/                  # Test suite
+.claude/agents/         # Specialist AI agents
+.claude/skills/         # Domain knowledge skills (auto-loaded when relevant)
 ```
-
-## Core patterns
-
-### Callback data
-
-All button interactions use `CallbackData` (Pydantic model in `callback_data.py`). Format: `{action};{entity}:{id}`. Predefined instances live in `mitup_bot/utils/callbacks.py`. Variants include `DateCallbackData` and `MeetingCallbackData` for richer payloads.
-
-### Guards
-
-Functions in `guards.py` validate handler inputs and raise domain exceptions (`UserNotFound`, `MeetupNotFound`, `MalformedCallbackData`). Always use guards instead of manual validation. Key guards: `current_user()`, `meeting_accessible()`, `valid_callback_data()`, `valid_meeting_callback_data()`.
-
-### Views
-
-Views in `mitup_bot/views/` abstract Telegram API calls from presentation. `MitupView` renders a message with an inline keyboard. `PaginatedMitupView` adds pagination. `MitupInlineView` is for inline query results. Use `views/factory.py` to construct views for standard screens. See `mitup_bot/views/CLAUDE.md` for full conventions.
-
-### Custom context
-
-`MitupContext` (in `custom_context.py`) extends PTB's `CallbackContext` with:
-- **User data registry** — `ContextId` enum keys mapping to `ContextData` (meeting ID + text). Access via context managers: `context.meeting_id()`, `context.text()`.
-- **Metrics engine** — `emit_metric()`, `put_feature_metric()`, `with_time_metric()` for CloudWatch metrics. Handler metrics are prepared automatically by the registry.
-
-### Configuration
-
-Config is loaded from TOML files in `mitup_bot/environments/` and optionally overridden by environment variables. Pydantic models validate all config values. See the `config` reference skill for full details.
-
-## Available skills
-
-| Skill | Type | Purpose |
-|-------|------|---------|
-| `/git` | Task | Branching, staging, committing, pushing, and rebasing |
-| `/mr` | Task | Generate an MR description from the GitLab template |
-| `/new-handler` | Task | Scaffold a new bot handler package |
-| `/translate` | Task | Add a new user-facing string to the message catalog |
-| `/ty-ignore` | Task | Insert a `ty: ignore` comment with the required issue URL |
-| `/new-migration` | Task | Generate and validate an Alembic migration |
-| `type-checking` | Reference | ty suppression rules (auto-loaded when type errors appear) |
-| `database` | Reference | Session decorator and migration patterns |
-| `translations` | Reference | gettext message class conventions |
-| `monitoring` | Reference | EMF metrics and CloudWatch patterns |
-| `api-wrapper` | Reference | TelegramApiWrapper, BotAdapter, ContextOrBotAdapter |
-| `error-handling` | Reference | Exception hierarchy and SUPPRESSED_EXCEPTIONS |
-| `config` | Reference | Config provider system and SecretStr |
-| `ci-pipeline` | Reference | Pipeline stages and validation jobs |

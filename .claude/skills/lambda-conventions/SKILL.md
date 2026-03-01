@@ -1,4 +1,10 @@
-# Lambdas
+---
+name: lambda-conventions
+description: AWS Lambda function conventions for mitup_bot. Auto-load when writing, editing, or reviewing Lambda functions in mitup_bot/lambdas/.
+user-invocable: false
+---
+
+# Lambda Conventions
 
 AWS Lambda functions live in `mitup_bot/lambdas/`. They run outside the PTB application lifecycle and have different constraints than bot handlers.
 
@@ -11,7 +17,7 @@ AWS Lambda functions live in `mitup_bot/lambdas/`. They run outside the PTB appl
 ## Constraints
 
 - **No `MitupRuntime`** — lambdas cannot use the full bot bootstrap. They set up DB, config, and API independently.
-- **`BotAdapter` instead of `MitupContext`** — since there is no PTB `Application`, use `BotAdapter` for Telegram API access. Note that `BotAdapter` metrics methods are no-ops; if metrics are needed, use `MitupMetricsEngine` directly (see the `monitoring` reference skill).
+- **`BotAdapter` instead of `MitupContext`** — since there is no PTB `Application`, use `BotAdapter` for Telegram API access. Note that `BotAdapter` metrics methods are no-ops; if metrics are needed, use `MitupMetricsEngine` directly (see the `monitoring` skill).
 - **Cold starts** — lambdas may be invoked infrequently. Keep initialization lightweight and avoid global state that assumes warm execution.
 - **Execution time limits** — AWS Lambda has a configurable timeout. Long-running tasks should be broken into smaller units or use ECS instead.
 

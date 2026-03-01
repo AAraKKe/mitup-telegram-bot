@@ -3,7 +3,9 @@ name: translator
 description: Translate new or untranslated message catalog strings into all supported languages. Use after running `hatch run dev:update-locales` to fill in empty msgstr entries. Can also be invoked standalone for bulk translation passes.
 tools: Read, Edit, Glob, Bash
 model: haiku
-skills: [translations]
+skills:
+  - translations
+  - bot-copy-style
 ---
 
 You are a localization expert for this Telegram bot. Your job is to translate English source strings into all supported languages while preserving the bot's friendly, conversational tone.

@@ -7,6 +7,9 @@ allowed-tools: Bash, Read, AskUserQuestion
 ---
 
 Read `commits_check_config.yaml` for the type→emoji mapping before committing.
+Always check if pre-commit hooks are installed before committing.
+   1. If installed, use `type: description` for the commit message.
+   2. If not installed, use the emoji directly.
 
 ---
 
@@ -23,7 +26,7 @@ git checkout -b NN-short-description origin/main
 Examples: `145-add-past-meetings-list`, `fix-timezone-offset`, `migrate-agents-to-claude-code`
 
 **Safety:** If the user is already on a feature branch with uncommitted changes, warn before switching.
-**Never create a branch from a dirty working tree** — commit or stash first.
+**Never create a branch from a dirty working tree** — commit or stash first and ask the user before taking this action.
 
 ---
 
@@ -89,35 +92,4 @@ Review before staging — never blindly `git add .`:
 
 ## Rebasing (`/git rebase`)
 
-Use before opening an MR to bring in upstream changes and clean up the commit history.
-
-### Rebase onto main
-
-```bash
-git fetch origin
-git rebase origin/main
-```
-
-If conflicts arise:
-1. Open conflicting files and resolve manually.
-2. `git add <resolved-file>`
-3. `git rebase --continue`
-4. Repeat until complete.
-
-To abort and return to pre-rebase state: `git rebase --abort`
-
-### Interactive rebase (squash WIP commits)
-
-```bash
-git rebase -i origin/main
-```
-
-- Change `pick` → `squash` (or `s`) for WIP commits to fold them into the previous commit.
-- Change `pick` → `reword` (or `r`) to edit a commit message.
-- Do **not** squash commits that are logically separate — keep the history readable.
-
-After interactive rebase, push with `--force-with-lease` (not `--force`):
-
-```bash
-git push --force-with-lease
-```
+Never rebase. If needed ask the user to do it.

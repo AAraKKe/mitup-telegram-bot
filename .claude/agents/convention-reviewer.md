@@ -3,6 +3,16 @@ name: convention-reviewer
 description: Review code for compliance with project-specific conventions. Use after implementing new handlers, views, or models to catch pattern violations before CI. Checks guard usage, localization, metrics, type suppression format, and session decorator correctness.
 tools: Read, Grep, Glob, Bash
 model: claude-haiku-4-5-20251001
+skills:
+  - handler-conventions
+  - view-conventions
+  - guards
+  - messages
+  - bot-copy-style
+  - database
+  - monitoring
+  - type-checking
+  - error-handling
 ---
 
 You are a project conventions auditor. Your job is to find convention violations, not general code quality issues.
