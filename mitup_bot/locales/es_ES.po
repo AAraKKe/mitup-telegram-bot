@@ -161,6 +161,18 @@ msgstr "Expulsar"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Eliminar fecha"
 
+msgid "ButtonMessages.MAKE_SEARCHABLE"
+msgstr "Hacer buscable"
+
+msgid "ButtonMessages.LOAD_CHAT_MEETINGS"
+msgstr "🔍 Cargar quedadas"
+
+msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
+msgstr "🔍 Buscar quedadas"
+
+msgid "ButtonMessages.REACTIVATE_MEETING"
+msgstr "Reactivar quedada"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "¡Bienvenido a MitUp Bot!\n\n"
 "Elige una de las siguientes opciones:"
@@ -341,6 +353,39 @@ msgstr "Perdona, estaba esperando la nueva hora para tu quedada. ¿Te gustaría 
 msgid "MeetingMessages.INVITE_USER_ON_EXIT"
 msgstr "Perdona, estaba esperando el nombre de la persona que quieres invitar. ¿Te gustaría enviarlo? Si no, toca Cancelar para salir."
 
+msgid "MeetingMessages.INVITE_USER_PROMPT"
+msgstr "<b>Añadir a la lista de invitados</b>\n\nPor favor, responde con el nombre de la persona que quieres añadir."
+
+msgid "MeetingMessages.INVITE_USER_CONFIRMATION"
+msgstr "<b>Confirmar adición</b>\n\n¿Estás seguro de que quieres añadir <b>${name}</b> a la quedada <b>${meeting_title}</b>?"
+
+msgid "MeetingMessages.INVITE_USER_OPEN_CHAT"
+msgstr "Abrir chat privado\n\nPara añadir participantes, necesitas abrir un chat conmigo primero."
+
+msgid "MeetingMessages.INVITE_USER_GO_PRIVATE"
+msgstr "Continuar en privado\n\nPor favor, cambia a nuestro chat privado para enviarme el nombre."
+
+msgid "MeetingMessages.INVITE_USER_SUCCESS"
+msgstr "<b>Lista actualizada</b>\n\nEl usuario <b>${name}</b> ha sido añadido a la quedada <b>${meeting_title}</b>."
+
+msgid "MeetingMessages.INVITE_USER_MEETING_FULL"
+msgstr "<b>Sin lugares disponibles</b>\n\nLa lista de invitados está llena. No puedes añadir a nadie más a menos que se libere un lugar."
+
+msgid "MeetingMessages.INVITE_USER_INVITES_DISABLED"
+msgstr "<b>Lista de invitados cerrada</b>\n\nYa no se permiten nuevas adiciones para esta quedada. El organizador ha cerrado la lista."
+
+msgid "MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND"
+msgstr "<b>Algo inesperado pasó...</b>\n\nDe repente perdí los detalles de la quedada. Esto no debería pasar.\n\nPor favor, intenta enviar el nombre de nuevo."
+
+msgid "MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK"
+msgstr "<b>Quedada no encontrada</b>\n\nLa quedada a la que intentas invitar a alguien ya no existe."
+
+msgid "MeetingMessages.INVITE_USERS_CANCELED"
+msgstr "El proceso de invitación ha sido cancelado."
+
+msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
+msgstr "Algo inesperado sucedió mientras se añadía el usuario invitado. Por favor, intenta de nuevo."
+
 msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
 msgstr "¡La quedada _*${meeting_title}*_ comenzará pronto!"
 
@@ -406,6 +451,30 @@ msgstr "La quedada se ha eliminado correctamente"
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
 msgstr "La quedada no se ha borrado"
 
+msgid "MeetingMessages.KICKED_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
+msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"
+
+msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
+msgstr "El participante que intentaste expulsar ya no está en la quedada."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
+msgstr "El participante <b>${participant}</b> ha sido expulsado correctamente."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
+msgstr "El participante <b>${participant}</b> ha sido expulsado correctamente. No hay más participantes para expulsar."
+
+msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
+msgstr "Elige el idioma de tu quedada. Esto cambiará el idioma usado cuando compartas la quedada.\n\nIdioma actual: <b>${language}</b>."
+
+msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
+msgstr "El idioma se ha configurado correctamente."
+
+msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
+msgstr "Esta quedada ya no está activa. Reactívala para compartirla de nuevo o elimínala permanentemente."
+
+msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
+msgstr "La quedada ha sido reactivada. Ahora puedes editarla y compartirla de nuevo."
+
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Esta qudada ha sido borrada"
 
@@ -447,6 +516,9 @@ msgstr "La fecha y hora de la quedada se han eliminado"
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Esta quedada ha sido eliminada 🚫"
 
+msgid "MeetingMessages.MEETING_HAS_FINISHED"
+msgstr "✅ Esta quedada ha finalizado ✅"
+
 msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
 msgstr "Puedes configurar diferentes opciones en tu quedada:\n\n"
 "*Lista de espera*: permite a tus contactos unirse a la quedada aunque esté llena. Los usuarios que se unan a la quedada una vez llena se añadirán a una lista de espera y serán aceptados como participantes en cuanto haya un hueco libre en el orden en el que se unieron.\n\n"
@@ -454,6 +526,18 @@ msgstr "Puedes configurar diferentes opciones en tu quedada:\n\n"
 "*Con invitación*: activa esta opción para que aquellos participantes en una quedada puedan añadir otros miembros, incluso si no tienen Telegram.\n\n"
 "*Incógnito*: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú si podrás ver los participantes de la quedada.\n\n"
 "*Mostrar zona horaria*: normalmente, cuando una quedada se comparte, incluye la zona horaría en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón _Zona horaria_ no aparezca cuando compartes la quedada."
+
+msgid "MeetingMessages.NOT_SEARCHABLE_FOOTNOTE"
+msgstr "🔍 Haz que esta quedada sea buscable en este chat."
+
+msgid "MeetingMessages.SEARCHABLE_FOOTNOTE"
+msgstr "✅ Esta quedada ahora es buscable en este chat."
+
+msgid "MeetingMessages.NOW_SEARCHABLE_ALERT"
+msgstr "✅ ¡Ahora es buscable!\n\nEsta quedada está ahora vinculada a este chat. Se incluirá en tus resultados de búsqueda cuando busques quedadas usando el modo inline del bot."
+
+msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
+msgstr "✅ ¡Ya es buscable!\n\nEsta quedada fue vinculada a este chat en un compartir anterior. Ya está incluida en tus resultados de búsqueda."
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
 msgstr "_Aún no tienes ninguna quedada.\n\n"
@@ -476,6 +560,42 @@ msgstr "Estas son todas tus quedadas pasadas."
 
 msgid "MeetingMessages.NO_PAST_MEETINGS"
 msgstr "_Todavía no tienes ninguna quedada pasada._"
+
+msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
+msgstr "➕ Crear una nueva quedada"
+
+msgid "InlineViewMessages.EXPLORE_MITUP_BUTTON"
+msgstr "🚀 Explorar Mitup"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE"
+msgstr "🔍 Quedadas en este chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION"
+msgstr "Busca quedadas compartidas en este chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE"
+msgstr "Toca el botón de abajo para cargar las quedadas compartidas en este chat."
+
+msgid "InlineViewMessages.READY_TO_SEARCH_MESSAGE"
+msgstr "Toca el botón de abajo para buscar quedadas compartidas en este chat."
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_TITLE"
+msgstr "No se encontraron quedadas"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION"
+msgstr "Aún no se ha compartido ninguna quedada en este chat"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE"
+msgstr "<i>Aún no se ha compartido ninguna quedada en este chat.</i>"
+
+msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
+msgstr "La quedada <b>${meeting_title}</b> será eliminada permanentemente en <b>${days_until_deletion} días</b>.\n\nPara evitar esto, puedes reactivar la quedada seleccionando el botón <b>${reactivate_meeting_button}</b> abajo.\n\nRecuerda que siempre puedes reactivar cualquier quedada pasada desde el botón <b>${past_meetings_button}</b> en el menú principal.\n\nSi no quieres reactivar la quedada, puedes ignorar este mensaje."
+
+msgid "NotificationMessages.MEETING_PERMANENTLY_DELETED"
+msgstr "La quedada <b>${meeting_title}</b> ha sido eliminada permanentemente."
+
+msgid "NotificationMessages.MEETING_STARTING"
+msgstr "¡La quedada <b>${meeting_title}</b> va a comenzar pronto!"
 
 msgid "Weekday.MONDAY"
 msgstr "Lun"

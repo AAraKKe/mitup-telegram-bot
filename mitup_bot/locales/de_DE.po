@@ -66,49 +66,49 @@ msgid "ButtonMessages.TIMEZONE"
 msgstr "🌐 Zeitzone"
 
 msgid "ButtonMessages.DEFAULT_OPTIONS"
-msgstr "👥 Default Options"
+msgstr "👥 Standardoptionen"
 
 msgid "ButtonMessages.PRIVACY"
-msgstr "🛡️ Privacy"
+msgstr "🛡️ Datenschutz"
 
 msgid "ButtonMessages.WAITING_LIST"
-msgstr "Waiting list"
+msgstr "Warteliste"
 
 msgid "ButtonMessages.PUBLIC"
-msgstr "Public"
+msgstr "Öffentlich"
 
 msgid "ButtonMessages.OPEN_INVITATION"
-msgstr "Open invitations"
+msgstr "Offene Einladungen"
 
 msgid "ButtonMessages.INCOGNITO"
-msgstr "Incognito"
+msgstr "Anonym"
 
 msgid "ButtonMessages.ENABLE"
-msgstr "Enable"
+msgstr "Aktivieren"
 
 msgid "ButtonMessages.DISABLE"
-msgstr "Disable"
+msgstr "Deaktivieren"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Abbrechen"
 
 msgid "ButtonMessages.TITLE"
-msgstr "🅰️ Title"
+msgstr "🅰️ Titel"
 
 msgid "ButtonMessages.DESCRIPTION"
 msgstr "📄 Beschreibung"
 
 msgid "ButtonMessages.DATE"
-msgstr "🗓️ Date"
+msgstr "🗓️ Datum"
 
 msgid "ButtonMessages.TIME"
-msgstr "🕒 Time"
+msgstr "🕒 Uhrzeit"
 
 msgid "ButtonMessages.NOTIFICATIONS_TIME"
-msgstr "⏰ Time"
+msgstr "⏰ Uhrzeit"
 
 msgid "ButtonMessages.SET_TIME"
-msgstr "🕒 Set time"
+msgstr "🕒 Uhrzeit setzen"
 
 msgid "ButtonMessages.PARTICIPANTS"
 msgstr "👥 Teilnehmer"
@@ -129,10 +129,10 @@ msgid "ButtonMessages.LEAVE"
 msgstr "❌ Verlassen"
 
 msgid "ButtonMessages.DELETE"
-msgstr "🗑️ Delete"
+msgstr "🗑️ Löschen"
 
 msgid "ButtonMessages.EDIT"
-msgstr "✏️ Edit"
+msgstr "✏️ Bearbeiten"
 
 msgid "ButtonMessages.SHARE"
 msgstr "📨 Teilen"
@@ -150,7 +150,7 @@ msgid "ButtonMessages.MEETING_LOCATION_COORDINATES"
 msgstr "📍 Ort"
 
 msgid "ButtonMessages.MEETING_MAX_PARTICIPANTS"
-msgstr "Max participants"
+msgstr "Max. Teilnehmer"
 
 msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
 msgstr "Unbegrenzt"
@@ -159,32 +159,32 @@ msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Rausschmeißen"
 
 msgid "ButtonMessages.DELETE_DATE"
-msgstr "🗑️ Delete date"
+msgstr "🗑️ Datum löschen"
 
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
-msgstr "Welcome to Mitup Bot!\n\n"
-"Choose one of the following options:"
+msgstr "Willkommen bei Mitup Bot!\n\n"
+"Wähle eine der folgenden Optionen:"
 
 msgid "Messages.DEFAULT_SETTINGS_DESCRIPTION"
-msgstr "Configure MitUp."
+msgstr "Konfiguriere MitUp."
 
 msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
-msgstr "Your timezone is set to *${timezone}*. \n"
-"Send me the name of your city or your location to set your timezone or touch in *Cancel* to go back."
+msgstr "Deine Zeitzone ist auf <b>${timezone}</b> eingestellt. \n"
+"Sende mir den Namen deiner Stadt oder deinen Standort, um deine Zeitzone zu ändern, oder tippe auf <b>Abbrechen</b>, um zurückzugehen."
 
 msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
-msgstr "Your timezone has been set to: *${timezone}* "
+msgstr "Deine Zeitzone wurde auf <b>${timezone}</b> eingestellt "
 
 msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
-msgstr "Welcome to Mitup Bot ${first_name}!\n\n"
-"Let's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n"
-"*Important*: we do not store your location and this information is only used to configure your timezone."
+msgstr "Willkommen bei Mitup Bot ${first_name}!\n\n"
+"Beginnen wir mit der Einstellung deiner Zeitzone. Sende mir den Namen deiner Stadt oder, für ein genaueres Ergebnis, deinen Standort, indem du auf 📎 drückst und den Ort wählst.\n\n"
+"<b>Wichtig</b>: Wir speichern deinen Standort nicht und diese Information wird nur zur Konfiguration deiner Zeitzone verwendet."
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
-msgstr "Perfect! Your timezone is ${timezone}"
+msgstr "Perfekt! Deine Zeitzone ist ${timezone}"
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
-msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
+msgstr "Es tut mir leid, ich konnte deine Zeitzone nicht festlegen. Bitte versuche es erneut."
 
 msgid "SettingsMessages.EDIT_TIMEZONE_ON_EXIT"
 msgstr "Du warst dabei, deine Zeitzone zu ändern. Sende mir den Namen deiner Stadt oder deinen Standort, um fortzufahren. Wenn du nicht fortfahren möchtest, tippe auf Abbrechen, um zu beenden."
@@ -193,66 +193,66 @@ msgid "SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT"
 msgstr "Bitte sende den Namen deiner Stadt als Text oder teile deinen Standort."
 
 msgid "SettingsMessages.SELECT_LANGUAGE"
-msgstr "Current language: *${language}*.\n\n"
-"Select a language."
+msgstr "Aktuelle Sprache: <b>${language}</b>.\n\n"
+"Wähle eine Sprache."
 
 msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
-msgstr "The language has been set successfully."
+msgstr "Die Sprache wurde erfolgreich eingestellt."
 
 msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
-msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\n"
-"You can configure different aspects of your meeting:\n\n"
-"*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n"
-"*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n"
-"*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n"
-"*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-"*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+msgstr "Hier kannst du die Standardoptionen konfigurieren, die beim Erstellen eines Treffens verwendet werden. Erstellst du normalerweise öffentliche Treffen? Stelle es hier ein. Erlaube ich anderen Personen normalerweise, andere Personen einzuladen oder das Treffen in anderen Chats zu teilen? Tue das hier. Alle deine Treffen werden diese Konfiguration erben.\n\n"
+"Du kannst verschiedene Aspekte deines Treffens konfigurieren:\n\n"
+"<b>Warteliste</b>: Erlaube Benutzern, dem Treffen beizutreten, auch wenn es voll ist. Benutzer, die beitreten, wenn es voll ist, werden auf eine Warteliste gesetzt und zur Teilnehmerliste hinzugefügt, sobald ein Platz verfügbar ist, in der Reihenfolge, in der sie beigetreten sind.\n\n"
+"<b>Öffentlich</b>: Aktiviere dies, um jedem, der das Treffen erhält, zu erlauben, es erneut zu teilen. Perfekt, um mehr Menschen zu erreichen.\n\n"
+"<b>Offene Einladungen</b>: Aktiviere diese Option, um Benutzern, die dem Treffen beigetreten sind, zu erlauben, Freunde hinzuzufügen, auch wenn diese nicht in Telegram sind.\n\n"
+"<b>Anonym</b>: Bei einem Treffen mit aktivierter Anonymität werden die Personen, die dem Treffen beigetreten sind, bei der gemeinsamen Nutzung nicht angezeigt. Nur die Anzahl der Teilnehmer wird angezeigt. Du kannst die Teilnehmer immer noch sehen.\n\n"
+"<b>Zeitzone anzeigen</b>: Treffen enthalten normalerweise die Zeitzone, auf die sich das Datum und die Uhrzeit des Treffens beziehen. Wenn diese Information in der Treffenachricht nicht angezeigt werden soll, kannst du sie hier deaktivieren. Dies deaktiviert auch die Schaltfläche <i>Zeitzone</i>, die beim Teilen des Treffens angezeigt wird."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
-msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your *Past meetings menu*.\n\n"
-"The curent timeout is *${timeout} minutes*\n\n"
-"Send the timeout \\(in minutes\\) you would like to use or touch Cancel to go back."
+msgstr "Das Timeout definiert, wie lange ein Treffen nach seinem Ende beibehalten wird. Nach dieser Zeit wird das Treffen deaktiviert. Du kannst es erneut über dein <b>Menü für vergangene Treffen</b> aktivieren.\n\n"
+"Das aktuelle Timeout beträgt <b>${timeout} Minuten</b>\n\n"
+"Sende das Timeout (in Minuten), das du verwenden möchtest, oder tippe auf Abbrechen, um zurückzugehen."
 
 msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
-msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
+msgstr "Oups! Das sieht nicht wie eine gültige Nummer aus. Bitte gib eine positive ganze Zahl ein. Keine Dezimalzahlen erlaubt!"
 
 msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
-msgstr "The timeout has been set to: *${timeout} minutes*"
+msgstr "Das Timeout wurde auf <b>${timeout} Minuten</b> eingestellt"
 
 msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
-msgstr "Configure MeetUp notifications.\n\n"
-"Notifications: ${notifications_status}\n"
-"When notifications are enabled, MeetUp will notify you *${notifications_time} minutes* before a meeting starts."
+msgstr "Konfiguriere MeetUp-Benachrichtigungen.\n\n"
+"Benachrichtigungen: ${notifications_status}\n"
+"Wenn Benachrichtigungen aktiviert sind, benachrichtigt dich MeetUp <b>${notifications_time} Minuten</b> bevor ein Treffen beginnt."
 
 msgid "SettingsMessages.NOTIFICATION_SET_TIME"
-msgstr "Send how long before a meeting starts \\(in minutes\\) you would like to be notified or touch Cancel to go back."
+msgstr "Sende, wie lange vor dem Beginn eines Treffens (in Minuten) du benachrichtigt werden möchtest, oder tippe auf Abbrechen, um zurückzugehen."
 
 msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
-msgstr "The notification time has been set to *${notifications_time} minutes*."
+msgstr "Die Benachrichtigungszeit wurde auf <b>${notifications_time} Minuten</b> eingestellt."
 
 msgid "SettingsMessages.ENABLED"
-msgstr "Enabled ✅"
+msgstr "Aktiviert ✅"
 
 msgid "SettingsMessages.DISABLED"
-msgstr "Disabled ❌"
+msgstr "Deaktiviert ❌"
 
 msgid "MeetingMessages.CREATE"
 msgstr "Lass uns ein Treffen erstellen. Wie lautet der Titel?"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
-msgstr "A meeting has been created with the title: *${title}*\n\n"
-"You can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\n"
-"When finished click on ✅ Done"
+msgstr "Ein Treffen wurde mit dem Titel erstellt: <b>${title}</b>\n\n"
+"Du kannst mehr Informationen zum Treffen mit den folgenden Optionen hinzufügen. Die Informationen, die nicht hinzugefügt wurden, werden nicht angezeigt, wenn das Treffen geteilt wird.\n\n"
+"Wenn fertig, klicke auf ✅ Fertig stellen"
 
 msgid "MeetingMessages.INVALID_TITLE"
-msgstr "I did not recognize what you sent as a valid title 🤔.\n\n"
-"Send a message with the title of the meeting or click on *Cancel*."
+msgstr "Ich erkannte das, was du gesendet hast, nicht als gültigen Titel 🤔.\n\n"
+"Sende eine Nachricht mit dem Titel des Treffens oder klicke auf <b>Abbrechen</b>."
 
 msgid "MeetingMessages.MEETING_TIME"
-msgstr ""
+msgstr "Treffzeit"
 
 msgid "MeetingMessages.CREATED_BY"
-msgstr "Created by: ${owner}"
+msgstr "Erstellt von: ${owner}"
 
 msgid "MeetingMessages.DESCRIPTION_NOT_SET"
 msgstr "🚫 Ohne Beschreibung 🚫"
@@ -264,77 +264,77 @@ msgid "MeetingMessages.LOCATION_NOT_SET"
 msgstr "🚫 Kein Ort festgelegt 🚫"
 
 msgid "MeetingMessages.EMPTY"
-msgstr "Empty"
+msgstr "Leer"
 
 msgid "MeetingMessages.PARTICIPANT"
-msgstr "Participant"
+msgstr "Teilnehmer"
 
 msgid "MeetingMessages.PARTICIPANTS"
 msgstr "Teilnehmer"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS"
-msgstr "\\(Max: ${max_participants}\\)"
+msgstr "(Max: ${max_participants})"
 
 msgid "MeetingMessages.MEETING_WITHOUT_DESCRIPTION"
-msgstr "_This meeting has no description yet_"
+msgstr "<i>Dieses Treffen hat noch keine Beschreibung</i>"
 
 msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
-msgstr "_This meeting has no participants yet_"
+msgstr "<i>Dieses Treffen hat noch keine Teilnehmer</i>"
 
 msgid "MeetingMessages.JOINED_MEETING_SUCCESS"
-msgstr "You joined the meeting!"
+msgstr "Du bist dem Treffen beigetreten!"
 
 msgid "MeetingMessages.JOINED_MEETING_ALREADY"
-msgstr "You have already joined this meeting"
+msgstr "Du bist diesem Treffen bereits beigetreten"
 
 msgid "MeetingMessages.JOINED_MEETING_NOT_FOUND"
-msgstr "The meeting you tried to join does not exist"
+msgstr "Das Treffen, dem du beitreten wolltest, existiert nicht"
 
 msgid "MeetingMessages.JOINED_MEETING_FULL"
-msgstr "Sorry! The meeting is full"
+msgstr "Entschuldigung! Das Treffen ist voll"
 
 msgid "MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST"
-msgstr "The meeting is full. You have been added to the waiting list."
+msgstr "Das Treffen ist voll. Du wurdest zur Warteliste hinzugefügt."
 
 msgid "MeetingMessages.JOINED_MEETING_UNREGISTERED"
-msgstr "You have joined the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to be receive notifications and create new meetings!"
+msgstr "Du bist dem Treffen beigetreten, %{user}! Es scheint, dass du Mitup noch nicht verwendet hast. Öffne einen Chat mit @mitupbot, um Benachrichtigungen zu erhalten und neue Treffen zu erstellen!"
 
 msgid "MeetingMessages.LEFT_MEETING_SUCCESS"
-msgstr "You have left the meeting"
+msgstr "Du hast das Treffen verlassen"
 
 msgid "MeetingMessages.LEFT_MEETING_ALREADY"
-msgstr "You cannot leave a meeting you have not joined"
+msgstr "Du kannst ein Treffen nicht verlassen, dem du nicht beigetreten bist"
 
 msgid "MeetingMessages.LEFT_MEETING_NOT_FOUND"
-msgstr "The meeting you tried to leave does not exist"
+msgstr "Das Treffen, das du verlassen wolltest, existiert nicht"
 
 msgid "MeetingMessages.LEFT_MEETING_UNREGISTERED"
-msgstr "You have left the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to receive notifications and create new meetings!"
+msgstr "Du hast das Treffen verlassen, %{user}! Es scheint, dass du Mitup noch nicht verwendet hast. Öffne einen Chat mit @mitupbot, um Benachrichtigungen zu erhalten und neue Treffen zu erstellen!"
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
-msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+msgstr "Es gibt einen freien Platz im Treffen <b>${meeting_title}</b>. Du wurdest jetzt von der Warteliste befördert!"
 
 msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
 msgstr "Du warst dabei, ein Treffen zu erstellen. Sende den Titel des Treffens, um fortzufahren. Wenn du nicht fortfahren möchtest, tippe auf Abbrechen, um zu beenden."
 
 msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "The meeting _*${meeting_title}*_ is starting soon!"
+msgstr "Das Treffen <b>${meeting_title}</b> beginnt bald!"
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
-msgstr "This is the current title of your meeting:\n"
-"*${title}*\n\n"
-" Send me the new one"
+msgstr "Dies ist der aktuelle Titel deines Treffens:\n"
+"<b>${title}</b>\n\n"
+"Sende mir den neuen"
 
 msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
-msgstr "This is the current description of your meeting:\n"
+msgstr "Dies ist die aktuelle Beschreibung deines Treffens:\n"
 "${description}\n\n"
-" Send me the new one"
+"Sende mir die neue"
 
 msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "The title has been properly set to: *${title}*"
+msgstr "Der Titel wurde korrekt auf <b>${title}</b> gesetzt"
 
 msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "The description has been properly set to: *${description}*"
+msgstr "Die Beschreibung wurde korrekt auf <b>${description}</b> gesetzt"
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION"
 msgstr "Einem Treffen kann eine GPS-Position hinzugefügt werden. Du kannst dem Ort bloß einen Namen geben, oder zusätzlich eine GPS-Position hinzufügen. Wähle eine der beiden Möglichkeiten."
@@ -343,32 +343,32 @@ msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME"
 msgstr "Sende mir den Namen des Ortes."
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
-msgstr "_Only from the phone 📱_\n\n"
-"Send the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
+msgstr "<i>Nur vom Telefon 📱</i>\n\n"
+"Sende den Ort des Treffens. Tippe auf das 📎 Symbol und wähle dann Ort. Du kannst jeden beliebigen Ort senden, nicht nur deinen aktuellen Ort."
 
 msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "The name of the location has been set to: *${name}*"
+msgstr "Der Name des Ortes wurde auf <b>${name}</b> gesetzt"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
-msgstr "The location has been saved successfuly"
+msgstr "Der Ort wurde erfolgreich gespeichert"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
-msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
+msgstr "Sende mir den Ort erneut. Denke daran, auf das Büroklammer-Symbol zu tippen und Ort zu wählen."
 
 msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
 msgstr "Hier kannst du die Teilnehmer des Treffens verwalten: du kannst die maximale Teilnehmerzahl des Treffens festlegen, sowie beliebige Teilnehmer des Treffens rausschmeißen."
 
 msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
-msgstr "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) or press in _No limit_ to allow an unlimited number of participants."
+msgstr "Sende mir die maximale Anzahl der im Treffen zulässigen Mitglieder (muss eine Zahl größer als 0 sein) oder drücke auf <i>Unbegrenzt</i>, um eine unbegrenzte Anzahl von Teilnehmern zu erlauben."
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
-msgstr "The maximum number of participants has been set to: *${max_participants}*"
+msgstr "Die maximale Anzahl der Teilnehmer wurde auf <b>${max_participants}</b> eingestellt"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
-msgstr "No limit"
+msgstr "Unbegrenzt"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
-msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
+msgstr "Die maximale Anzahl der Teilnehmer muss eine Zahl größer als 0 sein. Bitte versuche es erneut"
 
 msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
 msgstr "Dies sind die Nutzer, die an dem Treffen teilnehmen. Wähle, wen du rausschmeißen willst."
@@ -377,7 +377,7 @@ msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Bist du sicher, dass du dieses Treffen löschen willst?"
 
 msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
-msgstr "The meeting has been deleted successfully"
+msgstr "Das Treffen wurde erfolgreich gelöscht"
 
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
 msgstr "Das Treffen wurde nicht gelöscht"
@@ -386,48 +386,48 @@ msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Dieses Treffen wurde gelöscht"
 
 msgid "MeetingMessages.EDIT_DATE"
-msgstr "Select the new date. Press *🗑️ Delete date* if you want to unset the date and time of the meeting."
+msgstr "Wähle das neue Datum. Drücke <b>🗑️ Datum löschen</b>, wenn du das Datum und die Uhrzeit des Treffens zurücksetzen möchtest."
 
 msgid "MeetingMessages.ADD_DATE"
-msgstr "Select the date."
+msgstr "Wähle das Datum."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to: *${datetime}*. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
+msgstr "Das Datum wurde auf ${datetime} eingestellt. Um die Uhrzeit zu setzen, drücke <i>${set_time_button}</i>, ansonsten drücke <i>${back_edit_button}</i>, um zur Bearbeitung des Treffens zurückzukehren."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "The date has been set to: *${datetime}*"
+msgstr "Das Datum wurde auf ${datetime} eingestellt"
 
 msgid "MeetingMessages.EDIT_TIME"
-msgstr "Send me the time of the meeting in the format _HH:MM_"
+msgstr "Sende mir die Uhrzeit des Treffens im Format <i>HH:MM</i>"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "The time of the meeting has been set to *${datetime}*"
+msgstr "Die Uhrzeit des Treffens wurde auf ${datetime} eingestellt"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
-msgstr "Not sure I understand that time 🤔...\n\n"
-"Please, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"
+msgstr "Ich bin mir nicht sicher, ob ich diese Uhrzeit verstehe 🤔...\n\n"
+"Bitte sende die Uhrzeit im Format <i>HH:MM</i>, zum Beispiel <i>15:30</i> oder <i>09:15</i>"
 
 msgid "MeetingMessages.INVALID_TIME"
-msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\n"
-"Try again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), I am sure I can work with that 🧠."
+msgstr "Meine innere Uhr ist alt und kann diese Science-Fiction-Zeit 🛸 nicht verstehen.\n\n"
+"Versuche es erneut mit einer Uhrzeit, die gültige Stunden (00-23) und Minuten (00-59) hat. Ich bin sicher, ich kann damit arbeiten 🧠."
 
 msgid "MeetingMessages.DATE_TIME_DELETED"
-msgstr "The date and time of the meeting have been deleted successfully"
+msgstr "Das Datum und die Uhrzeit des Treffens wurden erfolgreich gelöscht"
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Dieses Treffen wurde gelöscht 🚫"
 
 msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
-msgstr "You can configure different aspects of your meeting:\n\n"
-"*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n"
-"*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n"
-"*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n"
-"*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-"*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+msgstr "Du kannst verschiedene Aspekte deines Treffens konfigurieren:\n\n"
+"<b>Warteliste</b>: Erlaube Benutzern, dem Treffen beizutreten, auch wenn es voll ist. Benutzer, die beitreten, wenn es voll ist, werden auf eine Warteliste gesetzt und zur Teilnehmerliste hinzugefügt, sobald ein Platz verfügbar ist, in der Reihenfolge, in der sie beigetreten sind.\n\n"
+"<b>Öffentlich</b>: Aktiviere dies, um jedem, der das Treffen erhält, zu erlauben, es erneut zu teilen. Perfekt, um mehr Menschen zu erreichen.\n\n"
+"<b>Offene Einladungen</b>: Aktiviere diese Option, um Benutzern, die dem Treffen beigetreten sind, zu erlauben, Freunde hinzuzufügen, auch wenn diese nicht in Telegram sind.\n\n"
+"<b>Anonym</b>: Bei einem Treffen mit aktivierter Anonymität werden die Personen, die dem Treffen beigetreten sind, bei der gemeinsamen Nutzung nicht angezeigt. Nur die Anzahl der Teilnehmer wird angezeigt. Du kannst die Teilnehmer immer noch sehen.\n\n"
+"<b>Zeitzone anzeigen</b>: Treffen enthalten normalerweise die Zeitzone, auf die sich das Datum und die Uhrzeit des Treffens beziehen. Wenn diese Information in der Treffenachricht nicht angezeigt werden soll, kannst du sie hier deaktivieren. Dies deaktiviert auch die Schaltfläche <i>Zeitzone</i>, die beim Teilen des Treffens angezeigt wird."
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
-msgstr "_You don't have any meetings yet.\n\n"
-"Click on _${new_meeting_button}_ in the main menu to create one._"
+msgstr "Du hast noch keine Treffen.\n\n"
+"Klicke auf ${new_meeting_button} im Hauptmenü, um ein Treffen zu erstellen."
 
 msgid "MeetingMessages.ACTIVE"
 msgstr "Dies sind Ihre aktiven Treffen."
@@ -557,3 +557,96 @@ msgstr "🇧🇷 Portuguese"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italian"
+
+msgid "ButtonMessages.MAKE_SEARCHABLE"
+msgstr "Auffindbar machen"
+
+msgid "ButtonMessages.LOAD_CHAT_MEETINGS"
+msgstr "🔍 Treffen laden"
+
+msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
+msgstr "🔍 Treffen durchsuchen"
+
+msgid "ButtonMessages.REACTIVATE_MEETING"
+msgstr "Treffen reaktivieren"
+
+msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
+msgstr "Bist du sicher, dass du <b>${participant}</b> aus dem Treffen <b>${meeting_title}</b> entfernen möchtest?"
+
+msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
+msgstr "Der Teilnehmer, den du entfernen wolltest, ist nicht mehr im Treffen."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
+msgstr "Der Teilnehmer <b>${participant}</b> wurde erfolgreich entfernt."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
+msgstr "Der Teilnehmer <b>${participant}</b> wurde erfolgreich entfernt. Es gibt keine weiteren Teilnehmer zum Entfernen."
+
+msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
+msgstr "Wähle die Sprache deines Treffens. Dies ändert die Sprache, die beim Teilen des Treffens verwendet wird.\n\nAktuelle Sprache: <b>${language}</b>."
+
+msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
+msgstr "Die Sprache wurde erfolgreich eingestellt."
+
+msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
+msgstr "Dieses Treffen ist nicht mehr aktiv. Reaktiviere es, um es erneut zu teilen, oder lösche es dauerhaft."
+
+msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
+msgstr "Das Treffen wurde reaktiviert. Du kannst es jetzt erneut bearbeiten und teilen."
+
+msgid "MeetingMessages.DELETE_DATE_CONFIRMATION"
+msgstr "Bist du sicher, dass du das Datum und die Uhrzeit des Treffens löschen möchtest?"
+
+msgid "MeetingMessages.DELETE_DATE_DECLINE"
+msgstr "Das Datum und die Uhrzeit werden nicht gelöscht"
+
+msgid "MeetingMessages.MEETING_HAS_FINISHED"
+msgstr "✅ Dieses Treffen ist beendet ✅"
+
+msgid "MeetingMessages.NOT_SEARCHABLE_FOOTNOTE"
+msgstr "🔍 Mache dieses Treffen in diesem Chat auffindbar."
+
+msgid "MeetingMessages.SEARCHABLE_FOOTNOTE"
+msgstr "✅ Dieses Treffen ist jetzt in diesem Chat auffindbar."
+
+msgid "MeetingMessages.NOW_SEARCHABLE_ALERT"
+msgstr "✅ Jetzt auffindbar!\n\nDieses Treffen ist jetzt mit diesem Chat verknüpft. Es wird in deinen Suchergebnissen einbezogen, wenn du nach Treffen mit dem Inline-Modus des Bots suchst."
+
+msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
+msgstr "✅ Bereits auffindbar!\n\nDieses Treffen war bereits von einer vorherigen gemeinsamen Nutzung mit diesem Chat verknüpft. Es ist bereits in deinen Suchergebnissen enthalten."
+
+msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
+msgstr "➕ Neues Treffen erstellen"
+
+msgid "InlineViewMessages.EXPLORE_MITUP_BUTTON"
+msgstr "🚀 Erkunde Mitup"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE"
+msgstr "🔍 Treffen in diesem Chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION"
+msgstr "Suche nach Treffen, die in diesem Chat geteilt wurden"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE"
+msgstr "Tippe die Schaltfläche unten, um die in diesem Chat geteilten Treffen zu laden."
+
+msgid "InlineViewMessages.READY_TO_SEARCH_MESSAGE"
+msgstr "Tippe die Schaltfläche unten, um nach Treffen in diesem Chat zu suchen."
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_TITLE"
+msgstr "Keine Treffen gefunden"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION"
+msgstr "In diesem Chat wurden noch keine Treffen geteilt"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE"
+msgstr "<i>In diesem Chat wurden noch keine Treffen geteilt.</i>"
+
+msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
+msgstr "Das Treffen <b>${meeting_title}</b> wird in <b>${days_until_deletion} Tagen</b> dauerhaft gelöscht.\n\nUm dies zu verhindern, kannst du das Treffen reaktivieren, indem du die Schaltfläche <b>${reactivate_meeting_button}</b> unten auswählst.\n\nDenke daran, dass du alle vergangenen Treffen jederzeit über die Schaltfläche <b>${past_meetings_button}</b> im Hauptmenü reaktivieren kannst.\n\nWenn du das Treffen nicht reaktivieren möchtest, kannst du diese Nachricht ignorieren."
+
+msgid "NotificationMessages.MEETING_PERMANENTLY_DELETED"
+msgstr "Das Treffen <b>${meeting_title}</b> wurde dauerhaft gelöscht."
+
+msgid "NotificationMessages.MEETING_STARTING"
+msgstr "Das Treffen <b>${meeting_title}</b> beginnt bald!"

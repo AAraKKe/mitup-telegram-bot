@@ -27,10 +27,10 @@ msgid "ButtonMessages.GO_FORWARD"
 msgstr "≫"
 
 msgid "ButtonMessages.CONFIRM"
-msgstr "✅ Confirm"
+msgstr "✅ Confirmar"
 
 msgid "ButtonMessages.DECLINE"
-msgstr "❌ Decline"
+msgstr "❌ Rexeitar"
 
 msgid "ButtonMessages.NEW_MEETING"
 msgstr "➕ Nova quedada"
@@ -42,7 +42,7 @@ msgid "ButtonMessages.PAST_MEETINGS"
 msgstr "💾 As túas quedadas pasadas"
 
 msgid "ButtonMessages.JOINED_MEETINGS"
-msgstr "👥 Joined meetings"
+msgstr "👥 Unícheste"
 
 msgid "ButtonMessages.SETTINGS"
 msgstr "⚙️ Axustes"
@@ -72,22 +72,22 @@ msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacidade"
 
 msgid "ButtonMessages.WAITING_LIST"
-msgstr "Waiting list"
+msgstr "Lista de espera"
 
 msgid "ButtonMessages.PUBLIC"
-msgstr "Public"
+msgstr "Pública"
 
 msgid "ButtonMessages.OPEN_INVITATION"
-msgstr "Open invitations"
+msgstr "Con convite"
 
 msgid "ButtonMessages.INCOGNITO"
-msgstr "Incognito"
+msgstr "Incógnito"
 
 msgid "ButtonMessages.ENABLE"
-msgstr "Enable"
+msgstr "Activar"
 
 msgid "ButtonMessages.DISABLE"
-msgstr "Disable"
+msgstr "Desactivar"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Cancelar"
@@ -102,13 +102,13 @@ msgid "ButtonMessages.DATE"
 msgstr "🗓️ Data"
 
 msgid "ButtonMessages.TIME"
-msgstr "🕒 Time"
+msgstr "🕒 Hora"
 
 msgid "ButtonMessages.NOTIFICATIONS_TIME"
-msgstr "⏰ Time"
+msgstr "⏰ Tempo"
 
 msgid "ButtonMessages.SET_TIME"
-msgstr "🕒 Set time"
+msgstr "🕒 Establecer hora"
 
 msgid "ButtonMessages.PARTICIPANTS"
 msgstr "👥 Participantes"
@@ -129,10 +129,10 @@ msgid "ButtonMessages.LEAVE"
 msgstr "❌ Saír"
 
 msgid "ButtonMessages.DELETE"
-msgstr "🗑️ Delete"
+msgstr "🗑️ Eliminar"
 
 msgid "ButtonMessages.EDIT"
-msgstr "✏️ Edit"
+msgstr "✏️ Editar"
 
 msgid "ButtonMessages.SHARE"
 msgstr "📨 Compartir"
@@ -150,7 +150,7 @@ msgid "ButtonMessages.MEETING_LOCATION_COORDINATES"
 msgstr "📍 Lugar"
 
 msgid "ButtonMessages.MEETING_MAX_PARTICIPANTS"
-msgstr "Max participants"
+msgstr "Límite de participantes"
 
 msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
 msgstr "Sen límite"
@@ -159,32 +159,32 @@ msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Botar"
 
 msgid "ButtonMessages.DELETE_DATE"
-msgstr "🗑️ Delete date"
+msgstr "🗑️ Eliminar data"
 
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
-msgstr "Welcome to Mitup Bot!\n\n"
-"Choose one of the following options:"
+msgstr "¡Benvido a Mitup Bot!\n\n"
+"Escolle unha das seguintes opcións:"
 
 msgid "Messages.DEFAULT_SETTINGS_DESCRIPTION"
-msgstr "Configure MitUp."
+msgstr "Configura MitUp."
 
 msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
-msgstr "Your timezone is set to *${timezone}*. \n"
-"Send me the name of your city or your location to set your timezone or touch in *Cancel* to go back."
+msgstr "A túa zona horaria está establecida a <b>${timezone}</b>. \n"
+"Envíame o nome da túa cidade ou a túa ubicación para establecer a túa zona horaria ou toca en <b>Cancelar</b> para volver."
 
 msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
-msgstr "Your timezone has been set to: *${timezone}* "
+msgstr "A túa zona horaria estableceuse a: <b>${timezone}</b> "
 
 msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
-msgstr "Welcome to Mitup Bot ${first_name}!\n\n"
-"Let's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n"
-"*Important*: we do not store your location and this information is only used to configure your timezone."
+msgstr "¡Benvido a Mitup Bot ${first_name}!\n\n"
+"Vamos comezar estabelecendo a túa zona horaria. Envíame o nome da túa cidade ou, para un resultado máis preciso, a túa ubicación tocando en 📎 e seleccionando Ubicación.\n\n"
+"<b>Importante</b>: non almacenamos a túa ubicación e esta información só se utiliza para configurar a túa zona horaria."
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
-msgstr "Perfect! Your timezone is ${timezone}"
+msgstr "¡Perfecto! A túa zona horaria é ${timezone}"
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
-msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
+msgstr "Desculpa, non puiden establecer a túa zona horaria. Por favor, intenta de novo."
 
 msgid "SettingsMessages.EDIT_TIMEZONE_ON_EXIT"
 msgstr "Estabas a cambiar a túa zona horaria. Envíame o nome da túa cidade ou a túa ubicación para continuar. Se non queres continuar, toca Cancelar para saír."
@@ -193,66 +193,66 @@ msgid "SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT"
 msgstr "Por favor, envíame o nome da túa cidade como texto ou comparte a túa ubicación."
 
 msgid "SettingsMessages.SELECT_LANGUAGE"
-msgstr "Current language: *${language}*.\n\n"
-"Select a language."
+msgstr "Idioma actual: <b>${language}</b>.\n\n"
+"Escolle un idioma."
 
 msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
-msgstr "The language has been set successfully."
+msgstr "O idioma estableceuse correctamente."
 
 msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
-msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\n"
-"You can configure different aspects of your meeting:\n\n"
-"*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n"
-"*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n"
-"*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n"
-"*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-"*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+msgstr "Acó podes configurar as opcións predeterminadas usadas ao crear unha quedada. ¿Creas normalmente quedadas públicas? Configúrao acó. ¿Sempre permites que persoas conviden a outras ou compartan a quedada noutros chats? Configúrao acó. Todas as túas quedadas heredarán esta configuración.\n\n"
+"Podes configurar diferentes aspectos da túa quedada:\n\n"
+"<b>Lista de espera</b>: permite aos usuarios unirse á quedada incluso cando está chea. Os usuarios que se unan á quedada cando está chea serán engadidos a unha lista de espera e serán engadidos á lista de participantes en cuanto haxa un lugar dispoñible na orde en que se uniron.\n\n"
+"<b>Pública</b>: activa esto para permitir que todos os que reciban a quedada a poidan compartir de novo. Perfecta para chegar a máis persoas.\n\n"
+"<b>Con convite</b>: activa esta opción para permitir que os usuarios que se uniron á quedada poidan engadir amigos incluso se non están en Telegram.\n\n"
+"<b>Incógnito</b>: unha quedada con incógnito habilitado non mostrará as persoas que se uniron á quedada cando se comparta. Solo se mostrará o número de participantes. Aínda poderás ver os participantes.\n\n"
+"<b>Mostrar zona horaria</b>: as quedadas normalmente inclúen a zona horaria á que se refiren a data e hora da quedada. Se non necesitas que esta información se amose na mensaxe da quedada podes deshabilitarla acó. Esto tamén deshabilitará o botón <i>Zona horaria</i> que se mostra cando se comparte a quedada."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
-msgstr "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. You can activate it again from your *Past meetings menu*.\n\n"
-"The curent timeout is *${timeout} minutes*\n\n"
-"Send the timeout \\(in minutes\\) you would like to use or touch Cancel to go back."
+msgstr "A prórroga define canto tempo se mantén unha quedada despois de que remate. Despois deste tempo a quedada será desactivada. Podes activala de novo desde o menú <b>Tus quedadas pasadas</b>.\n\n"
+"A prórroga actual é <b>${timeout} minutos</b>\n\n"
+"Envía a prórroga (en minutos) que te gustaría usar ou toca Cancelar para volver."
 
 msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
-msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
+msgstr "¡Vaia! Eso non parece un número válido. Por favor entra un número enteiro positivo. ¡Non se permiten decimais!"
 
 msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
-msgstr "The timeout has been set to: *${timeout} minutes*"
+msgstr "A prórroga estableceuse a: <b>${timeout} minutos</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
-msgstr "Configure MeetUp notifications.\n\n"
-"Notifications: ${notifications_status}\n"
-"When notifications are enabled, MeetUp will notify you *${notifications_time} minutes* before a meeting starts."
+msgstr "Configura as notificacións de MeetUp.\n\n"
+"Notificacións: ${notifications_status}\n"
+"Cando as notificacións están habilitadas, MeetUp te notificará <b>${notifications_time} minutos</b> antes de que comece unha quedada."
 
 msgid "SettingsMessages.NOTIFICATION_SET_TIME"
-msgstr "Send how long before a meeting starts \\(in minutes\\) you would like to be notified or touch Cancel to go back."
+msgstr "Envía canto tempo antes de que comece unha quedada (en minutos) te gustaría recibir unha notificación ou toca Cancelar para volver."
 
 msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
-msgstr "The notification time has been set to *${notifications_time} minutes*."
+msgstr "A hora de notificación estableceuse a <b>${notifications_time} minutos</b>."
 
 msgid "SettingsMessages.ENABLED"
-msgstr "Enabled ✅"
+msgstr "Habilitado ✅"
 
 msgid "SettingsMessages.DISABLED"
-msgstr "Disabled ❌"
+msgstr "Deshabilitado ❌"
 
 msgid "MeetingMessages.CREATE"
 msgstr "Imos crear unha quedada. Cal é o título?"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
-msgstr "A meeting has been created with the title: *${title}*\n\n"
-"You can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\n"
-"When finished click on ✅ Done"
+msgstr "Creouse unha quedada co título: <b>${title}</b>\n\n"
+"Podes engadir máis información á quedada coas opcións de abaixo. A información que non se engada non se mostrará cando a quedada se comparta.\n\n"
+"Cando remates fai clic en ✅ Feito"
 
 msgid "MeetingMessages.INVALID_TITLE"
-msgstr "I did not recognize what you sent as a valid title 🤔.\n\n"
-"Send a message with the title of the meeting or click on *Cancel*."
+msgstr "Non recoñecin o que enviaches como un título válido 🤔.\n\n"
+"Envía unha mensaxe co título da quedada ou fai clic en <b>Cancelar</b>."
 
 msgid "MeetingMessages.MEETING_TIME"
-msgstr ""
+msgstr "Hora da quedada"
 
 msgid "MeetingMessages.CREATED_BY"
-msgstr "Created by: ${owner}"
+msgstr "Creada por: ${owner}"
 
 msgid "MeetingMessages.DESCRIPTION_NOT_SET"
 msgstr "🚫 Sen descripción definida 🚫"
@@ -264,77 +264,137 @@ msgid "MeetingMessages.LOCATION_NOT_SET"
 msgstr "🚫 Sen lugar definido 🚫"
 
 msgid "MeetingMessages.EMPTY"
-msgstr "Empty"
+msgstr "Baleiro"
 
 msgid "MeetingMessages.PARTICIPANT"
-msgstr "Participant"
+msgstr "Participante"
 
 msgid "MeetingMessages.PARTICIPANTS"
 msgstr "Participantes"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS"
-msgstr "\\(Max: ${max_participants}\\)"
+msgstr "(Máx: ${max_participants})"
+
+msgid "MeetingMessages.INVITED_BY_USER"
+msgstr "<i>invitado por ${user}</i>"
 
 msgid "MeetingMessages.MEETING_WITHOUT_DESCRIPTION"
-msgstr "_This meeting has no description yet_"
+msgstr "<i>Esta quedada aínda non ten descripción</i>"
 
 msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
-msgstr "_This meeting has no participants yet_"
+msgstr "<i>Esta quedada aínda non ten participantes</i>"
 
 msgid "MeetingMessages.JOINED_MEETING_SUCCESS"
-msgstr "You joined the meeting!"
+msgstr "¡Unícheste á quedada!"
 
 msgid "MeetingMessages.JOINED_MEETING_ALREADY"
-msgstr "You have already joined this meeting"
+msgstr "Xa te uniches a esta quedada"
 
 msgid "MeetingMessages.JOINED_MEETING_NOT_FOUND"
-msgstr "The meeting you tried to join does not exist"
+msgstr "A quedada á que intentas unirte non existe"
 
 msgid "MeetingMessages.JOINED_MEETING_FULL"
-msgstr "Sorry! The meeting is full"
+msgstr "Desculpa! A quedada está chea"
 
 msgid "MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST"
-msgstr "The meeting is full. You have been added to the waiting list."
+msgstr "A quedada está chea. Foste engadido á lista de espera."
 
 msgid "MeetingMessages.JOINED_MEETING_UNREGISTERED"
-msgstr "You have joined the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to be receive notifications and create new meetings!"
+msgstr "Unícheste á quedada, %{user}! Parece que é a primeira vez que usas Mitup, abre un chat con @mitupbot para recibir notificacións e crear novas quedadas!"
 
 msgid "MeetingMessages.LEFT_MEETING_SUCCESS"
-msgstr "You have left the meeting"
+msgstr "Saíches da quedada"
 
 msgid "MeetingMessages.LEFT_MEETING_ALREADY"
-msgstr "You cannot leave a meeting you have not joined"
+msgstr "Non podes saír dunha quedada a que non te uniches"
 
 msgid "MeetingMessages.LEFT_MEETING_NOT_FOUND"
-msgstr "The meeting you tried to leave does not exist"
+msgstr "A quedada á que intentas saír non existe"
 
 msgid "MeetingMessages.LEFT_MEETING_UNREGISTERED"
-msgstr "You have left the meeting, %{user}! It seems you have never used Mitup before, open a chat with @mitupbot to receive notifications and create new meetings!"
+msgstr "Saíches da quedada, %{user}! Parece que é a primeira vez que usas Mitup, abre un chat con @mitupbot para recibir notificacións e crear novas quedadas!"
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
-msgstr "There is an open spot in the meeting *${meeting_title}*. You have now been promoted from the waiting list!"
+msgstr "Hai un lugar dispoñible na quedada <b>${meeting_title}</b>. Foste ascendido desde a lista de espera!"
 
 msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
 msgstr "Estabas a crear unha quedada. Envía o título da quedada para continuar. Se non queres continuar, toca Cancelar para saír."
 
+msgid "MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT"
+msgstr "Desculpa, estaba esperando o título da túa quedada. Te gustaría envialo? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION_ON_EXIT"
+msgstr "Desculpa, estaba esperando a descrición da túa quedada. Te gustaría enviarla? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT"
+msgstr "Desculpa, estaba esperando o nome do lugar. Te gustaría envialo? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT"
+msgstr "Desculpa, estaba esperando a ubicación da túa quedada. Te gustaría enviarla? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT"
+msgstr "Desculpa, estaba esperando o número máximo de participantes. Te gustaría envialo? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_ON_EXIT"
+msgstr "Desculpa, estaba esperando a túa selección para eliminar un participante. Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.EDIT_MEETING_TIME_ON_EXIT"
+msgstr "Desculpa, estaba esperando a nova hora para a túa quedada. Te gustaría enviarla? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.INVITE_USER_ON_EXIT"
+msgstr "Desculpa, estaba esperando o nome da persoa que queres convidar. Te gustaría envialo? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.INVITE_USER_PROMPT"
+msgstr "<b>Engadir á lista de convidados</b>\n\nPor favor contesta co nome da persoa que queres engadir."
+
+msgid "MeetingMessages.INVITE_USER_CONFIRMATION"
+msgstr "<b>Confirmar adición</b>\n\nEstás seguro de que queres engadir <b>${name}</b> á quedada <b>${meeting_title}</b>?"
+
+msgid "MeetingMessages.INVITE_USER_OPEN_CHAT"
+msgstr "Comezar chat privado\n\nPara engadir participantes, necesitas abrir un chat conmigo primeiro."
+
+msgid "MeetingMessages.INVITE_USER_GO_PRIVATE"
+msgstr "Continuar en privado\n\nPor favor cambia ao noso chat privado para enviarme o nome."
+
+msgid "MeetingMessages.INVITE_USER_SUCCESS"
+msgstr "<b>Lista actualizada</b>\n\nO usuario <b>${name}</b> foi engadido á quedada <b>${meeting_title}</b>."
+
+msgid "MeetingMessages.INVITE_USER_MEETING_FULL"
+msgstr "<b>Sen lugares</b>\n\nA lista de convidados está chea. Non podes engadir a ninguén máis a menos que se libre un lugar."
+
+msgid "MeetingMessages.INVITE_USER_INVITES_DISABLED"
+msgstr "<b>Lista de convidados pechada</b>\n\nNon se permiten novas adicions nesta quedada. O organizador pechara a lista."
+
+msgid "MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND"
+msgstr "<b>Iso foi inesperado...</b>\n\nDe súpeto perdin pista dos detalles da quedada. Esto non debería pasar.\n\nPor favor intenta enviar o nome de novo."
+
+msgid "MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK"
+msgstr "<b>Quedada non atopada</b>\n\nA quedada á que intentas convidar a alguén non existe."
+
+msgid "MeetingMessages.INVITE_USERS_CANCELED"
+msgstr "O proceso de invitación foi cancelado."
+
+msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
+msgstr "Algo inesperado aconteceu ao engadir o usuario invitado. Por favor intenta de novo."
+
 msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "The meeting _*${meeting_title}*_ is starting soon!"
+msgstr "¡A quedada <b>${meeting_title}</b> comezará pronto!"
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
-msgstr "This is the current title of your meeting:\n"
-"*${title}*\n\n"
-" Send me the new one"
+msgstr "Este é o título actual da túa quedada:\n"
+"<b>${title}</b>\n\n"
+"Envíame o novo"
 
 msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
-msgstr "This is the current description of your meeting:\n"
+msgstr "Esta é a descrición actual da túa quedada:\n"
 "${description}\n\n"
-" Send me the new one"
+"Envíame a nova"
 
 msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "The title has been properly set to: *${title}*"
+msgstr "O título estableceuse correctamente a: <b>${title}</b>"
 
 msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "The description has been properly set to: *${description}*"
+msgstr "A descrición estableceuse correctamente a: <b>${description}</b>"
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION"
 msgstr "Unha quedada pode ter unha ubicación asociada. Podes só indicar o nome dun lugar ou tamén engadir unha ubicación. Elixe calquera das dúas opcións."
@@ -343,41 +403,65 @@ msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME"
 msgstr "Envíame o nome do lugar."
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
-msgstr "_Only from the phone 📱_\n\n"
-"Send the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
+msgstr "<i>Solo desde o teléfono 📱</i>\n\n"
+"Envía a ubicación da quedada. Toca no icono 📎 e escolle ubicación. Podes escoller a ubicación que queiras, non só a túa ubicación actual."
 
 msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "The name of the location has been set to: *${name}*"
+msgstr "O nome da ubicación estableceuse a: <b>${name}</b>"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
-msgstr "The location has been saved successfuly"
+msgstr "A ubicación gardouse correctamente"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
-msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
+msgstr "Envíame a ubicación de novo. Lembra tocar no icono do clip e escoller ubicación."
 
 msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
 msgstr "Acó poderás xestionar os participantes da quedada: podes establecer un número máximo de persoas que poden asistir á quedada e botar a calquera dos participantes que se uniron a ela."
 
 msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
-msgstr "Send me the maximum number of members allowed in the meeting \\(must be a number greater than 0\\) or press in _No limit_ to allow an unlimited number of participants."
+msgstr "Envíame o número máximo de membros permitidos na quedada (debe ser un número maior que 0) ou preme en <i>Sen límite</i> para permitir un número ilimitado de participantes."
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
-msgstr "The maximum number of participants has been set to: *${max_participants}*"
+msgstr "O número máximo de participantes estableceuse a: <b>${max_participants}</b>"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
-msgstr "No limit"
+msgstr "Sen límite"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
-msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
+msgstr "O número máximo de participantes debe ser un número maior que 0. Por favor intenta de novo"
 
 msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
 msgstr "Estas son os usuarios que se uniron á quedada. Elixe a quen queres botar."
+
+msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
+msgstr "¿Estás seguro de que queres expulsar a <b>${participant}</b> da quedada <b>${meeting_title}</b>?"
+
+msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
+msgstr "O participante que intentas expulsar xa non está na quedada."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
+msgstr "O participante <b>${participant}</b> foi expulsado correctamente."
+
+msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
+msgstr "O participante <b>${participant}</b> foi expulsado correctamente. Non hai máis participantes para expulsar."
+
+msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
+msgstr "Escolle o idioma da túa quedada. Esto cambiará o idioma usado ao compartir a quedada.\n\nIdioma actual: <b>${language}</b>."
+
+msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
+msgstr "O idioma estableceuse correctamente."
+
+msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
+msgstr "Esta quedada xa non está activa. Reactívala para compartirla de novo, ou elimínaa permanentemente."
+
+msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
+msgstr "A quedada foi reactivada. Agora podes editarla e compartirla de novo."
 
 msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Seguro que queres eliminar esta quedada?"
 
 msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
-msgstr "The meeting has been deleted successfully"
+msgstr "A quedada foi eliminada correctamente"
 
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
 msgstr "Non se vai eliminar a quedada."
@@ -386,48 +470,69 @@ msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Esta quedada eliminouse"
 
 msgid "MeetingMessages.EDIT_DATE"
-msgstr "Select the new date. Press *🗑️ Delete date* if you want to unset the date and time of the meeting."
+msgstr "Escolle a nova data. Preme <b>🗑️ Eliminar data</b> se queres desactivar a data e hora da quedada."
 
 msgid "MeetingMessages.ADD_DATE"
-msgstr "Select the date."
+msgstr "Escolle a data."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to: *${datetime}*. To set the time press _${set_time_button}_, othwerise press _${back_edit_button}_ to go back to editing the meeting."
+msgstr "A data estableceuse a: <b>${datetime}</b>. Para establecer a hora preme <i>${set_time_button}</i>, ou preme <i>${back_edit_button}</i> para volver a editar a quedada."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "The date has been set to: *${datetime}*"
+msgstr "A data estableceuse a: <b>${datetime}</b>"
 
 msgid "MeetingMessages.EDIT_TIME"
-msgstr "Send me the time of the meeting in the format _HH:MM_"
+msgstr "Envíame a hora da quedada co formato <i>HH:MM</i>"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "The time of the meeting has been set to *${datetime}*"
+msgstr "A hora da quedada estableceuse a <b>${datetime}</b>"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
-msgstr "Not sure I understand that time 🤔...\n\n"
-"Please, send the time in the format _HH:MM_, for example _15:30_ or _09:15_"
+msgstr "Non estou seguro de que entendo esa hora 🤔...\n\n"
+"Por favor, envía a hora co formato <i>HH:MM</i>, por exemplo <i>15:30</i> ou <i>09:15</i>"
 
 msgid "MeetingMessages.INVALID_TIME"
-msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\n"
-"Try again with a time that has valid hours \\(00-23\\) and minutes \\(00-59\\), I am sure I can work with that 🧠."
+msgstr "O meu reloxo interno é antigo e non pode entender esa hora de ciencia ficción 🛸.\n\n"
+"Intenta de novo coa hora que teña horas válidas (00-23) e minutos (00-59), seguro que así entendo 🧠."
+
+msgid "MeetingMessages.DELETE_DATE_CONFIRMATION"
+msgstr "¿Estás seguro de que queres eliminar a data e hora da quedada?"
+
+msgid "MeetingMessages.DELETE_DATE_DECLINE"
+msgstr "A data e hora non se eliminarán"
 
 msgid "MeetingMessages.DATE_TIME_DELETED"
-msgstr "The date and time of the meeting have been deleted successfully"
+msgstr "A data e hora da quedada foron eliminadas correctamente"
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Esta quedada eliminouse 🚫"
 
+msgid "MeetingMessages.MEETING_HAS_FINISHED"
+msgstr "✅ Esta quedada rematou ✅"
+
 msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
-msgstr "You can configure different aspects of your meeting:\n\n"
-"*Waiting list*: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n"
-"*Public*: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n"
-"*Open invitations*: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n"
-"*Incognito*: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-"*Show timezone*: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the _Timezone_ button shown when the meeting is shared."
+msgstr "Podes configurar diferentes aspectos da túa quedada:\n\n"
+"<b>Lista de espera</b>: permite aos usuarios unirse á quedada incluso cando está chea. Os usuarios que se unan á quedada cando está chea serán engadidos a unha lista de espera e serán engadidos á lista de participantes en cuanto haxa un lugar dispoñible na orde en que se uniron.\n\n"
+"<b>Pública</b>: activa esto para permitir que todos os que reciban a quedada a poidan compartir de novo. Perfecta para chegar a máis persoas.\n\n"
+"<b>Con convite</b>: activa esta opción para permitir que os usuarios que se uniron á quedada poidan engadir amigos incluso se non están en Telegram.\n\n"
+"<b>Incógnito</b>: unha quedada con incógnito habilitado non mostrará as persoas que se uniron á quedada cando se comparta. Solo se mostrará o número de participantes. Aínda poderás ver os participantes.\n\n"
+"<b>Mostrar zona horaria</b>: as quedadas normalmente inclúen a zona horaria á que se refiren a data e hora da quedada. Se non necesitas que esta información se amose na mensaxe da quedada podes deshabilitarla acó. Esto tamén deshabilitará o botón <i>Zona horaria</i> que se mostra cando se comparte a quedada."
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
-msgstr "_You don't have any meetings yet.\n\n"
-"Click on _${new_meeting_button}_ in the main menu to create one._"
+msgstr "<i>Aínda non tes ningunha quedada.\n\n"
+"Fai clic en <i>${new_meeting_button}</i> no menú principal para crear unha.</i>"
+
+msgid "MeetingMessages.NOT_SEARCHABLE_FOOTNOTE"
+msgstr "🔍 Fai esta quedada buscable neste chat."
+
+msgid "MeetingMessages.SEARCHABLE_FOOTNOTE"
+msgstr "✅ Esta quedada agora é buscable neste chat."
+
+msgid "MeetingMessages.NOW_SEARCHABLE_ALERT"
+msgstr "✅ ¡Agora Buscable!\n\nEsta quedada agora está adxunta a este chat. Será incluída nos teus resultados de busca cando busques quedadas usando o modo en liña do bot."
+
+msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
+msgstr "✅ ¡Xa Buscable!\n\nEsta quedada xa estaba adxunta a este chat desde unha compartición anterior. Xa está incluída nos teus resultados de busca."
 
 msgid "MeetingMessages.ACTIVE"
 msgstr "Estas son todas as túas quedadas activas."
@@ -446,6 +551,42 @@ msgstr "Estas son todas as túas quedadas pasadas."
 
 msgid "MeetingMessages.NO_PAST_MEETINGS"
 msgstr "_Aínda non tes ningunha quedada pasada._"
+
+msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
+msgstr "➕ Crear unha nova quedada"
+
+msgid "InlineViewMessages.EXPLORE_MITUP_BUTTON"
+msgstr "🚀 Explorar Mitup"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE"
+msgstr "🔍 Quedadas neste chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION"
+msgstr "Busca quedadas compartidas neste chat"
+
+msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE"
+msgstr "Toca o botón de abaixo para cargar quedadas compartidas neste chat."
+
+msgid "InlineViewMessages.READY_TO_SEARCH_MESSAGE"
+msgstr "Toca o botón de abaixo para buscar quedadas compartidas neste chat."
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_TITLE"
+msgstr "Ningunha quedada atopada"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION"
+msgstr "Ningunha quedada foi compartida neste chat aínda"
+
+msgid "InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE"
+msgstr "<i>Ningunha quedada foi compartida neste chat aínda.</i>"
+
+msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
+msgstr "A quedada <b>${meeting_title}</b> será permanentemente eliminada en <b>${days_until_deletion} días</b>.\n\nPara evitar esto, podes reactivar a quedada seleccionando o botón <b>${reactivate_meeting_button}</b> de abaixo.\n\nLembra que sempre podes reactivar calquera quedada pasada desde o botón <b>${past_meetings_button}</b> no menú principal.\n\nSe non queres reactivar a quedada, podes ignorar esta mensaxe."
+
+msgid "NotificationMessages.MEETING_PERMANENTLY_DELETED"
+msgstr "A quedada <b>${meeting_title}</b> foi permanentemente eliminada."
+
+msgid "NotificationMessages.MEETING_STARTING"
+msgstr "¡A quedada <b>${meeting_title}</b> comezará pronto!"
 
 msgid "Weekday.MONDAY"
 msgstr "Lun"
@@ -541,19 +682,19 @@ msgid "MonthShort.DECEMBER"
 msgstr "Dec"
 
 msgid "Languages.SPANISH"
-msgstr "🇪🇸 Spanish"
+msgstr "🇪🇸 Español"
 
 msgid "Languages.GALICIAN"
 msgstr "🇪🇸 Galego"
 
 msgid "Languages.ENGLISH"
-msgstr "🇺🇸 English"
+msgstr "🇺🇸 Inglés"
 
 msgid "Languages.GERMAN"
-msgstr "🇩🇪 German"
+msgstr "🇩🇪 Alemán"
 
 msgid "Languages.PORTUGUESE"
-msgstr "🇧🇷 Portuguese"
+msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
-msgstr "🇮🇹 Italian"
+msgstr "🇮🇹 Italiano"
