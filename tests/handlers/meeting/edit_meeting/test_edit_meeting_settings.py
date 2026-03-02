@@ -29,7 +29,6 @@ def assert_default_options_value(
     public: bool,
     invitation: bool,
     incognito: bool,
-    show_timezone: bool,
 ):
     expected_waiting_list = (
         not waiting_list if handler_id is EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK else waiting_list
@@ -41,15 +40,11 @@ def assert_default_options_value(
     expected_incognito = (
         not incognito if handler_id is EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK else incognito
     )
-    expected_show_timezone = (
-        not show_timezone if handler_id is EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK else show_timezone
-    )
 
     assert meeting.waiting_list == expected_waiting_list
     assert meeting.public == expected_public
     assert meeting.allow_invitation == expected_invitation
     assert meeting.incognito == expected_incognito
-    assert meeting.show_timezone == expected_show_timezone
 
 
 @pytest.mark.parametrize(
@@ -71,19 +66,14 @@ def assert_default_options_value(
             UpdateRequest(callback_query=cb.SET_MEETING_INCOGNITO.with_id(1)),
             EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK,
         ),
-        (
-            UpdateRequest(callback_query=cb.SET_MEETING_SHOW_TIMEZONE.with_id(1)),
-            EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
-        ),
     ],
-    ids=["waiting_list", "public", "invitation", "incognito", "show_timezone"],
+    ids=["waiting_list", "public", "invitation", "incognito"],
     indirect=["update"],
 )
 @pytest.mark.parametrize("waiting_list", [True, False], ids=["waiting_list_true", "waiting_list_false"])
 @pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
 @pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
 @pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone_true", "show_timezone_false"])
 async def test_callbacks_to_set_meeting_setting(
     mock_session: MockDbSession,
     user_with_settings: User,
@@ -93,7 +83,6 @@ async def test_callbacks_to_set_meeting_setting(
     public: bool,
     invitation: bool,
     incognito: bool,
-    show_timezone: bool,
     app: StubMitupApp,
 ):
     meeting = user_with_settings.meetups[0]
@@ -101,7 +90,6 @@ async def test_callbacks_to_set_meeting_setting(
     meeting.public = public
     meeting.allow_invitation = invitation
     meeting.incognito = incognito
-    meeting.show_timezone = show_timezone
 
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(meeting, query_field="id")
@@ -111,4 +99,4 @@ async def test_callbacks_to_set_meeting_setting(
     expected_view = meeting.settings_view
 
     context.api.assert_edit_message_called(update, expected_view)
-    assert_default_options_value(meeting, handler_id, waiting_list, public, invitation, incognito, show_timezone)
+    assert_default_options_value(meeting, handler_id, waiting_list, public, invitation, incognito)

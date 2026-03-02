@@ -83,9 +83,6 @@ msgstr "Con invitación"
 msgid "ButtonMessages.INCOGNITO"
 msgstr "Incógnito"
 
-msgid "ButtonMessages.SHOW_TIMEZONE"
-msgstr "Mostrar zona horaria"
-
 msgid "ButtonMessages.ENABLE"
 msgstr "Activar"
 
@@ -250,6 +247,9 @@ msgstr "Se ha creado una quedada con el título ${title}.\n\n"
 msgid "MeetingMessages.INVALID_TITLE"
 msgstr "Creo que no entiendo el título que has enviado 🤔.\n\n"
 "Envíame un mensaje con el título de la quedada o toca en *Cancelar*."
+
+msgid "MeetingMessages.MEETING_TIME"
+msgstr "Hora de la quedada"
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Creada por: ${owner}"

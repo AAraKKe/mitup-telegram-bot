@@ -78,8 +78,6 @@ class ButtonMessages(MessageBase):
     PUBLIC = "Public"
     OPEN_INVITATION = "Open invitations"
     INCOGNITO = "Incognito"
-    SHOW_TIMEZONE = "Show timezone"
-    SHOW_IN_YOUR_TIMEZONE = "Show timezone"
     ENABLE = "Enable"
     DISABLE = "Disable"
 
@@ -217,6 +215,7 @@ class MeetingMessages(MessageBase):
     )
 
     # Meeting information
+    MEETING_TIME = "Meeting time"
     CREATED_BY = "Created by: ${owner}"
     DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
@@ -391,12 +390,12 @@ class MeetingMessages(MessageBase):
     )
     ADD_DATE = "Select the date."
     NEW_DATE_SET_SUCCESS = (
-        "The date has been set to: <b>${datetime}</b>. To set the time press <i>${set_time_button}</i>, "
+        "The date has been set to: ${datetime}. To set the time press <i>${set_time_button}</i>, "
         "othwerise press <i>${back_edit_button}</i> to go back to editing the meeting."
     )
-    DATE_UPDATE_SUCCESS = "The date has been set to: <b>${datetime}</b>"
+    DATE_UPDATE_SUCCESS = "The date has been set to: ${datetime}"
     EDIT_TIME = "Send me the time of the meeting in the format <i>HH:MM</i>"
-    EDIT_TIME_SUCCESS = "The time of the meeting has been set to <b>${datetime}</b>"
+    EDIT_TIME_SUCCESS = "The time of the meeting has been set to ${datetime}"
     WRONG_TIME_FORMAT = (
         f"Not sure I understand that time {Emojis.THINK}...\n\n"
         "Please, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"

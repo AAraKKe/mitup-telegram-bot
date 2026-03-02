@@ -59,7 +59,6 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
         public=user.settings.default_public,
         allow_invitation=user.settings.default_allow_invitation,
         incognito=user.settings.default_incognito,
-        show_timezone=user.settings.default_show_timezone,
     )
 
     session.add(meetup)

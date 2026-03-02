@@ -28,7 +28,6 @@ def assert_default_options_value(
     public: bool,
     invitation: bool,
     incognito: bool,
-    show_timezone: bool,
 ):
     expected_waiting_list = (
         not waiting_list if handler_id is EditSettingsHandlerId.SET_DEFAULT_WAITING_LIST else waiting_list
@@ -36,15 +35,11 @@ def assert_default_options_value(
     expected_public = not public if handler_id is EditSettingsHandlerId.SET_DEFAULT_PUBLIC else public
     expected_invitation = not invitation if handler_id is EditSettingsHandlerId.SET_DEFAULT_INVITATIONS else invitation
     expected_incognito = not incognito if handler_id is EditSettingsHandlerId.SET_DEFAULT_INCOGNITO else incognito
-    expected_show_timezone = (
-        not show_timezone if handler_id is EditSettingsHandlerId.SET_DEFAULT_SHOW_TIMEZONE else show_timezone
-    )
 
     assert settings.default_waiting_list == expected_waiting_list
     assert settings.default_public == expected_public
     assert settings.default_allow_invitation == expected_invitation
     assert settings.default_incognito == expected_incognito
-    assert settings.default_show_timezone == expected_show_timezone
 
 
 @pytest.mark.parametrize(
@@ -54,16 +49,14 @@ def assert_default_options_value(
         (UpdateRequest(callback_query=cb.SET_DEFAULT_PUBLIC), EditSettingsHandlerId.SET_DEFAULT_PUBLIC),
         (UpdateRequest(callback_query=cb.SET_DEFAULT_INVITATIONS), EditSettingsHandlerId.SET_DEFAULT_INVITATIONS),
         (UpdateRequest(callback_query=cb.SET_DEFAULT_INCOGNITO), EditSettingsHandlerId.SET_DEFAULT_INCOGNITO),
-        (UpdateRequest(callback_query=cb.SET_DEFAULT_SHOW_TIMEZONE), EditSettingsHandlerId.SET_DEFAULT_SHOW_TIMEZONE),
     ],
-    ids=["waiting_list", "public", "invitation", "incognito", "show_timezone"],
+    ids=["waiting_list", "public", "invitation", "incognito"],
     indirect=["update"],
 )
 @pytest.mark.parametrize("waiting_list", [True, False], ids=["waiting_list_true", "waiting_list_false"])
 @pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
 @pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
 @pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone_true", "show_timezone_false"])
 async def test_callbacks_to_set_default_option(
     mock_session: MockDbSession,
     user_with_settings: User,
@@ -73,14 +66,12 @@ async def test_callbacks_to_set_default_option(
     public: bool,
     invitation: bool,
     incognito: bool,
-    show_timezone: bool,
     app: StubMitupApp,
 ):
     settings = user_with_settings.settings
     settings.default_allow_invitation = invitation
     settings.default_incognito = incognito
     settings.default_public = public
-    settings.default_show_timezone = show_timezone
     settings.default_waiting_list = waiting_list
 
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -90,4 +81,4 @@ async def test_callbacks_to_set_default_option(
     expected_view = settings.default_meeting_settings_view()
 
     context.api.assert_edit_message_called(update, expected_view)
-    assert_default_options_value(settings, handler_id, waiting_list, public, invitation, incognito, show_timezone)
+    assert_default_options_value(settings, handler_id, waiting_list, public, invitation, incognito)

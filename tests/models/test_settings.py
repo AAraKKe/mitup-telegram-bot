@@ -29,7 +29,6 @@ def expected_default_meeting_options_view(
     public = settings.default_public
     invitation = settings.default_allow_invitation
     incognito = settings.default_incognito
-    show_timezone = settings.default_show_timezone
 
     message = SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE.get(lang=lang)
     waiting_list_button = options_button(
@@ -40,16 +39,12 @@ def expected_default_meeting_options_view(
         cb.SET_DEFAULT_INVITATIONS, ButtonMessages.OPEN_INVITATION.get(lang=lang), invitation
     )
     incognito_button = options_button(cb.SET_DEFAULT_INCOGNITO, ButtonMessages.INCOGNITO.get(lang=lang), incognito)
-    show_timezone_button = options_button(
-        cb.SET_DEFAULT_SHOW_TIMEZONE, ButtonMessages.SHOW_TIMEZONE.get(lang=lang), show_timezone
-    )
 
     return MitupView(
         message,
         keyboard=[
             [waiting_list_button, public_button],
             [invitation_button, incognito_button],
-            [show_timezone_button],
         ],
     ).with_back_button(text=ButtonMessages.SETTINGS, callback_data=cb.SETTINGS, lang=lang)
 
@@ -58,20 +53,17 @@ def expected_default_meeting_options_view(
 @pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
 @pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
 @pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone_true", "show_timezone_false"])
 def test_default_meeting_options_view(
     waiting_list: bool,
     public: bool,
     invitation: bool,
     incognito: bool,
-    show_timezone: bool,
     user_with_settings: User,
 ):
     settings = user_with_settings.settings
     settings.default_allow_invitation = invitation
     settings.default_incognito = incognito
     settings.default_public = public
-    settings.default_show_timezone = show_timezone
     settings.default_waiting_list = waiting_list
 
     view = settings.default_meeting_settings_view()

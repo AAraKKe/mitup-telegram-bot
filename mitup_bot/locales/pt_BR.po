@@ -83,9 +83,6 @@ msgstr "Open invitations"
 msgid "ButtonMessages.INCOGNITO"
 msgstr "Incognito"
 
-msgid "ButtonMessages.SHOW_TIMEZONE"
-msgstr "Show timezone"
-
 msgid "ButtonMessages.ENABLE"
 msgstr "Enable"
 
@@ -250,6 +247,9 @@ msgstr "A meeting has been created with the title: *${title}*\n\n"
 msgid "MeetingMessages.INVALID_TITLE"
 msgstr "I did not recognize what you sent as a valid title 🤔.\n\n"
 "Send a message with the title of the meeting or click on *Cancel*."
+
+msgid "MeetingMessages.MEETING_TIME"
+msgstr ""
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Created by: ${owner}"

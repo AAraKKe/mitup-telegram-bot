@@ -30,7 +30,6 @@ EXAMPLE_MEETING = Meetup(
     public=False,
     allow_invitation=False,
     incognito=False,
-    show_timezone=True,
 )
 COORDINATES = (123.1, -321.1)
 
@@ -67,7 +66,8 @@ def expected_message(
     invited_user: bool = False,
 ) -> str:
     str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang)
-    str_date = "1987-07-17 01:59 (Europe/Madrid)" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
+    # When datetime is set, _datetime_display returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
+    str_date = "Meeting time" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
     owner_inline = "john_doe" if username else "John"
     location = expected_location_name(
         lang=lang,
@@ -120,7 +120,8 @@ def expected_inline_message(
     if description:
         lines.append(f"--- {Emojis.DESCRIPTION} Test Description")
     if datetime:
-        lines.append(f"--- {Emojis.CLOCK} 1987-07-17 01:59 (Europe/Madrid)")
+        # When datetime is set, _datetime_display returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
+        lines.append(f"--- {Emojis.CLOCK} Meeting time")
     if location_name or coordinates:
         location_text = expected_location_name(
             lang=lang,
@@ -242,7 +243,6 @@ def test_meetup_message(
         public=False,
         allow_invitation=False,
         incognito=incognito,
-        show_timezone=True,
     )
     # Have at least one user joined to evaluate the list of user joined
     JoinedUsers(user=owner, meetup=meeting)
@@ -285,66 +285,6 @@ def test_meetup_message(
         assert dt_entities[0].unix_time == int(datetime(1987, 7, 16, 23, 59, tzinfo=UTC).timestamp())
     else:
         assert not dt_entities
-
-
-def test_time_properly_converted_for_timezone(settings: Settings):
-    meeting = Meetup(
-        title="Test Meeting",
-        description="Test Description",
-        datetime=datetime(2024, 1, 12, 12, 30, tzinfo=UTC),
-        owner=User(first_name="John", username="john_doe", tg_user_id=1, settings=settings),
-        waiting_list=False,
-        public=False,
-        allow_invitation=False,
-        incognito=False,
-        show_timezone=True,
-    )
-
-    # Expected time is 1 hour ahead of the one in the meeting (in UTC) assuming converstion to settings.tz
-    # Europe/Madrid
-    expected_time = "2024-01-12 13:30 (Europe/Madrid)"
-
-    assert expected_time == meeting.str_datetime.text
-
-    # Updatingt he timezone to Europe/Dublin in January the date should be the same but the time should be 12:30
-    # since Dublin is in the same timezone as UTC
-    settings.timezone = "Europe/Dublin"
-    expected_time = "2024-01-12 12:30 (Europe/Dublin)"
-    assert expected_time == meeting.str_datetime.text
-
-
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
-def test_timezone_not_included_when_show_timezone_disabled(show_timezone: bool, settings: Settings):
-    owner = User(first_name="John", username="john_doe", tg_user_id=1, settings=settings)
-    meeting = create_meetup(
-        id=123,
-        title="Test meeting",
-        show_timezone=show_timezone,
-        datetime=datetime(2024, 1, 12, 12, 30, tzinfo=UTC),
-        owner=owner,
-    )
-
-    expected_time = "2024-01-12 13:30 (Europe/Madrid)" if show_timezone else "2024-01-12 13:30"
-
-    assert expected_time == meeting.str_datetime.text
-
-
-@pytest.mark.parametrize(
-    "meeting_datetime, expected",
-    [
-        (datetime(2024, 1, 12, 12, 30, tzinfo=UTC), FormattedText("2024-01-12 12:30 (UTC)")),
-        (None, MeetingMessages.DATE_NOT_SET.get(lang="en")),
-    ],
-    ids=["with_datetime", "without_datetime"],
-)
-def test_meetup_full_datetime_string(meeting_datetime: datetime | None, expected: FormattedText):
-    # Settings() defaults to timezone="UTC"; full_str_datetime always shows the timezone.
-    meeting = create_meetup(
-        id=1,
-        owner=User(first_name="John", tg_user_id=1, settings=Settings()),
-    )
-    meeting.datetime = meeting_datetime
-    assert meeting.full_str_datetime == expected
 
 
 @pytest.mark.parametrize(
@@ -415,7 +355,6 @@ def test_short_description(description: str | None, expected_description: str | 
         public=False,
         allow_invitation=False,
         incognito=False,
-        show_timezone=True,
     )
 
     assert expected_description == meeting.short_description
@@ -424,7 +363,8 @@ def test_short_description(description: str | None, expected_description: str | 
 def build_inline_message(lang: str, meeting_datetime: datetime | None) -> str:
     result = [f"{Emojis.JOINED} {MeetingMessages.EMPTY.get(lang=lang).text}"]
     if meeting_datetime:
-        result.append(f"{Emojis.CLOCK} 2024-01-12 13:30 (Europe/Madrid)")
+        # inline_query_message uses _plain_datetime: plain UTC string with no timezone suffix
+        result.append(f"{Emojis.CLOCK} 2024-01-12 12:30")
     return "\n".join(result)
 
 
@@ -444,7 +384,6 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
         public=False,
         allow_invitation=False,
         incognito=False,
-        show_timezone=True,
     )
 
     expected = build_inline_message(user_with_settings.lang, meeting_datetime)
@@ -630,7 +569,6 @@ def expected_meeting_settings_view(
     public = meeting.public
     invitation = meeting.allow_invitation
     incognito = meeting.incognito
-    show_timezone = meeting.show_timezone
 
     message = MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=lang)
     waiting_list_button = options_button(
@@ -649,18 +587,12 @@ def expected_meeting_settings_view(
     incognito_button = options_button(
         cb.SET_MEETING_INCOGNITO.with_id(meeting.db_id), ButtonMessages.INCOGNITO.get(lang=lang), incognito
     )
-    show_timezone_button = options_button(
-        cb.SET_MEETING_SHOW_TIMEZONE.with_id(meeting.db_id),
-        ButtonMessages.SHOW_TIMEZONE.get(lang=lang),
-        show_timezone,
-    )
 
     return MitupView(
         message,
         keyboard=[
             [waiting_list_button, public_button],
             [invitation_button, incognito_button],
-            [show_timezone_button],
         ],
     ).with_back_button(text=ButtonMessages.EDIT, callback_data=cb.EDIT_MEETING.with_id(meeting.db_id), lang=lang)
 
@@ -669,20 +601,17 @@ def expected_meeting_settings_view(
 @pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
 @pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
 @pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone_true", "show_timezone_false"])
 def test_default_meeting_options_view(
     waiting_list: bool,
     public: bool,
     invitation: bool,
     incognito: bool,
-    show_timezone: bool,
     user_with_settings: User,
 ):
     meeting = user_with_settings.meetups[0]
     meeting.allow_invitation = invitation
     meeting.incognito = incognito
     meeting.public = public
-    meeting.show_timezone = show_timezone
     meeting.waiting_list = waiting_list
 
     view = meeting.settings_view
@@ -692,7 +621,7 @@ def test_default_meeting_options_view(
     assert expected_view == view
 
 
-def expected_inline_keyboard(language: str, with_timezone: bool, *, chat_instance: str | None = None) -> Keyboard:
+def expected_inline_keyboard(language: str, *, chat_instance: str | None = None) -> Keyboard:
     expected_keyboard = [
         [
             ButtonConfig(
@@ -705,15 +634,6 @@ def expected_inline_keyboard(language: str, with_timezone: bool, *, chat_instanc
             ),
         ]
     ]
-    if with_timezone:
-        expected_keyboard.append(
-            [
-                ButtonConfig(
-                    text=ButtonMessages.SHOW_IN_YOUR_TIMEZONE.get(lang=language),
-                    callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(123),
-                ),
-            ],
-        )
 
     if not chat_instance:
         expected_keyboard.append(
@@ -733,18 +653,16 @@ def expected_inline_keyboard(language: str, with_timezone: bool, *, chat_instanc
     SUPPORTED_LANGUAGES + [None],
     ids=[f"meeting_language_{lang}" for lang in SUPPORTED_LANGUAGES] + ["meeting_language_none"],
 )
-@pytest.mark.parametrize("with_timezone", [True, False], ids=["with_timezone", "without_timezone"])
-def test_inline_view(meeting: Meetup, meeting_language: str | None, with_timezone: bool):
+def test_inline_view(meeting: Meetup, meeting_language: str | None):
     # Ensure the language of the inline view is the language of the meeting
     # except when the meeting has no language
     meeting.language = meeting_language
-    meeting.show_timezone = with_timezone
     used_language = meeting_language or meeting.owner.lang
     view = meeting.inline_view()
 
     expected_view = MitupInlineView(
         description=meeting.inline_message,
-        keyboard=expected_inline_keyboard(language=used_language, with_timezone=with_timezone),
+        keyboard=expected_inline_keyboard(language=used_language),
         id="123",
         title=meeting.title,
         inline_description=meeting.inline_query_message,
@@ -758,19 +676,15 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None, with_timezon
     SUPPORTED_LANGUAGES + [None],
     ids=[f"meeting_language_{lang}" for lang in SUPPORTED_LANGUAGES] + ["meeting_language_none"],
 )
-@pytest.mark.parametrize("with_timezone", [True, False], ids=["with_timezone", "without_timezone"])
-def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None, with_timezone: bool):
+def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
     meeting.language = meeting_language
-    meeting.show_timezone = with_timezone
     used_language = meeting_language or meeting.owner.lang
 
     view = meeting.inline_view(chat_instance="some_chat_instance")
 
     expected_view = MitupInlineView(
         description=meeting.inline_message,
-        keyboard=expected_inline_keyboard(
-            language=used_language, with_timezone=with_timezone, chat_instance="some_chat_instance"
-        ),
+        keyboard=expected_inline_keyboard(language=used_language, chat_instance="some_chat_instance"),
         id="123",
         title=meeting.title,
         inline_description=meeting.inline_query_message,
@@ -1239,7 +1153,7 @@ def test_external_view():
 
 def test_edit_view(user_with_settings: User):
     meeting = user_with_settings.meetups[0]
-    now_in_tz = meeting.datetime_in_tz or meeting.owner.now_in_tz()
+    now_in_tz = meeting.owner.datetime_in_tz(meeting.datetime) if meeting.datetime else meeting.owner.now_in_tz()
 
     expected_view = MitupView(
         meeting.message,

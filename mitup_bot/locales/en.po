@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-03-01 23:32\n"
+"PO-Revision-Date: 2026-03-02 00:43\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -85,9 +85,6 @@ msgstr "Open invitations"
 
 msgid "ButtonMessages.INCOGNITO"
 msgstr "Incognito"
-
-msgid "ButtonMessages.SHOW_TIMEZONE"
-msgstr "Show timezone"
 
 msgid "ButtonMessages.ENABLE"
 msgstr "Enable"
@@ -244,6 +241,9 @@ msgstr "A meeting has been created with the title: <b>${title}</b>\n\nYou can ad
 
 msgid "MeetingMessages.INVALID_TITLE"
 msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on <b>Cancel</b>."
+
+msgid "MeetingMessages.MEETING_TIME"
+msgstr "Meeting time"
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Created by: ${owner}"
@@ -462,16 +462,16 @@ msgid "MeetingMessages.ADD_DATE"
 msgstr "Select the date."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to: <b>${datetime}</b>. To set the time press <i>${set_time_button}</i>, othwerise press <i>${back_edit_button}</i> to go back to editing the meeting."
+msgstr "The date has been set to: ${datetime}. To set the time press <i>${set_time_button}</i>, othwerise press <i>${back_edit_button}</i> to go back to editing the meeting."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "The date has been set to: <b>${datetime}</b>"
+msgstr "The date has been set to: ${datetime}"
 
 msgid "MeetingMessages.EDIT_TIME"
 msgstr "Send me the time of the meeting in the format <i>HH:MM</i>"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "The time of the meeting has been set to <b>${datetime}</b>"
+msgstr "The time of the meeting has been set to ${datetime}"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
 msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"

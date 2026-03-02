@@ -129,7 +129,6 @@ def seed_meetup(db_session: Session, seed_user: User) -> Meetup:
         public=False,
         allow_invitation=False,
         incognito=False,
-        show_timezone=True,
         owner=seed_user,
     )
     db_session.add(meetup)

@@ -64,7 +64,6 @@ class Meetup(BaseModel, SQLModel, table=True):
     public: bool = Field(nullable=False)
     allow_invitation: bool = Field(nullable=False)
     incognito: bool = Field(nullable=False)
-    show_timezone: bool = Field(nullable=False)
     expiration_notification_sent: bool = Field(nullable=False, default=False)
     description: str | None = None
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
@@ -243,24 +242,11 @@ class Meetup(BaseModel, SQLModel, table=True):
         return self.owner.settings.tz
 
     @property
-    def datetime_in_tz(self) -> dt.datetime | None:
-        return self.owner.datetime_in_tz(self.datetime) if self.datetime else None
-
-    @property
-    def str_datetime(self) -> FormattedText:
+    def _plain_datetime(self) -> str:
+        """UTC-formatted plain datetime string used in inline query previews."""
         if self.datetime:
-            datetime_str = f"{self.datetime_in_tz:%Y-%m-%d %H:%M}"
-            if self.show_timezone:
-                datetime_str += f" ({self.timezone.key})"
-            return FormattedText(datetime_str)
-        return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
-
-    @property
-    def full_str_datetime(self) -> FormattedText:
-        """Alawyas shows the time with the timezone"""
-        if self.datetime:
-            return FormattedText(f"{self.datetime_in_tz:%Y-%m-%d %H:%M} ({self.timezone.key})")
-        return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
+            return f"{self.datetime:%Y-%m-%d %H:%M}"
+        return MeetingMessages.DATE_NOT_SET.get_text(lang=self.lang)
 
     @property
     def participants_badge(self) -> Template:
@@ -355,7 +341,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         """Datetime field for the meeting message — entity-typed when a datetime is set."""
         if self.datetime is None:
             return MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
-        return EntityDateTime(self.str_datetime.text, int(self.datetime.timestamp()))
+        return EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), int(self.datetime.timestamp()), "DT")
 
     @property
     def message(self) -> FormattedText:
@@ -407,7 +393,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         result = t"{Emojis.JOINED} {self.participants_badge}"
 
         if self.datetime:
-            return render(t"{result}\n{Emojis.CLOCK} {self.str_datetime}")
+            return render(t"{result}\n{Emojis.CLOCK} {self._plain_datetime}")
 
         return render(result)
 
@@ -490,7 +476,7 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def edit_view(self) -> MitupView:
-        now_in_tz: dt.datetime = self.datetime_in_tz or self.owner.now_in_tz()
+        now_in_tz: dt.datetime = self.owner.datetime_in_tz(self.datetime) if self.datetime else self.owner.now_in_tz()
         return MitupView(
             self.message,
             [
@@ -576,13 +562,6 @@ class Meetup(BaseModel, SQLModel, table=True):
                     self.incognito,
                 ),
             ],
-            [
-                options_button(
-                    cb.SET_MEETING_SHOW_TIMEZONE.with_id(self.db_id),
-                    ButtonMessages.SHOW_TIMEZONE.get(lang=self.owner.lang),
-                    self.show_timezone,
-                ),
-            ],
         ]
 
         return MitupView(
@@ -628,16 +607,6 @@ class Meetup(BaseModel, SQLModel, table=True):
                     text=ButtonMessages.INVITE.get(lang=self.lang),
                     callback_data=cb.INVITE.with_id(self.db_id),
                 ),
-            )
-
-        if self.show_timezone:
-            keyboard.append(
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.SHOW_IN_YOUR_TIMEZONE.get(lang=self.lang),
-                        callback_data=cb.SHOW_IN_VIEWER_TIMEZONE.with_id(self.db_id),
-                    ),
-                ]
             )
 
         if self.public:

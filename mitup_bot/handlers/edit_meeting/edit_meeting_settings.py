@@ -115,9 +115,3 @@ create_meeting_settings_toggle_handler(
 create_meeting_settings_toggle_handler(
     EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK, callback_data=cb.SET_MEETING_INCOGNITO, attribute="incognito"
 )
-
-create_meeting_settings_toggle_handler(
-    EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
-    callback_data=cb.SET_MEETING_SHOW_TIMEZONE,
-    attribute="show_timezone",
-)

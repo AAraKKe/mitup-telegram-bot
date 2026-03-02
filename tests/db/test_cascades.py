@@ -28,7 +28,6 @@ def test_deleting_user_cascades_to_meetups(db_session: Session) -> None:
         public=False,
         allow_invitation=False,
         incognito=False,
-        show_timezone=True,
         owner=user,
     )
     db_session.add(user)
@@ -53,7 +52,6 @@ def test_deleting_meetup_cascades_to_joined_users(db_session: Session) -> None:
         public=False,
         allow_invitation=False,
         incognito=False,
-        show_timezone=True,
         owner=owner,
     )
     db_session.add(owner)

@@ -13,6 +13,8 @@ from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, Edit
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils import render
+from mitup_bot.utils.entities import EntityDateTime, FormattedText
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
@@ -23,7 +25,7 @@ TEST_CURRENT_DATE = dt.date(2024, 11, 15)
 TEST_31ST_DATETIME = dt.datetime(2024, 10, 31, 12, 30, 0, tzinfo=dt.UTC)
 
 
-def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
+def set_new_date_view(lang: str, meeting_id: int, datetime: FormattedText) -> MitupView:
     return MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
             lang=lang,
@@ -45,8 +47,13 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: str) -> MitupView:
     )
 
 
-def update_meeting_view(meeting: Meetup, datetime: str) -> MitupView:
+def update_meeting_view(meeting: Meetup, datetime: FormattedText) -> MitupView:
     return meeting.edit_view.with_context(MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=datetime))
+
+
+def datetime_entity(unix_time: int) -> FormattedText:
+    """Build the FormattedText that the handler produces for a set datetime."""
+    return render(t"{EntityDateTime('Meeting time', unix_time=unix_time, date_time_format='DT')}")
 
 
 @pytest.fixture(autouse=True)
@@ -131,8 +138,6 @@ async def test_edit_meeting_date_callback(
     indirect=["update"],
     ids=["set_date_for_the_first_time", "update_existing_date"],
 )
-# This should always show the timezone no matter what the configuration is
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
 async def test_set_meeting_date_callback(
     mock_session: MockDbSession,
     update: Update,
@@ -140,11 +145,8 @@ async def test_set_meeting_date_callback(
     new: bool,
     user_with_settings: User,
     app: StubMitupApp,
-    show_timezone: bool,
 ):
-    meeting = create_meetup(
-        id=10, title="TestMeeting", description="Description", datetime=current_datetime, show_timezone=show_timezone
-    )
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=current_datetime)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -153,17 +155,24 @@ async def test_set_meeting_date_callback(
 
     context, _ = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, update=update, app=app)
 
-    expected_view = (
-        set_new_date_view(user_with_settings.lang, 10, "2024-12-21 23:59 (Europe/Madrid)")
-        if new
-        else update_meeting_view(meeting, "2024-12-21 13:30 (Europe/Madrid)")
-    )
     expected_datetime = (
         # The meeting is set to 23:59 on the user timezone, i.e. one hour earlier in UTC
         dt.datetime.combine(TEST_MEETING_DATETIME_UTC.date(), dt.time(22, 59, tzinfo=dt.UTC))
         if new
         # If the meeting already has a time, it should be updated to the new date keeping the time
         else dt.datetime.combine(TEST_MEETING_DATETIME_UTC.date(), dt.time(12, 30, tzinfo=dt.UTC))
+    )
+    expected_view = (
+        set_new_date_view(
+            user_with_settings.lang,
+            10,
+            datetime_entity(int(expected_datetime.timestamp())),  # "Meeting time" entity with the final unix_time
+        )
+        if new
+        else update_meeting_view(
+            meeting,
+            datetime_entity(int(expected_datetime.timestamp())),
+        )
     )
 
     assert meeting.datetime == expected_datetime
@@ -361,38 +370,31 @@ async def test_edit_meeting_time_callback(
 
 
 @pytest.mark.parametrize(
-    "update, meeting, expected_meeting_time,expected_time_displayed",
+    "update, meeting, expected_meeting_time",
     [
         (
             UpdateRequest(message_text="20:20"),
             create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
             dt.datetime(2024, 12, 21, 19, 20, tzinfo=dt.UTC),
-            "2024-12-21 20:20 (Europe/Madrid)",
         ),
         (
             UpdateRequest(message_text="20:20"),
             create_meetup(id=10, title="TestMeeting", description="Description"),
             dt.datetime(2025, 1, 1, 19, 20, tzinfo=dt.UTC),
-            "2025-01-01 20:20 (Europe/Madrid)",
         ),
     ],
     indirect=["update"],
     ids=["meeting_with_time", "meeting_without_time"],
 )
 @freeze_time("2024-12-31 23:20:00", tz_offset=0)  # Freeze UTC time just before midnight to test timezone conversion
-# Always show timezone here no matter whether the meeting is configured to show it or not
-@pytest.mark.parametrize("show_timezone", [True, False], ids=["show_timezone", "no_timezone"])
 async def test_set_time_message_with_valid_time(
     mock_session: MockDbSession,
     update: Update,
     meeting: Meetup,
     expected_meeting_time: dt.datetime,
-    expected_time_displayed: str,
     user_with_settings: User,
     app: StubMitupApp,
-    show_timezone: bool,
 ):
-    meeting.show_timezone = show_timezone
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -428,7 +430,10 @@ async def test_set_time_message_with_valid_time(
     context.api.assert_send_message_called(
         update,
         meeting.edit_view.with_context(
-            MeetingMessages.EDIT_TIME_SUCCESS.get(lang=user_with_settings.lang, datetime=expected_time_displayed)
+            MeetingMessages.EDIT_TIME_SUCCESS.get(
+                lang=user_with_settings.lang,
+                datetime=datetime_entity(int(expected_meeting_time.timestamp())),
+            )
         ),
     )
     context.api.assert_update_meeting_messages_called(mock_session, meeting)

@@ -37,7 +37,6 @@ class Settings(BaseModel, SQLModel, table=True):
     default_public: bool = False
     default_allow_invitation: bool = False
     default_incognito: bool = False
-    default_show_timezone: bool = True
 
     user: User = Relationship(back_populates="settings")
 
@@ -81,13 +80,6 @@ class Settings(BaseModel, SQLModel, table=True):
                     cb.SET_DEFAULT_INCOGNITO,
                     ButtonMessages.INCOGNITO.get(lang=self.language),
                     self.default_incognito,
-                ),
-            ],
-            [
-                options_button(
-                    cb.SET_DEFAULT_SHOW_TIMEZONE,
-                    ButtonMessages.SHOW_TIMEZONE.get(lang=self.language),
-                    self.default_show_timezone,
                 ),
             ],
         ]

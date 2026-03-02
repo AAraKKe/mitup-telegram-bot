@@ -79,18 +79,3 @@ async def callback_query_toggle_default_incognito(session: Session, update: Upda
         update=update,
         view=user.settings.default_meeting_settings_view(),
     )
-
-
-@HandlersRegistry.register_callback_query(
-    EditSettingsHandlerId.SET_DEFAULT_SHOW_TIMEZONE, callback_data=cb.SET_DEFAULT_SHOW_TIMEZONE
-)
-@with_async_session
-async def callback_query_toggle_default_show_timezone(session: Session, update: Update, context: TMitupContext):
-    user = current_user(update, session)
-    user.settings.default_show_timezone = not user.settings.default_show_timezone
-    session.flush()
-
-    await context.api.edit_message(
-        update=update,
-        view=user.settings.default_meeting_settings_view(),
-    )

@@ -209,12 +209,6 @@ CONTEXTS = [
         id="set_meeting_allow_invitations",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_SHOW_TIMEZONE.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
-        id="set_meeting_show_timezone",
-    ),
-    Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,
         update_request=UpdateRequest(
             callback_query=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(MEETING_ID_NOT_FOUND, 1)

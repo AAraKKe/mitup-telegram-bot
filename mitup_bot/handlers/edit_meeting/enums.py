@@ -61,7 +61,6 @@ class EditMeetingHandlerId(HandlerId):
     SET_MEETING_PUBLIC_CALLBACK = auto()
     SET_MEETING_ALLOW_INVITATIONS_CALLBACK = auto()
     SET_MEETING_INCOGNITO_CALLBACK = auto()
-    SET_MEETING_SHOW_TIMEZONE_CALLBACK = auto()
 
     # Cancel button during edit
     CANCEL = auto()

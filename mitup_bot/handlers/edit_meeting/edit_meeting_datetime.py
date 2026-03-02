@@ -14,6 +14,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import render
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -62,10 +63,11 @@ async def callback_edit_meeting_date(session: Session, update: Update, context: 
     # If the date we want to navigate to is in the past, show the present month
     current_date = callback_data.date if today_in_user_timezone <= callback_data.date else today_in_user_timezone
 
+    meeting_date_in_tz = meeting.owner.datetime_in_tz(meeting.datetime) if meeting.datetime else None
     logging.info(
         "Calendar view: "
         f"Anchor date: {anchor_date}, Current date: {current_date}, "
-        f"Meeting date: {meeting.datetime_in_tz}, Now tz: {now_in_user_timezone} "
+        f"Meeting date: {meeting_date_in_tz}, Now tz: {now_in_user_timezone} "
         f"Callback date: {callback_data.date}"
     )
 
@@ -195,7 +197,7 @@ async def handle_first_datetime_set(
     view = MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
             lang=meeting.owner.settings.language,
-            datetime=meeting.full_str_datetime.text,
+            datetime=render(t"{meeting._datetime_display}"),
             back_edit_button=ButtonMessages.EDIT.back(lang=meeting.owner.settings.language),
             set_time_button=ButtonMessages.SET_TIME.get_text(lang=meeting.owner.settings.language),
         ),
@@ -226,7 +228,7 @@ async def handle_datetime_update(
     await context.api.edit_message(
         update=update,
         view=meeting.edit_view.with_context(
-            MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=meeting.full_str_datetime.text)
+            MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=render(t"{meeting._datetime_display}"))
         ),
     )
     await context.api.update_meeting_messages(
@@ -365,7 +367,7 @@ async def set_time_message(session: Session, update: Update, context: TMitupCont
 
         view = meeting.edit_view.with_context(
             MeetingMessages.EDIT_TIME_SUCCESS.get(
-                lang=current_user.settings.language, datetime=meeting.full_str_datetime.text
+                lang=current_user.settings.language, datetime=render(t"{meeting._datetime_display}")
             )
         )
 

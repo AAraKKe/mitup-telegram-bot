@@ -63,7 +63,6 @@ def create_meetup(
     public: bool = False,
     invitation: bool = False,
     incognito: bool = False,
-    show_timezone: bool = True,
     active: bool = True,
 ) -> Meetup:
     meetup = Meetup(
@@ -79,7 +78,6 @@ def create_meetup(
         max_members=max_members,
         allow_invitation=invitation,
         incognito=incognito,
-        show_timezone=show_timezone,
         active=active,
     )
 
@@ -103,7 +101,6 @@ def create_settings(
     default_public: bool = False,
     default_allow_invitation: bool = False,
     default_incognito: bool = False,
-    default_show_timezone: bool = True,
 ) -> Settings:
     return Settings(
         id=id,
@@ -115,7 +112,6 @@ def create_settings(
         default_public=default_public,
         default_allow_invitation=default_allow_invitation,
         default_incognito=default_incognito,
-        default_show_timezone=default_show_timezone,
     )
 
 
