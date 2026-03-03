@@ -1,6 +1,6 @@
 ---
 name: type-checking
-description: ty type checker rules for this project. Auto-load when writing code that may have type errors, suppressing ty diagnostics, or working with session decorators. Covers suppression format, the Concatenate/ParamSpec false positive, and the check-ty-ignores CI job.
+description: Skills that contians knowledge about how do type annotations, validate the proper use of them and run type checker in this project.
 user-invocable: false
 ---
 
