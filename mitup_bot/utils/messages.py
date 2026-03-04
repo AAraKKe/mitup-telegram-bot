@@ -252,6 +252,12 @@ class MeetingMessages(MessageBase):
         " You have now been promoted from the waiting list!"
     )
 
+    TITLE_WITH_UNSUPPORTED_ENTITY = (
+        f"I only understand a title or a title with a date {Emojis.THINK}.\n\n"
+        "Please send just the meeting title, or the title with a date formatted by Telegram. "
+        "Click <b>Cancel</b> to exit."
+    )
+
     # On-exit prompt shown when an unexpected message interrupts create-meeting
     CREATE_MEETING_ON_EXIT = (
         "You were in the middle of creating a meeting. Send the title of the meeting to continue. "

@@ -18,11 +18,11 @@ Guards live in `mitup_bot/guards.py`. They validate handler inputs and raise dom
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `current_user` | `(update, session)` | `User` | `UserNotFound` |
+| `current_user` | `(update, session)` | `User` | `UserNotFound` (caught by global error handler) |
 | `user_language` | `(update, session)` | `str` (lang code or fallback) | — |
-| `user_registered` | `(update, session, context, alert_message)` | `User \| None` | — (shows alert to user) |
+| `user_registered` | `(update, session, context, alert_message)` | `User \| None` | — (answers callback query with alert) |
 
-`current_user` is the standard guard for all handlers that require an authenticated user. It raises `UserNotFound` which is caught by the global error handler.
+Use `current_user` for all handlers that require an authenticated user. Use `user_registered` only when an unauthenticated user is a valid, non-fatal case (e.g. inline query handlers).
 
 ### Message and query access
 
@@ -31,18 +31,21 @@ Guards live in `mitup_bot/guards.py`. They validate handler inputs and raise dom
 | `message` | `(update)` | `Message` | `EffectiveMessageNotSet` |
 | `chat` | `(update)` | `Chat` | `EffectiveChatNotSet` |
 | `callback_query` | `(update)` | `CallbackQuery` | `CallbackQueryNotSet` |
-| `valid_callback_query` | `(update)` | `CallbackQuery` | `CallbackQueryNotSet` |
 | `valid_inline_query` | `(update)` | `InlineQuery` | `InlineQueryNotSetError` |
 
+<note>`valid_callback_query` is an internal variant used by `api_wrapper.py`. Use `callback_query` in handlers.</note>
+
 ### Callback data validation
+
+<critical_rules>
+  <rule>Always pass `handler_id` to `valid_callback_data`, `valid_meeting_callback_data`, and `valid_date_callback_data` so that `MalformedCallbackData` is scoped to the correct handler in error reports.</rule>
+</critical_rules>
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
 | `valid_callback_data` | `(cb, handler_id)` | `ValidCallbackData` | `MalformedCallbackData` |
 | `valid_meeting_callback_data` | `(cb, handler_id)` | `ValidMeetingCallbackData` | `MalformedCallbackData` |
 | `valid_date_callback_data` | `(cb, handler_id)` | `ValidDateCallbackData` | `MalformedCallbackData` |
-
-Always pass the `handler_id` so that `MalformedCallbackData` can be scoped to the correct handler in error reports.
 
 ### Meeting access
 
@@ -51,22 +54,19 @@ Always pass the `handler_id` so that `MalformedCallbackData` can be scoped to th
 | `meeting_accessible` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
 | `user_owns_meeting` | `(user, meeting_id, action, update, context, redirect=True)` | `Meetup \| None` | — (handles redirect internally) |
 
-`meeting_accessible` is the standard guard for any handler that operates on a meeting from the bot chat. It handles:
-- Meeting not found → shows "meeting deleted" message
-- Meeting inactive + user is owner → shows reactivation prompt
-- User does not own meeting → redirects to main menu
+Use `meeting_accessible` for all handlers that operate on a meeting from the bot chat (not inline). It handles three cases internally: meeting not found → "meeting deleted" message; meeting inactive + owner → reactivation prompt; non-owner → redirect to main menu. When `None` is returned, the handler must return immediately.
+
+`user_owns_meeting` is a lower-level guard that skips the not-found and inactive checks. Use it only when those cases are handled separately.
 
 ## Usage pattern
 
 ```python
-@HandlersRegistry.register_callback_query(handler_id=MyHandlerId.SHOW)
+@HandlersRegistry.register_callback_query(MyHandlerId.SHOW, callback_data=cb.MY_CALLBACK)
 @with_async_session
-async def show(session: Session, update: Update, context: MitupContext) -> None:
+async def show(session: Session, update: Update, context: TMitupContext) -> None:
+    meeting_id = guards.valid_callback_data(cb.MY_CALLBACK.parse(context.match), MyHandlerId.SHOW).id
     user = guards.current_user(update, session)
-    cb_data = guards.valid_callback_data(callback_data, MyHandlerId.SHOW)
-    meeting = await guards.meeting_accessible(
-        session, user, cb_data.id, "show meeting", update, context
-    )
+    meeting = await guards.meeting_accessible(session, user, meeting_id, "show meeting", update, context)
     if meeting is None:
         return
     # ... proceed with meeting

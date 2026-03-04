@@ -3,6 +3,36 @@
     "frontend-design@claude-plugins-official": true
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rm -rf .claude/agents_running && mkdir -p .claude/agents_running"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p .claude/agents_running && echo 1 >> .claude/agents_running/in"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p .claude/agents_running && echo 1 >> .claude/agents_running/out"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

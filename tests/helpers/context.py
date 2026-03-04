@@ -118,8 +118,52 @@ async def call_handler(
     # of ConversationHandlers which prevents us from using specific types as the return type is invariant
     handler_result = cast(Enum | None, await handler.handle_update(real_update, real_app, check_result, context))
 
-    # For conversation handlers, lets get the current state so we can assert on it
+    # For conversation handlers, retrieve the current state so callers can assert on it.
+    #
+    # PTB key format contract
+    # -----------------------
+    # PTB stores conversation state in ConversationHandler._conversations keyed by a
+    # tuple that depends on the handler's per_* settings:
+    #
+    #   per_chat=True,  per_user=True  (default) → key = (chat_id, user_id)
+    #   per_chat=False, per_user=True             → key = (user_id,)
+    #   per_chat=True,  per_user=False            → key = (chat_id,)
+    #   per_chat=False, per_user=False            → key = ()
+    #
+    # The old code always used (user_id,), which only matched conversations registered
+    # with per_chat=False. For the common default (per_chat=True, per_user=True) the
+    # lookup silently returned None — making ConversationTester step state assertions
+    # and any direct assert-on-state usage with a conversation handler ID unreliable.
+    #
+    # What was broken before this fix
+    # --------------------------------
+    # * Tests that called call_handler with a ConversationHandler ID and then asserted
+    #   `state == SomeState` would silently get None instead of the real state when
+    #   per_chat=True (the default).
+    # * ConversationTester.run() passes expected_state to ConversationStep; those
+    #   assertions would always fail for per_chat=True conversations, forcing tests to
+    #   omit expected_state entirely.
+    #
+    # What becomes possible after this fix
+    # -------------------------------------
+    # * ConversationStep(expected_state=...) assertions now work for all conversations
+    #   regardless of their per_chat / per_user configuration.
+    # * Tests that call call_handler with a conversation handler ID and inspect the
+    #   returned state will now receive the correct in-flight state.
+    #
+    # Risks / notes
+    # -------------
+    # * This implementation handles only per_chat=True,per_user=True and
+    #   per_chat=False,per_user=True (the two configurations used in this project).
+    #   Other combinations fall back to (user_id,) for safety.
+    # * Tests that previously asserted `state is None` on a per_chat=True conversation
+    #   will now receive the real state and may need updating.
     if isinstance(handler, ConversationHandler):
         user_id = kwargs.get("user_id", real_update.effective_user.id if real_update.effective_user else None)
-        handler_result = cast(Enum | None, handler._conversations.get((user_id,)))
+        if handler.per_chat and handler.per_user:
+            chat_id = real_update.effective_chat.id if real_update.effective_chat else None
+            conv_key: tuple[int | None, ...] = (chat_id, user_id)
+        else:
+            conv_key = (user_id,)
+        handler_result = cast(Enum | None, handler._conversations.get(conv_key))
     return context, handler_result

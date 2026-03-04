@@ -130,6 +130,18 @@ CONTEXTS = [
         id="wrong_time_format",
     ),
     Context(
+        handler_id=MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
+        update_request=UpdateRequest(message_text="My Meeting"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="create_meeting_title_message",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.CREATE_MEETING_INVALID_TITLE_MESSAGE,
+        update_request=UpdateRequest(message_text="My Meeting"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="create_meeting_invalid_title_message",
+    ),
+    Context(
         handler_id=EditSettingsHandlerId.LANGUAGE_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_LANGUAGE),
         error_modes={ErrorMode.USER_NOT_FOUND},

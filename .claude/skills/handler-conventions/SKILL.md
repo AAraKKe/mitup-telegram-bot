@@ -35,8 +35,6 @@ async def show(session: Session, update: Update, context: MitupContext) -> None:
     ...
 ```
 
-Callers invoke the handler **without** passing `session` — the decorator provides it.
-
 > **Type checker note:** Call sites trigger a false-positive `missing-argument` from `ty`. Suppress with `# ty: ignore[missing-argument]` and the tracking issue URL. See the `type-checking` skill.
 
 ## Conversation handlers
@@ -47,16 +45,17 @@ Callers invoke the handler **without** passing `session` — the decorator provi
 - `states` — `dict[Enum, list[HandlerId]]` mapping state keys to handlers.
 - `fallbacks` — handlers used when no state matches the incoming update.
 
-**Entry points must be registered before the conversation.** The registry looks up each handler ID at registration time — if a handler referenced in `entry_points_handler_names` hasn't been registered yet, `HandlerNotRegistered` is raised. When adding cross-module entry points, verify that `handlers/__init__.py` imports the entry-point module before the module that calls `register_conversation_handler`.
+**Entry points must be registered before the conversation.** The registry looks up each handler ID at registration time — if a handler referenced in `entry_points_handler_names` hasn't been registered yet, `HandlerNotRegistered` is raised. Verify that `handlers/__init__.py` imports the entry-point module before the module that calls `register_conversation_handler`.
 
 **Circular imports.** If module A needs an enum from module B and vice versa, extract shared enums into standalone files (e.g., `command_enums.py`, `enums.py`) or use a local import inside the function body. See `command_enums.py` (extracted `CommandsId`) and `commands.py` (local import of `ConversationMeetingState`) for examples.
 
 **Fallbacks and exit handling:**
 
-- **When the user can exit**: call `context.store_on_exit(ContextId.<X>, message, cancel_callback)` in the entry handler and set `fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT]`. `MESSAGE_WITHOUT_TEXT` shows an interruption view and keeps the user in state so they can cancel explicitly.
-- **When the user cannot exit** (e.g., registration flows): use a dedicated fallback handler (filter `~filters.TEXT | filters.COMMAND`, registered with `bindable=False`) that informs the user and returns the same state.
-- <critical_rules>
-  <rule>Text handlers in conversations MUST use `filters.TEXT & ~filters.COMMAND` so commands fall through to the fallback.</rule>
+- **Optional flows** (meeting creation, editing): call `context.store_on_exit(ContextId.<X>, message, cancel_callback)` in the entry handler and set `fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT]`. `MESSAGE_WITHOUT_TEXT` shows an interruption view and keeps the user in state so they can cancel explicitly.
+- **Mandatory onboarding flows** (registration, required setup the user cannot skip): use a dedicated fallback handler (filter `~filters.TEXT | filters.COMMAND`, registered with `bindable=False`) that informs the user and returns the same state.
+
+<critical_rules>
+  <rule>Text handlers inside a conversation's `states` dict MUST use `filters.TEXT & ~filters.COMMAND` so commands fall through to the fallback.</rule>
 </critical_rules>
 
 ## Filters
@@ -65,7 +64,7 @@ Handlers accept PTB `BaseFilter` instances to narrow which updates they process.
 
 ## Handler structure
 
-Handlers are organized into submodules by feature area. Each submodule typically contains:
+Each feature submodule typically contains:
 
 | File | Purpose |
 |------|---------|
@@ -102,8 +101,8 @@ cb.MY_ACTION.with_id(meeting.db_id)
 
 ### Naming conventions
 
-- Destructive flows must follow: `DELETE_<X>` (trigger) → `CONFIRM_<X>` (confirm) → `DECLINE_<X>` (decline).
-- Action names use `snake_case`; entity names use `snake_case`.
+- **Destructive flows** — any action that is irreversible or results in permanent data loss (hard deletes, meeting cancellation that removes all participants, any change users cannot undo through the bot) — must follow the three-step pattern: `DELETE_<X>` (trigger) → `CONFIRM_<X>` (confirm) → `DECLINE_<X>` (decline). Non-destructive actions (e.g. editing a description that can be re-edited) do not require this pattern.
+- Action and entity names use `snake_case`.
 - Keep action and entity strings short — callback data is limited to **64 bytes** total when encoded.
 
 ### Using callbacks in handlers
@@ -125,16 +124,14 @@ ButtonConfig(text=ButtonMessages.SHOW.get(lang=lang), callback_data=cb.SHOW_MEET
 1. Define a `HandlerId` member in the appropriate `enums.py` (or create a new submodule).
 2. Write the handler function with the `@HandlersRegistry.register_*` decorator.
 3. Add `@with_async_session` if database access is needed.
-4. Register the handler in `tests/test_failure_modes.py` if it uses guards.
+4. Register the handler in `tests/test_failure_modes.py` if it calls any `guards.*` function (e.g. `guards.current_user`, `guards.meeting_accessible`, `guards.valid_callback_data`, `guards.valid_meeting_callback_data`).
 5. Create a dedicated test file at `tests/handlers/<package>/test_<module>.py`.
 6. Import the handler module in `mitup_bot/handlers/__init__.py`.
 
 ## Shared utilities
 
-If multiple handlers in the same package need shared logic, extract it into a `utils.py` within that package. See `mitup_bot/handlers/inline_query/utils.py` for an example.
-
 <critical_rules>
-  <rule>NEVER import functions from one handler module into another. Shared logic belongs in a `utils.py` within the same package.</rule>
+  <rule>NEVER import functions from one handler module into another. Shared logic belongs in a `utils.py` within the same package. See `mitup_bot/handlers/inline_query/utils.py` for an example.</rule>
 </critical_rules>
 
 ## Localization

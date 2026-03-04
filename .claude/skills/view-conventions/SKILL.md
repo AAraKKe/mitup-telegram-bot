@@ -11,17 +11,19 @@ The view layer in `mitup_bot/views/` abstracts Telegram message presentation fro
 ## Important rules
 
 <critical_rules>
-  <rule>MUST use the `confirmation_view` factory method whenever creating a view to accept or decline any user choice. This ensures a consistent user experience and centralises confirmation dialog logic.</rule>
-  <rule>All callbacks that trigger a destructive action, confirm it, or decline it MUST follow the naming convention: `DELETE_<DESCRIPTION>` (trigger), `CONFIRM_<DESCRIPTION>` (confirm), `DECLINE_<DESCRIPTION>` (decline).</rule>
+  <rule>MUST use the `confirmation_view` factory for any accept/decline dialog. Never build confirm/decline keyboards by hand.</rule>
+  <rule>All callbacks involved in a destructive action MUST follow: `DELETE_<DESCRIPTION>` (trigger), `CONFIRM_<DESCRIPTION>` (confirm), `DECLINE_<DESCRIPTION>` (decline).</rule>
 </critical_rules>
 
 ## Core types
 
 ### `MitupView`
 
-The fundamental unit — a dataclass with `description` (`FormattedText`) and `keyboard` (list of `ButtonRow`). The `.markup` property converts the keyboard to a PTB `InlineKeyboardMarkup`.
+A dataclass with `description` (`FormattedText`) and `keyboard` (list of `ButtonRow`). The `.markup` property converts the keyboard to a PTB `InlineKeyboardMarkup`.
 
-`description` is always a `FormattedText`. Pass `MessageBase.get()` output directly — never extract `.text` first, as that strips formatting entities.
+<critical_rules>
+  <rule>Pass `MessageBase.get()` output directly as `description` — never extract `.text` first, as that strips formatting entities.</rule>
+</critical_rules>
 
 Builder methods modify the view in-place and return `self` for chaining:
 
@@ -35,7 +37,7 @@ Extends `MitupView` with `title`, `inline_description`, and `id` for use as inli
 
 ### `PaginatedMitupView`
 
-Handles lists of buttons that exceed a single screen. Use when the button list could grow beyond ~8 items:
+Use when the button list could grow beyond ~8 items:
 
 ```python
 PaginatedMitupView(
@@ -56,7 +58,9 @@ A Pydantic model wrapping `text` + one action field. Supported action fields (mu
 - `switch_inline_query` — prompts the user to select a chat and opens inline mode.
 - `switch_inline_query_current_chat` — opens inline mode in the current chat.
 
-**Critical constraint:** Telegram limits callback data to **64 bytes**. `ButtonConfig` validates this at the Pydantic level — construction fails if the encoded callback data exceeds 64 bytes.
+<critical_rules>
+  <rule>Telegram limits callback data to 64 bytes. `ButtonConfig` validates this at construction time and will raise if exceeded.</rule>
+</critical_rules>
 
 ### `CalendarKeyboard`
 
@@ -84,14 +88,12 @@ view = MitupView(
 
 ## Model-level views
 
-`Meetup` exposes its own views as properties: `main_view`, `edit_view`, `settings_view`, `inline_view`, `external_view`. If adding a new meeting-related screen, consider adding a property on `Meetup` following this pattern.
+`Meetup` exposes its own views as properties: `main_view`, `edit_view`, `settings_view`, `inline_view`, `external_view`. For new meeting-related screens, prefer adding a property on `Meetup` following this pattern.
 
 ## Button text
 
-All button labels come from `ButtonMessages` in `mitup_bot/utils/messages.py`. Use `.get(lang=...)` for translated text, or `.back(lang=...)` for the "← Label" back-button variant.
-
 <critical_rules>
-  <rule>NEVER hardcode button text. All button labels must come from `ButtonMessages`.</rule>
+  <rule>NEVER hardcode button text. All button labels must come from `ButtonMessages` in `mitup_bot/utils/messages.py`. Use `.get(lang=...)` for translated text, or `.back(lang=...)` for the "← Label" back-button variant.</rule>
 </critical_rules>
 
 ## Keyboard layout conventions

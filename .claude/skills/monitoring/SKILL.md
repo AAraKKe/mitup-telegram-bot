@@ -30,11 +30,15 @@ Three output backends exist, selected via `MetricsConfig.environment`:
 | `STDOUT` | Stdout (local EMF environment) | CI, automated testing |
 | `RICH` | `RichConsoleSink` — pretty-printed JSON via Rich | Local development |
 
+<critical_rules>
 The sink is configured once globally by `configure_metrics()` in `app.py`. Never select sinks conditionally in handler code.
+</critical_rules>
 
 ## Emitting metrics from handlers
 
+<critical_rules>
 All handler metrics go through `MitupContext` methods. Never instantiate loggers or call EMF directly.
+</critical_rules>
 
 ### `context.emit_metric()`
 
@@ -54,7 +58,7 @@ context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
 Key parameters:
 - `include_handler_dimensions` (default `True`) — adds `Handler` and `HandlerType` dimensions automatically.
 - `include_update_properties` (default `True`) — attaches Telegram update metadata (user ID, callback data, message text) as EMF properties (searchable but not dimensioned).
-- `emit_global` — also emits a dimensionless copy for aggregate dashboards.
+- `emit_global` — additionally emits a dimensionless copy of the metric (no handler or custom dimensions) for cross-handler aggregate dashboards.
 
 ### `context.put_feature_metric()`
 
@@ -100,7 +104,7 @@ If only one handler emits a metric, a plain string is acceptable — but prefer 
 
 ## Adding a new `Feature`
 
-`Feature` members track **user-facing feature usage**. Add a new member when introducing a new user action that should be tracked independently (e.g., a new way to set timezone, a new meeting action). See existing members in `monitoring/metric_keys.py` for the pattern.
+`Feature` members track **user-facing feature usage**. Add a new member when introducing a new user action that should be tracked independently (e.g., a new way to set timezone, a new meeting action). Follow the naming pattern in `monitoring/metric_keys.py`.
 
 ## Outside handler contexts
 
@@ -112,4 +116,6 @@ with engine.auto_flush() as metrics:
     metrics.put_metric(MetricKey.INACTIVE_USERS_DELETED, count, Unit.COUNT)
 ```
 
-`BotAdapter` (used in lambdas/CLI) does **not** emit metrics — its `emit_metric()` and `with_time_metric()` are no-ops. If metrics are needed from a lambda, use the engine directly.
+<note>
+`BotAdapter` (used in lambdas/CLI) does **not** emit metrics — its `emit_metric()` and `with_time_metric()` are no-ops. If metrics are needed from a lambda, use the engine directly as shown above.
+</note>

@@ -14,6 +14,8 @@ For complex tasks that span multiple areas (handler + migration + tests + transl
 
 For single-domain tasks or targeted fixes, invoke a specialist agent directly with natural language: "Use the handler-expert agent to...".
 
+**After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done.
+
 Run `/project-guide` for a full reference of all available agents and skills.
 
 ## Important rules

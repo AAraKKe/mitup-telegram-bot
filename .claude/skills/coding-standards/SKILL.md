@@ -8,15 +8,36 @@ user-invocable: false
 
 These standards are derived from the actual patterns used in this codebase. Deviations are bugs — not style preferences.
 
+## Hard antipatterns
+
+These are never acceptable. Check these first before writing or reviewing any code.
+
+<critical_rules>
+  <rule>No methods longer than ~30 lines (handlers) or ~20 lines (helpers). Split by responsibility.</rule>
+  <rule>No nesting deeper than 2 levels — use early return or extract a helper.</rule>
+  <rule>No leading underscore on module-level functions. A module-level function is either public (no underscore) or a class member (underscore allowed). Never use `_` on a function defined at module level.</rule>
+  <rule>No single-letter or abbreviated variable names outside of loop indices and explicitly mathematical contexts — name variables after what they represent.</rule>
+  <rule>`# ---` banners only in large files where sections are clearly distinct and hard to navigate without them (e.g. long test modules or large utility files).</rule>
+  <rule>No module docstrings on handler, model, or view files.</rule>
+  <rule>No `Optional[X]`, `List[X]`, `Dict[K, V]` — use modern union syntax and built-in generics. See [Type hints](#type-hints).</rule>
+  <rule>No `pass` — use `...` in empty bodies.</rule>
+  <rule>No `print()` — use `logging`. See [Logging](#logging).</rule>
+  <rule>No hardcoded language strings — always derive from `user.lang` or `meeting.lang`.</rule>
+  <rule>No hardcoded user-facing text — always use `Messages` classes from `messages.py`.</rule>
+  <rule>No star imports (`from module import *`). Import only what is used.</rule>
+  <rule>`else/elif` chains with more than 2 branches must use `match` instead.</rule>
+</critical_rules>
+
+---
+
 ## Single responsibility
 
 <critical_rules>
-  <rule>A function or method that does more than one thing must be split. The threshold is ~30 lines for handlers, ~20 for helpers. If you need to scroll to read it, it is too long.</rule>
-  <rule>If a method needs a multi-line comment to explain what the next block does, that block belongs in a separate function with a descriptive name.</rule>
+  <rule>If a method needs a multi-line comment to explain what the next block does, extract that block into a function with a descriptive name.</rule>
   <rule>Shared logic between two functions in the same package goes in a `utils.py` within that package. NEVER cross-import handler modules into each other.</rule>
 </critical_rules>
 
-Use early return to avoid nesting. Prefer:
+Use early return to avoid nesting:
 
 ```python
 if meeting is None:
@@ -25,7 +46,32 @@ if meeting is None:
 await context.api.edit_message(update=update, view=meeting.main_view)
 ```
 
-Over nested `if meeting is not None: ...` blocks.
+## Naming conventions
+
+| Symbol | Convention | Example |
+|--------|-----------|---------|
+| Callback query handlers | `callback_query_<action>` | `callback_query_show_meeting` |
+| Message handlers | `<action>_message_handler` | `edit_title_meeting_message_handler` |
+| Command handlers | `<action>_command` | `start_command` |
+| Module-level helpers | `snake_case` (no leading underscore) | `make_message_update` |
+| Truly private class internals | `_snake_case` | `_freeze`, `_build_key` |
+| Private inner dataclasses | `_PascalCase` | `_MarkerSpan` |
+| Type aliases | `PascalCase` | `Keyboard`, `TMitupContext` |
+| Section separators | `# ---` with a label | `# --- UTF-16 helper ---` |
+
+Variable names must describe what the variable holds, not its type or position:
+
+```python
+# Bad
+f = ValidTitleFilter()
+e1 = DateTimeMessageEntity(offset=0, length=8, unix_time=unix_ts)
+e2 = DateTimeMessageEntity(offset=9, length=5, unix_time=unix_ts)
+
+# Good
+title_filter = ValidTitleFilter()
+first_date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=unix_ts)
+second_date_entity = DateTimeMessageEntity(offset=9, length=5, unix_time=unix_ts)
+```
 
 ## Docstrings
 
@@ -40,9 +86,8 @@ Write a docstring only when the function name and signature do not convey the fu
 | Handler entry point | No — the decorator and name are sufficient |
 
 <critical_rules>
-  <rule>NEVER write a module docstring for handler files, model files, or view files. The code speaks for itself.</rule>
   <rule>Docstrings must be short (1–3 sentences max). No `Args:` / `Returns:` sections unless a parameter has a non-obvious contract.</rule>
-  <rule>Do NOT narrate what the code does in comments or docstrings. Explain *why* a non-obvious decision was made, not *what* the line does.</rule>
+  <rule>Explain *why* a non-obvious decision was made — never narrate *what* the code does.</rule>
 </critical_rules>
 
 **Good:**
@@ -75,14 +120,7 @@ def utf16_len(s: str) -> int:
 
 ## Type hints
 
-Always required. Use modern Python syntax — no legacy forms.
-
-| Wrong | Correct |
-|-------|---------|
-| `Optional[X]` | `X \| None` |
-| `Union[X, Y]` | `X \| Y` |
-| `List[X]`, `Dict[K, V]`, `Tuple[X, Y]` | `list[X]`, `dict[K, V]`, `tuple[X, Y]` |
-| No return type | Explicit `-> T` or `-> None` |
+Always required. Use modern union syntax and built-in generics (see [Hard antipatterns](#hard-antipatterns)). Always declare an explicit return type (`-> T` or `-> None`).
 
 Use `TYPE_CHECKING` for forward references that would cause circular imports:
 
@@ -122,10 +160,6 @@ match self.position:
         assert_never(unreachable)
 ```
 
-<critical_rules>
-  <rule>Avoid `else/elif` statements when more than 2 are used. Always prefer `match` statements instead.</rule>
-</critical_rules>
-
 **`assert` for invariants** — for conditions that *must* hold at that point due to framework guarantees, not user input:
 
 ```python
@@ -161,66 +195,9 @@ entities.extend(
 )
 ```
 
-Over:
+**Comprehensions instead of `for` loops** — always prefer comprehensions when possible. Only use `for` loops when there is logic in each iteration or the comprehension would require more than 2 nested loops.
 
-```python
-entities.append(MessageEntity(type=MessageEntity.BOLD, offset=offset, length=length))
-entities.append(MessageEntity(type=MessageEntity.ITALIC, offset=offset, length=length))
-```
-
-**Comprehensions instead of `for` loops** - Always prefer comprehensions over `for` loops when possible.
-
-Only use `for` loops when there is logic in each iteration or the comprehensions become complicated (more than 2 nested loops).
-
-```python
-entities = [
-    MessageEntity(type=MessageEntity.BOLD, offset=offset, length=length)
-    for offset, length in offsets_and_lengths
-]
-```
-
-Over:
-
-```python
-entities = []
-for offset, length in offsets_and_lengths:
-    entities.append(MessageEntity(type=MessageEntity.BOLD, offset=offset, length=length))
-```
-
-**Enum over string literals** - Always prefer enums over string literals when possible.
-
-```python
-@dataclass
-class _MarkerSpan:
-    outer_start: int
-    outer_end: int
-    inner_start: int
-    inner_end: int
-    types: list[EntityType]
-```
-
-Over:
-
-```python
-class _MarkerSpan:
-    outer_start: int
-    outer_end: int
-    inner_start: int
-    inner_end: int
-    types: list[str]
-```
-
-## Naming conventions
-
-| Symbol | Convention | Example |
-|--------|-----------|---------|
-| Callback query handlers | `callback_query_<action>` | `callback_query_show_meeting` |
-| Message handlers | `<action>_message_handler` | `edit_title_meeting_message_handler` |
-| Command handlers | `<action>_command` | `start_command` |
-| Private helpers | `_snake_case` | `_nearest_utf16` |
-| Private inner dataclasses | `_PascalCase` | `_MarkerSpan` |
-| Type aliases | `PascalCase` | `Keyboard`, `TMitupContext` |
-| Section separators | `# ---` with a label | `# --- UTF-16 helper ---` |
+**Enum over string literals** — always prefer enums over bare strings for anything that represents a fixed set of values.
 
 ## Imports
 
@@ -232,10 +209,23 @@ Alias frequently used modules at the import line:
 from mitup_bot.utils import callbacks as cb
 ```
 
-<critical_rules>
-  <rule>No star imports (`from module import *`).</rule>
-  <rule>Import only what is used. Remove unused imports.</rule>
-</critical_rules>
+## Comments
+
+Use comments to explain *why*, not *what*. The code already shows what is happening.
+
+**Good:**
+
+```python
+# We bypass the freeze guard — MessageEntity calls _freeze() in __init__
+object.__setattr__(self, "unix_time", unix_time)
+```
+
+**Bad:**
+
+```python
+# Set the unix_time attribute
+object.__setattr__(self, "unix_time", unix_time)
+```
 
 ## Data structure choices
 
@@ -261,44 +251,9 @@ class MalformedCallbackData(RuntimeError):
         )
 ```
 
-## Comments
-
-Use comments to explain *why*, not *what*. The code already shows what is happening.
-
-**Good:**
-
-```python
-# We bypass the freeze guard — MessageEntity calls _freeze() in __init__
-object.__setattr__(self, "unix_time", unix_time)
-```
-
-**Bad:**
-
-```python
-# Set the unix_time attribute
-object.__setattr__(self, "unix_time", unix_time)
-```
-
-Use section separators (`# -----`) only in large utility/infrastructure modules with clearly distinct sections. Handler and model files do not need them.
-
 ## Logging
 
 ```python
 logging.debug("Enter into <handler_name>")   # at handler entry points only
 logging.warning(message)                      # unexpected-but-recoverable situations
 ```
-
-Never use `print()` in production code.
-
-## Hard antipatterns
-
-<critical_rules>
-  <rule>No methods longer than ~30 lines. Split by responsibility.</rule>
-  <rule>No nesting deeper than 2 levels — use early return or extract a helper.</rule>
-  <rule>No long module docstrings on handler, model, or view files.</rule>
-  <rule>No `Optional[X]`, `List[X]`, `Dict[K, V]` — use modern union syntax and built-in generics.</rule>
-  <rule>No `pass` — use `...` in empty bodies.</rule>
-  <rule>No `print()` — use `logging`.</rule>
-  <rule>No hardcoded language strings — always derive from `user.lang` or `meeting.lang`.</rule>
-  <rule>No hardcoded user-facing text — always use `Messages` classes from `messages.py`.</rule>
-</critical_rules>

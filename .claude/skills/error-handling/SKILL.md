@@ -59,11 +59,11 @@ Raised by functions in `guards.py` when handler inputs are invalid. These are th
 
 ## The error handler
 
-`error_handler.handler()` in `mitup_bot/handlers/error_handler.py` processes all caught exceptions:
+`error_handler.handler()` in `mitup_bot/handlers/error_handler.py` is the entry point for all caught exceptions.
 
 ### Suppressed errors
 
-Some errors are harmless and suppressed silently. The `SUPPRESSED_EXCEPTIONS` dict maps exception types to sets of known-harmless message strings:
+`SUPPRESSED_EXCEPTIONS` maps exception types to sets of known-harmless message strings; `should_ignore_error()` checks this mapping and suppresses silently:
 
 ```python
 SUPPRESSED_EXCEPTIONS = {
@@ -71,7 +71,14 @@ SUPPRESSED_EXCEPTIONS = {
 }
 ```
 
-`should_ignore_error()` checks this mapping. Add entries here (not try/except in handlers) when a new Telegram API error should be silently ignored.
+<note>
+Two suppression mechanisms exist at different layers — use the correct one:
+
+- **`SUPPRESSED_EXCEPTIONS`** (global, `error_handler.py`): for Telegram API errors that can arise anywhere and should be silently ignored across all handlers.
+- **`EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS`** (inline, `api_wrapper.py`): for errors specific to `edit_message` calls (e.g. "Message is not modified") — caught before they reach the global error handler.
+
+Never add try/except blocks in handlers for either case.
+</note>
 
 ### Inactive user handling
 
@@ -111,4 +118,3 @@ All `edit_message` calls in `TelegramApi` already use this. Do not add custom tr
 3. If the exception should be suppressed, add it to `SUPPRESSED_EXCEPTIONS` in the error handler.
 4. If the exception needs special handling (like `InactiveUserInteraction`), add a branch in `error_handler.handler()`.
 5. If guards raise the new exception, register affected handlers in `tests/test_failure_modes.py` (see `tests/CLAUDE.md`).
-6. Always keep this file updated with any new exceptions and their handling patterns.

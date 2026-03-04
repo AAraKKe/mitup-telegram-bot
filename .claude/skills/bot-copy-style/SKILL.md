@@ -26,7 +26,7 @@ All user-facing text lives in `mitup_bot/utils/messages.py` as members of `Messa
 | `NotificationMessages` | Meeting notifications |
 
 <critical_rules>
-  <rule>NEVER hardcode user-facing text in handlers, views, or any other module. Always define new strings in the appropriate class in `messages.py`.</rule>
+  <rule>NEVER hardcode user-facing text in handlers, views, or any other module.</rule>
 </critical_rules>
 
 ## Using messages
@@ -44,7 +44,7 @@ MeetingMessages.INVITE.get(lang=user.lang, title=meeting.title)
 view.with_context(MeetingMessages.SUCCESS.get(lang=user.lang))
 ```
 
-Only extract `.text` (via `.get_text()` or `.get(...).text`) when you need a genuine plain string — specifically for `answer_callback_query` alert text where Telegram ignores entities anyway. Use `get_text()` in that case, which raises if entities are present:
+Only extract `.text` when you need a plain string — e.g., `answer_callback_query` alert text, where Telegram ignores entities. Use `.get_text()`, which raises if entities are present:
 
 ```python
 await api.answer_callback_query(update, text=MeetingMessages.NOT_FOUND.get_text(lang=lang), show_alert=True)
@@ -52,14 +52,14 @@ await api.answer_callback_query(update, text=MeetingMessages.NOT_FOUND.get_text(
 
 ## Inline formatting in messages
 
-Use HTML-like tags inside message strings to express formatting. These are parsed at runtime into Telegram entities — they do not appear in the rendered text:
+Use HTML-like tags inside message strings; they are parsed into Telegram entities at runtime:
 
 ```python
 INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK = "<b>Meeting Not Found</b>\n\nThe meeting does not exist anymore."
 INVITED_BY_USER = "<i>invited by ${user}</i>"
 ```
 
-Supported tags: `<b>` (bold), `<i>` (italic), `<u>` (underline), `<s>` (strikethrough), `<code>`, `<pre>`, `<spoiler>`. Tags may be nested.
+Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be nested.
 
 <critical_rules>
   <rule>NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use `<b>`, `<i>` tags instead.</rule>
@@ -68,13 +68,11 @@ Supported tags: `<b>` (bold), `<i>` (italic), `<u>` (underline), `<s>` (striketh
 
 ## Button labels
 
-All button labels come from `ButtonMessages`.
-
 <critical_rules>
   <rule>NEVER write button text inline. All button labels must come from `ButtonMessages`.</rule>
 </critical_rules>
 
-Button labels are plain text — entities in button text are ignored by Telegram. `.get(lang=...)` returns `FormattedText`, which is accepted by `ButtonConfig` (it strips entities internally). Use `.back(lang=...)` for the "← Label" back-button variant, which returns a plain `str`:
+Button labels are plain text — entities are ignored by Telegram. `.get(lang=...)` returns `FormattedText`, accepted by `ButtonConfig` (entities stripped internally). Use `.back(lang=...)` for the "← Label" back-button variant, which returns a plain `str`:
 
 ```python
 ButtonConfig(text=ButtonMessages.JOIN.get(lang=lang), callback_data=cb.JOIN)

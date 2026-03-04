@@ -10,20 +10,16 @@ user-invocable: false
 
 The database layer lives in `mitup_bot/db.py`. It uses SQLAlchemy with SQLModel and manages sessions through a `sessionmaker` configured at startup via `configure_db()`.
 
-Sessions are **never created manually** inside handlers or business logic. Instead, use the session-injecting decorators described below.
+**Never create sessions manually.** Use the session-injecting decorators instead.
 
 ## Session decorators
 
-Two decorators inject a `Session` as the first positional argument of the wrapped function:
+Two decorators inject a `Session` as the first positional argument and wrap the call in a transaction (commit on success, rollback on exception):
 
 | Decorator | Use case |
 |-----------|----------|
 | `with_session` | Synchronous functions |
 | `with_async_session` | Async functions (handlers, CLI commands) |
-
-Both open a transaction that is committed on success and rolled back on exception.
-
-### Usage
 
 ```python
 from mitup_bot.db import with_async_session
@@ -33,19 +29,18 @@ from sqlmodel import Session
 async def my_handler(session: Session, update: Update, context: MitupContext) -> int:
     user = session.get(User, user_id)
     ...
-```
 
-Callers invoke the function **without** the `session` argument — the decorator supplies it:
-
-```python
+# Call without the session argument — the decorator supplies it:
 await my_handler(update, context)
 ```
 
-> **Type checker note:** `ty` does not yet support `Concatenate` / `ParamSpec`, so call sites will produce a false-positive `missing-argument` error. Suppress with `# ty: ignore[missing-argument]` and include the tracking issue URL. See the `type-checking` reference skill for the full convention.
+<note>
+`ty` does not yet support `Concatenate` / `ParamSpec`, so call sites produce a false-positive `missing-argument` error. Suppress with `# ty: ignore[missing-argument]` and include the tracking issue URL. See the `type-checking` skill for the full convention.
+</note>
 
 ## Models
 
-All database models live in `mitup_bot/models/` and use SQLModel. Inspect `mitup_bot/models/__init__.py` for the current list of exported models.
+All SQLModel table models live in `mitup_bot/models/` and use SQLModel. Inspect `mitup_bot/models/__init__.py` for the current list of exported models.
 
 Key patterns:
 
@@ -57,8 +52,8 @@ When adding a new model:
 
 1. Create the model class in the appropriate file under `mitup_bot/models/`.
 2. Export it from `mitup_bot/models/__init__.py`.
-3. Generate an Alembic migration (see Migrations below).
-4. Add test helpers in `tests/helpers/` if the model needs factory functions for tests.
+3. Generate an Alembic migration (see [Migrations](#migrations) below).
+4. Add test helpers in `tests/helpers/` if the model is referenced in 2 or more test modules or requires more than 2 constructor arguments.
 
 ## Migrations
 
@@ -72,10 +67,10 @@ hatch run dev:migrations-downgrade  # Roll back one migration
 hatch run dev:validate-migrations   # Validate migration graph integrity
 ```
 
-When adding or modifying a model, generate a new migration and verify the upgrade/downgrade paths work correctly.
+When adding or modifying a model, generate a new migration and confirm both the upgrade and downgrade paths apply cleanly against a local database.
 
 ## Automatic timestamps
 
-`created_time` and `updated_time` are populated by **PostgreSQL trigger functions** defined in migration `65b4c46d9141`. The triggers (`set_created_time()` and `set_updated_time()`) set `CURRENT_TIMESTAMP` on insert/update respectively.
+PostgreSQL triggers (`set_created_time()`, `set_updated_time()`) defined in migration `65b4c46d9141` set `CURRENT_TIMESTAMP` on insert and update respectively. Application code never assigns these fields.
 
-Because the triggers handle this at the database level, model classes declare these fields as `dt.datetime | None = None` — they don't need to be set in application code. However, they are **never `None` in production** for any row that has been persisted. Test fixtures (e.g., `create_meetup`) set a default `created_time` to mirror this behavior.
+Model classes declare them as `dt.datetime | None = None` because Python cannot know about DB-level triggers at import time. In production every persisted row has non-`None` values. Test fixtures (e.g., `create_meetup`) supply a default `created_time` to mirror this invariant.

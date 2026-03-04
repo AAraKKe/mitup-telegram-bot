@@ -25,20 +25,19 @@ All user-facing strings are defined in `mitup_bot/utils/messages.py` as `StrEnum
 
 <critical_rules>
   <rule>NEVER hardcode the `lang` argument (e.g., `lang="en"`). Always derive it from `user.lang` or `meeting.lang`.</rule>
-  <rule>NEVER call `.get(...).text` and pass the result to `with_context`, `with_footnote`, or any view description — this strips entities. Pass the full `FormattedText`.</rule>
+  <rule>NEVER extract `.text` from the result and pass it to `with_context`, `with_footnote`, or any view description — this strips entities. Pass the full `FormattedText`.</rule>
 </critical_rules>
 
-`get()` translates the message, substitutes `${varname}` placeholders, parses formatting tags, and returns a `FormattedText`:
+Returns a `FormattedText` with translation, placeholder substitution, and formatting applied:
 
 ```python
-# Translated message — returns FormattedText
 MeetingMessages.INVITE.get(lang=user.lang, title=meeting.title)
 
 # Pass directly to with_context — never extract .text first
 view.with_context(MeetingMessages.SUCCESS.get(lang=user.lang))
 ```
 
-Substitution values (`**kwargs`) accept `str`, `int`, `float`, `None`, or `FormattedText`. Passing a `FormattedText` preserves its entities at the correct offset in the resulting string — this is the mechanism for embedding one formatted message inside another:
+Substitution values accept `str`, `int`, `float`, `None`, or `FormattedText`. A `FormattedText` value preserves its entities at the correct offset — use this to embed one formatted message inside another:
 
 ```python
 invited_by = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=inviter.inline_name)
@@ -48,26 +47,26 @@ full_name = render(t"{name} ({invited_by})")  # entities preserved
 
 ## `MessageBase.get_text()`
 
-Use only when you genuinely need a plain string and know no entities will be present — e.g. a callback alert text. Raises `ValueError` if the result has entities, preventing silent entity loss:
+Use only for plain-text contexts (e.g. callback alert text) where the template has no `<tag>` syntax and no `FormattedText` substitution values. Raises `ValueError` if the result has entities:
 
 ```python
-# Safe: alert text cannot carry formatting
 await api.answer_callback_query(update, text=MeetingMessages.NOT_FOUND.get_text(lang=lang), show_alert=True)
 ```
 
 ## Inline formatting in messages
 
-Format tags are embedded directly in the message string using HTML-like syntax. `parse_format_tags` strips the tags and emits the corresponding `MessageEntity` objects:
+Embed formatting with HTML-like tags; `parse_format_tags` converts them to `MessageEntity` objects:
 
 ```python
 INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK = "<b>Meeting Not Found</b>\n\nThe meeting ... does not exist anymore."
 INVITED_BY_USER = "<i>invited by ${user}</i>"
 ```
 
-Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be arbitrarily nested. Unclosed tags are silently dropped.
+Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be arbitrarily nested.
 
 <critical_rules>
-  <rule>NEVER put MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use `<b>`, `<i>` tags instead.</rule>
+  <rule>Unclosed tags are silently dropped at runtime — no error is raised. Always close every tag you open.</rule>
+  <rule>NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use `<b>`, `<i>` tags instead.</rule>
   <rule>Template placeholders use `${variable_name}` syntax — not `{variable_name}` or `%s`.</rule>
 </critical_rules>
 

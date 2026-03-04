@@ -154,6 +154,22 @@ def _shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
     return MessageEntity(**kwargs)
 
 
+def strip_entity_from_text(text: str, entity: MessageEntity) -> str:
+    """Return *text* with the UTF-16 span covered by *entity* removed.
+
+    Whitespace adjacent to the removed span is trimmed so that a single space
+    between the left and right parts is preserved rather than a double space.
+    """
+    encoded = text.encode("utf-16-le")
+    start = entity.offset * 2
+    end = (entity.offset + entity.length) * 2
+    left = encoded[:start].decode("utf-16-le").rstrip()
+    right = encoded[end:].decode("utf-16-le").lstrip()
+    if left and right:
+        return left + " " + right
+    return left + right
+
+
 # --- UTF-16 helper ---
 
 

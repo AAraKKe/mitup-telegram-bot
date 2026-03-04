@@ -14,14 +14,30 @@ set -euo pipefail
 command="$1"
 MAX_LINES=120
 
+# Skip if background agents are still running.
+# SubagentStart creates an in_* file; SubagentStop creates an out_* file.
+# If in-count != out-count, at least one agent is still working — defer.
+AGENTS_DIR=".claude/agents_running"
+if [ -d "$AGENTS_DIR" ]; then
+    in_count=$(wc -l < "$AGENTS_DIR/in" 2>/dev/null || echo 0)
+    out_count=$(wc -l < "$AGENTS_DIR/out" 2>/dev/null || echo 0)
+    if [ "$in_count" != "$out_count" ]; then
+        jq -n --arg cmd "$command" --argjson in "$in_count" --argjson out "$out_count" \
+            '{"decision":"approve","reason":"Skipped \($cmd): \($in - $out) background agent(s) still running."}'
+        exit 0
+    fi
+fi
+
 # Skip if no tracked files have been modified or staged.
 # Untracked files are intentionally ignored — persistent local files (.env,
 # uv.lock, etc.) would otherwise defeat the early-exit on every turn.
 if git diff --quiet HEAD; then
+    rm -f "$AGENTS_DIR/in" "$AGENTS_DIR/out"
     exit 0
 fi
 
 if output=$(hatch run "$command" 2>&1); then
+    rm -f "$AGENTS_DIR/in" "$AGENTS_DIR/out"
     exit 0
 fi
 
@@ -41,4 +57,5 @@ else
     reason="$clean"
 fi
 
+rm -f "$AGENTS_DIR/in" "$AGENTS_DIR/out"
 jq -n --arg reason "$reason" '{"decision":"block","reason":$reason}'

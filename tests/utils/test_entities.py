@@ -686,3 +686,61 @@ def test_formatted_text_join_accepts_plain_strings():
     result = FormattedText.join(" | ", ["foo", "bar"])
     assert result.text == "foo | bar"
     assert result.entities == []
+
+
+# ---------------------------------------------------------------------------
+# strip_entity_from_text()
+# ---------------------------------------------------------------------------
+
+from mitup_bot.utils.entities import strip_entity_from_text  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "text, offset, length, expected",
+    [
+        # ASCII word at the start
+        ("hello world", 0, 5, "world"),
+        # ASCII word in the middle
+        ("say hello there", 4, 5, "say there"),
+        # ASCII word at the end
+        ("see you soon", 8, 4, "see you"),
+    ],
+    ids=["ascii_start", "ascii_middle", "ascii_end"],
+)
+def test_strip_entity_from_text_ascii(text: str, offset: int, length: int, expected: str):
+    entity = MessageEntity(type=MessageEntity.BOLD, offset=offset, length=length)
+    assert strip_entity_from_text(text, entity) == expected
+
+
+def test_strip_entity_from_text_emoji_prefix():
+    # "🎉 " = 2 (emoji) + 1 (space) = 3 UTF-16 code units
+    # Entity covers "Party" starting at offset 3
+    text = "🎉 Party time"
+    entity = MessageEntity(type="date_time", offset=3, length=5)  # "Party"
+    result = strip_entity_from_text(text, entity)
+    assert result == "🎉 time"  # stripped, leading/trailing whitespace removed
+
+
+def test_strip_entity_from_text_emoji_is_the_entity():
+    # The entity itself is the emoji (2 UTF-16 code units, length=2)
+    text = "hello 🎉 world"
+    entity = MessageEntity(type="date_time", offset=6, length=2)  # "🎉"
+    result = strip_entity_from_text(text, entity)
+    assert result == "hello world"  # surrounding spaces collapsed by strip()
+
+
+def test_strip_entity_from_text_strips_surrounding_whitespace():
+    # After removal the remaining text may have leading/trailing spaces — they must be stripped
+    text = "  tomorrow  "
+    entity = MessageEntity(type="date_time", offset=2, length=8)  # "tomorrow"
+    result = strip_entity_from_text(text, entity)
+    assert result == ""  # only spaces remain after removing "tomorrow"
+
+
+def test_strip_entity_from_text_multi_codeunit_entity():
+    # 🇪🇸 is 2 regional indicator symbols → 4 UTF-16 code units
+    # Text: "Meeting 🇪🇸 now", entity covers "🇪🇸" at UTF-16 offset 8, length 4
+    text = "Meeting 🇪🇸 now"
+    entity = MessageEntity(type="date_time", offset=8, length=4)
+    result = strip_entity_from_text(text, entity)
+    assert result == "Meeting now"

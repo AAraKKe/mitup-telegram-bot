@@ -1,7 +1,8 @@
+import datetime as dt
 import logging
 
 from sqlmodel import Session
-from telegram import Update
+from telegram import Message, MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
@@ -13,11 +14,27 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import strip_entity_from_text
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
 from .enums import ConversationMeetingState, MeetingHandlerId
+
+
+class ValidTitleFilter(filters.MessageFilter):
+    """Accept text messages that contain at most one ``date_time`` entity and no BOT_COMMAND."""
+
+    def filter(self, message: Message) -> bool:
+        if not message.text:
+            return False
+        entities = message.entities or []
+        # Reject commands: BOT_COMMAND entity at offset 0 (same check as filters.COMMAND)
+        if entities and entities[0].type == MessageEntity.BOT_COMMAND and entities[0].offset == 0:
+            return False
+        if not entities:
+            return True
+        return sum(e.type == "date_time" for e in entities) <= 1
 
 
 @HandlersRegistry.register_callback_query(
@@ -42,36 +59,60 @@ async def callback_query_create_meeting(session: Session, update: Update, contex
 
 
 @HandlersRegistry.register_message(
-    MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
+    MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
+    ValidTitleFilter(),
+    bindable=False,
 )
 @with_async_session
-async def create_meeting_message_handler(session: Session, update: Update, context: TMitupContext):
-    assert update.effective_chat is not None
-
-    title = guards.message(update).text
-    assert title is not None, "There must be text in the message if we made it here"
-
+async def create_meeting_message_handler(session: Session, update: Update, context: TMitupContext) -> int:
     user = guards.current_user(update, session)
+    message = guards.message(update)
+    title = message.text
+    assert title is not None, "TEXT filter ensures this is set"
+
+    meeting_datetime: dt.datetime | None = None
+
+    # next() is safe: ValidTitleFilter guarantees at most one date_time entity
+    date_entity = next((e for e in (message.entities or []) if e.type == "date_time"), None)
+    if date_entity is not None:
+        unix_time = date_entity.to_dict().get("unix_time")
+        if unix_time is not None:
+            meeting_datetime = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
+        title = strip_entity_from_text(title, date_entity)
+
     meetup = Meetup(
         title=title,
         owner=user,
+        datetime=meeting_datetime,
         waiting_list=user.settings.default_waiting_list,
         public=user.settings.default_public,
         allow_invitation=user.settings.default_allow_invitation,
         incognito=user.settings.default_incognito,
     )
-
     session.add(meetup)
     session.flush()
 
-    message = MeetingMessages.CREATED_SUCCESS.get(title=meetup.title, lang=user.lang)
-    view = meetup.edit_view.with_context(message)
-
+    success_message = MeetingMessages.CREATED_SUCCESS.get(title=meetup.title, lang=user.lang)
+    view = meetup.edit_view.with_context(success_message)
     await context.api.send_message(update=update, view=view)
-
     context.put_feature_metric(Feature.CREATE_MEETING)
-
     return ConversationHandler.END
+
+
+@HandlersRegistry.register_message(
+    MeetingHandlerId.CREATE_MEETING_INVALID_TITLE_MESSAGE,
+    filters.TEXT & ~filters.COMMAND,
+    bindable=False,
+)
+@with_async_session
+async def create_meeting_invalid_title_message_handler(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationMeetingState:
+    user = guards.current_user(update, session)
+    error_msg = MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY.get(lang=user.lang)
+    view = views.factory.create_meeting_view(lang=user.lang, message=error_msg)
+    await context.api.send_message(update=update, view=view)
+    return ConversationMeetingState.TITLE
 
 
 @HandlersRegistry.register_callback_query(
@@ -99,5 +140,8 @@ HandlersRegistry.register_conversation_handler(
             MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK,
         ],
     },
-    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
+    fallbacks=[
+        MeetingHandlerId.CREATE_MEETING_INVALID_TITLE_MESSAGE,  # must come before MESSAGE_WITHOUT_TEXT
+        MessagesId.MESSAGE_WITHOUT_TEXT,
+    ],
 )

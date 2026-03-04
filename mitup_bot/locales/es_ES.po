@@ -326,6 +326,9 @@ msgstr "¡Has abandonado la quedada, %{user}! Parece que es la primera vez que u
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "Hay un espacio libre en la quedada ${meeting_title}. ¡Te has unido desde la lista de espera!"
 
+msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgstr "Solo entiendo un título o un título con una fecha 🤔.\n\nPor favor, envía solo el título de la quedada, o el título con una fecha formateada por Telegram. Haz clic en <b>Cancelar</b> para salir."
+
 msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
 msgstr "Estabas creando una quedada. Envía el título de la quedada para continuar. Si no quieres continuar, toca Cancelar para salir."
 

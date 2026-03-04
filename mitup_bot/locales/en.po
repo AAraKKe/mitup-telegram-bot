@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-03-02 00:43\n"
+"PO-Revision-Date: 2026-03-04 02:12\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -310,6 +310,9 @@ msgstr "You have left the meeting, %{user}! It seems you have never used Mitup b
 
 msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
 msgstr "There is an open spot in the meeting <b>${meeting_title}</b>. You have now been promoted from the waiting list!"
+
+msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgstr "I only understand a title or a title with a date 🤔.\n\nPlease send just the meeting title, or the title with a date formatted by Telegram. Click <b>Cancel</b> to exit."
 
 msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
 msgstr "You were in the middle of creating a meeting. Send the title of the meeting to continue. If you would not like to continue, tap Cancel to exit."

@@ -83,7 +83,7 @@ def settings_view(*, lang: str, message: str | FormattedText | None = None) -> M
     )
 
 
-def create_meeting_view(*, lang: str, message: str | None = None) -> MitupView:
+def create_meeting_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
     return MitupView(
         message or MeetingMessages.CREATE.get(lang=lang),
         [
