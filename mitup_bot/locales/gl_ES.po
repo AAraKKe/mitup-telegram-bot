@@ -161,6 +161,9 @@ msgstr "Botar"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Eliminar data"
 
+msgid "ButtonMessages.DELETE_DURATION"
+msgstr "🗑️ Eliminar duración"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "¡Benvido a Mitup Bot!\n\n"
 "Escolle unha das seguintes opcións:"
@@ -237,7 +240,7 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Deshabilitado ❌"
 
 msgid "MeetingMessages.CREATE"
-msgstr "Imos crear unha quedada. Cal é o título?"
+msgstr "Imos crear unha quedada. Cal é o título?\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
 msgstr "Creouse unha quedada co título: <b>${title}</b>\n\n"
@@ -468,6 +471,12 @@ msgstr "Non se vai eliminar a quedada."
 
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Esta quedada eliminouse"
+
+msgid "MeetingMessages.DATE_TIME_VIEW_MESSAGE"
+msgstr "Elixe o que desexas establecer para a túa quedada.\n\n<i>Consello: tamén podes enviar un mensaxe usando ${datetime_link} para establecer a data e hora á vez.</i>"
+
+msgid "MeetingMessages.WRONG_DATETIME_MESSAGE"
+msgstr "Toca <b>Data</b> ou <b>Hora</b> para actualizalas, ou envía un mensaxe con ${datetime_link} para establecer ambas á vez."
 
 msgid "MeetingMessages.EDIT_DATE"
 msgstr "Escolle a nova data. Preme <b>🗑️ Eliminar data</b> se queres desactivar a data e hora da quedada."

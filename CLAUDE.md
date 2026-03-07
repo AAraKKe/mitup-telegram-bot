@@ -12,7 +12,18 @@ For complex tasks that span multiple areas (handler + migration + tests + transl
 /em Add recurring meetings — needs a handler, DB migration, tests, and EN/ES translations.
 ```
 
-For single-domain tasks or targeted fixes, invoke a specialist agent directly with natural language: "Use the handler-expert agent to...".
+For single-domain tasks or targeted fixes, **always** delegate to the appropriate specialist agent — do not implement it directly. Check the table below to find the right agent:
+
+| Work involves | Delegate to |
+|---|---|
+| Files in `mitup_bot/handlers/` or `mitup_bot/utils/callbacks.py` | `handler-expert` |
+| Files in `mitup_bot/views/` | `view-expert` |
+| Files in `tests/` | `test-expert` |
+| Files in `mitup_bot/lambdas/` | `lambda-expert` |
+| Files in `mitup_bot/cli/` | `cli-expert` |
+| User-facing message text / button labels | `bot-copywriter` |
+| Translation `.po`/`.pot` files | `translator` |
+| Documentation in `docs/` | `docs-writer` |
 
 **After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done.
 

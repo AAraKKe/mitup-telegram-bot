@@ -74,11 +74,9 @@ class BotAdapter:
         properties: dict[str, str | int | float | None] | None = None,
         include_update_properties: bool = True,
         emit_global: bool = False,
-    ):
-        pass
+    ) -> None: ...
 
-    async def flush_metrics(self):
-        pass
+    async def flush_metrics(self) -> None: ...
 
 
 def build_api(context_or_bot: MitupContext | ExtBot) -> TelegramApiWrapper:
@@ -152,6 +150,7 @@ class TelegramApiWrapper(Protocol):
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
+        has_started: bool = False,
     ) -> None: ...
     async def update_meeting_messages(
         self,
@@ -162,6 +161,7 @@ class TelegramApiWrapper(Protocol):
         skip_current: bool = False,
         was_deleted: bool = False,
         has_finished: bool = False,
+        has_started: bool = False,
     ) -> None: ...
     async def notify_users_promoted_from_waiting_list(
         self,
@@ -196,6 +196,7 @@ class TelegramApi:
                 text=resolved.description.text,
                 entities=resolved.description.entities or None,
                 reply_markup=resolved.markup,
+                disable_web_page_preview=True,
             )
 
     @contextmanager
@@ -222,6 +223,7 @@ class TelegramApi:
                     text=resolved.description.text,
                     entities=resolved.description.entities or None,
                     reply_markup=resolved.markup,
+                    disable_web_page_preview=True,
                 )
             except Forbidden as e:
                 logging.warning(f"User {user.tg_user_id} has blocked the bot.")
@@ -314,6 +316,7 @@ class TelegramApi:
                     message_id=message_id,
                     inline_message_id=inline_message_id,
                     reply_markup=resolved.markup,
+                    disable_web_page_preview=True,
                 )
 
     async def answer_inline_query(
@@ -368,17 +371,13 @@ class TelegramApi:
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
+        has_started: bool = False,
     ):
         """
         Updates a single meeting message with the current meeting view.
 
-        Args:
-            message: The message model to update.
-            session: The database session.
-            meeting: The meeting object.
-            was_deleted: If set to True, the meeting has been deleted and the messages will be updated
-                         to inform the user.
-            has_finished: If set to True, the meeting has finished and the messages will be updated to inform the user.
+        `has_started` prepends the in-progress banner but keeps buttons active.
+        `has_finished` clears buttons; uses the enriched summary when `duration_minutes` is set.
         """
 
         view = (
@@ -400,10 +399,24 @@ class TelegramApi:
             entities = ftext.entities or None
             reply_markup = None
         elif has_finished:
-            finished_view = view.with_context(MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang))
+            finished_message = (
+                MeetingMessages.MEETING_FINISHED_SUMMARY.get(
+                    lang=meeting.lang,
+                    duration=meeting.duration_minutes,
+                    attendee_count=meeting.n_participants,
+                )
+                if meeting.duration_minutes is not None
+                else MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang)
+            )
+            finished_view = view.with_context(finished_message)
             text = finished_view.description.text
             entities = finished_view.description.entities or None
             reply_markup = None
+        elif has_started:
+            started_view = view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=meeting.lang))
+            text = started_view.description.text
+            entities = started_view.description.entities or None
+            reply_markup = view.markup
         else:
             text = view.description.text
             entities = view.description.entities or None
@@ -420,6 +433,7 @@ class TelegramApi:
                 message_id=message.message_id,
                 inline_message_id=message.inline_message_id,
                 reply_markup=reply_markup,
+                disable_web_page_preview=True,
             )
 
     async def update_meeting_messages(
@@ -428,9 +442,10 @@ class TelegramApi:
         session: Session,
         meeting: Meetup,
         current_message: MessageModel | None = None,
-        skip_current=False,
-        was_deleted=False,
-        has_finished=False,
+        skip_current: bool = False,
+        was_deleted: bool = False,
+        has_finished: bool = False,
+        has_started: bool = False,
     ):
         """
         Updates meeting messages with the current meeting view.
@@ -444,11 +459,26 @@ class TelegramApi:
             was_deleted: If set to True, the meeting has been deleted and the messages will be updated
                          to inform the user.
             has_finished: If set to True, the meeting has finished and the messages will be updated to inform the user.
+            has_started: If set to True, the in-progress banner is prepended; buttons remain active.
         """
         # First lets update the current message for a better user experience
         if current_message and not skip_current:
-            await self.update_single_meeting_message(current_message, session, meeting, was_deleted, has_finished)
+            await self.update_single_meeting_message(
+                current_message,
+                session,
+                meeting,
+                was_deleted=was_deleted,
+                has_finished=has_finished,
+                has_started=has_started,
+            )
         for message in meeting.messages:
             if message == current_message:
                 continue
-            await self.update_single_meeting_message(message, session, meeting, was_deleted, has_finished)
+            await self.update_single_meeting_message(
+                message,
+                session,
+                meeting,
+                was_deleted=was_deleted,
+                has_finished=has_finished,
+                has_started=has_started,
+            )

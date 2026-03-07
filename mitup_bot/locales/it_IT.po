@@ -161,6 +161,9 @@ msgstr "Rimuovi"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Elimina data"
 
+msgid "ButtonMessages.DELETE_DURATION"
+msgstr "🗑️ Elimina durata"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Benvenuto in Mitup Bot!\n\nScegli una delle seguenti opzioni:"
 
@@ -222,7 +225,7 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Disabilitato ❌"
 
 msgid "MeetingMessages.CREATE"
-msgstr "Creiamo un incontro. Qual è il titolo?"
+msgstr "Creiamo un incontro. Qual è il titolo?\n\n<i>Suggerimento: puoi anche usare ${datetime_link} per includere una data e un'ora direttamente.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
 msgstr "Un incontro è stato creato con il titolo: <b>${title}</b>\n\nPuoi aggiungere più informazioni all'incontro con le opzioni sottostanti. Le informazioni che non sono state aggiunte non verranno mostrate quando l'incontro viene condiviso.\n\nQuando hai finito fai clic su ✅ Fatto"
@@ -421,6 +424,12 @@ msgstr "L'incontro non sarà eliminato"
 
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Questo incontro è stato eliminato"
+
+msgid "MeetingMessages.DATE_TIME_VIEW_MESSAGE"
+msgstr "Scegli cosa vuoi impostare per il tuo incontro.\n\n<i>Suggerimento: puoi anche inviare un messaggio utilizzando ${datetime_link} per impostare la data e l'ora contemporaneamente.</i>"
+
+msgid "MeetingMessages.WRONG_DATETIME_MESSAGE"
+msgstr "Tocca <b>Data</b> o <b>Ora</b> per aggiornarle, o invia un messaggio con ${datetime_link} per impostare entrambe contemporaneamente."
 
 msgid "MeetingMessages.EDIT_DATE"
 msgstr "Seleziona la nuova data. Premi <b>🗑️ Elimina data</b> se desideri annullare la data e l'ora dell'incontro."

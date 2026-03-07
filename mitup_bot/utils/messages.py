@@ -86,6 +86,7 @@ class ButtonMessages(MessageBase):
     TITLE = f"{Emojis.TITLE} Title"
     DESCRIPTION = f"{Emojis.DESCRIPTION} Description"
     DATE = f"{Emojis.CALENDAR} Date"
+    DATE_TIME = f"{Emojis.CALENDAR} Date & Time"
     TIME = f"{Emojis.CLOCK} Time"
     NOTIFICATIONS_TIME = f"{Emojis.NOTIF} Time"
     SET_TIME = f"{Emojis.CLOCK} Set time"
@@ -105,9 +106,19 @@ class ButtonMessages(MessageBase):
     MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
     MEETING_KICK_OUT = "Kick out"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
+    DELETE_DURATION = f"{Emojis.DELETE} Delete duration"
     MAKE_SEARCHABLE = "Make it searchable"
     LOAD_CHAT_MEETINGS = f"{Emojis.SEARCH} Load meetings"
     SEARCH_CHAT_MEETINGS = f"{Emojis.SEARCH} Search meetings"
+
+    # Duration buttons
+    DURATION = f"{Emojis.HOURGLASS} Duration"
+    SET_DURATION = f"{Emojis.HOURGLASS} Set duration"
+    LOCK_ON_START = "Lock on start"
+
+    # Settings — Default Options buttons
+    MEETING_DURATION = f"{Emojis.HOURGLASS} Meeting duration"
+    DEFAULT_LOCK_ON_START = f"{Emojis.LOCK} Lock on start"
 
     # Notification buttons
     REACTIVATE_MEETING = "Reactivate meeting"
@@ -177,9 +188,10 @@ class SettingsMessages(MessageBase):
 
     # Timeout messages
     SET_TIMEOUT_SETTINGS = (
-        "Timeout defines how long a meeting is kept after it is over. After this time the meeting will be deactivated. "
-        "You can activate it again from your <b>Past meetings menu</b>.\n\n"
-        "The curent timeout is <b>${timeout} minutes</b>\n\n"
+        "Timeout defines how long after a meeting starts it is kept active. "
+        "Meetings without a set duration are deactivated once this time has passed. "
+        "After deactivation, you can reactivate a meeting from your <b>Past meetings menu</b>.\n\n"
+        "The current timeout is <b>${timeout} minutes</b>\n\n"
         "Send the timeout (in minutes) you would like to use or touch Cancel to go back."
     )
     INVALID_POSITIVE_INTEGER = (
@@ -202,7 +214,10 @@ class SettingsMessages(MessageBase):
 
 class MeetingMessages(MessageBase):
     # Meeting creation
-    CREATE = "Lets create a meeting. What is the title?"
+    CREATE = (
+        "Lets create a meeting. What is the title?\n\n"
+        "<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
+    )
     CREATED_SUCCESS = (
         "A meeting has been created with the title: <b>${title}</b>\n\n"
         "You can add more information to the meeting with the options below. "
@@ -216,6 +231,8 @@ class MeetingMessages(MessageBase):
 
     # Meeting information
     MEETING_TIME = "Meeting time"
+    MEETING_START_TIME = "Starts"
+    MEETING_STOP_TIME = "Ends"
     CREATED_BY = "Created by: ${owner}"
     DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
@@ -235,7 +252,7 @@ class MeetingMessages(MessageBase):
     JOINED_MEETING_FULL = "Sorry! The meeting is full"
     JOINED_MEETING_FULL_WAITING_LIST = "The meeting is full. You have been added to the waiting list."
     JOINED_MEETING_UNREGISTERED = (
-        "You have joined the meeting, %{user}! "
+        "You have joined the meeting, ${user}! "
         "It seems you have never used Mitup before, open a chat with @mitupbot to be "
         "receive notifications and create new meetings!"
     )
@@ -243,7 +260,7 @@ class MeetingMessages(MessageBase):
     LEFT_MEETING_ALREADY = "You cannot leave a meeting you have not joined"
     LEFT_MEETING_NOT_FOUND = "The meeting you tried to leave does not exist"
     LEFT_MEETING_UNREGISTERED = (
-        "You have left the meeting, %{user}! "
+        "You have left the meeting, ${user}! "
         "It seems you have never used Mitup before, open a chat with @mitupbot to "
         "receive notifications and create new meetings!"
     )
@@ -390,14 +407,22 @@ class MeetingMessages(MessageBase):
     ACCESS_TO_DELETED_MEETING = "This meeting has been deleted"
 
     # Edit meeting date and time
+    DATE_TIME_VIEW_MESSAGE = (
+        "Choose what you want to set for your meeting.\n\n"
+        "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+    )
+    WRONG_DATETIME_MESSAGE = (
+        "Tap <b>Date</b> or <b>Time</b> to update them, or send a message with a ${datetime_link} to set both at once."
+    )
     EDIT_DATE = (
         f"Select the new date. Press <b>{ButtonMessages.DELETE_DATE}</b> if you want to "
         "unset the date and time of the meeting."
     )
     ADD_DATE = "Select the date."
     NEW_DATE_SET_SUCCESS = (
-        "The date has been set to: ${datetime}. To set the time press <i>${set_time_button}</i>, "
-        "othwerise press <i>${back_edit_button}</i> to go back to editing the meeting."
+        "The date has been set to <b>${datetime}</b>. "
+        "The time defaults to 00:00.\n\n"
+        "Send the time in <i>HH:MM</i> format to change it, or tap Done to keep 00:00."
     )
     DATE_UPDATE_SUCCESS = "The date has been set to: ${datetime}"
     EDIT_TIME = "Send me the time of the meeting in the format <i>HH:MM</i>"
@@ -460,6 +485,41 @@ class MeetingMessages(MessageBase):
     PAST_MEETINGS_PAGE = "These are all your past meetings."
     NO_PAST_MEETINGS = "<i>You have no past meetings yet.</i>"
 
+    # Meeting in-progress and finalization states
+    MEETING_IN_PROGRESS = "▶️ This meeting is in progress ▶️"
+    MEETING_FINISHED_SUMMARY = (
+        "✅ This meeting has finished ✅\n\n<b>Duration:</b> ${duration} minutes · <b>Attendees:</b> ${attendee_count}"
+    )
+
+    # Duration edit flow
+    SET_DURATION_PROMPT = "Send me the duration of the meeting in minutes, or tap <b>Cancel</b> to go back."
+    EDIT_DURATION_PROMPT = (
+        "The current duration is <b>${current_duration} minutes</b>.\n\n"
+        "Send me the new duration in minutes, or tap <b>Cancel</b> to go back."
+    )
+    DURATION_SET_SUCCESS = "The duration has been set to: <b>${duration} minutes</b>"
+    DURATION_CLEARED = "The duration has been removed from this meeting."
+    EDIT_MEETING_DURATION_ON_EXIT = (
+        "Sorry, I was expecting the duration in minutes. Would you like to send it? If not, tap Cancel to exit."
+    )
+    LOCK_ON_START_STALE_ALERT = "You must set a duration before enabling this option."
+
+    # Duration sub-screen description
+    DURATION_VIEW_DESCRIPTION = (
+        "Set how long this meeting will last.\n\n"
+        "Current duration: <b>${current_duration} minutes</b>.\n\n"
+        "You can also lock the attendees list when the meeting starts, "
+        "so no one can join or leave once it is underway."
+    )
+    DURATION_VIEW_DESCRIPTION_NOT_SET = (
+        "Set how long this meeting will last.\n\n"
+        "No duration has been set yet. You can also lock the attendees list when the meeting starts, "
+        "so no one can join or leave once it is underway."
+    )
+
+    # Locked-meeting join/leave alert
+    JOIN_LOCKED_IN_PROGRESS = "This meeting has already started and its attendees list is locked."
+
 
 class InlineViewMessages(MessageBase):
     CREATE_NEW_MEETING_BUTTON = f"{Emojis.NEW_MEETING} Create a new meeting"
@@ -484,6 +544,7 @@ class NotificationMessages(MessageBase):
     )
     MEETING_PERMANENTLY_DELETED = "The meeting <b>${meeting_title}</b> has been permanently deleted."
     MEETING_STARTING = "The meeting <b>${meeting_title}</b> is starting soon!"
+    MEETING_STARTED = "The meeting <b>${meeting_title}</b> has started!"
 
 
 class Weekday(MessageBase):

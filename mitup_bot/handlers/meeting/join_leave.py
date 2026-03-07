@@ -19,7 +19,7 @@ from .enums import MeetingHandlerId
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
 @with_async_session
-async def join_meetup(session: Session, update: Update, context: TMitupContext):
+async def join_meetup(session: Session, update: Update, context: TMitupContext) -> None:
     """
     Handle the join action when clicked on a meeting. This action can be clicked by any user
     to whom the meeting has been shared to.
@@ -88,7 +88,7 @@ async def handle_non_existing_user_join(session: Session, update: Update, contex
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
 @with_async_session
-async def leave_meetup(session: Session, update: Update, context: TMitupContext):
+async def leave_meetup(session: Session, update: Update, context: TMitupContext) -> None:
     """
     Handle the leave action when clicked on a meeting. This action can be clicked by any user
     who has already joined the meeting. If the user is not registered we should ask the user
@@ -153,6 +153,14 @@ async def handle_join_leave_operation(
                     description=MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang),
                     keyboard=[],
                 ),
+            )
+            return
+
+        if meeting.lock_on_start and meeting.is_in_progress:
+            await context.api.answer_callback_query(
+                update=update,
+                text=MeetingMessages.JOIN_LOCKED_IN_PROGRESS.get_text(lang=user.lang),
+                show_alert=True,
             )
             return
 

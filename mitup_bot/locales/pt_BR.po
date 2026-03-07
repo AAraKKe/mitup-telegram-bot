@@ -161,6 +161,9 @@ msgstr "Expulsar"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Remover data"
 
+msgid "ButtonMessages.DELETE_DURATION"
+msgstr "🗑️ Remover duração"
+
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Tornar pesquisável"
 
@@ -249,7 +252,7 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Desativado ❌"
 
 msgid "MeetingMessages.CREATE"
-msgstr "Vamos criar um evento. Qual o título?"
+msgstr "Vamos criar um evento. Qual o título?\n\n<i>Dica: você também pode usar ${datetime_link} para incluir uma data e hora diretamente.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
 msgstr "Um evento foi criado com o título: <b>${title}</b>\n\n"
@@ -480,6 +483,12 @@ msgstr "O evento não foi excluído"
 
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Este evento foi excluído"
+
+msgid "MeetingMessages.DATE_TIME_VIEW_MESSAGE"
+msgstr "Escolha o que você deseja definir para seu evento.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e a hora de uma vez.</i>"
+
+msgid "MeetingMessages.WRONG_DATETIME_MESSAGE"
+msgstr "Toque em <b>Data</b> ou <b>Hora</b> para atualizá-las, ou envie uma mensagem com ${datetime_link} para definir ambas de uma vez."
 
 msgid "MeetingMessages.EDIT_DATE"
 msgstr "Selecione a nova data. Pressione <b>🗑️ Remover data</b> se você quiser desconfigurar a data e hora do evento."

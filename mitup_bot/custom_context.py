@@ -41,6 +41,7 @@ class ContextId(CamelCaseStrEnum):
     EDIT_MEETING_MAX_PARTICIPANTS = auto()
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = auto()
     EDIT_MEETING_TIME = auto()
+    EDIT_MEETING_DURATION = auto()
 
     # Create Meeting
     CREATE_MEETING = auto()
@@ -277,35 +278,10 @@ class MitupContext(
         # Special flag for global aggregation
         emit_global: bool = False,
     ):
-        """
-        Emit a metric with flexible dimension and property configuration.
+        """Emit a metric with flexible dimension and property configuration.
 
-        Metrics are batched by dimensionality and flushed at the end of handler execution.
-        Multiple metrics with the same dimensions are combined into a single EMF log line for cost optimization.
-
-        Args:
-            name (str | MetricKey): Metric name (use MetricKey enum for standard metrics)
-            value (float): Metric value
-            unit (Unit): Unit type (COUNT, MILLISECONDS, etc.)
-            dimensions (dict[str, str], optional): Additional custom dimensions to add. Defaults to None.
-            include_handler_dimensions (bool): If True, includes Handler and HandlerType dimensions. Defaults to True.
-            properties (dict[str, str | int | float | None], optional): Additional custom properties. Defaults to None.
-            include_update_properties (bool): If True, includes Telegram update metadata. Defaults to True.
-            emit_global (bool): If True, also emits the metric without any dimensions for global aggregation.
-                Defaults to False.
-
-        Examples:
-            # Simple handler metric (most common case)
-            context.emit_metric(MetricKey.ERROR, 1)
-
-            # Custom dimensions without handler context
-            context.emit_metric("ApiCall", 1, dimensions={"Service": "Google"}, include_handler_dimensions=False)
-
-            # Emit both with handler dims AND global (for aggregation)
-            context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
-
-            # Feature metric
-            context.emit_metric(MetricKey.COUNT, dimensions={"Feature": "JoinMeeting"})
+        Metrics with identical dimensions are batched into a single EMF log line — a CloudWatch
+        cost optimization since charges are per log line, not per metric within a line.
         """
         # Build dimensionality
         dimensionality = Dimensionality.or_null(dimensions)
@@ -340,29 +316,7 @@ class MitupContext(
         with_handler_dimensions: bool = False,
         with_update_properties: bool = True,
     ):
-        """
-        Emit a metric with a Feature dimension for tracking feature usage.
-
-        This is a convenience wrapper around emit_metric() that automatically adds the Feature dimension.
-        Useful for tracking feature usage like "how many times timezone is set using location vs message".
-
-        Args:
-            feature (Feature): The feature being tracked
-            value (float): Metric value. Defaults to 1.0.
-            name (str | MetricKey): Metric name. Defaults to COUNT for counting feature usage.
-            unit (Unit): Unit type. Defaults to COUNT.
-            dimensions (dict[str, str], optional): Additional dimensions. Defaults to None.
-            properties (dict[str, str | int | float | None], optional): Additional properties. Defaults to None.
-            with_handler_dimensions (bool): Include handler dimensions. Defaults to False.
-            with_update_properties (bool): Include update properties. Defaults to True.
-
-        Examples:
-            # Track feature usage
-            context.put_feature_metric(Feature.JOIN_MEETING)
-
-            # Track feature errors
-            context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=1)
-        """
+        """Convenience wrapper around emit_metric that adds a Feature dimension automatically."""
         feature_dimensions = (dimensions or {}) | {"Feature": str(feature)}
         self.emit_metric(
             name,
@@ -376,22 +330,7 @@ class MitupContext(
 
     @contextmanager
     def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
-        """
-        Context manager that emits a Time metric measuring the time it takes the code inside the context to run.
-
-        Args:
-            prefix (str): The prefix added to the metric name. The resulting metric name will be <prefix>Time.
-            handler_metrics (bool): If True, includes handler dimensions in the metric. Defaults to False.
-
-        Examples:
-            # Measure API call time without handler dimensions
-            with context.with_time_metric("TelegramApi"):
-                await context.bot.send_message(...)
-
-            # Measure operation time with handler dimensions
-            with context.with_time_metric("ProcessPayment", handler_metrics=True):
-                process_payment()
-        """
+        """Measure elapsed time and emit a ``<prefix>Time`` metric in milliseconds on exit."""
         start_time = perf_counter()
         yield
         elapsed_time = 1000 * (perf_counter() - start_time)

@@ -46,6 +46,7 @@ DECLINE_INVITE_USER = CallbackData(action="decline", entity="invite")
 EDIT_MEETING_DESCRIPTION = CallbackData(action="edit", entity="meet_desc")
 EDIT_MEETING_TITLE = CallbackData(action="edit", entity="meet_title")
 # ---- Datetime
+EDIT_MEETING_DATE_TIME = CallbackData(action="edit", entity="meet_dttm")
 EDIT_MEETING_DATE = DateCallbackData(action="edit", entity="meet_date")
 # This callback is part of the calendar view, the one above is part of the menu
 SET_MEETING_DATE = DateCallbackData(action="set", entity="md")
@@ -75,7 +76,12 @@ SET_MEETING_WAITING_LIST = CallbackData(action="set", entity="meet_wait")
 SET_MEETING_PUBLIC = CallbackData(action="set", entity="meet_pub")
 SET_MEETING_ALLOW_INVITATIONS = CallbackData(action="set", entity="meet_inv")
 SET_MEETING_INCOGNITO = CallbackData(action="set", entity="meet_inc")
-EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
+# ---- Duration
+EDIT_MEETING_DURATION = CallbackData(action="edit", entity="meet_dur")
+SET_MEETING_DURATION = CallbackData(action="set", entity="meet_dur")
+CLEAR_MEETING_DURATION = CallbackData(action="clear", entity="meet_dur")
+CANCEL_EDIT_MEETING_DURATION = CallbackData(action="cancel", entity="meet_dur")
+SET_MEETING_LOCK_ON_START = CallbackData(action="set", entity="meet_lock")
 # ---- General
 EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 
@@ -105,6 +111,7 @@ SET_DEFAULT_WAITING_LIST = CallbackData(action="set", entity="def_wait")
 SET_DEFAULT_PUBLIC = CallbackData(action="set", entity="def_pub")
 SET_DEFAULT_INVITATIONS = CallbackData(action="set", entity="def_inv")
 SET_DEFAULT_INCOGNITO = CallbackData(action="set", entity="def_inc")
+SET_DEFAULT_LOCK_ON_START = CallbackData(action="set", entity="def_lock")
 EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
 # Notifications
 TOGGLE_NOTIFICATIONS = CallbackData(action="toggle", entity="notif")

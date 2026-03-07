@@ -12,7 +12,14 @@ from telegram.ext import AIORateLimiter, ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper, build_api
-from mitup_bot.cli import generate_stats, inactive_meetings, meetups_cleanup, notify_meetings, user_cleanup
+from mitup_bot.cli import (
+    generate_stats,
+    inactive_meetings,
+    meetups_cleanup,
+    notify_meetings,
+    notify_meetings_started,
+    user_cleanup,
+)
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.monitoring.metrics import MetricKey, MitupMetricsLogger, configure_metrics
 
@@ -21,12 +28,14 @@ DEFAULT_GENERATE_STATS_INTERVAL = 3600
 DEFAULT_NOTIFY_MEETINGS_START = 60
 DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
 DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
+DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL = 60
 
 
 class EventType(Enum):
     USER_CLEANUP = "UserCleanup"
     GENERATE_STATS = "Stats"
     NOTIFY_START_MEETING = "NotifyStartMeeting"
+    NOTIFY_MEETING_STARTED = "NotifyMeetingStarted"
     DEACTIVATE_MEETINGS = "DeactivateMeetings"
     MEETUPS_CLEANUP = "MeetupsCleanup"
 
@@ -35,6 +44,7 @@ class EventType(Enum):
 class IntervalsConfiguration:
     user_cleanup: int
     notify_start_meeting: int
+    notify_meeting_started: int
     generate_stats: int
     deactivate_meetings: int
     meetups_cleanup: int
@@ -45,6 +55,8 @@ class IntervalsConfiguration:
                 return self.user_cleanup
             case EventType.NOTIFY_START_MEETING:
                 return self.notify_start_meeting
+            case EventType.NOTIFY_MEETING_STARTED:
+                return self.notify_meeting_started
             case EventType.GENERATE_STATS:
                 return self.generate_stats
             case EventType.DEACTIVATE_MEETINGS:
@@ -68,6 +80,8 @@ async def launch_event(event_type: EventType, api: TelegramApiWrapper, metrics: 
             user_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.NOTIFY_START_MEETING:
             await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        case EventType.NOTIFY_MEETING_STARTED:
+            await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.GENERATE_STATS:
             generate_stats.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.DEACTIVATE_MEETINGS:
@@ -162,6 +176,12 @@ async def run_all_tasks(intervals: IntervalsConfiguration, api: TelegramApiWrapp
     show_default=True,
 )
 @click.option(
+    "--notify-meeting-started-interval",
+    default=DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL,
+    help="Interval in seconds to send notifications when a meeting has started",
+    show_default=True,
+)
+@click.option(
     "--env",
     default=Env.DEV,
     type=click.Choice(Env, case_sensitive=False),
@@ -180,6 +200,7 @@ def cli(
     generate_stats_interval: int,
     deactivate_meetings_interval: int,
     meetups_cleanup_interval: int,
+    notify_meeting_started_interval: int,
     env: Env,
     start_time: float,
 ):
@@ -198,6 +219,7 @@ def cli(
     intervals = IntervalsConfiguration(
         user_cleanup=user_cleanup_interval,
         notify_start_meeting=notify_meeting_interval,
+        notify_meeting_started=notify_meeting_started_interval,
         generate_stats=generate_stats_interval,
         deactivate_meetings=deactivate_meetings_interval,
         meetups_cleanup=meetups_cleanup_interval,

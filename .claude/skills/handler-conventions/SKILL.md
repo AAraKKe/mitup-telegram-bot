@@ -119,14 +119,37 @@ from mitup_bot.utils import callbacks as cb
 ButtonConfig(text=ButtonMessages.SHOW.get(lang=lang), callback_data=cb.SHOW_MEETING.with_id(meeting_id))
 ```
 
+## Handler function naming
+
+Name handler functions after their registration type and action:
+
+| Registration | Naming pattern | Example |
+|---|---|---|
+| `register_callback_query` | `callback_query_<action>` | `callback_query_toggle_lock` |
+| `register_message` | `<action>_message_handler` | `duration_text_message_handler` |
+| `register_command` | `command_<name>` | `command_start` |
+
+<critical_rules>
+  <rule>Callback query handlers MUST be named `callback_query_<action>`. Never omit the `callback_query_` prefix (e.g. NOT `callback_date_time_entry`, but `callback_query_date_time_entry`).</rule>
+</critical_rules>
+
 ## Adding a new handler — checklist
 
 1. Define a `HandlerId` member in the appropriate `enums.py` (or create a new submodule).
-2. Write the handler function with the `@HandlersRegistry.register_*` decorator.
+2. Write the handler function with the `@HandlersRegistry.register_*` decorator. Follow the naming convention above.
 3. Add `@with_async_session` if database access is needed.
 4. Register the handler in `tests/test_failure_modes.py` if it calls any `guards.*` function (e.g. `guards.current_user`, `guards.meeting_accessible`, `guards.valid_callback_data`, `guards.valid_meeting_callback_data`).
 5. Create a dedicated test file at `tests/handlers/<package>/test_<module>.py`.
 6. Import the handler module in `mitup_bot/handlers/__init__.py`.
+
+## Removing a handler — checklist
+
+When deleting a handler entirely:
+
+1. Remove its `HandlerId` member from `enums.py`.
+2. Delete the handler function and any callbacks/views it exclusively owns.
+3. **Remove its `Context` entries from `tests/test_failure_modes.py`** — every guard call registered there becomes stale and will cause test failures if left behind.
+4. Remove its import from `mitup_bot/handlers/__init__.py` if the whole module is gone.
 
 ## Shared utilities
 

@@ -5,7 +5,6 @@ from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import guards
-from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -14,23 +13,12 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
 from .enums import EditMeetingHandlerId
-
-
-def cleanup_states(context: TMitupContext):
-    context.clean_user_data(
-        [
-            ContextId.EDIT_MEETING_TITLE,
-            ContextId.EDIT_MEETING_DESCRIPTION,
-            ContextId.EDIT_MEETING_LOCATION_NAME,
-            ContextId.EDIT_MEETING_LOCATION_COORDINATES,
-            ContextId.EDIT_MEETING_TIME,
-        ]
-    )
+from .utils import cleanup_states
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.EDIT, callback_data=cb.EDIT_MEETING, bindable=True)
 @with_async_session
-async def callback_query_edit_meeting(session: Session, update: Update, context: TMitupContext):
+async def callback_query_edit_meeting(session: Session, update: Update, context: TMitupContext) -> None:
     logging.debug("Enter into callback_query_edit_meeting")
 
     callback_data = guards.valid_callback_data(cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.EDIT)
@@ -50,7 +38,7 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
     EditMeetingHandlerId.CANCEL, callback_data=cb.EDIT_MEETING_CANCEL, bindable=True
 )
 @with_async_session
-async def cancel_edit_meeting(session: Session, update: Update, context: TMitupContext):
+async def cancel_edit_meeting(session: Session, update: Update, context: TMitupContext) -> int:
     """If at any point the user clicks on Cancel we should get back to the Edit meeting view"""
     user = guards.current_user(update, session)
 

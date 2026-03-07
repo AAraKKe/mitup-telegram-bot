@@ -101,6 +101,9 @@ msgstr "📄 Descripción"
 msgid "ButtonMessages.DATE"
 msgstr "🗓️ Fecha"
 
+msgid "ButtonMessages.DATE_TIME"
+msgstr "🗓️ Fecha y Hora"
+
 msgid "ButtonMessages.TIME"
 msgstr "🕒 Hora"
 
@@ -161,6 +164,9 @@ msgstr "Expulsar"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Eliminar fecha"
 
+msgid "ButtonMessages.DELETE_DURATION"
+msgstr "🗑️ Eliminar duración"
+
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Hacer buscable"
 
@@ -169,6 +175,21 @@ msgstr "🔍 Cargar quedadas"
 
 msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
 msgstr "🔍 Buscar quedadas"
+
+msgid "ButtonMessages.DURATION"
+msgstr "⌛ Duración"
+
+msgid "ButtonMessages.SET_DURATION"
+msgstr "⌛ Establecer duración"
+
+msgid "ButtonMessages.LOCK_ON_START"
+msgstr "Bloquear al iniciar"
+
+msgid "ButtonMessages.MEETING_DURATION"
+msgstr "⌛ Duración de la quedada"
+
+msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
+msgstr "🔒 Bloquear al iniciar"
 
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivar quedada"
@@ -221,9 +242,7 @@ msgstr "Aquí puedes configurar las opciones predeterminadas cuando creas una nu
 "*Mostrar zona horaria*: normalmente, cuando una quedada se comparte, incluye la zona horaría en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón _Zona horaria_ no aparezca cuando compartes la quedada."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
-msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene pasada su hora de inicio. Después de este tiempo la quedada es automáticamente desactivada. Puedes activarla de nuevo desde el menú *Tus quedadas pasadas*.\n\n"
-"El tiempo de prórroga actual es de *${timeout} minutos*.\n\n"
-"Dime cuál es el tiempo de prórroga \\(en minutos\\) que te gustaría usar o toca en Cancelar para volver."
+msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene activa después de que comience. Las quedadas sin una duración establecida se desactivan una vez que ha pasado este tiempo. Después de desactivar, puedes reactivar una quedada desde tu <b>Menú de quedadas pasadas</b>.\n\nEl tiempo de prórroga actual es <b>${timeout} minutos</b>\n\nEnvía el tiempo de prórroga (en minutos) que deseas usar o toca Cancelar para volver."
 
 msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
 msgstr "¡Vaya! Parece que ese no es un número válido. Por favor, envíame un número entero positivo. ¡No se permiten decimales!"
@@ -248,8 +267,11 @@ msgstr "Activado ✅"
 msgid "SettingsMessages.DISABLED"
 msgstr "Desactivado ❌"
 
+msgid "SettingsMessages.MEETING_DURATION_SETTINGS"
+msgstr "Configura la duración de la quedada.\n\nCuando está habilitada, puedes establecer una duración (en minutos) en cada una de tus quedadas. La duración se mostrará en el resumen de la quedada cuando ésta termine."
+
 msgid "MeetingMessages.CREATE"
-msgstr "Vamos a crear una quedada. Dime cual será el título"
+msgstr "Vamos a crear una quedada. Dime cual será el título\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
 msgstr "Se ha creado una quedada con el título ${title}.\n\n"
@@ -262,6 +284,12 @@ msgstr "Creo que no entiendo el título que has enviado 🤔.\n\n"
 
 msgid "MeetingMessages.MEETING_TIME"
 msgstr "Hora de la quedada"
+
+msgid "MeetingMessages.MEETING_START_TIME"
+msgstr "Empieza"
+
+msgid "MeetingMessages.MEETING_STOP_TIME"
+msgstr "Termina"
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Creada por: ${owner}"
@@ -481,6 +509,12 @@ msgstr "La quedada ha sido reactivada. Ahora puedes editarla y compartirla de nu
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Esta qudada ha sido borrada"
 
+msgid "MeetingMessages.DATE_TIME_VIEW_MESSAGE"
+msgstr "Elige qué deseas configurar para tu quedada.\n\n<i>Consejo: también puedes enviar un mensaje usando ${datetime_link} para establecer la fecha y hora a la vez.</i>"
+
+msgid "MeetingMessages.WRONG_DATETIME_MESSAGE"
+msgstr "Toca <b>Fecha</b> u <b>Hora</b> para actualizarlas, o envía un mensaje con ${datetime_link} para establecer ambas a la vez."
+
 msgid "MeetingMessages.EDIT_DATE"
 msgstr "Seleccione la nueva fecha. Presione *🗑️ Eliminar fecha* si desea eliminar la fecha y hora de la quedada."
 
@@ -488,7 +522,7 @@ msgid "MeetingMessages.ADD_DATE"
 msgstr "Selecciona la fecha."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "La fecha ha sido fijada a: *${datetime}*. Para configurar la hora de la quedada selecciona _${set_time_button}_ o pulsa _${back_edit_button}_ para volver a editar la quedada."
+msgstr "La fecha ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 00:00.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 00:00."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "La fecha de la quedada se ha establecido para el *${datetime}*"
@@ -564,6 +598,33 @@ msgstr "Estas son todas tus quedadas pasadas."
 msgid "MeetingMessages.NO_PAST_MEETINGS"
 msgstr "_Todavía no tienes ninguna quedada pasada._"
 
+msgid "MeetingMessages.MEETING_IN_PROGRESS"
+msgstr "▶️ Esta quedada está en curso ▶️"
+
+msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
+msgstr "✅ Esta quedada ha finalizado ✅\n\n<b>Duración:</b> ${duration} minutos · <b>Asistentes:</b> ${attendee_count}"
+
+msgid "MeetingMessages.SET_DURATION_PROMPT"
+msgstr "Envíame la duración de la quedada en minutos, o toca <b>Cancelar</b> para volver."
+
+msgid "MeetingMessages.EDIT_DURATION_PROMPT"
+msgstr "La duración actual es <b>${current_duration} minutos</b>.\n\nEnvíame la nueva duración en minutos, o toca <b>Cancelar</b> para volver."
+
+msgid "MeetingMessages.DURATION_SET_SUCCESS"
+msgstr "La duración se ha establecido en: <b>${duration} minutos</b>"
+
+msgid "MeetingMessages.DURATION_CLEARED"
+msgstr "La duración ha sido removida de esta quedada."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
+msgstr "Establece cuánto tiempo durará esta quedada.\n\nDuración actual: <b>${current_duration} minutos</b>.\n\nTambién puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
+msgstr "Establece cuánto tiempo durará esta quedada.\n\nAún no se ha establecido ninguna duración. También puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+
+msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
+msgstr "Esta quedada ya ha comenzado y su lista de asistentes está bloqueada."
+
 msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 
@@ -599,6 +660,9 @@ msgstr "La quedada <b>${meeting_title}</b> ha sido eliminada permanentemente."
 
 msgid "NotificationMessages.MEETING_STARTING"
 msgstr "¡La quedada <b>${meeting_title}</b> va a comenzar pronto!"
+
+msgid "NotificationMessages.MEETING_STARTED"
+msgstr "¡La quedada <b>${meeting_title}</b> ha comenzado!"
 
 msgid "Weekday.MONDAY"
 msgstr "Lun"

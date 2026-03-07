@@ -2,7 +2,8 @@
 name: em
 description: Engineering manager orchestration workflow. Invoke with /em <task> to plan and coordinate complex multi-domain features using specialist agents.
 disable-model-invocation: true
-argument-hint: "<task description> | implement <phase-file-path>"
+argument-hint: "<task description> | implement <phase-file-path> [phase-file-path ...]"
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 ---
 
 <task>
@@ -14,7 +15,7 @@ $ARGUMENTS
   <rule>Do NOT write any implementation code yourself.</rule>
   <rule>Do NOT start implementation delegation until the user has explicitly approved the plan.</rule>
   <rule>After presenting the plan, output ONLY: "Awaiting your approval to proceed." and STOP. Do not take any further action until the user responds.</rule>
-  <rule>When invoking a specialist for feasibility, always include: "Assess only — do NOT write or modify any code."</rule>
+  <rule>When invoking a specialist for feasibility, always ensure that thea gent should not implement code.</rule>
 </hard_constraints>
 
 <available_agents>
@@ -24,7 +25,7 @@ $ARGUMENTS
     Feasibility: ask about handler structure, state machine design, guard requirements, callback data naming.
   </agent>
   <agent name="view-expert">
-    Screens in `mitup_bot/views/` — MitupView, PaginatedMitupView, ButtonConfig, factory functions.
+    Expert in UX and screens in `mitup_bot/views/` — MitupView, PaginatedMitupView, ButtonConfig, factory functions.
     Feasibility: ask about view layout, callback data constraints, factory coverage.
   </agent>
   <agent name="lambda-expert">
@@ -66,8 +67,8 @@ $ARGUMENTS
 
 Read `<task>` first and determine the mode:
 
-- If `<task>` starts with `implement`, enter **Implementation mode** — skip directly to Step 6. Read the phase file from the path that follows `implement` (e.g., `implement .plans/feature-phase-1-handlers.md`). Do not re-run feasibility.
-- Otherwise, enter **Planning mode** — execute Steps 1–7 in order.
+- If `<task>` clearly states to implment a previously created plan, enter **Implementation mode** — skip directly to Step 6. Parse all phase file paths that follow `implement` (e.g., `implement .plans/slug-phase-1-handlers.md .plans/slug-phase-3-views.md`). Do not re-run feasibility.
+- Otherwise, enter **Planning mode** — execute Steps 1–5b in order.
 
 ---
 
@@ -76,24 +77,27 @@ Read `<task>` first and determine the mode:
 Execute these steps in strict order. Do not skip ahead.
 
 **Step 1 — Clarify (if needed)**
-If the task is ambiguous or missing key information, ask the user the minimum questions needed. Do not proceed until resolved. If the task is clear, skip to Step 2.
+If the task is ambiguous or missing key information, use `AskUserQuestion` to ask the minimum questions needed. Do not proceed until resolved. If the task is clear, skip to Step 2.
 
 **Step 2 — Identify domains**
-Read only the specific files needed to understand the current state. Keep this minimal — just enough to determine which agents from `<available_agents>` are relevant to this task.
+Read only the specific files needed to understand the current state. Use `Grep` and `Glob` to locate relevant symbols, entry points, and patterns. Keep this minimal — just enough to determine which agents from `<available_agents>` are relevant to this task.
 
-**Step 3 — Specialist feasibility**
-Consult `<available_agents>` to select the relevant specialists. For each one, invoke them with a scoped feasibility brief:
+**Step 3 — Specialist feasibility (parallel)**
+Consult `<available_agents>` to select the relevant specialists. Invoke all relevant feasibility agents **in parallel** (simultaneous `Agent` tool calls). For each one:
 - Describe the specific part of the feature that touches their domain.
 - Provide the entry-point files or modules to read.
-- Ask them to report: risks, gaps, constraints, and their recommended implementation approach.
+- Ask them to report: risks, gaps, constraints, questions, and their recommended implementation approach.
+- Pass `tools: "Read, Glob, Grep, Bash"` to enforce read-only access.
 - Explicitly include: "Assess only — do NOT write or modify any code."
 
 Wait for all specialists to report before moving to Step 4.
 
-**Step 4 — Plan**
-Synthesize the specialist reports into a phased implementation plan using the format in `<planning>`. Each phase maps directly to the work a specific specialist will do during implementation. Note any risks or constraints surfaced during feasibility.
+**Step 4 — Interactive Q&A round**
+Synthesize all questions, uncertainties, and ambiguities surfaced by feasibility agents into one consolidated list. Use `AskUserQuestion` to present them to the user in a single interactive round. Resolve all open questions before writing the plan. This surfaces risks early and prevents implementing against wrong assumptions.
 
-**Step 5 — Present and STOP**
+**Step 5 — Plan**
+Synthesize the specialist reports and Q&A answers into a phased implementation plan using the format in `<planning>`. Each phase maps directly to the work a specific specialist will do during implementation. For each phase, explicitly identify whether it is parallelizable and list its dependencies. Note any risks or constraints surfaced during feasibility.
+
 Present the plan to the user, including a summary of any significant findings from feasibility. Then output: "Awaiting your approval to proceed." and stop completely.
 
 **Step 5b — Save phase files (after approval)**
@@ -107,18 +111,46 @@ Once the user approves, write the phase files to `.plans/` before starting any i
 
 ---
 
-## Implementation mode (Steps 6–7)
+## Implementation mode (Steps 6–9)
 
-**Step 6 — Delegate implementation**
-Read the phase file. It contains everything the specialist agent needs. Invoke the agent named in the file with the full contents of the phase file as their brief.
+**Step 6 — Load context**
+Load `.plans/<slug>-overview.md` (if it exists alongside the phase files) plus all requested phase files. Read the `## Dependencies` section of each phase file to determine which phases are independent.
 
-1. Invoke the specialist agent with the phase file contents as context.
-2. Wait for the agent to complete.
-3. Report what was done.
-4. If the user invoked implementation manually (via `implement <file>`), stop after this phase and report. Do not automatically proceed to other phases.
+**Step 7 — Execute phases**
+Create a `TaskCreate` task for each phase being implemented.
 
-**Step 7 — Report**
-Provide a summary: what was changed, decisions made, and anything to verify before merging.
+Group phases by independence:
+- Phases with no dependencies on each other → spawn their specialist agents **in parallel** (simultaneous `Agent` tool calls). Update each task to `in_progress` before invoking its agent.
+- Phases that depend on others → run sequentially after their prerequisites complete.
+
+Agents are invoked with the full phase file contents as their brief. Do not restrict tools — the agent `.md` files already declare the right tool sets.
+
+Update each task to `completed` when its agent finishes.
+
+> **Production bugs found during a phase:** Specialists are empowered to fix broken production code they discover while completing their assigned work — even if it is outside the strict scope of the phase. A stale symbol reference, a broken import, or an incorrect guard call found in passing should be fixed in-place rather than left for a later phase or ignored.
+
+**Step 8 — Retrospective**
+After all requested phases complete, run a single retrospective. Do NOT report per-phase status — that is already communicated via task updates. Focus exclusively on learnings and follow-up work.
+
+Output the retrospective in this format:
+
+```
+Retrospective
+=============
+Agent/skill improvements:
+  - <specific improvement to an agent or skill file>
+
+Follow-up work identified:
+  - <tasks or features surfaced during implementation that weren't in scope>
+
+Risks / open questions:
+  - <anything unresolved that the user should be aware of>
+```
+
+If there is nothing to report in a section, omit it entirely rather than writing "none".
+
+**Step 9 — Summary**
+Provide a one-paragraph summary: what was changed across all phases, decisions made, and anything to verify before merging.
 </workflow>
 
 <planning>
@@ -132,6 +164,8 @@ Provide a summary: what was changed, decisions made, and anything to verify befo
 ## Proposed implementation plan
 
 ### Phase N: <name>
+#### Parallelizable: yes/no
+#### Depends on: [list phase numbers, or "none"]
 
 #### Goals
 
@@ -168,6 +202,9 @@ Each phase file is fully self-contained. A specialist agent reading it should ha
 
 ## Agent
 <specialist-name>
+
+## Dependencies
+- none | phase-1, phase-2
 
 ## Entry points
 - `path/to/file.py` — reason this is the starting point

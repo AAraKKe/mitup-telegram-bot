@@ -29,6 +29,7 @@ class EditSettingsHandlerId(HandlerId):
     SET_DEFAULT_PUBLIC = auto()
     SET_DEFAULT_INVITATIONS = auto()
     SET_DEFAULT_INCOGNITO = auto()
+    SET_DEFAULT_LOCK_ON_START = auto()
 
     # Edit timeout
     TIMEOUT_CALLBACK = auto()

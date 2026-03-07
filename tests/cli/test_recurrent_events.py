@@ -21,6 +21,7 @@ from tests.helpers import AnyFloat, MockApi, StubMetrics
 INTERVAL_PARAMS = [
     (EventType.USER_CLEANUP, "user_cleanup"),
     (EventType.NOTIFY_START_MEETING, "notify_start_meeting"),
+    (EventType.NOTIFY_MEETING_STARTED, "notify_meeting_started"),
     (EventType.GENERATE_STATS, "generate_stats"),
     (EventType.DEACTIVATE_MEETINGS, "deactivate_meetings"),
     (EventType.MEETUPS_CLEANUP, "meetups_cleanup"),
@@ -36,6 +37,7 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
     config = IntervalsConfiguration(
         user_cleanup=10,
         notify_start_meeting=20,
+        notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
         meetups_cleanup=50,
@@ -61,6 +63,7 @@ def test_build_bot(mock_ext_bot: MagicMock):
 # Async event types use `await module.run(...)`, sync ones call directly.
 ASYNC_LAUNCH_PARAMS = [
     (EventType.NOTIFY_START_MEETING, "mitup_bot.cli.commands.recurrent_events.notify_meetings"),
+    (EventType.NOTIFY_MEETING_STARTED, "mitup_bot.cli.commands.recurrent_events.notify_meetings_started"),
     (EventType.DEACTIVATE_MEETINGS, "mitup_bot.cli.commands.recurrent_events.inactive_meetings"),
     (EventType.MEETUPS_CLEANUP, "mitup_bot.cli.commands.recurrent_events.meetups_cleanup"),
 ]
@@ -187,6 +190,7 @@ async def test_run_all_tasks_creates_all_tasks():
     intervals = IntervalsConfiguration(
         user_cleanup=10,
         notify_start_meeting=20,
+        notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
         meetups_cleanup=50,

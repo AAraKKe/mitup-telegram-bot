@@ -83,9 +83,16 @@ def settings_view(*, lang: str, message: str | FormattedText | None = None) -> M
     )
 
 
-def create_meeting_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
+def create_meeting_view(
+    *, lang: str, message: str | FormattedText | None = None, datetime_link: FormattedText | None = None
+) -> MitupView:
+    if message is None:
+        kwargs: dict[str, FormattedText] = {}
+        if datetime_link is not None:
+            kwargs["datetime_link"] = datetime_link
+        message = MeetingMessages.CREATE.get(lang=lang, **kwargs)
     return MitupView(
-        message or MeetingMessages.CREATE.get(lang=lang),
+        message,
         [
             [
                 ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=cb.CANCEL_CREATE_MEETING),
@@ -175,25 +182,6 @@ def edit_meeting_property_view(
     return MitupView(message, keyboard=keyboard)
 
 
-def __edit_meeting_date_final_row(*, lang: str, meeting_id: int, new: bool) -> list[list[ButtonConfig]]:
-    final_rows = [
-        [ButtonConfig(text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
-    ]
-
-    if not new:
-        # Allow deleting the date if date is already set
-        final_rows.append(
-            [
-                ButtonConfig(
-                    text=ButtonMessages.DELETE_DATE.get(lang=lang),
-                    callback_data=cb.DELETE_MEETING_DATE.with_id(meeting_id),
-                )
-            ],
-        )
-
-    return final_rows
-
-
 def edit_meeting_date_view(
     *, lang: str, meeting_id: int, anchor_date: dt.date, current_date: dt.date, new: bool
 ) -> MitupView:
@@ -205,8 +193,11 @@ def edit_meeting_date_view(
         cb.EDIT_MEETING_DATE.with_id(meeting_id),
     ).keyboard
 
-    # Final row includes the back button and the delete date button when the date is set
-    calendar_keyboard.extend(__edit_meeting_date_final_row(lang=lang, meeting_id=meeting_id, new=new))
+    # Back button navigates to the EDIT_DATETIME entry within the conversation.
+    # Delete and Back buttons for the datetime entry screen are managed by the conversation handler.
+    calendar_keyboard.append(
+        [ButtonConfig(text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
+    )
 
     return MitupView(description=message, keyboard=calendar_keyboard)
 

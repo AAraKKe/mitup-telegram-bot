@@ -21,14 +21,13 @@ def test_invalid_timezone(settings: Settings, caplog: LogCaptureFixture):
         assert "Invalid timezone" in caplog.records[0].message
 
 
-def expected_default_meeting_options_view(
-    settings: Settings,
-) -> MitupView:
+def expected_default_meeting_options_view(settings: Settings) -> MitupView:
     lang = settings.language
     waiting_list = settings.default_waiting_list
     public = settings.default_public
     invitation = settings.default_allow_invitation
     incognito = settings.default_incognito
+    lock_on_start = settings.default_lock_on_start
 
     message = SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE.get(lang=lang)
     waiting_list_button = options_button(
@@ -39,12 +38,19 @@ def expected_default_meeting_options_view(
         cb.SET_DEFAULT_INVITATIONS, ButtonMessages.OPEN_INVITATION.get(lang=lang), invitation
     )
     incognito_button = options_button(cb.SET_DEFAULT_INCOGNITO, ButtonMessages.INCOGNITO.get(lang=lang), incognito)
+    # Row 3 is the lock toggle directly (no sub-screen navigation)
+    lock_button = options_button(
+        cb.SET_DEFAULT_LOCK_ON_START,
+        ButtonMessages.DEFAULT_LOCK_ON_START.get(lang=lang),
+        lock_on_start,
+    )
 
     return MitupView(
         message,
         keyboard=[
             [waiting_list_button, public_button],
             [invitation_button, incognito_button],
+            [lock_button],
         ],
     ).with_back_button(text=ButtonMessages.SETTINGS, callback_data=cb.SETTINGS, lang=lang)
 
@@ -53,11 +59,13 @@ def expected_default_meeting_options_view(
 @pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
 @pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
 @pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
+@pytest.mark.parametrize("lock_on_start", [True, False], ids=["lock_on_start_true", "lock_on_start_false"])
 def test_default_meeting_options_view(
     waiting_list: bool,
     public: bool,
     invitation: bool,
     incognito: bool,
+    lock_on_start: bool,
     user_with_settings: User,
 ):
     settings = user_with_settings.settings
@@ -65,6 +73,7 @@ def test_default_meeting_options_view(
     settings.default_incognito = incognito
     settings.default_public = public
     settings.default_waiting_list = waiting_list
+    settings.default_lock_on_start = lock_on_start
 
     view = settings.default_meeting_settings_view()
 

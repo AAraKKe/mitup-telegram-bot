@@ -2,7 +2,7 @@
 name: bot-copywriter
 description: Expert agent for writing and reviewing all user-facing text in the mitup_bot interface — messages, button labels, prompts, and notifications. Delegate to this agent whenever bot interface copy needs to be written, reviewed, or updated.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonnet
+model: haiku
 skills:
   - bot-copy-style
   - messages

@@ -9,6 +9,7 @@ from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_setting
 from mitup_bot.handlers.main_menu.show_main_menu import callback_query_main_menu
 from mitup_bot.handlers.meeting.create_meeting import (
     ConversationMeetingState,  # For create_meeting context
+    build_datetime_link,
     callback_query_cancel_meeting,
     callback_query_create_meeting,
 )
@@ -80,7 +81,9 @@ async def test_create_meeting_calls_to_create_meeting_view(
 
     await callback_query_create_meeting(update, context)
 
-    context.api.assert_edit_message_called(update, factory.create_meeting_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(
+        update, factory.create_meeting_view(lang=user_with_settings.lang, datetime_link=build_datetime_link())
+    )
 
 
 async def test_create_meeting_return_the_correct_state(

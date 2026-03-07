@@ -122,6 +122,18 @@ def utf16_len(s: str) -> int:
 
 Always required. Use modern union syntax and built-in generics (see [Hard antipatterns](#hard-antipatterns)). Always declare an explicit return type (`-> T` or `-> None`).
 
+**Conversation handler return types.** `ConversationMeetingState` is a plain `Enum`, not `IntEnum` — its members are **not** `int`. Handlers that return both a state and `ConversationHandler.END` (which is `int`) must be typed as `-> ConversationMeetingState | int`, not `-> int`:
+
+```python
+async def callback_query_set_meeting_time(...) -> ConversationMeetingState | int:
+    ...
+    return ConversationMeetingState.EDIT_TIME   # Enum, not int
+    ...
+    return ConversationHandler.END              # int (-1)
+```
+
+Handlers that only ever return a state (fallback handlers) should be typed `-> ConversationMeetingState`.
+
 Use `TYPE_CHECKING` for forward references that would cause circular imports:
 
 ```python

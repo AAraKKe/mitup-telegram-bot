@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 
 from sqlmodel import Session
@@ -10,6 +10,7 @@ from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import MitupView
 
 from .enums import EditMeetingHandlerId
 
@@ -45,6 +46,7 @@ async def toggle_meeting_setting(
     context: TMitupContext,
     handler_id: EditMeetingHandlerId,
     callback_data: cb.CallbackData,
+    return_view: Callable[[Meetup], MitupView],
 ) -> AsyncGenerator[Meetup | None]:
     user = guards.current_user(update, session)
 
@@ -63,9 +65,9 @@ async def toggle_meeting_setting(
         yield meeting
         session.flush()
 
-        await context.api.edit_message(update=update, view=meeting.settings_view)
+        await context.api.edit_message(update=update, view=return_view(meeting))
         # Update all messages to ensure any visible message contains the new changes but skip current one
-        # if preseento to stay in the settings view.
+        # to stay in the current sub-screen view.
         await context.api.update_meeting_messages(
             session=session,
             meeting=meeting,
@@ -77,7 +79,10 @@ async def toggle_meeting_setting(
 
 
 def create_meeting_settings_toggle_handler(
-    handler_id: EditMeetingHandlerId, callback_data: cb.CallbackData, attribute: str
+    handler_id: EditMeetingHandlerId,
+    callback_data: cb.CallbackData,
+    attribute: str,
+    return_view: Callable[[Meetup], MitupView] = lambda meeting: meeting.settings_view,
 ):
     @HandlersRegistry.register_callback_query(handler_id, callback_data=callback_data)
     @with_async_session
@@ -88,6 +93,7 @@ def create_meeting_settings_toggle_handler(
             context=context,
             handler_id=handler_id,
             callback_data=callback_data,
+            return_view=return_view,
         ) as meeting:
             if meeting is None:
                 return

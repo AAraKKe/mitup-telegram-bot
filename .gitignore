@@ -53,3 +53,7 @@ validate.po
 
 # Ignore planning folder with plans done by em
 .plans/
+
+# Local dev data and scripts not meant for the repo
+bin/populate_db.py
+bin/test_data.yaml

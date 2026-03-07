@@ -40,13 +40,19 @@ class EditMeetingHandlerId(HandlerId):
     LOCATION_COORDINATES_WRONG_MESSAGE = auto()
 
     # Edit meeting date and time
+    DATE_TIME_ENTRY_CALLBACK = auto()
     DATE_CALLBACK = auto()
     SET_DATE_CALLBACK = auto()
+    BACK_TO_EDIT_DATETIME_CALLBACK = auto()
+    BACK_TO_EDIT_MEETING_CALLBACK = auto()
     EDIT_TIME_CALLBACK = auto()
-    EDIT_TIME_CONVERSATION = auto()
+    EDIT_DATETIME_CONVERSATION = auto()
     SET_TIME_MESSAGE = auto()
     WRONG_TIME_FORMAT = auto()
     WRONG_TIME_MESSAGE = auto()
+    DATE_TIME_ENTITY_MESSAGE = auto()
+    DATETIME_WRONG_TEXT_FORMAT = auto()
+    DATETIME_WRONG_MESSAGE = auto()
     DELETE_DATE_TIME_CALLBACK = auto()
     CONFIRM_DELETE_DATE_TIME_CALLBACK = auto()
     DECLINE_DELETE_DATE_TIME_CALLBACK = auto()
@@ -62,6 +68,16 @@ class EditMeetingHandlerId(HandlerId):
     SET_MEETING_ALLOW_INVITATIONS_CALLBACK = auto()
     SET_MEETING_INCOGNITO_CALLBACK = auto()
 
+    # Edit meeting duration
+    DURATION_ENTRY_CALLBACK = auto()
+    DURATION_INPUT_CALLBACK = auto()
+    DURATION_TEXT_MESSAGE = auto()
+    DURATION_INVALID_MESSAGE = auto()
+    DURATION_CANCEL_CALLBACK = auto()
+    DURATION_CLEAR_CALLBACK = auto()
+    DURATION_CONVERSATION = auto()
+    LOCK_ON_START_CALLBACK = auto()
+
     # Cancel button during edit
     CANCEL = auto()
 
@@ -72,4 +88,7 @@ class ConversationMeetingState(Enum):
     EDIT_MAX_PARTICIPANTS = auto()
     EDIT_LOCATION_NAME = auto()
     EDIT_LOCATION_COORDIANTES = auto()
+    EDIT_DATETIME = auto()
+    EDIT_DATE = auto()
     EDIT_TIME = auto()
+    EDIT_DURATION = auto()

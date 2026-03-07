@@ -12,7 +12,7 @@ from enum import Enum
 
 import pytest
 from aws_embedded_metrics.unit import Unit
-from telegram import Update
+from telegram import Location, Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData, UserNotFound
@@ -33,6 +33,8 @@ MEETING_ID_NOT_OWNED = 99
 MEETING_ID_NOT_FOUND = 9999
 MEETING_ID_INACTIVE = 88
 
+_UNSET: dict[str, str] = {}  # Sentinel: field not explicitly provided (falls back to metrics_properties).
+
 
 class ErrorMode(Enum):
     """
@@ -50,7 +52,7 @@ class ErrorMode(Enum):
 @dataclass
 class MetricsProperties:
     metrics: list[str] = field(default_factory=list)
-    values: list[float] = field(default_factory=list)
+    values: list[float | list[float]] = field(default_factory=list)
     units: list[Unit] = field(default_factory=list)
 
 
@@ -71,9 +73,21 @@ class Context:
     meeting_id: dict[ContextId, int] | None = None  # Meeting id to store in the context data
     metrics_emitted: MetricsProperties = field(default_factory=MetricsProperties)
     metrics_properties: dict[str, str] | None = None
+    # Override metrics_properties when the meeting is not found. Uses _UNSET sentinel as default (falls back to
+    # metrics_properties). Set to None to explicitly pass no properties.
+    metrics_properties_not_found: dict[str, str] | None = field(default_factory=lambda: _UNSET)
+    # Override metrics_properties for the non-owner inactive meeting test. Uses _UNSET sentinel as default (falls back
+    # to metrics_properties). Set to None to explicitly pass no properties.
+    metrics_properties_non_owner_inactive: dict[str, str] | None = field(default_factory=lambda: _UNSET)
 
 
 CONTEXTS = [
+    Context(
+        handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_date_time_entry",
+    ),
     Context(
         handler_id=EditMeetingHandlerId.DATE_CALLBACK,
         update_request=UpdateRequest(
@@ -102,10 +116,22 @@ CONTEXTS = [
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="delete_meeting_datetime",
     ),
+    # CONFIRM_DELETE: calls cleanup_states when meeting is not accessible (not when user not found).
+    # Split into two entries so each error mode gets the correct expected metrics.
     Context(
         handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="confirm_delete_meeting_datetime",
+        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
+        # When meeting not found: MeetingNotOwned/Error is never emitted, so the logger is fresh and
+        # captures ContextId='EditMeetingTitle' (first context cleaned by cleanup_states).
+        metrics_properties_not_found={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
         id="confirm_delete_meeting_datetime",
     ),
     Context(
@@ -113,6 +139,29 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="decline_delete_meeting_datetime",
+    ),
+    # BACK_TO_EDIT_MEETING: calls cleanup_states when meeting is not accessible (not when user not found).
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="back_to_edit_meeting_from_datetime",
+        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
+        # When meeting not found: MeetingNotOwned/Error is never emitted, so the logger is fresh and
+        # captures ContextId='EditMeetingTitle' (first context cleaned by cleanup_states).
+        metrics_properties_not_found={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="back_to_edit_meeting_from_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="back_to_edit_datetime_from_calendar",
     ),
     Context(
         handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
@@ -128,6 +177,18 @@ CONTEXTS = [
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="wrong_time_format",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATETIME_WRONG_TEXT_FORMAT,
+        update_request=UpdateRequest(message_text="some text"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="datetime_wrong_text_format",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATETIME_WRONG_MESSAGE,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="datetime_wrong_message",
     ),
     Context(
         handler_id=MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
@@ -148,11 +209,23 @@ CONTEXTS = [
         id="user_not_found_edit_language",
     ),
     Context(
+        handler_id=EditSettingsHandlerId.SET_DEFAULT_LOCK_ON_START,
+        update_request=UpdateRequest(callback_query=cb.SET_DEFAULT_LOCK_ON_START),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="user_not_found_set_default_lock_on_start",
+    ),
+    Context(
         handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MISSING_USER_DATA},
         metrics_properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
         id="set_meeting_time_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="edit_meeting_date_time_entry",
     ),
     Context(
         handler_id=EditMeetingHandlerId.DATE_CALLBACK,
@@ -189,6 +262,18 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="decline_delete_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="back_to_edit_meeting_from_datetime_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="back_to_edit_datetime_from_calendar_malformed",
     ),
     Context(
         handler_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
@@ -395,6 +480,12 @@ CONTEXTS = [
         id="edit_inactive_meeting_settings",
     ),
     Context(
+        handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="edit_inactive_meeting_date_time_entry",
+    ),
+    Context(
         handler_id=EditMeetingHandlerId.DATE_CALLBACK,
         update_request=UpdateRequest(
             callback_query=cb.EDIT_MEETING_DATE.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
@@ -427,12 +518,34 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="confirm_delete_inactive_meeting_datetime",
+        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
+        # Owner path: no MeetingNotOwned/Error before cleanup_states → logger fresh → ContextId captured.
+        metrics_properties={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
+        # Non-owner path: MeetingNotOwned/Error emitted first → logger frozen without ContextId.
+        metrics_properties_non_owner_inactive=None,
     ),
     Context(
         handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="decline_delete_inactive_meeting_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="back_to_edit_meeting_from_datetime_inactive",
+        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
+        # Owner path: no MeetingNotOwned/Error before cleanup_states → logger fresh → ContextId captured.
+        metrics_properties={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
+        # Non-owner path: MeetingNotOwned/Error emitted first → logger frozen without ContextId.
+        metrics_properties_non_owner_inactive=None,
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="back_to_edit_datetime_from_calendar_inactive",
     ),
     Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,
@@ -453,6 +566,80 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_PUBLIC.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="set_inactive_meeting_public",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_duration",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_INPUT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="set_meeting_duration",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_CLEAR_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CLEAR_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="clear_meeting_duration",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCK_ON_START_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_LOCK_ON_START.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="set_meeting_lock_on_start",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="cancel_edit_meeting_duration",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_DURATION),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="cancel_edit_meeting_duration_malformed",
+    ),
+    # DURATION_TEXT_MESSAGE: guards.current_user is called before context.meeting_id, so ContextId is only
+    # set in the metrics when the user is found. The two error modes need separate Context entries.
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_TEXT_MESSAGE,
+        update_request=UpdateRequest(message_text="90"),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="duration_text_message",
+        meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
+        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[1], units=[Unit.COUNT]),
+        metrics_properties={"ContextId": ContextId.EDIT_MEETING_DURATION.value},
+        shows_deleted_message_when_not_found=False,
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_TEXT_MESSAGE,
+        update_request=UpdateRequest(message_text="90"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="duration_text_message",
+        meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
+        shows_deleted_message_when_not_found=False,
+    ),
+    # DURATION_INVALID_MESSAGE: same — current_user before context.meeting_id (ensure_clean=False, no CleanUserData).
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_INVALID_MESSAGE,
+        update_request=UpdateRequest(message_text="abc"),
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        id="duration_invalid_message",
+        meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
+        metrics_properties={"ContextId": ContextId.EDIT_MEETING_DURATION.value},
+        shows_deleted_message_when_not_found=False,
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_INVALID_MESSAGE,
+        update_request=UpdateRequest(message_text="abc"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="duration_invalid_message",
+        meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
+        shows_deleted_message_when_not_found=False,
     ),
 ]
 
@@ -577,11 +764,17 @@ async def test_callback_fails_when_meeting_not_found(
     metric_values = test_context.metrics_emitted.values + [0, AnyFloat(), 0]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
+    # When meeting is not found, use metrics_properties_not_found if explicitly set (not the _UNSET sentinel)
+    not_found_properties = (
+        test_context.metrics_properties_not_found
+        if test_context.metrics_properties_not_found is not _UNSET
+        else test_context.metrics_properties
+    )
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
-        properties=test_context.metrics_properties,
+        properties=not_found_properties,
         add_handler_dimensions=True,
         add_update_properties=True,
     )
@@ -809,11 +1002,18 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat(), 0]
     metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
 
+    # For the non-owner inactive path, MeetingNotOwned/Error is emitted before cleanup_states, so the
+    # logger is frozen without ContextId. Use the override if explicitly set (not the _UNSET sentinel).
+    non_owner_inactive_properties = (
+        test_context.metrics_properties_non_owner_inactive
+        if test_context.metrics_properties_non_owner_inactive is not _UNSET
+        else test_context.metrics_properties
+    )
     context.metrics_engine.assert_metrics_emited(
         names=metric_names,
         values=metric_values,
         units=metric_units,
-        properties=test_context.metrics_properties,
+        properties=non_owner_inactive_properties,
         add_handler_dimensions=True,
         add_update_properties=True,
     )

@@ -74,7 +74,9 @@ async def test_send_message_with_string_view(telegram_api: TelegramApi, bot: Asy
 
     result = await telegram_api.send_message(update, "hello")
 
-    bot.send_message.assert_awaited_once_with(chat_id=42, text="hello", entities=None, reply_markup=None)
+    bot.send_message.assert_awaited_once_with(
+        chat_id=42, text="hello", entities=None, reply_markup=None, disable_web_page_preview=True
+    )
     assert result is sentinel
 
 
@@ -87,7 +89,9 @@ async def test_send_message_with_mitup_view(telegram_api: TelegramApi, bot: Asyn
 
     result = await telegram_api.send_message(update, view)
 
-    bot.send_message.assert_awaited_once_with(chat_id=99, text="view text", entities=None, reply_markup=view.markup)
+    bot.send_message.assert_awaited_once_with(
+        chat_id=99, text="view text", entities=None, reply_markup=view.markup, disable_web_page_preview=True
+    )
     assert result is sentinel
 
 
@@ -147,6 +151,7 @@ async def test_send_message_to_user_with_mitup_view(telegram_api: TelegramApi, b
         text="Hello world",
         entities=None,
         reply_markup=view.markup,
+        disable_web_page_preview=True,
     )
     assert result is sentinel
 
@@ -163,6 +168,7 @@ async def test_send_message_to_user_with_plain_string(telegram_api: TelegramApi,
         text="plain text",
         entities=None,
         reply_markup=None,
+        disable_web_page_preview=True,
     )
     assert result is sentinel
 
@@ -543,6 +549,7 @@ async def test_edit_message_with_effective_message(telegram_api: TelegramApi, bo
         message_id=456,
         inline_message_id=None,
         reply_markup=None,
+        disable_web_page_preview=True,
     )
     assert result is sentinel
 
@@ -563,6 +570,7 @@ async def test_edit_message_with_inline_message_id(telegram_api: TelegramApi, bo
         message_id=None,
         inline_message_id="inline_999",
         reply_markup=None,
+        disable_web_page_preview=True,
     )
     assert result is sentinel
 

@@ -161,6 +161,9 @@ msgstr "Rausschmeißen"
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Datum löschen"
 
+msgid "ButtonMessages.DELETE_DURATION"
+msgstr "🗑️ Dauer löschen"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Willkommen bei Mitup Bot!\n\n"
 "Wähle eine der folgenden Optionen:"
@@ -237,7 +240,7 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Deaktiviert ❌"
 
 msgid "MeetingMessages.CREATE"
-msgstr "Lass uns ein Treffen erstellen. Wie lautet der Titel?"
+msgstr "Lass uns ein Treffen erstellen. Wie lautet der Titel?\n\n<i>Tipp: du kannst auch ${datetime_link} verwenden, um Datum und Uhrzeit direkt einzufügen.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
 msgstr "Ein Treffen wurde mit dem Titel erstellt: <b>${title}</b>\n\n"
@@ -384,6 +387,12 @@ msgstr "Das Treffen wurde nicht gelöscht"
 
 msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
 msgstr "Dieses Treffen wurde gelöscht"
+
+msgid "MeetingMessages.DATE_TIME_VIEW_MESSAGE"
+msgstr "Wähle aus, was du für dein Treffen einstellen möchtest.\n\n<i>Tipp: du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal einzustellen.</i>"
+
+msgid "MeetingMessages.WRONG_DATETIME_MESSAGE"
+msgstr "Tippe auf <b>Datum</b> oder <b>Uhrzeit</b>, um sie zu aktualisieren, oder sende eine Nachricht mit ${datetime_link}, um beide auf einmal einzustellen."
 
 msgid "MeetingMessages.EDIT_DATE"
 msgstr "Wähle das neue Datum. Drücke <b>🗑️ Datum löschen</b>, wenn du das Datum und die Uhrzeit des Treffens zurücksetzen möchtest."

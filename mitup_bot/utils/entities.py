@@ -165,9 +165,7 @@ def strip_entity_from_text(text: str, entity: MessageEntity) -> str:
     end = (entity.offset + entity.length) * 2
     left = encoded[:start].decode("utf-16-le").rstrip()
     right = encoded[end:].decode("utf-16-le").lstrip()
-    if left and right:
-        return left + " " + right
-    return left + right
+    return f"{left} {right}" if left and right else left + right
 
 
 # --- UTF-16 helper ---
@@ -264,6 +262,14 @@ def render(template: Template) -> FormattedText:
                 plain += str(value)
 
     return FormattedText(plain, entities)
+
+
+TELEGRAM_DATETIME_LINK_URL = "https://telegram.org/blog/member-tags-disable-sharing-and-more#time-and-date-formatting"
+
+
+def build_datetime_link() -> FormattedText:
+    """Build the ``FormattedText`` for Telegram's date & time formatting help link."""
+    return render(t"{Link("Telegram's date & time formatting", TELEGRAM_DATETIME_LINK_URL)}")
 
 
 # --- parse_format_tags() ---

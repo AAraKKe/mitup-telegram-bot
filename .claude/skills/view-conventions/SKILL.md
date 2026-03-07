@@ -30,6 +30,7 @@ Builder methods modify the view in-place and return `self` for chaining:
 - `with_context(message)` — prepends context text above the main description.
 - `with_context_menu(keyboard)` — appends extra button rows below the main keyboard.
 - `with_back_button(text, lang, callback_data)` — appends a single back-navigation row.
+- `with_footnote(text)` — appends a footnote (secondary, non-critical info) below the description.
 
 ### `MitupInlineView`
 
@@ -95,10 +96,3 @@ view = MitupView(
 <critical_rules>
   <rule>NEVER hardcode button text. All button labels must come from `ButtonMessages` in `mitup_bot/utils/messages.py`. Use `.get(lang=...)` for translated text, or `.back(lang=...)` for the "← Label" back-button variant.</rule>
 </critical_rules>
-
-## Keyboard layout conventions
-
-- One primary action per row for important buttons.
-- Two buttons per row for secondary/navigation actions.
-- Back/cancel buttons always go in the last row.
-- Use `with_back_button()` for single back navigation.

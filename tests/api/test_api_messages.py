@@ -76,6 +76,7 @@ async def test_send_message_with_a_view(context: StubMitupContext, update: Updat
         text=default_view.description.text,
         entities=None,
         reply_markup=default_view.markup,
+        disable_web_page_preview=True,
     )
 
     await assert_time_metric_emitted(context)
@@ -87,7 +88,11 @@ async def test_send_message_without_view(context: StubMitupContext, update: Upda
     await context.api.send_message(update=update, view="Hello, World")
 
     context.bot.send_message.assert_called_once_with(
-        chat_id=context.telegram_update.effective_chat.id, text="Hello, World", entities=None, reply_markup=None
+        chat_id=context.telegram_update.effective_chat.id,
+        text="Hello, World",
+        entities=None,
+        reply_markup=None,
+        disable_web_page_preview=True,
     )
 
     await assert_time_metric_emitted(context)
@@ -103,6 +108,7 @@ async def test_send_message_with_entities(context: StubMitupContext, update: Upd
         text=view_with_entities.description.text,
         entities=view_with_entities.description.entities,
         reply_markup=view_with_entities.markup,
+        disable_web_page_preview=True,
     )
 
     await assert_time_metric_emitted(context)
@@ -120,6 +126,7 @@ async def test_edit_message_with_entities(view_with_entities: MitupView, update:
         message_id=123,
         inline_message_id=None,
         reply_markup=view_with_entities.markup,
+        disable_web_page_preview=True,
     )
 
     await assert_time_metric_emitted(context)
@@ -137,6 +144,7 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
         message_id=123,
         inline_message_id=None,
         reply_markup=default_view.markup,
+        disable_web_page_preview=True,
     )
 
     await assert_time_metric_emitted(context)
@@ -146,7 +154,13 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
     await context.api.edit_message(update=update, view="Hello, World")
 
     context.bot.edit_message_text.assert_called_once_with(
-        text="Hello, World", entities=None, chat_id=123, message_id=123, inline_message_id=None, reply_markup=None
+        text="Hello, World",
+        entities=None,
+        chat_id=123,
+        message_id=123,
+        inline_message_id=None,
+        reply_markup=None,
+        disable_web_page_preview=True,
     )
 
     await assert_time_metric_emitted(context)
@@ -176,6 +190,7 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
         "message_id": None,
         "inline_message_id": None,
         "reply_markup": inline_view.markup,
+        "disable_web_page_preview": True,
     }
 
     assert edit.call_count == 3

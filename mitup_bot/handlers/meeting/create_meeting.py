@@ -14,7 +14,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import strip_entity_from_text
+from mitup_bot.utils.entities import build_datetime_link, strip_entity_from_text
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from ..command_enums import CommandsId
@@ -45,7 +45,7 @@ async def callback_query_create_meeting(session: Session, update: Update, contex
     logging.debug("Enter into callback_query_create_meeting")
 
     user = guards.current_user(update, session)
-    view = views.factory.create_meeting_view(lang=user.lang)
+    view = views.factory.create_meeting_view(lang=user.lang, datetime_link=build_datetime_link())
 
     context.store_on_exit(
         ContextId.CREATE_MEETING,
@@ -88,6 +88,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
         public=user.settings.default_public,
         allow_invitation=user.settings.default_allow_invitation,
         incognito=user.settings.default_incognito,
+        lock_on_start=user.settings.default_lock_on_start,
     )
     session.add(meetup)
     session.flush()

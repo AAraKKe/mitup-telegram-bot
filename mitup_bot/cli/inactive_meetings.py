@@ -36,7 +36,12 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
                 ),
                 and_(
                     Meetup.datetime != null(),
-                    func.now() > Meetup.datetime + func.cast(func.concat(Settings.timeout, " minutes"), INTERVAL),
+                    func.now()
+                    > Meetup.datetime
+                    + func.cast(
+                        func.concat(func.coalesce(Meetup.duration_minutes, Settings.timeout), " minutes"),
+                        INTERVAL,
+                    ),
                 ),
             ),
         )

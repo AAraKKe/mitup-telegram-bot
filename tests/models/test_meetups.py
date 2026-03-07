@@ -66,7 +66,7 @@ def expected_message(
     invited_user: bool = False,
 ) -> str:
     str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang)
-    # When datetime is set, _datetime_display returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
+    # When datetime is set, _datetime_section returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
     str_date = "Meeting time" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
     owner_inline = "john_doe" if username else "John"
     location = expected_location_name(
@@ -116,19 +116,31 @@ def expected_inline_message(
         participants_list += f"\n  invited_user ({invited_by_text})"
     str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
 
+    has_location = location_name or coordinates
     lines = [f"Test Meeting ({created_by})"]
     if description:
         lines.append(f"--- {Emojis.DESCRIPTION} Test Description")
     if datetime:
-        # When datetime is set, _datetime_display returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
+        # _datetime_section ends with "\n". In the datetime branch of inline_message:
+        #   t"\n{datetime_section}" produces "\n--- CLOCK time\n"
+        # If location is present, location_section starts with "\n", producing a blank
+        # line between the clock line and the location line.
+        # If location is absent, location_section is "" and participants follow directly
+        # with no blank line (since participants row has no leading "\n" in this branch).
         lines.append(f"--- {Emojis.CLOCK} Meeting time")
-    if location_name or coordinates:
+        if has_location:
+            lines.append("")  # blank line: location_section begins with "\n"
+    if has_location:
         location_text = expected_location_name(
             lang=lang,
             expected_name="Test Location" if location_name else None,
             expected_coordinates=f"[{Emojis.PIN}]" if coordinates else None,
         ).text
         lines.append(f"--- {Emojis.MAP} {location_text}")
+        if not datetime:
+            # In the no-datetime branch, location_section ends with "\n" and the
+            # participants row starts with "\n", producing a blank line between them.
+            lines.append("")
     lines.append(f"--- {Emojis.JOINED} {str_participants}")
     return "\n".join(lines)
 
@@ -902,34 +914,38 @@ def test_add_participant_adds_to_meeting_when_not_full():
     assert meeting.n_participants == 1
 
 
-def test_add_participant_adds_to_waiting_list_when_full():
+@pytest.mark.parametrize(
+    "waiting_list_enabled, expected_is_waiting, expected_n_participants, expected_n_waiting",
+    [
+        (True, True, 1, 1),  # full + waiting list on  -> added to waiting list
+        (False, None, 1, 0),  # full + waiting list off -> returns None
+    ],
+    ids=["full_waiting_list_enabled", "full_no_waiting_list"],
+)
+def test_add_participant_when_full(
+    waiting_list_enabled: bool,
+    expected_is_waiting: bool | None,
+    expected_n_participants: int,
+    expected_n_waiting: int,
+):
     owner = create_user(id=1, first_name="John")
     meeting = create_meetup(id=1, owner=owner, max_members=1)
-    meeting.waiting_list = True
-    user1 = create_user(id=2, first_name="Bob")
-    user2 = create_user(id=3, first_name="Alice")
-    meeting.create_joined_link(user2, is_waiting_list=False)
+    meeting.waiting_list = waiting_list_enabled
+    existing = create_user(id=2, first_name="Alice")
+    meeting.create_joined_link(existing, is_waiting_list=False)
+    candidate = create_user(id=3, first_name="Bob")
 
-    joined_link = meeting.add_participant(user1)
+    joined_link = meeting.add_participant(candidate)
 
-    assert joined_link is not None
-    assert joined_link.is_waiting_list
-    assert joined_link.user == user1
-    assert meeting.n_waiting == 1
+    if expected_is_waiting is None:
+        assert joined_link is None
+    else:
+        assert joined_link is not None
+        assert joined_link.is_waiting_list is expected_is_waiting
+        assert joined_link.user == candidate
 
-
-def test_add_participant_returns_none_when_full_and_no_waiting_list():
-    owner = create_user(id=1, first_name="John")
-    meeting = create_meetup(id=1, owner=owner, max_members=1)
-    meeting.waiting_list = False
-    user1 = create_user(id=2, first_name="Bob")
-    user2 = create_user(id=3, first_name="Alice")
-    meeting.create_joined_link(user2, is_waiting_list=False)
-
-    joined_link = meeting.add_participant(user1)
-
-    assert joined_link is None
-    assert meeting.n_participants == 1
+    assert meeting.n_participants == expected_n_participants
+    assert meeting.n_waiting == expected_n_waiting
 
 
 def test_remove_participant_removes_participant():
@@ -1187,8 +1203,9 @@ def test_external_view():
 
 def test_edit_view(user_with_settings: User):
     meeting = user_with_settings.meetups[0]
-    now_in_tz = meeting.owner.datetime_in_tz(meeting.datetime) if meeting.datetime else meeting.owner.now_in_tz()
 
+    # Row 2 is [Date & Time → EDIT_MEETING_DATE_TIME] [Duration → EDIT_MEETING_DURATION];
+    # there is no separate Date/Time row and no standalone Duration row.
     expected_view = MitupView(
         meeting.message,
         [
@@ -1204,12 +1221,12 @@ def test_edit_view(user_with_settings: User):
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.DATE.get(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_DATE.with_id(meeting.db_id).with_date(now_in_tz.date()),
+                    text=ButtonMessages.DATE_TIME.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_DATE_TIME.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.TIME.get(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_TIME.with_id(meeting.db_id),
+                    text=ButtonMessages.DURATION.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_DURATION.with_id(meeting.db_id),
                 ),
             ],
             [
@@ -1248,3 +1265,104 @@ def test_edit_view(user_with_settings: User):
     )
 
     assert expected_view == meeting.edit_view
+
+
+# ---------------------------------------------------------------------------
+# _datetime_section: single clock line vs start/stop lines
+# ---------------------------------------------------------------------------
+
+
+def test_datetime_section_no_datetime_shows_single_clock_line(user_with_settings: User):
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = None
+    meeting.duration_minutes = None
+
+    text = render(meeting._datetime_section).text
+
+    # A single "--- CLOCK <not set>" line followed by \n
+    assert text.startswith(f"--- {Emojis.CLOCK.value} ")
+    assert MeetingMessages.DATE_NOT_SET.get_text(lang=meeting.lang) in text
+    assert Emojis.START.value not in text
+    assert Emojis.STOP.value not in text
+
+
+def test_datetime_section_with_datetime_no_duration_shows_single_clock_line(user_with_settings: User):
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
+    meeting.duration_minutes = None
+
+    text = render(meeting._datetime_section).text
+
+    # Single clock line: "--- CLOCK Meeting time\n"
+    assert text.startswith(f"--- {Emojis.CLOCK.value} ")
+    assert text.endswith("\n")
+    assert Emojis.START.value not in text
+    assert Emojis.STOP.value not in text
+
+
+def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user_with_settings: User):
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
+    meeting.duration_minutes = 60  # 60 minutes
+
+    text = render(meeting._datetime_section).text
+
+    # Two lines: start line and stop line; no plain clock
+    assert Emojis.CLOCK.value not in text
+    assert Emojis.START.value in text
+    assert Emojis.STOP.value in text
+    # Both lines are present
+    start_label = MeetingMessages.MEETING_START_TIME.get_text(lang=meeting.lang)
+    stop_label = MeetingMessages.MEETING_STOP_TIME.get_text(lang=meeting.lang)
+    assert start_label in text
+    assert stop_label in text
+
+
+# --- duration_view: lock toggle always visible ---
+
+
+@pytest.mark.parametrize(
+    "duration_minutes",
+    [None, 30, 90],
+    ids=["no_duration", "duration_30", "duration_90"],
+)
+@pytest.mark.parametrize("lock_on_start", [True, False], ids=["lock_on_start_true", "lock_on_start_false"])
+def test_duration_view_lock_toggle_always_visible(
+    user_with_settings: User,
+    duration_minutes: int | None,
+    lock_on_start: bool,
+):
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.duration_minutes = duration_minutes
+    meeting.lock_on_start = lock_on_start
+
+    view = meeting.duration_view
+
+    lock_cb = cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
+    lock_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == lock_cb]
+
+    # Lock toggle must be present regardless of whether duration_minutes is set
+    assert len(lock_buttons) == 1  # exactly one lock toggle button
+
+
+def test_duration_view_keyboard_row0_has_only_set_button_when_no_duration(user_with_settings: User):
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.duration_minutes = None
+
+    view = meeting.duration_view
+
+    row0 = view.keyboard[0]
+    assert len(row0) == 1  # only "Set duration"
+    assert row0[0].callback_data == cb.SET_MEETING_DURATION.with_id(meeting.db_id)
+
+
+def test_duration_view_keyboard_row0_has_set_and_delete_buttons_when_duration_set(user_with_settings: User):
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.duration_minutes = 60
+
+    view = meeting.duration_view
+
+    row0 = view.keyboard[0]
+    assert len(row0) == 2  # "Set duration" + "Delete duration"
+    assert row0[0].callback_data == cb.SET_MEETING_DURATION.with_id(meeting.db_id)
+    assert row0[1].callback_data == cb.CLEAR_MEETING_DURATION.with_id(meeting.db_id)
