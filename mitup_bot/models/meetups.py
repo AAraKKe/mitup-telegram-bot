@@ -397,25 +397,19 @@ class Meetup(BaseModel, SQLModel, table=True):
 
         return render(result)
 
+    def _join_leave_row(self, lang: str) -> list[ButtonConfig]:
+        """Return the [JOIN, (INVITE,) LEAVE] row, inserting INVITE only when allow_invitation is True."""
+        join = ButtonConfig(text=ButtonMessages.JOIN.get(lang=lang), callback_data=cb.JOIN.with_id(self.db_id))
+        invite = ButtonConfig(text=ButtonMessages.INVITE.get(lang=lang), callback_data=cb.INVITE.with_id(self.db_id))
+        leave = ButtonConfig(text=ButtonMessages.LEAVE.get(lang=lang), callback_data=cb.LEAVE.with_id(self.db_id))
+        return [join, invite, leave] if self.allow_invitation else [join, leave]
+
     @property
     def main_view(self) -> MitupView:
         return MitupView(
             self.message,
             [
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.JOIN.get(lang=self.user_language),
-                        callback_data=cb.JOIN.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.INVITE.get(lang=self.user_language),
-                        callback_data=cb.INVITE.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.LEAVE.get(lang=self.user_language),
-                        callback_data=cb.LEAVE.with_id(self.db_id),
-                    ),
-                ],
+                self._join_leave_row(self.user_language),
                 [
                     ButtonConfig(
                         text=ButtonMessages.EDIT.get(lang=self.user_language),
@@ -447,20 +441,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         return MitupView(
             self.inline_message,
             [
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.JOIN.get(lang=self.user_language),
-                        callback_data=cb.JOIN.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.INVITE.get(lang=self.user_language),
-                        callback_data=cb.INVITE.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.LEAVE.get(lang=self.user_language),
-                        callback_data=cb.LEAVE.with_id(self.db_id),
-                    ),
-                ],
+                self._join_leave_row(self.user_language),
                 [
                     ButtonConfig(
                         text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
@@ -586,28 +567,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         return view.with_footnote(footnote)
 
     def build_inline_keyboard(self, *, is_searchable: bool = False) -> Keyboard:
-        keyboard = [
-            [
-                ButtonConfig(
-                    text=ButtonMessages.JOIN.get(lang=self.lang),
-                    callback_data=cb.JOIN.with_id(self.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.LEAVE.get(lang=self.lang),
-                    callback_data=cb.LEAVE.with_id(self.db_id),
-                ),
-            ],
-        ]
-
-        # Invite should appear in between join and leave
-        if self.allow_invitation:
-            keyboard[0].insert(
-                1,
-                ButtonConfig(
-                    text=ButtonMessages.INVITE.get(lang=self.lang),
-                    callback_data=cb.INVITE.with_id(self.db_id),
-                ),
-            )
+        keyboard = [self._join_leave_row(self.lang)]
 
         if self.public:
             keyboard.append(
