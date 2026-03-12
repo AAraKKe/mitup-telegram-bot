@@ -86,7 +86,7 @@ class Settings(BaseModel, SQLModel, table=True):
             [
                 options_button(
                     cb.SET_DEFAULT_LOCK_ON_START,
-                    ButtonMessages.DEFAULT_LOCK_ON_START.get(lang=self.language),
+                    ButtonMessages.LOCK_ON_START.get(lang=self.language),
                     self.default_lock_on_start,
                 ),
             ],

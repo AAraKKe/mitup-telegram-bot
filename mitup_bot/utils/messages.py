@@ -118,7 +118,6 @@ class ButtonMessages(MessageBase):
 
     # Settings — Default Options buttons
     MEETING_DURATION = f"{Emojis.HOURGLASS} Meeting duration"
-    DEFAULT_LOCK_ON_START = "Lock on start"
 
     # Notification buttons
     REACTIVATE_MEETING = "Reactivate meeting"
