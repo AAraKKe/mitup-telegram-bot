@@ -1345,24 +1345,33 @@ def test_duration_view_lock_toggle_always_visible(
     assert len(lock_buttons) == 1  # exactly one lock toggle button
 
 
-def test_duration_view_keyboard_row0_has_only_set_button_when_no_duration(user_with_settings: User):
+def test_duration_view_keyboard_row0_has_set_and_lock_buttons_when_no_duration(user_with_settings: User):
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.duration_minutes = None
 
     view = meeting.duration_view
 
     row0 = view.keyboard[0]
-    assert len(row0) == 1  # only "Set duration"
+    assert len(row0) == 2  # "Set duration" + LOCK_ON_START toggle
     assert row0[0].callback_data == cb.SET_MEETING_DURATION.with_id(meeting.db_id)
+    assert row0[1].callback_data == cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
+    # No delete row when duration is not set
+    delete_cb = cb.CLEAR_MEETING_DURATION.with_id(meeting.db_id)
+    all_buttons = [btn for row in view.keyboard for btn in row]
+    assert not any(btn.callback_data == delete_cb for btn in all_buttons)
 
 
-def test_duration_view_keyboard_row0_has_set_and_delete_buttons_when_duration_set(user_with_settings: User):
+def test_duration_view_keyboard_row0_has_set_and_lock_and_row1_has_delete_when_duration_set(user_with_settings: User):
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.duration_minutes = 60
 
     view = meeting.duration_view
 
     row0 = view.keyboard[0]
-    assert len(row0) == 2  # "Set duration" + "Delete duration"
+    assert len(row0) == 2  # "Set duration" + LOCK_ON_START toggle
     assert row0[0].callback_data == cb.SET_MEETING_DURATION.with_id(meeting.db_id)
-    assert row0[1].callback_data == cb.CLEAR_MEETING_DURATION.with_id(meeting.db_id)
+    assert row0[1].callback_data == cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
+    # Delete button is in row 1
+    row1 = view.keyboard[1]
+    assert len(row1) == 1  # only "Delete duration"
+    assert row1[0].callback_data == cb.CLEAR_MEETING_DURATION.with_id(meeting.db_id)

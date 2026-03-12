@@ -164,6 +164,33 @@ msgstr "🗑️ Eliminar data"
 msgid "ButtonMessages.DELETE_DURATION"
 msgstr "🗑️ Eliminar duración"
 
+msgid "ButtonMessages.DURATION"
+msgstr "⌛ Duración"
+
+msgid "ButtonMessages.SET_DURATION"
+msgstr "⌛ Establecer duración"
+
+msgid "ButtonMessages.LOCK_ON_START"
+msgstr "Bloquear ao iniciar"
+
+msgid "ButtonMessages.MEETING_DURATION"
+msgstr "⌛ Duración da quedada"
+
+msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
+msgstr "Bloquear ao iniciar"
+
+msgid "ButtonMessages.MAKE_SEARCHABLE"
+msgstr "Facer buscable"
+
+msgid "ButtonMessages.LOAD_CHAT_MEETINGS"
+msgstr "🔍 Cargar quedadas"
+
+msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
+msgstr "🔍 Buscar quedadas"
+
+msgid "ButtonMessages.REACTIVATE_MEETING"
+msgstr "Reactivar quedada"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Benvido a Mitup Bot!\n\n"
 "Escolle unha das seguintes opcións:"
@@ -209,7 +236,8 @@ msgstr "Acó podes configurar as opcións predeterminadas usadas ao crear unha q
 "<b>Pública</b>: activa isto para permitir que todos os que reciban a quedada a poidan compartir de novo. Perfecta para chegar a máis persoas.\n\n"
 "<b>Con convite</b>: activa esta opción para permitir que os usuarios que se uniron á quedada poidan engadir amigos incluso se non están en Telegram.\n\n"
 "<b>Incógnito</b>: unha quedada con incógnito habilitado non mostrará as persoas que se uniron á quedada cando se comparta. Só se mostrará o número de participantes. Aínda poderás ver os participantes.\n\n"
-"<b>Mostrar zona horaria</b>: as quedadas normalmente inclúen a zona horaria á que se refiren a data e hora da quedada. Se non necesitas que esta información se amose na mensaxe da quedada podes deshabilitarla acó. Isto tamén deshabilitará o botón <i>Zona horaria</i> que se mostra cando se comparte a quedada."
+"<b>Mostrar zona horaria</b>: as quedadas normalmente inclúen a zona horaria á que se refiren a data e hora da quedada. Se non necesitas que esta información se amose na mensaxe da quedada podes deshabilitarla acó. Isto tamén deshabilitará o botón <i>Zona horaria</i> que se mostra cando se comparte a quedada.\n\n"
+"<b>Bloquear ao iniciar</b>: cando está habilitado e unha quedada ten establecida unha duración, os participantes non poderán unirse nin saír despois de que a quedada comece. Cando está deshabilitado, os participantes aínda poderán unirse ou saír libremente."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
 msgstr "A prórroga define canto tempo se mantén unha quedada despois de que remate. Despois deste tempo a quedada será desactivada. Podes activala de novo desde o menú <b>Tus quedadas pasadas</b>.\n\n"
@@ -239,6 +267,9 @@ msgstr "Habilitado ✅"
 msgid "SettingsMessages.DISABLED"
 msgstr "Deshabilitado ❌"
 
+msgid "SettingsMessages.MEETING_DURATION_SETTINGS"
+msgstr "Configura a duración da quedada.\n\nCando está habilitada, podes establecer unha duración (en minutos) en cada unha das túas quedadas. A duración mostrarase no resumo da quedada cando remate."
+
 msgid "MeetingMessages.CREATE"
 msgstr "Imos crear unha quedada. Cal é o título?\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
 
@@ -251,8 +282,17 @@ msgid "MeetingMessages.INVALID_TITLE"
 msgstr "Non recoñecin o que enviaches como un título válido 🤔.\n\n"
 "Envía unha mensaxe co título da quedada ou fai clic en <b>Cancelar</b>."
 
+msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgstr "Solo entendo un título ou un título con data 🤔.\n\nPor favor, envía só o título da quedada, ou o título cunha data formateada por Telegram. Fai clic en <b>Cancelar</b> para saír."
+
 msgid "MeetingMessages.MEETING_TIME"
 msgstr "Hora da quedada"
+
+msgid "MeetingMessages.MEETING_START_TIME"
+msgstr "Comeza"
+
+msgid "MeetingMessages.MEETING_STOP_TIME"
+msgstr "Remata"
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Creada por: ${owner}"

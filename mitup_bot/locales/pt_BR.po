@@ -177,7 +177,7 @@ msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Duração do evento"
 
 msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "🔒 Bloquear ao iniciar"
+msgstr "Bloquear ao iniciar"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Tornar pesquisável"
@@ -236,7 +236,8 @@ msgstr "Aqui você pode configurar as opções padrão usadas ao criar um evento
 "<b>Público</b>: ative isso para permitir que todos que recebam o evento o compartilhem novamente. Perfeito para alcançar mais pessoas.\n\n"
 "<b>Convites abertos</b>: ative essa opção para permitir que os usuários que se juntaram ao evento adicionem amigos mesmo que não estejam no Telegram.\n\n"
 "<b>Incógnito</b>: um evento com incógnito ativado não mostrará as pessoas que se juntaram ao evento quando compartilhado. Apenas o número de participantes será mostrado. Você ainda poderá ver os participantes.\n\n"
-"<b>Mostrar fuso horário</b>: os eventos geralmente incluem o fuso horário ao qual a data e a hora se referem. Se não precisar dessa informação exibida na mensagem do evento, poderá desativá-la aqui. Isso também desativará o botão <i>Fuso horário</i> mostrado quando o evento é compartilhado."
+"<b>Mostrar fuso horário</b>: os eventos geralmente incluem o fuso horário ao qual a data e a hora se referem. Se não precisar dessa informação exibida na mensagem do evento, poderá desativá-la aqui. Isso também desativará o botão <i>Fuso horário</i> mostrado quando o evento é compartilhado.\n\n"
+"<b>Bloquear ao iniciar</b>: quando ativado e um evento tem uma duração definida, os participantes não podem entrar ou sair assim que o evento começa. Quando desativado, os participantes ainda podem entrar ou sair livremente."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
 msgstr "Tempo limite define quanto tempo um evento é mantido após terminar. Após esse tempo, o evento será desativado. Você pode ativá-lo novamente a partir do seu <b>Menu de eventos anteriores</b>.\n\n"

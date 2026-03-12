@@ -570,6 +570,31 @@ class Meetup(BaseModel, SQLModel, table=True):
             keyboard=keyboard,
         ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(self.db_id))
 
+    def _duration_keyboard(self) -> Keyboard:
+        keyboard: Keyboard = [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.SET_DURATION.get(lang=self.user_language),
+                    callback_data=cb.SET_MEETING_DURATION.with_id(self.db_id),
+                ),
+                options_button(
+                    cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
+                    ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
+                    self.lock_on_start,
+                ),
+            ],
+        ]
+        if self.duration_minutes is not None:
+            keyboard.append(
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.DELETE_DURATION.get(lang=self.user_language),
+                        callback_data=cb.CLEAR_MEETING_DURATION.with_id(self.db_id),
+                    )
+                ]
+            )
+        return keyboard
+
     @property
     def duration_view(self) -> MitupView:
         description = (
@@ -579,30 +604,7 @@ class Meetup(BaseModel, SQLModel, table=True):
             if self.duration_minutes is not None
             else MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET.get(lang=self.user_language)
         )
-        set_row = [
-            ButtonConfig(
-                text=ButtonMessages.SET_DURATION.get(lang=self.user_language),
-                callback_data=cb.SET_MEETING_DURATION.with_id(self.db_id),
-            ),
-        ]
-        if self.duration_minutes is not None:
-            set_row.append(
-                ButtonConfig(
-                    text=ButtonMessages.DELETE_DURATION.get(lang=self.user_language),
-                    callback_data=cb.CLEAR_MEETING_DURATION.with_id(self.db_id),
-                )
-            )
-        keyboard: Keyboard = [
-            set_row,
-            [
-                options_button(
-                    cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
-                    ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
-                    self.lock_on_start,
-                ),
-            ],
-        ]
-        return MitupView(description, keyboard).with_back_button(
+        return MitupView(description, self._duration_keyboard()).with_back_button(
             ButtonMessages.EDIT, self.user_language, cb.EDIT_MEETING.with_id(self.db_id)
         )
 

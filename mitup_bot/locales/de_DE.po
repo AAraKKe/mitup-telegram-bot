@@ -101,6 +101,9 @@ msgstr "📄 Beschreibung"
 msgid "ButtonMessages.DATE"
 msgstr "🗓️ Datum"
 
+msgid "ButtonMessages.DATE_TIME"
+msgstr "🗓️ Datum & Uhrzeit"
+
 msgid "ButtonMessages.TIME"
 msgstr "🕒 Uhrzeit"
 
@@ -164,6 +167,21 @@ msgstr "🗑️ Datum löschen"
 msgid "ButtonMessages.DELETE_DURATION"
 msgstr "🗑️ Dauer löschen"
 
+msgid "ButtonMessages.DURATION"
+msgstr "⌛ Dauer"
+
+msgid "ButtonMessages.SET_DURATION"
+msgstr "⌛ Dauer setzen"
+
+msgid "ButtonMessages.LOCK_ON_START"
+msgstr "Bei Start sperren"
+
+msgid "ButtonMessages.MEETING_DURATION"
+msgstr "⌛ Treffendauer"
+
+msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
+msgstr "🔒 Bei Start sperren"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Willkommen bei Mitup Bot!\n\n"
 "Wähle eine der folgenden Optionen:"
@@ -209,7 +227,8 @@ msgstr "Hier kannst du die Standardoptionen konfigurieren, die beim Erstellen ei
 "<b>Öffentlich</b>: Aktiviere dies, um jedem, der das Treffen erhält, zu erlauben, es erneut zu teilen. Perfekt, um mehr Menschen zu erreichen.\n\n"
 "<b>Offene Einladungen</b>: Aktiviere diese Option, um Benutzern, die dem Treffen beigetreten sind, zu erlauben, Freunde hinzuzufügen, auch wenn diese nicht in Telegram sind.\n\n"
 "<b>Anonym</b>: Bei einem Treffen mit aktivierter Anonymität werden die Personen, die dem Treffen beigetreten sind, bei der gemeinsamen Nutzung nicht angezeigt. Nur die Anzahl der Teilnehmer wird angezeigt. Du kannst die Teilnehmer immer noch sehen.\n\n"
-"<b>Zeitzone anzeigen</b>: Treffen enthalten normalerweise die Zeitzone, auf die sich das Datum und die Uhrzeit des Treffens beziehen. Wenn diese Information in der Treffenachricht nicht angezeigt werden soll, kannst du sie hier deaktivieren. Dies deaktiviert auch die Schaltfläche <i>Zeitzone</i>, die beim Teilen des Treffens angezeigt wird."
+"<b>Zeitzone anzeigen</b>: Treffen enthalten normalerweise die Zeitzone, auf die sich das Datum und die Uhrzeit des Treffens beziehen. Wenn diese Information in der Treffenachricht nicht angezeigt werden soll, kannst du sie hier deaktivieren. Dies deaktiviert auch die Schaltfläche <i>Zeitzone</i>, die beim Teilen des Treffens angezeigt wird.\n\n"
+"<b>Bei Start sperren</b>: Wenn aktiviert und ein Treffen eine festgelegte Dauer hat, können die Teilnehmer nicht beitreten oder das Treffen verlassen, sobald es beginnt. Wenn deaktiviert, können die Teilnehmer frei beitreten oder gehen."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
 msgstr "Das Timeout definiert, wie lange ein Treffen nach seinem Ende beibehalten wird. Nach dieser Zeit wird das Treffen deaktiviert. Du kannst es erneut über dein <b>Menü für vergangene Treffen</b> aktivieren.\n\n"

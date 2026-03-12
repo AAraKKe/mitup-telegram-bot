@@ -118,7 +118,7 @@ class ButtonMessages(MessageBase):
 
     # Settings — Default Options buttons
     MEETING_DURATION = f"{Emojis.HOURGLASS} Meeting duration"
-    DEFAULT_LOCK_ON_START = f"{Emojis.LOCK} Lock on start"
+    DEFAULT_LOCK_ON_START = "Lock on start"
 
     # Notification buttons
     REACTIVATE_MEETING = "Reactivate meeting"
@@ -183,7 +183,10 @@ class SettingsMessages(MessageBase):
         "Only the number of participants will be shown. You will still be able to see the participants.\n\n"
         "<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. "
         "If you don't need this information displayed on the meeting message you can disable it here. "
-        "This will also disable the <i>Timezone</i> button shown when the meeting is shared."
+        "This will also disable the <i>Timezone</i> button shown when the meeting is shared.\n\n"
+        "<b>Lock on start</b>: when enabled and a meeting has a duration set, "
+        "participants cannot join or leave once the meeting starts. "
+        "When disabled, participants can still join or leave freely."
     )
 
     # Timeout messages

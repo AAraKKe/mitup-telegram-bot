@@ -189,7 +189,7 @@ msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Duración de la quedada"
 
 msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "🔒 Bloquear al iniciar"
+msgstr "Bloquear al iniciar"
 
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivar quedada"
@@ -239,7 +239,8 @@ msgstr "Aquí puedes configurar las opciones predeterminadas cuando creas una nu
 "<b>Pública</b>: activa esta opción para permitir reenviar tus quedadas a todos aquellos que la reciban. Una opción perfecta para llegar a más personas.\n\n"
 "<b>Con invitación</b>: activa esta opción para que aquellos participantes en una quedada puedan añadir otros miembros, incluso si no tienen Telegram.\n\n"
 "<b>Incógnito</b>: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú sí podrás ver los participantes de la quedada.\n\n"
-"<b>Mostrar zona horaria</b>: normalmente, cuando una quedada se comparte, incluye la zona horaria en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón <i>Zona horaria</i> no aparezca cuando compartes la quedada."
+"<b>Mostrar zona horaria</b>: normalmente, cuando una quedada se comparte, incluye la zona horaria en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón <i>Zona horaria</i> no aparezca cuando compartes la quedada.\n\n"
+"<b>Bloquear al iniciar</b>: cuando está habilitado y una quedada tiene una duración establecida, los participantes no pueden unirse o abandonar la quedada una vez que ha comenzado. Cuando está deshabilitado, los participantes aún pueden unirse o abandonar libremente."
 
 msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
 msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene activa después de que comience. Las quedadas sin una duración establecida se desactivan una vez que ha pasado este tiempo. Después de desactivar, puedes reactivar una quedada desde tu <b>Menú de quedadas pasadas</b>.\n\nEl tiempo de prórroga actual es <b>${timeout} minutos</b>\n\nEnvía el tiempo de prórroga (en minutos) que deseas usar o toca Cancelar para volver."
@@ -617,6 +618,9 @@ msgstr "La duración se ha establecido en: <b>${duration} minutos</b>"
 
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "La duración ha sido eliminada de esta quedada."
+
+msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
+msgstr "Debes establecer una duración antes de habilitar esta opción."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
 msgstr "Establece cuánto tiempo durará esta quedada.\n\nDuración actual: <b>${current_duration} minutos</b>.\n\nTambién puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
