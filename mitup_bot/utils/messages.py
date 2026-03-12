@@ -148,7 +148,7 @@ class SettingsMessages(MessageBase):
         "<b>Important</b>: we do not store your location and this information is only used to "
         "configure your timezone."
     )
-    REGISTRATION_TIMEZONE_SET_SUCCESS = "Perfect! Your timezone is ${timezone}"
+    REGISTRATION_TIMEZONE_SET_SUCCESS = "Your timezone is ${timezone}"
     REGISTRATION_TIMEZONE_SET_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
 
     # On-exit prompt shown when an unexpected message interrupts timezone edit
@@ -163,7 +163,7 @@ class SettingsMessages(MessageBase):
 
     # Language settings
     SELECT_LANGUAGE = "Current language: <b>${language}</b>.\n\nSelect a language."
-    LANGUAGE_SET_SUCCESS = "The language has been set successfully."
+    LANGUAGE_SET_SUCCESS = "Language set."
 
     # Default meeting defualt options
     DEFAULT_MEETING_OPTIONS_MESSAGE = (
@@ -197,7 +197,7 @@ class SettingsMessages(MessageBase):
     INVALID_POSITIVE_INTEGER = (
         "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
     )
-    TIMEOUT_SET_SUCCESS = "The timeout has been set to: <b>${timeout} minutes</b>"
+    TIMEOUT_SET_SUCCESS = "Timeout set to: <b>${timeout} minutes</b>"
     NOTIFICATIONS_SETTINGS = (
         "Configure MeetUp notifications.\n\n"
         "Notifications: ${notifications_status}\n"
@@ -207,7 +207,7 @@ class SettingsMessages(MessageBase):
     NOTIFICATION_SET_TIME = (
         "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
     )
-    NOTIFICATION_TIME_SET_SUCCESS = "The notification time has been set to <b>${notifications_time} minutes</b>."
+    NOTIFICATION_TIME_SET_SUCCESS = "Notification time set to <b>${notifications_time} minutes</b>."
     ENABLED = f"Enabled {Emojis.CHECK}"
     DISABLED = f"Disabled {Emojis.CANCEL}"
 
@@ -219,7 +219,7 @@ class MeetingMessages(MessageBase):
         "<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
     )
     CREATED_SUCCESS = (
-        "A meeting has been created with the title: <b>${title}</b>\n\n"
+        "Meeting created: <b>${title}</b>\n\n"
         "You can add more information to the meeting with the options below. "
         "The information which has not been added won't be shown when the meeting is shared.\n\n"
         f"When finished click on {Emojis.CHECK} Done"
@@ -342,10 +342,10 @@ class MeetingMessages(MessageBase):
     EDIT_MEETING_DESCRIPTION = (
         "This is the current description of your meeting:\n${description}\n\n Send me the new one"
     )
-    TITLE_SET_SUCCESS = "The title has been properly set to: <b>${title}</b>"
+    TITLE_SET_SUCCESS = "Title updated to: <b>${title}</b>"
     # The user-supplied description is intentionally wrapped in bold so the newly set value
     # is visually highlighted in the confirmation message.
-    DESCRIPTION_SET_SUCCESS = "The description has been properly set to: <b>${description}</b>"
+    DESCRIPTION_SET_SUCCESS = "Description updated to: <b>${description}</b>"
 
     # Edit meeting location
     EDIT_MEETING_LOCATION = (
@@ -359,8 +359,8 @@ class MeetingMessages(MessageBase):
         f"Send the location of the meeting. Touch on the {Emojis.CLIP} icon and then choose location. "
         "You can send whatever location you want, not just your current location."
     )
-    LOCATION_NAME_SET_SUCCESS = "The name of the location has been set to: <b>${name}</b>"
-    LOCATION_COORDINATES_SUCCESS = "The location has been saved successfuly"
+    LOCATION_NAME_SET_SUCCESS = "Location name set to: <b>${name}</b>"
+    LOCATION_COORDINATES_SUCCESS = "Location saved."
     LOCATION_COORDINATES_WRONG = "Send me the location again. Remember to touch on the clip icon and choose location."
 
     # Edit meeting participants information
@@ -373,7 +373,7 @@ class MeetingMessages(MessageBase):
         "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) "
         "or press in <i>No limit</i> to allow an unlimited number of participants."
     )
-    MAX_PARTICIPANTS_SET_SUCCESS = "The maximum number of participants has been set to: <b>${max_participants}</b>"
+    MAX_PARTICIPANTS_SET_SUCCESS = "Max participants set to: <b>${max_participants}</b>"
     NO_LIMIT_PARTICIPANTS = "No limit"
     MAX_PARTICIPANTS_SET_FAIL = "The maximum number of participants must be a number greater than 0. Please, try again"
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = "These are the users that joined the meeting. Choose who you want to kick out."
@@ -381,10 +381,9 @@ class MeetingMessages(MessageBase):
         "Are you sure you want to kick out <b>${participant}</b> from the meeting <b>${meeting_title}</b>?"
     )
     PARTICIPANT_NO_LONGER_IN_MEETING = "The participant you tried to kick out is no longer in the meeting."
-    PARTICIPANT_KICKED_OUT_SUCCESS = "The participant <b>${participant}</b> has been kicked out successfully."
+    PARTICIPANT_KICKED_OUT_SUCCESS = "<b>${participant}</b> removed."
     PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS = (
-        "The participant <b>${participant}</b> has been kicked out successfully."
-        " There are no more participants to kick out."
+        "<b>${participant}</b> removed. No more participants to manage."
     )
 
     # Edit meeting language
@@ -392,17 +391,17 @@ class MeetingMessages(MessageBase):
         "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\n"
         "Current language: <b>${language}</b>."
     )
-    LANGUAGE_SET_SUCCESS = "The language has been set successfully."
+    LANGUAGE_SET_SUCCESS = "Language set."
 
     # Past meeting
     PAST_MEETING_DESCRIPTION = (
         "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
     )
-    REACTIVATE_MEETING_SUCCESS = "The meeting has been reactivated. You can now edit and share it again."
+    REACTIVATE_MEETING_SUCCESS = "Meeting reactivated. You can edit and share it again."
 
     # Delete meeting
     DELETE_MEETING = "Are you sure you want to delete this meeting?"
-    DELETE_MEETING_SUCCESS = "The meeting has been deleted successfully"
+    DELETE_MEETING_SUCCESS = "Meeting deleted."
     DELETE_MEETING_DECLINE = "The meeting won't be deleted"
     ACCESS_TO_DELETED_MEETING = "This meeting has been deleted"
 
@@ -424,9 +423,9 @@ class MeetingMessages(MessageBase):
         "The time defaults to 00:00.\n\n"
         "Send the time in <i>HH:MM</i> format to change it, or tap Done to keep 00:00."
     )
-    DATE_UPDATE_SUCCESS = "The date has been set to: ${datetime}"
+    DATE_UPDATE_SUCCESS = "Date set to: ${datetime}"
     EDIT_TIME = "Send me the time of the meeting in the format <i>HH:MM</i>"
-    EDIT_TIME_SUCCESS = "The time of the meeting has been set to ${datetime}"
+    EDIT_TIME_SUCCESS = "Time set to ${datetime}"
     WRONG_TIME_FORMAT = (
         f"Not sure I understand that time {Emojis.THINK}...\n\n"
         "Please, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"
@@ -438,7 +437,7 @@ class MeetingMessages(MessageBase):
     )
     DELETE_DATE_CONFIRMATION = "Are you sure you want to delete the date and time of the meeting?"
     DELETE_DATE_DECLINE = "The date and time won't be deleted"
-    DATE_TIME_DELETED = "The date and time of the meeting have been deleted successfully"
+    DATE_TIME_DELETED = "Date and time removed."
     MEETING_HAS_BEEN_DELETED = f"{Emojis.PROHIB} This meeting has been deleted {Emojis.PROHIB}"
     MEETING_HAS_FINISHED = f"{Emojis.CHECK} This meeting has finished {Emojis.CHECK}"
 
@@ -497,8 +496,8 @@ class MeetingMessages(MessageBase):
         "The current duration is <b>${current_duration} minutes</b>.\n\n"
         "Send me the new duration in minutes, or tap <b>Cancel</b> to go back."
     )
-    DURATION_SET_SUCCESS = "The duration has been set to: <b>${duration} minutes</b>"
-    DURATION_CLEARED = "The duration has been removed from this meeting."
+    DURATION_SET_SUCCESS = "Duration set to: <b>${duration} minutes</b>"
+    DURATION_CLEARED = "Duration removed."
     EDIT_MEETING_DURATION_ON_EXIT = (
         "Sorry, I was expecting the duration in minutes. Would you like to send it? If not, tap Cancel to exit."
     )

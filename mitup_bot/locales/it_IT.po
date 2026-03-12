@@ -164,6 +164,36 @@ msgstr "🗑️ Elimina data"
 msgid "ButtonMessages.DELETE_DURATION"
 msgstr "🗑️ Elimina durata"
 
+msgid "ButtonMessages.DATE_TIME"
+msgstr "🗓️ Data e Ora"
+
+msgid "ButtonMessages.DURATION"
+msgstr "⌛ Durata"
+
+msgid "ButtonMessages.SET_DURATION"
+msgstr "⌛ Imposta durata"
+
+msgid "ButtonMessages.LOCK_ON_START"
+msgstr "Blocca all'avvio"
+
+msgid "ButtonMessages.MEETING_DURATION"
+msgstr "⌛ Durata incontro"
+
+msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
+msgstr "🔒 Blocca all'avvio"
+
+msgid "ButtonMessages.MAKE_SEARCHABLE"
+msgstr "Rendi ricercabile"
+
+msgid "ButtonMessages.LOAD_CHAT_MEETINGS"
+msgstr "🔍 Carica incontri"
+
+msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
+msgstr "🔍 Cerca incontri"
+
+msgid "ButtonMessages.REACTIVATE_MEETING"
+msgstr "Riattiva incontro"
+
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Benvenuto in Mitup Bot!\n\nScegli una delle seguenti opzioni:"
 
@@ -174,7 +204,7 @@ msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
 msgstr "Il tuo fuso orario è impostato su <b>${timezone}</b>. \nInviami il nome della tua città o la tua posizione per impostare il tuo fuso orario o tocca <b>Annulla</b> per tornare indietro."
 
 msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
-msgstr "Il tuo fuso orario è stato impostato su: <b>${timezone}</b> "
+msgstr "Il tuo fuso orario è stato impostato a: <b>${timezone}</b>"
 
 msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
 msgstr "Benvenuto in Mitup Bot ${first_name}!\n\nInizziamo impostando il tuo fuso orario. Inviami il nome della tua città o, per un risultato più accurato, la tua posizione premendo su 📎 e selezionando Posizione.\n\n<b>Importante</b>: non memorizziamo la tua posizione e questa informazione viene utilizzata solo per configurare il tuo fuso orario."
@@ -195,7 +225,7 @@ msgid "SettingsMessages.SELECT_LANGUAGE"
 msgstr "Lingua corrente: <b>${language}</b>.\n\nSeleziona una lingua."
 
 msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
-msgstr "La lingua è stata impostata con successo."
+msgstr "Lingua impostata."
 
 msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
 msgstr "Qui puoi configurare le opzioni predefinite utilizzate quando crei un incontro. Di solito crei incontri pubblici? Impostalo qui. Consenti sempre alle persone di invitare altre persone o di condividere l'incontro in altre chat? Fallo qui. Tutti i tuoi incontri erediteranno questa configurazione.\n\nPuoi configurare diversi aspetti del tuo incontro:\n\n<b>Lista d'attesa</b>: consenti agli utenti di partecipare all'incontro anche quando è pieno. Gli utenti che si uniscono quando è pieno verranno aggiunti a una lista d'attesa e aggiunti all'elenco dei partecipanti non appena un posto sarà disponibile nell'ordine in cui si sono uniti.\n\n<b>Pubblico</b>: attiva questa opzione per consentire a chiunque riceva l'incontro di condividerlo di nuovo. Perfetto per raggiungere più persone.\n\n<b>Inviti aperti</b>: attiva questa opzione per consentire agli utenti che hanno partecipato all'incontro di aggiungere amici anche se non sono su Telegram.\n\n<b>Anonimo</b>: un incontro con l'opzione anonima abilitata non mostrerà le persone che hanno partecipato all'incontro quando viene condiviso. Verrà mostrato solo il numero dei partecipanti. Potrai comunque visualizzare i partecipanti.\n\n<b>Mostra fuso orario</b>: gli incontri di solito includono il fuso orario a cui si riferiscono la data e l'ora dell'incontro. Se non hai bisogno che queste informazioni vengano visualizzate nel messaggio dell'incontro, puoi disabilitarle qui. Questo disabiliterà anche il pulsante <i>Fuso orario</i> mostrato quando l'incontro viene condiviso."
@@ -207,7 +237,7 @@ msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
 msgstr "Oops! Non sembra un numero valido. Per favore, inserisci un numero intero positivo. Non sono consentiti decimali!"
 
 msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
-msgstr "Il timeout è stato impostato su: <b>${timeout} minuti</b>"
+msgstr "Timeout impostato a: <b>${timeout} minuti</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
 msgstr "Configura le notifiche di MeetUp.\n\nNotifiche: ${notifications_status}\nQuando le notifiche sono abilitate, MeetUp ti notificherà <b>${notifications_time} minuti</b> prima che inizi un incontro."
@@ -216,7 +246,7 @@ msgid "SettingsMessages.NOTIFICATION_SET_TIME"
 msgstr "Invia quanto tempo prima che inizi un incontro (in minuti) desideri essere notificato o tocca Annulla per tornare indietro."
 
 msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
-msgstr "L'ora di notifica è stata impostata su <b>${notifications_time} minuti</b>."
+msgstr "Ora di notifica impostata a <b>${notifications_time} minuti</b>."
 
 msgid "SettingsMessages.ENABLED"
 msgstr "Abilitato ✅"
@@ -228,13 +258,22 @@ msgid "MeetingMessages.CREATE"
 msgstr "Creiamo un incontro. Qual è il titolo?\n\n<i>Suggerimento: puoi anche usare ${datetime_link} per includere una data e un'ora direttamente.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
-msgstr "Un incontro è stato creato con il titolo: <b>${title}</b>\n\nPuoi aggiungere più informazioni all'incontro con le opzioni sottostanti. Le informazioni che non sono state aggiunte non verranno mostrate quando l'incontro viene condiviso.\n\nQuando hai finito fai clic su ✅ Fatto"
+msgstr "Incontro creato: <b>${title}</b>\n\nPuoi aggiungere più informazioni all'incontro con le opzioni sottostanti. Le informazioni che non sono state aggiunte non verranno mostrate quando l'incontro viene condiviso.\n\nQuando hai finito fai clic su ✅ Fatto"
 
 msgid "MeetingMessages.INVALID_TITLE"
 msgstr "Non ho riconosciuto quello che hai inviato come titolo valido 🤔.\n\nInvia un messaggio con il titolo dell'incontro o fai clic su <b>Annulla</b>."
 
+msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgstr "Capisco solo un titolo o un titolo con una data 🤔.\n\nPer favore, invia solo il titolo dell'incontro, o il titolo con una data formattata da Telegram. Fai clic su <b>Annulla</b> per uscire."
+
 msgid "MeetingMessages.MEETING_TIME"
 msgstr "Ora dell'incontro"
+
+msgid "MeetingMessages.MEETING_START_TIME"
+msgstr "Inizio"
+
+msgid "MeetingMessages.MEETING_STOP_TIME"
+msgstr "Fine"
 
 msgid "MeetingMessages.CREATED_BY"
 msgstr "Creato da: ${owner}"
@@ -372,10 +411,10 @@ msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
 msgstr "Questa è la descrizione attuale del tuo incontro:\n${description}\n\nInviami la nuova"
 
 msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "Il titolo è stato impostato correttamente su: <b>${title}</b>"
+msgstr "Titolo aggiornato a: <b>${title}</b>"
 
 msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "La descrizione è stata impostata correttamente su: <b>${description}</b>"
+msgstr "Descrizione aggiornata a: <b>${description}</b>"
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION"
 msgstr "Un incontro può avere un luogo associato. Puoi semplicemente impostare il nome del posto o puoi anche allegarlo. Scegli una qualsiasi delle due opzioni."
@@ -387,13 +426,13 @@ msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
 msgstr "<i>Solo dal telefono 📱</i>\n\nInvia la posizione dell'incontro. Tocca l'icona 📎 e quindi scegli posizione. Puoi inviare qualsiasi posizione desideri, non solo la tua posizione attuale."
 
 msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "Il nome del luogo è stato impostato su: <b>${name}</b>"
+msgstr "Nome della posizione impostato su: <b>${name}</b>"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
-msgstr "The location has been saved successfuly"
+msgstr "Posizione salvata."
 
 msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
-msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
+msgstr "Inviami di nuovo la posizione. Ricorda di toccare l'icona 📎 e scegliere posizione."
 
 msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
 msgstr "Qui potrai gestire i partecipanti dell'incontro: puoi impostare il numero massimo di persone che possono partecipare all'incontro nonché cacciare qualsiasi partecipante dell'incontro."
@@ -408,7 +447,7 @@ msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
 msgstr "Senza limiti"
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
-msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
+msgstr "Il numero massimo di partecipanti deve essere un numero maggiore di 0. Per favore, riprova"
 
 msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
 msgstr "Questi sono gli utenti che si sono uniti all'incontro. Scegli chi vuoi cacciare."
@@ -417,7 +456,7 @@ msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Sei sicuro di voler eliminare questo incontro?"
 
 msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
-msgstr "L'incontro è stato eliminato con successo"
+msgstr "Incontro eliminato."
 
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
 msgstr "L'incontro non sarà eliminato"
@@ -438,16 +477,16 @@ msgid "MeetingMessages.ADD_DATE"
 msgstr "Seleziona la data."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "La data è stata impostata su: ${datetime}. Per impostare l'ora premi <i>${set_time_button}</i>, altrimenti premi <i>${back_edit_button}</i> per tornare alla modifica dell'incontro."
+msgstr "La data è stata impostata a <b>${datetime}</b>. L'ora è predefinita alle 00:00.\n\nInvia l'ora nel formato <i>HH:MM</i> per cambiarla, oppure tocca Fine per mantenere 00:00."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "La data è stata impostata su: ${datetime}"
+msgstr "Data impostata a: ${datetime}"
 
 msgid "MeetingMessages.EDIT_TIME"
 msgstr "Inviami l'ora dell'incontro nel formato <i>HH:MM</i>"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "L'ora dell'incontro è stata impostata su ${datetime}"
+msgstr "Ora impostata a ${datetime}"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
 msgstr "Non sono sicuro di capire quell'ora 🤔...\n\nPer favore, invia l'ora nel formato <i>HH:MM</i>, ad esempio <i>15:30</i> o <i>09:15</i>"
@@ -462,13 +501,46 @@ msgid "MeetingMessages.DELETE_DATE_DECLINE"
 msgstr "La data e l'ora non verranno eliminate"
 
 msgid "MeetingMessages.DATE_TIME_DELETED"
-msgstr "La data e l'ora dell'incontro sono state eliminate con successo"
+msgstr "Data e ora rimossi."
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Questo incontro è stato eliminato 🚫"
 
 msgid "MeetingMessages.MEETING_HAS_FINISHED"
 msgstr "✅ Questo incontro è terminato ✅"
+
+msgid "MeetingMessages.MEETING_IN_PROGRESS"
+msgstr "▶️ Questo incontro è in corso ▶️"
+
+msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
+msgstr "✅ Questo incontro è terminato ✅\n\n<b>Durata:</b> ${duration} minuti · <b>Partecipanti:</b> ${attendee_count}"
+
+msgid "MeetingMessages.SET_DURATION_PROMPT"
+msgstr "Inviami la durata dell'incontro in minuti, oppure tocca <b>Annulla</b> per tornare indietro."
+
+msgid "MeetingMessages.EDIT_DURATION_PROMPT"
+msgstr "La durata attuale è <b>${current_duration} minuti</b>.\n\nInviami la nuova durata in minuti, oppure tocca <b>Annulla</b> per tornare indietro."
+
+msgid "MeetingMessages.DURATION_SET_SUCCESS"
+msgstr "Durata impostata a: <b>${duration} minuti</b>"
+
+msgid "MeetingMessages.DURATION_CLEARED"
+msgstr "Durata rimossa."
+
+msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
+msgstr "Mi dispiace, mi aspettavo la durata in minuti. Vuoi inviarlo? In caso contrario, tocca Annulla per uscire."
+
+msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
+msgstr "Devi impostare una durata prima di abilitare questa opzione."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
+msgstr "Imposta per quanto tempo durerà questo incontro.\n\nDurata attuale: <b>${current_duration} minuti</b>.\n\nPuoi anche bloccare la lista dei partecipanti quando l'incontro inizia, in modo che nessuno possa unirsi o lasciare una volta che è iniziato."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
+msgstr "Imposta per quanto tempo durerà questo incontro.\n\nNessuna durata è stata impostata ancora. Puoi anche bloccare la lista dei partecipanti quando l'incontro inizia, in modo che nessuno possa unirsi o lasciare una volta che è iniziato."
+
+msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
+msgstr "Questo incontro è già iniziato e la sua lista di partecipanti è bloccata."
 
 msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
 msgstr "Puoi configurare diversi aspetti del tuo incontro:\n\n<b>Lista d'attesa</b>: consenti agli utenti di partecipare all'incontro anche quando è pieno. Gli utenti che si uniscono quando è pieno verranno aggiunti a una lista d'attesa e aggiunti all'elenco dei partecipanti non appena un posto sarà disponibile nell'ordine in cui si sono uniti.\n\n<b>Pubblico</b>: attiva questa opzione per consentire a chiunque riceva l'incontro di condividerlo di nuovo. Perfetto per raggiungere più persone.\n\n<b>Inviti aperti</b>: attiva questa opzione per consentire agli utenti che hanno partecipato all'incontro di aggiungere amici anche se non sono su Telegram.\n\n<b>Anonimo</b>: un incontro con l'opzione anonima abilitata non mostrerà le persone che hanno partecipato all'incontro quando viene condiviso. Verrà mostrato solo il numero dei partecipanti. Potrai comunque visualizzare i partecipanti.\n\n<b>Mostra fuso orario</b>: gli incontri di solito includono il fuso orario a cui si riferiscono la data e l'ora dell'incontro. Se non hai bisogno che queste informazioni vengano visualizzate nel messaggio dell'incontro, puoi disabilitarle qui. Questo disabiliterà anche il pulsante <i>Fuso orario</i> mostrato quando l'incontro viene condiviso."
@@ -492,25 +564,13 @@ msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
 msgstr "Scegli la lingua del tuo incontro. Questo cambierà la lingua utilizzata quando viene condiviso l'incontro.\n\nLingua corrente: <b>${language}</b>."
 
 msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
-msgstr "La lingua è stata impostata con successo."
+msgstr "Lingua impostata."
 
 msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
 msgstr "Questo incontro non è più attivo. Riattivalo per condividerlo di nuovo, oppure eliminalo permanentemente."
 
 msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
-msgstr "L'incontro è stato riattivato. Puoi ora modificarlo e condividerlo di nuovo."
-
-msgid "MeetingMessages.MAKE_SEARCHABLE"
-msgstr "Rendi ricercabile"
-
-msgid "MeetingMessages.LOAD_CHAT_MEETINGS"
-msgstr "Carica incontri"
-
-msgid "MeetingMessages.SEARCH_CHAT_MEETINGS"
-msgstr "Cerca incontri"
-
-msgid "MeetingMessages.REACTIVATE_MEETING"
-msgstr "Riattiva incontro"
+msgstr "Incontro riattivato. Puoi ora modificarlo e condividerlo di nuovo."
 
 msgid "MeetingMessages.NOT_SEARCHABLE_FOOTNOTE"
 msgstr "🔍 Rendi questo incontro ricercabile in questa chat."
@@ -534,13 +594,13 @@ msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
 msgstr "Questi sono gli incontri a cui hai partecipato."
 
 msgid "MeetingMessages.NO_JOINED_MEETINGS"
-msgstr "_Non hai ancora partecipato a nessun incontro._"
+msgstr "<i>Non hai ancora partecipato a nessun incontro.</i>"
 
 msgid "MeetingMessages.PAST_MEETINGS_PAGE"
 msgstr "Questi sono tutti i tuoi incontri passati."
 
 msgid "MeetingMessages.NO_PAST_MEETINGS"
-msgstr "_Non hai ancora nessun incontro passato._"
+msgstr "<i>Non hai ancora nessun incontro passato.</i>"
 
 msgid "Weekday.MONDAY"
 msgstr "Lun"
@@ -688,3 +748,6 @@ msgstr "L'incontro <b>${meeting_title}</b> è stato eliminato permanentemente."
 
 msgid "NotificationMessages.MEETING_STARTING"
 msgstr "L'incontro <b>${meeting_title}</b> sta per iniziare!"
+
+msgid "NotificationMessages.MEETING_STARTED"
+msgstr "L'incontro <b>${meeting_title}</b> è iniziato!"

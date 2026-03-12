@@ -6,11 +6,20 @@ user-invocable: false
 
 # Bot Copy Style
 
+**Important**: this bot is not a chat bot, is an app where the UI is a Telegram chat. Therefore, do not create text as if it was an ongoing conversation. Frame text in this app as you would in the UI of a mobile app.
+
 ## Tone
 
 - **Friendly, not over the top.** The bot is warm and helpful but not excessively enthusiastic.
 - **Direct without being terse.** Instructions are clear and concise; no padding.
 - **Social context.** Meetings in this bot are social gatherings — with friends, family, groups — not just work meetings. Examples and prompts should reflect this variety.
+
+## What to avoid
+
+- **Fancy punctuation.** No em dashes (`—`), en dashes (`–`), or ellipsis characters (`…`). Use plain periods and commas.
+- **Standalone filler affirmations.** Don't open a message with "Perfect!", "Great!", "Done!" as a detached opener. If the tone calls for it, integrate it into the message naturally — `"You're in!"` instead of `"Great! You have joined the meeting."`.
+- **Narrating the obvious.** Don't recap what the button just did. A success message should tell the user what's next or confirm the new state, not describe the action they just took.
+- **Impersonal passive constructions.** Prefer `"Meeting created"` or `"You're all set"` over `"The meeting has been created"`. Short and direct reads more human.
 
 ## Adding messages
 

@@ -164,6 +164,21 @@ msgstr "🗑️ Remover data"
 msgid "ButtonMessages.DELETE_DURATION"
 msgstr "🗑️ Remover duração"
 
+msgid "ButtonMessages.DURATION"
+msgstr "⌛ Duração"
+
+msgid "ButtonMessages.SET_DURATION"
+msgstr "⌛ Definir duração"
+
+msgid "ButtonMessages.LOCK_ON_START"
+msgstr "Bloquear ao iniciar"
+
+msgid "ButtonMessages.MEETING_DURATION"
+msgstr "⌛ Duração do evento"
+
+msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
+msgstr "🔒 Bloquear ao iniciar"
+
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Tornar pesquisável"
 
@@ -196,7 +211,7 @@ msgstr "Bem-vindo ao Mitup Bot ${first_name}!\n\n"
 "<b>Importante</b>: não armazenamos sua localização e essa informação é usada apenas para configurar seu fuso horário."
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
-msgstr "Perfect! Your timezone is ${timezone}"
+msgstr "Seu fuso horário está definido para ${timezone}"
 
 msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
 msgstr "Desculpe, não consegui definir seu fuso horário. Por favor, tente novamente."
@@ -212,7 +227,7 @@ msgstr "Idioma atual: <b>${language}</b>.\n\n"
 "Selecione um idioma."
 
 msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
-msgstr "O idioma foi definido com sucesso."
+msgstr "Idioma definido."
 
 msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
 msgstr "Aqui você pode configurar as opções padrão usadas ao criar um evento. Costuma criar eventos públicos? Configure aqui. Sempre permite que pessoas convide outras ou compartilhe o evento em outros chats? Faça aqui. Todos os seus eventos herdarão essa configuração.\n\n"
@@ -232,7 +247,7 @@ msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
 msgstr "Opa! Isso não parece um número válido. Por favor, digite um número inteiro positivo. Sem decimais permitidos!"
 
 msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
-msgstr "O tempo limite foi definido para: <b>${timeout} minutos</b>"
+msgstr "Tempo limite definido para: <b>${timeout} minutos</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
 msgstr "Configure as notificações do MeetUp.\n\n"
@@ -243,7 +258,7 @@ msgid "SettingsMessages.NOTIFICATION_SET_TIME"
 msgstr "Envie quanto tempo antes de um evento começar (em minutos) que você gostaria de ser notificado ou toque em Cancelar para voltar."
 
 msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
-msgstr "O horário de notificação foi definido para <b>${notifications_time} minutos</b>."
+msgstr "Horário de notificação definido para <b>${notifications_time} minutos</b>."
 
 msgid "SettingsMessages.ENABLED"
 msgstr "Ativado ✅"
@@ -255,7 +270,7 @@ msgid "MeetingMessages.CREATE"
 msgstr "Vamos criar um evento. Qual o título?\n\n<i>Dica: você também pode usar ${datetime_link} para incluir uma data e hora diretamente.</i>"
 
 msgid "MeetingMessages.CREATED_SUCCESS"
-msgstr "Um evento foi criado com o título: <b>${title}</b>\n\n"
+msgstr "Evento criado: <b>${title}</b>\n\n"
 "Você pode adicionar mais informações ao evento com as opções abaixo. As informações que não foram adicionadas não serão mostradas quando o evento for compartilhado.\n\n"
 "Quando terminar, clique em ✅ Concluído"
 
@@ -300,7 +315,7 @@ msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
 msgstr "<i>Este evento ainda não tem participantes</i>"
 
 msgid "MeetingMessages.JOINED_MEETING_SUCCESS"
-msgstr "Você entrou no evento!"
+msgstr "Participação confirmada!"
 
 msgid "MeetingMessages.JOINED_MEETING_ALREADY"
 msgstr "Você já se juntou a este evento"
@@ -406,10 +421,10 @@ msgstr "Esta é a descrição atual do seu evento:\n"
 " Envie-me a nova"
 
 msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "O título foi definido adequadamente para: <b>${title}</b>"
+msgstr "Título atualizado para: <b>${title}</b>"
 
 msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "A descrição foi definida adequadamente para: <b>${description}</b>"
+msgstr "Descrição atualizada para: <b>${description}</b>"
 
 msgid "MeetingMessages.EDIT_MEETING_LOCATION"
 msgstr "Um evento pode ter um local associado. Você pode simplesmente definir o nome do lugar ou enviar o local como anexo. Escolha qualquer uma das duas opções."
@@ -422,10 +437,10 @@ msgstr "<i>Apenas do telefone 📱</i>\n\n"
 "Envie a localização do evento. Toque no ícone 📎 e escolha localização. Você pode enviar qualquer localização que quiser, não apenas sua localização atual."
 
 msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "O nome da localização foi definido para: <b>${name}</b>"
+msgstr "Nome da localização definido para: <b>${name}</b>"
 
 msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
-msgstr "A localização foi salva com sucesso"
+msgstr "Localização salva."
 
 msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
 msgstr "Envie-me a localização novamente. Lembre-se de tocar no ícone de clipe e escolher localização."
@@ -437,7 +452,7 @@ msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
 msgstr "Envie-me o número máximo de membros permitidos no evento (deve ser um número maior que 0) ou pressione em <i>Sem limite</i> para permitir um número ilimitado de participantes."
 
 msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
-msgstr "O número máximo de participantes foi definido para: <b>${max_participants}</b>"
+msgstr "Máx. de participantes definido para: <b>${max_participants}</b>"
 
 msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
 msgstr "Sem limite"
@@ -455,28 +470,28 @@ msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
 msgstr "O participante que você tentou expulsar não está mais no evento."
 
 msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
-msgstr "O participante <b>${participant}</b> foi expulso com sucesso."
+msgstr "<b>${participant}</b> removido."
 
 msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
-msgstr "O participante <b>${participant}</b> foi expulso com sucesso. Não há mais participantes para expulsar."
+msgstr "<b>${participant}</b> removido. Não há mais participantes para gerenciar."
 
 msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
 msgstr "Escolha o idioma do seu evento. Isso mudará o idioma usado ao compartilhar o evento.\n\nIdioma atual: <b>${language}</b>."
 
 msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
-msgstr "O idioma foi definido com sucesso."
+msgstr "Idioma definido."
 
 msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
 msgstr "Este evento não está mais ativo. Reative-o para compartilhá-lo novamente ou exclua-o permanentemente."
 
 msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
-msgstr "O evento foi reativado. Você pode editá-lo e compartilhá-lo novamente."
+msgstr "Evento reativado. Você pode editá-lo e compartilhá-lo novamente."
 
 msgid "MeetingMessages.DELETE_MEETING"
 msgstr "Tem certeza que deseja excluir este evento?"
 
 msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
-msgstr "O evento foi excluído com sucesso"
+msgstr "Evento excluído."
 
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
 msgstr "O evento não foi excluído"
@@ -497,16 +512,16 @@ msgid "MeetingMessages.ADD_DATE"
 msgstr "Selecione a data."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "A data foi definida para: ${datetime}. Para definir a hora, pressione <i>${set_time_button}</i>, caso contrário, pressione <i>${back_edit_button}</i> para voltar a editar o evento."
+msgstr "A data foi definida para <b>${datetime}</b>. A hora está predefinida como 00:00.\n\nEnvie a hora no formato <i>HH:MM</i> para alterá-la, ou toque em Concluído para manter 00:00."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "A data foi definida para: ${datetime}"
+msgstr "Data definida para: ${datetime}"
 
 msgid "MeetingMessages.EDIT_TIME"
 msgstr "Envie-me a hora do evento no formato <i>HH:MM</i>"
 
 msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "A hora do evento foi definida para ${datetime}"
+msgstr "Hora definida para ${datetime}"
 
 msgid "MeetingMessages.WRONG_TIME_FORMAT"
 msgstr "Não tenho certeza se entendi essa hora 🤔...\n\n"
@@ -523,7 +538,31 @@ msgid "MeetingMessages.DELETE_DATE_DECLINE"
 msgstr "A data e hora não serão excluídas"
 
 msgid "MeetingMessages.DATE_TIME_DELETED"
-msgstr "A data e hora do evento foram excluídas com sucesso"
+msgstr "Data e hora removidas."
+
+msgid "MeetingMessages.SET_DURATION_PROMPT"
+msgstr "Envie-me a duração do evento em minutos ou toque em <b>Cancelar</b> para voltar."
+
+msgid "MeetingMessages.EDIT_DURATION_PROMPT"
+msgstr "A duração atual é <b>${current_duration} minutos</b>.\n\nEnvie-me a nova duração em minutos ou toque em <b>Cancelar</b> para voltar."
+
+msgid "MeetingMessages.DURATION_SET_SUCCESS"
+msgstr "Duração definida para: <b>${duration} minutos</b>"
+
+msgid "MeetingMessages.DURATION_CLEARED"
+msgstr "Duração removida."
+
+msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
+msgstr "Desculpe, eu esperava a duração em minutos. Você gostaria de enviar? Caso contrário, toque em Cancelar para sair."
+
+msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
+msgstr "Você precisa definir uma duração antes de ativar essa opção."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
+msgstr "Defina quanto tempo este evento durará.\n\nDuração atual: <b>${current_duration} minutos</b>.\n\nVocê também pode bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
+msgstr "Defina quanto tempo este evento durará.\n\nNenhuma duração foi definida ainda. Você também pode bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Este evento foi excluído 🚫"

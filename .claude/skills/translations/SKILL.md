@@ -39,29 +39,17 @@ hatch run dev:update-locales
 
 ## Message content and formatting
 
-Messages contain **semantic content and inline format tags** — not MarkdownV2 syntax, not raw escaping.
-
-Inline formatting uses HTML-like tags that translators keep intact:
+Messages use HTML-like tags for inline formatting and `${variable_name}` for template placeholders:
 
 ```python
-# Good — semantic content with explicit tags
 MEETING_TITLE_LABEL = "<b>Title:</b> ${title}"
 INVITED_BY_USER = "<i>invited by ${user}</i>"
-
-# Bad — MarkdownV2 syntax (never use this)
-MEETING_TITLE_LABEL = "*Title:* ${title}"
-
-# Bad — bakes escaping into the message
-NO_LIMIT_PARTICIPANTS = "\\(No limit\\)"
 ```
 
-Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be nested. Template placeholders use `${variable_name}` syntax.
+Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be nested.
 
-`MessageBase.get()` returns a `FormattedText` (plain text + `MessageEntity` list). The entities are computed from the tags; the `.po` translation file contains the tag-annotated string.
-
-### Translators must preserve format tags
-
-When translating strings that contain `<b>`, `<i>`, or `${var}` markers, the translated string must keep those markers intact — they are not HTML for display, they are formatting instructions parsed at runtime.
+NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) — use `<b>`, `<i>` tags instead.
+NEVER use raw escaping (`\\(`, `\\)`) — write plain characters.
 
 ## CI enforcement
 

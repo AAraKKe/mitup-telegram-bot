@@ -18,7 +18,7 @@ msgstr ""
 "Language-Team: German\n"
 
 msgid "ButtonMessages.MAIN_MENU"
-msgstr "≪ Main Menu"
+msgstr "≪ Hauptmenü"
 
 msgid "ButtonMessages.GO_BACK"
 msgstr "≪"
@@ -27,10 +27,10 @@ msgid "ButtonMessages.GO_FORWARD"
 msgstr "≫"
 
 msgid "ButtonMessages.CONFIRM"
-msgstr "✅ Confirm"
+msgstr "✅ Bestätigen"
 
 msgid "ButtonMessages.DECLINE"
-msgstr "❌ Decline"
+msgstr "❌ Ablehnen"
 
 msgid "ButtonMessages.NEW_MEETING"
 msgstr "➕ Neues Treffen"
@@ -401,7 +401,7 @@ msgid "MeetingMessages.ADD_DATE"
 msgstr "Wähle das Datum."
 
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "Das Datum wurde auf ${datetime} eingestellt. Um die Uhrzeit zu setzen, drücke <i>${set_time_button}</i>, ansonsten drücke <i>${back_edit_button}</i>, um zur Bearbeitung des Treffens zurückzukehren."
+msgstr "Das Datum wurde auf <b>${datetime}</b> eingestellt. Die Uhrzeit ist auf 00:00 voreingestellt.\n\nSende die Uhrzeit im Format <i>HH:MM</i>, um sie zu ändern, oder drücke Fertig stellen, um 00:00 beizubehalten."
 
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "Das Datum wurde auf ${datetime} eingestellt"
@@ -439,7 +439,7 @@ msgstr "Du hast noch keine Treffen.\n\n"
 "Klicke auf ${new_meeting_button} im Hauptmenü, um ein Treffen zu erstellen."
 
 msgid "MeetingMessages.ACTIVE"
-msgstr "Dies sind Ihre aktiven Treffen."
+msgstr "Dies sind deine aktiven Treffen."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "Dies sind alle deine aktiven Treffen."
@@ -448,13 +448,13 @@ msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
 msgstr "Dies sind die Treffen, an denen du teilnimmst."
 
 msgid "MeetingMessages.NO_JOINED_MEETINGS"
-msgstr "_Du hast noch an keinem Treffen teilgenommen._"
+msgstr "<i>Du hast noch an keinem Treffen teilgenommen.</i>"
 
 msgid "MeetingMessages.PAST_MEETINGS_PAGE"
 msgstr "Dies sind alle deine vergangenen Treffen."
 
 msgid "MeetingMessages.NO_PAST_MEETINGS"
-msgstr "_Du hast noch keine vergangenen Treffen._"
+msgstr "<i>Du hast noch keine vergangenen Treffen.</i>"
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"
@@ -541,13 +541,13 @@ msgid "MonthShort.SEPTEMBER"
 msgstr "Sep"
 
 msgid "MonthShort.OCTOBER"
-msgstr "Oct"
+msgstr "Okt"
 
 msgid "MonthShort.NOVEMBER"
 msgstr "Nov"
 
 msgid "MonthShort.DECEMBER"
-msgstr "Dec"
+msgstr "Dez"
 
 msgid "Languages.SPANISH"
 msgstr "🇪🇸 Spanish"
