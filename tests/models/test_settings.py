@@ -41,7 +41,7 @@ def expected_default_meeting_options_view(settings: Settings) -> MitupView:
     # Row 3 is the lock toggle directly (no sub-screen navigation)
     lock_button = options_button(
         cb.SET_DEFAULT_LOCK_ON_START,
-        ButtonMessages.DEFAULT_LOCK_ON_START.get(lang=lang),
+        ButtonMessages.LOCK_ON_START.get(lang=lang),
         lock_on_start,
     )
 
