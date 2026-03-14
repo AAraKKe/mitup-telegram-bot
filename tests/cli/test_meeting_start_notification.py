@@ -88,6 +88,64 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
     )
 
 
+async def test_non_forbidden_exception_is_logged_and_loop_continues(
+    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+):
+    """A non-Forbidden exception from send_message_to_user is counted as failed and logged.
+
+    The exception is NOT re-raised immediately — the loop continues processing the next
+    joined_link.  After the loop, because failed > 0, a RuntimeError is raised.
+    """
+    meeting = create_meetup(id=1, title="Test meetup")
+    joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
+    joined_2 = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
+    link_1 = JoinedUsers(user=joined_1, meetup=meeting)
+    link_2 = JoinedUsers(user=joined_2, meetup=meeting)
+
+    mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link_1, link_2))
+
+    send_message_mock = api.mock_method("send_message_to_user")
+    # First call raises a generic (non-Forbidden) exception; second succeeds.
+    send_message_mock.side_effect = [Exception("Network error"), None]
+
+    with pytest.raises(RuntimeError, match="Failed to send notification to 1 users"):
+        await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+
+    await metrics.flush()
+
+    # The second link was still notified — the loop did not abort on the first failure.
+    assert link_2.notification_sent
+
+    metrics.assert_metrics_emited(
+        [
+            MetricKey.NOTIFICATIONS_TO_SEND,
+            MetricKey.NOTIFICATIONS_SENT,
+            MetricKey.NOTIFICATIONS_FAILED,
+            MetricKey.INACTIVE_USER_SET,
+        ],
+        [2, 1, 1, 0],
+        [Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+
+
+async def test_failed_greater_than_zero_raises_runtime_error(
+    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+):
+    """When failed > 0 after the notification loop, RuntimeError is raised."""
+    meeting = create_meetup(id=1, title="Test meetup")
+    joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
+    link_1 = JoinedUsers(user=joined_1, meetup=meeting)
+
+    mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link_1,))
+
+    send_message_mock = api.mock_method("send_message_to_user")
+    send_message_mock.side_effect = Exception("Unexpected error")
+
+    with pytest.raises(RuntimeError, match="Failed to send notification to 1 users. Check logs for more details."):
+        await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+
+
 async def test_forbidden_message_sent(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str):
     meeting = create_meetup(id=1, title="Test meetup")
     joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))

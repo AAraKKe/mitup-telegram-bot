@@ -177,6 +177,13 @@ def create_message(
     )
 
 
+def owner_with_meeting(meeting_id: int = 1) -> tuple[User, Meetup]:
+    """Build a user owning a single meeting. Returns (user, meeting)."""
+    meeting = create_meetup(id=meeting_id, title="Test Meeting")
+    user = create_user(id=1, tg_user_id=123, owned_meetings=[meeting], settings=Settings(id=1))
+    return user, meeting
+
+
 def telegram_user_from_user(user: User) -> TgUser:
     return TgUser(
         id=user.tg_user_id,

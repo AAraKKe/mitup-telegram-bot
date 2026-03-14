@@ -246,6 +246,36 @@ async def test_user_leave_for_non_existing_meeting(
     )
 
 
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1))], indirect=True)
+async def test_leave_creates_new_message_when_no_existing_message_found(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """When message_from_update returns None during a leave operation (branch 168→170),
+    a new Message is created and appended to the meeting's messages list."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+    # Join the user so they can leave
+    JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
+
+    # Confirm no messages exist before the handler runs
+    assert len(meeting.messages) == 0
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    # A new message was created (branch 168→170 in handle_join_leave_operation)
+    assert len(meeting.messages) == 1
+    mock_session.assert_flushed()
+
+    context.api.assert_update_meeting_messages_called(
+        session=mock_session,
+        meeting=meeting,
+        current_message=meeting.messages[0],
+    )
+
+
 @pytest.mark.parametrize(
     "update, handler_id",
     [

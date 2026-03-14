@@ -119,7 +119,7 @@ def ensure_all_translations() -> int:
 @click.group()
 def cli():
     """All commands related to translations management."""
-    pass
+    pass  # pragma: no cover
 
 
 @cli.command()

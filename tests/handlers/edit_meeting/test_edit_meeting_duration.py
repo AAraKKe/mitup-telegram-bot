@@ -298,3 +298,60 @@ async def test_lock_on_start_stale_alert_when_no_duration(
 
     # No message edit should have occurred
     context.api.assert_method_just_called("edit_message", times=0)
+
+
+# ---------------------------------------------------------------------------
+# ContextPropertyNotSetError in conversation message handlers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(message_text="90")],
+    indirect=True,
+)
+async def test_duration_text_message_handler_edits_to_main_menu_when_context_missing(
+    mock_session: MockDbSession,
+    update: Update,
+    app: StubMitupApp,
+):
+    """When no meeting_id is stored, duration_text_message_handler catches ContextPropertyNotSetError,
+    edits the message to the main menu, and ends the conversation."""
+    user, _ = owner_with_meeting(meeting_id=1)
+    mock_session.add_object(user, query_field="tg_user_id")
+
+    # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_TEXT_MESSAGE,
+        update=update,
+        app=app,
+    )
+
+    context.api.assert_method_just_called("edit_message", times=1)
+    assert state == ConversationHandler.END
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(message_text="not_a_number")],
+    indirect=True,
+)
+async def test_duration_invalid_message_handler_edits_to_main_menu_when_context_missing(
+    mock_session: MockDbSession,
+    update: Update,
+    app: StubMitupApp,
+):
+    """When no meeting_id is stored, duration_invalid_message_handler catches ContextPropertyNotSetError,
+    edits the message to the main menu, and ends the conversation."""
+    user, _ = owner_with_meeting(meeting_id=1)
+    mock_session.add_object(user, query_field="tg_user_id")
+
+    # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_INVALID_MESSAGE,
+        update=update,
+        app=app,
+    )
+
+    context.api.assert_method_just_called("edit_message", times=1)
+    assert state == ConversationHandler.END

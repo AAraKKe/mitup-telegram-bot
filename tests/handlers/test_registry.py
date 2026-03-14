@@ -11,11 +11,11 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import HandlerRegisteredError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.handlers.registry import HandlerWrapper
+from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.monitoring.metrics import NULL_DIMENSIONALITY
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, build_context
+from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, UpdateRequest, build_context
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 
@@ -151,6 +151,41 @@ def test_cannot_register_same_conversation_twice():
         ClearableRegistry.register_conversation_handler(
             HandlerTestId.BINDABLE, entry_points_handler_names=[], states={}, fallbacks=[]
         )
+
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_callback_query_fallback_answers_with_sorry_message(
+    update: Update,
+    app: StubMitupApp,
+):
+    """callback_query_fallback calls bot.answer_callback_query with the fallback message."""
+    context = build_context(update, app)
+    assert update.callback_query is not None
+
+    await callback_query_fallback(update, context)
+
+    # The bot's answer_callback_query method is called with the fallback message and show_alert=True
+    context.bot.answer_callback_query.assert_called_once_with(
+        update.callback_query.id,
+        "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀",
+        show_alert=True,
+    )
+
+
+def test_cannot_register_same_inline_handler_twice():
+    """Registering the same handler_id via register_inline_handler twice raises HandlerRegisteredError."""
+
+    @ClearableRegistry.register_inline_handler(HandlerTestId.BINDABLE)
+    async def my_inline_handler(update: Update, context: StubMitupContext):
+        pass
+
+    with pytest.raises(HandlerRegisteredError):
+
+        @ClearableRegistry.register_inline_handler(HandlerTestId.BINDABLE)
+        async def another_inline_handler(update: Update, context: StubMitupContext):
+            pass
 
     ClearableRegistry.clear()
 

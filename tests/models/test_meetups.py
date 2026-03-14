@@ -1375,3 +1375,86 @@ def test_duration_view_keyboard_row0_has_set_and_lock_and_row1_has_delete_when_d
     row1 = view.keyboard[1]
     assert len(row1) == 1  # only "Delete duration"
     assert row1[0].callback_data == cb.CLEAR_MEETING_DURATION.with_id(meeting.db_id)
+
+
+# --- _plain_datetime fallback branch ---
+
+
+def test_plain_datetime_fallback_when_no_datetime_set(user_with_settings: User):
+    """_plain_datetime must return the DATE_NOT_SET message when meeting.datetime is None."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = None
+
+    result = meeting._plain_datetime
+
+    # Line 251: the else-branch returning the localised "date not set" string
+    expected = MeetingMessages.DATE_NOT_SET.get_text(lang=meeting.lang)
+    assert result == expected  # plain str, not FormattedText
+
+
+def test_plain_datetime_formatted_when_datetime_set(user_with_settings: User):
+    """_plain_datetime must return a UTC-formatted string when meeting.datetime is set."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = datetime(2024, 1, 12, 12, 30, tzinfo=UTC)
+
+    result = meeting._plain_datetime
+
+    assert result == "2024-01-12 12:30"  # f"{self.datetime:%Y-%m-%d %H:%M}"
+
+
+# --- main_view and external_view: join/leave row hidden when locked and in-progress ---
+
+
+def test_main_view_hides_join_leave_row_when_locked_and_in_progress(user_with_settings: User):
+    """main_view must omit the join/leave row when lock_on_start=True and the meeting is in progress."""
+    import datetime as dt
+    from datetime import timedelta
+
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    # Set datetime to 5 minutes ago and duration to 60 min so is_in_progress is True
+    meeting.datetime = now - timedelta(minutes=5)
+    meeting.duration_minutes = 60
+    meeting.lock_on_start = True
+
+    assert meeting.is_in_progress  # guard: the branch condition must be True
+
+    view = meeting.main_view
+
+    join_cb = cb.JOIN.with_id(meeting.db_id)
+    join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
+    # Lines 427→429: the join/leave row is skipped when locked and in progress
+    assert len(join_buttons) == 0
+
+
+def test_external_view_hides_join_leave_row_when_locked_and_in_progress(user_with_settings: User):
+    """external_view must omit the join/leave row when lock_on_start=True and the meeting is in progress."""
+    import datetime as dt
+    from datetime import timedelta
+
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = now - timedelta(minutes=5)
+    meeting.duration_minutes = 60
+    meeting.lock_on_start = True
+
+    assert meeting.is_in_progress  # guard: the branch condition must be True
+
+    view = meeting.external_view
+
+    join_cb = cb.JOIN.with_id(meeting.db_id)
+    join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
+    # Lines 461→463: the join/leave row is skipped when locked and in progress
+    assert len(join_buttons) == 0
+
+
+def test_build_inline_keyboard_hides_join_leave_row_when_locked_and_in_progress(user_with_settings: User):
+    """build_inline_keyboard must omit the join/leave row when is_locked_and_in_progress=True."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+
+    keyboard = meeting.build_inline_keyboard(is_locked_and_in_progress=True)
+
+    join_cb = cb.JOIN.with_id(meeting.db_id)
+    join_buttons = [btn for row in keyboard for btn in row if btn.callback_data == join_cb]
+    # Lines 633→636: the join/leave row is skipped
+    assert len(join_buttons) == 0

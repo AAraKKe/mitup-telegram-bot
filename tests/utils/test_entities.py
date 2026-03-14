@@ -744,3 +744,22 @@ def test_strip_entity_from_text_multi_codeunit_entity():
     entity = MessageEntity(type="date_time", offset=8, length=4)
     result = strip_entity_from_text(text, entity)
     assert result == "Meeting now"
+
+
+# ---------------------------------------------------------------------------
+# FormattedText.__eq__ — cross-type comparison
+# ---------------------------------------------------------------------------
+
+
+def test_formatted_text_eq_returns_not_implemented_for_non_formatted_text():
+    # __eq__ must return NotImplemented (not False) when the other object is not a FormattedText.
+    # This lets Python fall back to the reflected comparison on the other object.
+    ft = FormattedText("x")
+    result = ft.__eq__(42)
+    assert result is NotImplemented
+
+
+def test_formatted_text_ne_non_formatted_text_evaluates_to_true():
+    # Confirming that the != operator also reflects correctly for non-FormattedText objects.
+    ft = FormattedText("x")
+    assert ft != 42

@@ -14,6 +14,7 @@ from mitup_bot.exceptions import (
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
+    InlineQueryNotSetError,
     MalformedCallbackData,
     UserNotFound,
 )
@@ -24,8 +25,11 @@ from mitup_bot.guards import (
     meeting_accessible,
     message,
     user_language,
+    user_owns_meeting,
     user_registered,
     valid_callback_data,
+    valid_callback_query,
+    valid_inline_query,
 )
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
 from mitup_bot.models import User
@@ -264,3 +268,53 @@ async def test_context_manager_for_registered_user(
                 MeetingMessages.INVITE_USER_OPEN_CHAT.get(lang="en"),
                 show_alert=True,
             )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query="")], indirect=True)
+def test_valid_inline_query_raises_when_no_inline_query(update: Update):
+    # An update with inline_query="" produces Update(inline_query=None) per create_update logic
+    with pytest.raises(InlineQueryNotSetError):
+        valid_inline_query(update)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=False)], indirect=True)
+def test_valid_callback_query_raises_when_no_callback_query(update: Update):
+    with pytest.raises(CallbackQueryNotSet):
+        valid_callback_query(update)
+
+
+async def test_user_owns_meeting_redirect_logs_and_emits_metric_and_edits_main_menu(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    caplog: pytest.LogCaptureFixture,
+):
+    # meeting_id 999 does not belong to user_with_settings (who owns ids 1 and 2)
+    with caplog.at_level(logging.WARNING):
+        result = await user_owns_meeting(user_with_settings, 999, "test action", update, context, redirect=True)
+        await context.flush_metrics()
+
+    assert result is None
+    assert any(r.levelno == logging.WARNING for r in caplog.records)
+    assert "999" in caplog.text  # meeting id
+    assert "1" in caplog.text  # user id
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.metrics_engine.assert_metrics_emited([MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT])
+
+
+async def test_user_owns_meeting_returns_none_silently_when_redirect_false(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    caplog: pytest.LogCaptureFixture,
+):
+    """When redirect=False and the user does not own the meeting, None is returned
+    and edit_message is NOT called (branch guards.py:142->150 False path)."""
+    # meeting_id 999 does not belong to user_with_settings (who owns ids 1 and 2)
+    with caplog.at_level(logging.WARNING):
+        result = await user_owns_meeting(user_with_settings, 999, "test action", update, context, redirect=False)
+
+    assert result is None
+    # No warning logged and no message sent because redirect is disabled
+    assert "User tried" not in caplog.text
+    context.api.assert_method_just_called("edit_message", times=0)

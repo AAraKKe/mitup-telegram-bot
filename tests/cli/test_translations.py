@@ -58,6 +58,27 @@ def test_print_diff(line: str, expected: str):
     assert expected == output.getvalue()
 
 
+@mock.patch("mitup_bot.cli.commands.translations.mo_file_for_language")
+@mock.patch("mitup_bot.cli.commands.translations.subprocess")
+def test_build_skips_mkdir_when_mo_directory_already_exists(
+    subprocess_mock: mock.Mock, mo_mock: mock.Mock, tmp_path: Path
+):
+    # Pre-create all LC_MESSAGES directories so mo_path.parent.exists() returns True
+    for lang in SUPPORTED_LANGUAGES:
+        (tmp_path / f"locales/{lang}/LC_MESSAGES").mkdir(parents=True)
+
+    mo_mock.side_effect = lambda lang: tmp_path / f"locales/{lang}/LC_MESSAGES/mitup_bot.mo"
+
+    with console().capture() as capture:
+        result = CliRunner().invoke(build)
+
+    captured = capture.get()
+
+    assert result.exit_code == 0
+    # The "Creating mo path" message must NOT appear since the directories already exist
+    assert "Creating mo path for language" not in captured
+
+
 @mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
 def test_build_translations_fails_without_po_file(po_mock: mock.Mock):
     po_mock.return_value = Path("non_existent_file")

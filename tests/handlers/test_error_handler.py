@@ -25,6 +25,15 @@ async def test_errors_ignored(error: type, message: str, context: StubMitupConte
     context.metrics_engine.assert_metrics_not_emited([MetricKey.FAULT], [1])
 
 
+async def test_handle_inactive_user_not_found(context: StubMitupContext, mock_session: MockDbSession):
+    """When user_id does not exist in the session, handle_inactive_user returns silently without emitting metrics."""
+    # Do not add any user to the session so the lookup returns None
+    await error_handler.handle_inactive_user(context, user_id=999)
+    await context.metrics_engine.flush_metrics()
+
+    context.metrics_engine.assert_metrics_not_emited([MetricKey.INACTIVE_USER_SET], [1])
+
+
 async def test_handle_inactive_user_error(context: StubMitupContext, user: User, mock_session: MockDbSession):
     assert user.is_active
 

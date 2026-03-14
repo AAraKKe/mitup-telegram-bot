@@ -607,7 +607,7 @@ async def test_edit_time_can_be_cancelled(
     context.api.assert_edit_message_called(update, meeting.edit_view, times=1)
 
 
-def _date_time_entity_update(user: TgUser, unix_time: int) -> Update:
+def date_time_entity_update(user: TgUser, unix_time: int) -> Update:
     """Build an Update containing a message with a ``date_time`` entity."""
     chat = Chat(id=DEFAULT_CHAT_ID, type="private")
     text = "Tomorrow at noon"
@@ -680,6 +680,60 @@ async def test_date_time_entry_callback(
     context.api.assert_edit_message_called(update, expected_view)
 
 
+@pytest.mark.parametrize(
+    "update",
+    [(UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(10)))],
+    indirect=["update"],
+    ids=["date_time_entry_no_datetime"],
+)
+async def test_date_time_entry_callback_without_datetime(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+):
+    """DATE_TIME_ENTRY_CALLBACK with meeting.datetime=None must NOT include the DELETE_DATE button."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    # Explicitly ensure no datetime is set (create_meetup defaults to None already)
+    assert meeting.datetime is None
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK, update=update, app=app)
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+
+    today = user_with_settings.now_in_tz().date()
+    datetime_link = build_datetime_link()
+    # When meeting.datetime is None the DELETE_DATE row (branch 152→161) is skipped
+    expected_view = MitupView(
+        description=MeetingMessages.DATE_TIME_VIEW_MESSAGE.get(
+            lang=user_with_settings.lang, datetime_link=datetime_link
+        ),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.DATE.get(lang=user_with_settings.lang),
+                    callback_data=cb.EDIT_MEETING_DATE.with_id(10).with_date(today),
+                ),
+                ButtonConfig(
+                    text=ButtonMessages.TIME.get(lang=user_with_settings.lang),
+                    callback_data=cb.EDIT_MEETING_TIME.with_id(10),
+                ),
+            ],
+            # No DELETE_DATE row — meeting.datetime is None
+            [
+                ButtonConfig(
+                    text=ButtonMessages.EDIT.back(lang=user_with_settings.lang),
+                    callback_data=cb.EDIT_MEETING.with_id(10),
+                ),
+            ],
+        ],
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
 async def test_date_time_entity_message(
     mock_session: MockDbSession,
     user_with_settings: User,
@@ -687,7 +741,7 @@ async def test_date_time_entity_message(
 ):
     unix_time = 1735000000  # arbitrary fixed unix timestamp for assertions
     tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
-    update = _date_time_entity_update(tg_user, unix_time)
+    update = date_time_entity_update(tg_user, unix_time)
 
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
     user_with_settings.meetups.append(meeting)
@@ -774,7 +828,7 @@ async def test_date_time_entity_message_user_not_found(
 ):
     """DATE_TIME_ENTITY_MESSAGE raises UserNotFound when the user is not registered."""
     tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
-    update = _date_time_entity_update(tg_user, unix_time=1735000000)
+    update = date_time_entity_update(tg_user, unix_time=1735000000)
     # Do not add the user to the session — guard raises UserNotFound.
 
     context, _ = await call_handler(
@@ -808,7 +862,7 @@ async def test_date_time_entity_message_meeting_not_owned(
 ):
     """DATE_TIME_ENTITY_MESSAGE stops when the meeting is not accessible to the user."""
     tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
-    update = _date_time_entity_update(tg_user, unix_time=1735000000)
+    update = date_time_entity_update(tg_user, unix_time=1735000000)
     not_owned_meeting = create_meetup(id=99, title="Not Owned")
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)

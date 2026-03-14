@@ -15,6 +15,7 @@ __all__ = [
     "create_settings",
     "create_message",
     "create_joined_link",
+    "owner_with_meeting",
     "MockDbSession",
     "MITUP_DIR",
     "console",
@@ -39,6 +40,7 @@ from .fixtures import (
     create_settings,
     telegram_user_from_user,
     create_joined_link,
+    owner_with_meeting,
 )
 from .stub_db import MockDbSession, Result
 from .filesystem import MITUP_DIR

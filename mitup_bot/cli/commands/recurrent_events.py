@@ -63,8 +63,8 @@ class IntervalsConfiguration:
                 return self.deactivate_meetings
             case EventType.MEETUPS_CLEANUP:
                 return self.meetups_cleanup
-            case never:
-                assert_never(never)
+            case never:  # pragma: no cover
+                assert_never(never)  # pragma: no cover
 
 
 def build_bot(config: BotConfig) -> ExtBot:
@@ -88,8 +88,8 @@ async def launch_event(event_type: EventType, api: TelegramApiWrapper, metrics: 
             await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.MEETUPS_CLEANUP:
             await meetups_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-        case never:
-            assert_never(never)
+        case never:  # pragma: no cover
+            assert_never(never)  # pragma: no cover
 
 
 async def handle_maintainance(event_type: EventType, api: TelegramApiWrapper) -> None:

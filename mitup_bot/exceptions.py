@@ -53,7 +53,7 @@ class CallbackQueryNotSet(RuntimeError):
         super().__init__(f"Expected callback data in Telegram Update not available: {update.to_json()}")
 
 
-class InvalidUserData(RuntimeError): ...
+class InvalidUserData(RuntimeError): ...  # pragma: no cover
 
 
 class UpdateNotDefined(ValueError):
@@ -61,7 +61,7 @@ class UpdateNotDefined(ValueError):
         super().__init__("MitupContext Update was requested but it is not defined.")
 
 
-class ContextPropertyNotSetError(ValueError): ...
+class ContextPropertyNotSetError(ValueError): ...  # pragma: no cover
 
 
 class ContextPropertyConversionError(ValueError):

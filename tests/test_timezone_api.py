@@ -203,3 +203,54 @@ def test_get_coordinates_logs_warning_on_failure(geocode_client, context: StubMi
     context.metrics_engine.assert_metrics_emited(
         [MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse")], [1], [Unit.COUNT]
     )
+
+
+# ---------------------------------------------------------------------------
+# Direct accessor functions raise when not configured
+# ---------------------------------------------------------------------------
+
+
+def test_geocode_client_raises_when_not_configured():
+    """geocode_client() raises GeocodeClientNotConfiguredError when configure() was never called."""
+    # reset_clients autouse fixture guarantees __geocode_client is None here.
+    with pytest.raises(GeocodeClientNotConfiguredError):
+        timezone_api.geocode_client()
+
+
+def test_geocode_client_returns_client_when_configured(gmaps_client):
+    """geocode_client() returns the configured client (exercises the return path at line 40)."""
+    timezone_api.configure(CONFIG_GMAPS_KEYS)
+
+    client = timezone_api.geocode_client()
+
+    assert client is not None
+
+
+def test_timezone_client_raises_when_not_configured():
+    """timezone_client() raises TimezoneClientNotConfiguredError when configure() was never called."""
+    # reset_clients autouse fixture guarantees __timezone_client is None here.
+    with pytest.raises(TimezoneClientNotConfiguredError):
+        timezone_api.timezone_client()
+
+
+def test_timezone_client_returns_client_when_configured(gmaps_client):
+    """timezone_client() returns the configured client (exercises the return path at line 46)."""
+    timezone_api.configure(CONFIG_GMAPS_KEYS)
+
+    client = timezone_api.timezone_client()
+
+    assert client is not None
+
+
+def test_configure_raises_timezone_already_initialized_when_only_timezone_client_set(gmaps_client):
+    """configure() raises TimezoneClientAlreadyInitializedError when __timezone_client is already
+    set but __geocode_client is still None.
+
+    This exercises the branch at line 62 of timezone_api.py which is only reachable when
+    __geocode_client is falsy and __timezone_client is truthy.
+    """
+    # Inject a pre-existing timezone client while leaving geocode client as None.
+    timezone_api.__timezone_client = mock.MagicMock()
+
+    with pytest.raises(TimezoneClientAlreadyInitializedError):
+        timezone_api.configure(CONFIG_GMAPS_KEYS)

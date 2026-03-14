@@ -2,15 +2,17 @@ from collections.abc import Callable
 from functools import partial
 
 import pytest
+from aws_embedded_metrics.unit import Unit
 
 from mitup_bot import views
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
+from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
-from tests.helpers import MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
+from tests.helpers import AnyFloat, MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
 from tests.helpers.conversation import ConversationStep, ConversationTester
 from tests.helpers.handler_context import HandlerContext
 
@@ -506,4 +508,82 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
         update=handler_context.update,
         text=expected_message.get(lang=user_with_settings.lang),
         show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DECLINE_INVITE_USER.with_id(MEETING_ID))],
+    indirect=True,
+)
+async def test_decline_user_invitation_when_meeting_no_longer_allows_invitations(
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    meeting: Meetup,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """When ensure_meeting_still_allows_invitations returns None, handler edits to main_menu_view and returns END."""
+    setup_db(mock_session, user_with_settings, meeting)
+
+    async def _always_none(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "mitup_bot.handlers.meeting.invite_users.ensure_meeting_still_allows_invitations",
+        _always_none,
+    )
+
+    context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, handler_context=handler_context)
+
+    expected_view = views_factory.main_menu_view(
+        lang=user_with_settings.lang,
+        message=MeetingMessages.INVITE_USERS_CANCELED.get(lang=user_with_settings.lang),
+    )
+    context.api.assert_edit_message_called(handler_context.update, expected_view)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DECLINE_INVITE_USER.with_id(MEETING_ID))],
+    indirect=True,
+)
+async def test_fallback_invite_user_clears_context_and_sends_main_menu(
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    meeting: Meetup,
+):
+    """Fallback handler clears context, sends main menu with unexpected-update message, emits a FAULT metric."""
+    setup_db(mock_session, user_with_settings, meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_FALLBACK, handler_context=handler_context)
+
+    # Context data should have been cleared
+    assert context.user_data is not None
+    assert len(context.user_data.registry) == 0
+
+    # Main menu should have been sent with the unexpected-updates message
+    expected_view = views_factory.main_menu_view(
+        lang=user_with_settings.lang,
+        message=MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES.get(lang=user_with_settings.lang),
+    )
+    context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
+
+    # The FAULT metric should have been emitted with the expected prefix,
+    # batched together with the other standard handler metrics in a single log line.
+    # The ContextId property is set by clean_user_data before the metric is emitted.
+    context.metrics_engine.assert_metrics_emited(
+        names=[
+            "CleanUserData",
+            MetricKey.FAULT.with_prefix("FallbackInviteUserConversation"),
+            MetricKey.FAULT,
+            MetricKey.TIME,
+            MetricKey.DB_CONNECTIONS_LEAKED,
+        ],
+        values=[1, 1.0, 0, AnyFloat(), 0],
+        units=[Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
+        properties={"ContextId": str(ContextId.INVITE_USERS)},
+        add_handler_dimensions=True,
+        add_update_properties=True,
     )

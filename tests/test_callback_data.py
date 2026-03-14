@@ -104,3 +104,17 @@ def test_meeting_callback_data_with_id():
     cb = MeetingCallbackData(entity="meeting", action="edit").with_ids(meeting_id=10, id=21)
     cb = cb.with_id(10)
     assert str(cb) == "edit;meeting:10:10"
+
+
+@pytest.mark.parametrize(
+    "id, entity, expected",
+    [
+        (None, "meeting", True),  # id is None → malformed
+        (42, "unknown", True),  # unknown entity → malformed
+        (42, "meeting", False),  # valid id and known entity → not malformed
+    ],
+    ids=["none_id", "unknown_entity", "valid"],
+)
+def test_callback_data_is_malformed(id: int | None, entity: str, expected: bool):
+    cb = CallbackData(action="show", entity=entity, id=id)
+    assert cb.is_malformed() is expected

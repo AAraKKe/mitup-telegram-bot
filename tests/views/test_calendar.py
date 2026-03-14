@@ -217,3 +217,39 @@ def test_calendar_marks_anchor_date():
     # 22 23 24 25 26 27 28
     # 29 30 31
     assert cal.keyboard[2][4].text == Emojis.CHECK.value
+
+
+@freezegun.freeze_time("2024-01-01", tz_offset=0)
+def test_navigation_day_clamps_to_last_valid_day_of_month():
+    # anchor_date is Jan 31. Navigating forward one month leads to Feb, which has no day 31.
+    # The __navigation_day fallback must return the last day of Feb (29 in 2024, because it's a leap year).
+    cal = CalendarKeyboard(
+        anchor_date=dt.date(2024, 1, 31),
+        current_date=dt.date(2024, 1, 31),
+        callback_data=DateCallbackData(entity="cal", action="go", id=1),
+        navigation_callback_data=DateCallbackData(entity="nav", action="go", id=1),
+    )
+
+    # The forward navigation button (by month) should target 2024-02-29 (2024 is a leap year)
+    # Navigation rows are the last two rows; the month-nav row is at index -2
+    month_nav_row = cal.keyboard[-2]
+    # There should be at least a forward button (the label and forward buttons)
+    # The rightmost button in the row is always the forward button
+    forward_button = month_nav_row[-1]
+    forward_cb = forward_button.callback_data
+    assert isinstance(forward_cb, DateCallbackData)
+    # 2024 is a leap year — Feb has 29 days, so the clamped day is 29
+    assert forward_cb.date == dt.date(2024, 2, 29)  # last valid day in Feb 2024
+
+
+def test_calendar_str_contains_pipe_separator():
+    cal = CalendarKeyboard(
+        anchor_date=dt.date(2024, 7, 12),
+        current_date=dt.date(2024, 7, 12),
+        callback_data=DateCallbackData(entity="cal", action="go", id=1),
+        navigation_callback_data=DateCallbackData(entity="nav", action="go", id=1),
+    )
+    result = str(cal)
+    assert isinstance(result, str)
+    assert len(result) > 0
+    assert "|" in result

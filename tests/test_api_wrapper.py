@@ -280,7 +280,7 @@ async def test_notify_users_promoted_filters_invited_users(telegram_api: Telegra
 # ---------------------------------------------------------------------------
 
 
-def _make_bot_chat_meeting() -> tuple[Meetup, MessageModel]:
+def make_bot_chat_meeting() -> tuple[Meetup, MessageModel]:
     meeting = create_meetup(id=10, title="Test Meeting", language="en")
     owner = create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(
@@ -293,7 +293,7 @@ def _make_bot_chat_meeting() -> tuple[Meetup, MessageModel]:
     return meeting, msg
 
 
-def _make_inline_meeting() -> tuple[Meetup, MessageModel]:
+def make_inline_meeting() -> tuple[Meetup, MessageModel]:
     meeting = create_meetup(id=10, title="Test Meeting", language="en")
     create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(
@@ -308,7 +308,7 @@ def _make_inline_meeting() -> tuple[Meetup, MessageModel]:
 
 
 async def test_update_single_meeting_message_bot_chat(telegram_api: TelegramApi, bot: AsyncMock):
-    meeting, msg = _make_bot_chat_meeting()
+    meeting, msg = make_bot_chat_meeting()
     session = MagicMock(spec=Session)
 
     await telegram_api.update_single_meeting_message(msg, session, meeting)
@@ -322,7 +322,7 @@ async def test_update_single_meeting_message_bot_chat(telegram_api: TelegramApi,
 
 
 async def test_update_single_meeting_message_inline(telegram_api: TelegramApi, bot: AsyncMock):
-    meeting, msg = _make_inline_meeting()
+    meeting, msg = make_inline_meeting()
     session = MagicMock(spec=Session)
 
     await telegram_api.update_single_meeting_message(msg, session, meeting)
@@ -348,7 +348,7 @@ async def test_update_single_meeting_message_state_flags(
     has_finished: bool,
     expected_text_fragment: str,
 ):
-    meeting, msg = _make_bot_chat_meeting()
+    meeting, msg = make_bot_chat_meeting()
     session = MagicMock(spec=Session)
 
     await telegram_api.update_single_meeting_message(
@@ -363,8 +363,8 @@ async def test_update_single_meeting_message_state_flags(
 async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
     telegram_api: TelegramApi, bot: AsyncMock
 ):
-    meeting_bot, msg_bot = _make_bot_chat_meeting()
-    meeting_inline, msg_inline = _make_inline_meeting()
+    meeting_bot, msg_bot = make_bot_chat_meeting()
+    meeting_inline, msg_inline = make_inline_meeting()
     session = MagicMock(spec=Session)
 
     await telegram_api.update_single_meeting_message(msg_bot, session, meeting_bot)
@@ -380,7 +380,7 @@ async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
 
 
 async def test_update_single_meeting_message_not_modified_is_swallowed(telegram_api: TelegramApi, bot: AsyncMock):
-    meeting, msg = _make_bot_chat_meeting()
+    meeting, msg = make_bot_chat_meeting()
     session = MagicMock(spec=Session)
     bot.edit_message_text.side_effect = BadRequest("Message is not modified: ...")
 
@@ -389,7 +389,7 @@ async def test_update_single_meeting_message_not_modified_is_swallowed(telegram_
 
 
 async def test_update_single_meeting_message_not_found_deletes_message(telegram_api: TelegramApi, bot: AsyncMock):
-    meeting, msg = _make_bot_chat_meeting()
+    meeting, msg = make_bot_chat_meeting()
     session = MagicMock(spec=Session)
     bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
 
@@ -640,3 +640,32 @@ async def test_answer_callback_query(telegram_api: TelegramApi, bot: AsyncMock, 
     await telegram_api.answer_callback_query(update, text, show_alert=False)
 
     bot.answer_callback_query.assert_awaited_once_with(update.callback_query.id, text=text, show_alert=False)
+
+
+async def test_answer_callback_query_raises_when_formatted_text_has_entities(
+    telegram_api: TelegramApi,
+):
+    from telegram import MessageEntity
+
+    from mitup_bot.utils.entities import FormattedText
+
+    update = MagicMock(spec=Update)
+    # FormattedText with at least one entity — should trigger the ValueError guard
+    ft = FormattedText("hello", [MessageEntity(type="bold", offset=0, length=5)])
+
+    with pytest.raises(ValueError, match="Callback query text should not contain entities"):
+        await telegram_api.answer_callback_query(update, ft, show_alert=False)
+
+
+async def test_update_single_meeting_message_has_started_branch(telegram_api: TelegramApi, bot: AsyncMock):
+    # When has_started=True the "in progress" banner is prepended but reply_markup is preserved
+    meeting, msg = make_bot_chat_meeting()
+    session = MagicMock(spec=Session)
+
+    await telegram_api.update_single_meeting_message(msg, session, meeting, has_started=True)
+
+    call_kwargs = bot.edit_message_text.call_args.kwargs
+    # The markup must be present (buttons remain active while in progress)
+    assert call_kwargs["reply_markup"] is not None
+    # The text must contain the in-progress indicator
+    assert "progress" in call_kwargs["text"].lower()

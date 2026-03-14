@@ -27,7 +27,7 @@ from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, DEFAULT
 # ---------------------------------------------------------------------------
 
 
-def _make_message_update(text: str, entities: list[MessageEntity] | None = None) -> Update:
+def make_message_update(text: str, entities: list[MessageEntity] | None = None) -> Update:
     """Build an Update carrying a Message with the given text and entities."""
     tg_user = TelegramUser(**DEFAULT_TG_USER_PARAMS)
     tg_chat = Chat(id=DEFAULT_CHAT_ID, type="private")
@@ -140,7 +140,7 @@ async def test_meeting_creation_with_date_entity_strips_title_and_sets_datetime(
     unix_ts = 1_700_000_000
     # Text: "Board meeting tomorrow" -- "tomorrow" starts at offset 14, length 8
     date_entity = DateTimeMessageEntity(offset=14, length=8, unix_time=unix_ts)
-    title_update = _make_message_update("Board meeting tomorrow", entities=[date_entity])
+    title_update = make_message_update("Board meeting tomorrow", entities=[date_entity])
 
     context, _ = await call_handler(
         MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=title_update, app=conversation.app
@@ -156,6 +156,36 @@ async def test_meeting_creation_with_date_entity_strips_title_and_sets_datetime(
 
 
 # ---------------------------------------------------------------------------
+# create_meeting_message_handler — date_entity without unix_time: title stripped, datetime not set
+# ---------------------------------------------------------------------------
+
+
+async def test_meeting_creation_with_date_entity_without_unix_time_strips_title_but_leaves_datetime_none(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app,
+):
+    """A date_time entity whose to_dict() lacks 'unix_time' still strips the entity span from the
+    title (line 81) but does NOT set meetup.datetime (unix_time is None → line 79-80 skipped)."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    # Build a plain MessageEntity with type="date_time" that has no unix_time in to_dict().
+    # MessageEntity.to_dict() only serialises known fields, so a bare date_time entity
+    # without the unix_time attribute will not include it in the dict.
+    date_entity = MessageEntity(type="date_time", offset=14, length=8)
+    title_update = make_message_update("Board meeting tomorrow", entities=[date_entity])
+
+    context, _ = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, update=title_update, app=app)
+
+    assert len(mock_session.objects_added) == 1
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    # The entity span ("tomorrow") was stripped from the title
+    assert new_meeting.title == "Board meeting"  # "tomorrow" (offset=14, len=8) stripped
+    # But datetime was NOT set because unix_time was absent
+    assert new_meeting.datetime is None
+
+
+# ---------------------------------------------------------------------------
 # create_meeting_invalid_title_message_handler — unsupported entity fires fallback
 #
 # PTB does not persist conversation state for fallback handlers, so these
@@ -168,7 +198,7 @@ async def test_meeting_creation_with_date_entity_strips_title_and_sets_datetime(
 @pytest.mark.parametrize(
     "bad_update",
     [
-        _make_message_update(
+        make_message_update(
             "tomorrow later",
             entities=[
                 DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000),
@@ -210,14 +240,14 @@ async def test_invalid_title_fires_fallback_handler(
 
 
 def test_valid_title_filter_plain_text_passes():
-    f = ValidTitleFilter()
-    update = _make_message_update("Board meeting")
+    title_filter = ValidTitleFilter()
+    update = make_message_update("Board meeting")
     assert update.effective_message is not None
-    assert f.filter(update.effective_message) is True
+    assert title_filter.filter(update.effective_message) is True
 
 
 def test_valid_title_filter_no_text_rejects():
-    f = ValidTitleFilter()
+    title_filter = ValidTitleFilter()
     tg_user = TelegramUser(**DEFAULT_TG_USER_PARAMS)
     tg_chat = Chat(id=DEFAULT_CHAT_ID, type="private")
     message = Message(
@@ -227,52 +257,52 @@ def test_valid_title_filter_no_text_rejects():
         from_user=tg_user,
         text=None,
     )
-    assert f.filter(message) is False
+    assert title_filter.filter(message) is False
 
 
 def test_valid_title_filter_command_rejects():
     # BOT_COMMAND entity at offset 0 means it is a /command — must be rejected
-    f = ValidTitleFilter()
-    update = _make_message_update(
+    title_filter = ValidTitleFilter()
+    update = make_message_update(
         "/start",
         entities=[MessageEntity(type=MessageEntity.BOT_COMMAND, offset=0, length=6)],
     )
     assert update.effective_message is not None
-    assert f.filter(update.effective_message) is False
+    assert title_filter.filter(update.effective_message) is False
 
 
 def test_valid_title_filter_one_date_entity_passes():
-    f = ValidTitleFilter()
+    title_filter = ValidTitleFilter()
     date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
-    update = _make_message_update("tomorrow", entities=[date_entity])
+    update = make_message_update("tomorrow", entities=[date_entity])
     assert update.effective_message is not None
-    assert f.filter(update.effective_message) is True
+    assert title_filter.filter(update.effective_message) is True
 
 
 def test_valid_title_filter_date_entity_with_other_entities_passes():
     # One date_time entity alongside a bold entity is still valid
-    f = ValidTitleFilter()
+    title_filter = ValidTitleFilter()
     date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
     bold_entity = MessageEntity(type=MessageEntity.BOLD, offset=9, length=5)
-    update = _make_message_update("tomorrow board", entities=[date_entity, bold_entity])
+    update = make_message_update("tomorrow board", entities=[date_entity, bold_entity])
     assert update.effective_message is not None
-    assert f.filter(update.effective_message) is True
+    assert title_filter.filter(update.effective_message) is True
 
 
 def test_valid_title_filter_non_command_entity_passes():
     # A bold entity without any date_time entity is a valid title
-    f = ValidTitleFilter()
+    title_filter = ValidTitleFilter()
     bold_entity = MessageEntity(type=MessageEntity.BOLD, offset=0, length=5)
-    update = _make_message_update("hello", entities=[bold_entity])
+    update = make_message_update("hello", entities=[bold_entity])
     assert update.effective_message is not None
-    assert f.filter(update.effective_message) is True
+    assert title_filter.filter(update.effective_message) is True
 
 
 def test_valid_title_filter_multiple_date_entities_rejects():
     # Two date_time entities must be rejected (sum > 1)
-    f = ValidTitleFilter()
-    e1 = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
-    e2 = DateTimeMessageEntity(offset=9, length=5, unix_time=1_700_001_000)
-    update = _make_message_update("tomorrow later", entities=[e1, e2])
+    title_filter = ValidTitleFilter()
+    first_date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
+    second_date_entity = DateTimeMessageEntity(offset=9, length=5, unix_time=1_700_001_000)
+    update = make_message_update("tomorrow later", entities=[first_date_entity, second_date_entity])
     assert update.effective_message is not None
-    assert f.filter(update.effective_message) is False
+    assert title_filter.filter(update.effective_message) is False

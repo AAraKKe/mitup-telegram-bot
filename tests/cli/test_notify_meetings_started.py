@@ -1,3 +1,5 @@
+from unittest.mock import ANY
+
 import pytest
 from aws_embedded_metrics.unit import Unit
 from telegram.error import Forbidden
@@ -216,6 +218,49 @@ async def test_forbidden_marks_user_inactive_and_does_not_raise(
 
 
 # ---------------------------------------------------------------------------
+# Non-Forbidden participant exception → logged, counter incremented, loop continues
+# ---------------------------------------------------------------------------
+
+
+async def test_non_forbidden_participant_exception_is_logged_and_counted(
+    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+):
+    """A non-Forbidden exception from send_message_to_user for a participant is caught by
+    gather, logged, and increments the failed counter.  The meeting loop continues to the
+    next participant and ultimately raises RuntimeError because failed > 0.
+    """
+    meeting = create_meetup(id=1, title="Demo meetup")
+    participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
+    participant_b = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
+    create_joined_link(user=participant_a, meetup=meeting, id=1, is_waiting_list=False)
+    create_joined_link(user=participant_b, meetup=meeting, id=2, is_waiting_list=False)
+
+    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
+
+    send_mock = api.mock_method("send_message_to_user")
+    # First participant raises a generic exception; second succeeds.
+    send_mock.side_effect = [Exception("Network failure"), None]
+
+    with pytest.raises(RuntimeError, match="Failed to process started notifications"):
+        await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+
+    await metrics.flush()
+
+    # The second participant's send still succeeded → sent=1.
+    # The failed exception from the first send → failed=1.
+    metrics.assert_metrics_emited(
+        [
+            MetricKey.MEETINGS_STARTED_PROCESSED,
+            MetricKey.STARTED_NOTIFICATIONS_SENT,
+            MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        ],
+        [1, 1, 1],
+        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Failed meeting increments counter and raises RuntimeError at the end
 # ---------------------------------------------------------------------------
 
@@ -235,8 +280,6 @@ async def test_failed_meeting_increments_counter_and_raises(
 
     # Second call to update_meeting_messages raises
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("Boom")]
-
-    from unittest.mock import ANY
 
     with pytest.raises(RuntimeError, match="Failed to process started notifications"):
         await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759

@@ -196,3 +196,47 @@ async def test_timing_metrics_with_handler_dimensions(context: StubMitupContext)
     context.metrics_engine.assert_metrics_emited(
         ["MyMetricTime"], [AnyFloat()], [Unit.MILLISECONDS], dimensions={"HandlerDim": "HandlerValue"}
     )
+
+
+def test_prepare_handler_metrics_empty_dict_is_noop(context: StubMitupContext):
+    # Passing an empty dict must not alter handler_dimensionality
+    from mitup_bot.monitoring import NULL_DIMENSIONALITY
+
+    context.prepare_handler_metrics({})
+
+    # The handler dimensionality must remain the null (empty) dimensionality
+    assert context.handler_dimensionality == NULL_DIMENSIONALITY
+
+
+async def test_emit_metric_global_also_emits_under_null_dimensionality(context: StubMitupContext):
+    # emit_global=True must emit the metric under its own dimensionality AND also under
+    # NULL_DIMENSIONALITY (for global CloudWatch aggregation).
+    # We use a dimension on the primary call so both loggers are distinct, allowing
+    # independent assertions.
+    context.emit_metric(
+        "global_metric",
+        value=5.0,
+        dimensions={"MyDim": "MyVal"},
+        emit_global=True,
+        include_handler_dimensions=False,
+        include_update_properties=False,
+    )
+
+    await context.flush_metrics()
+
+    # The primary metric is emitted under the named dimension
+    context.metrics_engine.assert_metrics_emited(
+        ["global_metric"],
+        [5.0],
+        dimensions={"MyDim": "MyVal"},
+        add_handler_dimensions=False,
+        add_update_properties=False,
+    )
+    # The global copy is emitted under NULL_DIMENSIONALITY (no dimensions at all)
+    context.metrics_engine.assert_metrics_emited(
+        ["global_metric"],
+        [5.0],
+        dimensions=None,
+        add_handler_dimensions=False,
+        add_update_properties=False,
+    )

@@ -2,11 +2,20 @@ import pytest
 from aws_embedded_metrics.unit import Unit
 
 import mitup_bot.utils.callbacks as cb
+from mitup_bot.handlers.meeting.attach_to_chat import _is_already_attached
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils.messages import MeetingMessages
-from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler, create_message
+from tests.helpers import (
+    AnyFloat,
+    HandlerContext,
+    MockDbSession,
+    UpdateRequest,
+    call_handler,
+    create_meetup,
+    create_message,
+)
 
 
 @pytest.mark.parametrize(
@@ -195,3 +204,12 @@ async def test_attach_to_chat_meeting_not_found(
     )
 
     context.metrics_engine.assert_feature_metrics_not_emitted(Feature.ATTACH_TO_CHAT)
+
+
+def test_is_already_attached_returns_false_when_chat_instance_is_none():
+    """_is_already_attached returns False immediately when chat_instance is None, regardless of meeting messages."""
+    meeting = create_meetup(id=1, title="Test")
+
+    result = _is_already_attached(meeting, chat_instance=None)
+
+    assert result is False  # early return branch at line 19
