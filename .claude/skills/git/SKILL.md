@@ -72,8 +72,13 @@ Review before staging — never blindly `git add .`:
 
 4. Ask for the commit description if not provided via `$ARGUMENTS`.
 5. Build the message: `{type}: {description}`, using conventional type prefix and description.
-6. Run `git commit -m "{type}: {description}"`.
-7. Run `git status` to confirm the working tree is clean.
+6. **Deployment flags** — append a flag to the commit message title when the user asks to deploy or skip deployment:
+   - `[force-deploy]` — forces a staging deployment from `main` even when no deployment-related files changed. Example: `Fix: update copy [force-deploy]`
+   - `[no-deploy]` — suppresses deployment even when deployment files changed. Example: `Refactor: reorganise helpers [no-deploy]`
+   - These flags are matched against `$CI_COMMIT_TITLE` (first line only), so they must be in the commit message title.
+   - Production deploys only from the `release` branch regardless of flags; `[force-deploy]` only affects staging.
+7. Run `git commit -m "{type}: {description}"`.
+8. Run `git status` to confirm the working tree is clean.
 
 ---
 

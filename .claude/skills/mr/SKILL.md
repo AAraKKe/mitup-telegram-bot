@@ -16,8 +16,9 @@ model: haiku
    - **How to set up and validate locally**: Numbered steps to test.
    - **MR acceptance checklist**: Check off what applies.
 6. Output the complete description as plain Markdown.
-7. Create the MR using `glab mr create` with the following flags:
-   - `--title` — commit-style title (emoji prefix matching the commit type)
+7. Read `commits_check_config.yaml` (repo root) to get the full emoji-to-type mapping, then pick the emoji that best matches the nature of this MR. The title must start with that emoji.
+   Create the MR using `glab mr create` with the following flags:
+   - `--title` — commit-style title (emoji prefix from `commits_check_config.yaml` matching the change type)
    - `--description` — the full Markdown body via `"$(cat <<'EOF' ... EOF)"`
    - `--source-branch` — current branch (`git branch --show-current`)
    - `--target-branch main`
