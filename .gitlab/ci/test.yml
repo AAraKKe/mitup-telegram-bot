@@ -20,9 +20,17 @@ build-translations:
     paths:
       - mitup_bot/locales
 
+validate-ci-languages:
+  stage: build
+  needs: []
+  script: hatch run dev:python bin/check_ci_languages.py
+
 test:
   stage: test
-  script: hatch run dev:test-cov
+  parallel:
+    matrix:
+      - LANG: [en, es_ES, gl_ES, de_DE, pt_BR, it_IT]
+  script: hatch run dev:test-cov -- tests --lang $LANG
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   dependencies:
     - build-translations

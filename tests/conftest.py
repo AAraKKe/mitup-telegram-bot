@@ -32,6 +32,22 @@ from tests.helpers.types import CliRunner as TypeRunner
 from tests.helpers.types import StubMitupContext
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--lang",
+        default="en",
+        choices=[*SUPPORTED_LANGUAGES, "all"],
+        help="Language(s) to test. Use 'all' to run all supported languages.",
+    )
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "lang" in metafunc.fixturenames:
+        lang_opt: str = metafunc.config.getoption("--lang")
+        langs = SUPPORTED_LANGUAGES if lang_opt == "all" else [lang_opt]
+        metafunc.parametrize("lang", langs, ids=[f"lang_{lang}" for lang in langs])
+
+
 @pytest.fixture
 def none():
     """
@@ -39,11 +55,6 @@ def none():
     Specially in places where pytest getfixture value is used to dinamically load fixtures
     """
     return None
-
-
-@pytest.fixture(params=SUPPORTED_LANGUAGES, ids=[f"lang_{lang}" for lang in SUPPORTED_LANGUAGES])
-def lang(request: pytest.FixtureRequest) -> str:
-    return request.param
 
 
 @pytest.fixture
