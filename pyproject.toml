@@ -209,7 +209,7 @@ test-hook = [
 ]
 test-db = [
     "build-locales",
-    "FORCE_COLOR=1 pytest --db-tests --dist no --junitxml=report.xml {args:tests/db/}",
+    "FORCE_COLOR=1 pytest --db-tests --dist no --junitxml=report.xml {args:tests/models/db_behavior/}",
 ]
 test-cov = [
     "build-locales",

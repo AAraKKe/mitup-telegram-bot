@@ -8,9 +8,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.exceptions import HandlerRegisteredError
+from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.monitoring.metrics import NULL_DIMENSIONALITY
@@ -224,3 +225,52 @@ async def test_all_handlers_emit_global_metrics(
         add_handler_dimensions=False,
         times=valid_handlers,
     )
+
+
+# ---------------------------------------------------------------------------
+# Conversation handler registration (merged from test_conversation.py)
+# ---------------------------------------------------------------------------
+
+
+class CommandsTestId(HandlerId):
+    COMMAND_REGISTERED = "new_command_registered"
+    COMMAND_REGISTERED_2 = "other new command registered"
+    COMMAND_NOT_REGISTERED = "not_registered"
+
+
+class ConversationsTestId(HandlerId):
+    CONVERSATION_WITH_NO_HANDLERS = "conversation_with_no_handlers"
+    CONVERSATION_WITH_HANDLERS = "conversation_with_handlers"
+
+
+def test_conversation_fails_without_existing_handler():
+    @HandlersRegistry.register_command(CommandsTestId.COMMAND_REGISTERED)
+    async def command_custom_new(update: Update, context: StubMitupContext):
+        return "Done!"
+
+    with pytest.raises(HandlerNotRegistered):
+        HandlersRegistry.register_conversation_handler(
+            ConversationsTestId.CONVERSATION_WITH_NO_HANDLERS,
+            entry_points_handler_names=[CommandsTestId.COMMAND_REGISTERED],
+            states={
+                ConversationSettingsState.TIMEZONE: [CommandsTestId.COMMAND_NOT_REGISTERED],
+            },
+            fallbacks=[CommandsTestId.COMMAND_REGISTERED],
+        )
+
+
+def test_conversation_handler_can_be_registered():
+    @HandlersRegistry.register_command(CommandsTestId.COMMAND_REGISTERED_2)
+    async def command_conversation_registered(update: Update, context: StubMitupContext):
+        return "Done!"
+
+    HandlersRegistry.register_conversation_handler(
+        ConversationsTestId.CONVERSATION_WITH_HANDLERS,
+        entry_points_handler_names=[CommandsTestId.COMMAND_REGISTERED_2],
+        states={
+            ConversationSettingsState.TIMEZONE: [CommandsTestId.COMMAND_REGISTERED_2],
+        },
+        fallbacks=[CommandsTestId.COMMAND_REGISTERED_2],
+    )
+
+    assert ConversationsTestId.CONVERSATION_WITH_HANDLERS in HandlersRegistry.handlers

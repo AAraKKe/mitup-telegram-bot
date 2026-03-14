@@ -1,7 +1,7 @@
 import pytest
 from telegram import Update
 
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Message, User
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import SUPPORTED_LANGUAGES

@@ -10,8 +10,8 @@ from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import UserNotFound
-from mitup_bot.handlers.edit_meeting.edit_meeting_datetime import build_edit_datetime_entry_view as _build_entry_view
-from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as _build_entry_view
+from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
 from mitup_bot.monitoring import MetricKey

@@ -3,8 +3,8 @@ from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.handlers.edit_meeting.edit_meeting_duration import duration_input_prompt_view
-from mitup_bot.handlers.edit_meeting.enums import ConversationMeetingState, EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.edit_meeting_duration import duration_input_prompt_view
+from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Settings
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages

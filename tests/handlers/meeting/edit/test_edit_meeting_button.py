@@ -5,7 +5,7 @@ import pytest
 from telegram import Update
 
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.handlers.edit_meeting.entry import callback_query_edit_meeting
+from mitup_bot.handlers.meeting.edit.entry import callback_query_edit_meeting
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import StubMitupContext, UpdateRequest, create_meetup

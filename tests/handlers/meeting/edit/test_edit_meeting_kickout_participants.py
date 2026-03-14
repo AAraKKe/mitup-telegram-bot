@@ -1,8 +1,8 @@
 import pytest
 from telegram import Update
 
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
-from mitup_bot.handlers.edit_meeting.views import edit_participants_view, kick_out_users_view
+from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.views import edit_participants_view, kick_out_users_view
 from mitup_bot.models.users import User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb

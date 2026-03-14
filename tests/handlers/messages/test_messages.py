@@ -4,8 +4,8 @@ import pytest
 from telegram import Update
 
 from mitup_bot.custom_context import ContextId, MitupContext
-from mitup_bot.handlers.edit_meeting.edit_meeting_description import edit_description_meeting_message_handler
-from mitup_bot.handlers.edit_meeting.edit_meeting_title import edit_title_meeting_message_handler
+from mitup_bot.handlers.meeting.edit.edit_meeting_description import edit_description_meeting_message_handler
+from mitup_bot.handlers.meeting.edit.edit_meeting_title import edit_title_meeting_message_handler
 from mitup_bot.handlers.messages import filter_messages_without_text
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingMessages

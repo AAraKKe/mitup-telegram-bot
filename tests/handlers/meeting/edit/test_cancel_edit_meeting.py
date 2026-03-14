@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb

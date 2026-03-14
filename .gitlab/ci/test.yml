@@ -22,7 +22,7 @@ build-translations:
 
 validate-ci-languages:
   stage: build
-  needs: []
+  needs: [{job: build-docker-ci, optional: true}]
   script: hatch run dev:python bin/check_ci_languages.py
 
 test:
@@ -34,7 +34,7 @@ test:
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   dependencies:
     - build-translations
-  needs: [preparation, build-translations]
+  needs: [preparation, build-translations, validate-ci-languages]
   artifacts:
     when: always # Important to get reports when test fail
     reports:

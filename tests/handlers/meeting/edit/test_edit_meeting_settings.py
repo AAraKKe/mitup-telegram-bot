@@ -1,7 +1,7 @@
 import pytest
 from telegram import Update
 
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler

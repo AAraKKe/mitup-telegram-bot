@@ -17,9 +17,9 @@ from telegram import Location, Update
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData, UserNotFound
 from mitup_bot.handler_id import HandlerId
-from mitup_bot.handlers.edit_meeting.enums import EditMeetingHandlerId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
+from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
