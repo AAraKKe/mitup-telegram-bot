@@ -769,5 +769,8 @@ msgstr "▶️ Esta quedada está en curso ▶️"
 msgid "MeetingMessages.SET_DURATION_PROMPT"
 msgstr "Envíame a duración da quedada en minutos, ou toca <b>Cancelar</b> para volver."
 
+msgid "MeetingMessages.STALE_CANCEL_BUTTON"
+msgstr "Xa respondaches a esta pregunta"
+
 msgid "NotificationMessages.MEETING_STARTED"
 msgstr "A quedada <b>${meeting_title}</b> comezou!"

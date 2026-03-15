@@ -66,6 +66,20 @@ async def test_edit_message_without_inline_message_id(context: StubMitupContext)
         await context.api.edit_message(update=update, view=message)
 
 
+async def test_clear_reply_markup_raises_no_message_available_with_callback_query_without_inline_id(
+    context: StubMitupContext,
+):
+    """Raises NoMessageAvailable when callback_query exists but both message refs are None."""
+    update = mock.MagicMock(spec=Update)
+    update.effective_message = None
+    update.callback_query = mock.MagicMock()
+    update.callback_query.inline_message_id = None
+    update.callback_query.message = None
+
+    with pytest.raises(NoMessageAvailable):
+        await context.api.clear_reply_markup(update)
+
+
 async def test_send_message_with_a_view(context: StubMitupContext, update: Update, default_view: MitupView):
     assert context.telegram_update.effective_chat is not None
 

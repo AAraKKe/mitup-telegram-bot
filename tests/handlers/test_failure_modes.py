@@ -21,6 +21,7 @@ from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
+from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
@@ -640,6 +641,12 @@ CONTEXTS = [
         id="duration_invalid_message",
         meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
         shows_deleted_message_when_not_found=False,
+    ),
+    Context(
+        handler_id=StaleCancelHandlerId.STALE_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_CREATE_MEETING),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="stale_cancel",
     ),
 ]
 

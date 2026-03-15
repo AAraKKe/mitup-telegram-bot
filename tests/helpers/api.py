@@ -75,6 +75,9 @@ class MockApi(TelegramApi):
             "answer_inline_query", update=update, results=results, button=button, cache_time=cache_time
         )
 
+    async def clear_reply_markup(self, update: Update):
+        return await self.call_mock("clear_reply_markup", update=update)
+
     def call_mock(self, name: str, **kwargs: DefaultValue | Any) -> mock.AsyncMock:
         new_kwargs = {arg: value for arg, value in kwargs.items() if not isinstance(value, DefaultValue)}
         return self.mock_method(name)(**new_kwargs)

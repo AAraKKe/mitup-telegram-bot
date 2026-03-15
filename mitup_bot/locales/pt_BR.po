@@ -769,5 +769,8 @@ msgstr "Este evento já começou e a lista de participantes está bloqueada."
 msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
 msgstr "Entendo apenas um título ou um título com uma data 🤔.\n\nEnvie apenas o título do evento, ou o título com uma data formatada pelo Telegram. Clique em <b>Cancelar</b> para sair."
 
+msgid "MeetingMessages.STALE_CANCEL_BUTTON"
+msgstr "Você já respondeu essa pergunta"
+
 msgid "NotificationMessages.MEETING_STARTED"
 msgstr "O evento <b>${meeting_title}</b> começou!"

@@ -771,3 +771,6 @@ msgstr "Ich verstehe nur einen Titel oder einen Titel mit einem Datum 🤔.\n\nB
 
 msgid "NotificationMessages.MEETING_STARTED"
 msgstr "Das Treffen <b>${meeting_title}</b> hat begonnen!"
+
+msgid "MeetingMessages.STALE_CANCEL_BUTTON"
+msgstr "Du hast diese Frage bereits beantwortet"

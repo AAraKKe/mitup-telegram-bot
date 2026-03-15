@@ -590,6 +590,9 @@ msgstr "Questi sono tutti i tuoi incontri passati."
 msgid "MeetingMessages.NO_PAST_MEETINGS"
 msgstr "<i>Non hai ancora nessun incontro passato.</i>"
 
+msgid "MeetingMessages.STALE_CANCEL_BUTTON"
+msgstr "Hai già risposto"
+
 msgid "Weekday.MONDAY"
 msgstr "Lun"
 

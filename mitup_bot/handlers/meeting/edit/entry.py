@@ -35,10 +35,10 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
 
 
 @HandlersRegistry.register_callback_query(
-    EditMeetingHandlerId.CANCEL, callback_data=cb.EDIT_MEETING_CANCEL, bindable=True
+    EditMeetingHandlerId.CANCEL, callback_data=cb.EDIT_MEETING_CANCEL, bindable=False
 )
 @with_async_session
-async def cancel_edit_meeting(session: Session, update: Update, context: TMitupContext) -> int:
+async def callback_query_cancel_edit_meeting(session: Session, update: Update, context: TMitupContext) -> int:
     """If at any point the user clicks on Cancel we should get back to the Edit meeting view"""
     user = guards.current_user(update, session)
 
@@ -54,7 +54,7 @@ async def cancel_edit_meeting(session: Session, update: Update, context: TMitupC
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
-    logging.debug(f"Enter into cancel_edit_meeting. Meeting id: {meeting_id}")
+    logging.debug(f"Enter into callback_query_cancel_edit_meeting. Meeting id: {meeting_id}")
 
     meetup = await guards.user_owns_meeting(user, meeting_id, "Cancel edit meeting", update, context)
     if meetup is None:

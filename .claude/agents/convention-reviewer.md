@@ -1,7 +1,7 @@
 ---
 name: convention-reviewer
 description: Reviews code for compliance with project-specific conventions. Use after implementing new handlers, views, models, or tests to catch pattern violations before CI. Checks guard usage, localization, metrics, type suppression format, session decorator correctness, naming, and code structure.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 model: sonnet
 skills:
   - coding-standards
@@ -28,6 +28,7 @@ When reviewing code:
 - Do not skip a violation because it seems minor
 - Do not invent rules not present in the skills
 - Do not suggest improvements beyond fixing the violation
+- **Never fix violations yourself.** Your only output is a structured report. Fixes are the responsibility of the specialist agent that made the changes.
 </instructions>
 
 <output_format>

@@ -14,7 +14,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import build_datetime_link, strip_entity_from_text
+from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from ..command_enums import CommandsId
@@ -78,7 +78,6 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
         unix_time = date_entity.to_dict().get("unix_time")
         if unix_time is not None:
             meeting_datetime = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
-        title = strip_entity_from_text(title, date_entity)
 
     meetup = Meetup(
         title=title,

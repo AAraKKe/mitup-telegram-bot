@@ -36,7 +36,7 @@ DELETE_PAST_MEETING = CallbackData(action="delete", entity="past_meeting")
 CONFIRM_DELETE_PAST_MEETING = CallbackData(action="confirm_delete", entity="past_meeting")
 DECLINE_DELETE_PAST_MEETING = CallbackData(action="decline_delete", entity="past_meeting")
 CONFIRM_INVITE_USER = CallbackData(action="confirm", entity="invite")
-DECLINE_INVITE_USER = CallbackData(action="decline", entity="invite")
+CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
 
 # ----------------------------------------
 # Edit meeting callbacks

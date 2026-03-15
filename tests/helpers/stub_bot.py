@@ -35,6 +35,7 @@ class StubBot(ExtBot, AsyncMock):
     edit_message_text: AsyncMock
     answer_inline_query: AsyncMock
     answer_callback_query: AsyncMock
+    edit_message_reply_markup: AsyncMock
 
     def __init__(self, *args, **kwargs):
         # We do not want to initialize the ExtBot as it requires a token
@@ -47,3 +48,4 @@ class StubBot(ExtBot, AsyncMock):
         self.edit_message_text = AsyncMock()
         self.answer_inline_query = AsyncMock()
         self.answer_callback_query = AsyncMock()
+        self.edit_message_reply_markup = AsyncMock()

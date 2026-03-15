@@ -25,7 +25,7 @@ For single-domain tasks or targeted fixes, **always** delegate to the appropriat
 | Translation `.po`/`.pot` files | `translator` |
 | Documentation in `docs/` | `docs-writer` |
 
-**After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done.
+**After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done. If the reviewer reports violations, **resume the specialist agent that made the changes** and pass it the full violation report — do not fix violations yourself.
 
 Run `/project-guide` for a full reference of all available agents and skills.
 
@@ -66,7 +66,7 @@ When editing any instruction file, follow these rules:
 - **Hosted on GitLab** at <https://gitlab.com/meetupbot/mitup-telegram-bot>. All URLs must follow GitLab conventions, not GitHub's.
 - **Interacting with repo**: you can use the `glab` cli.
   - **Exceptions**: do not use the `glab` cli to post comments or replies to merge request discussion threads. Use the `/comment-mr` skill instead.
-- **Issue templates** are in `.gitlab/issue_templates/`. Link format: `https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/new?issuable_template=TemplateName`. Available templates: `Bug`, `Feature Proposal`, `Task`, `New Language Request`, `Improve Documentation`, `Translation`, `Service Desk Request`.
+- **Creating issues**: use the `/create-issue` skill. It prompts for the issue type, fills in the correct template, and creates the issue via `glab`. Never invent labels — each template already embeds the correct `/label` quick-action lines.
 - **Merge request template** is at `.gitlab/merge_request_templates/Default.md`. When asked to produce an MR description, follow that template and output plain Markdown the user can copy-paste directly.
 - **Commit message format** — Every commit message must be prepended with an emoji that matches the commit type. The mapping is defined in `commits_check_config.yaml`. See `docs/collaborate/commit_message_format.md` for full rules.
   - **With pre-commit hooks installed** (local dev): Write commits in conventional format (`Type[(scope)][!]: description`). The hook replaces the type with the emoji automatically.

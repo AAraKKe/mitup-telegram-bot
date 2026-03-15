@@ -599,6 +599,63 @@ async def test_edit_message_raises_no_message_available(telegram_api: TelegramAp
 
 
 # ---------------------------------------------------------------------------
+# clear_reply_markup
+# ---------------------------------------------------------------------------
+
+
+async def test_clear_reply_markup_with_effective_message(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 77
+    update.effective_message.id = 88
+
+    await telegram_api.clear_reply_markup(update)
+
+    bot.edit_message_reply_markup.assert_awaited_once_with(
+        chat_id=77,
+        message_id=88,
+        inline_message_id=None,
+        reply_markup=None,
+    )
+
+
+async def test_clear_reply_markup_with_inline_message_id(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_message = None
+    update.callback_query.inline_message_id = "inline_42"
+
+    await telegram_api.clear_reply_markup(update)
+
+    bot.edit_message_reply_markup.assert_awaited_once_with(
+        chat_id=None,
+        message_id=None,
+        inline_message_id="inline_42",
+        reply_markup=None,
+    )
+
+
+async def test_clear_reply_markup_suppresses_message_not_modified(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 1
+    update.effective_message.id = 2
+    # "Message is not modified" is silently ignored by handle_edit_errors
+    bot.edit_message_reply_markup.side_effect = BadRequest(
+        "Message is not modified: specified new message content and reply markup are exactly the same"
+    )
+
+    # Must not raise
+    await telegram_api.clear_reply_markup(update)
+
+
+async def test_clear_reply_markup_raises_no_message_available(telegram_api: TelegramApi):
+    update = MagicMock(spec=Update)
+    update.effective_message = None
+    update.callback_query = None
+
+    with pytest.raises(NoMessageAvailable):
+        await telegram_api.clear_reply_markup(update)
+
+
+# ---------------------------------------------------------------------------
 # answer_inline_query
 # ---------------------------------------------------------------------------
 

@@ -1,7 +1,6 @@
 ---
 name: em
 description: Engineering manager orchestration workflow. Invoke with /em <task> to plan and coordinate complex multi-domain features using specialist agents.
-disable-model-invocation: true
 argument-hint: "<task description> | implement <phase-file-path> [phase-file-path ...]"
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 ---
@@ -129,8 +128,15 @@ Update each task to `completed` when its agent finishes.
 
 > **Production bugs found during a phase:** Specialists are empowered to fix broken production code they discover while completing their assigned work — even if it is outside the strict scope of the phase. A stale symbol reference, a broken import, or an incorrect guard call found in passing should be fixed in-place rather than left for a later phase or ignored.
 
+**Step 7.5 — Convention review**
+After all implementation phases complete, run the `convention-reviewer` agent on all files touched across every phase. If it reports violations:
+- Identify which specialist agent(s) own the violated files (using the domain table in CLAUDE.md).
+- Resume each relevant specialist agent and pass it the full violation report for its domain.
+- Do NOT fix violations yourself.
+- Re-run convention-reviewer after the specialist finishes until it reports no violations.
+
 **Step 8 — Retrospective**
-After all requested phases complete, run a single retrospective. Do NOT report per-phase status — that is already communicated via task updates. Focus exclusively on learnings and follow-up work.
+After all requested phases complete (and convention review is clean), run a single retrospective. Do NOT report per-phase status — that is already communicated via task updates. Focus exclusively on learnings and follow-up work.
 
 Output the retrospective in this format:
 

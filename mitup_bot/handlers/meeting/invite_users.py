@@ -39,7 +39,7 @@ async def send_request_for_invite_name(context: TMitupContext, user: User, meeti
     view = views.factory.request_information_with_cancel_view(
         lang=user.lang,
         message=MeetingMessages.INVITE_USER_PROMPT.get(lang=user.lang),
-        callback_data=cb.DECLINE_INVITE_USER.with_id(meeting_id),
+        callback_data=cb.CANCEL_INVITE_USER.with_id(meeting_id),
     )
 
     await context.api.send_message_to_user(user=user, view=view)
@@ -88,7 +88,9 @@ async def ensure_meeting_still_allows_invitations(
     MeetingHandlerId.INVITE_USERS_CALLBACK, callback_data=cb.INVITE, bindable=False
 )
 @with_async_session
-async def callback_query_invite_users(session: Session, update: Update, context: TMitupContext):
+async def callback_query_invite_users(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationInviteState | int:
     # This action can be called by unsubscribed users
     callback_data = guards.valid_callback_data(cb.INVITE.parse(context.match), MeetingHandlerId.INVITE_USERS_CALLBACK)
     meeting_id = callback_data.id
@@ -112,17 +114,17 @@ async def callback_query_invite_users(session: Session, update: Update, context:
     context.store_on_exit(
         ContextId.INVITE_USERS,
         MeetingMessages.INVITE_USER_ON_EXIT.get(lang=user.lang),
-        cb.DECLINE_INVITE_USER.with_id(meeting_id),
+        cb.CANCEL_INVITE_USER.with_id(meeting_id),
     )
 
     return ConversationInviteState.NAME
 
 
 @HandlersRegistry.register_callback_query(
-    MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK, callback_data=cb.DECLINE_INVITE_USER, bindable=False
+    MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK, callback_data=cb.CANCEL_INVITE_USER, bindable=False
 )
 @with_async_session
-async def callback_query_cancel_invite_user(session: Session, update: Update, context: TMitupContext):
+async def callback_query_cancel_invite_user(session: Session, update: Update, context: TMitupContext) -> int:
     # Clear the stored meeting ID, send the user to the main menu and end the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
     user = guards.current_user(update, session)
@@ -142,7 +144,9 @@ async def callback_query_cancel_invite_user(session: Session, update: Update, co
     bindable=False,
 )
 @with_async_session
-async def message_invite_users_name(session: Session, update: Update, context: TMitupContext):
+async def invite_users_name_message_handler(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationInviteState | int:
     user = guards.current_user(update, session)
 
     invited_user_name = guards.message(update).text
@@ -170,7 +174,7 @@ async def message_invite_users_name(session: Session, update: Update, context: T
             lang=user.lang,
             message=message,
             confirm_callback_data=cb.CONFIRM_INVITE_USER.with_id(meeting.db_id),
-            decline_callback_data=cb.DECLINE_INVITE_USER.with_id(meeting.db_id),
+            decline_callback_data=cb.CANCEL_INVITE_USER.with_id(meeting.db_id),
         )
 
         await context.api.send_message_to_user(user, view)
@@ -181,7 +185,7 @@ async def message_invite_users_name(session: Session, update: Update, context: T
     MeetingHandlerId.INVITE_USERS_CONFIRM_CALLBACK, bindable=False, callback_data=cb.CONFIRM_INVITE_USER
 )
 @with_async_session
-async def confirm_user_invitation(session: Session, update: Update, context: TMitupContext):
+async def callback_query_confirm_user_invitation(session: Session, update: Update, context: TMitupContext) -> int:
     user = guards.current_user(update, session)
 
     callback_data = guards.valid_callback_data(
@@ -229,22 +233,21 @@ async def confirm_user_invitation(session: Session, update: Update, context: TMi
 
 
 @HandlersRegistry.register_callback_query(
-    MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, bindable=False, callback_data=cb.DECLINE_INVITE_USER
+    MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, bindable=False, callback_data=cb.CANCEL_INVITE_USER
 )
 @with_async_session
-async def decline_user_invitation(session: Session, update: Update, context: TMitupContext):
+async def callback_query_decline_user_invitation(session: Session, update: Update, context: TMitupContext) -> int:
     user = guards.current_user(update, session)
 
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
 
     message = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user.lang)
-    message_text = message.text
 
     # If the user owns the meeting, go back to the meeting, if they do not
     # send to main menu
     meeting_id = guards.valid_callback_data(
-        cb.DECLINE_INVITE_USER.parse(context.match), MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK
+        cb.CANCEL_INVITE_USER.parse(context.match), MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK
     ).id
     meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
     if meeting is None:
@@ -254,7 +257,7 @@ async def decline_user_invitation(session: Session, update: Update, context: TMi
         return ConversationHandler.END
 
     if user.own_meeting(meeting_id):
-        view = meeting.view_for(user).with_context(message=message_text)
+        view = meeting.view_for(user).with_context(message=message)
     else:
         view = main_menu_view(lang=user.lang, message=message)
 
@@ -264,7 +267,7 @@ async def decline_user_invitation(session: Session, update: Update, context: TMi
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.INVITE_USERS_FALLBACK, bindable=False)
 @with_async_session
-async def fallback_invite_user(session: Session, update: Update, context: TMitupContext):
+async def callback_query_fallback_invite_user(session: Session, update: Update, context: TMitupContext) -> int:
     user = guards.current_user(update, session)
 
     # Clean the stored data related to the conversation

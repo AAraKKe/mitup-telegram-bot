@@ -613,6 +613,9 @@ msgstr "Establece cuánto tiempo durará esta quedada.\n\nAún no se ha establec
 msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
 msgstr "Esta quedada ya ha comenzado y su lista de asistentes está bloqueada."
 
+msgid "MeetingMessages.STALE_CANCEL_BUTTON"
+msgstr "Ya has respondido esta pregunta"
+
 msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 

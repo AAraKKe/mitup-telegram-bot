@@ -120,7 +120,7 @@ def utf16_len(s: str) -> int:
 
 ## Type hints
 
-Always required. Use modern union syntax and built-in generics (see [Hard antipatterns](#hard-antipatterns)). Always declare an explicit return type (`-> T` or `-> None`).
+Always required. Use modern union syntax and built-in generics (see [Hard antipatterns](#hard-antipatterns)). Always declare an explicit return type when the function returns a value (`-> T`). `-> None` is implicit and **must not** be written — omitting it is the correct style.
 
 **Conversation handler return types.** `ConversationMeetingState` is a plain `Enum`, not `IntEnum` — its members are **not** `int`. Handlers that return both a state and `ConversationHandler.END` (which is `int`) must be typed as `-> ConversationMeetingState | int`, not `-> int`:
 

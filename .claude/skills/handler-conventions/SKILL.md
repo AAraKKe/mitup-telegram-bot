@@ -105,6 +105,12 @@ cb.MY_ACTION.with_id(meeting.db_id)
 - Action and entity names use `snake_case`.
 - Keep action and entity strings short — callback data is limited to **64 bytes** total when encoded.
 
+### Cancel buttons in conversations
+
+<critical_rules>
+  <rule>Any button that cancels an action inside a `ConversationHandler` MUST use `action="cancel"` in its `CallbackData` definition. This ensures the global stale cancel handler (`stale_cancel.py`) automatically handles the button if it is tapped outside an active conversation. Using any other action (e.g., `"decline"`) is a bug.</rule>
+</critical_rules>
+
 ### Using callbacks in handlers
 
 Pass the predefined instance directly to `ButtonConfig` or as a filter pattern for `register_callback_query`:

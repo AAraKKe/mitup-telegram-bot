@@ -63,7 +63,7 @@ async def test_delete_meeting_works(
     context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app)
 
     mock_session.assert_not_deleted()
-    context.api.assert_send_message_called(
+    context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
@@ -72,6 +72,7 @@ async def test_delete_meeting_works(
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
         ),
     )
+    context.api.assert_method_just_called("send_message", times=0)
 
 
 @pytest.mark.parametrize(
@@ -189,7 +190,8 @@ async def test_confirm_delete_meeting_works(
         ],
     )
 
-    context.api.assert_send_message_called(update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
+    context.api.assert_method_just_called("send_message", times=0)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(1))], indirect=True)

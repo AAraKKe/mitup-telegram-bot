@@ -121,12 +121,14 @@ async def test_callback_query_create_meeting_stores_on_exit(
 # ---------------------------------------------------------------------------
 
 
-async def test_meeting_creation_with_date_entity_strips_title_and_sets_datetime(
+async def test_meeting_creation_with_date_entity_preserves_full_title_and_sets_datetime(
     user_with_settings: User,
     mock_session: MockDbSession,
     conversation: ConversationTester,
 ):
-    """A single date_time entity strips that span from the title and sets meetup.datetime."""
+    """A single date_time entity no longer strips the title — the full user input is stored.
+    The meetup.datetime field is still derived from the entity's unix_time.
+    """
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     # The entry step uses ConversationTester. The title step must be invoked via
@@ -148,9 +150,42 @@ async def test_meeting_creation_with_date_entity_strips_title_and_sets_datetime(
 
     assert len(mock_session.objects_added) == 1
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
-    # "tomorrow" (offset 14, length 8) is stripped and surrounding whitespace removed
-    assert new_meeting.title == "Board meeting"
-    # datetime derived from unix_time
+    # Full user input is preserved — entity span is NOT stripped from the title.
+    assert new_meeting.title == "Board meeting tomorrow"
+    # datetime is still derived from the entity's unix_time.
+    expected_dt = dt.datetime.fromtimestamp(unix_ts, tz=dt.UTC)
+    assert new_meeting.datetime == expected_dt
+
+
+async def test_meeting_creation_with_single_word_datetime_title_preserves_title(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    conversation: ConversationTester,
+):
+    """A title that is entirely a single date_time entity (e.g. 'today') is stored as-is,
+    not reduced to an empty string.
+    """
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    entry_steps = [
+        ConversationStep.callback(cb.CREATE_MEETING, expected_state=ConversationMeetingState.TITLE),
+    ]
+    await conversation.run(handler_id=MeetingHandlerId.CREATE_MEETING_CONVERSATION, steps=entry_steps)
+
+    unix_ts = 1_700_000_000
+    # "today" spans the entire text: offset=0, length=5
+    date_entity = DateTimeMessageEntity(offset=0, length=5, unix_time=unix_ts)
+    title_update = make_message_update("today", entities=[date_entity])
+
+    context, _ = await call_handler(
+        MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=title_update, app=conversation.app
+    )
+
+    assert len(mock_session.objects_added) == 1
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    # Title must be "today", not "" (regression guard against the old strip behaviour).
+    assert new_meeting.title == "today"
+    # datetime is derived from the entity even though the title was not modified.
     expected_dt = dt.datetime.fromtimestamp(unix_ts, tz=dt.UTC)
     assert new_meeting.datetime == expected_dt
 
@@ -160,13 +195,13 @@ async def test_meeting_creation_with_date_entity_strips_title_and_sets_datetime(
 # ---------------------------------------------------------------------------
 
 
-async def test_meeting_creation_with_date_entity_without_unix_time_strips_title_but_leaves_datetime_none(
+async def test_meeting_creation_with_date_entity_without_unix_time_preserves_title_and_leaves_datetime_none(
     user_with_settings: User,
     mock_session: MockDbSession,
     app,
 ):
-    """A date_time entity whose to_dict() lacks 'unix_time' still strips the entity span from the
-    title (line 81) but does NOT set meetup.datetime (unix_time is None → line 79-80 skipped)."""
+    """A date_time entity whose to_dict() lacks 'unix_time' preserves the full title and does NOT
+    set meetup.datetime (unix_time is None → the timestamp branch is skipped)."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     # Build a plain MessageEntity with type="date_time" that has no unix_time in to_dict().
@@ -179,9 +214,9 @@ async def test_meeting_creation_with_date_entity_without_unix_time_strips_title_
 
     assert len(mock_session.objects_added) == 1
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
-    # The entity span ("tomorrow") was stripped from the title
-    assert new_meeting.title == "Board meeting"  # "tomorrow" (offset=14, len=8) stripped
-    # But datetime was NOT set because unix_time was absent
+    # Full user input is preserved — the entity span is NOT stripped from the title.
+    assert new_meeting.title == "Board meeting tomorrow"
+    # datetime was NOT set because unix_time was absent in to_dict().
     assert new_meeting.datetime is None
 
 

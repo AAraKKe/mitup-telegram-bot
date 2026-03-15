@@ -168,6 +168,7 @@ class TelegramApiWrapper(Protocol):
         joined_users: Sequence[JoinedUsers],
         meeting: Meetup,
     ) -> None: ...
+    async def clear_reply_markup(self, update: Update) -> None: ...
 
 
 class TelegramApi:
@@ -319,6 +320,28 @@ class TelegramApi:
                     disable_web_page_preview=True,
                 )
 
+    async def clear_reply_markup(self, update: Update) -> None:
+        chat_id = None
+        message_id = None
+        inline_message_id = None
+
+        if update.effective_message:
+            chat_id = update.effective_message.chat.id
+            message_id = update.effective_message.id
+        elif update.callback_query and update.callback_query.inline_message_id:
+            inline_message_id = update.callback_query.inline_message_id
+        else:
+            raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
+
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            with handle_edit_errors(adapter=self.adapter):
+                await self.adapter.bot.edit_message_reply_markup(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    inline_message_id=inline_message_id,
+                    reply_markup=None,
+                )
+
     async def answer_inline_query(
         self,
         update: Update,
@@ -448,18 +471,9 @@ class TelegramApi:
         has_started: bool = False,
     ):
         """
-        Updates meeting messages with the current meeting view.
-
-        Args:
-            session: The database session.
-            meeting: The Meetup object.
-            current_message: The current message model, if any. If provided, it will be edited before any other message.
-            skip_current: If set to True, the current message will be skipped. This is needed if the current message
-                          is being updated in a different way.
-            was_deleted: If set to True, the meeting has been deleted and the messages will be updated
-                         to inform the user.
-            has_finished: If set to True, the meeting has finished and the messages will be updated to inform the user.
-            has_started: If set to True, the in-progress banner is prepended; buttons remain active.
+        Updates all tracked messages for a meeting. Edits `current_message` first for
+        immediate feedback, then updates the rest. Use `skip_current` when the caller is
+        already handling the current message separately.
         """
         # First lets update the current message for a better user experience
         if current_message and not skip_current:

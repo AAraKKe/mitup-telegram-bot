@@ -521,6 +521,9 @@ class MeetingMessages(MessageBase):
     # Locked-meeting join/leave alert
     JOIN_LOCKED_IN_PROGRESS = "This meeting has already started and its attendees list is locked."
 
+    # Stale cancel button alert
+    STALE_CANCEL_BUTTON = "You've already answered this question"
+
 
 class InlineViewMessages(MessageBase):
     CREATE_NEW_MEETING_BUTTON = f"{Emojis.NEW_MEETING} Create a new meeting"

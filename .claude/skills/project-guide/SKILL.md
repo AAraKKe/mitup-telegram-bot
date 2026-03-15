@@ -111,6 +111,7 @@ Skills are knowledge documents that Claude loads automatically when relevant. Yo
 | `/new-migration` | Generate and validate an Alembic migration |
 | `/translate` | Add a new user-facing string to the message catalog |
 | `/ty-ignore` | Insert a `ty: ignore` comment with the required issue URL |
+| `/create-issue` | Create a GitLab issue using the correct project template and labels |
 | `/comment-mr` | Reply to a GitLab MR discussion thread |
 | `/project-guide` | This guide |
 

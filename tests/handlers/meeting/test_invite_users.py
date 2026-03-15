@@ -58,7 +58,7 @@ async def test_invite_users_by_registered_user(
     expected_view = views.factory.request_information_with_cancel_view(
         lang=user_with_settings.lang,
         message=MeetingMessages.INVITE_USER_PROMPT.get(lang=user_with_settings.lang),
-        callback_data=cb.DECLINE_INVITE_USER.with_id(MEETING_ID),
+        callback_data=cb.CANCEL_INVITE_USER.with_id(MEETING_ID),
     )
 
     if external_chat:
@@ -150,7 +150,7 @@ async def test_invite_users_ask_for_name(
             lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
         ),
         confirm_callback_data=cb.CONFIRM_INVITE_USER.with_id(MEETING_ID),
-        decline_callback_data=cb.DECLINE_INVITE_USER.with_id(MEETING_ID),
+        decline_callback_data=cb.CANCEL_INVITE_USER.with_id(MEETING_ID),
     )
 
     message_step.context.api.assert_send_message_to_user_called(
@@ -174,7 +174,7 @@ async def test_cancel_name_request(
     # These are the steps for the conversation when cancelling the name request
     steps = [
         ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
-        ConversationStep.callback(cb.DECLINE_INVITE_USER.with_id(MEETING_ID)),
+        ConversationStep.callback(cb.CANCEL_INVITE_USER.with_id(MEETING_ID)),
     ]
 
     result = await conversation.run(
@@ -275,7 +275,7 @@ async def test_invite_user_decline_confirmation(
     steps = [
         ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
         ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.CONFIRMATION),
-        ConversationStep.callback(cb.DECLINE_INVITE_USER.with_id(MEETING_ID)),
+        ConversationStep.callback(cb.CANCEL_INVITE_USER.with_id(MEETING_ID)),
     ]
 
     result = await conversation.run(
@@ -513,7 +513,7 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.DECLINE_INVITE_USER.with_id(MEETING_ID))],
+    [UpdateRequest(callback_query=cb.CANCEL_INVITE_USER.with_id(MEETING_ID))],
     indirect=True,
 )
 async def test_decline_user_invitation_when_meeting_no_longer_allows_invitations(
@@ -545,7 +545,7 @@ async def test_decline_user_invitation_when_meeting_no_longer_allows_invitations
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.DECLINE_INVITE_USER.with_id(MEETING_ID))],
+    [UpdateRequest(callback_query=cb.CANCEL_INVITE_USER.with_id(MEETING_ID))],
     indirect=True,
 )
 async def test_fallback_invite_user_clears_context_and_sends_main_menu(
