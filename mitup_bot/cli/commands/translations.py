@@ -88,29 +88,110 @@ def validate_translations() -> int:
     return 0
 
 
+def msgids_for_language(lang: str) -> set[str]:
+    lines = po_file_for_language(lang).read_text(encoding="utf-8").splitlines()
+    return {line.split(None, 1)[1].strip() for line in lines if line.startswith("msgid ")}
+
+
+def parse_po_blocks(text: str) -> list[list[str]]:
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    for line in text.splitlines():
+        if line.strip() == "":
+            if current:
+                blocks.append(current)
+                current = []
+        else:
+            current.append(line)
+    if current:
+        blocks.append(current)
+    return blocks
+
+
+def msgid_from_block(block: list[str]) -> str | None:
+    for line in block:
+        if line.startswith("msgid "):
+            return line.split(None, 1)[1]
+    return None
+
+
+def filter_blocks(blocks: list[list[str]], english_msgids: set[str]) -> tuple[list[list[str]], list[str]]:
+    kept: list[list[str]] = []
+    removed_msgids: list[str] = []
+    for block in blocks:
+        msgid = msgid_from_block(block)
+        if msgid is None or msgid == '""' or msgid in english_msgids:
+            kept.append(block)
+        else:
+            removed_msgids.append(msgid)
+    return kept, removed_msgids
+
+
+def clean_all_locales() -> int:
+    english_msgids = msgids_for_language("en")
+    non_english_languages = [lang for lang in SUPPORTED_LANGUAGES if lang != "en"]
+
+    had_error = False
+    for lang in non_english_languages:
+        po_path = po_file_for_language(lang)
+        try:
+            text = po_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            error(f"{lang}: could not read {po_path}: {exc}")
+            had_error = True
+            continue
+
+        kept, removed_msgids = filter_blocks(parse_po_blocks(text), english_msgids)
+
+        if not removed_msgids:
+            success(f"{lang}: already clean")
+            continue
+
+        cleaned = "\n\n".join("\n".join(block) for block in kept) + "\n"
+
+        try:
+            po_path.write_text(cleaned, encoding="utf-8")
+        except OSError as exc:
+            error(f"{lang}: could not write {po_path}: {exc}")
+            had_error = True
+            continue
+
+        console().print(f"{lang}: removed {len(removed_msgids)} stale entry(s):")
+        for msgid in removed_msgids:
+            console().print(f"  [yellow]- {msgid.strip(chr(34))}[/]")
+
+    return 1 if had_error else 0
+
+
 def ensure_all_translations() -> int:
     console().print(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
 
-    msgdis: dict[str, list[str]] = {}
-    for lang in SUPPORTED_LANGUAGES:
-        with open(po_file_for_language(lang)) as f:
-            msgids = [line.split()[1] + "\n" for line in f.readlines() if line.startswith("msgid")]
-            msgdis[lang] = msgids
+    english_msgids = msgids_for_language("en")
+    non_english_languages = [lang for lang in SUPPORTED_LANGUAGES if lang != "en"]
 
-    failed = False
+    diverged = False
 
-    for idx, lang in enumerate(SUPPORTED_LANGUAGES[:-1]):
-        for other_lang in SUPPORTED_LANGUAGES[idx + 1 :]:
-            if diff := list(
-                difflib.unified_diff(msgdis[lang], msgdis[other_lang], fromfile=lang, tofile=other_lang, n=0)
-            ):
-                error(f"Language {lang} and {other_lang} have different msgids.")
-                for element in diff:
-                    print_diff_line(element)
-                failed = True
+    for lang in non_english_languages:
+        lang_msgids = msgids_for_language(lang)
+        missing = sorted(english_msgids - lang_msgids)
+        extra = sorted(lang_msgids - english_msgids)
 
-    if not failed:
-        success("All languages have the same msgids.")
+        if not missing and not extra:
+            success(f"{lang} is in sync with en")
+            continue
+
+        diverged = True
+        if missing:
+            error(f"{lang} is missing {len(missing)} msgid(s):")
+            for msgid in missing:
+                console().print(f"  [red]- {msgid.strip(chr(34))}[/]")
+        if extra:
+            error(f"{lang} has {len(extra)} stale msgid(s) (removed/renamed in English):")
+            for msgid in extra:
+                console().print(f"  [yellow]- {msgid.strip(chr(34))}[/]")
+
+    if not diverged:
+        success("All languages are in sync with English.")
         return 0
 
     return 1
@@ -119,7 +200,7 @@ def ensure_all_translations() -> int:
 @click.group()
 def cli():
     """All commands related to translations management."""
-    pass  # pragma: no cover
+    ...  # pragma: no cover
 
 
 @cli.command()
@@ -142,6 +223,13 @@ def validate_ids(ctx: click.Context):
 def validate_locales(ctx: click.Context):
     """Validate that all po files contain the same msgids."""
     ctx.exit(ensure_all_translations())
+
+
+@cli.command()
+@click.pass_context
+def clean_locales(ctx: click.Context):
+    """Remove stale msgid blocks from non-English .po files."""
+    ctx.exit(clean_all_locales())
 
 
 @cli.command()

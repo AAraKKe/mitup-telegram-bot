@@ -140,9 +140,6 @@ msgstr "📨 Condividi"
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
 
-msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Modifica"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Nome"
 
@@ -178,9 +175,6 @@ msgstr "Blocca all'avvio"
 
 msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Durata incontro"
-
-msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "Blocca all'avvio"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Rendi ricercabile"
@@ -401,9 +395,6 @@ msgstr "Il processo di invito è stato annullato."
 msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
 msgstr "Qualcosa di inaspettato è accaduto durante l'aggiunta dell'utente invitato. Per favore, riprova."
 
-msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "L'incontro <b>${meeting_title}</b> sta per iniziare!"
-
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "Questo è il titolo attuale del tuo incontro:\n<b>${title}</b>\n\nInviami il nuovo"
 
@@ -583,9 +574,6 @@ msgstr "✅ Ora ricercabile!\n\nQuesto incontro è ora collegato a questa chat. 
 
 msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
 msgstr "✅ Già ricercabile!\n\nQuesto incontro era già collegato a questa chat da una condivisione precedente. È già incluso nei tuoi risultati di ricerca."
-
-msgid "MeetingMessages.ACTIVE"
-msgstr "Questi sono tutti i tuoi incontri attivi."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "Questi sono tutti i tuoi incontri attivi."

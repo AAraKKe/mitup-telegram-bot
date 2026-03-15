@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from io import StringIO
 from pathlib import Path
@@ -13,6 +14,7 @@ from mitup_bot.cli.commands.translations import (
     VALIDATE_PO_FILE,
     all_messages,
     build,
+    clean_locales,
     mo_file_for_language,
     po_file_for_language,
     print_diff_line,
@@ -197,16 +199,17 @@ def test_validate_locales_succeeds(mock_po: mock.Mock, tmp_path: Path):
         result = CliRunner().invoke(validate_locales)
 
     assert result.exit_code == 0
-    assert "All languages have the same msgids." in capture.get()
+    assert "All languages are in sync with English." in capture.get()
 
 
 @mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
 def test_validate_locales_fails(mock_po: mock.Mock, tmp_path: Path):
     po_file = tmp_path / "en.po"
-    po_file.write_text('msgid: "test"\nmsgstr: "test"')
+    # Use proper PO format (no colon after msgid) so msgids_for_language() parses them correctly
+    po_file.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n')
 
     es_po_file = tmp_path / "es_ES.po"
-    es_po_file.write_text('msgid: "test"\nmsgstr: "test"\nmsgid: "test2"\nmsgstr: "test2"')
+    es_po_file.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n\nmsgid "test2"\nmsgstr "test2"\n')
 
     mock_po.side_effect = lambda lang: es_po_file if lang == "es_ES" else po_file
 
@@ -214,4 +217,79 @@ def test_validate_locales_fails(mock_po: mock.Mock, tmp_path: Path):
         result = CliRunner().invoke(validate_locales)
 
     assert result.exit_code == 1
-    assert "Language en and es_ES have different msgids." in capture.get()
+    # Strip ANSI escape codes before asserting: Rich injects color codes around numbers and
+    # parentheses, which would break substring checks on the raw captured string.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", capture.get())
+    assert "es_ES has 1 stale msgid(s) (removed/renamed in English):" in plain
+    # msgid.strip(chr(34)) strips the surrounding quotes from the raw token "test2" -> test2
+    assert "- test2" in plain
+
+
+@mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
+def test_clean_locales_removes_stale_entries(mock_po: mock.Mock, tmp_path: Path):
+    # en.po has one msgid; es_ES.po has two — "test2" is stale
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n')
+
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "prueba"\n\nmsgid "test2"\nmsgstr "prueba2"\n')
+
+    mock_po.side_effect = lambda lang, validate=False: en_po if lang == "en" else es_po
+
+    with console().capture() as capture:
+        result = CliRunner().invoke(clean_locales)
+
+    assert result.exit_code == 0
+    # Strip ANSI escape codes: Rich colorizes numbers and parentheses, breaking raw substrings.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", capture.get())
+    assert "removed 1 stale entry(s)" in plain
+    content = es_po.read_text()
+    assert "test2" not in content
+    assert "test" in content
+
+
+@mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
+def test_clean_locales_already_clean(mock_po: mock.Mock, tmp_path: Path):
+    po_file = tmp_path / "en.po"
+    po_file.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n')
+
+    mock_po.return_value = po_file
+
+    with console().capture() as capture:
+        result = CliRunner().invoke(clean_locales)
+
+    assert result.exit_code == 0
+    assert "already clean" in capture.get()
+
+
+@mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
+def test_clean_locales_preserves_header(mock_po: mock.Mock, tmp_path: Path):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n')
+
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "prueba"\n\nmsgid "stale"\nmsgstr "viejo"\n')
+
+    mock_po.side_effect = lambda lang, validate=False: en_po if lang == "en" else es_po
+
+    CliRunner().invoke(clean_locales)
+
+    content = es_po.read_text()
+    assert 'msgid ""\nmsgstr ""' in content
+
+
+@mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
+def test_clean_locales_read_error(mock_po: mock.Mock, tmp_path: Path):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n')
+
+    bad_path = mock.Mock(spec=Path)
+    bad_path.read_text.side_effect = OSError("Permission denied")
+
+    mock_po.side_effect = lambda lang, validate=False: en_po if lang == "en" else bad_path
+
+    with console().capture() as capture:
+        result = CliRunner().invoke(clean_locales)
+
+    assert result.exit_code == 1
+    assert "could not read" in capture.get()

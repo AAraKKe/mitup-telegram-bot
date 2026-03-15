@@ -140,9 +140,6 @@ msgstr "📨 Compartilhar"
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Conversa"
 
-msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Editar"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Nome"
 
@@ -175,9 +172,6 @@ msgstr "Bloquear ao iniciar"
 
 msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Duração do evento"
-
-msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "Bloquear ao iniciar"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Tornar pesquisável"
@@ -408,9 +402,6 @@ msgstr "O processo de convite foi cancelado."
 msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
 msgstr "Algo inesperado aconteceu ao adicionar o usuário convidado. Por favor, tente novamente."
 
-msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "O evento <i><b>${meeting_title}</b></i> está começando em breve!"
-
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "Este é o título atual do seu evento:\n"
 "<b>${title}</b>\n\n"
@@ -582,9 +573,6 @@ msgstr "Você pode configurar diferentes aspectos do seu evento:\n\n"
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
 msgstr "Você ainda não tem nenhum evento.\n\n"
 "Clique em <b>${new_meeting_button}</b> no menu principal para criar um."
-
-msgid "MeetingMessages.ACTIVE"
-msgstr "Estes são seus eventos ativos."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "Estes são todos os seus eventos ativos."
@@ -759,3 +747,27 @@ msgstr "🇧🇷 Português"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
+
+msgid "ButtonMessages.DATE_TIME"
+msgstr "🗓️ Data e Hora"
+
+msgid "MeetingMessages.MEETING_IN_PROGRESS"
+msgstr "▶️ Este evento está em andamento ▶️"
+
+msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
+msgstr "✅ Este evento terminou ✅\n\n<b>Duração:</b> ${duration} minutos · <b>Participantes:</b> ${attendee_count}"
+
+msgid "MeetingMessages.MEETING_START_TIME"
+msgstr "Começa"
+
+msgid "MeetingMessages.MEETING_STOP_TIME"
+msgstr "Termina"
+
+msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
+msgstr "Este evento já começou e a lista de participantes está bloqueada."
+
+msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgstr "Entendo apenas um título ou um título com uma data 🤔.\n\nEnvie apenas o título do evento, ou o título com uma data formatada pelo Telegram. Clique em <b>Cancelar</b> para sair."
+
+msgid "NotificationMessages.MEETING_STARTED"
+msgstr "O evento <b>${meeting_title}</b> começou!"

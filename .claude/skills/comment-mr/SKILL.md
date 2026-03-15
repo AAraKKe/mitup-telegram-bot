@@ -3,12 +3,14 @@ name: comment-mr
 description: Reply to a GitLab MR discussion thread (review comments).
 user-invocable: true
 argument-hint: "<mr_iid>"
-allowed-tools: Bash(bin/gl_reply_thread.py*)
+allowed-tools: Bash(hatch run dev:python bin/gl_reply_thread.py*)
 ---
 
-> **Always use this skill when replying to MR review threads.** Do not call `glab api` directly to post notes — go through `bin/gl_reply_thread.py` so that all interactions use the same entry point and the skill can be invoked consistently.
+> **Always use this skill when replying to MR review threads.** Do not call `glab api` directly to post notes — go through `hatch run dev:python bin/gl_reply_thread.py` so that all interactions use the same entry point and the skill can be invoked consistently.
 
-Use `bin/gl_reply_thread.py` to reply to comment threads in a GitLab MR.
+> **Always invoke via `hatch run dev:python hatch run dev:python bin/gl_reply_thread.py`**, never as a bare `hatch run dev:python bin/gl_reply_thread.py` call. The script requires Python 3.14+ features (`match` statement) and the project's dependencies — the system Python does not satisfy either requirement.
+
+Use `hatch run dev:python hatch run dev:python bin/gl_reply_thread.py` to reply to comment threads in a GitLab MR.
 The `$ARGUMENTS` value is the MR IID (e.g., `/comment-mr 251`).
 
 ---
@@ -18,7 +20,7 @@ The `$ARGUMENTS` value is the MR IID (e.g., `/comment-mr 251`).
 Get a compact summary of all unresolved threads:
 
 ```bash
-bin/gl_reply_thread.py --list <mr_iid>
+hatch run dev:python bin/gl_reply_thread.py --list <mr_iid>
 ```
 
 Output format per thread:
@@ -37,7 +39,7 @@ This is intentionally compact — just enough to identify the thread. Use `--get
 If the first line is not enough context to compose a reply, fetch the full thread:
 
 ```bash
-bin/gl_reply_thread.py --get <mr_iid> <discussion_id>
+hatch run dev:python bin/gl_reply_thread.py --get <mr_iid> <discussion_id>
 ```
 
 This prints every note in the thread with its author and full body — use this instead of fetching all discussions at once to minimise token usage.
@@ -55,7 +57,7 @@ Start the reply with **`**Answered by: Claude Code**`** on its own line, then ex
 ### Single reply (body from stdin)
 
 ```bash
-bin/gl_reply_thread.py <mr_iid> <discussion_id> <<'EOF'
+hatch run dev:python bin/gl_reply_thread.py <mr_iid> <discussion_id> <<'EOF'
 **Answered by: Claude Code**
 
 Your explanation here.
@@ -67,7 +69,7 @@ EOF
 When you have replies ready for several threads, post them all in one call instead of looping. Pass a JSON array via stdin (`-`) or from a file:
 
 ```bash
-bin/gl_reply_thread.py --reply-batch <mr_iid> - <<'EOF'
+hatch run dev:python bin/gl_reply_thread.py --reply-batch <mr_iid> - <<'EOF'
 [
   {
     "discussion_id": "abc123",
@@ -90,7 +92,7 @@ Each entry requires `discussion_id` (the full thread ID from `--list`) and `body
 After replying, mark the thread as resolved if the issue has been fully addressed:
 
 ```bash
-bin/gl_reply_thread.py --resolve <mr_iid> <discussion_id>
+hatch run dev:python bin/gl_reply_thread.py --resolve <mr_iid> <discussion_id>
 ```
 
 ---
@@ -99,13 +101,13 @@ bin/gl_reply_thread.py --resolve <mr_iid> <discussion_id>
 
 ```bash
 # 1. Get a compact overview of all open threads
-bin/gl_reply_thread.py --list 251
+hatch run dev:python bin/gl_reply_thread.py --list 251
 
 # 2. If the first line is ambiguous, read the full thread before replying
-bin/gl_reply_thread.py --get 251 abc123
+hatch run dev:python bin/gl_reply_thread.py --get 251 abc123
 
 # 3. Post replies — use --reply-batch when you have multiple replies ready
-bin/gl_reply_thread.py --reply-batch 251 - <<'EOF'
+hatch run dev:python bin/gl_reply_thread.py --reply-batch 251 - <<'EOF'
 [
   {"discussion_id": "abc123", "body": "**Answered by: Claude Code**\n\nFixed in the latest commit."},
   {"discussion_id": "def456", "body": "**Answered by: Claude Code**\n\nTypo corrected."}
@@ -113,6 +115,6 @@ bin/gl_reply_thread.py --reply-batch 251 - <<'EOF'
 EOF
 
 # 4. Resolve the threads
-bin/gl_reply_thread.py --resolve 251 abc123
-bin/gl_reply_thread.py --resolve 251 def456
+hatch run dev:python bin/gl_reply_thread.py --resolve 251 abc123
+hatch run dev:python bin/gl_reply_thread.py --resolve 251 def456
 ```

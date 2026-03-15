@@ -143,9 +143,6 @@ msgstr "📨 Teilen"
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
 
-msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Bearbeiten"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Name"
 
@@ -178,9 +175,6 @@ msgstr "Bei Start sperren"
 
 msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Treffendauer"
-
-msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "🔒 Bei Start sperren"
 
 msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
 msgstr "Willkommen bei Mitup Bot!\n\n"
@@ -339,9 +333,6 @@ msgstr "Es gibt einen freien Platz im Treffen <b>${meeting_title}</b>. Du wurdes
 msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
 msgstr "Du warst dabei, ein Treffen zu erstellen. Sende den Titel des Treffens, um fortzufahren. Wenn du nicht fortfahren möchtest, tippe auf Abbrechen, um zu beenden."
 
-msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "Das Treffen <b>${meeting_title}</b> beginnt bald!"
-
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "Dies ist der aktuelle Titel deines Treffens:\n"
 "<b>${title}</b>\n\n"
@@ -456,9 +447,6 @@ msgstr "Du kannst verschiedene Aspekte deines Treffens konfigurieren:\n\n"
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
 msgstr "Du hast noch keine Treffen.\n\n"
 "Klicke auf ${new_meeting_button} im Hauptmenü, um ein Treffen zu erstellen."
-
-msgid "MeetingMessages.ACTIVE"
-msgstr "Dies sind deine aktiven Treffen."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "Dies sind alle deine aktiven Treffen."
@@ -678,3 +666,108 @@ msgstr "Das Treffen <b>${meeting_title}</b> wurde dauerhaft gelöscht."
 
 msgid "NotificationMessages.MEETING_STARTING"
 msgstr "Das Treffen <b>${meeting_title}</b> beginnt bald!"
+
+msgid "MeetingMessages.DURATION_CLEARED"
+msgstr "Dauer entfernt."
+
+msgid "MeetingMessages.DURATION_SET_SUCCESS"
+msgstr "Dauer eingestellt auf: <b>${duration} Minuten</b>"
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
+msgstr "Lege fest, wie lange dieses Treffen dauert.\n\nAktuelle Dauer: <b>${current_duration} Minuten</b>.\n\nDu kannst auch die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
+msgstr "Lege fest, wie lange dieses Treffen dauert.\n\nEs wurde noch keine Dauer eingestellt. Du kannst auch die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
+
+msgid "MeetingMessages.EDIT_DURATION_PROMPT"
+msgstr "Die aktuelle Dauer ist <b>${current_duration} Minuten</b>.\n\nSende mir die neue Dauer in Minuten, oder tippe auf <b>Abbrechen</b>, um zurückzugehen."
+
+msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete die Beschreibung deines Treffens. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete die Dauer in Minuten. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete deine Auswahl zum Entfernen eines Teilnehmers. Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete den Ort deines Treffens. Möchtest du ihn senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete den Namen des Ortes. Möchtest du ihn senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete die maximale Anzahl von Teilnehmern. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_TIME_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete die neue Uhrzeit für dein Treffen. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete den Titel deines Treffens. Möchtest du ihn senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.INVITED_BY_USER"
+msgstr "<i>eingeladen von ${user}</i>"
+
+msgid "MeetingMessages.INVITE_USERS_CANCELED"
+msgstr "Der Einladungsprozess wurde abgebrochen."
+
+msgid "MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND"
+msgstr "<b>Das war unerwartet...</b>\n\nIch habe plötzlich die Treffendetails verloren. Das sollte nicht passieren.\n\nBitte sende den Namen erneut."
+
+msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
+msgstr "Etwas Unerwartetes ist beim Hinzufügen des eingeladenen Benutzers passiert. Bitte versuche es erneut."
+
+msgid "MeetingMessages.INVITE_USER_CONFIRMATION"
+msgstr "<b>Hinzufügen bestätigen</b>\n\nBist du sicher, dass du <b>${name}</b> zum Treffen <b>${meeting_title}</b> hinzufügen möchtest?"
+
+msgid "MeetingMessages.INVITE_USER_GO_PRIVATE"
+msgstr "Im Privaten fortfahren\n\nBitte wechsle zu unserem privaten Chat, um mir den Namen zu senden."
+
+msgid "MeetingMessages.INVITE_USER_INVITES_DISABLED"
+msgstr "<b>Gästeliste geschlossen</b>\n\nNeue Hinzufügungen sind für dieses Treffen nicht mehr erlaubt. Der Veranstalter hat die Liste geschlossen."
+
+msgid "MeetingMessages.INVITE_USER_MEETING_FULL"
+msgstr "<b>Keine Plätze mehr</b>\n\nDie Gästeliste ist derzeit voll. Du kannst niemanden hinzufügen, es sei denn, es wird ein Platz frei."
+
+msgid "MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK"
+msgstr "<b>Treffen nicht gefunden</b>\n\nDas Treffen, zu dem du jemanden einladen möchtest, existiert nicht mehr."
+
+msgid "MeetingMessages.INVITE_USER_ON_EXIT"
+msgstr "Es tut mir leid, ich erwartete den Namen der Person, die du einladen möchtest. Möchtest du ihn senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+
+msgid "MeetingMessages.INVITE_USER_OPEN_CHAT"
+msgstr "Privaten Chat starten\n\nUm Teilnehmer hinzuzufügen, musst du zunächst einen Chat mit mir öffnen."
+
+msgid "MeetingMessages.INVITE_USER_PROMPT"
+msgstr "<b>Zur Gästeliste hinzufügen</b>\n\nBitte antworte mit dem Namen der Person, die du hinzufügen möchtest."
+
+msgid "MeetingMessages.INVITE_USER_SUCCESS"
+msgstr "<b>Liste aktualisiert</b>\n\nBenutzer <b>${name}</b> wurde zum Treffen <b>${meeting_title}</b> hinzugefügt."
+
+msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
+msgstr "Dieses Treffen hat bereits begonnen und seine Teilnehmerliste ist gesperrt."
+
+msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
+msgstr "Du musst eine Dauer festlegen, bevor du diese Option aktivierst."
+
+msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
+msgstr "✅ Dieses Treffen ist beendet ✅\n\n<b>Dauer:</b> ${duration} Minuten · <b>Teilnehmer:</b> ${attendee_count}"
+
+msgid "MeetingMessages.MEETING_IN_PROGRESS"
+msgstr "▶️ Dieses Treffen läuft gerade ▶️"
+
+msgid "MeetingMessages.MEETING_START_TIME"
+msgstr "Beginnt"
+
+msgid "MeetingMessages.MEETING_STOP_TIME"
+msgstr "Endet"
+
+msgid "MeetingMessages.SET_DURATION_PROMPT"
+msgstr "Sende mir die Dauer des Treffens in Minuten, oder tippe auf <b>Abbrechen</b>, um zurückzugehen."
+
+msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgstr "Ich verstehe nur einen Titel oder einen Titel mit einem Datum 🤔.\n\nBitte sende nur den Titel des Treffens oder den Titel mit einem von Telegram formatierten Datum. Klicke auf <b>Abbrechen</b>, um zu beenden."
+
+msgid "NotificationMessages.MEETING_STARTED"
+msgstr "Das Treffen <b>${meeting_title}</b> hat begonnen!"

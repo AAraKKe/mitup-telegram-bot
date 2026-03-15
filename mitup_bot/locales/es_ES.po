@@ -143,9 +143,6 @@ msgstr "📨 Compartir"
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
 
-msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Editar"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Nombre"
 
@@ -187,9 +184,6 @@ msgstr "Bloquear al iniciar"
 
 msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Duración de la quedada"
-
-msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "Bloquear al iniciar"
 
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivar quedada"
@@ -267,9 +261,6 @@ msgstr "Activado ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Desactivado ❌"
-
-msgid "SettingsMessages.MEETING_DURATION_SETTINGS"
-msgstr "Configura la duración de la quedada.\n\nCuando está habilitada, puedes establecer una duración (en minutos) en cada una de tus quedadas. La duración se mostrará en el resumen de la quedada cuando ésta termine."
 
 msgid "MeetingMessages.CREATE"
 msgstr "Vamos a crear una quedada. Dime cual será el título\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
@@ -421,9 +412,6 @@ msgstr "El proceso de invitación ha sido cancelado."
 msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
 msgstr "Algo inesperado sucedió mientras se añadía el usuario invitado. Por favor, intenta de nuevo."
 
-msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "¡La quedada <b>${meeting_title}</b> comenzará pronto!"
-
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "Este es el título actual de la quedada:\n"
 "<b>${title}</b>\n\n"
@@ -485,9 +473,6 @@ msgstr "La quedada se ha eliminado correctamente"
 
 msgid "MeetingMessages.DELETE_MEETING_DECLINE"
 msgstr "La quedada no se ha borrado"
-
-msgid "MeetingMessages.KICKED_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
-msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"
 
 msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
 msgstr "El participante que intentaste expulsar ya no está en la quedada."
@@ -582,9 +567,6 @@ msgstr "✅ ¡Ya es buscable!\n\nEsta quedada fue vinculada a este chat en un co
 
 msgid "MeetingMessages.NO_MEETINGS_FOUND"
 msgstr "Aún no tienes ninguna quedada.\n\nSelecciona <b>${new_meeting_button}</b> en el menú principal para crear una."
-
-msgid "MeetingMessages.ACTIVE"
-msgstr "Estas son tus quedadas activas."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "Estas son todas tus quedadas activas."
@@ -780,3 +762,9 @@ msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
+
+msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
+msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"
+
+msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
+msgstr "Perdona, estaba esperando la duración en minutos. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."

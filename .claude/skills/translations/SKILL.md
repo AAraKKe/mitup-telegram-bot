@@ -51,6 +51,24 @@ Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags
 NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) — use `<b>`, `<i>` tags instead.
 NEVER use raw escaping (`\\(`, `\\)`) — write plain characters.
 
+## Validating translations
+
+Two checks exist:
+
+- `hatch run dev:validate-ids` — ensures every Python message has an entry in `en.po` (English source vs code)
+- `hatch run dev:validate-locales` — ensures every non-English `.po` file contains the same msgids as `en.po`, reporting missing/extra entries per language
+
+## Orchestrating translator agents
+
+Per-language vocabulary rules live at `.claude/agents/translations/<lang_code>.md` (e.g. `de_DE.md`). These are consumed by translator agents — the main agent does not need to read them, only reference their path when spawning agents.
+
+Workflow for adding/syncing translations:
+1. Run `hatch run dev:validate-locales` to identify which languages are out of sync and which msgids each one is missing.
+2. Spawn one translator agent per affected language (never combine languages in one agent). Include the `validate-locales` output in the prompt so the agent knows what to add.
+3. After all agents complete, run `hatch run dev:validate-locales` again — must exit 0.
+
 ## CI enforcement
 
-The `validate-locales` job runs `hatch run dev:validate-locales` to ensure every message defined in code has a corresponding entry in the English translations file. Missing entries cause the job to fail.
+Two CI jobs enforce translation correctness:
+- `validate-ids` — runs `hatch run dev:validate-ids`; ensures every message in code has a corresponding entry in `en.po`.
+- `validate-locales` — runs `hatch run dev:validate-locales`; ensures all non-English `.po` files are in sync with English. Depends on `build-translations`.

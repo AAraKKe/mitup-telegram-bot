@@ -140,9 +140,6 @@ msgstr "📨 Compartir"
 msgid "ButtonMessages.CHAT"
 msgstr "💬 Chat"
 
-msgid "ButtonMessages.BACK_EDIT"
-msgstr "≪ Editar"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Nome"
 
@@ -175,9 +172,6 @@ msgstr "Bloquear ao iniciar"
 
 msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Duración da quedada"
-
-msgid "ButtonMessages.DEFAULT_LOCK_ON_START"
-msgstr "Bloquear ao iniciar"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Facer buscable"
@@ -266,9 +260,6 @@ msgstr "Habilitado ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Deshabilitado ❌"
-
-msgid "SettingsMessages.MEETING_DURATION_SETTINGS"
-msgstr "Configura a duración da quedada.\n\nCando está habilitada, podes establecer unha duración (en minutos) en cada unha das túas quedadas. A duración mostrarase no resumo da quedada cando remate."
 
 msgid "MeetingMessages.CREATE"
 msgstr "Imos crear unha quedada. Cal é o título?\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
@@ -419,9 +410,6 @@ msgstr "O proceso de invitación foi cancelado."
 
 msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
 msgstr "Algo inesperado aconteceu ao engadir o usuario invitado. Por favor intenta de novo."
-
-msgid "MeetingMessages.NOTIFICATION_MEETING_STARTING"
-msgstr "A quedada <b>${meeting_title}</b> comezará pronto!"
 
 msgid "MeetingMessages.EDIT_MEETING_TITLE"
 msgstr "Este é o título actual da túa quedada:\n"
@@ -582,9 +570,6 @@ msgstr "✅ Agora Buscable!\n\nEsta quedada agora está adxunta a este chat. Ser
 
 msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
 msgstr "✅ Xa Buscable!\n\nEsta quedada xa estaba adxunta a este chat desde unha compartición anterior. Xa está incluída nos teus resultados de busca."
-
-msgid "MeetingMessages.ACTIVE"
-msgstr "Estas son todas as túas quedadas activas."
 
 msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
 msgstr "Estas son todas as túas quedadas activas."
@@ -747,3 +732,42 @@ msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
+
+msgid "ButtonMessages.DATE_TIME"
+msgstr "🗓️ Data e Hora"
+
+msgid "MeetingMessages.DURATION_CLEARED"
+msgstr "Duración eliminada."
+
+msgid "MeetingMessages.DURATION_SET_SUCCESS"
+msgstr "Duración establecida a: <b>${duration} minutos</b>"
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
+msgstr "Estabelece canto tempo durará esta quedada.\n\nDuración actual: <b>${current_duration} minutos</b>.\n\nTamén podes bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
+
+msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
+msgstr "Estabelece canto tempo durará esta quedada.\n\nAínda non se estableceu duración. Tamén podes bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
+
+msgid "MeetingMessages.EDIT_DURATION_PROMPT"
+msgstr "A duración actual é <b>${current_duration} minutos</b>.\n\nEnvíame a nova duración en minutos, ou toca <b>Cancelar</b> para volver."
+
+msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
+msgstr "Desculpa, estaba esperando a duración en minutos. Te gustaría enviarla? Se non, toca Cancelar para saír."
+
+msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
+msgstr "Esta quedada xa comezou e a súa lista de asistentes está bloqueada."
+
+msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
+msgstr "Debes establecer unha duración antes de activar esta opción."
+
+msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
+msgstr "✅ Esta quedada rematou ✅\n\n<b>Duración:</b> ${duration} minutos · <b>Asistentes:</b> ${attendee_count}"
+
+msgid "MeetingMessages.MEETING_IN_PROGRESS"
+msgstr "▶️ Esta quedada está en curso ▶️"
+
+msgid "MeetingMessages.SET_DURATION_PROMPT"
+msgstr "Envíame a duración da quedada en minutos, ou toca <b>Cancelar</b> para volver."
+
+msgid "NotificationMessages.MEETING_STARTED"
+msgstr "A quedada <b>${meeting_title}</b> comezou!"

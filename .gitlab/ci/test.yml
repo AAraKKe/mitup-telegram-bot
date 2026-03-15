@@ -91,11 +91,20 @@ validate-migrations:
   script: hatch run dev:validate-migrations
   needs: [preparation]
 
+validate-ids:
+  # Validates that all messages in code are present in the English translations file
+  stage: test
+  script:
+    - hatch run dev:validate-ids
+
 validate-locales:
-  # This just validates that all messages in code are present in the translations english file
+  # Validates that all non-English .po files contain the same msgids as English
   stage: test
   script:
     - hatch run dev:validate-locales
+  dependencies:
+    - build-translations
+  needs: [preparation, build-translations]
 
 test-db:
   stage: test

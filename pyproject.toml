@@ -235,9 +235,11 @@ serve-docs = "mkdocs serve"
 build-docs = "mkdocs build --strict"
 push-docs = "python -m mitup_bot.cli.run publish-docs {args:}"
 update-source-language = "python -m mitup_bot.cli.run translations update"
-validate-locales = "python -m mitup_bot.cli.run translations validate-ids"
+validate-ids = "python -m mitup_bot.cli.run translations validate-ids"
+validate-locales = "python -m mitup_bot.cli.run translations validate-locales"
 build-locales = "python -m mitup_bot.cli.run translations build"
-update-locales = ["update-source-language", "build-locales"]
+clean-locales = "python -m mitup_bot.cli.run translations clean-locales"
+update-locales = ["update-source-language", "clean-locales", "build-locales", "validate-locales"]
 set-local-bot = "python -m mitup_bot.cli.run dev {args:}"
 populate-db = "python bin/populate_db.py {args:}"
 

@@ -97,7 +97,10 @@ Review before staging — never blindly `git add .`:
    - These are matched against `$CI_COMMIT_TITLE` (first line only), so they must be in the title.
    - Production deploys only from the `release` branch; `[force-deploy]` only affects staging.
 8. Run `git commit -m "<message>"`.
-9. Run `git status` to confirm the working tree is clean.
+9. **If the commit fails due to a hook auto-fixing files** (e.g. `trailing-whitespace` or `ruff-format` reports "files were modified by this hook"):
+   - Re-stage the modified files: `git add <files modified by hook>` (check hook output for which files were fixed)
+   - Re-run the same commit command — do NOT amend; the previous commit did not happen.
+10. Run `git status` to confirm the working tree is clean.
 
 ---
 
