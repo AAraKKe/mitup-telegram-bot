@@ -22,7 +22,6 @@ build-translations:
 
 validate-ci-languages:
   stage: build
-  needs: [{job: build-docker-ci, optional: true}]
   script: hatch run dev:python bin/check_ci_languages.py
 
 test:
