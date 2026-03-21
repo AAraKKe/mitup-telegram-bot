@@ -19,7 +19,7 @@ Before writing a test, read the reference that matches what you're testing:
 |---|---|
 | Any test using fixtures, MockDbSession, or UpdateRequest | `references/fixtures.md` |
 | Handler callback/command tests using MockApi | `references/api-and-assertions.md` |
-| Asserting CloudWatch metrics were emitted | `references/metrics.md` |
+| Asserting metrics via `MetricAssertions` fixture | `references/metrics.md` |
 | Handler tests (callback, command, conversation flows) | `references/handler-tests.md` |
 | Adding a handler to the centralized failure modes module | `references/failure-modes.md` |
 | CLI command tests (recurrent events, notifications, etc.) | `references/cli-tests.md` |

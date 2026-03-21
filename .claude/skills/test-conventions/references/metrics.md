@@ -2,99 +2,118 @@
 
 ## Overview
 
-Metrics are tested via `StubMetrics` and `StubMetricsEngine` from `tests.helpers.monitoring`. These use an `InMemorySink` that captures emitted CloudWatch EMF metrics for assertion.
+Metrics are tested via `MetricAssertions` from `tests.helpers.monitoring`. It wraps a `MetricsClient` backed by `NullBackend` and inspects the accumulated `MetricRecord` list for assertions.
 
-`StubMetricsEngine` is available via `context.metrics_engine` after calling `call_handler`.
+Two fixtures are available globally (defined in `tests/conftest.py`):
 
-## Important: Unit.MILLISECONDS for TIME metrics
+- `metrics_client` — a `MetricsClient(NullBackend())` instance injected into contexts.
+- `metrics` — a `MetricAssertions(metrics_client)` wrapper for assertions.
 
-When asserting `MetricKey.TIME`, you **must** explicitly pass `units=[Unit.MILLISECONDS]`. The default unit is `Unit.COUNT`, which causes a silent mismatch. Always import:
+## Fixture wiring
+
+### Handler tests
+
+The `metrics_client` is automatically wired into `context` and `handler_context` fixtures:
 
 ```python
-from aws_embedded_metrics.unit import Unit
+async def test_something(
+    context: StubMitupContext,
+    metrics: MetricAssertions,
+    ...
+):
+    await some_handler(update, context)
+    await context.flush_metrics()
+
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 ```
 
-## StubMetricsEngine assertion methods
+After calling handlers, **always call `await context.flush_metrics()`** before asserting — this flushes the backend and ensures all records are captured.
 
-### `assert_handler_metrics_emitted(names, values=None, units=None, exception=None, times=1)`
+### CLI tests
 
-The most common assertion for handler tests. Automatically adds handler dimensions and update properties.
+CLI commands receive `MetricsClient` directly. Override the `metrics_client` fixture locally when you need `base_dimensions`:
 
 ```python
-context.metrics_engine.assert_handler_metrics_emitted(
-    [MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-    [0, AnyFloat(), 0],
-    [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
+from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
+from tests.helpers.monitoring import MetricAssertions
+
+@pytest.fixture
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value})
+
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
+
+async def test_cli_command(mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi):
+    await some_cli_command.run(api, metrics_client)
+    await metrics_client.flush()
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+```
+
+For CLI tests, call **`await metrics_client.flush()`** directly (there is no context wrapper).
+
+## MetricAssertions API
+
+### `assert_emitted(**kwargs)`
+
+Asserts a metric was emitted the expected number of times.
+
+```python
+metrics.assert_emitted(
+    name=MetricKey.FAULT,          # Required — str or MetricKey
+    value=1,                       # None = skip value check
+    unit=MetricUnit.MILLISECONDS,  # None = skip unit check
+    dimensions={"Feature": "X"},   # None = skip; subset match by default
+    dimensions_exact=False,        # True = require exact dimension match (no extra dims allowed)
+    properties={"key": "val"},     # None = skip; subset match by default
+    properties_exact=False,        # True = require exact property match
+    exception=UserNotFound,        # type[Exception] or str; checks record's exception properties
+    times=1,                       # Expected emission count
 )
 ```
 
-With an exception:
+**Dimension matching:** By default, `dimensions={"Feature": "X"}` matches records that have _at least_ that dimension (subset match). Use `dimensions_exact=True` to require the record has _exactly_ those dimensions and no others.
+
+**Value flexibility:** Pass `value=None` to skip value checking entirely. This replaces the old `AnyFloat()` pattern for non-deterministic values like timing. However, `AnyFloat()` is still available via `tests.helpers` for cases where you need a float-matching sentinel in other assertions.
+
+### `assert_not_emitted(**kwargs)`
+
+Convenience wrapper — same parameters as `assert_emitted` but asserts `times=0`:
+
 ```python
-context.metrics_engine.assert_handler_metrics_emitted(
-    [MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-    [1, AnyFloat(), 0],
-    [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-    exception=UserNotFound,
-)
+metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 ```
 
-### `assert_metrics_emited(names, values, units, namespace, dimensions, properties, exception, times, negative_case, add_handler_dimensions, add_update_properties)`
+## Important: MetricUnit.MILLISECONDS for TIME metrics
 
-Full-control assertion. Use when you need custom dimensions, properties, or to disable automatic handler dimensions.
+When asserting `MetricKey.TIME`, you **must** explicitly pass `unit=MetricUnit.MILLISECONDS`. The default unit is `MetricUnit.COUNT`, which causes a silent mismatch:
 
 ```python
-context.metrics_engine.assert_metrics_emited(
-    [MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-    [0, AnyFloat(), 0],
-    [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-    dimensions={"EventType": event_type.value},
-    exception="RuntimeError",
-    add_handler_dimensions=False,
-)
+from mitup_bot.monitoring import MetricUnit
+
+# Correct
+metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
+
+# Wrong — will silently not match because unit defaults to COUNT
+metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat())
 ```
 
-### `assert_feature_metrics_emitted(feature, times=1)`
+## Exception matching
 
-Asserts a feature metric (`MetricKey.COUNT` with `Feature` dimension) was emitted.
-
-```python
-context.metrics_engine.assert_feature_metrics_emitted(Feature.MEETING_CREATED)
-```
-
-### `assert_feature_metrics_not_emitted(feature)`
-
-Asserts a feature metric was NOT emitted.
-
-### `assert_metrics_not_emited(names, ...)`
-
-Asserts metrics were NOT emitted. Same signature as `assert_metrics_emited` but inverted.
-
-## StubMetrics (standalone, without context)
-
-For CLI tests or code that creates its own metrics logger, instantiate `StubMetrics` directly:
+Pass `exception=` to match the exception recorded in a metric's properties:
 
 ```python
-from tests.helpers import StubMetrics
+# By class — resolves to fully qualified name for matching
+metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception=UserNotFound)
 
-stub = StubMetrics()
-# ... run code that uses stub as its metrics logger ...
-stub.assert_metrics_emited(
-    [MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-    [0, AnyFloat(), 0],
-    [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-    dimensions={"EventType": event_type.value},
-)
-```
-
-## AnyFloat
-
-Use `AnyFloat()` for metric values where the exact number doesn't matter (e.g., timing):
-
-```python
-from tests.helpers import AnyFloat
-
-# Matches any int or float
-[0, AnyFloat(), 0]
+# By string — matches against the error_type property
+metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception="RuntimeError")
 ```
 
 ## Fault prefix pattern
@@ -106,4 +125,39 @@ MetricKey.FAULT.with_prefix(MetricKey.MEETING_NOT_OWNED)   # "MeetingNotOwned/Fa
 MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED)    # "MeetingNotOwned/Error"
 ```
 
-NOTE: This reference documents the current metrics assertion API. If the monitoring system is being refactored, check `tests/helpers/monitoring.py` for the latest signatures.
+## Common handler metrics pattern
+
+Every handler invocation automatically emits `Fault`, `Time`, and `DbConnectionsLeaked`. Assert all three when testing handler-level metrics:
+
+```python
+metrics.assert_emitted(name=MetricKey.FAULT, value=0)
+metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
+metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
+```
+
+For handlers that raise exceptions:
+
+```python
+metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)  # handler dims + global
+metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
+metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+```
+
+## Feature metrics
+
+Assert feature usage metrics emitted via `context.put_feature_metric()`:
+
+```python
+metrics.assert_emitted(
+    name=MetricKey.COUNT,
+    value=1,
+    dimensions={"Feature": str(Feature.JOIN_MEETING)},
+)
+
+# Negative assertion
+metrics.assert_not_emitted(
+    name=MetricKey.COUNT,
+    dimensions={"Feature": str(Feature.NEW_LANDING)},
+)
+```

@@ -10,34 +10,47 @@ The bot uses [AWS Embedded Metrics Format (EMF)](https://docs.aws.amazon.com/Ama
 
 ## Architecture
 
-### Metrics engine
+### MetricsClient
 
-`MitupMetricsEngine` is the central coordinator. It manages multiple `MitupMetricsLogger` instances, one per unique `Dimensionality`. Loggers with identical dimensions share a single EMF log line — this is a **cost optimization** (CloudWatch charges per log line, not per metric within a line).
+`MetricsClient` is the central metrics API. It accepts a `MetricsBackend` and optional `base_dimensions`, accumulates `MetricRecord` instances internally, and delegates emission to the backend.
 
-The engine is created per-request in `MitupContext.from_update()` and flushed after every handler invocation by `callback_with_metrics()` in the registry.
+In handler contexts, `MitupContext` wraps `MetricsClient` and provides convenience methods (`emit_metric`, `put_feature_metric`, `with_time_metric`). The client is created per-request in `MitupContext.from_update()` and flushed after every handler invocation by `callback_with_metrics()` in the registry.
 
-### Dimensionality
+### MetricsBackend
 
-`Dimensionality` is an immutable, hashable bag of key-value dimension pairs. The engine uses it as a cache key — calling `get_logger(Dimensionality(Handler="Show", HandlerType="Callback"))` twice returns the same logger instance. `NULL_DIMENSIONALITY` is the singleton for dimensionless metrics.
+`MetricsBackend` is a protocol with two implementations:
 
-### Sinks
+| Backend | When used |
+|---------|-----------|
+| `EmfBackend` | Production — delegates to `aws_embedded_metrics` for real CloudWatch emission |
+| `NullBackend` | Tests — silent no-op; records are still captured in `MetricsClient._records` |
 
-Three output backends exist, selected via `MetricsConfig.environment`:
+The backend is configured once globally by `configure_emf_backend()` in `app.py`. Never select backends conditionally in handler code.
 
-| `MetricsEnv` | Backend | When used |
-|--------------|---------|-----------|
-| `CLOUDWATCH` | AWS CloudWatch (default EMF) | Production |
-| `STDOUT` | Stdout (local EMF environment) | CI, automated testing |
-| `RICH` | `RichConsoleSink` — pretty-printed JSON via Rich | Local development |
+### MetricRecord
+
+`MetricRecord` is a frozen dataclass that captures a single metric emission:
+
+- `name: str` — the metric name (typically a `MetricKey` value)
+- `value: float` — the metric value
+- `unit: MetricUnit` — one of `COUNT`, `MILLISECONDS`, `BYTES`, `SECONDS`, `NONE`
+- `dimensions: frozenset[tuple[str, str]]` — immutable dimension pairs
+- `properties: dict[str, Any]` — searchable EMF properties (not dimensions)
+
+### MetricUnit
+
+Custom `MetricUnit` enum (in `monitoring/units.py`) replaces the old `aws_embedded_metrics.unit.Unit`:
+
+- `MetricUnit.COUNT`, `MetricUnit.MILLISECONDS`, `MetricUnit.BYTES`, `MetricUnit.SECONDS`, `MetricUnit.NONE`
 
 <critical_rules>
-The sink is configured once globally by `configure_metrics()` in `app.py`. Never select sinks conditionally in handler code.
+Always import `MetricUnit` from `mitup_bot.monitoring`, never from `aws_embedded_metrics`.
 </critical_rules>
 
 ## Emitting metrics from handlers
 
 <critical_rules>
-All handler metrics go through `MitupContext` methods. Never instantiate loggers or call EMF directly.
+All handler metrics go through `MitupContext` methods. Never instantiate clients or call EMF directly.
 </critical_rules>
 
 ### `context.emit_metric()`
@@ -108,14 +121,18 @@ If only one handler emits a metric, a plain string is acceptable — but prefer 
 
 ## Outside handler contexts
 
-For code that runs outside the request cycle (lambdas, CLI scripts), use `MitupMetricsEngine` directly with `auto_flush()` or `async_auto_flush()`:
+For code that runs outside the request cycle (lambdas, CLI scripts), create a `MetricsClient` directly with the appropriate backend:
 
 ```python
-engine = MitupMetricsEngine(logger_provider=lambda ep: MitupMetricsLogger(ep))
-with engine.auto_flush() as metrics:
-    metrics.put_metric(MetricKey.INACTIVE_USERS_DELETED, count, Unit.COUNT)
+from mitup_bot.monitoring import MetricsClient, EmfBackend, MetricKey, MetricUnit
+
+client = MetricsClient(backend, base_dimensions={"EventType": event_type.value})
+client.emit(MetricKey.INACTIVE_USERS_DELETED, count, MetricUnit.COUNT)
+await client.flush()
 ```
 
+Use `NullBackend()` in tests and `EmfBackend(...)` in production. The `base_dimensions` are merged into every emission automatically.
+
 <note>
-`BotAdapter` (used in lambdas/CLI) does **not** emit metrics — its `emit_metric()` and `with_time_metric()` are no-ops. If metrics are needed from a lambda, use the engine directly as shown above.
+`BotAdapter` (used in lambdas/CLI) does **not** emit metrics — its `emit_metric()` and `with_time_metric()` are no-ops. If metrics are needed from a lambda, use `MetricsClient` directly as shown above.
 </note>

@@ -62,7 +62,7 @@ These are the most common mistakes that cause wasted iteration cycles. Memorize 
 
 1. **Relationship trap**: never pass `owner=user` to `create_meetup` if the user already exists — causes duplicate entries. Create the meetup first, then pass it via `owned_meetings`.
 2. **Identity matching**: the `update` fixture defaults to `tg_user_id=123`. Users must match.
-3. **MetricKey.TIME units**: always pass `units=[Unit.MILLISECONDS]` explicitly. Default is Count.
+3. **MetricKey.TIME units**: always pass `unit=MetricUnit.MILLISECONDS` explicitly. Default is `MetricUnit.COUNT`, which causes a silent mismatch.
 4. **Conversation entry points**: pass individual handler IDs, NOT ConversationHandler IDs.
 5. **MockApi methods**: must be regular functions, NOT `async def`.
 6. **Never call handlers directly**: always use `call_handler()` from `tests.helpers.context`.
