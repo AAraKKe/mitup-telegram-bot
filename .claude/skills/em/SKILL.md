@@ -2,7 +2,7 @@
 name: em
 description: Engineering manager orchestration workflow. Invoke with /em <task> to plan and coordinate complex multi-domain features using specialist agents.
 argument-hint: "<task description> | implement <phase-file-path> [phase-file-path ...]"
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList, EnterWorktree
 ---
 
 <task>
@@ -14,7 +14,10 @@ $ARGUMENTS
   <rule>Do NOT write any implementation code yourself.</rule>
   <rule>Do NOT start implementation delegation until the user has explicitly approved the plan.</rule>
   <rule>After presenting the plan, output ONLY: "Awaiting your approval to proceed." and STOP. Do not take any further action until the user responds.</rule>
-  <rule>When invoking a specialist for feasibility, always ensure that thea gent should not implement code.</rule>
+  <rule>When invoking a specialist for feasibility, always ensure that the agent should not implement code.</rule>
+  <rule>All implementation work MUST happen inside a worktree. Use `EnterWorktree` before executing any phase. See `<worktree>` for details.</rule>
+  <rule>Never pass `isolation: "worktree"` when spawning agents — that creates a separate worktree per agent. All agents must share the same worktree.</rule>
+  <rule>Every implementation agent prompt MUST start with the worktree preamble from `<worktree>` and end with the file-tracking instruction.</rule>
 </hard_constraints>
 
 <available_agents>
@@ -60,6 +63,42 @@ $ARGUMENTS
     No feasibility phase needed — this is a post-implementation check.
   </agent>
 </available_agents>
+
+<worktree>
+## Why a worktree
+
+Implementation work always happens in a git worktree so that the user's main working directory stays clean. This lets them continue other work while phases execute, and keeps half-finished changes off the main checkout.
+
+## How it works
+
+1. **One shared worktree** — call `EnterWorktree` once with the feature slug as the name (e.g., `EnterWorktree(name: "recurring-meetings")`). This switches the session's CWD to the new worktree directory. Store the **absolute worktree path** — you will need it for every agent prompt.
+2. **Agents do NOT inherit the worktree CWD.** Spawned agents default to the original repository root, not the worktree. You must explicitly tell every agent the worktree path and instruct it to work there. Do NOT pass `isolation: "worktree"` to any agent — that creates a separate worktree per agent, defeating the purpose.
+3. **Worktree preamble** — prepend the following block (with the actual path substituted) to **every** implementation agent prompt. This is the single most important instruction for correct worktree operation:
+
+```
+IMPORTANT — WORKTREE CONTEXT
+You are working inside a git worktree at: <WORKTREE_ABSOLUTE_PATH>
+All file reads, edits, writes, and bash commands MUST target files under this path.
+When using Read, Edit, Write, or Glob, always use absolute paths starting with <WORKTREE_ABSOLUTE_PATH>/.
+When using Bash, always `cd <WORKTREE_ABSOLUTE_PATH>` first (or use absolute paths).
+Do NOT touch any files outside this directory — the main repository checkout is a different directory.
+```
+
+## File tracking
+
+Every implementation agent must also report which files it created or modified. Include this instruction verbatim at the end of every implementation agent prompt (after the phase brief):
+
+```
+When you are done, list every file you created or modified under a "## Files touched" heading at the end of your response. Use one bullet per file, relative paths only, no nesting or extra text. Example:
+
+## Files touched
+- mitup_bot/handlers/foo/bar.py
+- mitup_bot/views/foo_view.py
+- tests/handlers/test_foo.py
+```
+
+After each agent completes, extract the file list from the `## Files touched` section (one path per bullet line). Accumulate all file lists across phases — you will need them for the convention review step.
+</worktree>
 
 <workflow>
 ## Mode detection
@@ -112,8 +151,14 @@ Once the user approves, write the phase files to `.plans/` before starting any i
 
 ## Implementation mode (Steps 6–9)
 
-**Step 6 — Load context**
-Load `.plans/<slug>-overview.md` (if it exists alongside the phase files) plus all requested phase files. Read the `## Dependencies` section of each phase file to determine which phases are independent.
+**Step 6 — Enter worktree and load context**
+
+Before any implementation begins, create a shared worktree for all phases:
+
+1. Derive the feature slug from the phase file names or task description (kebab-case, max 4 words).
+2. Call `EnterWorktree(name: "<slug>")`. This switches the session's CWD into the worktree.
+3. Store the absolute worktree path (the new CWD after `EnterWorktree`). You will embed this path in every agent prompt via the worktree preamble from `<worktree>`.
+4. Load `.plans/<slug>-overview.md` (if it exists alongside the phase files) plus all requested phase files. Read the `## Dependencies` section of each phase file to determine which phases are independent.
 
 **Step 7 — Execute phases**
 Create a `TaskCreate` task for each phase being implemented.
@@ -122,18 +167,45 @@ Group phases by independence:
 - Phases with no dependencies on each other → spawn their specialist agents **in parallel** (simultaneous `Agent` tool calls). Update each task to `in_progress` before invoking its agent.
 - Phases that depend on others → run sequentially after their prerequisites complete.
 
-Agents are invoked with the full phase file contents as their brief. Do not restrict tools — the agent `.md` files already declare the right tool sets.
+Every agent prompt must be structured as:
+1. The worktree preamble from `<worktree>` (with the actual absolute path substituted)
+2. The full phase file contents as the implementation brief
+3. The file-tracking instruction from `<worktree>`
+
+Do not restrict tools — the agent `.md` files already declare the right tool sets.
+
+After each agent completes, parse its response for the `## Files touched` section and accumulate all file paths into a running list. You will pass this list to the convention reviewer.
 
 Update each task to `completed` when its agent finishes.
 
 > **Production bugs found during a phase:** Specialists are empowered to fix broken production code they discover while completing their assigned work — even if it is outside the strict scope of the phase. A stale symbol reference, a broken import, or an incorrect guard call found in passing should be fixed in-place rather than left for a later phase or ignored.
 
 **Step 7.5 — Convention review**
-After all implementation phases complete, run the `convention-reviewer` agent on all files touched across every phase. If it reports violations:
+After all implementation phases complete, run the `convention-reviewer` agent. The convention-reviewer only has Read, Grep, and Glob — it cannot run git commands. You must pass it the explicit list of files to review.
+
+Include in the convention-reviewer prompt:
+- The worktree preamble (so it reads files from the correct directory)
+- The complete list of files touched across all phases (the accumulated list from Step 7), one per line
+
+Example prompt structure:
+```
+IMPORTANT — WORKTREE CONTEXT
+You are working inside a git worktree at: /path/to/worktree
+All file reads and searches MUST target files under this path.
+When using Read, Grep, or Glob, always use absolute paths starting with /path/to/worktree/.
+Do NOT access any files outside this directory — the main repository checkout is a different directory.
+
+Review the following files for convention violations:
+- mitup_bot/handlers/foo/bar.py
+- mitup_bot/views/foo_view.py
+- tests/handlers/test_foo.py
+```
+
+If the reviewer reports violations:
 - Identify which specialist agent(s) own the violated files (using the domain table in CLAUDE.md).
-- Resume each relevant specialist agent and pass it the full violation report for its domain.
+- Resume each relevant specialist agent and pass it the full violation report for its domain (include the worktree preamble again when resuming).
 - Do NOT fix violations yourself.
-- Re-run convention-reviewer after the specialist finishes until it reports no violations.
+- Re-run convention-reviewer (with the same explicit file list and worktree preamble) after the specialist finishes until it reports no violations.
 
 **Step 8 — Retrospective**
 After all requested phases complete (and convention review is clean), run a single retrospective. Do NOT report per-phase status — that is already communicated via task updates. Focus exclusively on learnings and follow-up work.
