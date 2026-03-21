@@ -34,14 +34,16 @@ class ValidTitleFilter(filters.MessageFilter):
             return False
         if not entities:
             return True
-        return sum(e.type == "date_time" for e in entities) <= 1
+        return sum(e.type == MessageEntity.DATE_TIME for e in entities) <= 1
 
 
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CREATE_MEETING_CALLBACK, callback_data=cb.CREATE_MEETING, bindable=False
 )
 @with_async_session
-async def callback_query_create_meeting(session: Session, update: Update, context: TMitupContext):
+async def callback_query_create_meeting(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationMeetingState:
     logging.debug("Enter into callback_query_create_meeting")
 
     user = guards.current_user(update, session)
@@ -73,11 +75,11 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
     meeting_datetime: dt.datetime | None = None
 
     # next() is safe: ValidTitleFilter guarantees at most one date_time entity
-    date_entity = next((e for e in (message.entities or []) if e.type == "date_time"), None)
+    date_entity = next((e for e in (message.entities or []) if e.type == MessageEntity.DATE_TIME), None)
     if date_entity is not None:
-        unix_time = date_entity.to_dict().get("unix_time")
+        unix_time = date_entity.unix_time
         if unix_time is not None:
-            meeting_datetime = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
+            meeting_datetime = unix_time
 
     meetup = Meetup(
         title=title,
@@ -118,7 +120,7 @@ async def create_meeting_invalid_title_message_handler(
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK, callback_data=cb.CANCEL_CREATE_MEETING, bindable=False
 )
-async def callback_query_cancel_meeting(update: Update, context: TMitupContext):
+async def callback_query_cancel_meeting(update: Update, context: TMitupContext) -> int:
     logging.debug("Enter into callback_query_cancel_meeting")
 
     # Just send the user to the main menu

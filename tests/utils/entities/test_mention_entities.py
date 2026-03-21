@@ -1,9 +1,11 @@
+import datetime
+
 import pytest
+from telegram import MessageEntity
 
 from mitup_bot.utils.entities import (
     Bold,
     BoldItalic,
-    DateTimeMessageEntity,
     EntityDateTime,
     FormattedText,
     Italic,
@@ -106,21 +108,23 @@ def test_render_link():
 
 
 def test_render_entity_datetime():
-    result = render(t"{EntityDateTime('tomorrow', unix_time=9999999)}")
+    unix_dt = datetime.datetime.fromtimestamp(9999999, tz=datetime.UTC)
+    result = render(t"{EntityDateTime('tomorrow', unix_time=unix_dt)}")
     assert result.text == "tomorrow"
     assert len(result.entities) == 1
     e = result.entities[0]
-    assert isinstance(e, DateTimeMessageEntity)
+    assert e.type == MessageEntity.DATE_TIME  # "date_time"
     assert e.offset == 0
     assert e.length == 8
-    assert e.unix_time == 9999999
+    assert e.unix_time == unix_dt
 
 
 def test_render_entity_datetime_with_format():
-    result = render(t"{EntityDateTime('now', unix_time=1, date_time_format='date')}")
+    unix_dt = datetime.datetime.fromtimestamp(1, tz=datetime.UTC)
+    result = render(t"{EntityDateTime('now', unix_time=unix_dt, date_time_format='date')}")
     assert result.text == "now"
     e = result.entities[0]
-    assert isinstance(e, DateTimeMessageEntity)
+    assert e.type == MessageEntity.DATE_TIME  # "date_time"
     assert e.date_time_format == "date"
 
 
@@ -216,8 +220,6 @@ def test_render_deeply_nested_template_entity_offset():
 
 
 def test_render_nested_template_containing_formatted_text_shifts_entities():
-    from telegram import MessageEntity
-
     # FormattedText inside a nested template must also be shifted by the outer prefix.
     ft = FormattedText("bold", [MessageEntity(type="bold", offset=0, length=4)])
     inner = t"{ft} suffix"
@@ -231,15 +233,16 @@ def test_render_nested_template_containing_formatted_text_shifts_entities():
 
 
 # ---------------------------------------------------------------------------
-# DateTimeMessageEntity.to_dict()
+# MessageEntity(type=DATE_TIME).to_dict()
 # ---------------------------------------------------------------------------
 
 
 def test_date_time_message_entity_to_dict_basic():
-    e = DateTimeMessageEntity(offset=0, length=5, unix_time=1234567890)
+    unix_dt = datetime.datetime.fromtimestamp(1234567890, tz=datetime.UTC)
+    e = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=5, unix_time=unix_dt)
     d = e.to_dict()
     assert d.get("type") == "date_time"
-    assert d["unix_time"] == 1234567890
+    assert d["unix_time"] == 1234567890  # PTB serialises datetime → int timestamp
 
 
 @pytest.mark.parametrize(
@@ -251,7 +254,10 @@ def test_date_time_message_entity_to_dict_basic():
     ids=["format_present", "format_absent"],
 )
 def test_date_time_message_entity_to_dict_format(date_time_format: str | None, expect_key: bool):
-    e = DateTimeMessageEntity(offset=0, length=5, unix_time=42, date_time_format=date_time_format)
+    unix_dt = datetime.datetime.fromtimestamp(42, tz=datetime.UTC)
+    e = MessageEntity(
+        type=MessageEntity.DATE_TIME, offset=0, length=5, unix_time=unix_dt, date_time_format=date_time_format
+    )
     d = e.to_dict()
     assert ("date_time_format" in d) == expect_key
     if expect_key:

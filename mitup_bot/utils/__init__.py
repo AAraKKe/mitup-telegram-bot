@@ -3,7 +3,6 @@ __all__ = (
     "BoldItalic",
     "ButtonMessages",
     "callbacks",
-    "DateTimeMessageEntity",
     "Emojis",
     "EntityDateTime",
     "InlineViewMessages",
@@ -27,7 +26,6 @@ from .emojis import Emojis
 from .entities import (
     Bold,
     BoldItalic,
-    DateTimeMessageEntity,
     EntityDateTime,
     Italic,
     Link,

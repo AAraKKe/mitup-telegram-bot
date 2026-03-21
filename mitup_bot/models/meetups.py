@@ -349,13 +349,13 @@ class Meetup(BaseModel, SQLModel, table=True):
             datetime_display = MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
             return t"--- {Emojis.CLOCK} {datetime_display}\n"
 
-        start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), int(self.datetime.timestamp()), "DT")
+        start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.datetime, "DT")
 
         if self.duration_minutes is None:
             return t"--- {Emojis.CLOCK} {start_entity}\n"
 
         stop_datetime = self.datetime + dt.timedelta(minutes=self.duration_minutes)
-        stop_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), int(stop_datetime.timestamp()), "DT")
+        stop_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), stop_datetime, "DT")
         start_label = MeetingMessages.MEETING_START_TIME.get(lang=self.lang)
         stop_label = MeetingMessages.MEETING_STOP_TIME.get(lang=self.lang)
         return t"--- {Emojis.START} {start_label}: {start_entity}\n--- {Emojis.STOP} {stop_label}: {stop_entity}\n"

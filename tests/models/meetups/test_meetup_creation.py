@@ -13,7 +13,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.emojis import Emojis
-from mitup_bot.utils.entities import DateTimeMessageEntity, FormattedText
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
@@ -291,10 +291,11 @@ def test_meetup_message(
     assert bold_entities[0].length == 12  # "Test Meeting"
 
     # A date_time entity is present if and only if a datetime was set.
-    dt_entities = [e for e in result.entities if isinstance(e, DateTimeMessageEntity)]
+    dt_entities = [e for e in result.entities if e.type == MessageEntity.DATE_TIME]
     if meetup_datetime:
         assert len(dt_entities) == 1
-        assert dt_entities[0].unix_time == int(datetime(1987, 7, 16, 23, 59, tzinfo=UTC).timestamp())
+        # PTB stores unix_time as datetime on the entity; compare against the expected datetime directly.
+        assert dt_entities[0].unix_time == datetime(1987, 7, 16, 23, 59, tzinfo=UTC)
     else:
         assert not dt_entities
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -103,55 +104,21 @@ class EntityDateTime:
     """Telegram ``date_time`` entity — each viewer sees the time in their own locale."""
 
     text: str
-    unix_time: int
+    unix_time: dt.datetime
     date_time_format: str | None = None
-
-
-# --- DateTimeMessageEntity ---
-
-
-class DateTimeMessageEntity(MessageEntity):
-    """PTB ``MessageEntity`` subclass carrying the ``unix_time`` field for ``date_time`` entities."""
-
-    unix_time: int
-    date_time_format: str | None
-
-    __slots__ = ("date_time_format", "unix_time")
-
-    def __init__(
-        self,
-        offset: int,
-        length: int,
-        unix_time: int,
-        date_time_format: str | None = None,
-    ) -> None:
-        super().__init__(type="date_time", offset=offset, length=length)
-        # MessageEntity calls _freeze() in __init__, so we bypass the guard here.
-        object.__setattr__(self, "unix_time", unix_time)
-        object.__setattr__(self, "date_time_format", date_time_format)
-
-    def to_dict(self, recursive: bool = True) -> dict:
-        d = super().to_dict(recursive=recursive)
-        d["unix_time"] = self.unix_time
-        if self.date_time_format is not None:
-            d["date_time_format"] = self.date_time_format
-        return d
 
 
 def _shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
     """Return a copy of *entity* with its offset shifted by *offset* UTF-16 code units."""
-    if isinstance(entity, DateTimeMessageEntity):
-        return DateTimeMessageEntity(
-            offset=entity.offset + offset,
-            length=entity.length,
-            unix_time=entity.unix_time,
-            date_time_format=entity.date_time_format,
-        )
     # MessageEntity is frozen; construct a new instance with the adjusted offset.
-    kwargs: dict = {"type": entity.type, "offset": entity.offset + offset, "length": entity.length}
-    if entity.url:
-        kwargs["url"] = entity.url
-    return MessageEntity(**kwargs)
+    return MessageEntity(
+        type=entity.type,
+        offset=entity.offset + offset,
+        length=entity.length,
+        url=entity.url,
+        unix_time=entity.unix_time,
+        date_time_format=entity.date_time_format,
+    )
 
 
 def strip_entity_from_text(text: str, entity: MessageEntity) -> str:
@@ -209,7 +176,8 @@ def _render_link(plain: str, value: Link) -> list[MessageEntity]:
 def _render_entity_datetime(plain: str, value: EntityDateTime) -> list[MessageEntity]:
     offset, length = utf16_len(plain), utf16_len(value.text)
     return [
-        DateTimeMessageEntity(
+        MessageEntity(
+            type=MessageEntity.DATE_TIME,
             offset=offset,
             length=length,
             unix_time=value.unix_time,

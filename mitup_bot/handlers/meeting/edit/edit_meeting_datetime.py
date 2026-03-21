@@ -4,7 +4,7 @@ from re import Match
 from typing import cast
 
 from sqlmodel import Session
-from telegram import Message, Update
+from telegram import Message, MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
@@ -52,7 +52,7 @@ class DateTimeEntityFilter(filters.MessageFilter):
     """Accept messages that contain at least one ``date_time`` entity."""
 
     def filter(self, message: Message) -> bool:
-        return any(e.type == "date_time" for e in (message.entities or []))
+        return any(e.type == MessageEntity.DATE_TIME for e in (message.entities or []))
 
 
 # --- Shared helpers ---
@@ -409,7 +409,7 @@ async def handle_first_datetime_set(
         callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting.db_id),
     )
     assert meeting.datetime is not None
-    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), int(meeting.datetime.timestamp()), "DT")
+    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
     view = MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
             lang=lang,
@@ -439,7 +439,7 @@ async def handle_datetime_update(
     session.flush()
 
     assert meeting.datetime is not None
-    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), int(meeting.datetime.timestamp()), "DT")
+    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
     today = meeting.owner.now_in_tz().date()
     await context.api.edit_message(
         update=update,
@@ -522,8 +522,8 @@ async def date_time_entity_message_handler(session: Session, update: Update, con
 
     message = guards.message(update)
     entities = message.entities or []
-    date_entity = next(e for e in entities if e.type == "date_time")
-    unix_time = date_entity.to_dict().get("unix_time")
+    date_entity = next(e for e in entities if e.type == MessageEntity.DATE_TIME)
+    unix_time = date_entity.unix_time
     assert unix_time is not None, "date_time entity must carry unix_time"
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME) as meeting_id:
@@ -535,14 +535,12 @@ async def date_time_entity_message_handler(session: Session, update: Update, con
         if meeting is None:
             return ConversationHandler.END
 
-        meeting.datetime = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
+        meeting.datetime = unix_time
         session.add(meeting)
         session.flush()
 
         assert meeting.datetime is not None
-        datetime_entity = EntityDateTime(
-            MeetingMessages.MEETING_TIME.get_text(), int(meeting.datetime.timestamp()), "DT"
-        )
+        datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
         view = meeting.edit_view.with_context(
             MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=current_user.lang, datetime=render(t"{datetime_entity}"))
         )
@@ -592,9 +590,7 @@ async def set_time_message_handler(
         session.flush()
 
         assert meeting.datetime is not None
-        datetime_entity = EntityDateTime(
-            MeetingMessages.MEETING_TIME.get_text(), int(meeting.datetime.timestamp()), "DT"
-        )
+        datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
         view = meeting.edit_view.with_context(
             MeetingMessages.EDIT_TIME_SUCCESS.get(lang=current_user.lang, datetime=render(t"{datetime_entity}"))
         )

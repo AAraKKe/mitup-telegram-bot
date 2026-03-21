@@ -11,7 +11,6 @@ from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHa
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import DateTimeMessageEntity
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
     ConversationStep,
@@ -140,8 +139,9 @@ async def test_meeting_creation_with_date_entity_preserves_full_title_and_sets_d
     await conversation.run(handler_id=MeetingHandlerId.CREATE_MEETING_CONVERSATION, steps=entry_steps)
 
     unix_ts = 1_700_000_000
+    unix_dt = dt.datetime.fromtimestamp(unix_ts, tz=dt.UTC)
     # Text: "Board meeting tomorrow" -- "tomorrow" starts at offset 14, length 8
-    date_entity = DateTimeMessageEntity(offset=14, length=8, unix_time=unix_ts)
+    date_entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=14, length=8, unix_time=unix_dt)
     title_update = make_message_update("Board meeting tomorrow", entities=[date_entity])
 
     context, _ = await call_handler(
@@ -173,8 +173,9 @@ async def test_meeting_creation_with_single_word_datetime_title_preserves_title(
     await conversation.run(handler_id=MeetingHandlerId.CREATE_MEETING_CONVERSATION, steps=entry_steps)
 
     unix_ts = 1_700_000_000
+    unix_dt = dt.datetime.fromtimestamp(unix_ts, tz=dt.UTC)
     # "today" spans the entire text: offset=0, length=5
-    date_entity = DateTimeMessageEntity(offset=0, length=5, unix_time=unix_ts)
+    date_entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=5, unix_time=unix_dt)
     title_update = make_message_update("today", entities=[date_entity])
 
     context, _ = await call_handler(
@@ -236,8 +237,18 @@ async def test_meeting_creation_with_date_entity_without_unix_time_preserves_tit
         make_message_update(
             "tomorrow later",
             entities=[
-                DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000),
-                DateTimeMessageEntity(offset=9, length=5, unix_time=1_700_001_000),
+                MessageEntity(
+                    type=MessageEntity.DATE_TIME,
+                    offset=0,
+                    length=8,
+                    unix_time=dt.datetime.fromtimestamp(1_700_000_000, tz=dt.UTC),
+                ),
+                MessageEntity(
+                    type=MessageEntity.DATE_TIME,
+                    offset=9,
+                    length=5,
+                    unix_time=dt.datetime.fromtimestamp(1_700_001_000, tz=dt.UTC),
+                ),
             ],
         ),
     ],
@@ -308,7 +319,12 @@ def test_valid_title_filter_command_rejects():
 
 def test_valid_title_filter_one_date_entity_passes():
     title_filter = ValidTitleFilter()
-    date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
+    date_entity = MessageEntity(
+        type=MessageEntity.DATE_TIME,
+        offset=0,
+        length=8,
+        unix_time=dt.datetime.fromtimestamp(1_700_000_000, tz=dt.UTC),
+    )
     update = make_message_update("tomorrow", entities=[date_entity])
     assert update.effective_message is not None
     assert title_filter.filter(update.effective_message) is True
@@ -317,7 +333,12 @@ def test_valid_title_filter_one_date_entity_passes():
 def test_valid_title_filter_date_entity_with_other_entities_passes():
     # One date_time entity alongside a bold entity is still valid
     title_filter = ValidTitleFilter()
-    date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
+    date_entity = MessageEntity(
+        type=MessageEntity.DATE_TIME,
+        offset=0,
+        length=8,
+        unix_time=dt.datetime.fromtimestamp(1_700_000_000, tz=dt.UTC),
+    )
     bold_entity = MessageEntity(type=MessageEntity.BOLD, offset=9, length=5)
     update = make_message_update("tomorrow board", entities=[date_entity, bold_entity])
     assert update.effective_message is not None
@@ -336,8 +357,18 @@ def test_valid_title_filter_non_command_entity_passes():
 def test_valid_title_filter_multiple_date_entities_rejects():
     # Two date_time entities must be rejected (sum > 1)
     title_filter = ValidTitleFilter()
-    first_date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=1_700_000_000)
-    second_date_entity = DateTimeMessageEntity(offset=9, length=5, unix_time=1_700_001_000)
+    first_date_entity = MessageEntity(
+        type=MessageEntity.DATE_TIME,
+        offset=0,
+        length=8,
+        unix_time=dt.datetime.fromtimestamp(1_700_000_000, tz=dt.UTC),
+    )
+    second_date_entity = MessageEntity(
+        type=MessageEntity.DATE_TIME,
+        offset=9,
+        length=5,
+        unix_time=dt.datetime.fromtimestamp(1_700_001_000, tz=dt.UTC),
+    )
     update = make_message_update("tomorrow later", entities=[first_date_entity, second_date_entity])
     assert update.effective_message is not None
     assert title_filter.filter(update.effective_message) is False

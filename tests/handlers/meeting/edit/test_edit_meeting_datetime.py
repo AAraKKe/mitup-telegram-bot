@@ -4,7 +4,7 @@ from typing import cast
 import pytest
 from aws_embedded_metrics.unit import Unit
 from freezegun import freeze_time
-from telegram import CallbackQuery, Chat, Location, Message, Update
+from telegram import CallbackQuery, Chat, Location, Message, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
 
@@ -17,7 +17,7 @@ from mitup_bot.models import Message as MeetupMessage
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
-from mitup_bot.utils.entities import DateTimeMessageEntity, EntityDateTime, FormattedText, build_datetime_link
+from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
@@ -54,7 +54,8 @@ def update_meeting_view(meeting: Meetup, datetime: FormattedText) -> MitupView:
 
 def datetime_entity(unix_time: int) -> FormattedText:
     """Build the FormattedText that the handler produces for a set datetime."""
-    return render(t"{EntityDateTime('Meeting time', unix_time=unix_time, date_time_format='DT')}")
+    unix_dt = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
+    return render(t"{EntityDateTime('Meeting time', unix_time=unix_dt, date_time_format='DT')}")
 
 
 @pytest.fixture(autouse=True)
@@ -188,7 +189,7 @@ async def test_set_meeting_date_callback(
         # today must be obtained under freeze_time to match the FakeDate from meeting.owner.now_in_tz().
         assert response == ConversationMeetingState.EDIT_DATETIME
         today = meeting.owner.now_in_tz().date()
-        dt_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), int(expected_datetime.timestamp()), "DT")
+        dt_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), expected_datetime, "DT")
         expected_view = _build_entry_view(meeting, meeting.lang, today).with_context(
             MeetingMessages.DATE_UPDATE_SUCCESS.get(
                 lang=meeting.lang,
@@ -611,7 +612,8 @@ def date_time_entity_update(user: TgUser, unix_time: int) -> Update:
     """Build an Update containing a message with a ``date_time`` entity."""
     chat = Chat(id=DEFAULT_CHAT_ID, type="private")
     text = "Tomorrow at noon"
-    entity = DateTimeMessageEntity(offset=0, length=len(text), unix_time=unix_time)
+    unix_dt = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
+    entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=len(text), unix_time=unix_dt)
     message = Message(
         DEFAULT_MESSAGE_ID,
         date=DEFAULT_TEST_DATE,
