@@ -150,7 +150,6 @@ class TelegramApiWrapper(Protocol):
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
-        has_started: bool = False,
     ) -> None: ...
     async def update_meeting_messages(
         self,
@@ -161,7 +160,6 @@ class TelegramApiWrapper(Protocol):
         skip_current: bool = False,
         was_deleted: bool = False,
         has_finished: bool = False,
-        has_started: bool = False,
     ) -> None: ...
     async def notify_users_promoted_from_waiting_list(
         self,
@@ -394,12 +392,10 @@ class TelegramApi:
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
-        has_started: bool = False,
     ):
         """
         Updates a single meeting message with the current meeting view.
 
-        `has_started` prepends the in-progress banner but keeps buttons active.
         `has_finished` clears buttons; uses the enriched summary when `duration_minutes` is set.
         """
 
@@ -435,11 +431,6 @@ class TelegramApi:
             text = finished_view.description.text
             entities = finished_view.description.entities or None
             reply_markup = None
-        elif has_started:
-            started_view = view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=meeting.lang))
-            text = started_view.description.text
-            entities = started_view.description.entities or None
-            reply_markup = view.markup
         else:
             text = view.description.text
             entities = view.description.entities or None
@@ -468,7 +459,6 @@ class TelegramApi:
         skip_current: bool = False,
         was_deleted: bool = False,
         has_finished: bool = False,
-        has_started: bool = False,
     ):
         """
         Updates all tracked messages for a meeting. Edits `current_message` first for
@@ -483,7 +473,6 @@ class TelegramApi:
                 meeting,
                 was_deleted=was_deleted,
                 has_finished=has_finished,
-                has_started=has_started,
             )
         for message in meeting.messages:
             if message == current_message:
@@ -494,5 +483,4 @@ class TelegramApi:
                 meeting,
                 was_deleted=was_deleted,
                 has_finished=has_finished,
-                has_started=has_started,
             )

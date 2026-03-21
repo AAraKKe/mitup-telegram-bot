@@ -43,7 +43,6 @@ class MockApi(TelegramApi):
         skip_current: bool = DEFAULT_FALSE,  # type: ignore
         was_deleted: bool = DEFAULT_FALSE,  # type: ignore
         has_finished: bool = DEFAULT_FALSE,  # type: ignore
-        has_started: bool = DEFAULT_FALSE,  # type: ignore
     ):
         return self.call_mock(
             "update_meeting_messages",
@@ -53,7 +52,6 @@ class MockApi(TelegramApi):
             skip_current=skip_current,
             was_deleted=was_deleted,
             has_finished=has_finished,
-            has_started=has_started,
         )
 
     def answer_callback_query(

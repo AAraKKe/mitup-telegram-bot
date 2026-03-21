@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+import datetime as dt
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -305,3 +306,105 @@ def test_build_inline_keyboard_hides_join_leave_row_when_locked_and_in_progress(
     join_buttons = [btn for row in keyboard for btn in row if btn.callback_data == join_cb]
     # Lines 633→636: the join/leave row is skipped
     assert len(join_buttons) == 0
+
+
+# ---------------------------------------------------------------------------
+# In-progress label in views
+# ---------------------------------------------------------------------------
+
+
+def make_in_progress_meeting(owner: User):
+    """Create a meeting that is currently in progress (started 5 min ago, lasts 120 min)."""
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=2, owner=owner)
+    meeting.datetime = now - timedelta(minutes=5)
+    meeting.duration_minutes = 120
+    return meeting
+
+
+def make_not_in_progress_meeting(owner: User):
+    """Create a meeting that has not started yet (datetime in the future)."""
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=3, owner=owner)
+    meeting.datetime = now + timedelta(hours=2)
+    meeting.duration_minutes = 60
+    return meeting
+
+
+@pytest.mark.parametrize(
+    "get_view",
+    [
+        lambda m: m.main_view,
+        lambda m: m.external_view,
+    ],
+    ids=["main_view", "external_view"],
+)
+def test_view_includes_in_progress_label_when_in_progress(user_with_settings: User, get_view):
+    meeting = make_in_progress_meeting(user_with_settings)
+
+    assert meeting.is_in_progress  # guard: precondition for the branch under test
+
+    view = get_view(meeting)
+    # main_view and external_view always use the owner's settings language
+    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.user_language)
+    assert expected_text in view.description.text
+
+
+def test_inline_view_includes_in_progress_label_when_meeting_has_language(user_with_settings: User):
+    """inline_view uses meeting.lang; when the meeting has its own language set, that language is used."""
+    meeting = make_in_progress_meeting(user_with_settings)
+    # make_in_progress_meeting uses the default language="en" from create_meetup
+    assert meeting.language == "en"
+
+    assert meeting.is_in_progress  # guard: precondition for the branch under test
+
+    view = meeting.inline_view()
+    # meeting.lang resolves to meeting.language ("en") since it is explicitly set
+    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
+    assert expected_text in view.description.text
+
+
+def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(user_with_settings: User):
+    """inline_view uses meeting.lang; when language=None, it falls through to user_language."""
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=2, owner=user_with_settings, language=None)
+    meeting.datetime = now - timedelta(minutes=5)
+    meeting.duration_minutes = 120
+    assert meeting.language is None
+
+    assert meeting.is_in_progress  # guard: precondition for the branch under test
+
+    view = meeting.inline_view()
+    # meeting.lang falls through to meeting.user_language when language is None
+    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
+    assert expected_text in view.description.text
+
+
+@pytest.mark.parametrize(
+    "get_view",
+    [
+        lambda m: m.main_view,
+        lambda m: m.external_view,
+    ],
+    ids=["main_view", "external_view"],
+)
+def test_view_excludes_in_progress_label_when_not_in_progress(user_with_settings: User, get_view):
+    meeting = make_not_in_progress_meeting(user_with_settings)
+
+    assert not meeting.is_in_progress  # guard: precondition
+
+    view = get_view(meeting)
+    # main_view and external_view always use the owner's settings language
+    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.user_language)
+    assert expected_text not in view.description.text
+
+
+def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_settings: User):
+    meeting = make_not_in_progress_meeting(user_with_settings)
+
+    assert not meeting.is_in_progress  # guard: precondition
+
+    view = meeting.inline_view()
+    # inline_view uses meeting.lang (meeting.language or meeting.user_language)
+    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
+    assert expected_text not in view.description.text

@@ -452,7 +452,10 @@ class Meetup(BaseModel, SQLModel, table=True):
                 ],
             ]
         )
-        return MitupView(self.message, keyboard)
+        view = MitupView(self.message, keyboard)
+        if self.is_in_progress:
+            view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=self.user_language))
+        return view
 
     @property
     def external_view(self) -> MitupView:
@@ -468,7 +471,10 @@ class Meetup(BaseModel, SQLModel, table=True):
                 ),
             ]
         )
-        return MitupView(self.inline_message, keyboard)
+        view = MitupView(self.inline_message, keyboard)
+        if self.is_in_progress:
+            view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=self.user_language))
+        return view
 
     def view_for(self, user: User) -> MitupView:
         """Get the appropriate view for the given user depending on whether they own the meeting or not."""
@@ -625,6 +631,8 @@ class Meetup(BaseModel, SQLModel, table=True):
             title=str(self.title),
             inline_description=self.inline_query_message,
         )
+        if self.is_in_progress:
+            view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=self.lang))
         return view.with_footnote(footnote)
 
     def build_inline_keyboard(

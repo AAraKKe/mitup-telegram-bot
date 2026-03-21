@@ -712,17 +712,3 @@ async def test_answer_callback_query_raises_when_formatted_text_has_entities(
 
     with pytest.raises(ValueError, match="Callback query text should not contain entities"):
         await telegram_api.answer_callback_query(update, ft, show_alert=False)
-
-
-async def test_update_single_meeting_message_has_started_branch(telegram_api: TelegramApi, bot: AsyncMock):
-    # When has_started=True the "in progress" banner is prepended but reply_markup is preserved
-    meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=Session)
-
-    await telegram_api.update_single_meeting_message(msg, session, meeting, has_started=True)
-
-    call_kwargs = bot.edit_message_text.call_args.kwargs
-    # The markup must be present (buttons remain active while in progress)
-    assert call_kwargs["reply_markup"] is not None
-    # The text must contain the in-progress indicator
-    assert "progress" in call_kwargs["text"].lower()

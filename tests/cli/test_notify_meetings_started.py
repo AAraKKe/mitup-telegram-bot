@@ -112,9 +112,8 @@ async def test_started_notification_sent_to_participants(
     # The started flag is set
     assert meeting.started_notification_sent is True
 
-    # update_meeting_messages called with has_started=True
+    # update_meeting_messages was called for this meeting
     call_kwargs = api.mock_method("update_meeting_messages").call_args.kwargs
-    assert call_kwargs["has_started"] is True
     assert call_kwargs["meeting"] is meeting
 
     metrics.assert_metrics_emited(

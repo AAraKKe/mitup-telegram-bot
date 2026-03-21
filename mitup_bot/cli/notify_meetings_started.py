@@ -72,7 +72,7 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLo
                 else:
                     sent += 1
 
-            await api.update_meeting_messages(session=session, meeting=meeting, has_started=True)
+            await api.update_meeting_messages(session=session, meeting=meeting)
             meeting.started_notification_sent = True
             meetings_processed += 1
         except Exception as error:

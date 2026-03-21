@@ -58,7 +58,7 @@ def create_meetup(
     location: MeetupLocation | None = None,
     max_members: int | None = None,
     waiting_list: bool = False,
-    language: str = "en",
+    language: str | None = "en",
     owner: User | None = None,
     public: bool = False,
     invitation: bool = False,
