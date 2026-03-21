@@ -258,6 +258,9 @@ async def test_confirm_delete_meeting_date(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
+    # Set end_datetime and lock_on_start so the cascade-clear is exercised
+    meeting.end_datetime = dt.datetime(2024, 12, 21, 13, 0, tzinfo=dt.UTC)
+    meeting.lock_on_start = True
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -271,6 +274,8 @@ async def test_confirm_delete_meeting_date(
 
     assert response == ConversationHandler.END
     assert meeting.datetime is None
+    assert meeting.end_datetime is None  # cascade: deleting datetime must also clear end_datetime
+    assert meeting.lock_on_start is False  # cascade: deleting datetime must also clear lock_on_start
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
     # cleanup_states clears EDIT_MEETING_TIME from context

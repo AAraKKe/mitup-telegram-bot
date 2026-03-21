@@ -589,15 +589,6 @@ msgstr "▶️ Esta quedada está en curso ▶️"
 msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
 msgstr "✅ Esta quedada ha finalizado ✅\n\n<b>Duración:</b> ${duration} minutos · <b>Asistentes:</b> ${attendee_count}"
 
-msgid "MeetingMessages.SET_DURATION_PROMPT"
-msgstr "Envíame la duración de la quedada en minutos, o toca <b>Cancelar</b> para volver."
-
-msgid "MeetingMessages.EDIT_DURATION_PROMPT"
-msgstr "La duración actual es <b>${current_duration} minutos</b>.\n\nEnvíame la nueva duración en minutos, o toca <b>Cancelar</b> para volver."
-
-msgid "MeetingMessages.DURATION_SET_SUCCESS"
-msgstr "La duración se ha establecido en: <b>${duration} minutos</b>"
-
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "La duración ha sido eliminada de esta quedada."
 
@@ -605,10 +596,10 @@ msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
 msgstr "Debes establecer una duración antes de habilitar esta opción."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Establece cuánto tiempo durará esta quedada.\n\nDuración actual: <b>${current_duration} minutos</b>.\n\nTambién puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+msgstr "La quedada termina a: <b>${end_datetime}</b>\n\nPuedes cambiar la hora de finalización o bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Establece cuánto tiempo durará esta quedada.\n\nAún no se ha establecido ninguna duración. También puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+msgstr "Establece una hora de finalización para darle una duración a la quedada. También puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
 
 msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
 msgstr "Esta quedada ya ha comenzado y su lista de asistentes está bloqueada."
@@ -771,3 +762,21 @@ msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la qu
 
 msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
 msgstr "Perdona, estaba esperando la duración en minutos. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."
+
+msgid "MeetingMessages.DURATION_NO_START_DATETIME"
+msgstr "Para establecer una duración, primero establece cuándo comienza la quedada. Elige una fecha y hora abajo.\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
+
+msgid "MeetingMessages.DURATION_START_DATETIME_SET"
+msgstr "Hora de inicio establecida. Ahora establece cuándo termina la quedada."
+
+msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
+msgstr "La quedada comienza a <b>${start_datetime}</b>. Establece cuándo termina.\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
+
+msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
+msgstr "La quedada comienza a <b>${start_datetime}</b>. Actualmente termina a <b>${end_datetime}</b>.\n\nEstablece la nueva hora de finalización.\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
+
+msgid "MeetingMessages.END_DATETIME_BEFORE_START"
+msgstr "La hora de finalización debe ser posterior a la hora de inicio."
+
+msgid "MeetingMessages.END_DATETIME_IN_PAST"
+msgstr "La hora de finalización debe ser en el futuro."

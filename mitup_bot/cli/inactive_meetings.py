@@ -21,6 +21,9 @@ INTERVAL_TO_DEACTIVATE = "1 year"
 #   - The current time is past meeting.datetime + timeout from the owner's settings
 #
 # If the meeting does not ahve a datetime set, the meeting is deactivated INTERVAL_TO_DEACTIVATE from the creation date.
+# When end_datetime is set, the meeting window extends to end_datetime + timeout.
+# When only datetime is set, the meeting is deactivated after datetime + timeout.
+# When no datetime is set, fall back to created_time + INTERVAL_TO_DEACTIVATE.
 MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
     select(Meetup)
     .join(User)
@@ -36,11 +39,8 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
                 and_(
                     Meetup.datetime != null(),
                     func.now()
-                    > Meetup.datetime
-                    + func.cast(
-                        func.concat(func.coalesce(Meetup.duration_minutes, Settings.timeout), " minutes"),
-                        INTERVAL,
-                    ),
+                    > func.coalesce(Meetup.end_datetime, Meetup.datetime)
+                    + func.cast(func.concat(Settings.timeout, " minutes"), INTERVAL),
                 ),
             ),
         )

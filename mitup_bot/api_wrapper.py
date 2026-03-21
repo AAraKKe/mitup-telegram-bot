@@ -43,7 +43,7 @@ EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")
 
 
 if TYPE_CHECKING:
-    pass
+    ...
 
 
 class BotAdapter:
@@ -392,7 +392,7 @@ class TelegramApi:
         """
         Updates a single meeting message with the current meeting view.
 
-        `has_finished` clears buttons; uses the enriched summary when `duration_minutes` is set.
+        `has_finished` clears buttons; uses the enriched summary when `end_datetime` is set.
         """
 
         view = (
@@ -417,10 +417,11 @@ class TelegramApi:
             finished_message = (
                 MeetingMessages.MEETING_FINISHED_SUMMARY.get(
                     lang=meeting.lang,
-                    duration=meeting.duration_minutes,
+                    start_datetime=f"{meeting.datetime:%Y-%m-%d %H:%M}" if meeting.datetime else "?",
+                    end_datetime=f"{meeting.end_datetime:%Y-%m-%d %H:%M}" if meeting.end_datetime else "?",
                     attendee_count=meeting.n_participants,
                 )
-                if meeting.duration_minutes is not None
+                if meeting.end_datetime is not None
                 else MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang)
             )
             finished_view = view.with_context(finished_message)

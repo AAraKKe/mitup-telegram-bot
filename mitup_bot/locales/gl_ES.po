@@ -739,17 +739,11 @@ msgstr "🗓️ Data e Hora"
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "Duración eliminada."
 
-msgid "MeetingMessages.DURATION_SET_SUCCESS"
-msgstr "Duración establecida a: <b>${duration} minutos</b>"
-
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Estabelece canto tempo durará esta quedada.\n\nDuración actual: <b>${current_duration} minutos</b>.\n\nTamén podes bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
+msgstr "A quedada termina en: <b>${end_datetime}</b>\n\nPodes cambiar a hora de remate ou bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Estabelece canto tempo durará esta quedada.\n\nAínda non se estableceu duración. Tamén podes bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
-
-msgid "MeetingMessages.EDIT_DURATION_PROMPT"
-msgstr "A duración actual é <b>${current_duration} minutos</b>.\n\nEnvíame a nova duración en minutos, ou toca <b>Cancelar</b> para volver."
+msgstr "Estabelece unha hora de remate para a quedada para darlle unha duración. Tamén podes bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
 
 msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
 msgstr "Desculpa, estaba esperando a duración en minutos. Te gustaría enviarla? Se non, toca Cancelar para saír."
@@ -766,11 +760,26 @@ msgstr "✅ Esta quedada rematou ✅\n\n<b>Duración:</b> ${duration} minutos ·
 msgid "MeetingMessages.MEETING_IN_PROGRESS"
 msgstr "▶️ Esta quedada está en curso ▶️"
 
-msgid "MeetingMessages.SET_DURATION_PROMPT"
-msgstr "Envíame a duración da quedada en minutos, ou toca <b>Cancelar</b> para volver."
-
 msgid "MeetingMessages.STALE_CANCEL_BUTTON"
 msgstr "Xa respondaches a esta pregunta"
 
 msgid "NotificationMessages.MEETING_STARTED"
 msgstr "A quedada <b>${meeting_title}</b> comezou!"
+
+msgid "MeetingMessages.DURATION_NO_START_DATETIME"
+msgstr "Para establecer unha duración, primeiro estabelece cando comeza a quedada. Escolle unha data e hora embaixo.\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
+
+msgid "MeetingMessages.DURATION_START_DATETIME_SET"
+msgstr "Hora de inicio establecida. Agora estabelece cando termina a quedada."
+
+msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
+msgstr "A quedada comeza en <b>${start_datetime}</b>. Estabelece cando termina.\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
+
+msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
+msgstr "A quedada comeza en <b>${start_datetime}</b>. A quedada actualmente termina en <b>${end_datetime}</b>.\n\nEstablece a nova hora de remate.\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
+
+msgid "MeetingMessages.END_DATETIME_BEFORE_START"
+msgstr "A hora de remate debe ser posterior á hora de inicio."
+
+msgid "MeetingMessages.END_DATETIME_IN_PAST"
+msgstr "A hora de remate debe estar no futuro."

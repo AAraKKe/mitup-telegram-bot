@@ -4,7 +4,7 @@ import datetime as dt
 from math import ceil
 from typing import TYPE_CHECKING
 
-from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_data import CallbackData, DateCallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
@@ -183,20 +183,35 @@ def edit_meeting_property_view(
 
 
 def edit_meeting_date_view(
-    *, lang: str, meeting_id: int, anchor_date: dt.date, current_date: dt.date, new: bool
+    *,
+    lang: str,
+    meeting_id: int,
+    anchor_date: dt.date,
+    current_date: dt.date,
+    new: bool,
+    set_date_callback: DateCallbackData | None = None,
+    nav_callback: DateCallbackData | None = None,
+    back_callback: CallbackData | None = None,
 ) -> MitupView:
+    """Build a calendar view for date selection, parameterized by callback data.
+
+    When no callback overrides are provided, defaults to the start-datetime callbacks
+    used by the edit_meeting_datetime conversation.
+    """
+    resolved_set = set_date_callback or cb.SET_MEETING_DATE
+    resolved_nav = nav_callback or cb.EDIT_MEETING_DATE
+    resolved_back = back_callback or cb.EDIT_MEETING
+
     message = MeetingMessages.ADD_DATE.get(lang=lang) if new else MeetingMessages.EDIT_DATE.get(lang=lang)
     calendar_keyboard = CalendarKeyboard(
         anchor_date,
         current_date,
-        cb.SET_MEETING_DATE.with_id(meeting_id),
-        cb.EDIT_MEETING_DATE.with_id(meeting_id),
+        resolved_set.with_id(meeting_id),
+        resolved_nav.with_id(meeting_id),
     ).keyboard
 
-    # Back button navigates to the EDIT_DATETIME entry within the conversation.
-    # Delete and Back buttons for the datetime entry screen are managed by the conversation handler.
     calendar_keyboard.append(
-        [ButtonConfig(text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id))]
+        [ButtonConfig(text=ButtonMessages.EDIT.back(lang=lang), callback_data=resolved_back.with_id(meeting_id))]
     )
 
     return MitupView(description=message, keyboard=calendar_keyboard)

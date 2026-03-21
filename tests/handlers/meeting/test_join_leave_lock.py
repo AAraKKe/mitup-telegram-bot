@@ -13,12 +13,12 @@ from tests.helpers.handler_context import HandlerContext
 
 def user_with_meeting(
     meeting_id: int = 1,
-    duration_minutes: int | None = None,
+    end_datetime: dt.datetime | None = None,
     lock_on_start: bool = False,
     meeting_datetime: dt.datetime | None = None,
 ) -> tuple[User, Meetup]:
     meeting = create_meetup(id=meeting_id, title="Test Meeting", datetime=meeting_datetime)
-    meeting.duration_minutes = duration_minutes
+    meeting.end_datetime = end_datetime
     meeting.lock_on_start = lock_on_start
     user = create_user(id=1, tg_user_id=123, owned_meetings=[meeting], settings=Settings(id=1))
     return user, meeting
@@ -54,10 +54,10 @@ async def test_join_leave_blocked_when_lock_on_start_and_in_progress(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
-    # Meeting started 5 min ago and will last 90 min → is_in_progress
+    # Meeting started 5 min ago, ends 85 min from now (90 min total) → is_in_progress
     user, meeting = user_with_meeting(
         meeting_id=1,
-        duration_minutes=90,
+        end_datetime=now_plus(85),
         lock_on_start=True,
         meeting_datetime=now_minus(5),
     )
@@ -97,10 +97,10 @@ async def test_join_leave_allowed_when_lock_off_regardless_of_progress(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
-    # Meeting is in progress but lock is off
+    # Meeting is in progress (ends 85 min from now) but lock is off
     user, meeting = user_with_meeting(
         meeting_id=1,
-        duration_minutes=90,
+        end_datetime=now_plus(85),
         lock_on_start=False,
         meeting_datetime=now_minus(5),
     )
@@ -139,7 +139,7 @@ async def test_join_leave_allowed_when_lock_on_but_meeting_not_started(
     # Meeting starts in the future → not in progress
     user, meeting = user_with_meeting(
         meeting_id=1,
-        duration_minutes=90,
+        end_datetime=now_plus(120),  # 90 min duration, both start and end in the future
         lock_on_start=True,
         meeting_datetime=now_plus(30),
     )
@@ -155,7 +155,7 @@ async def test_join_leave_allowed_when_lock_on_but_meeting_not_started(
 
 
 # ---------------------------------------------------------------------------
-# Lock does NOT block when duration_minutes is None (is_in_progress is always False)
+# Lock does NOT block when end_datetime is None (is_in_progress is always False)
 # ---------------------------------------------------------------------------
 
 
@@ -174,10 +174,10 @@ async def test_join_leave_allowed_when_lock_on_but_no_duration(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
-    # lock_on_start=True but duration_minutes=None → is_in_progress is always False
+    # lock_on_start=True but end_datetime=None → is_in_progress is always False
     user, meeting = user_with_meeting(
         meeting_id=1,
-        duration_minutes=None,
+        end_datetime=None,
         lock_on_start=True,
         meeting_datetime=now_minus(5),
     )

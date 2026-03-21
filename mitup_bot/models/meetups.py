@@ -65,7 +65,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     allow_invitation: bool = Field(nullable=False)
     incognito: bool = Field(nullable=False)
     expiration_notification_sent: bool = Field(nullable=False, default=False)
-    duration_minutes: int | None = None
+    end_datetime: dt.datetime | None = None
     started_notification_sent: bool = Field(nullable=False, default=False)
     lock_on_start: bool = Field(nullable=False, default=False)
     description: str | None = None
@@ -113,11 +113,13 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def is_in_progress(self) -> bool:
-        """Return True only when a duration is set and the current UTC time falls within the meeting window."""
-        if self.duration_minutes is None or self.datetime is None:
+        """Return True only when an end time is set and the current UTC time falls within the meeting window."""
+        if self.end_datetime is None or self.datetime is None:
             return False
         now = dt.datetime.now(dt.UTC)
-        return self.datetime <= now < self.datetime + dt.timedelta(minutes=self.duration_minutes)
+        end = self.end_datetime if self.end_datetime.tzinfo else self.end_datetime.replace(tzinfo=dt.UTC)
+        start = self.datetime if self.datetime.tzinfo else self.datetime.replace(tzinfo=dt.UTC)
+        return start <= now < end
 
     @property
     def participants(self) -> list[JoinedUsers]:
@@ -342,7 +344,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     def _datetime_section(self) -> Template:
         """Date/time section for the meeting message.
 
-        When a duration is set, shows separate start and stop lines using ▶️/⏹️.
+        When an end time is set, shows separate start and stop lines using ▶️/⏹️.
         Otherwise shows a single clock line with the datetime or a not-set placeholder.
         """
         if self.datetime is None:
@@ -351,11 +353,10 @@ class Meetup(BaseModel, SQLModel, table=True):
 
         start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.datetime, "DT")
 
-        if self.duration_minutes is None:
+        if self.end_datetime is None:
             return t"--- {Emojis.CLOCK} {start_entity}\n"
 
-        stop_datetime = self.datetime + dt.timedelta(minutes=self.duration_minutes)
-        stop_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), stop_datetime, "DT")
+        stop_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.end_datetime, "DT")
         start_label = MeetingMessages.MEETING_START_TIME.get(lang=self.lang)
         stop_label = MeetingMessages.MEETING_STOP_TIME.get(lang=self.lang)
         return t"--- {Emojis.START} {start_label}: {start_entity}\n--- {Emojis.STOP} {stop_label}: {stop_entity}\n"
@@ -590,7 +591,7 @@ class Meetup(BaseModel, SQLModel, table=True):
                 ),
             ],
         ]
-        if self.duration_minutes is not None:
+        if self.end_datetime is not None:
             keyboard.append(
                 [
                     ButtonConfig(
@@ -603,13 +604,13 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def duration_view(self) -> MitupView:
-        description = (
-            MeetingMessages.DURATION_VIEW_DESCRIPTION.get(
-                lang=self.user_language, current_duration=self.duration_minutes
+        if self.end_datetime is not None:
+            end_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.end_datetime, "DT")
+            description = MeetingMessages.DURATION_VIEW_DESCRIPTION.get(
+                lang=self.user_language, end_datetime=render(t"{end_entity}")
             )
-            if self.duration_minutes is not None
-            else MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET.get(lang=self.user_language)
-        )
+        else:
+            description = MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET.get(lang=self.user_language)
         return MitupView(description, self._duration_keyboard()).with_back_button(
             ButtonMessages.EDIT, self.user_language, cb.EDIT_MEETING.with_id(self.db_id)
         )

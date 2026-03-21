@@ -71,12 +71,31 @@ class EditMeetingHandlerId(HandlerId):
     # Edit meeting duration
     DURATION_ENTRY_CALLBACK = auto()
     DURATION_INPUT_CALLBACK = auto()
-    DURATION_TEXT_MESSAGE = auto()
-    DURATION_INVALID_MESSAGE = auto()
     DURATION_CANCEL_CALLBACK = auto()
     DURATION_CLEAR_CALLBACK = auto()
     DURATION_CONVERSATION = auto()
     LOCK_ON_START_CALLBACK = auto()
+
+    # Duration — set start datetime sub-flow
+    DURATION_START_DATE_NAV_CALLBACK = auto()
+    DURATION_START_SET_DATE_CALLBACK = auto()
+    DURATION_START_TIME_CALLBACK = auto()
+    DURATION_START_DATETIME_ENTITY_MESSAGE = auto()
+    DURATION_START_WRONG_INPUT = auto()
+    DURATION_START_SET_TIME_MESSAGE = auto()
+    DURATION_START_TIME_WRONG_INPUT = auto()
+    DURATION_BACK_TO_START_DATETIME_CALLBACK = auto()
+
+    # Duration — set end datetime sub-flow
+    DURATION_END_ENTRY_CALLBACK = auto()
+    DURATION_END_DATE_NAV_CALLBACK = auto()
+    DURATION_END_SET_DATE_CALLBACK = auto()
+    DURATION_END_TIME_CALLBACK = auto()
+    DURATION_END_DATETIME_ENTITY_MESSAGE = auto()
+    DURATION_END_WRONG_INPUT = auto()
+    DURATION_END_SET_TIME_MESSAGE = auto()
+    DURATION_END_TIME_WRONG_INPUT = auto()
+    DURATION_BACK_TO_END_DATETIME_CALLBACK = auto()
 
     # Cancel button during edit
     CANCEL = auto()
@@ -91,4 +110,11 @@ class ConversationMeetingState(Enum):
     EDIT_DATETIME = auto()
     EDIT_DATE = auto()
     EDIT_TIME = auto()
-    EDIT_DURATION = auto()
+
+    # Duration conversation states
+    DURATION_SET_START_DATETIME = auto()
+    DURATION_SET_START_DATE = auto()
+    DURATION_SET_START_TIME = auto()
+    EDIT_END_DATETIME = auto()
+    EDIT_END_DATE = auto()
+    EDIT_END_TIME = auto()

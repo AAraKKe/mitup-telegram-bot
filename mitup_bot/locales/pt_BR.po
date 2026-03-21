@@ -532,15 +532,6 @@ msgstr "A data e hora não serão excluídas"
 msgid "MeetingMessages.DATE_TIME_DELETED"
 msgstr "Data e hora removidas."
 
-msgid "MeetingMessages.SET_DURATION_PROMPT"
-msgstr "Envie-me a duração do evento em minutos ou toque em <b>Cancelar</b> para voltar."
-
-msgid "MeetingMessages.EDIT_DURATION_PROMPT"
-msgstr "A duração atual é <b>${current_duration} minutos</b>.\n\nEnvie-me a nova duração em minutos ou toque em <b>Cancelar</b> para voltar."
-
-msgid "MeetingMessages.DURATION_SET_SUCCESS"
-msgstr "Duração definida para: <b>${duration} minutos</b>"
-
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "Duração removida."
 
@@ -551,10 +542,10 @@ msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
 msgstr "Você precisa definir uma duração antes de ativar essa opção."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Defina quanto tempo este evento durará.\n\nDuração atual: <b>${current_duration} minutos</b>.\n\nVocê também pode bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
+msgstr "Evento termina em: <b>${end_datetime}</b>\n\nVocê pode alterar o horário de término ou bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Defina quanto tempo este evento durará.\n\nNenhuma duração foi definida ainda. Você também pode bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
+msgstr "Defina um horário de término para o evento para dar a ele uma duração. Você também pode bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
 
 msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
 msgstr "🚫 Este evento foi excluído 🚫"
@@ -774,3 +765,21 @@ msgstr "Você já respondeu essa pergunta"
 
 msgid "NotificationMessages.MEETING_STARTED"
 msgstr "O evento <b>${meeting_title}</b> começou!"
+
+msgid "MeetingMessages.DURATION_NO_START_DATETIME"
+msgstr "Para definir uma duração, primeiro defina quando o evento começa. Escolha uma data e hora abaixo.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e hora de uma vez.</i>"
+
+msgid "MeetingMessages.DURATION_START_DATETIME_SET"
+msgstr "Horário de início definido. Agora defina quando o evento termina."
+
+msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
+msgstr "Evento começa em <b>${start_datetime}</b>. Defina quando termina.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e hora de uma vez.</i>"
+
+msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
+msgstr "Evento começa em <b>${start_datetime}</b>. O evento atualmente termina em <b>${end_datetime}</b>.\n\nDefina o novo horário de término.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e hora de uma vez.</i>"
+
+msgid "MeetingMessages.END_DATETIME_BEFORE_START"
+msgstr "O horário de término deve ser após o horário de início."
+
+msgid "MeetingMessages.END_DATETIME_IN_PAST"
+msgstr "O horário de término deve estar no futuro."

@@ -56,6 +56,7 @@ async def show(session: Session, update: Update, context: MitupContext) -> None:
 
 <critical_rules>
   <rule>Text handlers inside a conversation's `states` dict MUST use `filters.TEXT & ~filters.COMMAND` so commands fall through to the fallback.</rule>
+  <rule>Wrong-input catch-all handlers (where both TEXT and ~TEXT variants call the same fallback) SHOULD use a single handler with `~filters.COMMAND` instead of two separate handlers. This still excludes commands so they fall through to the conversation fallback. Place the catch-all last in the state handler list.</rule>
 </critical_rules>
 
 ## Filters

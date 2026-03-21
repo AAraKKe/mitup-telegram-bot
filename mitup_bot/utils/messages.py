@@ -489,32 +489,45 @@ class MeetingMessages(MessageBase):
     # Meeting in-progress and finalization states
     MEETING_IN_PROGRESS = "▶️ This meeting is in progress ▶️"
     MEETING_FINISHED_SUMMARY = (
-        "✅ This meeting has finished ✅\n\n<b>Duration:</b> ${duration} minutes · <b>Attendees:</b> ${attendee_count}"
+        "✅ This meeting has finished ✅\n\n"
+        "<b>From:</b> ${start_datetime} · <b>To:</b> ${end_datetime} · "
+        "<b>Attendees:</b> ${attendee_count}"
     )
 
-    # Duration edit flow
-    SET_DURATION_PROMPT = "Send me the duration of the meeting in minutes, or tap <b>Cancel</b> to go back."
-    EDIT_DURATION_PROMPT = (
-        "The current duration is <b>${current_duration} minutes</b>.\n\n"
-        "Send me the new duration in minutes, or tap <b>Cancel</b> to go back."
+    # Duration edit flow — auto-chain prompt when no start datetime exists
+    DURATION_NO_START_DATETIME = (
+        "To set a duration, first set when the meeting starts. Choose a date and time below.\n\n"
+        "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
     )
-    DURATION_SET_SUCCESS = "Duration set to: <b>${duration} minutes</b>"
+    DURATION_START_DATETIME_SET = "Start time set. Now set when the meeting ends."
+
+    # Duration edit flow — end datetime prompts
+    SET_END_DATETIME_PROMPT = (
+        "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n"
+        "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+    )
+    EDIT_END_DATETIME_PROMPT = (
+        "Meeting starts at <b>${start_datetime}</b>. The meeting currently ends at <b>${end_datetime}</b>.\n\n"
+        "Set the new end time.\n\n"
+        "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+    )
+    END_DATETIME_BEFORE_START = "The end time must be after the start time."
+    END_DATETIME_IN_PAST = "The end time must be in the future."
     DURATION_CLEARED = "Duration removed."
     EDIT_MEETING_DURATION_ON_EXIT = (
-        "Sorry, I was expecting the duration in minutes. Would you like to send it? If not, tap Cancel to exit."
+        "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
     )
-    LOCK_ON_START_STALE_ALERT = "You must set a duration before enabling this option."
+    LOCK_ON_START_STALE_ALERT = "You must set an end time before enabling this option."
 
     # Duration sub-screen description
     DURATION_VIEW_DESCRIPTION = (
-        "Set how long this meeting will last.\n\n"
-        "Current duration: <b>${current_duration} minutes</b>.\n\n"
-        "You can also lock the attendees list when the meeting starts, "
+        "Meeting ends at: <b>${end_datetime}</b>\n\n"
+        "You can change the end time or lock the attendees list when the meeting starts, "
         "so no one can join or leave once it is underway."
     )
     DURATION_VIEW_DESCRIPTION_NOT_SET = (
-        "Set how long this meeting will last.\n\n"
-        "No duration has been set yet. You can also lock the attendees list when the meeting starts, "
+        "Set an end time for the meeting to give it a duration. "
+        "You can also lock the attendees list when the meeting starts, "
         "so no one can join or leave once it is underway."
     )
 

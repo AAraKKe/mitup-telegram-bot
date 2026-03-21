@@ -670,17 +670,11 @@ msgstr "Das Treffen <b>${meeting_title}</b> beginnt bald!"
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "Dauer entfernt."
 
-msgid "MeetingMessages.DURATION_SET_SUCCESS"
-msgstr "Dauer eingestellt auf: <b>${duration} Minuten</b>"
-
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Lege fest, wie lange dieses Treffen dauert.\n\nAktuelle Dauer: <b>${current_duration} Minuten</b>.\n\nDu kannst auch die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
+msgstr "Treffen endet um: <b>${end_datetime}</b>\n\nDu kannst die Endzeit ändern oder die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Lege fest, wie lange dieses Treffen dauert.\n\nEs wurde noch keine Dauer eingestellt. Du kannst auch die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
-
-msgid "MeetingMessages.EDIT_DURATION_PROMPT"
-msgstr "Die aktuelle Dauer ist <b>${current_duration} Minuten</b>.\n\nSende mir die neue Dauer in Minuten, oder tippe auf <b>Abbrechen</b>, um zurückzugehen."
+msgstr "Lege eine Endzeit für das Treffen fest, um ihm eine Dauer zu geben. Du kannst auch die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
 
 msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION_ON_EXIT"
 msgstr "Es tut mir leid, ich erwartete die Beschreibung deines Treffens. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
@@ -763,9 +757,6 @@ msgstr "Beginnt"
 msgid "MeetingMessages.MEETING_STOP_TIME"
 msgstr "Endet"
 
-msgid "MeetingMessages.SET_DURATION_PROMPT"
-msgstr "Sende mir die Dauer des Treffens in Minuten, oder tippe auf <b>Abbrechen</b>, um zurückzugehen."
-
 msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
 msgstr "Ich verstehe nur einen Titel oder einen Titel mit einem Datum 🤔.\n\nBitte sende nur den Titel des Treffens oder den Titel mit einem von Telegram formatierten Datum. Klicke auf <b>Abbrechen</b>, um zu beenden."
 
@@ -774,3 +765,21 @@ msgstr "Das Treffen <b>${meeting_title}</b> hat begonnen!"
 
 msgid "MeetingMessages.STALE_CANCEL_BUTTON"
 msgstr "Du hast diese Frage bereits beantwortet"
+
+msgid "MeetingMessages.DURATION_NO_START_DATETIME"
+msgstr "Um eine Dauer zu setzen, stelle zuerst fest, wann das Treffen beginnt. Wähle unten ein Datum und eine Uhrzeit.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal festzulegen.</i>"
+
+msgid "MeetingMessages.DURATION_START_DATETIME_SET"
+msgstr "Startzeit gesetzt. Stelle jetzt fest, wann das Treffen endet."
+
+msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
+msgstr "Treffen beginnt um <b>${start_datetime}</b>. Stelle fest, wann es endet.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal festzulegen.</i>"
+
+msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
+msgstr "Treffen beginnt um <b>${start_datetime}</b>. Das Treffen endet derzeit um <b>${end_datetime}</b>.\n\nSteile die neue Endzeit fest.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal festzulegen.</i>"
+
+msgid "MeetingMessages.END_DATETIME_BEFORE_START"
+msgstr "Die Endzeit muss nach der Startzeit liegen."
+
+msgid "MeetingMessages.END_DATETIME_IN_PAST"
+msgstr "Die Endzeit muss in der Zukunft liegen."

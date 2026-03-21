@@ -120,7 +120,7 @@ def test_datetime_section_no_datetime_shows_single_clock_line(user_with_settings
 
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.datetime = None
-    meeting.duration_minutes = None
+    meeting.end_datetime = None
 
     text = render(meeting._datetime_section).text
 
@@ -136,7 +136,7 @@ def test_datetime_section_with_datetime_no_duration_shows_single_clock_line(user
 
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
-    meeting.duration_minutes = None
+    meeting.end_datetime = None
 
     text = render(meeting._datetime_section).text
 
@@ -152,7 +152,7 @@ def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user
 
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
-    meeting.duration_minutes = 60  # 60 minutes
+    meeting.end_datetime = datetime(2024, 6, 15, 11, 0, tzinfo=UTC)  # 60 minutes later
 
     text = render(meeting._datetime_section).text
 
@@ -171,18 +171,18 @@ def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user
 
 
 @pytest.mark.parametrize(
-    "duration_minutes",
-    [None, 30, 90],
-    ids=["no_duration", "duration_30", "duration_90"],
+    "end_datetime",
+    [None, dt.datetime(2024, 6, 15, 10, 30, tzinfo=dt.UTC), dt.datetime(2024, 6, 15, 11, 30, tzinfo=dt.UTC)],
+    ids=["no_end_datetime", "end_datetime_30min", "end_datetime_90min"],
 )
 @pytest.mark.parametrize("lock_on_start", [True, False], ids=["lock_on_start_true", "lock_on_start_false"])
 def test_duration_view_lock_toggle_always_visible(
     user_with_settings: User,
-    duration_minutes: int | None,
+    end_datetime: dt.datetime | None,
     lock_on_start: bool,
 ):
     meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.duration_minutes = duration_minutes
+    meeting.end_datetime = end_datetime
     meeting.lock_on_start = lock_on_start
 
     view = meeting.duration_view
@@ -190,13 +190,13 @@ def test_duration_view_lock_toggle_always_visible(
     lock_cb = cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
     lock_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == lock_cb]
 
-    # Lock toggle must be present regardless of whether duration_minutes is set
+    # Lock toggle must be present regardless of whether end_datetime is set
     assert len(lock_buttons) == 1  # exactly one lock toggle button
 
 
-def test_duration_view_keyboard_row0_has_set_and_lock_buttons_when_no_duration(user_with_settings: User):
+def test_duration_view_keyboard_row0_has_set_and_lock_buttons_when_no_end_datetime(user_with_settings: User):
     meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.duration_minutes = None
+    meeting.end_datetime = None
 
     view = meeting.duration_view
 
@@ -210,9 +210,11 @@ def test_duration_view_keyboard_row0_has_set_and_lock_buttons_when_no_duration(u
     assert not any(btn.callback_data == delete_cb for btn in all_buttons)
 
 
-def test_duration_view_keyboard_row0_has_set_and_lock_and_row1_has_delete_when_duration_set(user_with_settings: User):
+def test_duration_view_keyboard_row0_has_set_and_lock_and_row1_has_delete_when_end_datetime_set(
+    user_with_settings: User,
+):
     meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.duration_minutes = 60
+    meeting.end_datetime = dt.datetime(2024, 6, 15, 11, 0, tzinfo=dt.UTC)  # end datetime set
 
     view = meeting.duration_view
 
@@ -260,9 +262,9 @@ def test_main_view_hides_join_leave_row_when_locked_and_in_progress(user_with_se
 
     now = dt.datetime.now(dt.UTC)
     meeting = create_meetup(id=1, owner=user_with_settings)
-    # Set datetime to 5 minutes ago and duration to 60 min so is_in_progress is True
+    # Set datetime to 5 minutes ago and end_datetime to 55 min from now so is_in_progress is True
     meeting.datetime = now - timedelta(minutes=5)
-    meeting.duration_minutes = 60
+    meeting.end_datetime = now + timedelta(minutes=55)  # total 60 min, still in progress
     meeting.lock_on_start = True
 
     assert meeting.is_in_progress  # guard: the branch condition must be True
@@ -283,7 +285,7 @@ def test_external_view_hides_join_leave_row_when_locked_and_in_progress(user_wit
     now = dt.datetime.now(dt.UTC)
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.datetime = now - timedelta(minutes=5)
-    meeting.duration_minutes = 60
+    meeting.end_datetime = now + timedelta(minutes=55)  # total 60 min, still in progress
     meeting.lock_on_start = True
 
     assert meeting.is_in_progress  # guard: the branch condition must be True
@@ -314,11 +316,11 @@ def test_build_inline_keyboard_hides_join_leave_row_when_locked_and_in_progress(
 
 
 def make_in_progress_meeting(owner: User):
-    """Create a meeting that is currently in progress (started 5 min ago, lasts 120 min)."""
+    """Create a meeting that is currently in progress (started 5 min ago, ends 120 min from start)."""
     now = dt.datetime.now(dt.UTC)
     meeting = create_meetup(id=2, owner=owner)
     meeting.datetime = now - timedelta(minutes=5)
-    meeting.duration_minutes = 120
+    meeting.end_datetime = now + timedelta(minutes=115)  # 120 min total from start, still in progress
     return meeting
 
 
@@ -327,7 +329,7 @@ def make_not_in_progress_meeting(owner: User):
     now = dt.datetime.now(dt.UTC)
     meeting = create_meetup(id=3, owner=owner)
     meeting.datetime = now + timedelta(hours=2)
-    meeting.duration_minutes = 60
+    meeting.end_datetime = now + timedelta(hours=3)  # 60 min duration, both in future
     return meeting
 
 
@@ -369,7 +371,7 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(use
     now = dt.datetime.now(dt.UTC)
     meeting = create_meetup(id=2, owner=user_with_settings, language=None)
     meeting.datetime = now - timedelta(minutes=5)
-    meeting.duration_minutes = 120
+    meeting.end_datetime = now + timedelta(minutes=115)  # still in progress
     assert meeting.language is None
 
     assert meeting.is_in_progress  # guard: precondition for the branch under test
@@ -408,3 +410,25 @@ def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_s
     # inline_view uses meeting.lang (meeting.language or meeting.user_language)
     expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
     assert expected_text not in view.description.text
+
+
+# ---------------------------------------------------------------------------
+# is_in_progress: naive datetime compatibility (DB round-trip simulation)
+# ---------------------------------------------------------------------------
+
+
+def test_is_in_progress_with_naive_datetimes(user_with_settings: User):
+    """is_in_progress must return True when datetimes are naive (no tzinfo), as returned by the DB.
+
+    In production the DateTime column has no timezone, so SQLAlchemy returns naive datetimes.
+    Tests normally pass because fixtures set tzinfo=UTC in memory and never round-trip through
+    the DB. This test simulates the actual DB behaviour.
+    """
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    # Naive datetimes: started in the past, ends far in the future
+    meeting.datetime = dt.datetime(2024, 1, 1, 10, 0)  # naive, no tzinfo — simulates DB return
+    meeting.end_datetime = dt.datetime(2099, 12, 31, 23, 59)  # naive, far future — meeting still running
+
+    # Before the fix, comparing naive end_datetime with aware now() raised TypeError.
+    # After the fix, naive datetimes are normalised to UTC before comparison.
+    assert meeting.is_in_progress is True

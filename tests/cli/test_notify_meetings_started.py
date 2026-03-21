@@ -39,7 +39,7 @@ def test_meetings_to_notify_started_query(mock_session: MockDbSession):
     expected_query = (
         "SELECT meetups.id, meetups.owner_id, meetups.title, meetups.waiting_list,"
         " meetups.public, meetups.allow_invitation, meetups.incognito,"
-        " meetups.expiration_notification_sent, meetups.duration_minutes,"
+        " meetups.expiration_notification_sent, meetups.end_datetime,"
         " meetups.started_notification_sent, meetups.lock_on_start, meetups.description,"
         " meetups.created_time, meetups.updated_time, meetups.expiration_time,"
         " meetups.datetime, meetups.max_members, meetups.language, meetups.location,"

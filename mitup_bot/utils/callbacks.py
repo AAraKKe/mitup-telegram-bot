@@ -76,12 +76,22 @@ SET_MEETING_WAITING_LIST = CallbackData(action="set", entity="meet_wait")
 SET_MEETING_PUBLIC = CallbackData(action="set", entity="meet_pub")
 SET_MEETING_ALLOW_INVITATIONS = CallbackData(action="set", entity="meet_inv")
 SET_MEETING_INCOGNITO = CallbackData(action="set", entity="meet_inc")
-# ---- Duration
+# ---- Duration / End datetime
 EDIT_MEETING_DURATION = CallbackData(action="edit", entity="meet_dur")
 SET_MEETING_DURATION = CallbackData(action="set", entity="meet_dur")
 CLEAR_MEETING_DURATION = CallbackData(action="clear", entity="meet_dur")
 CANCEL_EDIT_MEETING_DURATION = CallbackData(action="cancel", entity="meet_dur")
 SET_MEETING_LOCK_ON_START = CallbackData(action="set", entity="meet_lock")
+# End datetime within duration conversation
+EDIT_MEETING_END_DATE_TIME = CallbackData(action="edit", entity="meet_edt")
+EDIT_MEETING_END_DATE = DateCallbackData(action="edit", entity="meet_ed")
+SET_MEETING_END_DATE = DateCallbackData(action="set", entity="med")
+EDIT_MEETING_END_TIME = CallbackData(action="edit", entity="meet_et")
+CANCEL_EDIT_MEETING_END_DATETIME = CallbackData(action="cancel", entity="meet_edt")
+# Start datetime within duration conversation (reused callbacks with different entity)
+DURATION_EDIT_START_DATE = DateCallbackData(action="edit", entity="dur_sd")
+DURATION_SET_START_DATE = DateCallbackData(action="set", entity="dsd")
+DURATION_EDIT_START_TIME = CallbackData(action="edit", entity="dur_st")
 # ---- General
 EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 

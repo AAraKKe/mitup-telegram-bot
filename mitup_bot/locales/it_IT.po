@@ -506,15 +506,6 @@ msgstr "▶️ Questo incontro è in corso ▶️"
 msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
 msgstr "✅ Questo incontro è terminato ✅\n\n<b>Durata:</b> ${duration} minuti · <b>Partecipanti:</b> ${attendee_count}"
 
-msgid "MeetingMessages.SET_DURATION_PROMPT"
-msgstr "Inviami la durata dell'incontro in minuti, oppure tocca <b>Annulla</b> per tornare indietro."
-
-msgid "MeetingMessages.EDIT_DURATION_PROMPT"
-msgstr "La durata attuale è <b>${current_duration} minuti</b>.\n\nInviami la nuova durata in minuti, oppure tocca <b>Annulla</b> per tornare indietro."
-
-msgid "MeetingMessages.DURATION_SET_SUCCESS"
-msgstr "Durata impostata a: <b>${duration} minuti</b>"
-
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "Durata rimossa."
 
@@ -525,10 +516,10 @@ msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
 msgstr "Devi impostare una durata prima di abilitare questa opzione."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Imposta per quanto tempo durerà questo incontro.\n\nDurata attuale: <b>${current_duration} minuti</b>.\n\nPuoi anche bloccare la lista dei partecipanti quando l'incontro inizia, in modo che nessuno possa unirsi o lasciare una volta che è iniziato."
+msgstr "L'incontro termina a: <b>${end_datetime}</b>\n\nPuoi modificare l'orario di fine o bloccare la lista dei partecipanti quando l'incontro inizia, in modo che nessuno possa unirsi o lasciare una volta che è iniziato."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Imposta per quanto tempo durerà questo incontro.\n\nNessuna durata è stata impostata ancora. Puoi anche bloccare la lista dei partecipanti quando l'incontro inizia, in modo che nessuno possa unirsi o lasciare una volta che è iniziato."
+msgstr "Imposta un orario di fine per l'incontro per dargli una durata. Puoi anche bloccare la lista dei partecipanti quando l'incontro inizia, in modo che nessuno possa unirsi o lasciare una volta che è iniziato."
 
 msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
 msgstr "Questo incontro è già iniziato e la sua lista di partecipanti è bloccata."
@@ -742,3 +733,21 @@ msgstr "L'incontro <b>${meeting_title}</b> sta per iniziare!"
 
 msgid "NotificationMessages.MEETING_STARTED"
 msgstr "L'incontro <b>${meeting_title}</b> è iniziato!"
+
+msgid "MeetingMessages.DURATION_NO_START_DATETIME"
+msgstr "Per impostare una durata, prima imposta quando inizia l'incontro. Scegli una data e un'ora di seguito.\n\n<i>Suggerimento: puoi anche inviare un messaggio usando ${datetime_link} per impostare la data e l'ora in una sola volta.</i>"
+
+msgid "MeetingMessages.DURATION_START_DATETIME_SET"
+msgstr "Orario di inizio impostato. Ora imposta quando termina l'incontro."
+
+msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
+msgstr "L'incontro inizia a <b>${start_datetime}</b>. Imposta quando termina.\n\n<i>Suggerimento: puoi anche inviare un messaggio usando ${datetime_link} per impostare la data e l'ora in una sola volta.</i>"
+
+msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
+msgstr "L'incontro inizia a <b>${start_datetime}</b>. L'incontro attualmente termina a <b>${end_datetime}</b>.\n\nImposta il nuovo orario di fine.\n\n<i>Suggerimento: puoi anche inviare un messaggio usando ${datetime_link} per impostare la data e l'ora in una sola volta.</i>"
+
+msgid "MeetingMessages.END_DATETIME_BEFORE_START"
+msgstr "L'orario di fine deve essere dopo l'orario di inizio."
+
+msgid "MeetingMessages.END_DATETIME_IN_PAST"
+msgstr "L'orario di fine deve essere nel futuro."

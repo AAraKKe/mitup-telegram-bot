@@ -40,6 +40,7 @@ class ContextId(CamelCaseStrEnum):
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = auto()
     EDIT_MEETING_TIME = auto()
     EDIT_MEETING_DURATION = auto()
+    EDIT_MEETING_END_DATETIME = auto()
 
     # Create Meeting
     CREATE_MEETING = auto()

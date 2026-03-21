@@ -4,7 +4,7 @@ from re import Match
 from typing import cast
 
 from sqlmodel import Session
-from telegram import Message, MessageEntity, Update
+from telegram import MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
@@ -20,7 +20,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
-from .utils import cleanup_states
+from .utils import DateTimeEntityFilter, cleanup_states, safe_anchor_date
 
 # This module manages the date/time editing sub-flow for a meeting.
 #
@@ -45,28 +45,7 @@ from .utils import cleanup_states
 # visible only when meeting.datetime is set.
 
 
-# --- Filters ---
-
-
-class DateTimeEntityFilter(filters.MessageFilter):
-    """Accept messages that contain at least one ``date_time`` entity."""
-
-    def filter(self, message: Message) -> bool:
-        return any(e.type == MessageEntity.DATE_TIME for e in (message.entities or []))
-
-
 # --- Shared helpers ---
-
-
-def safe_anchor_date(meeting_datetime: dt.datetime | None, user_now: dt.datetime) -> dt.date:
-    """
-    Returns the anchor date for the calendar view. If the meeting has a datetime set, and it is
-    in the future, return the date of the meeting. Otherwise return the current date.
-    """
-    if meeting_datetime:
-        meeting_date = dt.date(meeting_datetime.year, meeting_datetime.month, meeting_datetime.day)
-        return meeting_date if meeting_date >= user_now.date() else user_now.date()
-    return user_now.date()
 
 
 async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting: Meetup) -> ConversationMeetingState:
@@ -259,6 +238,8 @@ async def callback_query_confirm_delete_date_time(session: Session, update: Upda
         return ConversationHandler.END
 
     meeting.datetime = None
+    meeting.end_datetime = None
+    meeting.lock_on_start = False
     session.add(meeting)
     session.flush()
 

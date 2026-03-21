@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-03-15 14:18\n"
+"PO-Revision-Date: 2026-03-21 22:43\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -564,31 +564,40 @@ msgid "MeetingMessages.MEETING_IN_PROGRESS"
 msgstr "▶️ This meeting is in progress ▶️"
 
 msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
-msgstr "✅ This meeting has finished ✅\n\n<b>Duration:</b> ${duration} minutes · <b>Attendees:</b> ${attendee_count}"
+msgstr "✅ This meeting has finished ✅\n\n<b>From:</b> ${start_datetime} · <b>To:</b> ${end_datetime} · <b>Attendees:</b> ${attendee_count}"
 
-msgid "MeetingMessages.SET_DURATION_PROMPT"
-msgstr "Send me the duration of the meeting in minutes, or tap <b>Cancel</b> to go back."
+msgid "MeetingMessages.DURATION_NO_START_DATETIME"
+msgstr "To set a duration, first set when the meeting starts. Choose a date and time below.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
 
-msgid "MeetingMessages.EDIT_DURATION_PROMPT"
-msgstr "The current duration is <b>${current_duration} minutes</b>.\n\nSend me the new duration in minutes, or tap <b>Cancel</b> to go back."
+msgid "MeetingMessages.DURATION_START_DATETIME_SET"
+msgstr "Start time set. Now set when the meeting ends."
 
-msgid "MeetingMessages.DURATION_SET_SUCCESS"
-msgstr "Duration set to: <b>${duration} minutes</b>"
+msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
+msgstr "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+
+msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
+msgstr "Meeting starts at <b>${start_datetime}</b>. The meeting currently ends at <b>${end_datetime}</b>.\n\nSet the new end time.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+
+msgid "MeetingMessages.END_DATETIME_BEFORE_START"
+msgstr "The end time must be after the start time."
+
+msgid "MeetingMessages.END_DATETIME_IN_PAST"
+msgstr "The end time must be in the future."
 
 msgid "MeetingMessages.DURATION_CLEARED"
 msgstr "Duration removed."
 
 msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
-msgstr "Sorry, I was expecting the duration in minutes. Would you like to send it? If not, tap Cancel to exit."
+msgstr "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
 
 msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
-msgstr "You must set a duration before enabling this option."
+msgstr "You must set an end time before enabling this option."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Set how long this meeting will last.\n\nCurrent duration: <b>${current_duration} minutes</b>.\n\nYou can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+msgstr "Meeting ends at: <b>${end_datetime}</b>\n\nYou can change the end time or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
 
 msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Set how long this meeting will last.\n\nNo duration has been set yet. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+msgstr "Set an end time for the meeting to give it a duration. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
 
 msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
 msgstr "This meeting has already started and its attendees list is locked."
