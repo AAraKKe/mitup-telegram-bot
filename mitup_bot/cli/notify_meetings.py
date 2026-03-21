@@ -3,7 +3,6 @@ from asyncio import gather
 from collections.abc import Sequence
 from contextlib import contextmanager
 
-from aws_embedded_metrics.unit import Unit
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, false, func, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
@@ -12,7 +11,7 @@ from telegram.error import Forbidden
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
-from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 
@@ -71,14 +70,14 @@ async def send_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
 
 
 @db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
+async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Send a notification to all users that have joined a meeting that is about to start"""
     joined_links = joined_links_to_notify(session)
     deactivated_users = 0
     failed = 0
     sent = 0
 
-    metrics.put_metric(MetricKey.NOTIFICATIONS_TO_SEND.value, len(joined_links), unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.NOTIFICATIONS_TO_SEND, len(joined_links), MetricUnit.COUNT)
 
     notifications = []
 
@@ -100,9 +99,9 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLo
 
     deactivated_users = sum(not link.user.is_active for link in joined_links)
 
-    metrics.put_metric(MetricKey.NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.NOTIFICATIONS_FAILED.value, failed, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.INACTIVE_USER_SET.value, deactivated_users, unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.NOTIFICATIONS_SENT, sent, MetricUnit.COUNT)
+    metrics.emit(MetricKey.NOTIFICATIONS_FAILED, failed, MetricUnit.COUNT)
+    metrics.emit(MetricKey.INACTIVE_USER_SET, deactivated_users, MetricUnit.COUNT)
 
     if failed:
         raise RuntimeError(f"Failed to send notification to {failed} users. Check logs for more details.")

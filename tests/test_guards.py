@@ -4,7 +4,6 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import Chat, Message, Update
 
@@ -40,6 +39,7 @@ from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import StubMitupContext, UpdateRequest, create_meetup, create_user
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -193,6 +193,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
+    metrics: MetricAssertions,
     caplog: pytest.LogCaptureFixture,
 ):
     meeting = create_meetup(999, "Meeting!", description="Description")
@@ -209,9 +210,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
         assert result is None
 
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
-        context.metrics_engine.assert_metrics_emited(
-            [MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT]
-        )
+        metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
 
 
 @pytest.mark.parametrize(
@@ -287,6 +286,7 @@ async def test_user_owns_meeting_redirect_logs_and_emits_metric_and_edits_main_m
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
+    metrics: MetricAssertions,
     caplog: pytest.LogCaptureFixture,
 ):
     # meeting_id 999 does not belong to user_with_settings (who owns ids 1 and 2)
@@ -299,7 +299,7 @@ async def test_user_owns_meeting_redirect_logs_and_emits_metric_and_edits_main_m
     assert "999" in caplog.text  # meeting id
     assert "1" in caplog.text  # user id
     context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
-    context.metrics_engine.assert_metrics_emited([MetricKey.ERROR.with_prefix("MeetingNotOwned")], [1], [Unit.COUNT])
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
 
 
 async def test_user_owns_meeting_returns_none_silently_when_redirect_false(

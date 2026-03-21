@@ -2,7 +2,6 @@ from asyncio import CancelledError
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from click.testing import CliRunner
 
 from mitup_bot.cli.commands.recurrent_events import (
@@ -15,8 +14,9 @@ from mitup_bot.cli.commands.recurrent_events import (
     run_all_tasks,
     run_periodic,
 )
-from mitup_bot.monitoring import MetricKey
-from tests.helpers import AnyFloat, MockApi, StubMetrics
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
+from tests.helpers import MockApi
+from tests.helpers.monitoring import MetricAssertions
 
 INTERVAL_PARAMS = [
     (EventType.USER_CLEANUP, "user_cleanup"),
@@ -81,11 +81,11 @@ SYNC_LAUNCH_PARAMS = [
 )
 async def test_launch_event_async(event_type: EventType, module_path: str):
     api = MockApi()
-    metrics = StubMetrics()
+    client = MetricsClient(NullBackend())
 
     with patch(f"{module_path}.run", new_callable=AsyncMock) as mock_run:
-        await launch_event(event_type, api, metrics)
-        mock_run.assert_awaited_once_with(api, metrics)
+        await launch_event(event_type, api, client)
+        mock_run.assert_awaited_once_with(api, client)
 
 
 @pytest.mark.parametrize(
@@ -95,11 +95,11 @@ async def test_launch_event_async(event_type: EventType, module_path: str):
 )
 async def test_launch_event_sync(event_type: EventType, module_path: str):
     api = MockApi()
-    metrics = StubMetrics()
+    client = MetricsClient(NullBackend())
 
     with patch(f"{module_path}.run") as mock_run:
-        await launch_event(event_type, api, metrics)
-        mock_run.assert_called_once_with(api, metrics)
+        await launch_event(event_type, api, client)
+        mock_run.assert_called_once_with(api, client)
 
 
 MAINTAINANCE_PARAMS = [
@@ -121,38 +121,55 @@ async def test_handle_maintainance(
     expected_fault: int,
     expected_exception: str | None,
 ):
-    api = MockApi()
+    captured_client: list[MetricsClient] = []
+    fake_api = MagicMock()
+
+    def make_client(backend, base_dimensions=None):
+        client = MetricsClient(NullBackend(), base_dimensions=base_dimensions)
+        captured_client.append(client)
+        return client
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.resolve_environment"),
         patch(
             "mitup_bot.cli.commands.recurrent_events.launch_event",
             new_callable=AsyncMock,
             side_effect=launch_side_effect,
         ) as mock_launch,
         patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.MitupMetricsLogger") as mock_logger_cls,
+        patch("mitup_bot.cli.commands.recurrent_events.build_api", return_value=fake_api),
+        patch("mitup_bot.cli.commands.recurrent_events.MetricsClient", side_effect=make_client),
     ):
-        stub = StubMetrics()
-        mock_logger_cls.return_value = stub
         mock_db.get_open_connections.return_value = leaked_connections
 
-        await handle_maintainance(event_type, api)
+        await handle_maintainance(event_type, MagicMock())
 
         mock_db.set_connection_context.assert_called_once_with(event_type.value)
-        mock_launch.assert_awaited_once_with(event_type, api, stub)
+        assert len(captured_client) == 1
+        client = captured_client[0]
+        mock_launch.assert_awaited_once_with(event_type, fake_api, client)
 
-        stub.assert_metrics_emited(
-            [MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-            [expected_fault, AnyFloat(), leaked_connections],
-            [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
+        assertions = MetricAssertions(client)
+        assertions.assert_emitted(
+            name=MetricKey.FAULT,
+            value=expected_fault,
+            unit=MetricUnit.COUNT,
             dimensions={"EventType": event_type.value},
-            exception=expected_exception,
+        )
+        assertions.assert_emitted(
+            name=MetricKey.TIME,
+            unit=MetricUnit.MILLISECONDS,
+            dimensions={"EventType": event_type.value},
+        )
+        assertions.assert_emitted(
+            name=MetricKey.DB_CONNECTIONS_LEAKED,
+            value=leaked_connections,
+            unit=MetricUnit.COUNT,
+            dimensions={"EventType": event_type.value},
         )
 
 
 async def test_run_periodic_runs_event():
-    api = MockApi()
+    bot = MagicMock()
 
     # First sleep is the time_before_start delay, second is the interval sleep after handle_maintainance
     with (
@@ -160,13 +177,13 @@ async def test_run_periodic_runs_event():
         patch("mitup_bot.cli.commands.recurrent_events.handle_maintainance", new_callable=AsyncMock) as mock_handle,
     ):
         with pytest.raises(CancelledError):
-            await run_periodic(60, EventType.USER_CLEANUP, api, time_before_start=0)
+            await run_periodic(60, EventType.USER_CLEANUP, bot, time_before_start=0)
 
-        mock_handle.assert_awaited_once_with(EventType.USER_CLEANUP, api)
+        mock_handle.assert_awaited_once_with(EventType.USER_CLEANUP, bot)
 
 
 async def test_run_periodic_default_jitter():
-    api = MockApi()
+    bot = MagicMock()
     sleep_values: list[float] = []
 
     async def sleep_side_effect(seconds: float):
@@ -178,7 +195,7 @@ async def test_run_periodic_default_jitter():
         patch("mitup_bot.cli.commands.recurrent_events.handle_maintainance", new_callable=AsyncMock),
     ):
         with pytest.raises(CancelledError):
-            await run_periodic(100, EventType.USER_CLEANUP, api, time_before_start=None)
+            await run_periodic(100, EventType.USER_CLEANUP, bot, time_before_start=None)
 
     assert len(sleep_values) == 1
     # Jitter should be between 0 and 1% of the interval (100 * 0.01 = 1.0)
@@ -186,7 +203,7 @@ async def test_run_periodic_default_jitter():
 
 
 async def test_run_all_tasks_creates_all_tasks():
-    api = MockApi()
+    bot = MagicMock()
     intervals = IntervalsConfiguration(
         user_cleanup=10,
         notify_start_meeting=20,
@@ -203,14 +220,14 @@ async def test_run_all_tasks_creates_all_tasks():
     async def fake_run_periodic(
         interval: int,
         event_type: EventType,
-        api,
+        bot,
         time_before_start: float | None = None,
     ):
         created_tasks.append(event_type)
         propagated_start_times.append(time_before_start)
 
     with patch("mitup_bot.cli.commands.recurrent_events.run_periodic", side_effect=fake_run_periodic):
-        await run_all_tasks(intervals, api, start_time=start_time)
+        await run_all_tasks(intervals, bot, start_time=start_time)
 
     assert set(created_tasks) == set(EventType)
     assert propagated_start_times == [start_time] * len(EventType)
@@ -222,7 +239,6 @@ def test_cli_invokes_with_defaults():
     with (
         patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
         patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.configure_metrics"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot") as mock_build_bot,
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
@@ -245,7 +261,6 @@ def test_cli_passes_custom_intervals():
     with (
         patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
         patch("mitup_bot.cli.commands.recurrent_events.db"),
-        patch("mitup_bot.cli.commands.recurrent_events.configure_metrics"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.run_all_tasks", new_callable=AsyncMock) as mock_run_all_tasks,
@@ -292,7 +307,6 @@ def test_cli_env_option():
     with (
         patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
         patch("mitup_bot.cli.commands.recurrent_events.db"),
-        patch("mitup_bot.cli.commands.recurrent_events.configure_metrics") as mock_configure_metrics,
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
@@ -304,4 +318,3 @@ def test_cli_env_option():
 
         assert result.exit_code == 0, result.output
         mock_config_cls.assert_called_once()
-        mock_configure_metrics.assert_called_once_with(mock_config.metrics)

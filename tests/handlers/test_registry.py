@@ -2,7 +2,6 @@ from enum import Enum, auto
 from unittest import mock
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
@@ -13,10 +12,11 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback
+from mitup_bot.monitoring import MetricsClient, MetricUnit, NullBackend
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.monitoring.metrics import NULL_DIMENSIONALITY
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, UpdateRequest, build_context
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 
@@ -191,40 +191,33 @@ def test_cannot_register_same_inline_handler_twice():
     ClearableRegistry.clear()
 
 
-async def test_all_handlers_emit_global_metrics(
-    app: StubMitupApp, update: Update, context: StubMitupContext, mock_session: MockDbSession
-):
+async def test_all_handlers_emit_global_metrics(app: StubMitupApp, update: Update, mock_session: MockDbSession):
     await app.initialize()
 
     # Define check_stat that is valid for conversation handlers
     check_state = [ConversationHandler.END, None, mock.AsyncMock(return_value=ConversationHandler.END), True]
 
-    # Handle update with all handlers
+    # Use a shared metrics client so we can aggregate all records across handler calls
+    shared_client = MetricsClient(NullBackend())
     valid_handlers = 0
 
-    global_logger = context.metrics_engine.get_logger(NULL_DIMENSIONALITY)
     for wrapper in HandlersRegistry.handlers.values():
         # Ignore conversation handlers because those are never executed, only handlers registered in them
-        if wrapper.is_conversation:
+        if wrapper.is_conversation():
             continue
 
         valid_handlers += 1
 
-        handler_context = build_context(update, app)
+        handler_context = build_context(update, app, metrics=shared_client)
         await wrapper.handler.handle_update(update, app, check_state, handler_context)
-        # Keep track of all metrics emitted in each context for no dimension metrics
 
-        logger = handler_context.metrics_engine.get_logger(NULL_DIMENSIONALITY)
-        global_logger.sink.container.extend(logger.sink.container)
-
-    # All handlers have emitted the global fault and time metric
-    context.metrics_engine.assert_metrics_emited(
-        [MetricKey.TIME, MetricKey.FAULT],
-        [AnyFloat(), AnyFloat()],
-        [Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=False,
-        times=valid_handlers,
+    # All handlers have emitted the global TIME and FAULT metrics.
+    # emit_global=True means 2 records per handler per metric (with + without handler dims).
+    metrics = MetricAssertions(shared_client)
+    metrics.assert_emitted(
+        name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=valid_handlers * 2
     )
+    metrics.assert_emitted(name=MetricKey.FAULT, value=AnyFloat(), times=valid_handlers * 2)
 
 
 # ---------------------------------------------------------------------------

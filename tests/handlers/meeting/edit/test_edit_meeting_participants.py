@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import ConversationHandler
 
@@ -11,20 +10,20 @@ from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view, edit_participants_view
 from mitup_bot.models import User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import factory
 from tests.helpers import (
     AnyFloat,
     StubMitupApp,
-    StubMitupContext,
     UpdateRequest,
     call_handler,
     create_meetup,
     create_user,
     owner_with_meeting,
 )
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -45,22 +44,12 @@ def failure_cases(callback_data: CallbackData):
     ]
 
 
-def assert_metrics_for_failure(error_count: int, error_type: type[Exception], context: StubMitupContext):
-    expected_metric_names: list[str | MetricKey] = [
-        MetricKey.FAULT.with_prefix(error_type.__name__),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    expected_metric_values = [error_count, error_count, AnyFloat(), 0]
-    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    context.metrics_engine.assert_handler_metrics_emitted(
-        expected_metric_names,
-        expected_metric_values,
-        units=expected_metric_units,
-        exception=error_type,
-    )
+def assert_metrics_for_failure(error_count: int, error_type: type[Exception], metrics_client: MetricsClient):
+    metrics = MetricAssertions(metrics_client)
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix(error_type.__name__), value=error_count)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -89,28 +78,24 @@ async def test_edit_meeting_participants_meeting_not_owned(
     user_with_settings: User,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app)
+        context, _ = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app, metrics_client=metrics_client
+        )
 
         assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
-    context.metrics_engine.assert_metrics_emited(
-        [
-            MetricKey.ERROR.with_prefix("MeetingNotOwned"),
-            MetricKey.FAULT,
-            MetricKey.TIME,
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        [1, 0, AnyFloat(), 0],
-        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -129,18 +114,21 @@ async def test_edit_meeting_participants_failures(
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
+    metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app)
+        context, _ = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_CALLBACK, update=update, app=app, metrics_client=metrics_client
+        )
         if error_type is None:
             assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
             context.api.assert_edit_message_called(update, factory.main_menu_view())
 
-    assert_metrics_for_failure(error_count, error_type, context)
+    assert_metrics_for_failure(error_count, error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -180,15 +168,18 @@ async def test_edit_meeting_max_participants_failures(
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
+    metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app)
+        context, _ = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app, metrics_client=metrics_client
+        )
 
-    assert_metrics_for_failure(error_count, error_type, context)
+    assert_metrics_for_failure(error_count, error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -200,12 +191,16 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
     user_with_settings: User,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app)
+        context, result = await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, update=update, app=app, metrics_client=metrics_client
+        )
 
         assert result is ConversationHandler.END
         assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
@@ -213,18 +208,10 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
 
         assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
-    context.metrics_engine.assert_metrics_emited(
-        [
-            MetricKey.ERROR.with_prefix("MeetingNotOwned"),
-            MetricKey.FAULT,
-            MetricKey.TIME,
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        [1, 0, AnyFloat(), 0],
-        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -274,6 +261,7 @@ async def test_edit_meeting_no_limit_participants_failures(
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
+    metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
@@ -281,7 +269,7 @@ async def test_edit_meeting_no_limit_participants_failures(
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
-            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app
+            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app, metrics_client=metrics_client
         )
 
         if error_type is None:
@@ -289,7 +277,7 @@ async def test_edit_meeting_no_limit_participants_failures(
             assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
             context.api.assert_edit_message_called(update, factory.main_menu_view())
 
-    assert_metrics_for_failure(error_count, error_type, context)
+    assert_metrics_for_failure(error_count, error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -301,31 +289,25 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
     user_with_settings: User,
     app: StubMitupApp,
     caplog: pytest.LogCaptureFixture,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
-            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app
+            EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, update=update, app=app, metrics_client=metrics_client
         )
 
         assert result is ConversationHandler.END
         assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
-    context.metrics_engine.assert_metrics_emited(
-        [
-            MetricKey.ERROR.with_prefix("MeetingNotOwned"),
-            MetricKey.FAULT,
-            MetricKey.TIME,
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        [1, 0, AnyFloat(), 0],
-        units=[Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(

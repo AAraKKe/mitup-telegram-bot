@@ -1,19 +1,19 @@
 import logging
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting import MeetingHandlerId
 from mitup_bot.models import Settings, User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.fixtures import create_joined_link, create_user
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -32,22 +32,12 @@ def failure_cases(callback_data: CallbackData):
     ]
 
 
-def assert_metrics_for_failure(error_count: int, error_type: type[Exception], context: StubMitupContext):
-    expected_metric_names: list[str | MetricKey] = [
-        MetricKey.FAULT.with_prefix(error_type.__name__),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    expected_metric_values = [error_count, error_count, AnyFloat(), 0]
-    expected_metric_units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    context.metrics_engine.assert_handler_metrics_emitted(
-        expected_metric_names,
-        expected_metric_values,
-        units=expected_metric_units,
-        exception=error_type,
-    )
+def assert_metrics_for_failure(error_count: int, error_type: type[Exception], metrics_client: MetricsClient):
+    metrics = MetricAssertions(metrics_client)
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix(error_type.__name__), value=error_count)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(1))], indirect=True)
@@ -229,13 +219,14 @@ async def test_delete_meeting_failures(
     error_type: type[Exception],
     app: StubMitupApp,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
+    metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app)
+    await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app, metrics_client=metrics_client)
 
-    assert_metrics_for_failure(1, error_type, context)
+    assert_metrics_for_failure(1, error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -252,13 +243,16 @@ async def test_confirm_delete_meeting_failures(
     error_type: type[Exception],
     app: StubMitupApp,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
+    metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app)
+    await call_handler(
+        MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app, metrics_client=metrics_client
+    )
 
-    assert_metrics_for_failure(1, error_type, context)
+    assert_metrics_for_failure(1, error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -275,13 +269,16 @@ async def test_decline_delete_meeting_failures(
     error_type: type[Exception],
     app: StubMitupApp,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
+    metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, update=update, app=app)
+    await call_handler(
+        MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, update=update, app=app, metrics_client=metrics_client
+    )
 
-    assert_metrics_for_failure(1, error_type, context)
+    assert_metrics_for_failure(1, error_type, metrics_client)
 
 
 # Test that when a meeting is deleted with invited users, those users are also deleted

@@ -1,11 +1,11 @@
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Protocol
+from typing import Any, Protocol
 
-from aws_embedded_metrics.unit import Unit
 from telegram.ext import ExtBot
 
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring.units import MetricUnit
 
 
 class ContextOrBotAdapter(Protocol):
@@ -22,13 +22,10 @@ class ContextOrBotAdapter(Protocol):
         self,
         name: str | MetricKey,
         value: float = 1.0,
-        unit: Unit = Unit.COUNT,
+        unit: MetricUnit = MetricUnit.COUNT,
         *,
         dimensions: dict[str, str] | None = None,
-        include_handler_dimensions: bool = True,
-        properties: dict[str, str | int | float | None] | None = None,
-        include_update_properties: bool = True,
-        emit_global: bool = False,
+        properties: dict[str, Any] | None = None,
     ): ...
 
     async def flush_metrics(self): ...

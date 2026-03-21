@@ -1,7 +1,6 @@
 import logging
 from typing import cast
 
-from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 from telegram import User as TgUser
@@ -26,6 +25,7 @@ from mitup_bot.exceptions import (
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, MessageBase
@@ -136,7 +136,7 @@ async def user_owns_meeting(
     If the redirect flag is False, None is returned but no communication happens with the user.
     """
     if meeting := user.own_meeting(meeting_id):
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=Unit.COUNT)
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
         return meeting
 
     if redirect:
@@ -145,7 +145,7 @@ async def user_owns_meeting(
             f"Meeting id: {meeting_id}, user id: {user.db_id}"
         )
         logging.warning(message)
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=Unit.COUNT)
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
     return None
 

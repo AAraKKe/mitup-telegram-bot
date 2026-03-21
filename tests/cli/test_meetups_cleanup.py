@@ -1,59 +1,62 @@
 from typing import cast
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 
 from mitup_bot.cli import meetups_cleanup
 from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.cli.meetups_cleanup import MEETUPS_DELETION_FAILED
 from mitup_bot.exceptions import InactiveUserInteraction
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import (
     MockApi,
     MockDbSession,
-    StubMetrics,
     create_joined_link,
     create_meetup,
     create_settings,
     create_user,
 )
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
-def metrics() -> StubMetrics:
-    metrics = StubMetrics([])
-    metrics.set_dimensions({"EventType": EventType.MEETUPS_CLEANUP.value})
-    return metrics
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.MEETUPS_CLEANUP.value})
 
 
-async def test_notify_no_meetings(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
+
+
+async def test_notify_no_meetings(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, ())
-    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics)
-    await metrics.flush()
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+    await metrics_client.flush()
 
     api.assert_method_just_called("send_message_to_user", times=0)
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETUPS_ABOUT_TO_BE_DELETED],
-        [0],
-        [Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
+        value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
 
 
 async def test_notify_meeting_about_to_be_deleted(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     meeting = create_meetup(id=1, title="Expiring Meeting", language=lang)
     owner = create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1, language=lang))
 
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (meeting,))
 
-    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics)
-    await metrics.flush()
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+    await metrics_client.flush()
 
     expected_view = MitupView(
         description=NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED.get(
@@ -86,37 +89,44 @@ async def test_notify_meeting_about_to_be_deleted(
     # The on_success callback fires after a successful send and sets this flag.
     assert meeting.expiration_notification_sent is True
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETUPS_ABOUT_TO_BE_DELETED],
-        [1],
-        [Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
+        value=1,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
 
 
-async def test_delete_no_meetings(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_delete_no_meetings(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, ())
-    await meetups_cleanup.delete_meetups(mock_session, api, metrics)
-    await metrics.flush()
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+    await metrics_client.flush()
 
     api.assert_method_just_called("send_message_to_user", times=0)
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETUPS_DELETED, MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED)],
-        [0, 0],
-        [Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_DELETED,
+        value=0,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
 
 
-async def test_delete_meeting_successfully(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str):
+async def test_delete_meeting_successfully(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+):
     meeting = create_meetup(id=1, title="To Delete", language=lang)
     owner = create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1, language=lang))
 
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting,))
 
-    await meetups_cleanup.delete_meetups(mock_session, api, metrics)
-    await metrics.flush()
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+    await metrics_client.flush()
 
     expected_view = MitupView(
         description=NotificationMessages.MEETING_PERMANENTLY_DELETED.get(
@@ -136,15 +146,21 @@ async def test_delete_meeting_successfully(mock_session: MockDbSession, metrics:
     # No outside users linked to this meeting; SQLAlchemy renders an empty IN as IN (NULL) AND (1 != 1).
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETUPS_DELETED, MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED)],
-        [1, 0],
-        [Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_DELETED,
+        value=1,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
 
 
-async def test_delete_meeting_with_outside_users(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_delete_meeting_with_outside_users(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     meeting = create_meetup(id=1, title="To Delete")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
@@ -154,22 +170,28 @@ async def test_delete_meeting_with_outside_users(mock_session: MockDbSession, me
 
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting,))
 
-    await meetups_cleanup.delete_meetups(mock_session, api, metrics)
-    await metrics.flush()
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+    await metrics_client.flush()
 
     assert "DELETE FROM meetups WHERE meetups.id IN (1)" in mock_session.queries_executed
     # The outside user (id=2) must be deleted; the owner (id=1, tg_user_id != -1) must not appear.
     assert "DELETE FROM users WHERE users.id IN (2)" in mock_session.queries_executed
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETUPS_DELETED, MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED)],
-        [1, 0],
-        [Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_DELETED,
+        value=1,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
 
 
-async def test_delete_partial_failure_inactive_user(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_delete_partial_failure_inactive_user(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     meeting_ok = create_meetup(id=1, title="OK Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting_ok], settings=create_settings(id=1))
 
@@ -183,33 +205,44 @@ async def test_delete_partial_failure_inactive_user(mock_session: MockDbSession,
     # meeting_fail is never added to meeting_ids and counts as a deletion failure.
     api.mock_method("send_message_to_user").side_effect = [None, InactiveUserInteraction(20, private=True)]
 
-    await meetups_cleanup.delete_meetups(mock_session, api, metrics)
-    await metrics.flush()
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+    await metrics_client.flush()
 
     assert owner_fail.is_active is False
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETUPS_DELETED, MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED)],
-        [1, 1],
-        [Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_DELETED,
+        value=1,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        value=1,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
 
 
-async def test_run_orchestrates_both_functions(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_run_orchestrates_both_functions(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, ())
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, ())
 
-    await meetups_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await meetups_cleanup.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
-            MetricKey.MEETUPS_DELETED,
-            MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
-        ],
-        [0, 0, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
+        value=0,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_DELETED,
+        value=0,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )

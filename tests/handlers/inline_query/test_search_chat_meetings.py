@@ -8,7 +8,7 @@ from telegram.ext import Application
 
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from mitup_bot.models import Meetup, Message, User
-from mitup_bot.monitoring import Feature
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils.messages import InlineViewMessages
 from mitup_bot.views import MitupInlineView
 from tests.helpers import (
@@ -19,6 +19,7 @@ from tests.helpers import (
     create_message,
     create_user,
 )
+from tests.helpers.monitoring import MetricAssertions
 
 CHAT_INSTANCE = "test_chat_instance"
 
@@ -48,6 +49,8 @@ async def test_search_returns_matching_meetings(
     user_with_settings: User,
     mock_session: MockDbSession,
     app: Application,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     mock_session.add_user(user_with_settings)
 
@@ -59,14 +62,16 @@ async def test_search_returns_matching_meetings(
 
     register_messages_query(mock_session, [msg])
 
-    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app)
+    context, _ = await call_handler(
+        InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app, metrics_client=metrics_client
+    )
 
     context.api.assert_answer_inline_query_called(
         update=update,
         results=[meeting.inline_view(chat_instance=CHAT_INSTANCE)],
         cache_time=0,
     )
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.SEARCH_CHAT_MEETINGS)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SEARCH_CHAT_MEETINGS)})
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}")], indirect=True)

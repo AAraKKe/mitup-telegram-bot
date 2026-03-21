@@ -9,7 +9,6 @@ from telegram.ext import Application, CallbackContext, ExtBot, JobQueue
 
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.custom_context import MitupContext, MitupUserData
-from mitup_bot.monitoring import MitupMetricsEngine, MitupMetricsLogger
 
 T = TypeVar("T")
 
@@ -26,11 +25,8 @@ UT = TypeVar("UT", bound=Update)
 """Type that defines and Update objects or a subclass of it"""
 
 
-TMitupContext = MitupContext[ExtBot, TelegramApiWrapper, MitupMetricsEngine[MitupMetricsLogger]]
+TMitupContext = MitupContext[ExtBot, TelegramApiWrapper]
 """Standard type of MitupContext used through the project"""
-
-TMitupEngine = MitupMetricsEngine[MitupMetricsLogger]
-"""Full type of the standard metrics engine"""
 
 JQ = TypeVar("JQ", bound=JobQueue | None)
 MitupApp = Application[ExtBot, TMitupContext, MitupUserData, dict, dict, JQ]

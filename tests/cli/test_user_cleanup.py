@@ -1,26 +1,31 @@
 from unittest.mock import MagicMock
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from sqlalchemy.dialects import postgresql
 
 from mitup_bot.cli import user_cleanup
 from mitup_bot.cli.user_cleanup import INACTIVE_USERS_SELECT_STATEMENT
-from mitup_bot.monitoring import MetricKey
-from tests.helpers import MockDbSession, StubMetrics, create_user
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
+from tests.helpers import MockDbSession, create_user
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
-def metrics() -> StubMetrics:
-    return StubMetrics([])
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend())
 
 
-async def test_no_inactive_users(mock_session: MockDbSession, metrics: StubMetrics):
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
+
+
+async def test_no_inactive_users(mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions):
     api = MagicMock()
 
     # No users registered — select returns empty result (default behavior)
-    user_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    user_cleanup.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     # Delete statement still executes but with empty set
     assert mock_session.exec.call_count == 2
@@ -28,14 +33,12 @@ async def test_no_inactive_users(mock_session: MockDbSession, metrics: StubMetri
     # No real user IDs targeted — empty-set form renders as IN (NULL) AND (1 != 1)
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
 
-    metrics.assert_metrics_emited(
-        [MetricKey.INACTIVE_USERS_DELETED],
-        [0],
-        [Unit.COUNT],
-    )
+    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
 
 
-async def test_inactive_users_deleted(mock_session: MockDbSession, metrics: StubMetrics):
+async def test_inactive_users_deleted(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
     api = MagicMock()
 
     inactive_1 = create_user(id=10, tg_user_id=10, is_active=False)
@@ -44,8 +47,8 @@ async def test_inactive_users_deleted(mock_session: MockDbSession, metrics: Stub
     # Register select result — returns user IDs
     mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive_1.id, inactive_2.id))  # ty: ignore[invalid-argument-type]  # https://github.com/astral-sh/ty/issues/2839
 
-    user_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    user_cleanup.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     # Two exec calls: select + delete
     assert mock_session.exec.call_count == 2
@@ -53,19 +56,15 @@ async def test_inactive_users_deleted(mock_session: MockDbSession, metrics: Stub
     # DELETE targets the correct user IDs (IDs 10 and 11; small integers iterate in ascending order in CPython sets)
     assert "DELETE FROM users WHERE users.id IN (10, 11)" in mock_session.queries_executed
 
-    metrics.assert_metrics_emited(
-        [MetricKey.INACTIVE_USERS_DELETED],
-        [2],
-        [Unit.COUNT],
-    )
+    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=2, unit=MetricUnit.COUNT)
 
 
 def test_select_query_filters_correctly(mock_session: MockDbSession):
     """Verify the SQL query selects inactive users excluding invited ones (tg_user_id != -1)."""
     api = MagicMock()
-    metrics = StubMetrics([])
+    client = MetricsClient(NullBackend())
 
-    user_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    user_cleanup.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
     expected_query = mock_session.normalize_query(
         str(

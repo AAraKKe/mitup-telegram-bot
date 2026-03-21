@@ -23,18 +23,17 @@ from mitup_bot.handlers.registration_process.enums import (
     RegistrationProcessHandlerId,
 )
 from mitup_bot.models import User
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, NullBackend
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
     MockApi,
-    StubMetrics,
-    StubMetricsEngine,
     StubMitupApp,
     StubMitupContext,
     UpdateRequest,
     call_handler,
 )
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -62,9 +61,7 @@ async def test_command_registry_can_register_command_handlers(update: Update):
 
     callback_return = await handler.callback(
         update,
-        StubMitupContext(
-            mock.MagicMock(), update, StubMetricsEngine(logger_provider=lambda ep: StubMetrics()), MockApi()
-        ),
+        StubMitupContext(mock.MagicMock(), update, MetricsClient(NullBackend()), MockApi()),
     )
     assert callback_return == "Done!"
 
@@ -137,8 +134,12 @@ async def test_command_start_with_new_user(
     mock_session: MockDbSession,
     update: Update,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
-    context, result = await call_handler(RegistrationProcessHandlerId.TIMEZONE_COMMAND, update=update, app=app)
+    context, result = await call_handler(
+        RegistrationProcessHandlerId.TIMEZONE_COMMAND, update=update, app=app, metrics_client=metrics_client
+    )
 
     assert update.effective_user is not None
 
@@ -149,24 +150,17 @@ async def test_command_start_with_new_user(
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
-    context.metrics_engine.assert_metrics_emited(
-        names=[MetricKey.COUNT],
-        values=[1],
-        dimensions={"Feature": Feature.NEW_LANDING},
-        add_handler_dimensions=False,
-    )
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.NEW_LANDING)})
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(user=False)]), indirect=True)
 async def test_command_stat_with_new_user_use_incorrect_user(
-    mock_session: MockDbSession, update: Update, context: StubMitupContext
+    mock_session: MockDbSession, update: Update, context: StubMitupContext, metrics: MetricAssertions
 ):
     with pytest.raises(EffectiveUserNotSet):
         await command_start_with_new_user(update, context)
 
-    context.metrics_engine.assert_metrics_not_emited(
-        names=[MetricKey.COUNT], values=[1], dimensions={"Feature": Feature.NEW_LANDING}
-    )
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.NEW_LANDING)})
 
 
 @pytest.mark.parametrize("command", [command_start_with_existing_user, command_go_to_main_menu])

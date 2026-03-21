@@ -4,9 +4,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import auto
 from time import perf_counter
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 
@@ -18,15 +17,14 @@ from mitup_bot.exceptions import (
     InvalidUserData,
 )
 from mitup_bot.monitoring import (
-    NULL_DIMENSIONALITY,
     CamelCaseStrEnum,
-    Dimensionality,
     Feature,
     MetricKey,
-    MitupMetricsEngine,
-    MitupMetricsLogger,
     properties_from_update,
 )
+from mitup_bot.monitoring.backend import EmfBackend
+from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.utils.entities import FormattedText
 
 
@@ -109,19 +107,18 @@ class MitupUserData:
 # Use old syntax to allow defining covariance
 TB = TypeVar("TB", bound=ExtBot, covariant=True)
 TAPI = TypeVar("TAPI", bound=TelegramApiWrapper, covariant=True)
-TME = TypeVar("TME", bound=MitupMetricsEngine, covariant=True)
 
 
 class MitupContext(
     CallbackContext[TB, MitupUserData, dict, dict],
-    Generic[TB, TAPI, TME],  # noqa: UP046
+    Generic[TB, TAPI],  # noqa: UP046
 ):
     """
     Custom context for the Mitup bot that includes several utilities.
 
     - User data registry. Access to the registry is provided through context managers that ensure that
     the data is removed once out of scope.
-    - Metrics. The context includes a metrics engine that allows emitting metrics with context specific
+    - Metrics. The context includes a metrics client that allows emitting metrics with context specific
     dimensions and properties as well as custom metrics with different dimensions.
     """
 
@@ -129,13 +126,12 @@ class MitupContext(
         self,
         application: Application,
         update: Update,
-        # Python does not yet support generic of generics, until then we can keep this as TME
-        metrics_engine: TME,
+        metrics: MetricsClient,
         api: TAPI,
     ):
-        self.metrics_engine = metrics_engine
+        self.metrics = metrics
         self.telegram_update = update
-        self.handler_dimensionality = NULL_DIMENSIONALITY
+        self._handler_dimensions: dict[str, str] = {}
         self.__update = update
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
@@ -149,10 +145,6 @@ class MitupContext(
     def get_update(self) -> Update:
         return self.__update
 
-    @property
-    def handler_metrics_logger(self) -> MitupMetricsLogger:
-        return self.metrics_engine.get_logger(self.handler_dimensionality)
-
     def __get_user_data_property[T: int | str | bool](
         self, context: ContextId, property: str, property_type: type[T], ensure_clean: bool
     ) -> Generator[T]:
@@ -161,8 +153,6 @@ class MitupContext(
 
         If ensure_clean is True, the property is removed after yielding it
         """
-        self.handler_metrics_logger.set_property("ContextId", context.value)
-
         if (
             self.user_data is None
         ):  # pragma: no cover, the app does not allow us to set user_data in tests and this should never happen
@@ -185,12 +175,12 @@ class MitupContext(
         except Exception:
             if ensure_clean:
                 self.user_data.remove_context(context)
-                self.emit_metric("CleanUserData", 1, unit=Unit.COUNT)
+                self.emit_metric("CleanUserData", properties={"ContextId": context.value})
             raise
 
         if ensure_clean:
             self.user_data.remove_context(context)
-            self.emit_metric("CleanUserData", 1, unit=Unit.COUNT)
+            self.emit_metric("CleanUserData", properties={"ContextId": context.value})
 
     @contextmanager
     def meeting_id(self, context: ContextId, ensure_clean=True) -> Generator[int]:
@@ -212,9 +202,10 @@ class MitupContext(
             raise InvalidUserData("User data requested but not set")
 
         self.user_data.store_meeting_id(context, meeting_id)
-        self.handler_metrics_logger.set_property("StoredMeetingId", meeting_id)
-        self.handler_metrics_logger.set_property("ContextId", context.value)
-        self.emit_metric("StoredMeetingId", 1, unit=Unit.COUNT)
+        self.emit_metric(
+            "StoredMeetingId",
+            properties={"StoredMeetingId": meeting_id, "ContextId": context.value},
+        )
 
     def store_text(self, context: ContextId, text: str | FormattedText):
         if self.user_data is None:  # pragma: no cover
@@ -222,9 +213,10 @@ class MitupContext(
 
         ftext = text if isinstance(text, FormattedText) else FormattedText(text)
         self.user_data.store_text(context, ftext)
-        self.handler_metrics_logger.set_property("ContextId", context.value)
-        self.handler_metrics_logger.set_property("StoredText", ftext.text)
-        self.emit_metric("StoredContextText", 1, unit=Unit.COUNT)
+        self.emit_metric(
+            "StoredContextText",
+            properties={"ContextId": context.value, "StoredText": ftext.text},
+        )
 
     def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData) -> None:
         fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
@@ -243,8 +235,7 @@ class MitupContext(
 
         for context in contexts:
             self.user_data.remove_context(context)
-            self.metrics_engine.properties["ContextId"] = context.value
-            self.emit_metric("CleanUserData", 1, unit=Unit.COUNT)
+            self.emit_metric("CleanUserData", properties={"ContextId": context.value})
 
     def clean_all_user_data(self):
         if self.user_data is None:  # pragma: no cover
@@ -261,19 +252,19 @@ class MitupContext(
         if not handler_dimensions:
             return
 
-        self.handler_dimensionality = Dimensionality(**handler_dimensions)
+        self._handler_dimensions = handler_dimensions
 
     def emit_metric(
         self,
         name: str | MetricKey,
         value: float = 1.0,
-        unit: Unit = Unit.COUNT,
+        unit: MetricUnit = MetricUnit.COUNT,
         *,
         # Dimension control
         dimensions: dict[str, str] | None = None,
         include_handler_dimensions: bool = True,
         # Property control
-        properties: dict[str, str | int | float | None] | None = None,
+        properties: dict[str, Any] | None = None,
         include_update_properties: bool = True,
         # Special flag for global aggregation
         emit_global: bool = False,
@@ -283,36 +274,31 @@ class MitupContext(
         Metrics with identical dimensions are batched into a single EMF log line — a CloudWatch
         cost optimization since charges are per log line, not per metric within a line.
         """
-        # Build dimensionality
-        dimensionality = Dimensionality.or_null(dimensions)
+        dims = dict(dimensions or {})
         if include_handler_dimensions:
-            dimensionality += self.handler_dimensionality
+            dims |= self._handler_dimensions
 
-        # Build properties
-        props = properties or {}
+        props = dict(properties or {})
         if include_update_properties:
             props |= properties_from_update(self.telegram_update)
 
-        # Emit primary metric
-        logger = self.metrics_engine.get_logger(dimensionality, props)
-        logger.put_metric(str(name), value, unit.value)
+        self.metrics.emit(name, value, unit, dimensions=dims, properties=props)
 
-        # Optionally emit global version
         if emit_global:
-            global_props = properties or {}
+            global_dims = dict(dimensions or {})
+            global_props = dict(properties or {})
             if include_update_properties:
                 global_props |= properties_from_update(self.telegram_update)
-            global_logger = self.metrics_engine.get_logger(NULL_DIMENSIONALITY, global_props)
-            global_logger.put_metric(str(name), value, unit.value)
+            self.metrics.emit(name, value, unit, dimensions=global_dims, properties=global_props)
 
     def put_feature_metric(
         self,
         feature: Feature,
         value: float = 1.0,
         name: str | MetricKey = MetricKey.COUNT,
-        unit: Unit = Unit.COUNT,
+        unit: MetricUnit = MetricUnit.COUNT,
         dimensions: dict[str, str] | None = None,
-        properties: dict[str, str | int | float | None] | None = None,
+        properties: dict[str, Any] | None = None,
         with_handler_dimensions: bool = False,
         with_update_properties: bool = True,
     ):
@@ -338,13 +324,12 @@ class MitupContext(
         self.emit_metric(
             MetricKey.TIME.with_prefix(prefix, separator=""),
             elapsed_time,
-            Unit.MILLISECONDS,
+            MetricUnit.MILLISECONDS,
             include_handler_dimensions=handler_metrics,
         )
 
     async def flush_metrics(self):
-        # If we are requesting to flush a stand alone metrics logger, flush it
-        await self.metrics_engine.flush_metrics()
+        await self.metrics.flush()
 
     @classmethod
     def from_update(
@@ -354,6 +339,6 @@ class MitupContext(
     ) -> MitupContext:
         assert isinstance(update, Update), "This should never happen, type is always Update in Mitupbot"
 
-        engine = MitupMetricsEngine[MitupMetricsLogger](logger_provider=lambda ep: MitupMetricsLogger(ep))
+        metrics = MetricsClient(EmfBackend())
 
-        return MitupContext(application, update=update, metrics_engine=engine, api=TelegramApi())
+        return MitupContext(application, update=update, metrics=metrics, api=TelegramApi())

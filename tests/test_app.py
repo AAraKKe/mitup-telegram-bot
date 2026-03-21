@@ -67,7 +67,7 @@ def _patch_runtime_deps() -> Generator[RuntimeDeps]:
         mock.patch("mitup_bot.app.Application.builder") as mock_builder,
         mock.patch("mitup_bot.app.db.configure_db") as mock_db,
         mock.patch("mitup_bot.app.timezone_api.configure") as mock_tz,
-        mock.patch("mitup_bot.app.configure_metrics") as mock_metrics,
+        mock.patch("mitup_bot.app.configure_emf_backend") as mock_metrics,
         mock.patch("mitup_bot.app.HandlersRegistry") as mock_registry,
     ):
         builder_instance = mock.MagicMock()

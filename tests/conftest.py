@@ -15,7 +15,8 @@ from mitup_bot.cli.cli_commands import MitupCliCommand
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
-from mitup_bot.monitoring.metrics import configure_metrics
+from mitup_bot.monitoring import MetricsClient, NullBackend
+from mitup_bot.monitoring.backend import configure_emf_backend
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
@@ -27,6 +28,7 @@ from tests.helpers.context import build_context
 from tests.helpers.conversation import ConversationTester
 from tests.helpers.fixtures import UpdateRequest, create_meetup, create_test_app, create_update
 from tests.helpers.handler_context import HandlerContext
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 from tests.helpers.types import CliRunner as TypeRunner
 from tests.helpers.types import StubMitupContext
@@ -229,19 +231,29 @@ def cli() -> TypeRunner:
 
 
 @pytest.fixture
-def context(app: Application, update: Update) -> StubMitupContext:
-    return build_context(update, app)
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend())
+
+
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
+
+
+@pytest.fixture
+def context(app: Application, update: Update, metrics_client: MetricsClient) -> StubMitupContext:
+    return build_context(update, app, metrics=metrics_client)
 
 
 @pytest.fixture(autouse=True, scope="session")
 def configure_test_metrics():
     """Make sure metrics are always configured during test session"""
-    configure_metrics(MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False))
+    configure_emf_backend(MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False))
 
 
 @pytest.fixture
-def handler_context(update: Update, app: Application) -> HandlerContext:
-    return HandlerContext(update=update, app=app)
+def handler_context(update: Update, app: Application, metrics_client: MetricsClient) -> HandlerContext:
+    return HandlerContext(update=update, app=app, metrics_client=metrics_client)
 
 
 @pytest.fixture(autouse=True, scope="session")

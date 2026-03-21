@@ -25,7 +25,9 @@ def bot() -> AsyncMock:
 
 @pytest.fixture
 def adapter(bot: AsyncMock) -> BotAdapter:
-    return BotAdapter(bot=bot)
+    from mitup_bot.monitoring import MetricsClient, NullBackend
+
+    return BotAdapter(bot=bot, metrics=MetricsClient(NullBackend()))
 
 
 @pytest.fixture
@@ -502,7 +504,9 @@ async def test_update_meeting_messages_state_flag_propagated(
 
 
 async def test_bot_adapter_flush_metrics(bot: AsyncMock):
-    adapter = BotAdapter(bot=bot)
+    from mitup_bot.monitoring import MetricsClient, NullBackend
+
+    adapter = BotAdapter(bot=bot, metrics=MetricsClient(NullBackend()))
     await adapter.flush_metrics()
 
 

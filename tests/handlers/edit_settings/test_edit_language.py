@@ -1,18 +1,17 @@
 from math import ceil
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 
-from mitup_bot.exceptions import InvalidLanguageError
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.models import User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
 from tests.helpers import AnyFloat, MockDbSession, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers.monitoring import MetricAssertions
 
 
 def language_buttons(lang: str) -> list[ButtonConfig]:
@@ -108,19 +107,16 @@ async def test_set_language_fails_if_id_invalid(
     mock_session: MockDbSession,
     user: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
-
-    context.metrics_engine.assert_metrics_emited(
-        [
-            MetricKey.FAULT.with_prefix("InvalidLanguageError"),
-            MetricKey.FAULT,
-            MetricKey.TIME,
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        [1, 1, AnyFloat(), 0],
-        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        exception=InvalidLanguageError,
+    context, _ = await call_handler(
+        EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app, metrics_client=metrics_client
     )
+
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("InvalidLanguageError"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)

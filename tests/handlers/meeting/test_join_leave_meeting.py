@@ -1,14 +1,14 @@
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import MitupView
 from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler, create_meetup
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
@@ -16,6 +16,7 @@ async def test_existing_user_joins_own_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -35,7 +36,7 @@ async def test_existing_user_joins_own_meeting(
     mock_session.assert_flushed()
 
     # We have emited a feature metric for user joined
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.JOIN_MEETING)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
@@ -57,6 +58,7 @@ async def test_user_already_join_does_not_join(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -75,7 +77,7 @@ async def test_user_already_join_does_not_join(
     mock_session.assert_flushed()
 
     # No feature metric has been emitted
-    context.metrics_engine.assert_feature_metrics_not_emitted(Feature.JOIN_MEETING)
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
@@ -90,6 +92,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     owner = User(first_name="Owner", tg_user_id=1, settings=Settings())
     meeting = create_meetup(id=123, title="My Meeting", max_members=1, waiting_list=False, owner=owner)
@@ -104,7 +107,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     mock_session.assert_flushed()
 
     # No feature metric has been emitted
-    context.metrics_engine.assert_feature_metrics_not_emitted(Feature.JOIN_MEETING)
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
@@ -119,6 +122,7 @@ async def test_user_join_for_non_existing_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -126,12 +130,10 @@ async def test_user_join_for_non_existing_meeting(
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # No feature metric has been emitted
-    context.metrics_engine.assert_metrics_emited(
-        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-        [1.0, 0.0, AnyFloat(), 0],
-        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=False,
-    )
+    metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
     # The user has been notified
     context.api.assert_edit_message_called(
@@ -168,6 +170,7 @@ async def test_user_leaves_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -180,7 +183,7 @@ async def test_user_leaves_meeting(
     assert not meeting.has_participant(user_with_settings.db_id)
 
     # We have emited a feature metric for user left
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.LEAVE_MEETING)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.LEAVE_MEETING)})
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
@@ -225,6 +228,7 @@ async def test_user_leave_for_non_existing_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -232,12 +236,10 @@ async def test_user_leave_for_non_existing_meeting(
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # No feature metric has been emitted
-    context.metrics_engine.assert_metrics_emited(
-        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-        [1.0, 0.0, AnyFloat(), 0],
-        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=False,
-    )
+    metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
     # The user has been notified
     context.api.assert_edit_message_called(

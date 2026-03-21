@@ -52,7 +52,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1)
     context.emit_metric(MetricKey.FAULT, 1, emit_global=True)
 
-    context.metrics_engine.add_stack_trace()
+    context.metrics.add_stack_trace()
 
     # If we are in development mode, lets print the exception when it happens
     if env is Env.DEV:  # pragma: no cover

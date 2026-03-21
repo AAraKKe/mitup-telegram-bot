@@ -18,6 +18,7 @@ from mitup_bot.monitoring import Feature
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import StubMitupContext
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -44,6 +45,7 @@ async def test_show_main_menu(
 async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
     update: Update,
     context: StubMitupContext,
+    metrics: MetricAssertions,
     user_with_settings: User,
     mock_session: MockDbSession,
 ):
@@ -57,11 +59,10 @@ async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
     await context.flush_metrics()
 
     context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
-    context.metrics_engine.assert_metrics_emited(
-        names=["Cancel"],
-        values=[1],
-        dimensions={"Feature": Feature.CREATE_MEETING},
-        add_handler_dimensions=False,  # Assuming this was intentional
+    metrics.assert_emitted(
+        name="Cancel",
+        value=1,
+        dimensions={"Feature": str(Feature.CREATE_MEETING)},
     )
 
 

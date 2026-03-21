@@ -7,10 +7,9 @@ from telegram.ext import Application
 from mitup_bot.custom_context import MitupContext, MitupUserData
 
 from .api import MockApi
-from .monitoring import StubMetricsEngine
 from .stub_bot import StubBot
 
-StubMitupContext = MitupContext[StubBot, MockApi, StubMetricsEngine]
+StubMitupContext = MitupContext[StubBot, MockApi]
 """MitupContext type for testing purposes"""
 
 StubMitupApp = Application[StubBot, StubMitupContext, MitupUserData, dict, dict, None]

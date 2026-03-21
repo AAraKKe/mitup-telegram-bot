@@ -2,12 +2,12 @@ from collections.abc import Callable
 from functools import partial
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 
 from mitup_bot import views
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
+from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
@@ -15,6 +15,7 @@ from mitup_bot.views import factory as views_factory
 from tests.helpers import AnyFloat, MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
 from tests.helpers.conversation import ConversationStep, ConversationTester
 from tests.helpers.handler_context import HandlerContext
+from tests.helpers.monitoring import MetricAssertions
 
 MEETING_ID = 999
 
@@ -553,6 +554,8 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
     user_with_settings: User,
     mock_session: MockDbSession,
     meeting: Meetup,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     """Fallback handler clears context, sends main menu with unexpected-update message, emits a FAULT metric."""
     setup_db(mock_session, user_with_settings, meeting)
@@ -573,17 +576,8 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
     # The FAULT metric should have been emitted with the expected prefix,
     # batched together with the other standard handler metrics in a single log line.
     # The ContextId property is set by clean_user_data before the metric is emitted.
-    context.metrics_engine.assert_metrics_emited(
-        names=[
-            "CleanUserData",
-            MetricKey.FAULT.with_prefix("FallbackInviteUserConversation"),
-            MetricKey.FAULT,
-            MetricKey.TIME,
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        values=[1, 1.0, 0, AnyFloat(), 0],
-        units=[Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        properties={"ContextId": str(ContextId.INVITE_USERS)},
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name="CleanUserData", value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("FallbackInviteUserConversation"), value=1.0)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)

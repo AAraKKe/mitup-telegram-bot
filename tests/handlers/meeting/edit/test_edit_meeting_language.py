@@ -3,12 +3,13 @@ from telegram import Update
 
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Message, User
-from mitup_bot.monitoring import Feature
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import factory
 from tests.helpers import StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -53,6 +54,8 @@ async def test_callback_set_meeting_language(
     new_language_idx: int,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     """Test that setting a meeting language updates the meeting and its messages."""
     # Start with a meeting in English
@@ -66,7 +69,9 @@ async def test_callback_set_meeting_language(
     message2 = Message(message_id=222, chat_id=222, meetup=meeting)
     meeting.messages.extend([message1, message2])
 
-    context, _ = await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app, metrics_client=metrics_client
+    )
 
     # Verify the language was updated
     expected_language = SUPPORTED_LANGUAGES[new_language_idx]
@@ -91,7 +96,7 @@ async def test_callback_set_meeting_language(
     context.api.assert_update_meeting_messages_called(mock_session, meeting)
 
     # Verify feature metric was emitted
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.MEETING_LANGUAGE_SET)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.MEETING_LANGUAGE_SET)})
 
 
 @pytest.mark.parametrize(

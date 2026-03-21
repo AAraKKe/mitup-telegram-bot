@@ -14,10 +14,11 @@ from mitup_bot.handlers.registration_process.enums import (
     RegistrationProcessHandlerId,
 )
 from mitup_bot.models import User
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views import factory
 from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -28,6 +29,8 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     app: StubMitupApp,
     get_timezone_from_api: mock.MagicMock,
     user_with_settings: User,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     get_timezone_from_api.return_value = cast(Message, update.effective_message).text
@@ -35,7 +38,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     assert user_with_settings.settings.timezone != cast(Message, update.effective_message).text
 
     context, result = await call_handler(
-        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app
+        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app, metrics_client=metrics_client
     )
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(
@@ -49,19 +52,9 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     assert user_with_settings.settings.timezone == cast(Message, update.effective_message).text
     context.api.assert_send_message_called(update, view)
     assert result == ConversationHandler.END
-    context.metrics_engine.assert_metrics_emited(
-        names=[MetricKey.COUNT, MetricKey.ERROR],
-        values=[1, 0],
-        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
-        add_handler_dimensions=False,
-    )
-
-    context.metrics_engine.assert_metrics_emited(
-        names=[MetricKey.COUNT],
-        values=[1],
-        dimensions={"Feature": Feature.NEW_USER_REGISTERED},
-        add_handler_dimensions=False,
-    )
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
+    metrics.assert_emitted(name=MetricKey.ERROR, value=0, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.NEW_USER_REGISTERED)})
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(message_text="some text")]), indirect=True)
@@ -72,6 +65,8 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     get_timezone_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -80,7 +75,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     assert update.effective_message is not None
 
     context, result = await call_handler(
-        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app
+        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app, metrics_client=metrics_client
     )
 
     assert (
@@ -92,18 +87,9 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
         update, SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang)
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
-    context.metrics_engine.assert_metrics_emited(
-        names=[MetricKey.COUNT, MetricKey.ERROR],
-        values=[1, 1],
-        dimensions={"Feature": Feature.TIMEZONE_WITH_MESSAGE},
-        add_handler_dimensions=False,
-    )
-    context.metrics_engine.assert_metrics_not_emited(
-        names=[MetricKey.COUNT],
-        values=[1],
-        dimensions={"Feature": Feature.NEW_USER_REGISTERED},
-        add_handler_dimensions=False,
-    )
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
+    metrics.assert_emitted(name=MetricKey.ERROR, value=1, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.NEW_USER_REGISTERED)})
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)

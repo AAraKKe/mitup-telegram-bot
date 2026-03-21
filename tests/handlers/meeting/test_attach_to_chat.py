@@ -1,11 +1,10 @@
 import pytest
-from aws_embedded_metrics.unit import Unit
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.meeting.attach_to_chat import _is_already_attached
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.utils.messages import MeetingMessages
 from tests.helpers import (
     AnyFloat,
@@ -16,6 +15,7 @@ from tests.helpers import (
     create_meetup,
     create_message,
 )
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.mark.parametrize(
@@ -27,6 +27,7 @@ async def test_attach_to_chat_new_message(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When the message is not yet tracked, a new Message is created with chat_instance."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -50,7 +51,7 @@ async def test_attach_to_chat_new_message(
     )
 
     # Feature metric emitted
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.ATTACH_TO_CHAT)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
@@ -69,6 +70,7 @@ async def test_attach_to_chat_existing_message_without_chat_instance(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When a tracked message already exists but has no chat_instance, it gets updated."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -91,7 +93,7 @@ async def test_attach_to_chat_existing_message_without_chat_instance(
         show_alert=True,
     )
 
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.ATTACH_TO_CHAT)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
 @pytest.mark.parametrize(
@@ -103,6 +105,7 @@ async def test_attach_to_chat_already_attached_in_other_chat(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When the meeting is attached in a different chat, a new message is created with the current chat_instance."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -135,7 +138,7 @@ async def test_attach_to_chat_already_attached_in_other_chat(
         show_alert=True,
     )
 
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.ATTACH_TO_CHAT)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
 @pytest.mark.parametrize(
@@ -147,6 +150,7 @@ async def test_attach_to_chat_already_attached_in_same_chat(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When the meeting is already attached to this chat via another message, show 'already searchable' alert."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -170,7 +174,7 @@ async def test_attach_to_chat_already_attached_in_same_chat(
         show_alert=True,
     )
 
-    context.metrics_engine.assert_feature_metrics_emitted(Feature.ATTACH_TO_CHAT)
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
 @pytest.mark.parametrize(
@@ -182,6 +186,7 @@ async def test_attach_to_chat_meeting_not_found(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When the meeting no longer exists, inform the user and emit stale metric."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -196,14 +201,12 @@ async def test_attach_to_chat_meeting_not_found(
     )
 
     # Stale meeting metric emitted
-    context.metrics_engine.assert_metrics_emited(
-        [MetricKey.STALE_MEETING_MESSAGE, MetricKey.FAULT, MetricKey.TIME, MetricKey.DB_CONNECTIONS_LEAKED],
-        [1.0, 0.0, AnyFloat(), 0],
-        [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT],
-        add_handler_dimensions=False,
-    )
+    metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
-    context.metrics_engine.assert_feature_metrics_not_emitted(Feature.ATTACH_TO_CHAT)
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
 def test_is_already_attached_returns_false_when_chat_instance_is_none():

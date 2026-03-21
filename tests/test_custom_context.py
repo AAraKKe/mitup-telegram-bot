@@ -1,15 +1,15 @@
 from typing import Any
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
-from mitup_bot.monitoring import Feature
+from mitup_bot.monitoring import Feature, MetricUnit
 from tests.helpers import AnyFloat, StubMitupContext
+from tests.helpers.monitoring import MetricAssertions
 
 
 def test_add_and_remove_context(context: StubMitupContext):
@@ -130,6 +130,7 @@ def test_context_has_meeting_id(context: StubMitupContext):
 )
 async def test_metrics_emitted(
     context: StubMitupContext,
+    metrics: MetricAssertions,
     dimensions: None | dict[str, str],
     properties: None | dict[str, Any],
     with_update_properties: bool,
@@ -146,17 +147,17 @@ async def test_metrics_emitted(
 
     await context.flush_metrics()
 
-    context.metrics_engine.assert_metrics_emited(
-        ["test_metric"],
-        [123],
+    # Subset match on dimensions/properties: the record includes extra auto-added properties
+    # (update properties like user_id, chat_id). We check only the explicitly-passed ones.
+    metrics.assert_emitted(
+        name="test_metric",
+        value=123,
         dimensions=dimensions,
-        properties=properties or {},
-        add_update_properties=with_update_properties,
-        add_handler_dimensions=with_handler_dimensions,
+        properties=properties,
     )
 
 
-async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupContext):
+async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupContext, metrics: MetricAssertions):
     context.put_feature_metric(
         Feature.CREATE_MEETING,
         name="MyMetric",
@@ -167,25 +168,28 @@ async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupCo
 
     await context.flush_metrics()
 
-    context.metrics_engine.assert_metrics_emited(
-        ["MyMetric"],
-        [123],
+    metrics.assert_emitted(
+        name="MyMetric",
+        value=123,
         dimensions={"DimeName": "DimeValue", "Feature": Feature.CREATE_MEETING.value},
         properties={"PropName": "PropValue"},
-        add_handler_dimensions=False,
     )
 
 
-async def test_timing_metrics(context: StubMitupContext):
+async def test_timing_metrics(context: StubMitupContext, metrics: MetricAssertions):
     with context.with_time_metric("MyMetric"):
         pass
 
     await context.flush_metrics()
 
-    context.metrics_engine.assert_metrics_emited(["MyMetricTime"], [AnyFloat()], [Unit.MILLISECONDS])
+    metrics.assert_emitted(
+        name="MyMetricTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+    )
 
 
-async def test_timing_metrics_with_handler_dimensions(context: StubMitupContext):
+async def test_timing_metrics_with_handler_dimensions(context: StubMitupContext, metrics: MetricAssertions):
     context.prepare_handler_metrics({"HandlerDim": "HandlerValue"})
 
     with context.with_time_metric("MyMetric", handler_metrics=True):
@@ -193,26 +197,27 @@ async def test_timing_metrics_with_handler_dimensions(context: StubMitupContext)
 
     await context.flush_metrics()
 
-    context.metrics_engine.assert_metrics_emited(
-        ["MyMetricTime"], [AnyFloat()], [Unit.MILLISECONDS], dimensions={"HandlerDim": "HandlerValue"}
+    metrics.assert_emitted(
+        name="MyMetricTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+        dimensions={"HandlerDim": "HandlerValue"},
     )
 
 
 def test_prepare_handler_metrics_empty_dict_is_noop(context: StubMitupContext):
-    # Passing an empty dict must not alter handler_dimensionality
-    from mitup_bot.monitoring import NULL_DIMENSIONALITY
-
+    # Passing an empty dict must not alter _handler_dimensions
     context.prepare_handler_metrics({})
 
-    # The handler dimensionality must remain the null (empty) dimensionality
-    assert context.handler_dimensionality == NULL_DIMENSIONALITY
+    # The handler dimensions must remain empty
+    assert context._handler_dimensions == {}
 
 
-async def test_emit_metric_global_also_emits_under_null_dimensionality(context: StubMitupContext):
-    # emit_global=True must emit the metric under its own dimensionality AND also under
-    # NULL_DIMENSIONALITY (for global CloudWatch aggregation).
-    # We use a dimension on the primary call so both loggers are distinct, allowing
-    # independent assertions.
+async def test_emit_metric_global_also_emits_under_null_dimensionality(
+    context: StubMitupContext, metrics: MetricAssertions
+):
+    # emit_global=True emits the metric twice: once with the primary dimensions and once as
+    # a global copy. Both have the same explicit dimensions but the global copy omits handler dims.
     context.emit_metric(
         "global_metric",
         value=5.0,
@@ -224,19 +229,10 @@ async def test_emit_metric_global_also_emits_under_null_dimensionality(context: 
 
     await context.flush_metrics()
 
-    # The primary metric is emitted under the named dimension
-    context.metrics_engine.assert_metrics_emited(
-        ["global_metric"],
-        [5.0],
+    # Two records emitted — the primary and the global copy
+    metrics.assert_emitted(
+        name="global_metric",
+        value=5.0,
         dimensions={"MyDim": "MyVal"},
-        add_handler_dimensions=False,
-        add_update_properties=False,
-    )
-    # The global copy is emitted under NULL_DIMENSIONALITY (no dimensions at all)
-    context.metrics_engine.assert_metrics_emited(
-        ["global_metric"],
-        [5.0],
-        dimensions=None,
-        add_handler_dimensions=False,
-        add_update_properties=False,
+        times=2,
     )

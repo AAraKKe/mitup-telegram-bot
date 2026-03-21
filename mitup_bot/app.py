@@ -12,7 +12,7 @@ from mitup_bot import db, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.monitoring.metrics import configure_metrics
+from mitup_bot.monitoring.backend import configure_emf_backend
 
 
 class MitupRuntime:
@@ -68,7 +68,7 @@ class MitupRuntime:
         timezone_api.configure(self.config.google_api)
 
     def __configure_metrics(self):
-        configure_metrics(self.config.metrics)
+        configure_emf_backend(self.config.metrics)
         logging.info(f"Metrics Configuration set: {self.config.metrics}")
 
     def __build_application(self) -> Application:

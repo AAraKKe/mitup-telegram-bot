@@ -11,11 +11,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Location, Update
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.exceptions import ContextPropertyNotSetError, MalformedCallbackData, UserNotFound
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
@@ -23,11 +21,13 @@ from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
 from mitup_bot.models import User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
-from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, create_meetup
+from tests.helpers.context import build_context
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 MEETING_ID_NOT_OWNED = 99
@@ -51,13 +51,6 @@ class ErrorMode(Enum):
 
 
 @dataclass
-class MetricsProperties:
-    metrics: list[str] = field(default_factory=list)
-    values: list[float | list[float]] = field(default_factory=list)
-    units: list[Unit] = field(default_factory=list)
-
-
-@dataclass
 class Context:
     handler_id: HandlerId
     update_request: UpdateRequest
@@ -72,14 +65,13 @@ class Context:
     )
     shows_deleted_message_when_not_found: bool = True  # False for handlers using user_owns_meeting directly
     meeting_id: dict[ContextId, int] | None = None  # Meeting id to store in the context data
-    metrics_emitted: MetricsProperties = field(default_factory=MetricsProperties)
-    metrics_properties: dict[str, str] | None = None
-    # Override metrics_properties when the meeting is not found. Uses _UNSET sentinel as default (falls back to
-    # metrics_properties). Set to None to explicitly pass no properties.
-    metrics_properties_not_found: dict[str, str] | None = field(default_factory=lambda: _UNSET)
-    # Override metrics_properties for the non-owner inactive meeting test. Uses _UNSET sentinel as default (falls back
-    # to metrics_properties). Set to None to explicitly pass no properties.
-    metrics_properties_non_owner_inactive: dict[str, str] | None = field(default_factory=lambda: _UNSET)
+    # Extra metric emissions for this handler (e.g. CleanUserData). Each is a (name, times) pair.
+    extra_metrics: list[tuple[str, int]] = field(default_factory=list)
+    # Override extra_metrics when the meeting is not found. Uses _UNSET sentinel as default (falls back to
+    # extra_metrics). Set to [] to explicitly assert no extra metrics.
+    extra_metrics_not_found: list[tuple[str, int]] | None = field(default_factory=lambda: _UNSET)
+    # Override extra_metrics for the non-owner inactive meeting test.
+    extra_metrics_non_owner_inactive: list[tuple[str, int]] | None = field(default_factory=lambda: _UNSET)
 
 
 CONTEXTS = [
@@ -124,10 +116,10 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="confirm_delete_meeting_datetime",
-        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
-        # When meeting not found: MeetingNotOwned/Error is never emitted, so the logger is fresh and
-        # captures ContextId='EditMeetingTitle' (first context cleaned by cleanup_states).
-        metrics_properties_not_found={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
+        # cleanup_states() emits 6 x CleanUserData when meeting is accessible but not owned
+        extra_metrics=[("CleanUserData", 6)],
+        # When meeting is not found, MeetingNotOwned/Error is never emitted, so CleanUserData is also emitted
+        extra_metrics_not_found=[("CleanUserData", 6)],
     ),
     Context(
         handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
@@ -147,10 +139,8 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="back_to_edit_meeting_from_datetime",
-        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
-        # When meeting not found: MeetingNotOwned/Error is never emitted, so the logger is fresh and
-        # captures ContextId='EditMeetingTitle' (first context cleaned by cleanup_states).
-        metrics_properties_not_found={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
+        extra_metrics=[("CleanUserData", 6)],
+        extra_metrics_not_found=[("CleanUserData", 6)],
     ),
     Context(
         handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
@@ -169,8 +159,7 @@ CONTEXTS = [
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_time_message",
-        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[1], units=[Unit.COUNT]),
-        metrics_properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
+        extra_metrics=[("CleanUserData", 1)],
         meeting_id={ContextId.EDIT_MEETING_TIME: 99},
     ),
     Context(
@@ -219,7 +208,6 @@ CONTEXTS = [
         handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        metrics_properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
         id="set_meeting_time_message",
     ),
     Context(
@@ -519,11 +507,10 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="confirm_delete_inactive_meeting_datetime",
-        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
-        # Owner path: no MeetingNotOwned/Error before cleanup_states → logger fresh → ContextId captured.
-        metrics_properties={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
-        # Non-owner path: MeetingNotOwned/Error emitted first → logger frozen without ContextId.
-        metrics_properties_non_owner_inactive=None,
+        # Owner path: cleanup_states emits 6 x CleanUserData
+        extra_metrics=[("CleanUserData", 6)],
+        # Non-owner path: MeetingNotOwned/Error is emitted before cleanup_states; CleanUserData is still emitted
+        extra_metrics_non_owner_inactive=[("CleanUserData", 6)],
     ),
     Context(
         handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
@@ -536,11 +523,8 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="back_to_edit_meeting_from_datetime_inactive",
-        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[[1, 1, 1, 1, 1, 1]], units=[Unit.COUNT]),
-        # Owner path: no MeetingNotOwned/Error before cleanup_states → logger fresh → ContextId captured.
-        metrics_properties={"ContextId": ContextId.EDIT_MEETING_TITLE.value},
-        # Non-owner path: MeetingNotOwned/Error emitted first → logger frozen without ContextId.
-        metrics_properties_non_owner_inactive=None,
+        extra_metrics=[("CleanUserData", 6)],
+        extra_metrics_non_owner_inactive=[("CleanUserData", 6)],
     ),
     Context(
         handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
@@ -604,16 +588,15 @@ CONTEXTS = [
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="cancel_edit_meeting_duration_malformed",
     ),
-    # DURATION_TEXT_MESSAGE: guards.current_user is called before context.meeting_id, so ContextId is only
-    # set in the metrics when the user is found. The two error modes need separate Context entries.
+    # DURATION_TEXT_MESSAGE: guards.current_user is called before context.meeting_id, so CleanUserData is only
+    # emitted when the user is found (MEETING_NOT_OWNED path).
     Context(
         handler_id=EditMeetingHandlerId.DURATION_TEXT_MESSAGE,
         update_request=UpdateRequest(message_text="90"),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="duration_text_message",
         meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
-        metrics_emitted=MetricsProperties(metrics=["CleanUserData"], values=[1], units=[Unit.COUNT]),
-        metrics_properties={"ContextId": ContextId.EDIT_MEETING_DURATION.value},
+        extra_metrics=[("CleanUserData", 1)],
         shows_deleted_message_when_not_found=False,
     ),
     Context(
@@ -624,14 +607,13 @@ CONTEXTS = [
         meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
         shows_deleted_message_when_not_found=False,
     ),
-    # DURATION_INVALID_MESSAGE: same — current_user before context.meeting_id (ensure_clean=False, no CleanUserData).
+    # DURATION_INVALID_MESSAGE: current_user before context.meeting_id (ensure_clean=False, no CleanUserData).
     Context(
         handler_id=EditMeetingHandlerId.DURATION_INVALID_MESSAGE,
         update_request=UpdateRequest(message_text="abc"),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="duration_invalid_message",
         meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
-        metrics_properties={"ContextId": ContextId.EDIT_MEETING_DURATION.value},
         shows_deleted_message_when_not_found=False,
     ),
     Context(
@@ -655,25 +637,14 @@ CONTEXTS = [
 # Factory methods
 # -------------------
 def handler_stop_for_accessing_meeting_not_owned_factory() -> list[Context]:
-    """
-    This factory should return a list of Context object for test cases where the handler should fail because the
-    meeting is not accessible. This is, the guards.meeting_accessible returns None.
-    Also used for testing when:
-    - user is not found
-    - meeting is not found
-    """
     return [context for context in CONTEXTS if ErrorMode.MEETING_NOT_OWNED in context.error_modes]
 
 
 def handler_stops_when_user_not_found() -> list[Context]:
-    # We can use the same as for meeting not owned because the user needs to
-    # be checked before the meeting ownership
     return [context for context in CONTEXTS if ErrorMode.USER_NOT_FOUND in context.error_modes]
 
 
 def handler_stops_when_meeting_not_found() -> list[Context]:
-    # We can use the same as for meeting not owned we with teh same context we just need
-    # not to register the meeting
     return [context for context in CONTEXTS if ErrorMode.MEETING_NOT_FOUND in context.error_modes]
 
 
@@ -682,18 +653,29 @@ def handler_stops_due_to_missing_user_data() -> list[Context]:
 
 
 def handler_stops_due_to_malformed_callback_data() -> list[Context]:
-    """
-    Provides context with callback data that would fail when being parsed
-    """
     return [context for context in CONTEXTS if ErrorMode.MALFORMED_CALLBACK_DATA in context.error_modes]
 
 
 def handler_shows_reactivation_prompt_for_inactive_meeting() -> list[Context]:
-    """
-    Provides context where the owner accesses an inactive meeting from the bot chat.
-    The handler should show a reactivation prompt instead of the normal view.
-    """
     return [context for context in CONTEXTS if ErrorMode.MEETING_INACTIVE_OWNER in context.error_modes]
+
+
+def _assert_handler_metrics(
+    metrics: MetricAssertions,
+    *,
+    fault_value: int,
+    extra_metrics: list[tuple[str, int]] | None = None,
+) -> None:
+    """Assert the standard handler metrics emitted by callback_with_metrics."""
+    # FAULT: emit_global=True means 2 records (with handler dims + without)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=fault_value, times=2)
+    # TIME: emit_global=True means 2 records
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    # DB_CONNECTIONS_LEAKED: emit_global=True means 2 records
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    # Extra metrics this handler emits
+    for metric_name, times in extra_metrics or []:
+        metrics.assert_emitted(name=metric_name, times=times)
 
 
 @pytest.mark.parametrize(
@@ -710,34 +692,25 @@ async def test_callback_fails_when_meeting_not_accessible(
     update: Update,
     app: StubMitupApp,
     user_with_settings: User,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED))
 
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    # This does not raise an exception but logs an error
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=test_context.metrics_properties,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    # MeetingNotOwned error metric is emitted
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    ctx.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -755,37 +728,26 @@ async def test_callback_fails_when_meeting_not_found(
     update: Update,
     app: StubMitupApp,
     user_with_settings: User,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    # This does not raise an exception but logs an error
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [0, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
+    extra = (
+        test_context.extra_metrics_not_found
+        if test_context.extra_metrics_not_found is not _UNSET
+        else test_context.extra_metrics
+    )
+    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
 
-    # When meeting is not found, use metrics_properties_not_found if explicitly set (not the _UNSET sentinel)
-    not_found_properties = (
-        test_context.metrics_properties_not_found
-        if test_context.metrics_properties_not_found is not _UNSET
-        else test_context.metrics_properties
-    )
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=not_found_properties,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
-    # The user is sent to the main menu
     keyboard = test_context.custom_keyboard or [
         [
             ButtonConfig(
@@ -794,7 +756,7 @@ async def test_callback_fails_when_meeting_not_found(
             )
         ]
     ]
-    context.api.assert_edit_message_called(
+    ctx.api.assert_edit_message_called(
         update,
         MitupView(
             description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
@@ -816,30 +778,22 @@ async def test_callback_fails_with_malformed_callback_data(
     test_context: Context,
     update: Update,
     app: StubMitupApp,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    # This does not raise an exception but logs an error
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.FAULT.with_prefix("MalformedCallbackData"),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=test_context.metrics_properties,
-        exception=MalformedCallbackData,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    # emit_global=True for FAULT means 2 records (FAULT=1 for handler dims + global)
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("MalformedCallbackData"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -852,31 +806,21 @@ async def test_callback_fails_when_user_is_not_found(
     test_context: Context,
     update: Update,
     app: StubMitupApp,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
-    # Do not register the user in the db and call the handler
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    # This does not raise an exception but logs an error
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.FAULT.with_prefix("UserNotFound"),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=test_context.metrics_properties,
-        exception=UserNotFound,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -892,35 +836,21 @@ async def test_callback_fails_when_missing_necessary_user_data(
     test_context: Context,
     update: Update,
     app: StubMitupApp,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
-    # If context data is needed it should be validated before having to hit the database.
-    # The fault should happen before testing if any object exists in the db and, therefore,
-    # there is no need to add any.
-    # If this test fails because the an object is not found in the database, it means that the
-    # validation is not happening in the right place and the callback needs to be updated.
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    # This does not raise an exception but logs an error
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [1, 1, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=test_context.metrics_properties,
-        exception=ContextPropertyNotSetError,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -937,38 +867,30 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
     update: Update,
     app: StubMitupApp,
     user_with_settings: User,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
     inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False)
     user_with_settings.meetups.append(inactive_meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [0, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
+    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
 
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=test_context.metrics_properties,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
     back_rows = (
         test_context.reactivation_back_keyboard_factory(user_with_settings.lang)
         if test_context.reactivation_back_keyboard_factory
         else None
     )
-    context.api.assert_edit_message_called(
+    ctx.api.assert_edit_message_called(
         update,
         factory.reactivation_prompt_view(
             lang=user_with_settings.lang, meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
@@ -990,38 +912,27 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     update: Update,
     app: StubMitupApp,
     user_with_settings: User,
+    metrics_client,
+    metrics: MetricAssertions,
 ):
     """Non-owner accessing an inactive meeting is redirected to main menu (not-owned behavior)."""
     inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False)
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(
-        test_context.handler_id, update=update, app=app, with_meeting_id=test_context.meeting_id
+    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
+    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
+        test_context.handler_id
     )
+    check_result = handler.check_update(update)
+    assert check_result is not None and check_result is not False
+    await handler.handle_update(update, app, check_result, ctx)
 
-    metric_names = test_context.metrics_emitted.metrics + [
-        MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
-        MetricKey.FAULT,
-        MetricKey.TIME,
-        MetricKey.DB_CONNECTIONS_LEAKED,
-    ]
-    metric_values = test_context.metrics_emitted.values + [1, 0, AnyFloat(), 0]
-    metric_units = test_context.metrics_emitted.units + [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-
-    # For the non-owner inactive path, MeetingNotOwned/Error is emitted before cleanup_states, so the
-    # logger is frozen without ContextId. Use the override if explicitly set (not the _UNSET sentinel).
-    non_owner_inactive_properties = (
-        test_context.metrics_properties_non_owner_inactive
-        if test_context.metrics_properties_non_owner_inactive is not _UNSET
-        else test_context.metrics_properties
+    extra = (
+        test_context.extra_metrics_non_owner_inactive
+        if test_context.extra_metrics_non_owner_inactive is not _UNSET
+        else test_context.extra_metrics
     )
-    context.metrics_engine.assert_metrics_emited(
-        names=metric_names,
-        values=metric_values,
-        units=metric_units,
-        properties=non_owner_inactive_properties,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
+    ctx.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))

@@ -2,7 +2,6 @@ import logging
 from asyncio import gather
 from contextlib import contextmanager
 
-from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session, and_, false, func, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.error import Forbidden
@@ -10,7 +9,7 @@ from telegram.error import Forbidden
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup
-from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 
@@ -45,7 +44,7 @@ async def send_started_notification(joined_link: JoinedUsers, api: TelegramApiWr
 
 
 @db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
+async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Send a notification to all participants when a meeting's scheduled time has arrived."""
     meetings = session.exec(MEETINGS_TO_NOTIFY_STARTED_STATEMENT).all()
     meetings_processed = 0
@@ -53,7 +52,7 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLo
     failed = 0
     failed_details: list[str] = []
 
-    metrics.put_metric(MetricKey.MEETINGS_STARTED_PROCESSED.value, len(meetings), unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.MEETINGS_STARTED_PROCESSED, len(meetings), MetricUnit.COUNT)
 
     for meeting in meetings:
         try:
@@ -85,11 +84,13 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLo
                 f"Failed to process meeting (meeting: {meeting.id}, owner: {meeting.owner_id}): {error}"
             )
 
-    if failed_details:
-        metrics.set_property("failed_details", failed_details)
-
-    metrics.put_metric(MetricKey.STARTED_NOTIFICATIONS_SENT.value, sent, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.STARTED_NOTIFICATIONS_FAILED.value, failed, unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.STARTED_NOTIFICATIONS_SENT, sent, MetricUnit.COUNT)
+    metrics.emit(
+        MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        failed,
+        MetricUnit.COUNT,
+        properties={"failed_details": failed_details} if failed_details else None,
+    )
 
     if failed:
         raise RuntimeError(f"Failed to process started notifications for {failed} items. Check logs for more details.")

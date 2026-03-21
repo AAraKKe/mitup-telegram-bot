@@ -2,50 +2,65 @@ import datetime as dt
 from unittest.mock import ANY
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 
 from mitup_bot.cli import inactive_meetings
 from mitup_bot.cli.commands.recurrent_events import EventType
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
 from tests.helpers import (
     MockApi,
     MockDbSession,
-    StubMetrics,
     create_joined_link,
     create_meetup,
     create_settings,
     create_user,
 )
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
-def metrics() -> StubMetrics:
-    metrics = StubMetrics([])
-    metrics.set_dimensions({"EventType": EventType.DEACTIVATE_MEETINGS.value})
-    return metrics
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value})
 
 
-async def test_no_meetings_to_deactivate(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
+
+
+async def test_no_meetings_to_deactivate(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, ())
-    await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     api.assert_method_just_called("update_meeting_messages", times=0)
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETINGS_TO_DEACTIVATE, MetricKey.MEETINGS_DEACTIVATED, MetricKey.MEETINGS_DEACTIVATION_FAILED],
-        [0, 0, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_TO_DEACTIVATE,
+        value=0,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=0,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
 
 
-async def test_single_meeting_deactivated(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_single_meeting_deactivated(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     meeting = create_meetup(id=1, title="Test Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting,))
-    await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     assert meeting.active is False
     assert meeting.expiration_time is not None
@@ -57,15 +72,26 @@ async def test_single_meeting_deactivated(mock_session: MockDbSession, metrics: 
     assert call_kwargs["meeting"] is meeting
     assert call_kwargs["session"] is mock_session
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETINGS_TO_DEACTIVATE, MetricKey.MEETINGS_DEACTIVATED, MetricKey.MEETINGS_DEACTIVATION_FAILED],
-        [1, 1, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_TO_DEACTIVATE,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
 
 
-async def test_meeting_with_invited_users(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_meeting_with_invited_users(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     meeting = create_meetup(id=1, title="Test Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
@@ -78,8 +104,8 @@ async def test_meeting_with_invited_users(mock_session: MockDbSession, metrics: 
     create_joined_link(user=invited_user, meetup=meeting, id=2)
 
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting,))
-    await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     assert meeting.active is False
 
@@ -87,15 +113,26 @@ async def test_meeting_with_invited_users(mock_session: MockDbSession, metrics: 
     assert "DELETE FROM users WHERE users.id IN (3)" in mock_session.queries_executed
     assert f"DELETE FROM messages WHERE messages.meetup_id = {meeting.id}" in mock_session.queries_executed
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETINGS_TO_DEACTIVATE, MetricKey.MEETINGS_DEACTIVATED, MetricKey.MEETINGS_DEACTIVATION_FAILED],
-        [1, 1, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_TO_DEACTIVATE,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
 
 
-async def test_api_failure_raises_runtime_error(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_api_failure_raises_runtime_error(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     meeting_ok = create_meetup(id=1, title="OK Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting_ok], settings=create_settings(id=1))
 
@@ -110,9 +147,9 @@ async def test_api_failure_raises_runtime_error(mock_session: MockDbSession, met
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("API timeout")]
 
     with pytest.raises(RuntimeError, match="Failed to deactivate 1 meetings"):
-        await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
-    await metrics.flush()
+    await metrics_client.flush()
 
     # First meeting should still be deactivated
     assert meeting_ok.active is False
@@ -121,16 +158,27 @@ async def test_api_failure_raises_runtime_error(mock_session: MockDbSession, met
     # Second meeting should remain active since its processing failed
     assert meeting_fail.active is True
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETINGS_TO_DEACTIVATE, MetricKey.MEETINGS_DEACTIVATED, MetricKey.MEETINGS_DEACTIVATION_FAILED],
-        [2, 1, 1],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_TO_DEACTIVATE,
+        value=2,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        value=1,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
         properties={"failed_details": ANY},
     )
 
 
-async def test_multiple_meetings_deactivated(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_multiple_meetings_deactivated(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     meeting_a = create_meetup(id=1, title="Meeting A")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting_a], settings=create_settings(id=1))
 
@@ -139,17 +187,26 @@ async def test_multiple_meetings_deactivated(mock_session: MockDbSession, metric
 
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting_a, meeting_b))
 
-    await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     assert meeting_a.active is False
     assert meeting_b.active is False
     assert meeting_a.expiration_time is not None
     assert meeting_b.expiration_time is not None
 
-    metrics.assert_metrics_emited(
-        [MetricKey.MEETINGS_TO_DEACTIVATE, MetricKey.MEETINGS_DEACTIVATED, MetricKey.MEETINGS_DEACTIVATION_FAILED],
-        [2, 2, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_TO_DEACTIVATE,
+        value=2,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=2,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )

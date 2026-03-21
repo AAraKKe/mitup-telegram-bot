@@ -2,7 +2,6 @@ from typing import cast
 from unittest import mock
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.error import BadRequest
 
@@ -14,16 +13,17 @@ from mitup_bot.api_wrapper import (
 )
 from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.models import Meetup, Message, MessageButtons, User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import AnyFloat, MockDbSession, StubMitupContext, create_meetup
 from tests.helpers.context import build_context
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
-def context(app, update):
+def context(app, update, metrics_client: MetricsClient):
     """Override the global context fixture and inject real API wrapper."""
-    context = build_context(update, app)
+    context = build_context(update, app, metrics=metrics_client)
     # We want to test the real wrapper here, not the mock
     api = TelegramApi()
     api.adapter = cast(ContextOrBotAdapter, context)
@@ -33,14 +33,14 @@ def context(app, update):
     return context
 
 
-async def assert_time_metric_emitted(context: StubMitupContext):
-    await context.flush_metrics()
+async def assert_time_metric_emitted(context: StubMitupContext, metrics: MetricAssertions, times: int = 1):
+    await context.metrics.flush()
 
-    context.metrics_engine.assert_metrics_emited(
-        ["TelegramApiTime"],
-        [AnyFloat()],
-        [Unit.MILLISECONDS],
-        add_handler_dimensions=False,
+    metrics.assert_emitted(
+        name="TelegramApiTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+        times=times,
     )
 
 
@@ -80,7 +80,9 @@ async def test_clear_reply_markup_raises_no_message_available_with_callback_quer
         await context.api.clear_reply_markup(update)
 
 
-async def test_send_message_with_a_view(context: StubMitupContext, update: Update, default_view: MitupView):
+async def test_send_message_with_a_view(
+    context: StubMitupContext, update: Update, default_view: MitupView, metrics: MetricAssertions
+):
     assert context.telegram_update.effective_chat is not None
 
     await context.api.send_message(update=update, view=default_view)
@@ -93,10 +95,10 @@ async def test_send_message_with_a_view(context: StubMitupContext, update: Updat
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics)
 
 
-async def test_send_message_without_view(context: StubMitupContext, update: Update):
+async def test_send_message_without_view(context: StubMitupContext, update: Update, metrics: MetricAssertions):
     assert context.telegram_update.effective_chat is not None
 
     await context.api.send_message(update=update, view="Hello, World")
@@ -109,10 +111,12 @@ async def test_send_message_without_view(context: StubMitupContext, update: Upda
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics)
 
 
-async def test_send_message_with_entities(context: StubMitupContext, update: Update, view_with_entities: MitupView):
+async def test_send_message_with_entities(
+    context: StubMitupContext, update: Update, view_with_entities: MitupView, metrics: MetricAssertions
+):
     assert context.telegram_update.effective_chat is not None
 
     await context.api.send_message(update=update, view=view_with_entities)
@@ -125,10 +129,12 @@ async def test_send_message_with_entities(context: StubMitupContext, update: Upd
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics)
 
 
-async def test_edit_message_with_entities(view_with_entities: MitupView, update: Update, context: StubMitupContext):
+async def test_edit_message_with_entities(
+    view_with_entities: MitupView, update: Update, context: StubMitupContext, metrics: MetricAssertions
+):
     assert update.effective_message is not None
 
     await context.api.edit_message(update=update, view=view_with_entities)
@@ -143,10 +149,12 @@ async def test_edit_message_with_entities(view_with_entities: MitupView, update:
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics)
 
 
-async def test_edit_message_with_a_view(default_view: MitupView, update: Update, context: StubMitupContext):
+async def test_edit_message_with_a_view(
+    default_view: MitupView, update: Update, context: StubMitupContext, metrics: MetricAssertions
+):
     assert update.effective_message is not None
 
     await context.api.edit_message(update=update, view=default_view)
@@ -161,10 +169,10 @@ async def test_edit_message_with_a_view(default_view: MitupView, update: Update,
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics)
 
 
-async def test_edit_message_without_view(update: Update, context: StubMitupContext):
+async def test_edit_message_without_view(update: Update, context: StubMitupContext, metrics: MetricAssertions):
     await context.api.edit_message(update=update, view="Hello, World")
 
     context.bot.edit_message_text.assert_called_once_with(
@@ -177,10 +185,12 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics)
 
 
-async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession):
+async def test_edit_meetup_messages(
+    user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
     meeting = create_meetup(id=123, owner=user_with_settings, title="Test meeting", description="Test description")
     # Message in the chat with the owner
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
@@ -243,7 +253,7 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
         ]
     )
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics, times=3)  # one metric per edit call
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in MESSAGE_NOT_FOUND_ERROR_PATTERNS])
@@ -252,6 +262,7 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
     context: StubMitupContext,
     mock_session: MockDbSession,
     bad_request_message: str,
+    metrics: MetricAssertions,
 ):
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
@@ -270,16 +281,15 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 
     await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
     # Since this is outside a callback, make sure we flush metrics
-    await context.flush_metrics()
+    await context.metrics.flush()
 
     assert edit.call_count == 2
     mock_session.assert_deleted(meeting.messages[0])
-    context.metrics_engine.assert_metrics_emited(
-        [MetricKey.MESSAGE_DELETED, "TelegramApiTime"],
-        [1, AnyFloat()],
-        [Unit.COUNT, Unit.MILLISECONDS],
-        add_handler_dimensions=False,
-    )
+
+    metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(
+        name="TelegramApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2
+    )  # one per edit attempt
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS])
@@ -288,6 +298,7 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
     context: StubMitupContext,
     mock_session: MockDbSession,
     bad_request_message: str,
+    metrics: MetricAssertions,
 ):
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
@@ -308,4 +319,4 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
 
     assert edit.call_count == 2
 
-    await assert_time_metric_emitted(context)
+    await assert_time_metric_emitted(context, metrics, times=2)  # one metric per edit call

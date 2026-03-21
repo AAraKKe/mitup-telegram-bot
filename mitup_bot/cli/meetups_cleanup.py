@@ -9,7 +9,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import Meetup, User
-from mitup_bot.monitoring import MetricKey, MitupMetricsLogger, Unit
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import ButtonConfig, MitupView
@@ -38,7 +38,7 @@ MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
 )
 
 
-async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger):
+async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiWrapper, metrics: MetricsClient):
     meetups = session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT).all()
 
     views: list[MitupView] = []
@@ -80,10 +80,10 @@ async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiW
 
     if views:
         await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
-    metrics.put_metric(MetricKey.MEETUPS_ABOUT_TO_BE_DELETED.value, len(meetups), unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.MEETUPS_ABOUT_TO_BE_DELETED, len(meetups), MetricUnit.COUNT)
 
 
-async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger):
+async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: MetricsClient):
     meetups = session.exec(MEETUPS_TO_DELETE_STATEMENT).all()
 
     views: list[MitupView] = []
@@ -121,11 +121,11 @@ async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: Mit
     deleted_count = len(meeting_ids)
     failed_count = len(meetups) - deleted_count
 
-    metrics.put_metric(MetricKey.MEETUPS_DELETED.value, len(meeting_ids), unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED), failed_count, unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.MEETUPS_DELETED, len(meeting_ids), MetricUnit.COUNT)
+    metrics.emit(MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED), failed_count, MetricUnit.COUNT)
 
 
 @db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
+async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     await notify_meetups_about_to_be_deleted(session, api, metrics)
     await delete_meetups(session, api, metrics)

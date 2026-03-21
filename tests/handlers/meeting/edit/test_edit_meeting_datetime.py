@@ -2,19 +2,17 @@ import datetime as dt
 from typing import cast
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from freezegun import freeze_time
 from telegram import CallbackQuery, Chat, Location, Message, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.exceptions import UserNotFound
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as _build_entry_view
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link
@@ -22,6 +20,7 @@ from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, DEFAULT_TEST_DATE, DEFAULT_TG_USER_PARAMS
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 TEST_MEETING_DATETIME_UTC = dt.datetime(2024, 12, 21, 12, 0, tzinfo=dt.UTC)
@@ -348,13 +347,17 @@ async def test_edit_meeting_time_callback(
     expected_response: int,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     if meeting.db_id == 10:
         user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.EDIT_TIME_CALLBACK, update=update, app=app)
+    context, response = await call_handler(
+        EditMeetingHandlerId.EDIT_TIME_CALLBACK, update=update, app=app, metrics_client=metrics_client
+    )
 
     assert response == expected_response
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) or expected_response == ConversationHandler.END
@@ -375,30 +378,16 @@ async def test_edit_meeting_time_callback(
     if expected_response == ConversationMeetingState.EDIT_TIME:
         context.api.assert_edit_message_called(update, expected_view)
 
-    # StoredMeetingId is emitted only if the meeting is accessible
-    names = [
-        MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
-        MetricKey.FAULT.value,
-        MetricKey.TIME.value,
-        MetricKey.DB_CONNECTIONS_LEAKED.value,
-    ]
-    values = [1 if expected_response == ConversationHandler.END else 0, 0, AnyFloat(), 0]
-    units = [Unit.COUNT, Unit.COUNT, Unit.MILLISECONDS, Unit.COUNT]
-    properties = None
-    if expected_response == ConversationMeetingState.EDIT_TIME:
-        names.append("StoredMeetingId")
-        values.append(1)
-        units.append(Unit.COUNT)
-        properties = {"ContextId": ContextId.EDIT_MEETING_TIME.value}
-
-    context.metrics_engine.assert_metrics_emited(
-        names=names,
-        values=values,
-        units=units,
-        properties=properties,
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    if expected_response == ConversationHandler.END:
+        metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    else:
+        metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
+        metrics.assert_emitted(
+            name="StoredMeetingId", value=1, properties={"ContextId": ContextId.EDIT_MEETING_TIME.value}
+        )
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -426,13 +415,19 @@ async def test_set_time_message_with_valid_time(
     expected_meeting_time: dt.datetime,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, response = await call_handler(
-        EditMeetingHandlerId.SET_TIME_MESSAGE, update=update, app=app, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+        EditMeetingHandlerId.SET_TIME_MESSAGE,
+        update=update,
+        app=app,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+        metrics_client=metrics_client,
     )
 
     assert response == ConversationHandler.END
@@ -444,20 +439,11 @@ async def test_set_time_message_with_valid_time(
     # Meeting id has been removed from context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    context.metrics_engine.assert_metrics_emited(
-        names=[
-            MetricKey.TIME,
-            MetricKey.FAULT,
-            "CleanUserData",
-            MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED),
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        values=[AnyFloat(), 0, 1, 0, 0],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
-        properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name="CleanUserData", value=1)
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
     context.api.assert_send_message_called(
         update,
@@ -482,6 +468,8 @@ async def test_set_time_message_with_invalid_time(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
     user_with_settings.meetups.append(meeting)
@@ -489,7 +477,11 @@ async def test_set_time_message_with_invalid_time(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, response = await call_handler(
-        EditMeetingHandlerId.SET_TIME_MESSAGE, update=update, app=app, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+        EditMeetingHandlerId.SET_TIME_MESSAGE,
+        update=update,
+        app=app,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+        metrics_client=metrics_client,
     )
 
     assert response == ConversationMeetingState.EDIT_TIME
@@ -503,16 +495,10 @@ async def test_set_time_message_with_invalid_time(
     # Message sent to retry
     context.api.assert_send_message_called(update, MeetingMessages.INVALID_TIME.get(lang=user_with_settings.lang))
 
-    context.metrics_engine.assert_handler_metrics_emitted(
-        names=[
-            MetricKey.TIME,
-            MetricKey.FAULT,
-            MetricKey.ERROR.with_prefix("InvalidTime"),
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        values=[AnyFloat(), 0, 1, 0],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT],
-    )
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("InvalidTime"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 def entry_point_update(update: Update):
@@ -542,13 +528,15 @@ async def test_conversation_fallback_with_wrong_message_format(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    # Lets first trigger the conversation
+    # Lets first trigger the conversation (use a separate client to not pollute the metrics we want to assert)
     context, _ = await call_handler(
         EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION,
         update=entry_point_update(update),
@@ -557,7 +545,9 @@ async def test_conversation_fallback_with_wrong_message_format(
     )
 
     # Now answer with a wrong message format
-    context, _ = await call_handler(EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, update=update, app=app, metrics_client=metrics_client
+    )
 
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
@@ -567,16 +557,10 @@ async def test_conversation_fallback_with_wrong_message_format(
         update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang), times=1
     )
 
-    context.metrics_engine.assert_handler_metrics_emitted(
-        names=[
-            MetricKey.TIME,
-            MetricKey.FAULT,
-            MetricKey.ERROR.with_prefix("WrongTimeFormat"),
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        values=[AnyFloat(), 0, 1, 0],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT],
-    )
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 @pytest.mark.parametrize(
@@ -800,33 +784,31 @@ async def test_datetime_state_fallbacks(
     expected_state: ConversationMeetingState,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     """Plain text and non-text messages in EDIT_DATETIME state return an error and stay in EDIT_DATETIME."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(handler_id, update=update, app=app)
+    context, response = await call_handler(handler_id, update=update, app=app, metrics_client=metrics_client)
 
     assert response == expected_state
     context.api.assert_send_message_called(
         update,
         MeetingMessages.WRONG_DATETIME_MESSAGE.get(lang=user_with_settings.lang, datetime_link=build_datetime_link()),
     )
-    context.metrics_engine.assert_handler_metrics_emitted(
-        names=[
-            MetricKey.TIME,
-            MetricKey.FAULT,
-            MetricKey.ERROR.with_prefix("WrongDatetimeFormat"),
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        values=[AnyFloat(), 0, 1, 0],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT],
-    )
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 async def test_date_time_entity_message_user_not_found(
     mock_session: MockDbSession,
     user_with_settings: User,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
     """DATE_TIME_ENTITY_MESSAGE raises UserNotFound when the user is not registered."""
     tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
@@ -838,23 +820,14 @@ async def test_date_time_entity_message_user_not_found(
         update=update,
         app=app,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        metrics_client=metrics_client,
     )
 
-    context.metrics_engine.assert_metrics_emited(
-        names=[
-            MetricKey.TIME,
-            MetricKey.FAULT.with_prefix("UserNotFound"),
-            MetricKey.FAULT,
-            "CleanUserData",
-            MetricKey.DB_CONNECTIONS_LEAKED,
-        ],
-        values=[AnyFloat(), 1, 1, 1, 0],
-        units=[Unit.MILLISECONDS, Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
-        exception=UserNotFound,
-        properties={"ContextId": ContextId.EDIT_MEETING_TIME.value},
-        add_handler_dimensions=True,
-        add_update_properties=True,
-    )
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name="CleanUserData", value=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
 async def test_date_time_entity_message_meeting_not_owned(

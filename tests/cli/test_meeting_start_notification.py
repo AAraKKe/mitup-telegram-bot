@@ -1,21 +1,24 @@
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram.error import Forbidden
 
 from mitup_bot.cli import notify_meetings
 from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.models import JoinedUsers
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
-from tests.helpers import MockApi, MockDbSession, StubMetrics, create_meetup, create_settings, create_user
+from tests.helpers import MockApi, MockDbSession, create_meetup, create_settings, create_user
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
-def metrics() -> StubMetrics:
-    metrics = StubMetrics([])
-    metrics.set_dimensions({"EventType": EventType.NOTIFY_START_MEETING.value})
-    return metrics
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.NOTIFY_START_MEETING.value})
+
+
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
 
 
 def test_query_for_users_to_notify_about_meeting_start(mock_session: MockDbSession):
@@ -50,7 +53,9 @@ WHERE meetups.datetime IS NOT NULL
     assert mock_session.normalize_query(expected_query) == mock_session.queries_executed[0]
 
 
-async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str) -> None:
+async def test_meeting_start(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+) -> None:
     meeting = create_meetup(id=1, title="Test meetup")
     joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
     joined_2 = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
@@ -58,8 +63,8 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
     link_2 = JoinedUsers(user=joined_2, meetup=meeting)
 
     mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link_1, link_2))
-    await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     assert link_1.notification_sent
     assert link_2.notification_sent
@@ -75,21 +80,30 @@ async def test_meeting_start(mock_session: MockDbSession, metrics: StubMetrics, 
     api.assert_send_message_to_user_called(user=joined_1, view=view1, times=2)
     api.assert_send_message_to_user_called(user=joined_2, view=view2, times=2)
 
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.NOTIFICATIONS_TO_SEND,
-            MetricKey.NOTIFICATIONS_SENT,
-            MetricKey.NOTIFICATIONS_FAILED,
-            MetricKey.INACTIVE_USER_SET,
-        ],
-        [2, 2, 0, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_TO_SEND,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_SENT,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_FAILED,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.INACTIVE_USER_SET,
+        value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
 
 async def test_non_forbidden_exception_is_logged_and_loop_continues(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     """A non-Forbidden exception from send_message_to_user is counted as failed and logged.
 
@@ -109,28 +123,37 @@ async def test_non_forbidden_exception_is_logged_and_loop_continues(
     send_message_mock.side_effect = [Exception("Network error"), None]
 
     with pytest.raises(RuntimeError, match="Failed to send notification to 1 users"):
-        await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
-    await metrics.flush()
+    await metrics_client.flush()
 
     # The second link was still notified — the loop did not abort on the first failure.
     assert link_2.notification_sent
 
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.NOTIFICATIONS_TO_SEND,
-            MetricKey.NOTIFICATIONS_SENT,
-            MetricKey.NOTIFICATIONS_FAILED,
-            MetricKey.INACTIVE_USER_SET,
-        ],
-        [2, 1, 1, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_TO_SEND,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_SENT,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_FAILED,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.INACTIVE_USER_SET,
+        value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
 
 async def test_failed_greater_than_zero_raises_runtime_error(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     """When failed > 0 after the notification loop, RuntimeError is raised."""
     meeting = create_meetup(id=1, title="Test meetup")
@@ -143,10 +166,12 @@ async def test_failed_greater_than_zero_raises_runtime_error(
     send_message_mock.side_effect = Exception("Unexpected error")
 
     with pytest.raises(RuntimeError, match="Failed to send notification to 1 users. Check logs for more details."):
-        await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
 
-async def test_forbidden_message_sent(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str):
+async def test_forbidden_message_sent(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+):
     meeting = create_meetup(id=1, title="Test meetup")
     joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
     joined_2 = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
@@ -158,8 +183,8 @@ async def test_forbidden_message_sent(mock_session: MockDbSession, metrics: Stub
     # Need to access low level mock, still do not have a way of mocking the api call directly
     send_message_mock = api.mock_method("send_message_to_user")
     send_message_mock.side_effect = [Forbidden("Nope"), None]
-    await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     assert link_1.notification_sent
     assert link_2.notification_sent
@@ -175,14 +200,23 @@ async def test_forbidden_message_sent(mock_session: MockDbSession, metrics: Stub
     api.assert_send_message_to_user_called(user=joined_1, view=view1, times=2)
     api.assert_send_message_to_user_called(user=joined_2, view=view2, times=2)
 
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.NOTIFICATIONS_TO_SEND,
-            MetricKey.NOTIFICATIONS_SENT,
-            MetricKey.NOTIFICATIONS_FAILED,
-            MetricKey.INACTIVE_USER_SET,
-        ],
-        [2, 2, 0, 1],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_TO_SEND,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_SENT,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.NOTIFICATIONS_FAILED,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.INACTIVE_USER_SET,
+        value=1,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )

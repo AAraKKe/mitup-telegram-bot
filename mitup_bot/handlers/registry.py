@@ -7,7 +7,6 @@ from enum import Enum
 from time import perf_counter
 from warnings import filterwarnings
 
-from aws_embedded_metrics.unit import Unit
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import (
@@ -29,6 +28,7 @@ from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.utils.mitup_types import HandlerCallback, TMitupContext
 
 from .error_handler import handler as error_handler
@@ -69,11 +69,11 @@ def callback_with_metrics(
         finally:
             latency = (perf_counter() - start) * 1000
             # Emit latency with handler dimensions and globally for aggregation
-            context.emit_metric(MetricKey.TIME, latency, Unit.MILLISECONDS, emit_global=True)
+            context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS, emit_global=True)
 
             # Emit leaked database connections (should be 0 if all connections were properly closed)
             context.emit_metric(
-                MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), Unit.COUNT, emit_global=True
+                MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT, emit_global=True
             )
 
             # Make sure we flush the metrics after every callback to drain any buffered metrics

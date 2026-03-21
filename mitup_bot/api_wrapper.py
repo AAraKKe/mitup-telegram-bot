@@ -3,9 +3,9 @@ import re
 from asyncio import gather
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Protocol, cast
+from time import perf_counter
+from typing import TYPE_CHECKING, Any, Protocol
 
-from aws_embedded_metrics.unit import Unit
 from sqlmodel import Session
 from telegram import (
     InlineQueryResultArticle,
@@ -15,7 +15,7 @@ from telegram import (
     Update,
 )
 from telegram.error import BadRequest, Forbidden
-from telegram.ext import CallbackContext, ExtBot
+from telegram.ext import ExtBot
 
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
@@ -27,6 +27,8 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.joined_users import JoinedUsers
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils.entities import FormattedText
@@ -41,19 +43,15 @@ EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")
 
 
 if TYPE_CHECKING:
-    from mitup_bot.custom_context import MitupContext
+    pass
 
 
 class BotAdapter:
-    """
-    This class is used to be able to use the TelegramApi classes with a bot instead of a MitupContext.
+    """Adapter that wraps an ExtBot with a MetricsClient to conform to ContextOrBotAdapter."""
 
-    TODO: For now this class does not emit any metrics and just provides access to the bot. In thef uture
-    we might want to create feature parity with context so this adapter emits the same metrics that the context does.
-    """
-
-    def __init__(self, bot: ExtBot):
+    def __init__(self, bot: ExtBot, metrics: MetricsClient):
         self._bot = bot
+        self._metrics = metrics
 
     @property
     def bot(self) -> ExtBot:
@@ -61,32 +59,44 @@ class BotAdapter:
 
     @contextmanager
     def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
+        start = perf_counter()
         yield
+        elapsed = 1000 * (perf_counter() - start)
+        self._metrics.emit(
+            MetricKey.TIME.with_prefix(prefix, separator=""),
+            elapsed,
+            MetricUnit.MILLISECONDS,
+        )
 
     def emit_metric(
         self,
         name: str | MetricKey,
         value: float = 1.0,
-        unit: Unit = Unit.COUNT,
+        unit: MetricUnit = MetricUnit.COUNT,
         *,
         dimensions: dict[str, str] | None = None,
-        include_handler_dimensions: bool = True,
-        properties: dict[str, str | int | float | None] | None = None,
-        include_update_properties: bool = True,
-        emit_global: bool = False,
-    ) -> None: ...
+        properties: dict[str, Any] | None = None,
+    ):
+        self._metrics.emit(name, value, unit, dimensions=dimensions, properties=properties)
 
-    async def flush_metrics(self) -> None: ...
+    async def flush_metrics(self):
+        await self._metrics.flush()
 
 
-def build_api(context_or_bot: MitupContext | ExtBot) -> TelegramApiWrapper:
-    from mitup_bot.custom_context import MitupContext
+def build_api(adapter_or_bot: ContextOrBotAdapter | ExtBot) -> TelegramApiWrapper:
+    """Build a TelegramApi from an adapter or a bare ExtBot.
 
-    adapter = context_or_bot if isinstance(context_or_bot, MitupContext) else BotAdapter(context_or_bot)
+    When an ExtBot is passed directly, it is wrapped in a BotAdapter with a NullBackend.
+    Prefer constructing BotAdapter(bot, metrics_client) explicitly for real metric emission.
+    """
+    from mitup_bot.monitoring.backend import NullBackend
+
+    if isinstance(adapter_or_bot, ExtBot):
+        adapter: ContextOrBotAdapter = BotAdapter(adapter_or_bot, MetricsClient(NullBackend()))
+    else:
+        adapter = adapter_or_bot
     api = TelegramApi()
-    # ty seems to be having issues finding that the adapter is of conforming type for now
-    # https://github.com/astral-sh/ty/issues/2692
-    api.adapter = cast(ContextOrBotAdapter, adapter)
+    api.adapter = adapter
     return api
 
 
@@ -107,7 +117,7 @@ def handle_edit_errors(
             if session and message:
                 logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
                 session.delete(message)
-            adapter.emit_metric(MetricKey.MESSAGE_DELETED, include_handler_dimensions=False)
+            adapter.emit_metric(MetricKey.MESSAGE_DELETED)
             return
         raise
 
@@ -198,24 +208,10 @@ class TelegramApi:
                 disable_web_page_preview=True,
             )
 
-    @contextmanager
-    def _with_time_metrics_context(self) -> Generator[None]:
-        """
-        Context manager that can be used either with a context or a bot. If a context is passed,
-        a metric will be emitted with the time it took to send the API call to Telegram.
-        """
-        # We check if it is an instance of CallbackContext because the adapter wraps it
-        # but does not inherit from it
-        if isinstance(self.adapter, CallbackContext):
-            with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-                yield
-        else:
-            yield
-
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
         resolved = _resolve_view(view)
 
-        with self._with_time_metrics_context():
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             try:
                 return await self.adapter.bot.send_message(
                     chat_id=user.tg_user_id,
@@ -266,7 +262,7 @@ class TelegramApi:
                 # we do not want to error out but mark the user as inactive
                 logging.info(f"Marking user {user.tg_user_id} as inactive")
                 user.is_active = False
-                self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET, include_handler_dimensions=False)
+                self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
                 continue
 
             # Handle Callbacks

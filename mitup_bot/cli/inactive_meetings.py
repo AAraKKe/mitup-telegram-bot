@@ -3,7 +3,6 @@ import logging
 import traceback
 from typing import cast
 
-from aws_embedded_metrics.unit import Unit
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, delete, func, literal, null, or_, select, true
 from sqlmodel.sql.expression import SelectOfScalar
@@ -11,7 +10,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import Meetup, Message, Settings, User
-from mitup_bot.monitoring import MetricKey, MitupMetricsLogger
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 # The amount of time a meeting stays active after it has been created when there is no datetime set
 INTERVAL_TO_DEACTIVATE = "1 year"
@@ -50,14 +49,14 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
 
 
 @db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
+async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Mark meetings as inactive when they've been finished for longer than the configured timeout"""
     meetings = session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT).all()
     deactivated = 0
     failed = 0
     invited_users_ids: list[int] = []
 
-    metrics.put_metric(MetricKey.MEETINGS_TO_DEACTIVATE.value, len(meetings), unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.MEETINGS_TO_DEACTIVATE, len(meetings), MetricUnit.COUNT)
     failed_details: list[str] = []
 
     for meeting in meetings:
@@ -94,11 +93,13 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MitupMetricsLo
                 f"Stack trace: {traceback.format_exc()}"
             )
 
-    if failed_details:
-        metrics.set_property("failed_details", failed_details)
-
-    metrics.put_metric(MetricKey.MEETINGS_DEACTIVATED.value, deactivated, unit=Unit.COUNT.value)
-    metrics.put_metric(MetricKey.MEETINGS_DEACTIVATION_FAILED.value, failed, unit=Unit.COUNT.value)
+    metrics.emit(MetricKey.MEETINGS_DEACTIVATED, deactivated, MetricUnit.COUNT)
+    metrics.emit(
+        MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        failed,
+        MetricUnit.COUNT,
+        properties={"failed_details": failed_details} if failed_details else None,
+    )
 
     if failed:
         raise RuntimeError(

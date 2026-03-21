@@ -4,14 +4,13 @@ from typing import Any, cast, overload
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot.api_wrapper import ContextOrBotAdapter
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.monitoring import MetricsClient, NullBackend
 from tests.helpers.handler_context import HandlerContext
 
 from .api import MockApi
-from .monitoring import StubMetrics, StubMetricsEngine
 from .types import StubMitupApp, StubMitupContext
 
 
@@ -19,20 +18,16 @@ def build_context(
     update: Update,
     app: StubMitupApp,
     with_meeting_id: dict[ContextId, int] | None = None,
+    metrics: MetricsClient | None = None,
 ) -> StubMitupContext:
     if update.effective_message:
         update.effective_message.set_bot(app.bot)
 
-    # Build test metrics engine
-    metrics_engine = StubMetricsEngine(logger_provider=lambda _: StubMetrics())
+    client = metrics or MetricsClient(NullBackend())
 
     context = MitupContext.from_update(update=update, application=app)
     context.api = MockApi()
-    context.api.adapter = cast(ContextOrBotAdapter, context)
-    context.metrics_engine = metrics_engine
-
-    # Allow the engine to access the context
-    metrics_engine.parent_context = context
+    context.metrics = client
 
     for context_id, meeting_id in (with_meeting_id or {}).items():
         assert context.user_data is not None
@@ -49,6 +44,7 @@ async def call_handler(
     app: StubMitupApp,
     with_meeting_id: dict[ContextId, int] | None = None,
     user_id: int | None = None,
+    metrics_client: MetricsClient | None = None,
 ) -> tuple[StubMitupContext, Enum | None]:
     """
     Call a handler directly with the given update and app, building the context.
@@ -59,6 +55,7 @@ async def call_handler(
         app: The StubMitupApp instance.
         with_meeting_id: Optional mapping of ContextId to meeting IDs to pre-populate in the context.
         user_id: Optional user ID to get the state of the conversation handler, if any.
+        metrics_client: Optional MetricsClient to use for the context.
     """
 
 
@@ -89,6 +86,7 @@ async def call_handler(
     app: StubMitupApp | None = cast(StubMitupApp | None, kwargs.get("app"))
     with_meeting_id: dict[ContextId, int] | None = cast(dict[ContextId, int] | None, kwargs.get("with_meeting_id"))
     handler_context: HandlerContext | None = cast(HandlerContext | None, kwargs.get("handler_context"))
+    metrics: MetricsClient | None = cast(MetricsClient | None, kwargs.get("metrics_client"))
 
     real_update: Update
     real_app: StubMitupApp
@@ -96,6 +94,7 @@ async def call_handler(
     if handler_context is not None:
         real_update = handler_context.update
         real_app = handler_context.app
+        metrics = handler_context.metrics_client
     elif update is not None and app is not None:
         real_update = update
         real_app = app
@@ -105,7 +104,7 @@ async def call_handler(
             "both 'update' and 'app' as keyword arguments."
         )
 
-    context = build_context(real_update, real_app, with_meeting_id)
+    context = build_context(real_update, real_app, with_meeting_id, metrics=metrics)
 
     handler = HandlersRegistry.get_handler(handler_id)
 

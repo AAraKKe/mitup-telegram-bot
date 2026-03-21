@@ -6,8 +6,6 @@ from time import perf_counter
 from typing import assert_never
 
 import click
-from aws_embedded_metrics.environment.environment_detector import resolve_environment
-from aws_embedded_metrics.unit import Unit
 from telegram.ext import AIORateLimiter, ExtBot
 
 from mitup_bot import db
@@ -21,7 +19,7 @@ from mitup_bot.cli import (
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
-from mitup_bot.monitoring.metrics import MetricKey, MitupMetricsLogger, configure_metrics
+from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
 DEFAULT_GENERATE_STATS_INTERVAL = 3600
@@ -74,51 +72,47 @@ def build_bot(config: BotConfig) -> ExtBot:
     )
 
 
-async def launch_event(event_type: EventType, api: TelegramApiWrapper, metrics: MitupMetricsLogger) -> None:
+async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
     match event_type:
         case EventType.USER_CLEANUP:
-            user_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            user_cleanup.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.NOTIFY_START_MEETING:
-            await notify_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await notify_meetings.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.NOTIFY_MEETING_STARTED:
-            await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await notify_meetings_started.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.GENERATE_STATS:
-            generate_stats.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            generate_stats.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.DEACTIVATE_MEETINGS:
-            await inactive_meetings.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await inactive_meetings.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case EventType.MEETUPS_CLEANUP:
-            await meetups_cleanup.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await meetups_cleanup.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
         case never:  # pragma: no cover
             assert_never(never)  # pragma: no cover
 
 
-async def handle_maintainance(event_type: EventType, api: TelegramApiWrapper) -> None:
-    metrics = MitupMetricsLogger(resolve_environment)
-    metrics.set_dimensions({"EventType": event_type.value})
+async def handle_maintainance(event_type: EventType, bot: ExtBot, client: MetricsClient | None = None) -> None:
+    client = client or MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})
+    api = build_api(bot)
 
     start_time = perf_counter()
     fault = False
     try:
         db.set_connection_context(event_type.value)
-        await launch_event(event_type, api, metrics)
+        await launch_event(event_type, api, client)
     except Exception:
         fault = True
-        metrics.add_stack_trace("exception")
+        client.add_stack_trace("exception")
     finally:
-        metrics.put_metric(MetricKey.FAULT.value, 1 if fault else 0, unit=Unit.COUNT.value)
-        metrics.put_metric(MetricKey.TIME.value, (perf_counter() - start_time) * 1000, unit=Unit.MILLISECONDS.value)
-        metrics.put_metric(
-            MetricKey.DB_CONNECTIONS_LEAKED.value,
-            db.get_open_connections(event_type.value),
-            unit=Unit.COUNT.value,
-        )
-        await metrics.flush()
+        client.emit(MetricKey.FAULT, 1 if fault else 0, MetricUnit.COUNT)
+        client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS)
+        client.emit(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections(event_type.value), MetricUnit.COUNT)
+        await client.flush()
 
 
 async def run_periodic(
     interval: int,
     event_type: EventType,
-    api: TelegramApiWrapper,
+    bot: ExtBot,
     time_before_start: float | None = None,
 ):
     # If no time provided add 1% interval jitter
@@ -127,11 +121,11 @@ async def run_periodic(
 
     # Run the coroutine indefinitely
     while True:
-        await handle_maintainance(event_type, api)
+        await handle_maintainance(event_type, bot)
         await asyncio.sleep(interval)
 
 
-async def run_all_tasks(intervals: IntervalsConfiguration, api: TelegramApiWrapper, start_time: float):
+async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, start_time: float):
     async with asyncio.TaskGroup() as tg:
         for event_type in EventType:
             tg.create_task(
@@ -139,7 +133,7 @@ async def run_all_tasks(intervals: IntervalsConfiguration, api: TelegramApiWrapp
                     intervals.get(event_type),
                     time_before_start=start_time,
                     event_type=event_type,
-                    api=api,
+                    bot=bot,
                 )
             )
 
@@ -211,10 +205,8 @@ def cli(
     )
 
     db.configure_db(config.db)
-    configure_metrics(config.metrics)
 
     bot = build_bot(config.bot)
-    api = build_api(bot)
 
     intervals = IntervalsConfiguration(
         user_cleanup=user_cleanup_interval,
@@ -224,4 +216,4 @@ def cli(
         deactivate_meetings=deactivate_meetings_interval,
         meetups_cleanup=meetups_cleanup_interval,
     )
-    asyncio.run(run_all_tasks(intervals, api, start_time))
+    asyncio.run(run_all_tasks(intervals, bot, start_time))

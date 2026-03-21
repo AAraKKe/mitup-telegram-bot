@@ -1,30 +1,32 @@
 from unittest.mock import ANY
 
 import pytest
-from aws_embedded_metrics.unit import Unit
 from telegram.error import Forbidden
 
 from mitup_bot.cli import notify_meetings_started
 from mitup_bot.cli.commands.recurrent_events import EventType
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 from tests.helpers import (
     MockApi,
     MockDbSession,
-    StubMetrics,
     create_joined_link,
     create_meetup,
     create_settings,
     create_user,
 )
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
-def metrics() -> StubMetrics:
-    metrics = StubMetrics([])
-    metrics.set_dimensions({"EventType": EventType.NOTIFY_START_MEETING.value})
-    return metrics
+def metrics_client() -> MetricsClient:
+    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.NOTIFY_START_MEETING.value})
+
+
+@pytest.fixture
+def metrics(metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(metrics_client)
 
 
 # ---------------------------------------------------------------------------
@@ -56,21 +58,28 @@ def test_meetings_to_notify_started_query(mock_session: MockDbSession):
 # ---------------------------------------------------------------------------
 
 
-async def test_no_meetings_to_notify(mock_session: MockDbSession, metrics: StubMetrics, api: MockApi):
+async def test_no_meetings_to_notify(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, ())
 
-    await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     api.assert_method_just_called("update_meeting_messages", times=0)
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETINGS_STARTED_PROCESSED,
-            MetricKey.STARTED_NOTIFICATIONS_SENT,
-            MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        ],
-        [0, 0, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -81,7 +90,7 @@ async def test_no_meetings_to_notify(mock_session: MockDbSession, metrics: StubM
 
 
 async def test_started_notification_sent_to_participants(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     meeting = create_meetup(id=1, title="Demo meetup")
     participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
@@ -91,8 +100,8 @@ async def test_started_notification_sent_to_participants(
 
     mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
 
-    await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     # Both participants received the notification
     view_a = MitupView(
@@ -116,14 +125,19 @@ async def test_started_notification_sent_to_participants(
     call_kwargs = api.mock_method("update_meeting_messages").call_args.kwargs
     assert call_kwargs["meeting"] is meeting
 
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETINGS_STARTED_PROCESSED,
-            MetricKey.STARTED_NOTIFICATIONS_SENT,
-            MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        ],
-        [1, 2, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -134,7 +148,7 @@ async def test_started_notification_sent_to_participants(
 
 
 async def test_waiting_list_participants_not_notified(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     meeting = create_meetup(id=1, title="Demo meetup")
     regular = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
@@ -144,18 +158,23 @@ async def test_waiting_list_participants_not_notified(
 
     mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
 
-    await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     # Only 1 notification sent (the regular participant)
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETINGS_STARTED_PROCESSED,
-            MetricKey.STARTED_NOTIFICATIONS_SENT,
-            MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        ],
-        [1, 1, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -177,7 +196,7 @@ async def test_waiting_list_participants_not_notified(
 
 
 async def test_forbidden_marks_user_inactive_and_does_not_raise(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     meeting = create_meetup(id=1, title="Demo meetup")
     participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
@@ -191,8 +210,8 @@ async def test_forbidden_marks_user_inactive_and_does_not_raise(
     # First participant raises Forbidden, second succeeds
     send_mock.side_effect = [Forbidden("blocked"), None]
 
-    await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
-    await metrics.flush()
+    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await metrics_client.flush()
 
     # User whose send raised Forbidden is marked inactive via handle_forbidden
     assert participant_a.is_active is False
@@ -204,14 +223,19 @@ async def test_forbidden_marks_user_inactive_and_does_not_raise(
 
     # Forbidden is caught by handle_forbidden so the coroutine returns normally;
     # gather sees both results as successes → sent=2, failed=0.
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETINGS_STARTED_PROCESSED,
-            MetricKey.STARTED_NOTIFICATIONS_SENT,
-            MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        ],
-        [1, 2, 0],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -222,7 +246,7 @@ async def test_forbidden_marks_user_inactive_and_does_not_raise(
 
 
 async def test_non_forbidden_participant_exception_is_logged_and_counted(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     """A non-Forbidden exception from send_message_to_user for a participant is caught by
     gather, logged, and increments the failed counter.  The meeting loop continues to the
@@ -241,20 +265,25 @@ async def test_non_forbidden_participant_exception_is_logged_and_counted(
     send_mock.side_effect = [Exception("Network failure"), None]
 
     with pytest.raises(RuntimeError, match="Failed to process started notifications"):
-        await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
-    await metrics.flush()
+    await metrics_client.flush()
 
     # The second participant's send still succeeded → sent=1.
     # The failed exception from the first send → failed=1.
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETINGS_STARTED_PROCESSED,
-            MetricKey.STARTED_NOTIFICATIONS_SENT,
-            MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        ],
-        [1, 1, 1],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=1,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
 
@@ -265,7 +294,7 @@ async def test_non_forbidden_participant_exception_is_logged_and_counted(
 
 
 async def test_failed_meeting_increments_counter_and_raises(
-    mock_session: MockDbSession, metrics: StubMetrics, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
 ):
     meeting_ok = create_meetup(id=1, title="Good meeting")
     create_user(id=1, tg_user_id=1, owned_meetings=[meeting_ok], settings=create_settings(id=1, language=lang))
@@ -281,9 +310,9 @@ async def test_failed_meeting_increments_counter_and_raises(
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("Boom")]
 
     with pytest.raises(RuntimeError, match="Failed to process started notifications"):
-        await notify_meetings_started.run(api, metrics)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
 
-    await metrics.flush()
+    await metrics_client.flush()
 
     # First meeting was processed successfully
     assert meeting_ok.started_notification_sent is True
@@ -294,14 +323,19 @@ async def test_failed_meeting_increments_counter_and_raises(
     # MEETINGS_STARTED_PROCESSED = len(meetings) = 2 (both were selected regardless of outcome)
     # STARTED_NOTIFICATIONS_SENT = 0 (no participants added to these meetings)
     # STARTED_NOTIFICATIONS_FAILED = 1 (the second meeting's update_meeting_messages raised)
-    metrics.assert_metrics_emited(
-        [
-            MetricKey.MEETINGS_STARTED_PROCESSED,
-            MetricKey.STARTED_NOTIFICATIONS_SENT,
-            MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        ],
-        [2, 0, 1],
-        [Unit.COUNT, Unit.COUNT, Unit.COUNT],
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=2,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=1,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
         properties={"failed_details": ANY},
     )

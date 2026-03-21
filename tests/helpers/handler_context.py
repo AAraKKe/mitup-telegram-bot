@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from telegram import Update
 
+from mitup_bot.monitoring import MetricsClient
 from tests.helpers.types import StubMitupApp
 
 
@@ -16,3 +17,4 @@ class HandlerContext:
 
     update: Update
     app: StubMitupApp
+    metrics_client: MetricsClient
