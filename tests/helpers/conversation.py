@@ -7,6 +7,7 @@ from telegram import CallbackQuery, Chat, Message
 from telegram import User as TgUser
 
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.monitoring import MetricsClient, NullBackend
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
     DEFAULT_MESSAGE_ID,
@@ -15,6 +16,7 @@ from tests.helpers.constants import (
 )
 from tests.helpers.context import call_handler
 from tests.helpers.fixtures import UpdateRequest, create_test_app, create_update
+from tests.helpers.handler_context import HandlerContext
 from tests.helpers.types import StubMitupApp, StubMitupContext
 
 
@@ -139,7 +141,8 @@ class ConversationTester:
 
             update = create_update(req, self.chat, self.user, self._tg_message, self._tg_callback_query)
 
-            context, result = await call_handler(handler_id, update=update, app=self.app)
+            handler_ctx = HandlerContext(update=update, app=self.app, metrics_client=MetricsClient(NullBackend()))
+            context, result = await call_handler(handler_id, handler_context=handler_ctx)
 
             step_result = StepResult(step_index=i, context=context, state=result, update_request=req)
             step_results.append(step_result)

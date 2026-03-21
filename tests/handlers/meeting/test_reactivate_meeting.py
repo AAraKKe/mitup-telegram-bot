@@ -9,8 +9,8 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from tests.helpers import (
+    HandlerContext,
     MockDbSession,
-    StubMitupApp,
     UpdateRequest,
     call_handler,
 )
@@ -36,12 +36,12 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
 
     assert inactive_meeting.active is True
     assert inactive_meeting.expiration_time is None
@@ -61,7 +61,7 @@ async def test_reactivate_meeting_returns_silently_when_full_meeting_not_found(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When Meetup.by_id(include_inactive=True) returns None, the handler returns silently
     without editing any message."""
@@ -71,7 +71,7 @@ async def test_reactivate_meeting_returns_silently_when_full_meeting_not_found(
     mock_session.add_object(user_with_settings.meetups[0])
 
     with mock.patch.object(Meetup, "by_id", return_value=None):
-        context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, update=update, app=app)
+        context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
 
     # Handler returned silently — no edit_message call
     context.api.assert_method_just_called("edit_message", times=0)

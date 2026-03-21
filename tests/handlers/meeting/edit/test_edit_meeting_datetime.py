@@ -3,7 +3,7 @@ from typing import cast
 
 import pytest
 from freezegun import freeze_time
-from telegram import CallbackQuery, Chat, Location, Message, MessageEntity, Update
+from telegram import CallbackQuery, Location, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
 
@@ -12,14 +12,13 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_dat
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
-from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, DEFAULT_TEST_DATE, DEFAULT_TG_USER_PARAMS
+from tests.helpers import AnyFloat, HandlerContext, StubMitupApp, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -102,13 +101,13 @@ async def test_edit_meeting_date_callback(
     anchor_date: dt.date,
     current_date: dt.date,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.DATE_CALLBACK, update=update, app=app)
+    context, response = await call_handler(EditMeetingHandlerId.DATE_CALLBACK, handler_context=handler_context)
 
     assert response == ConversationMeetingState.EDIT_DATE
     context.api.assert_edit_message_called(
@@ -146,7 +145,7 @@ async def test_set_meeting_date_callback(
     current_datetime: dt.datetime,
     new: bool,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=current_datetime)
     user_with_settings.meetups.append(meeting)
@@ -155,7 +154,7 @@ async def test_set_meeting_date_callback(
     # Lets add a message to validate it has been updated
     MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
 
-    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, update=update, app=app)
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
 
     expected_datetime = (
         # The meeting is set to 00:00 on the user timezone (Europe/Madrid, UTC+1 in December),
@@ -215,13 +214,15 @@ async def test_delete_meeting_date(
     update: Update,
     meeting: Meetup,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, update=update, app=app)
+    context, response = await call_handler(
+        EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, handler_context=handler_context
+    )
 
     assert response == ConversationMeetingState.EDIT_DATETIME
     assert meeting.datetime == TEST_MEETING_DATETIME_UTC
@@ -255,7 +256,7 @@ async def test_confirm_delete_meeting_date(
     update: Update,
     meeting: Meetup,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -264,8 +265,7 @@ async def test_confirm_delete_meeting_date(
 
     context, response = await call_handler(
         EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
 
@@ -298,14 +298,14 @@ async def test_decline_delete_meeting_date(
     update: Update,
     meeting: Meetup,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, response = await call_handler(
-        EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK, update=update, app=app
+        EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK, handler_context=handler_context
     )
 
     assert response == ConversationMeetingState.EDIT_DATETIME
@@ -346,8 +346,7 @@ async def test_edit_meeting_time_callback(
     meeting: Meetup,
     expected_response: int,
     user_with_settings: User,
-    app: StubMitupApp,
-    metrics_client: MetricsClient,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
     if meeting.db_id == 10:
@@ -355,9 +354,7 @@ async def test_edit_meeting_time_callback(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(
-        EditMeetingHandlerId.EDIT_TIME_CALLBACK, update=update, app=app, metrics_client=metrics_client
-    )
+    context, response = await call_handler(EditMeetingHandlerId.EDIT_TIME_CALLBACK, handler_context=handler_context)
 
     assert response == expected_response
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) or expected_response == ConversationHandler.END
@@ -414,8 +411,7 @@ async def test_set_time_message_with_valid_time(
     meeting: Meetup,
     expected_meeting_time: dt.datetime,
     user_with_settings: User,
-    app: StubMitupApp,
-    metrics_client: MetricsClient,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
     user_with_settings.meetups.append(meeting)
@@ -424,10 +420,8 @@ async def test_set_time_message_with_valid_time(
 
     context, response = await call_handler(
         EditMeetingHandlerId.SET_TIME_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
-        metrics_client=metrics_client,
     )
 
     assert response == ConversationHandler.END
@@ -467,8 +461,7 @@ async def test_set_time_message_with_invalid_time(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
-    metrics_client: MetricsClient,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
@@ -478,10 +471,8 @@ async def test_set_time_message_with_invalid_time(
 
     context, response = await call_handler(
         EditMeetingHandlerId.SET_TIME_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
-        metrics_client=metrics_client,
     )
 
     assert response == ConversationMeetingState.EDIT_TIME
@@ -528,7 +519,7 @@ async def test_conversation_fallback_with_wrong_message_format(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
-    metrics_client: MetricsClient,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
@@ -537,17 +528,15 @@ async def test_conversation_fallback_with_wrong_message_format(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     # Lets first trigger the conversation (use a separate client to not pollute the metrics we want to assert)
+    ctx = HandlerContext(update=entry_point_update(update), app=app, metrics_client=MetricsClient(NullBackend()))
     context, _ = await call_handler(
         EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION,
-        update=entry_point_update(update),
-        app=app,
+        handler_context=ctx,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
 
     # Now answer with a wrong message format
-    context, _ = await call_handler(
-        EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, update=update, app=app, metrics_client=metrics_client
-    )
+    context, _ = await call_handler(EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, handler_context=handler_context)
 
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
@@ -573,40 +562,24 @@ async def test_edit_time_can_be_cancelled(
     update: Update,
     user_with_settings: User,
     app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
+    ctx = HandlerContext(update=entry_point_update(update), app=app, metrics_client=MetricsClient(NullBackend()))
     context, _ = await call_handler(
         EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION,
-        update=entry_point_update(update),
-        app=app,
+        handler_context=ctx,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
-    context, _ = await call_handler(EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, handler_context=handler_context)
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
     context.api.assert_edit_message_called(update, meeting.edit_view, times=1)
-
-
-def date_time_entity_update(user: TgUser, unix_time: int) -> Update:
-    """Build an Update containing a message with a ``date_time`` entity."""
-    chat = Chat(id=DEFAULT_CHAT_ID, type="private")
-    text = "Tomorrow at noon"
-    unix_dt = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
-    entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=len(text), unix_time=unix_dt)
-    message = Message(
-        DEFAULT_MESSAGE_ID,
-        date=DEFAULT_TEST_DATE,
-        chat=chat,
-        from_user=user,
-        text=text,
-        entities=[entity],
-    )
-    return Update(DEFAULT_MESSAGE_ID, message=message)
 
 
 @pytest.mark.parametrize(
@@ -618,14 +591,16 @@ async def test_date_time_entry_callback(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK, update=update, app=app)
+    context, response = await call_handler(
+        EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK, handler_context=handler_context
+    )
 
     assert response == ConversationMeetingState.EDIT_DATETIME
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
@@ -676,7 +651,7 @@ async def test_date_time_entry_callback_without_datetime(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """DATE_TIME_ENTRY_CALLBACK with meeting.datetime=None must NOT include the DELETE_DATE button."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
@@ -686,7 +661,9 @@ async def test_date_time_entry_callback_without_datetime(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK, update=update, app=app)
+    context, response = await call_handler(
+        EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK, handler_context=handler_context
+    )
 
     assert response == ConversationMeetingState.EDIT_DATETIME
 
@@ -720,15 +697,28 @@ async def test_date_time_entry_callback_without_datetime(
     context.api.assert_edit_message_called(update, expected_view)
 
 
+DATE_TIME_ENTITY_UNIX_TIME = 1735000000
+DATE_TIME_ENTITY_TEXT = "Tomorrow at noon"
+DATE_TIME_ENTITY_REQUEST = UpdateRequest(
+    message_text=DATE_TIME_ENTITY_TEXT,
+    entities=[
+        MessageEntity(
+            type=MessageEntity.DATE_TIME,
+            offset=0,
+            length=len(DATE_TIME_ENTITY_TEXT),
+            unix_time=dt.datetime.fromtimestamp(DATE_TIME_ENTITY_UNIX_TIME, tz=dt.UTC),
+        )
+    ],
+)
+
+
+@pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST], indirect=True)
 async def test_date_time_entity_message(
     mock_session: MockDbSession,
+    update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
-    unix_time = 1735000000  # arbitrary fixed unix timestamp for assertions
-    tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
-    update = date_time_entity_update(tg_user, unix_time)
-
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -737,13 +727,12 @@ async def test_date_time_entity_message(
 
     context, response = await call_handler(
         EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
 
     assert response == ConversationHandler.END
-    expected_datetime = dt.datetime.fromtimestamp(unix_time, tz=dt.UTC)
+    expected_datetime = dt.datetime.fromtimestamp(DATE_TIME_ENTITY_UNIX_TIME, tz=dt.UTC)
     assert meeting.datetime == expected_datetime
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
@@ -753,7 +742,7 @@ async def test_date_time_entity_message(
         meeting.edit_view.with_context(
             MeetingMessages.DATE_UPDATE_SUCCESS.get(
                 lang=user_with_settings.lang,
-                datetime=datetime_entity(unix_time),
+                datetime=datetime_entity(DATE_TIME_ENTITY_UNIX_TIME),
             )
         ),
     )
@@ -783,14 +772,13 @@ async def test_datetime_state_fallbacks(
     handler_id: EditMeetingHandlerId,
     expected_state: ConversationMeetingState,
     user_with_settings: User,
-    app: StubMitupApp,
-    metrics_client: MetricsClient,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
     """Plain text and non-text messages in EDIT_DATETIME state return an error and stay in EDIT_DATETIME."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(handler_id, update=update, app=app, metrics_client=metrics_client)
+    context, response = await call_handler(handler_id, handler_context=handler_context)
 
     assert response == expected_state
     context.api.assert_send_message_called(
@@ -803,24 +791,21 @@ async def test_datetime_state_fallbacks(
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
+@pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST], indirect=True)
 async def test_date_time_entity_message_user_not_found(
     mock_session: MockDbSession,
+    update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
-    metrics_client: MetricsClient,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
     """DATE_TIME_ENTITY_MESSAGE raises UserNotFound when the user is not registered."""
-    tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
-    update = date_time_entity_update(tg_user, unix_time=1735000000)
     # Do not add the user to the session — guard raises UserNotFound.
 
     context, _ = await call_handler(
         EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 99},
-        metrics_client=metrics_client,
     )
 
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
@@ -830,22 +815,21 @@ async def test_date_time_entity_message_user_not_found(
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
 
 
+@pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST], indirect=True)
 async def test_date_time_entity_message_meeting_not_owned(
     mock_session: MockDbSession,
+    update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """DATE_TIME_ENTITY_MESSAGE stops when the meeting is not accessible to the user."""
-    tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
-    update = date_time_entity_update(tg_user, unix_time=1735000000)
     not_owned_meeting = create_meetup(id=99, title="Not Owned")
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)
 
     context, response = await call_handler(
         EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 99},
     )
 
@@ -864,7 +848,7 @@ async def test_back_to_edit_meeting(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """BACK_TO_EDIT_MEETING_CALLBACK cleans up context and returns ConversationHandler.END."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
@@ -874,8 +858,7 @@ async def test_back_to_edit_meeting(
 
     context, response = await call_handler(
         EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
 
@@ -895,7 +878,7 @@ async def test_back_to_edit_datetime(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """BACK_TO_EDIT_DATETIME_CALLBACK re-shows the EDIT_DATETIME entry view and returns EDIT_DATETIME."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
@@ -905,8 +888,7 @@ async def test_back_to_edit_datetime(
 
     context, response = await call_handler(
         EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
-        update=update,
-        app=app,
+        handler_context=handler_context,
     )
 
     assert response == ConversationMeetingState.EDIT_DATETIME

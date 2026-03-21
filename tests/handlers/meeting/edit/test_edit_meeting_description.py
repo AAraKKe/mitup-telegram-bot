@@ -14,7 +14,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
-from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -38,7 +38,7 @@ async def test_callback_query_edit_meeting_description_works(
     update: Update,
     expected_description: Callable[[str], str],
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
@@ -47,7 +47,7 @@ async def test_callback_query_edit_meeting_description_works(
 
     mock_session.add_object(user_with_settings.meetups[int(meeting_id) - 1])
 
-    context, result = await call_handler(EditMeetingHandlerId.DESCRIPTION_CALLBACK, update=update, app=app)
+    context, result = await call_handler(EditMeetingHandlerId.DESCRIPTION_CALLBACK, handler_context=handler_context)
 
     assert context.user_data is not None
     assert context.has_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION)

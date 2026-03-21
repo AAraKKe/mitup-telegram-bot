@@ -4,12 +4,12 @@ from telegram import Update
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(1))], indirect=True)
 async def test_edit_default_options_view(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
+    mock_session: MockDbSession, user_with_settings: User, update: Update, handler_context: HandlerContext
 ):
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -17,7 +17,7 @@ async def test_edit_default_options_view(
 
     expected_view = meeting.settings_view
 
-    context, _ = await call_handler(EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK, handler_context=handler_context)
 
     context.api.assert_edit_message_called(update, expected_view)
 
@@ -83,7 +83,7 @@ async def test_callbacks_to_set_meeting_setting(
     public: bool,
     invitation: bool,
     incognito: bool,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     meeting = user_with_settings.meetups[0]
     meeting.waiting_list = waiting_list
@@ -94,7 +94,7 @@ async def test_callbacks_to_set_meeting_setting(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(meeting, query_field="id")
 
-    context, _ = await call_handler(handler_id, update=update, app=app)
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
 
     expected_view = meeting.settings_view
 

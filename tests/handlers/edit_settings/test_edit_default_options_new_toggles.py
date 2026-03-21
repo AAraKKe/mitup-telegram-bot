@@ -4,7 +4,7 @@ from telegram import Update
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
 @pytest.mark.parametrize(
@@ -27,13 +27,13 @@ async def test_toggle_flips_value_and_re_renders_default_meeting_settings(
     handler_id: EditSettingsHandlerId,
     attr_name: str,
     initial_value: bool,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     settings = user_with_settings.settings
     setattr(settings, attr_name, initial_value)
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, _ = await call_handler(handler_id, update=update, app=app)
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
 
     # The setting was toggled
     assert getattr(settings, attr_name) == (not initial_value)

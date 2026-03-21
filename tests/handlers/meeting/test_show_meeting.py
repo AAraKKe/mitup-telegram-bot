@@ -11,8 +11,8 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import (
+    HandlerContext,
     MockDbSession,
-    StubMitupApp,
     StubMitupContext,
     UpdateRequest,
     call_handler,
@@ -24,7 +24,7 @@ from tests.helpers import (
 async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -54,7 +54,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
 
     mock_session.add_object(target_meeting)
 
-    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
     expected_view = target_meeting.main_view
     context.api.assert_edit_message_called(update, expected_view)

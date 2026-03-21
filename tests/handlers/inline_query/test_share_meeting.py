@@ -1,10 +1,9 @@
 import pytest
 from telegram import Update
-from telegram.ext import Application
 
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.models import User
-from tests.helpers.context import call_handler
+from tests.helpers.context import HandlerContext, call_handler
 from tests.helpers.fixtures import UpdateRequest, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession
 
@@ -25,7 +24,7 @@ async def test_share_meeting(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
     meeting_id: int,
     is_owner: bool,
     is_public: bool,
@@ -43,7 +42,7 @@ async def test_share_meeting(
     mock_session.add_object(meetup)
     mock_session.commit()
 
-    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
 
     if should_share:
         context.api.assert_method_just_called("answer_inline_query")

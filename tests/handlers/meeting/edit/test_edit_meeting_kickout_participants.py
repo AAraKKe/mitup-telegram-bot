@@ -10,7 +10,6 @@ from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views.factory import confirmation_view
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
-    StubMitupApp,
     UpdateRequest,
     call_handler,
     create_joined_link,
@@ -86,7 +85,7 @@ def prepare_meeting(mock_session: MockDbSession, user_with_settings: User):
 )
 async def test_edit_meeting_kickout_participants_sends_list_of_participants(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
     page_number: int,
@@ -94,7 +93,9 @@ async def test_edit_meeting_kickout_participants_sends_list_of_participants(
 ):
     prepare_meeting(mock_session, user_with_settings)
 
-    context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK, handler_context=handler_context
+    )
 
     context.api.assert_edit_message_called(
         update,
@@ -121,7 +122,7 @@ async def test_edit_meeting_kickout_participants_sends_list_of_participants(
 )
 async def test_edit_meeting_kickout_participants_ignores_waiting_list(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -132,7 +133,9 @@ async def test_edit_meeting_kickout_participants_ignores_waiting_list(
     user_with_settings.meetups[0].joined_links[3].is_waiting_list = True
     user_with_settings.meetups[0].joined_links[4].is_waiting_list = True
 
-    context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK, handler_context=handler_context
+    )
 
     args_list = context.api.call_args_list("edit_message")
     assert len(args_list) == 1
@@ -147,14 +150,16 @@ async def test_edit_meeting_kickout_participants_ignores_waiting_list(
 )
 async def test_edit_meeting_kickout_participants_with_no_participants(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK, handler_context=handler_context
+    )
 
     context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[0]))
 
@@ -166,12 +171,14 @@ async def test_edit_meeting_kickout_participants_with_no_participants(
 )
 async def test_edit_meeting_kickout_given_participant(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
-    context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK, handler_context=handler_context
+    )
     context.api.assert_edit_message_called(
         update,
         confirmation_view(
@@ -192,12 +199,14 @@ async def test_edit_meeting_kickout_given_participant(
 )
 async def test_edit_meeting_kickout_participant_no_longer_in_meeting(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
-    context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK, handler_context=handler_context
+    )
     context.api.assert_edit_message_called(
         update,
         edit_participants_view(user_with_settings.meetups[0]).with_context(
@@ -213,7 +222,7 @@ async def test_edit_meeting_kickout_participant_no_longer_in_meeting(
 )
 async def test_edit_meeting_kickout_participant_confirm(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -223,7 +232,7 @@ async def test_edit_meeting_kickout_participant_confirm(
     assert participant_to_delete is not None
 
     context, _ = await call_handler(
-        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK, update=update, app=app
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK, handler_context=handler_context
     )
 
     # Test the message has been edited successfully
@@ -321,7 +330,7 @@ async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
 )
 async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
@@ -332,7 +341,7 @@ async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
     create_joined_link(user=create_user(id=5, username="user_5", first_name="User 5"), meetup=meeting)
 
     context, _ = await call_handler(
-        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK, update=update, app=app
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK, handler_context=handler_context
     )
 
     context.api.assert_edit_message_called(
@@ -352,13 +361,13 @@ async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
 )
 async def test_edit_meeting_kickout_participant_confirm_no_longer_in_meeting(
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     mock_session: MockDbSession,
     update: Update,
 ):
     prepare_meeting(mock_session, user_with_settings)
     context, _ = await call_handler(
-        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK, update=update, app=app
+        EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK, handler_context=handler_context
     )
 
     context.api.assert_edit_message_called(

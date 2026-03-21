@@ -8,7 +8,7 @@ from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, Edit
 from mitup_bot.models import Settings
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
-from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler, create_meetup, create_user
+from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
 
 
 def owner_with_meeting(meeting_id: int = 1, duration_minutes: int | None = None, lock_on_start: bool = False):
@@ -33,13 +33,13 @@ def owner_with_meeting(meeting_id: int = 1, duration_minutes: int | None = None,
 async def test_duration_entry_renders_duration_view(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, _ = await call_handler(EditMeetingHandlerId.DURATION_ENTRY_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.DURATION_ENTRY_CALLBACK, handler_context=handler_context)
 
     context.api.assert_edit_message_called(update, meeting.duration_view)
 
@@ -57,13 +57,13 @@ async def test_duration_entry_renders_duration_view(
 async def test_duration_input_entry_shows_prompt_and_enters_state(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1, duration_minutes=None)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(EditMeetingHandlerId.DURATION_INPUT_CALLBACK, update=update, app=app)
+    context, state = await call_handler(EditMeetingHandlerId.DURATION_INPUT_CALLBACK, handler_context=handler_context)
 
     expected_prompt = duration_input_prompt_view(1, user.lang, None)
     context.api.assert_edit_message_called(update, expected_prompt)
@@ -78,13 +78,13 @@ async def test_duration_input_entry_shows_prompt_and_enters_state(
 async def test_duration_input_entry_shows_edit_prompt_when_duration_already_set(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1, duration_minutes=60)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(EditMeetingHandlerId.DURATION_INPUT_CALLBACK, update=update, app=app)
+    context, state = await call_handler(EditMeetingHandlerId.DURATION_INPUT_CALLBACK, handler_context=handler_context)
 
     # Prompt reflects the existing duration value
     expected_prompt = duration_input_prompt_view(1, user.lang, 60)
@@ -105,7 +105,7 @@ async def test_duration_input_entry_shows_edit_prompt_when_duration_already_set(
 async def test_valid_duration_text_saves_duration_and_exits_conversation(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
@@ -113,8 +113,7 @@ async def test_valid_duration_text_saves_duration_and_exits_conversation(
 
     context, state = await call_handler(
         EditMeetingHandlerId.DURATION_TEXT_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_DURATION: 1},
     )
 
@@ -142,7 +141,7 @@ async def test_valid_duration_text_saves_duration_and_exits_conversation(
 async def test_invalid_duration_text_shows_error_and_stays_in_state(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     text: str,
 ):
     """Non-positive or non-numeric text uses DURATION_INVALID_MESSAGE handler which re-prompts."""
@@ -153,8 +152,7 @@ async def test_invalid_duration_text_shows_error_and_stays_in_state(
     # We test the invalid-message handler directly to exercise the re-prompt path
     context, state = await call_handler(
         EditMeetingHandlerId.DURATION_INVALID_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_DURATION: 1},
     )
 
@@ -181,7 +179,7 @@ async def test_invalid_duration_text_shows_error_and_stays_in_state(
 async def test_cancel_during_duration_input_returns_to_view(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1, duration_minutes=45)
     mock_session.add_object(user, query_field="tg_user_id")
@@ -189,8 +187,7 @@ async def test_cancel_during_duration_input_returns_to_view(
 
     context, state = await call_handler(
         EditMeetingHandlerId.DURATION_CANCEL_CALLBACK,
-        update=update,
-        app=app,
+        handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_DURATION: 1},
     )
 
@@ -214,13 +211,13 @@ async def test_cancel_during_duration_input_returns_to_view(
 async def test_clear_duration_removes_duration_and_lock(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1, duration_minutes=90, lock_on_start=True)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, _ = await call_handler(EditMeetingHandlerId.DURATION_CLEAR_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.DURATION_CLEAR_CALLBACK, handler_context=handler_context)
 
     assert meeting.duration_minutes is None  # cleared
     assert meeting.lock_on_start is False  # also cleared
@@ -244,14 +241,14 @@ async def test_clear_duration_removes_duration_and_lock(
 async def test_toggle_lock_on_start_flips_value_and_re_renders(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     initial_lock: bool,
 ):
     user, meeting = owner_with_meeting(meeting_id=1, duration_minutes=60, lock_on_start=initial_lock)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, _ = await call_handler(EditMeetingHandlerId.LOCK_ON_START_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.LOCK_ON_START_CALLBACK, handler_context=handler_context)
 
     assert meeting.lock_on_start == (not initial_lock)  # flipped
 
@@ -277,7 +274,7 @@ async def test_toggle_lock_on_start_flips_value_and_re_renders(
 async def test_lock_on_start_stale_alert_when_no_duration(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     user, meeting = owner_with_meeting(meeting_id=1, duration_minutes=None)
     mock_session.add_object(user, query_field="tg_user_id")
@@ -285,7 +282,7 @@ async def test_lock_on_start_stale_alert_when_no_duration(
 
     original_lock = meeting.lock_on_start
 
-    context, _ = await call_handler(EditMeetingHandlerId.LOCK_ON_START_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.LOCK_ON_START_CALLBACK, handler_context=handler_context)
 
     # lock_on_start must not have been modified
     assert meeting.lock_on_start == original_lock
@@ -313,7 +310,7 @@ async def test_lock_on_start_stale_alert_when_no_duration(
 async def test_duration_text_message_handler_edits_to_main_menu_when_context_missing(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When no meeting_id is stored, duration_text_message_handler catches ContextPropertyNotSetError,
     edits the message to the main menu, and ends the conversation."""
@@ -323,8 +320,7 @@ async def test_duration_text_message_handler_edits_to_main_menu_when_context_mis
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
     context, state = await call_handler(
         EditMeetingHandlerId.DURATION_TEXT_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
     )
 
     context.api.assert_method_just_called("edit_message", times=1)
@@ -339,7 +335,7 @@ async def test_duration_text_message_handler_edits_to_main_menu_when_context_mis
 async def test_duration_invalid_message_handler_edits_to_main_menu_when_context_missing(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When no meeting_id is stored, duration_invalid_message_handler catches ContextPropertyNotSetError,
     edits the message to the main menu, and ends the conversation."""
@@ -349,8 +345,7 @@ async def test_duration_invalid_message_handler_edits_to_main_menu_when_context_
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
     context, state = await call_handler(
         EditMeetingHandlerId.DURATION_INVALID_MESSAGE,
-        update=update,
-        app=app,
+        handler_context=handler_context,
     )
 
     context.api.assert_method_just_called("edit_message", times=1)

@@ -10,7 +10,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
-from tests.helpers import AnyFloat, MockDbSession, StubMitupApp, UpdateRequest, call_handler
+from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler
 from tests.helpers.monitoring import MetricAssertions
 
 
@@ -26,10 +26,10 @@ async def test_edit_language(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    context, _ = await call_handler(EditSettingsHandlerId.LANGUAGE_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditSettingsHandlerId.LANGUAGE_CALLBACK, handler_context=handler_context)
 
     expected_view = PaginatedMitupView(
         description=SettingsMessages.SELECT_LANGUAGE.get(
@@ -67,11 +67,11 @@ async def test_set_language(
     update: Update,
     mock_session: MockDbSession,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     language: str,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
 
     expected_view = (
         PaginatedMitupView(
@@ -106,15 +106,13 @@ async def test_set_language_fails_if_id_invalid(
     update: Update,
     mock_session: MockDbSession,
     user: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user, "tg_user_id")
 
-    context, _ = await call_handler(
-        EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app, metrics_client=metrics_client
-    )
+    context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("InvalidLanguageError"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)

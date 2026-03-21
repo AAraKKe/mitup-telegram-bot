@@ -12,7 +12,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
-from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -33,14 +33,14 @@ async def test_show_past_meeting_page_fails_without_callback_query_data(
 async def test_show_past_meetings_entry_shows_correct_view(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
 ):
     past_meetings = [create_meetup(id=i, active=False) for i in range(10, 14)]
     user_with_settings.meetups = past_meetings + [create_meetup(id=20, active=True)]
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_buttons = [
         ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
@@ -67,14 +67,14 @@ async def test_show_past_meetings_entry_shows_correct_view(
 async def test_show_past_meetings_page_navigation_shows_correct_view(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
 ):
     past_meetings = [create_meetup(id=i, active=False) for i in range(10, 14)]
     user_with_settings.meetups = past_meetings
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK, handler_context=handler_context)
 
     expected_buttons = [
         ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
@@ -101,7 +101,7 @@ async def test_show_past_meetings_page_navigation_shows_correct_view(
 async def test_show_past_meetings_excludes_active_meetings(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
 ):
     """Active meetings must not appear in the past meetings list."""
@@ -110,7 +110,7 @@ async def test_show_past_meetings_excludes_active_meetings(
     user_with_settings.meetups = [past, active]
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = PaginatedMitupView(
         description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
@@ -134,13 +134,13 @@ async def test_show_past_meetings_excludes_active_meetings(
 async def test_show_past_meetings_without_past_meetings_shows_main_menu(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
 ):
     user_with_settings.meetups = [create_meetup(id=10, active=True)]
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,

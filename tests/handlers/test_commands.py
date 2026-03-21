@@ -27,8 +27,8 @@ from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, NullBackend
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
+    HandlerContext,
     MockApi,
-    StubMitupApp,
     StubMitupContext,
     UpdateRequest,
     call_handler,
@@ -133,13 +133,11 @@ def test_registry_fails_to_get_handler_that_does_not_exist():
 async def test_command_start_with_new_user(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
-    context, result = await call_handler(
-        RegistrationProcessHandlerId.TIMEZONE_COMMAND, update=update, app=app, metrics_client=metrics_client
-    )
+    context, result = await call_handler(RegistrationProcessHandlerId.TIMEZONE_COMMAND, handler_context=handler_context)
 
     assert update.effective_user is not None
 
@@ -185,11 +183,11 @@ async def test_start_inline_deep_link_sends_create_meeting_view(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_user(user_with_settings)
 
-    context, result = await call_handler(CommandsId.START_WITH_EXISTING_USER, update=update, app=app)
+    context, result = await call_handler(CommandsId.START_WITH_EXISTING_USER, handler_context=handler_context)
 
     expected_view = create_meeting_view(lang=user_with_settings.lang)
     context.api.assert_send_message_called(update, expected_view)

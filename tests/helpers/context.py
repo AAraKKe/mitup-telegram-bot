@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, cast, overload
+from typing import cast
 
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -36,39 +36,14 @@ def build_context(
     return cast(StubMitupContext, context)
 
 
-@overload
-async def call_handler(
-    handler_id: HandlerId,
-    *,
-    update: Update,
-    app: StubMitupApp,
-    with_meeting_id: dict[ContextId, int] | None = None,
-    user_id: int | None = None,
-    metrics_client: MetricsClient | None = None,
-) -> tuple[StubMitupContext, Enum | None]:
-    """
-    Call a handler directly with the given update and app, building the context.
-
-    Args:
-        handler_id: The ID of the handler to call.
-        update: The Update object to process.
-        app: The StubMitupApp instance.
-        with_meeting_id: Optional mapping of ContextId to meeting IDs to pre-populate in the context.
-        user_id: Optional user ID to get the state of the conversation handler, if any.
-        metrics_client: Optional MetricsClient to use for the context.
-    """
-
-
-@overload
 async def call_handler(
     handler_id: HandlerId,
     *,
     handler_context: HandlerContext,
     with_meeting_id: dict[ContextId, int] | None = None,
     user_id: int | None = None,
-) -> tuple[StubMitupContext, None]:
-    """
-    Call a handler directly with the given HandlerContext, building the context.
+) -> tuple[StubMitupContext, Enum | None]:
+    """Call a handler directly with the given HandlerContext, building the context.
 
     Args:
         handler_id: The ID of the handler to call.
@@ -76,46 +51,21 @@ async def call_handler(
         with_meeting_id: Optional mapping of ContextId to meeting IDs to pre-populate in the context.
         user_id: Optional user ID to get the state of the conversation handler, if any.
     """
+    update = handler_context.update
+    app = handler_context.app
 
-
-async def call_handler(
-    handler_id: HandlerId,
-    **kwargs: Any,
-) -> tuple[StubMitupContext, Enum | None]:
-    update: Update | None = cast(Update | None, kwargs.get("update"))
-    app: StubMitupApp | None = cast(StubMitupApp | None, kwargs.get("app"))
-    with_meeting_id: dict[ContextId, int] | None = cast(dict[ContextId, int] | None, kwargs.get("with_meeting_id"))
-    handler_context: HandlerContext | None = cast(HandlerContext | None, kwargs.get("handler_context"))
-    metrics: MetricsClient | None = cast(MetricsClient | None, kwargs.get("metrics_client"))
-
-    real_update: Update
-    real_app: StubMitupApp
-
-    if handler_context is not None:
-        real_update = handler_context.update
-        real_app = handler_context.app
-        metrics = handler_context.metrics_client
-    elif update is not None and app is not None:
-        real_update = update
-        real_app = app
-    else:
-        raise ValueError(
-            "Invalid call_handler usage. You must provide either 'handler_context' or "
-            "both 'update' and 'app' as keyword arguments."
-        )
-
-    context = build_context(real_update, real_app, with_meeting_id, metrics=metrics)
+    context = build_context(update, app, with_meeting_id, metrics=handler_context.metrics_client)
 
     handler = HandlersRegistry.get_handler(handler_id)
 
     # Allow natural handling of the request data provided on the update
-    check_result = handler.check_update(real_update)
+    check_result = handler.check_update(update)
     assert check_result is not None, "This update would not be processed by the handler!"
     assert check_result is not False, "This update would not be processed by the handler!"
 
     # Force cast becuase PTB forces a return type when declaring handlers and set `object` as return type
     # of ConversationHandlers which prevents us from using specific types as the return type is invariant
-    handler_result = cast(Enum | None, await handler.handle_update(real_update, real_app, check_result, context))
+    handler_result = cast(Enum | None, await handler.handle_update(update, app, check_result, context))
 
     # For conversation handlers, retrieve the current state so callers can assert on it.
     #
@@ -158,9 +108,10 @@ async def call_handler(
     # * Tests that previously asserted `state is None` on a per_chat=True conversation
     #   will now receive the real state and may need updating.
     if isinstance(handler, ConversationHandler):
-        user_id = kwargs.get("user_id", real_update.effective_user.id if real_update.effective_user else None)
+        if user_id is None:
+            user_id = update.effective_user.id if update.effective_user else None
         if handler.per_chat and handler.per_user:
-            chat_id = real_update.effective_chat.id if real_update.effective_chat else None
+            chat_id = update.effective_chat.id if update.effective_chat else None
             conv_key: tuple[int | None, ...] = (chat_id, user_id)
         else:
             conv_key = (user_id,)

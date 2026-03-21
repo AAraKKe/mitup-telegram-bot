@@ -7,8 +7,8 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
+    HandlerContext,
     MockDbSession,
-    StubMitupApp,
     UpdateRequest,
     call_handler,
 )
@@ -56,12 +56,12 @@ async def test_delete_past_meeting_shows_confirmation(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context)
 
     mock_session.assert_not_deleted()
     context.api.assert_send_message_called(
@@ -83,12 +83,12 @@ async def test_show_past_meeting_renders_detail_view(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, handler_context=handler_context)
 
     context.api.assert_edit_message_called(update, expected_past_meeting_view(inactive_meeting, user_with_settings))
 
@@ -101,12 +101,14 @@ async def test_confirm_delete_past_meeting_deletes_and_redirects_to_past_meeting
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context
+    )
 
     mock_session.assert_deleted(inactive_meeting)
     context.api.assert_update_meeting_messages_called(session=mock_session, meeting=inactive_meeting, was_deleted=True)
@@ -134,12 +136,14 @@ async def test_decline_delete_past_meeting_returns_to_past_meeting_view(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context
+    )
 
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(update, expected_past_meeting_view(inactive_meeting, user_with_settings))
@@ -153,14 +157,14 @@ async def test_show_past_meeting_silent_when_full_meeting_not_found(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When the user owns the meeting but Meetup.by_id returns None the handler returns silently."""
     # Register the user so guards.current_user succeeds, but do NOT register inactive_meeting
     # so that Meetup.by_id(session, id, include_inactive=True) returns None.
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, handler_context=handler_context)
 
     context.api.assert_method_just_called("edit_message", times=0)
 
@@ -173,12 +177,14 @@ async def test_confirm_delete_past_meeting_silent_when_full_meeting_not_found(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When Meetup.by_id returns None the confirm-delete handler returns silently without deleting anything."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context
+    )
 
     mock_session.assert_not_deleted()
     context.api.assert_method_just_called("send_message", times=0)
@@ -192,11 +198,13 @@ async def test_decline_delete_past_meeting_silent_when_full_meeting_not_found(
     update: Update,
     user_with_settings: User,
     inactive_meeting,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When Meetup.by_id returns None the decline-delete handler returns silently."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(
+        MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context
+    )
 
     context.api.assert_method_just_called("edit_message", times=0)

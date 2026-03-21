@@ -17,7 +17,8 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views import factory
-from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import StubMitupContext, UpdateRequest, call_handler
+from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -26,7 +27,7 @@ from tests.helpers.stub_db import MockDbSession
 async def test_registration_timezone_message_handler_set_the_correct_timezone_and_view(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     get_timezone_from_api: mock.MagicMock,
     user_with_settings: User,
     metrics_client: MetricsClient,
@@ -38,7 +39,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     assert user_with_settings.settings.timezone != cast(Message, update.effective_message).text
 
     context, result = await call_handler(
-        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app, metrics_client=metrics_client
+        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, handler_context=handler_context
     )
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(
@@ -61,7 +62,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
 async def test_registration_timezone_message_handler_log_with_incorrect_timezone(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     get_timezone_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
@@ -75,7 +76,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     assert update.effective_message is not None
 
     context, result = await call_handler(
-        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, update=update, app=app, metrics_client=metrics_client
+        RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, handler_context=handler_context
     )
 
     assert (

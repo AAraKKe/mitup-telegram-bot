@@ -7,16 +7,23 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
 from mitup_bot.views import factory
-from tests.helpers import MockDbSession, StubMitupApp, UpdateRequest, call_handler, telegram_user_from_user
+from tests.helpers import (
+    HandlerContext,
+    MockDbSession,
+    StubMitupApp,
+    UpdateRequest,
+    call_handler,
+    telegram_user_from_user,
+)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_TIMEOUT)], indirect=True)
 async def test_callback_query_timeout(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
+    mock_session: MockDbSession, user_with_settings: User, update: Update, handler_context: HandlerContext
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(EditSettingsHandlerId.TIMEOUT_CALLBACK, update=update, app=app)
+    context, result = await call_handler(EditSettingsHandlerId.TIMEOUT_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
@@ -31,11 +38,13 @@ async def test_callback_query_timeout(
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="10")], indirect=True)
 async def test_settings_timeout_text_message_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
+    mock_session: MockDbSession, user_with_settings: User, update: Update, handler_context: HandlerContext
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, result = await call_handler(EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT, update=update, app=app)
+    context, result = await call_handler(
+        EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT, handler_context=handler_context
+    )
 
     expected_view = factory.settings_view(
         lang=user_with_settings.lang,
@@ -55,14 +64,17 @@ async def test_settings_timeout_text_message_handler(
     indirect=True,
 )
 async def test_settings_timeout_invalid_input_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, app: StubMitupApp
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     # Frist call the conversation handler with the valid callback
     telegram_user = telegram_user_from_user(user_with_settings)
-    context, _ = await call_handler(
-        EditSettingsHandlerId.TIMEOUT_CONVERSATION,
+    ctx = HandlerContext(
         update=Update(
             1,
             callback_query=CallbackQuery(
@@ -74,10 +86,15 @@ async def test_settings_timeout_invalid_input_handler(
             ),
         ),
         app=app,
+        metrics_client=handler_context.metrics_client,
+    )
+    context, _ = await call_handler(
+        EditSettingsHandlerId.TIMEOUT_CONVERSATION,
+        handler_context=ctx,
     )
 
     # Now that we are in the conversation, we will call the conversation handler with a text message with invalid input
-    context, _ = await call_handler(EditSettingsHandlerId.TIMEOUT_CONVERSATION, update=update, app=app)
+    context, _ = await call_handler(EditSettingsHandlerId.TIMEOUT_CONVERSATION, handler_context=handler_context)
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
@@ -97,8 +114,12 @@ async def test_settings_timeout_invalid_input_handler(
         text="10",
     )
 
+    ctx = HandlerContext(
+        update=Update(1, message=correct_message), app=app, metrics_client=handler_context.metrics_client
+    )
     context, _ = await call_handler(
-        EditSettingsHandlerId.TIMEOUT_CONVERSATION, update=Update(1, message=correct_message), app=app
+        EditSettingsHandlerId.TIMEOUT_CONVERSATION,
+        handler_context=ctx,
     )
 
     assert user_with_settings.settings.timeout == 10

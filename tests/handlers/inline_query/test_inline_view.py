@@ -3,7 +3,6 @@ from collections.abc import Callable
 
 import pytest
 from telegram import Update
-from telegram.ext import Application
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
@@ -11,7 +10,7 @@ from mitup_bot.models import User
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import ButtonMessages, InlineViewMessages
 from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
-from tests.helpers import create_meetup, create_user
+from tests.helpers import HandlerContext, create_meetup, create_user
 from tests.helpers.context import call_handler
 from tests.helpers.fixtures import UpdateRequest
 from tests.helpers.stub_db import MockDbSession
@@ -53,11 +52,11 @@ async def test_inline_view_returns_results_and_button(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     mock_session.add_user(user_with_settings)
 
-    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
 
     context.api.assert_method_just_called("answer_inline_query")
     _, kwargs = context.api.call_args("answer_inline_query")
@@ -85,13 +84,13 @@ async def test_inline_view_uses_user_language(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     """When the user has a mitup profile, inline view messages should use their language."""
     mock_session.add_user(user_with_settings)
     lang = user_with_settings.lang
 
-    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
 
     _, kwargs = context.api.call_args("answer_inline_query")
     button = kwargs["button"]
@@ -105,12 +104,12 @@ async def test_inline_view_uses_user_language(
 async def test_inline_view_falls_back_to_default_language_for_unknown_user(
     update: Update,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     """When the user does not have a mitup profile, inline view should fall back to the default language."""
     default_lang = TranslationEngine.FALLBACK_LANG
 
-    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,
@@ -159,13 +158,13 @@ def _mixed_active_inactive_scenario() -> tuple[User, list[MitupInlineView]]:
 async def test_inline_view_includes_user_meetings(
     update: Update,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
     build_scenario: Callable[[], tuple[User, list[MitupInlineView]]],
 ):
     user, expected_meeting_views = build_scenario()
     mock_session.add_user(user)
 
-    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,
@@ -179,7 +178,7 @@ async def test_inline_view_includes_user_meetings(
 async def test_inline_view_sorts_user_meetings_by_relevance(
     update: Update,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     """Future meetings first, then no datetime, then past."""
     now = dt.datetime.now(tz=dt.UTC)
@@ -191,7 +190,7 @@ async def test_inline_view_sorts_user_meetings_by_relevance(
     user = create_user(id=1, tg_user_id=123, first_name="Test", owned_meetings=[past, future, no_date])
     mock_session.add_user(user)
 
-    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,
@@ -210,7 +209,7 @@ async def test_inline_view_sorts_user_meetings_by_relevance(
 async def test_inline_view_sorts_no_datetime_meetings_by_created_time(
     update: Update,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     """Meetings without a datetime should be ordered by created_time ascending."""
     base = dt.datetime(2024, 1, 1, tzinfo=dt.UTC)
@@ -222,7 +221,7 @@ async def test_inline_view_sorts_no_datetime_meetings_by_created_time(
     user = create_user(id=1, tg_user_id=123, first_name="Test", owned_meetings=[late, early, middle])
     mock_session.add_user(user)
 
-    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,

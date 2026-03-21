@@ -9,12 +9,14 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback_query_create_meeting
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
     ConversationStep,
     ConversationTester,
+    HandlerContext,
     MockDbSession,
     StubMitupContext,
     call_handler,
@@ -124,6 +126,7 @@ async def test_meeting_creation_with_date_entity_preserves_full_title_and_sets_d
     user_with_settings: User,
     mock_session: MockDbSession,
     conversation: ConversationTester,
+    metrics_client: MetricsClient,
 ):
     """A single date_time entity no longer strips the title — the full user input is stored.
     The meetup.datetime field is still derived from the entity's unix_time.
@@ -144,8 +147,10 @@ async def test_meeting_creation_with_date_entity_preserves_full_title_and_sets_d
     date_entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=14, length=8, unix_time=unix_dt)
     title_update = make_message_update("Board meeting tomorrow", entities=[date_entity])
 
+    ctx = HandlerContext(update=title_update, app=conversation.app, metrics_client=metrics_client)
     context, _ = await call_handler(
-        MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=title_update, app=conversation.app
+        MeetingHandlerId.CREATE_MEETING_CONVERSATION,
+        handler_context=ctx,
     )
 
     assert len(mock_session.objects_added) == 1
@@ -161,6 +166,7 @@ async def test_meeting_creation_with_single_word_datetime_title_preserves_title(
     user_with_settings: User,
     mock_session: MockDbSession,
     conversation: ConversationTester,
+    metrics_client: MetricsClient,
 ):
     """A title that is entirely a single date_time entity (e.g. 'today') is stored as-is,
     not reduced to an empty string.
@@ -178,8 +184,10 @@ async def test_meeting_creation_with_single_word_datetime_title_preserves_title(
     date_entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=5, unix_time=unix_dt)
     title_update = make_message_update("today", entities=[date_entity])
 
+    ctx = HandlerContext(update=title_update, app=conversation.app, metrics_client=metrics_client)
     context, _ = await call_handler(
-        MeetingHandlerId.CREATE_MEETING_CONVERSATION, update=title_update, app=conversation.app
+        MeetingHandlerId.CREATE_MEETING_CONVERSATION,
+        handler_context=ctx,
     )
 
     assert len(mock_session.objects_added) == 1
@@ -200,6 +208,7 @@ async def test_meeting_creation_with_date_entity_without_unix_time_preserves_tit
     user_with_settings: User,
     mock_session: MockDbSession,
     app,
+    metrics_client: MetricsClient,
 ):
     """A date_time entity whose to_dict() lacks 'unix_time' preserves the full title and does NOT
     set meetup.datetime (unix_time is None → the timestamp branch is skipped)."""
@@ -211,7 +220,11 @@ async def test_meeting_creation_with_date_entity_without_unix_time_preserves_tit
     date_entity = MessageEntity(type="date_time", offset=14, length=8)
     title_update = make_message_update("Board meeting tomorrow", entities=[date_entity])
 
-    context, _ = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, update=title_update, app=app)
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    context, _ = await call_handler(
+        MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
+        handler_context=ctx,
+    )
 
     assert len(mock_session.objects_added) == 1
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
@@ -259,6 +272,7 @@ async def test_invalid_title_fires_fallback_handler(
     mock_session: MockDbSession,
     app,
     bad_update: Update,
+    metrics_client: MetricsClient,
 ):
     """Text with unsupported entities triggers the fallback handler, keeping TITLE state."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -266,8 +280,10 @@ async def test_invalid_title_fires_fallback_handler(
     # Call the fallback handler directly. PTB does not persist state from fallback
     # handlers when going through the ConversationHandler, so using the individual
     # handler ID lets us assert the actual return value.
+    ctx = HandlerContext(update=bad_update, app=app, metrics_client=metrics_client)
     context, state = await call_handler(
-        MeetingHandlerId.CREATE_MEETING_INVALID_TITLE_MESSAGE, update=bad_update, app=app
+        MeetingHandlerId.CREATE_MEETING_INVALID_TITLE_MESSAGE,
+        handler_context=ctx,
     )
 
     # No meeting created

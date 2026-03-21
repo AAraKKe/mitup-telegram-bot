@@ -15,7 +15,7 @@ from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import (
-    StubMitupApp,
+    HandlerContext,
     StubMitupContext,
     UpdateRequest,
     call_handler,
@@ -46,7 +46,7 @@ async def test_show_meetings_use_correct_view(
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     # We add some meetings to the user joined_links so that the view is not empty
     meetups_to_join = [create_meetup(id=i, owner=user_with_settings, title=f"Test Meeting {i}") for i in range(10, 14)]
@@ -55,7 +55,7 @@ async def test_show_meetings_use_correct_view(
     ]
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
 
     user_meetings_buttons: list[ButtonConfig] = [
         ButtonConfig(text=str(link.meetup.title), callback_data=cb.SHOW_MEETING.with_id(link.meetup.db_id))
@@ -89,7 +89,7 @@ async def test_show_meetings_filters_out_inactive_meetings(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     active_meetup = create_meetup(id=10, title="Active Meeting")
     inactive_meetup = create_meetup(id=11, title="Inactive Meeting", active=False)
@@ -99,7 +99,7 @@ async def test_show_meetings_filters_out_inactive_meetings(
     ]
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = PaginatedMitupView(
         description=MeetingMessages.JOINED_MEETINGS_PAGE.get(lang=user_with_settings.lang),
@@ -133,7 +133,7 @@ async def test_show_meetings_shows_empty_state_when_all_joined_meetings_inactive
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     inactive_meetups = [create_meetup(id=i, title=f"Inactive {i}", active=False) for i in range(10, 13)]
     user_with_settings.joined_links = [
@@ -141,7 +141,7 @@ async def test_show_meetings_shows_empty_state_when_all_joined_meetings_inactive
     ]
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
@@ -154,12 +154,12 @@ async def test_show_meetings_shows_empty_state_when_all_joined_meetings_inactive
     "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
 )
 async def test_show_meetings_without_meetings_to_show_works(
-    mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User
+    mock_session: MockDbSession, update: Update, handler_context: HandlerContext, user_with_settings: User
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     user_with_settings.meetups = []
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,

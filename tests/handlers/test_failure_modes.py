@@ -25,8 +25,7 @@ from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
-from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, create_meetup
-from tests.helpers.context import build_context
+from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -690,27 +689,22 @@ async def test_callback_fails_when_meeting_not_accessible(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
-    metrics_client,
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED))
 
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     # MeetingNotOwned error metric is emitted
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     _assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
-    ctx.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
 @pytest.mark.parametrize(
@@ -726,20 +720,15 @@ async def test_callback_fails_when_meeting_not_found(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
-    metrics_client,
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     extra = (
         test_context.extra_metrics_not_found
@@ -756,7 +745,7 @@ async def test_callback_fails_when_meeting_not_found(
             )
         ]
     ]
-    ctx.api.assert_edit_message_called(
+    context.api.assert_edit_message_called(
         update,
         MitupView(
             description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
@@ -777,17 +766,12 @@ async def test_callback_fails_with_malformed_callback_data(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
-    metrics_client,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     # emit_global=True for FAULT means 2 records (FAULT=1 for handler dims + global)
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("MalformedCallbackData"), value=1)
@@ -805,17 +789,13 @@ async def test_callback_fails_when_user_is_not_found(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
-    metrics_client,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    # Do not register the user in the db and call the handler
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
@@ -835,17 +815,17 @@ async def test_callback_fails_when_missing_necessary_user_data(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
-    metrics_client,
+    handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    # If context data is needed it should be validated before having to hit the database.
+    # The fault should happen before testing if any object exists in the db and, therefore,
+    # there is no need to add any.
+    # If this test fails because the an object is not found in the database, it means that the
+    # validation is not happening in the right place and the callback needs to be updated.
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
@@ -865,9 +845,8 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
-    metrics_client,
     metrics: MetricAssertions,
 ):
     inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False)
@@ -875,13 +854,9 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     _assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
 
@@ -890,7 +865,7 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
         if test_context.reactivation_back_keyboard_factory
         else None
     )
-    ctx.api.assert_edit_message_called(
+    context.api.assert_edit_message_called(
         update,
         factory.reactivation_prompt_view(
             lang=user_with_settings.lang, meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
@@ -910,9 +885,8 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
-    metrics_client,
     metrics: MetricAssertions,
 ):
     """Non-owner accessing an inactive meeting is redirected to main menu (not-owned behavior)."""
@@ -920,13 +894,9 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    ctx = build_context(update, app, test_context.meeting_id, metrics=metrics_client)
-    handler = __import__("mitup_bot.handlers", fromlist=["HandlersRegistry"]).HandlersRegistry.get_handler(
-        test_context.handler_id
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
-    check_result = handler.check_update(update)
-    assert check_result is not None and check_result is not False
-    await handler.handle_update(update, app, check_result, ctx)
 
     extra = (
         test_context.extra_metrics_non_owner_inactive
@@ -935,4 +905,4 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     _assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
-    ctx.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))

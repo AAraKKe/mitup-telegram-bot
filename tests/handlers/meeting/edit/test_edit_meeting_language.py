@@ -8,7 +8,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import factory
-from tests.helpers import StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -23,7 +23,7 @@ async def test_callback_edit_meeting_language(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """Test that the edit meeting language callback displays the language selection view."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", language="en")
@@ -31,7 +31,7 @@ async def test_callback_edit_meeting_language(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(EditMeetingHandlerId.LANGUAGE_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.LANGUAGE_CALLBACK, handler_context=handler_context)
 
     context.api.assert_edit_message_called(
         update,
@@ -53,7 +53,7 @@ async def test_callback_set_meeting_language(
     update: Update,
     new_language_idx: int,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
@@ -69,9 +69,7 @@ async def test_callback_set_meeting_language(
     message2 = Message(message_id=222, chat_id=222, meetup=meeting)
     meeting.messages.extend([message1, message2])
 
-    context, _ = await call_handler(
-        EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app, metrics_client=metrics_client
-    )
+    context, _ = await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
 
     # Verify the language was updated
     expected_language = SUPPORTED_LANGUAGES[new_language_idx]
@@ -113,7 +111,7 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
     update: Update,
     initial_language: str,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """Test that changing language updates all message keyboards with the new language."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", language=initial_language)
@@ -129,7 +127,7 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
     ]
     meeting.messages.extend(messages)
 
-    context, _ = await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
 
     # Verify all message keyboards were updated
     for message in messages:

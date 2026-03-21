@@ -12,7 +12,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
-from tests.helpers import StubMitupApp, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -80,13 +80,13 @@ async def test_show_meetings_use_correct_view(
     "update", [UpdateRequest(callback_query=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1))], indirect=True
 )
 async def test_show_meetings_without_meetings_to_show_works(
-    mock_session: MockDbSession, update: Update, app: StubMitupApp, user_with_settings: User
+    mock_session: MockDbSession, update: Update, handler_context: HandlerContext, user_with_settings: User
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     user_with_settings.meetups = [create_meetup(10, active=False)]
 
     # Use MainMenuHandlerId for call_handler
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
@@ -113,7 +113,7 @@ async def test_show_meetings_without_meetings_to_show_works(
 async def test_show_meetings_skips_meetings_with_blank_titles(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
     blank_title: str,
     meeting_id: int,
@@ -128,7 +128,7 @@ async def test_show_meetings_skips_meetings_with_blank_titles(
     blank_meeting = create_meetup(meeting_id, title=blank_title)
     user_with_settings.meetups = [valid_meeting, blank_meeting]
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, handler_context=handler_context)
 
     # Only the meeting with a non-blank title should appear as a button.
     expected_buttons = [
@@ -161,7 +161,7 @@ async def test_show_meetings_skips_meetings_with_blank_titles(
 async def test_show_meetings_falls_back_to_no_meetings_view_when_all_titles_are_blank(
     mock_session: MockDbSession,
     update: Update,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     user_with_settings: User,
 ):
     """When all active meetings have blank titles the handler must show the 'no meetings' view
@@ -174,7 +174,7 @@ async def test_show_meetings_falls_back_to_no_meetings_view_when_all_titles_are_
         create_meetup(31, title="   "),
     ]
 
-    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,

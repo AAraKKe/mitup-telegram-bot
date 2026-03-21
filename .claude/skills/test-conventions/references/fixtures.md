@@ -75,6 +75,7 @@ async def test_something(update: Update, ...):
 | `chat` | `bool` | `True` | Include chat info |
 | `message` | `bool` | `True` | Include message info |
 | `message_text` | `str \| None` | `None` | Text content of the message |
+| `entities` | `list[MessageEntity] \| None` | `None` | Message entities (e.g., `DATE_TIME`) |
 | `location` | `Location \| None` | `None` | Location data |
 | `callback_query` | `CallbackData \| bool` | `False` | Callback data (use `cb.XXX.with_id(n)`) |
 | `command` | `str \| bool` | `False` | Bot command (e.g., `"start"`) |

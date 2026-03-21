@@ -40,6 +40,7 @@ class UpdateRequest:
     chat: bool = True
     message: bool = True
     message_text: str | None = None
+    entities: list[MessageEntity] | None = None
     location: Location | None = None
     callback_query: CallbackData | bool = False
     command: str | bool = False
@@ -295,6 +296,7 @@ def create_update(
             chat=chat,
             from_user=user,
             text=request.message_text,
+            entities=request.entities,
             location=request.location,
         ),
     )

@@ -11,7 +11,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.fixtures import create_joined_link, create_user
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -45,12 +45,12 @@ async def test_delete_meeting_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
@@ -93,13 +93,13 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     handler_id: MeetingHandlerId,
     action: str,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     caplog: pytest.LogCaptureFixture,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(handler_id, update=update, app=app)
+        context, _ = await call_handler(handler_id, handler_context=handler_context)
 
         assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
         assert "Meeting id: 999, user id: 1" in caplog.text
@@ -135,7 +135,7 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     handler_id: MeetingHandlerId,
     action: str,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     caplog: pytest.LogCaptureFixture,
 ):
     owner = User(tg_user_id=2, first_name="Another", id=2, settings=Settings())
@@ -144,7 +144,7 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     mock_session.add_object(meeting)
 
     with caplog.at_level(logging.WARNING):
-        context, _ = await call_handler(handler_id, update=update, app=app)
+        context, _ = await call_handler(handler_id, handler_context=handler_context)
 
         assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
         assert "Meeting id: 111, user id: 1" in caplog.text
@@ -157,14 +157,14 @@ async def test_confirm_delete_meeting_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     meeting_deleted = user_with_settings.meetups[0]
     mock_session.add_object(meeting_deleted)
 
-    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     mock_session.assert_deleted(meeting_deleted)
 
@@ -189,12 +189,12 @@ async def test_decline_delete_meeting_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
@@ -217,14 +217,14 @@ async def test_delete_meeting_failures(
     update: Update,
     user_fixture: str,
     error_type: type[Exception],
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
     metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, update=update, app=app, metrics_client=metrics_client)
+    context, _ = await call_handler(MeetingHandlerId.DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     assert_metrics_for_failure(1, error_type, metrics_client)
 
@@ -241,16 +241,14 @@ async def test_confirm_delete_meeting_failures(
     update: Update,
     user_fixture: str,
     error_type: type[Exception],
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
     metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    await call_handler(
-        MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app, metrics_client=metrics_client
-    )
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     assert_metrics_for_failure(1, error_type, metrics_client)
 
@@ -267,16 +265,14 @@ async def test_decline_delete_meeting_failures(
     update: Update,
     user_fixture: str,
     error_type: type[Exception],
-    app: StubMitupApp,
+    handler_context: HandlerContext,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
     metrics_client: MetricsClient,
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
 
-    await call_handler(
-        MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, update=update, app=app, metrics_client=metrics_client
-    )
+    context, _ = await call_handler(MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     assert_metrics_for_failure(1, error_type, metrics_client)
 
@@ -287,7 +283,7 @@ async def test_delete_meeting_with_invited_users_works(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     meeting = user_with_settings.meetups[0]
@@ -299,7 +295,7 @@ async def test_delete_meeting_with_invited_users_works(
 
     mock_session.add_object(user_with_settings.meetups[0])
 
-    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, update=update, app=app)
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
     expected_delete_query = f"DELETE FROM users WHERE users.id IN ({invited_user_1.user_id}, {invited_user_2.user_id})"
     assert expected_delete_query in mock_session.queries_executed

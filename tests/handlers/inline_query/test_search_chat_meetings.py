@@ -4,7 +4,6 @@ from collections.abc import Callable
 import pytest
 from sqlmodel import select
 from telegram import Update
-from telegram.ext import Application
 
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from mitup_bot.models import Meetup, Message, User
@@ -12,6 +11,7 @@ from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils.messages import InlineViewMessages
 from mitup_bot.views import MitupInlineView
 from tests.helpers import (
+    HandlerContext,
     MockDbSession,
     UpdateRequest,
     call_handler,
@@ -48,7 +48,7 @@ async def test_search_returns_matching_meetings(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
@@ -62,9 +62,7 @@ async def test_search_returns_matching_meetings(
 
     register_messages_query(mock_session, [msg])
 
-    context, _ = await call_handler(
-        InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app, metrics_client=metrics_client
-    )
+    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,
@@ -79,12 +77,12 @@ async def test_search_returns_no_meetings_found_when_empty(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     mock_session.add_user(user_with_settings)
     register_messages_query(mock_session, [])
 
-    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,
@@ -127,14 +125,14 @@ async def test_search_filters_to_single_result(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
     build_scenario: Callable[[User], tuple[list[Message], Meetup]],
 ):
     mock_session.add_user(user_with_settings)
     messages, expected_meeting = build_scenario(user_with_settings)
     register_messages_query(mock_session, messages)
 
-    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,
@@ -148,7 +146,7 @@ async def test_search_skips_message_with_no_meetup(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     """A Message whose .meetup is None must be skipped (the continue branch on line 39)."""
     mock_session.add_user(user_with_settings)
@@ -159,7 +157,7 @@ async def test_search_skips_message_with_no_meetup(
 
     register_messages_query(mock_session, [orphan_msg])
 
-    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, handler_context=handler_context)
 
     # Since no valid meetup was found, we should get the "no meetings found" response
     context.api.assert_answer_inline_query_called(
@@ -173,7 +171,7 @@ async def test_search_skips_message_with_no_meetup(
 async def test_search_sorts_by_relevance(
     update: Update,
     mock_session: MockDbSession,
-    app: Application,
+    handler_context: HandlerContext,
 ):
     """Future meetings first, then no datetime, then past."""
     now = dt.datetime.now(tz=dt.UTC)
@@ -195,7 +193,7 @@ async def test_search_sorts_by_relevance(
 
     register_messages_query(mock_session, [msg1, msg2, msg3])
 
-    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, update=update, app=app)
+    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, handler_context=handler_context)
 
     context.api.assert_answer_inline_query_called(
         update=update,

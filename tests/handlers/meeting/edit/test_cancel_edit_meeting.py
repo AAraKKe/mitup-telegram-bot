@@ -10,19 +10,21 @@ from mitup_bot.models import Meetup
 from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
-from tests.helpers import StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(123))]), indirect=True)
 async def test_cancel_edit_meeting_works(
-    mock_session: MockDbSession, update: Update, meeting: Meetup, app: StubMitupApp
+    mock_session: MockDbSession, update: Update, meeting: Meetup, handler_context: HandlerContext
 ):
     mock_session.add_object(meeting)
     mock_session.add_object(meeting.owner, "tg_user_id")
 
     context, result = await call_handler(
-        EditMeetingHandlerId.CANCEL, update=update, app=app, with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123}
+        EditMeetingHandlerId.CANCEL,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123},
     )
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -37,15 +39,14 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
     update: Update,
     meeting: Meetup,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     with caplog.at_level(logging.ERROR):
         context, result = await call_handler(
             EditMeetingHandlerId.CANCEL,
-            update=update,
-            app=app,
+            handler_context=handler_context,
             with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123},
         )
 
@@ -60,7 +61,7 @@ async def test_cancel_edit_meeting_returns_end_when_user_does_not_own_meeting(
     caplog: pytest.LogCaptureFixture,
     update: Update,
     user_with_settings: User,
-    app: StubMitupApp,
+    handler_context: HandlerContext,
 ):
     """When user_owns_meeting returns None (meeting not owned), cancel_edit_meeting returns END.
     The guard itself redirects the user to the main menu via edit_message."""
@@ -69,7 +70,7 @@ async def test_cancel_edit_meeting_returns_end_when_user_does_not_own_meeting(
     mock_session.add_object(create_meetup(999))
 
     with caplog.at_level(logging.WARNING):
-        context, result = await call_handler(EditMeetingHandlerId.CANCEL, update=update, app=app)
+        context, result = await call_handler(EditMeetingHandlerId.CANCEL, handler_context=handler_context)
         assert "User tried 'Cancel edit meeting' with a meeting that does not belong to them." in caplog.text
 
     assert result is ConversationHandler.END
