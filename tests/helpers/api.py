@@ -155,7 +155,7 @@ class MockApi(TelegramApi):
         was_deleted: bool | None = None,
         times: int = 1,
     ):
-        arguments = {
+        arguments: dict[str, Any] = {
             "session": session,
             "meeting": meeting,
         }

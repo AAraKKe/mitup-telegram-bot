@@ -38,7 +38,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 USAGE = """\
 Usage:
@@ -125,10 +125,11 @@ def cmd_reply_batch(mr_iid: str, json_source: str) -> None:
         print("Error: batch JSON must be an array.", file=sys.stderr)
         sys.exit(1)
 
-    for idx, entry in enumerate(replies, start=1):
-        if not isinstance(entry, dict) or "discussion_id" not in entry or "body" not in entry:
+    for idx, raw_entry in enumerate(replies, start=1):
+        if not isinstance(raw_entry, dict) or "discussion_id" not in raw_entry or "body" not in raw_entry:
             print(f"Error: batch JSON entry #{idx} must be an object with 'discussion_id' and 'body'.", file=sys.stderr)
             sys.exit(1)
+        entry = cast(dict[str, str], raw_entry)
         cmd_reply(mr_iid, entry["discussion_id"], entry["body"])
 
 

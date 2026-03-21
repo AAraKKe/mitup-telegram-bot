@@ -34,6 +34,26 @@ class InMemorySink(StdoutSink):
             self.container.append(json.loads(content))
 
 
+def _metrics_match(expected: dict[str, Any], actual: dict[str, Any]) -> bool:
+    """Compare two metric dicts, handling EMF value aggregation.
+
+    When the same metric name is emitted multiple times on one logger,
+    aws-embedded-metrics aggregates the scalar values into a list.
+    This function treats an expected scalar as matching an actual list
+    when the scalar matches every element of that list.
+    """
+    if expected.keys() != actual.keys():
+        return False
+    for key in expected:
+        ev, av = expected[key], actual[key]
+        if isinstance(av, list) and not isinstance(ev, list):
+            if any(ev != element for element in av):
+                return False
+        elif ev != av:
+            return False
+    return True
+
+
 class StubMetrics(MitupMetricsLogger):
     def __init__(self, container: TSinkContainer | None = None):
         self.metrics_container: TSinkContainer = [] if container is None else container
@@ -58,7 +78,7 @@ class StubMetrics(MitupMetricsLogger):
         self,
         names: Sequence[str | MetricKey],
         namespace: str,
-        values: Sequence[float] | Sequence[Sequence[float]] | None = None,
+        values: Sequence[float | Sequence[float]] | None = None,
         units: Sequence[Unit] | None = None,
         dimensions: list[dict[str, str]] | None = None,
         properties: dict[str, Any] | None = None,
@@ -117,7 +137,7 @@ class StubMetrics(MitupMetricsLogger):
     def assert_metrics_emited(
         self,
         names: Sequence[str | MetricKey],
-        values: Sequence[float] | Sequence[Sequence[float]] | None = None,
+        values: Sequence[float | Sequence[float]] | None = None,
         units: Sequence[Unit] | None = None,
         namespace: str | None = None,
         dimensions: dict[str, str | Feature] | None = None,
@@ -176,11 +196,11 @@ class StubMetrics(MitupMetricsLogger):
         emitted_list = "\n- ".join(str(element) for element in actual)
 
         if negative_case:
-            assert all(expected != cw_metrics for cw_metrics in actual), (
+            assert all(not _metrics_match(expected, cw_metrics) for cw_metrics in actual), (
                 f"Unexpected metrics emitted.\nNot expected:\n- {expected}\nEmitted:\n- {emitted_list}"
             )
         else:
-            found = sum(expected == cw_metrics for cw_metrics in actual)
+            found = sum(_metrics_match(expected, cw_metrics) for cw_metrics in actual)
             assert found == times, (
                 f"Expected metrics emitted {times} times. But emitted {found} times."
                 f"\nExpected:\n- {expected}\nEmitted:\n- {emitted_list}"
@@ -240,7 +260,7 @@ class StubMetricsEngine(MitupMetricsEngine[StubMetrics]):
     def assert_metrics_emited(
         self,
         names: Sequence[str | MetricKey],
-        values: Sequence[float] | None = None,
+        values: Sequence[float | Sequence[float]] | None = None,
         units: Sequence[Unit] | None = None,
         namespace: str | None = None,
         dimensions: dict[str, str | Feature] | None = None,
@@ -298,7 +318,7 @@ class StubMetricsEngine(MitupMetricsEngine[StubMetrics]):
     def assert_handler_metrics_emitted(
         self,
         names: Sequence[str | MetricKey],
-        values: Sequence[float] | None = None,
+        values: Sequence[float | Sequence[float]] | None = None,
         units: Sequence[Unit] | None = None,
         exception: type[Exception] | str | None = None,
         times: int = 1,

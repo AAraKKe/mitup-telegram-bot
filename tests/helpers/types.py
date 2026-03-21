@@ -21,7 +21,10 @@ class AnyFloat(float):
     """Use this in assertions for metrics where the value is not important"""
 
     def __eq__(self, other: Any) -> bool:
-        return True
+        return isinstance(other, (int, float))
+
+    def __ne__(self, other: Any) -> bool:
+        return not self.__eq__(other)
 
 
 class CliRunner(Protocol):
