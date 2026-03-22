@@ -134,5 +134,5 @@ await client.flush()
 Use `NullBackend()` in tests and `EmfBackend(...)` in production. The `base_dimensions` are merged into every emission automatically.
 
 <note>
-`BotAdapter` (used in lambdas/CLI) does **not** emit metrics — its `emit_metric()` and `with_time_metric()` are no-ops. If metrics are needed from a lambda, use `MetricsClient` directly as shown above.
+`BotAdapter` delegates metrics to the `MetricsClient` provided at construction. When a real backend (e.g., `EmfBackend`) is used, metrics are emitted normally. For convenience, `build_api(bare_ext_bot)` defaults to `NullBackend` when metrics are not needed (see the `api-wrapper` skill).
 </note>

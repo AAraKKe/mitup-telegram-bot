@@ -25,7 +25,7 @@ Defined in `protocols.py`. Requires `bot`, `with_time_metric()`, `emit_metric()`
 | Adapter | Context | Metrics |
 |---------|---------|---------|
 | `MitupContext` | Handler execution (full PTB context) | Full metrics emission |
-| `BotAdapter` | Lambda/CLI (bare `ExtBot`) | No-op metrics (stubs) |
+| `BotAdapter` | Lambda/CLI (bare `ExtBot`) | Metrics via provided `MetricsClient` |
 
 ## Usage in handlers
 
@@ -55,12 +55,12 @@ Or construct manually:
 ```python
 from mitup_bot.api_wrapper import TelegramApi, BotAdapter
 
-adapter = BotAdapter(bot)
+adapter = BotAdapter(bot, metrics_client)
 api = TelegramApi()
 api.adapter = adapter
 ```
 
-Note that `BotAdapter` does not emit metrics. If metrics are needed from non-handler code, use `MitupMetricsEngine` directly (see the `monitoring` reference skill).
+`BotAdapter` requires a `MetricsClient` to emit metrics. For convenience, `build_api(bare_ext_bot)` defaults to `NullBackend` when you don't need metrics (see the `monitoring` reference skill).
 
 ## Key methods
 

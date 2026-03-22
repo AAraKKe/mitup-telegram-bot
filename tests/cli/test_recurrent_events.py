@@ -168,6 +168,45 @@ async def test_handle_maintainance(
         )
 
 
+async def test_handle_maintainance_emits_telegram_api_time_metrics():
+    """Verify TelegramApiTime metrics flow through the real MetricsClient via BotAdapter."""
+    captured_client: list[MetricsClient] = []
+
+    def make_client(backend, base_dimensions=None):
+        assert not isinstance(backend, NullBackend), "Expected a real backend, not NullBackend"
+        client = MetricsClient(NullBackend(), base_dimensions=base_dimensions)
+        captured_client.append(client)
+        return client
+
+    bot = AsyncMock()
+
+    async def trigger_api_call(event_type, api, client):
+        """Simulate a Telegram API call inside an event to exercise with_time_metric."""
+        await api.send_message_to_user(MagicMock(tg_user_id=123, lang="en"), "test")
+
+    with (
+        patch(
+            "mitup_bot.cli.commands.recurrent_events.launch_event",
+            side_effect=trigger_api_call,
+        ),
+        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
+        patch("mitup_bot.cli.commands.recurrent_events.MetricsClient", side_effect=make_client),
+    ):
+        mock_db.get_open_connections.return_value = 0
+
+        await handle_maintainance(EventType.USER_CLEANUP, bot)
+
+        assert len(captured_client) == 1
+        client = captured_client[0]
+        assertions = MetricAssertions(client)
+
+        # TelegramApiTime is emitted by BotAdapter.with_time_metric inside TelegramApi methods
+        assertions.assert_emitted(
+            name="TelegramApiTime",
+            unit=MetricUnit.MILLISECONDS,
+        )
+
+
 async def test_run_periodic_runs_event():
     bot = MagicMock()
 
@@ -239,6 +278,7 @@ def test_cli_invokes_with_defaults():
     with (
         patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
         patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
+        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend") as mock_configure_emf,
         patch("mitup_bot.cli.commands.recurrent_events.build_bot") as mock_build_bot,
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
@@ -251,6 +291,7 @@ def test_cli_invokes_with_defaults():
         assert result.exit_code == 0, result.output
         mock_config_cls.assert_called_once()
         mock_db.configure_db.assert_called_once_with(mock_config.db)
+        mock_configure_emf.assert_called_once_with(mock_config.metrics)
         mock_build_bot.assert_called_once_with(mock_config.bot)
         mock_async_run.assert_called_once()
 
@@ -261,6 +302,7 @@ def test_cli_passes_custom_intervals():
     with (
         patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
         patch("mitup_bot.cli.commands.recurrent_events.db"),
+        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.run_all_tasks", new_callable=AsyncMock) as mock_run_all_tasks,
@@ -307,6 +349,7 @@ def test_cli_env_option():
     with (
         patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
         patch("mitup_bot.cli.commands.recurrent_events.db"),
+        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),

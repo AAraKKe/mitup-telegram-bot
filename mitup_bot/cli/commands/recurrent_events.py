@@ -9,7 +9,7 @@ import click
 from telegram.ext import AIORateLimiter, ExtBot
 
 from mitup_bot import db
-from mitup_bot.api_wrapper import TelegramApiWrapper, build_api
+from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.cli import (
     generate_stats,
     inactive_meetings,
@@ -19,7 +19,7 @@ from mitup_bot.cli import (
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
-from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, configure_emf_backend
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
 DEFAULT_GENERATE_STATS_INTERVAL = 3600
@@ -92,7 +92,7 @@ async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: M
 
 async def handle_maintainance(event_type: EventType, bot: ExtBot, client: MetricsClient | None = None) -> None:
     client = client or MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})
-    api = build_api(bot)
+    api = build_api(BotAdapter(bot, client))
 
     start_time = perf_counter()
     fault = False
@@ -205,6 +205,7 @@ def cli(
     )
 
     db.configure_db(config.db)
+    configure_emf_backend(config.metrics)
 
     bot = build_bot(config.bot)
 

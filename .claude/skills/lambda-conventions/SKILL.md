@@ -17,7 +17,7 @@ AWS Lambda functions live in `mitup_bot/lambdas/`. They run outside the PTB appl
 ## Constraints
 
 - **No `MitupRuntime`** — lambdas cannot use the full bot bootstrap. They set up DB, config, and API independently.
-- **`BotAdapter` instead of `MitupContext`** — since there is no PTB `Application`, use `BotAdapter` for Telegram API access. Note that `BotAdapter` metrics methods are no-ops; if metrics are needed, use `MitupMetricsEngine` directly (see the `monitoring` skill).
+- **`BotAdapter` instead of `MitupContext`** — since there is no PTB `Application`, use `BotAdapter` for Telegram API access. Provide a `MetricsClient` to emit metrics, or use `NullBackend` if metrics are not needed (see the `monitoring` and `api-wrapper` skills).
 - **Cold starts** — lambdas may be invoked infrequently. Keep initialization lightweight and avoid global state that assumes warm execution.
 - **Execution time limits** — AWS Lambda has a configurable timeout. Long-running tasks should be broken into smaller units or use ECS instead.
 
