@@ -24,7 +24,7 @@ dependencies = [
     "pydantic==2.12.5",
     "alembic==1.18.4",
     "rich==14.3.3",
-    "tzdata==2025.3",
+    "tzdata==2026.1",
     "googlemaps==4.10.0",
     "aws-embedded-metrics==3.4.0",
     "pyyaml==6.0.3",
