@@ -63,7 +63,7 @@ async def test_meeting_start(
     link_2 = JoinedUsers(user=joined_2, meetup=meeting)
 
     mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link_1, link_2))
-    await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await notify_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     assert link_1.notification_sent
@@ -123,7 +123,7 @@ async def test_non_forbidden_exception_is_logged_and_loop_continues(
     send_message_mock.side_effect = [Exception("Network error"), None]
 
     with pytest.raises(RuntimeError, match="Failed to send notification to 1 users"):
-        await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings.run(api, metrics_client)
 
     await metrics_client.flush()
 
@@ -166,7 +166,7 @@ async def test_failed_greater_than_zero_raises_runtime_error(
     send_message_mock.side_effect = Exception("Unexpected error")
 
     with pytest.raises(RuntimeError, match="Failed to send notification to 1 users. Check logs for more details."):
-        await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings.run(api, metrics_client)
 
 
 async def test_forbidden_message_sent(
@@ -183,7 +183,7 @@ async def test_forbidden_message_sent(
     # Need to access low level mock, still do not have a way of mocking the api call directly
     send_message_mock = api.mock_method("send_message_to_user")
     send_message_mock.side_effect = [Forbidden("Nope"), None]
-    await notify_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await notify_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     assert link_1.notification_sent

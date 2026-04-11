@@ -122,5 +122,5 @@ def test_paginated_view_match_navigation_button_returns_empty_list_for_unique_po
     assert view.position is PaginatedViewPosition.UNIQUE
 
     # Call the private method directly — returns [] for UNIQUE (line 262-263)
-    result = view._PaginatedMitupView__match_navigation_button(cb.SHOW_MEETING)  # type: ignore[attr-defined]
+    result = view._PaginatedMitupView__match_navigation_button(cb.SHOW_MEETING)  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]  # https://github.com/astral-sh/ty/issues/645
     assert result == []  # UNIQUE case returns an empty list, not navigation buttons

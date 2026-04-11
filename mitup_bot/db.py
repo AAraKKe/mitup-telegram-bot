@@ -111,7 +111,7 @@ def with_session[**P, R](func: Callable[Concatenate[Session, P], R]) -> Callable
         with begin() as session:
             return func(session, *args, **kwargs)
 
-    return wrapper  # ty: ignore[invalid-return-type]  # https://github.com/astral-sh/ty/issues/2759
+    return wrapper
 
 
 def with_async_session[**P, R](
@@ -138,4 +138,4 @@ def with_async_session[**P, R](
         with begin() as session:
             return await func(session, *args, **kwargs)
 
-    return async_wrapper  # ty: ignore[invalid-return-type]  # https://github.com/astral-sh/ty/issues/2759
+    return async_wrapper

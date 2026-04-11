@@ -75,17 +75,17 @@ def build_bot(config: BotConfig) -> ExtBot:
 async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
     match event_type:
         case EventType.USER_CLEANUP:
-            user_cleanup.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            user_cleanup.run(api, client)
         case EventType.NOTIFY_START_MEETING:
-            await notify_meetings.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await notify_meetings.run(api, client)
         case EventType.NOTIFY_MEETING_STARTED:
-            await notify_meetings_started.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await notify_meetings_started.run(api, client)
         case EventType.GENERATE_STATS:
-            generate_stats.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            generate_stats.run(api, client)
         case EventType.DEACTIVATE_MEETINGS:
-            await inactive_meetings.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await inactive_meetings.run(api, client)
         case EventType.MEETUPS_CLEANUP:
-            await meetups_cleanup.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+            await meetups_cleanup.run(api, client)
         case never:  # pragma: no cover
             assert_never(never)  # pragma: no cover
 

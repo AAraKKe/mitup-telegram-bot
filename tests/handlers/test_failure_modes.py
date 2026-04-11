@@ -9,6 +9,7 @@ import datetime as dt
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Final
 
 import pytest
 from telegram import Location, MessageEntity, Update
@@ -33,7 +34,12 @@ MEETING_ID_NOT_OWNED = 99
 MEETING_ID_NOT_FOUND = 9999
 MEETING_ID_INACTIVE = 88
 
-_UNSET: dict[str, str] = {}  # Sentinel: field not explicitly provided (falls back to metrics_properties).
+
+class _Unset:
+    """Sentinel type for dataclass fields that distinguish 'not set' from None."""
+
+
+_UNSET: Final = _Unset()
 
 
 class ErrorMode(Enum):
@@ -68,9 +74,9 @@ class Context:
     extra_metrics: list[tuple[str, int]] = field(default_factory=list)
     # Override extra_metrics when the meeting is not found. Uses _UNSET sentinel as default (falls back to
     # extra_metrics). Set to [] to explicitly assert no extra metrics.
-    extra_metrics_not_found: list[tuple[str, int]] | None = field(default_factory=lambda: _UNSET)
+    extra_metrics_not_found: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
     # Override extra_metrics for the non-owner inactive meeting test.
-    extra_metrics_non_owner_inactive: list[tuple[str, int]] | None = field(default_factory=lambda: _UNSET)
+    extra_metrics_non_owner_inactive: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
 
 
 CONTEXTS = [
@@ -899,7 +905,7 @@ async def test_callback_fails_when_meeting_not_found(
 
     extra = (
         test_context.extra_metrics_not_found
-        if test_context.extra_metrics_not_found is not _UNSET
+        if not isinstance(test_context.extra_metrics_not_found, _Unset)
         else test_context.extra_metrics
     )
     _assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
@@ -1067,7 +1073,7 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
 
     extra = (
         test_context.extra_metrics_non_owner_inactive
-        if test_context.extra_metrics_non_owner_inactive is not _UNSET
+        if not isinstance(test_context.extra_metrics_non_owner_inactive, _Unset)
         else test_context.extra_metrics
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)

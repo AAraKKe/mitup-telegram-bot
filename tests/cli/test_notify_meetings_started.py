@@ -63,7 +63,7 @@ async def test_no_meetings_to_notify(
 ):
     mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, ())
 
-    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
 
     api.assert_method_just_called("update_meeting_messages", times=0)
@@ -100,7 +100,7 @@ async def test_started_notification_sent_to_participants(
 
     mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
 
-    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
 
     # Both participants received the notification
@@ -158,7 +158,7 @@ async def test_waiting_list_participants_not_notified(
 
     mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
 
-    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
 
     # Only 1 notification sent (the regular participant)
@@ -210,7 +210,7 @@ async def test_forbidden_marks_user_inactive_and_does_not_raise(
     # First participant raises Forbidden, second succeeds
     send_mock.side_effect = [Forbidden("blocked"), None]
 
-    await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
 
     # User whose send raised Forbidden is marked inactive via handle_forbidden
@@ -265,7 +265,7 @@ async def test_non_forbidden_participant_exception_is_logged_and_counted(
     send_mock.side_effect = [Exception("Network failure"), None]
 
     with pytest.raises(RuntimeError, match="Failed to process started notifications"):
-        await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings_started.run(api, metrics_client)
 
     await metrics_client.flush()
 
@@ -310,7 +310,7 @@ async def test_failed_meeting_increments_counter_and_raises(
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("Boom")]
 
     with pytest.raises(RuntimeError, match="Failed to process started notifications"):
-        await notify_meetings_started.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await notify_meetings_started.run(api, metrics_client)
 
     await metrics_client.flush()
 

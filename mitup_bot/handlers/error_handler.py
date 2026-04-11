@@ -43,7 +43,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
         return
 
     if isinstance(error, InactiveUserInteraction) and error.private:
-        await handle_inactive_user(context, error.user_id)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await handle_inactive_user(context, error.user_id)
         return
 
     # Emit an error metric for the current update both including the error type and a general

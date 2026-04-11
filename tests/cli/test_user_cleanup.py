@@ -24,7 +24,7 @@ async def test_no_inactive_users(mock_session: MockDbSession, metrics_client: Me
     api = MagicMock()
 
     # No users registered — select returns empty result (default behavior)
-    user_cleanup.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
     # Delete statement still executes but with empty set
@@ -47,7 +47,7 @@ async def test_inactive_users_deleted(
     # Register select result — returns user IDs
     mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive_1.id, inactive_2.id))  # ty: ignore[invalid-argument-type]  # https://github.com/astral-sh/ty/issues/2839
 
-    user_cleanup.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
     # Two exec calls: select + delete
@@ -64,7 +64,7 @@ def test_select_query_filters_correctly(mock_session: MockDbSession):
     api = MagicMock()
     client = MetricsClient(NullBackend())
 
-    user_cleanup.run(api, client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    user_cleanup.run(api, client)
 
     expected_query = mock_session.normalize_query(
         str(

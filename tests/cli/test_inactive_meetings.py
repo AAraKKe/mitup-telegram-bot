@@ -31,7 +31,7 @@ async def test_no_meetings_to_deactivate(
     mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
 ):
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, ())
-    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     api.assert_method_just_called("update_meeting_messages", times=0)
@@ -59,7 +59,7 @@ async def test_single_meeting_deactivated(
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting,))
-    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     assert meeting.active is False
@@ -104,7 +104,7 @@ async def test_meeting_with_invited_users(
     create_joined_link(user=invited_user, meetup=meeting, id=2)
 
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting,))
-    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     assert meeting.active is False
@@ -147,7 +147,7 @@ async def test_api_failure_raises_runtime_error(
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("API timeout")]
 
     with pytest.raises(RuntimeError, match="Failed to deactivate 1 meetings"):
-        await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+        await inactive_meetings.run(api, metrics_client)
 
     await metrics_client.flush()
 
@@ -187,7 +187,7 @@ async def test_multiple_meetings_deactivated(
 
     mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting_a, meeting_b))
 
-    await inactive_meetings.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     assert meeting_a.active is False

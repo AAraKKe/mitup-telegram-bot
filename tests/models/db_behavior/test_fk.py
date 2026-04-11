@@ -16,7 +16,7 @@ def test_invited_by_id_is_nullable(db_session: Session, seed_joined_link: Joined
 def test_invited_by_fk_references_users(db_session: Session, seed_user: User, seed_meetup: Meetup) -> None:
     with pytest.raises(IntegrityError):
         with db_session.begin_nested():
-            db_session.exec(  # type: ignore[call-overload]
+            db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/376
                 text(
                     "INSERT INTO joined_users (user_id, meetup_id, invited_by_id)"
                     " VALUES (:user_id, :meetup_id, 9999999)"

@@ -228,7 +228,7 @@ async def test_run_orchestrates_both_functions(
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, ())
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, ())
 
-    await meetups_cleanup.run(api, metrics_client)  # ty: ignore[missing-argument]  # https://github.com/astral-sh/ty/issues/2759
+    await meetups_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
     metrics.assert_emitted(

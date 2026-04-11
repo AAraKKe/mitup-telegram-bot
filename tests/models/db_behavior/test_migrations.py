@@ -23,7 +23,7 @@ def test_no_pending_migrations(db_session: Session) -> None:
     """
     expected = _alembic_head()
     rows = (
-        db_session.exec(  # type: ignore[call-overload]
+        db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/376
             text("SELECT version_num FROM alembic_version")
         )
         .scalars()
