@@ -60,3 +60,17 @@ validate.po
 # Local dev data and scripts not meant for the repo
 bin/populate_db.py
 bin/test_data.yaml
+
+# direnv local config
+.envrc
+
+# pyenv local version
+.python-version
+
+# Scratch files
+test.sh
+report.json
+
+# /em skill eval workspace and eval definitions (local dev only)
+.claude/skills/em/em-workspace/
+.claude/skills/em/evals/
