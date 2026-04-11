@@ -64,8 +64,10 @@ Per-language vocabulary rules live at `.claude/agents/translations/<lang_code>.m
 
 Workflow for adding/syncing translations:
 1. Run `hatch run dev:validate-locales` to identify which languages are out of sync and which msgids each one is missing.
-2. Spawn one translator agent per affected language (never combine languages in one agent). Include the `validate-locales` output in the prompt so the agent knows what to add.
+2. Spawn one translator agent per affected language (never combine languages in one agent). The translator agent has a helper script (`bin/translation_status.py`) that gives it all the information it needs — you don't need to pre-digest the work list. Just tell the agent the language code and what to do.
 3. After all agents complete, run `hatch run dev:validate-locales` again — must exit 0.
+
+When English strings have been updated and translations need review, tell the translator agents to use `--review` mode. This compares English text against a git ref and shows what changed.
 
 ## CI enforcement
 
