@@ -54,6 +54,8 @@ filterwarnings = [
     'ignore:.*Revision rev3.*Migration 4:UserWarning',
     # Ignore warnings from PTB regarding ChatFullInfo since we do not use that information
     'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*',
+    # AsyncMock coroutines GC'd across xdist workers trigger spurious "coroutine was never awaited" warnings
+    'ignore:coroutine .* was never awaited:RuntimeWarning',
 ]
 asyncio_default_fixture_loop_scope = "function"
 markers = [

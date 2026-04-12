@@ -283,3 +283,11 @@ def test_parse_format_tags_zero_length_variable_produces_no_entity():
     result = parse_format_tags("<b>${title}</b>", {"title": ""})
     assert result.text == ""
     assert result.entities == []
+
+
+def test_parse_format_tags_closing_tag_without_opener_is_ignored():
+    # A closing tag with no matching opening tag must be silently stripped
+    # without producing an entity (branch 300->284: style not in active).
+    result = parse_format_tags("hello </b>world", {})
+    assert result.text == "hello world"
+    assert result.entities == []

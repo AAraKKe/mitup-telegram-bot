@@ -467,6 +467,62 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
 
+# ---------------------------------------------------------------------------
+# PARTICIPANTS_MAXIMUM_MESSAGE — meeting is None after user_owns_meeting (line 156)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="5")], indirect=True)
+async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """When user_owns_meeting returns None (meeting not owned), handler returns ConversationHandler.END."""
+    not_owned_meeting = create_meetup(id=99, title="Not Owned")
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(not_owned_meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 99},
+    )
+
+    assert state == ConversationHandler.END
+    # Meeting not owned — redirected to main menu
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+
+
+# ---------------------------------------------------------------------------
+# PARTICIPANTS_MAXIMUM_WRONG_MESSAGE — meeting is None after user_owns_meeting (line 186)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="not a number")], indirect=True)
+async def test_edit_wrong_max_participants_returns_end_when_meeting_not_owned(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """When user_owns_meeting returns None in wrong input handler, returns ConversationHandler.END."""
+    not_owned_meeting = create_meetup(id=99, title="Not Owned")
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(not_owned_meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 99},
+    )
+
+    assert state == ConversationHandler.END
+    # Meeting not owned — redirected to main menu
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+
+
 def test_edit_meeting_participants_view_without_participants():
     owner = create_user(id=1, username="owner", first_name="Owner")
     meeting = create_meetup(id=1, owner=owner)

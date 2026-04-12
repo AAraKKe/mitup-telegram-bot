@@ -872,6 +872,98 @@ DATE_TIME_ENTITY_REQUEST_FUTURE = UpdateRequest(
 )
 
 
+# ---------------------------------------------------------------------------
+# handle_first_datetime_set — end_cleared path (lines 258-263, 281-282)
+# When the first date is set and it causes end_datetime to be cleared
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(dt.date(2026, 6, 15)))],
+    indirect=True,
+)
+async def test_set_date_first_time_clears_end_datetime_when_past_end(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Setting a date for the first time when end_datetime exists and new start > end triggers end_cleared."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    assert meeting.datetime is None
+    # Set end_datetime in the past relative to the new start date
+    meeting.end_datetime = dt.datetime(2025, 1, 1, 12, 0, tzinfo=dt.UTC)
+    meeting.lock_on_start = True
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    # end_datetime was cleared because new start (2026-06-14 23:00 UTC in Europe/Madrid) > end (2025-01-01)
+    assert meeting.end_datetime is None
+    assert meeting.lock_on_start is False
+
+    # The alert should have been shown
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingMessages.END_DATETIME_CLEARED_BY_START.get_text(lang=meeting.lang),
+        show_alert=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# fallback_answer — wrong time format (lines 494-501)
+# WRONG_TIME_FORMAT and WRONG_TIME_MESSAGE handlers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(message_text="not a time format")],
+    indirect=True,
+)
+async def test_wrong_time_format_fallback_sends_error_and_stays_in_edit_time(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """WRONG_TIME_FORMAT sends wrong time format error and stays in EDIT_TIME state."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.WRONG_TIME_FORMAT, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    context.api.assert_send_message_called(update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang))
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(location=Location(latitude=0, longitude=0))],
+    indirect=True,
+)
+async def test_wrong_time_message_type_fallback_sends_error_and_stays_in_edit_time(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """WRONG_TIME_MESSAGE (non-text message) sends wrong time format error and stays in EDIT_TIME state."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.WRONG_TIME_MESSAGE, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    context.api.assert_send_message_called(update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang))
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+
+
 @pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST_FUTURE], indirect=True)
 async def test_datetime_entity_past_end_datetime_clears_end(
     mock_session: MockDbSession,

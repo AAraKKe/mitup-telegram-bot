@@ -94,6 +94,19 @@ async def test_flush_delegates_to_backend():
     assert len(client.records) == 1
 
 
+def test_set_global_property_delegates_to_backend():
+    from unittest.mock import MagicMock
+
+    from mitup_bot.monitoring.backend import MetricsBackend
+
+    backend = MagicMock(spec=MetricsBackend)
+    client = MetricsClient(backend)
+
+    client.set_global_property("request_id", "abc-123")
+
+    backend.set_global_property.assert_called_once_with("request_id", "abc-123")
+
+
 def test_metric_assertions_helper_works_with_client():
     client = _client()
     client.emit(MetricKey.FAULT, 0)
@@ -105,3 +118,19 @@ def test_metric_assertions_assert_not_emitted():
     client = _client()
 
     MetricAssertions(client).assert_not_emitted(name=MetricKey.FAULT)
+
+
+# ---------------------------------------------------------------------------
+# update_fields_from_update — branch coverage
+# ---------------------------------------------------------------------------
+
+
+def test_update_fields_from_update_no_effective_user():
+    """An Update with no user omits the 'user' key (branch 25->31)."""
+    from telegram import Update
+
+    from mitup_bot.monitoring.client import update_fields_from_update
+
+    result = update_fields_from_update(Update(update_id=1))
+
+    assert "user" not in result

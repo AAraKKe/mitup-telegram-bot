@@ -63,6 +63,16 @@ def test_build_api_with_context():
     assert api.adapter is context
 
 
+def test_build_api_with_raw_ext_bot():
+    """When an ExtBot is passed directly, it is wrapped in a BotAdapter with NullBackend."""
+    raw_bot = MagicMock(spec=ExtBot)
+    api = build_api(raw_bot)
+
+    assert isinstance(api, TelegramApi)
+    assert isinstance(api.adapter, BotAdapter)
+    assert api.adapter.bot is raw_bot
+
+
 # ---------------------------------------------------------------------------
 # send_message
 # ---------------------------------------------------------------------------

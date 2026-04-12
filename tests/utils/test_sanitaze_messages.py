@@ -14,7 +14,7 @@ class TestEngine(TranslationEngine):
         return "Hello, <b>${name}!</b>. <i>This is cursive</i>"
 
 
-class TestMessage(MessageBase):
+class SampleMessage(MessageBase):
     TEST = ""  # Not matter the text since we are translating later
 
     def translations_class(self) -> type[TranslationEngineProtocol]:
@@ -23,7 +23,7 @@ class TestMessage(MessageBase):
 
 def test_get_returns_formatted_text():
 
-    result = TestMessage.TEST.get(name="World")
+    result = SampleMessage.TEST.get(name="World")
     assert result.text == "Hello, World!. This is cursive"
     assert len(result.entities) == 2
     assert result.entities[0].type == "bold"
@@ -37,26 +37,26 @@ def test_get_returns_plain_text():
         def translate(cls, message_id: str, lang: str) -> str:
             return "Hello, world!"
 
-    class TestMessage2(MessageBase):
+    class SampleMessage2(MessageBase):
         TEST = ""  # Not matter the text since we are translating later
 
         def translations_class(self) -> type[TranslationEngineProtocol]:
             return TestEngine2
 
-    result = TestMessage2.TEST.get(name="World")
+    result = SampleMessage2.TEST.get(name="World")
     assert result == FormattedText("Hello, world!")
 
 
 def test_get_text_raises_error_if_entities_are_present():
     with pytest.raises(ValueError):
-        TestMessage.TEST.get_text(name="World")
+        SampleMessage.TEST.get_text(name="World")
 
 
 def test_get_accepts_formatted_text_kwarg_and_preserves_entities():
     from telegram import MessageEntity
 
     italic_name = FormattedText("Alice", [MessageEntity(type="italic", offset=0, length=5)])
-    result = TestMessage.TEST.get(name=italic_name)
+    result = SampleMessage.TEST.get(name=italic_name)
     # Plain text: bold wraps "Alice!" and italic comes from the substituted FormattedText
     assert result.text == "Hello, Alice!. This is cursive"
     italic_entities = [e for e in result.entities if e.type == "italic"]

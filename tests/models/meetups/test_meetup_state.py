@@ -352,6 +352,35 @@ def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_s
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# enforce_datetime_ordering — returns False when start < end (line 654)
+# ---------------------------------------------------------------------------
+
+
+def test_enforce_datetime_ordering_returns_false_when_start_before_end(user_with_settings: User):
+    """enforce_datetime_ordering returns False (no clearing) when start < end."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
+    meeting.end_datetime = datetime(2024, 6, 15, 12, 0, tzinfo=UTC)  # 2 hours later
+
+    result = meeting.enforce_datetime_ordering()
+
+    assert result is False
+    # end_datetime is preserved
+    assert meeting.end_datetime == datetime(2024, 6, 15, 12, 0, tzinfo=UTC)
+
+
+def test_enforce_datetime_ordering_returns_false_when_end_is_none(user_with_settings: User):
+    """enforce_datetime_ordering returns False when end_datetime is None (nothing to clear)."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
+    meeting.end_datetime = None
+
+    result = meeting.enforce_datetime_ordering()
+
+    assert result is False
+
+
 def test_is_in_progress_with_naive_datetimes(user_with_settings: User):
     """is_in_progress must return True when datetimes are naive (no tzinfo), as returned by the DB.
 

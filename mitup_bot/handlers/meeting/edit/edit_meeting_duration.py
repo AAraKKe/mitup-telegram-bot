@@ -14,7 +14,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link, render
+from mitup_bot.utils.entities import EntityDateTime, build_datetime_link, render
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -122,9 +122,6 @@ async def show_end_datetime_entry(
     update: Update,
     meeting: Meetup,
     lang: str,
-    *,
-    context_message: str | FormattedText | None = None,
-    use_send: bool = False,
 ) -> ConversationMeetingState:
     """Show the end datetime entry view. Transitions to EDIT_END_DATETIME state."""
     assert meeting.datetime is not None
@@ -167,13 +164,7 @@ async def show_end_datetime_entry(
     view = MitupView(description=description, keyboard=keyboard).with_back_button(
         ButtonMessages.WHEN, lang, cb.CANCEL_EDIT_MEETING_DURATION.with_id(meeting_id)
     )
-    if context_message is not None:
-        view = view.with_context(context_message)
-
-    if use_send:
-        await context.api.send_message(update=update, view=view)
-    else:
-        await context.api.edit_message(update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationMeetingState.EDIT_END_DATETIME
 
@@ -212,9 +203,6 @@ async def save_end_datetime_and_finish(
     update: Update,
     meeting: Meetup,
     end_dt: dt.datetime,
-    lang: str,
-    *,
-    use_send: bool = False,
 ) -> int:
     """Persist end_datetime, broadcast updates, and return ConversationHandler.END."""
     meeting.end_datetime = end_dt
@@ -223,10 +211,7 @@ async def save_end_datetime_and_finish(
 
     response_view = meeting.when_view
 
-    if use_send:
-        await context.api.send_message(update=update, view=response_view)
-    else:
-        await context.api.edit_message(update=update, view=response_view)
+    await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(session=session, meeting=meeting)
 
     cleanup_states(context)
@@ -262,9 +247,7 @@ async def duration_end_datetime_entity_handler(
             await context.api.send_message(update=update, view=error)
             return ConversationMeetingState.EDIT_END_DATETIME
 
-        return await save_end_datetime_and_finish(
-            session, context, update, meeting, unix_time, user.lang, use_send=True
-        )
+        return await save_end_datetime_and_finish(session, context, update, meeting, unix_time)
 
 
 @HandlersRegistry.register_message(
@@ -495,9 +478,7 @@ async def duration_end_set_time_handler(
             await context.api.send_message(update=update, view=error)
             return ConversationMeetingState.EDIT_END_TIME
 
-        return await save_end_datetime_and_finish(
-            session, context, update, meeting, proposed_end, user.lang, use_send=True
-        )
+        return await save_end_datetime_and_finish(session, context, update, meeting, proposed_end)
 
 
 @HandlersRegistry.register_message(

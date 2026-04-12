@@ -16,6 +16,8 @@ from mitup_bot.cli.commands.translations import (
     build,
     clean_locales,
     mo_file_for_language,
+    msgid_from_block,
+    parse_po_blocks,
     po_file_for_language,
     print_diff_line,
     update,
@@ -276,6 +278,100 @@ def test_clean_locales_preserves_header(mock_po: mock.Mock, tmp_path: Path):
 
     content = es_po.read_text()
     assert 'msgid ""\nmsgstr ""' in content
+
+
+# ---------------------------------------------------------------------------
+# msgid_from_block — None when block has no msgid line (line 115)
+# ---------------------------------------------------------------------------
+
+
+def test_msgid_from_block_returns_none_for_block_without_msgid():
+    block = ["# A comment line", 'msgstr "some value"']
+    assert msgid_from_block(block) is None
+
+
+def test_msgid_from_block_returns_msgid_when_present():
+    block = ['msgid "hello"', 'msgstr "world"']
+    assert msgid_from_block(block) == '"hello"'
+
+
+# ---------------------------------------------------------------------------
+# parse_po_blocks — branch coverage (lines 101->99, 106->108)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_po_blocks_consecutive_blank_lines():
+    """Consecutive blank lines should not produce empty blocks (branch 101->99: current is empty)."""
+    text = 'msgid "a"\nmsgstr "b"\n\n\n\nmsgid "c"\nmsgstr "d"'
+    blocks = parse_po_blocks(text)
+
+    assert len(blocks) == 2
+    assert blocks[0] == ['msgid "a"', 'msgstr "b"']
+    assert blocks[1] == ['msgid "c"', 'msgstr "d"']
+
+
+def test_parse_po_blocks_trailing_block_without_newline():
+    """A file that does not end with a blank line still captures the trailing block (branch 106->108)."""
+    text = 'msgid "a"\nmsgstr "b"\n\nmsgid "c"\nmsgstr "d"'
+    blocks = parse_po_blocks(text)
+
+    assert len(blocks) == 2
+    assert blocks[1] == ['msgid "c"', 'msgstr "d"']
+
+
+@pytest.mark.parametrize("text", ["", "\n", "\n\n\n"], ids=["empty", "single_newline", "only_newlines"])
+def test_parse_po_blocks_empty_input(text: str):
+    """Input with no content lines returns an empty list (branch 106->108: current is empty at loop end)."""
+    assert parse_po_blocks(text) == []
+
+
+# ---------------------------------------------------------------------------
+# clean_all_locales — OSError when writing (lines 154-157)
+# ---------------------------------------------------------------------------
+
+
+@mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
+def test_clean_locales_write_error(mock_po: mock.Mock, tmp_path: Path):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n')
+
+    bad_path = mock.Mock(spec=Path)
+    bad_path.read_text.return_value = (
+        'msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "prueba"\n\nmsgid "stale"\nmsgstr "viejo"\n'
+    )
+    bad_path.write_text.side_effect = OSError("Permission denied")
+
+    mock_po.side_effect = lambda lang, validate=False: en_po if lang == "en" else bad_path
+
+    with console().capture() as capture:
+        result = CliRunner().invoke(clean_locales)
+
+    assert result.exit_code == 1
+    assert "could not write" in capture.get()
+
+
+# ---------------------------------------------------------------------------
+# ensure_all_translations — locale has missing msgids (lines 185-187)
+# ---------------------------------------------------------------------------
+
+
+@mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")
+def test_validate_locales_reports_missing_msgids(mock_po: mock.Mock, tmp_path: Path):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "test"\n\nmsgid "extra_en"\nmsgstr "extra"\n')
+
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "test"\nmsgstr "prueba"\n')
+
+    mock_po.side_effect = lambda lang: es_po if lang == "es_ES" else en_po
+
+    with console().capture() as capture:
+        result = CliRunner().invoke(validate_locales)
+
+    assert result.exit_code == 1
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", capture.get())
+    assert "es_ES is missing" in plain
+    assert "extra_en" in plain
 
 
 @mock.patch("mitup_bot.cli.commands.translations.po_file_for_language")

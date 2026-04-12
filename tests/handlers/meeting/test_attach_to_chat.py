@@ -209,6 +209,35 @@ async def test_attach_to_chat_meeting_not_found(
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.ATTACH_TO_CHAT.with_id(1), from_bot_chat=False)],
+    indirect=True,
+)
+async def test_attach_to_chat_existing_message_with_chat_instance_unchanged(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """When a tracked message already has chat_instance set, it is not overwritten (elif branch skipped)."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+
+    # Pre-existing message WITH chat_instance already set (inline_message_id matches the update default)
+    existing_message = create_message(meetup_id=meeting.db_id, chat_instance="existing_instance")
+    meeting.messages.append(existing_message)
+
+    context, _ = await call_handler(MeetingHandlerId.ATTACH_TO_CHAT, handler_context=handler_context)
+
+    # chat_instance must remain the same (not overwritten)
+    assert existing_message.chat_instance == "existing_instance"
+    mock_session.assert_flushed()
+
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
+
+
 def test_is_already_attached_returns_false_when_chat_instance_is_none():
     """_is_already_attached returns False immediately when chat_instance is None, regardless of meeting messages."""
     meeting = create_meetup(id=1, title="Test")

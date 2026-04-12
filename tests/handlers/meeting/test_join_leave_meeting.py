@@ -7,7 +7,15 @@ from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import MitupView
-from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler, create_meetup
+from tests.helpers import (
+    AnyFloat,
+    HandlerContext,
+    MockDbSession,
+    UpdateRequest,
+    call_handler,
+    create_meetup,
+    create_message,
+)
 from tests.helpers.monitoring import MetricAssertions
 
 
@@ -85,6 +93,40 @@ async def test_user_already_join_does_not_join(
         text=MeetingMessages.JOINED_MEETING_ALREADY.get(lang=user_with_settings.lang),
         show_alert=False,
     )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
+async def test_join_with_existing_message_does_not_create_new_one(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """When message_from_update finds an existing message, no new Message is created (branch 168->173)."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+
+    # Pre-populate a message that matches the update's effective_message.message_id (default 123)
+    from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID
+
+    existing_message = create_message(
+        meetup_id=meeting.db_id,
+        message_id=DEFAULT_MESSAGE_ID,
+        chat_id=DEFAULT_CHAT_ID,
+        inline_message_id=None,
+    )
+    meeting.messages.append(existing_message)
+
+    assert len(meeting.messages) == 1
+
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
+
+    # No new message was created — the existing one is reused
+    assert len(meeting.messages) == 1
+    mock_session.assert_flushed()
+
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(123))], indirect=True)
