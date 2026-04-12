@@ -513,6 +513,9 @@ msgstr "Selecciona la fecha."
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
 msgstr "La fecha ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 00:00.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 00:00."
 
+msgid "MeetingMessages.NEW_END_DATE_SET_SUCCESS"
+msgstr "La fecha de fin ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 23:59.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 23:59."
+
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "La fecha de la quedada se ha establecido para el <b>${datetime}</b>"
 
@@ -756,6 +759,42 @@ msgstr "🇧🇷 Portugués"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italiano"
+
+msgid "ButtonMessages.WHEN"
+msgstr "🕒 Cuándo"
+
+msgid "ButtonMessages.SET_START_TIME"
+msgstr "▶️ Establecer hora de inicio"
+
+msgid "ButtonMessages.SET_END_TIME"
+msgstr "⏹️ Establecer hora de finalización"
+
+msgid "ButtonMessages.CLEAR_TIMES"
+msgstr "🗑️ Borrar horas"
+
+msgid "MeetingMessages.WHEN_VIEW_NO_TIMES"
+msgstr "Establece cuándo es tu quedada. Puedes establecer una hora de inicio, una hora de finalización, o ambas. También puedes bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+
+msgid "MeetingMessages.WHEN_VIEW_START_ONLY"
+msgstr "La quedada comienza a: <b>${start_datetime}</b>\n\nPuedes establecer una hora de finalización o bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+
+msgid "MeetingMessages.WHEN_VIEW_BOTH"
+msgstr "La quedada comienza a: <b>${start_datetime}</b>\nLa quedada termina a: <b>${end_datetime}</b>\n\nPuedes cambiar las horas o bloquear la lista de asistentes cuando comience la quedada, así nadie podrá unirse o salirse una vez que esté en curso."
+
+msgid "MeetingMessages.TIMES_CLEARED"
+msgstr "Horas eliminadas."
+
+msgid "MeetingMessages.CLEAR_TIMES_CONFIRMATION"
+msgstr "¿Estás seguro de que quieres eliminar las horas de inicio y finalización?"
+
+msgid "MeetingMessages.CLEAR_TIMES_DECLINE"
+msgstr "Las horas no se eliminarán."
+
+msgid "MeetingMessages.END_DATETIME_CLEARED_BY_START"
+msgstr "La nueva hora de inicio es posterior a la hora de finalización, así que la hora de finalización ha sido eliminada."
+
+msgid "MeetingMessages.SET_END_TIME_STALE_ALERT"
+msgstr "La hora de inicio fue eliminada. Establécela de nuevo antes de elegir una hora de finalización."
 
 msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
 msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"

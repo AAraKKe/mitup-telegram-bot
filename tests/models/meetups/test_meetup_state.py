@@ -47,8 +47,7 @@ def test_external_view():
 def test_edit_view(user_with_settings: User):
     meeting = user_with_settings.meetups[0]
 
-    # Row 2 is [Date & Time → EDIT_MEETING_DATE_TIME] [Duration → EDIT_MEETING_DURATION];
-    # there is no separate Date/Time row and no standalone Duration row.
+    # Row 2 is [When → EDIT_MEETING_WHEN] — a single button replaces "Date & Time" + "Duration".
     expected_view = MitupView(
         meeting.message,
         [
@@ -64,12 +63,8 @@ def test_edit_view(user_with_settings: User):
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.DATE_TIME.get(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_DATE_TIME.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.DURATION.get(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_DURATION.with_id(meeting.db_id),
+                    text=ButtonMessages.WHEN.get(lang=meeting.user_language),
+                    callback_data=cb.EDIT_MEETING_WHEN.with_id(meeting.db_id),
                 ),
             ],
             [
@@ -165,66 +160,6 @@ def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user
     stop_label = MeetingMessages.MEETING_STOP_TIME.get_text(lang=meeting.lang)
     assert start_label in text
     assert stop_label in text
-
-
-# --- duration_view: lock toggle always visible ---
-
-
-@pytest.mark.parametrize(
-    "end_datetime",
-    [None, dt.datetime(2024, 6, 15, 10, 30, tzinfo=dt.UTC), dt.datetime(2024, 6, 15, 11, 30, tzinfo=dt.UTC)],
-    ids=["no_end_datetime", "end_datetime_30min", "end_datetime_90min"],
-)
-@pytest.mark.parametrize("lock_on_start", [True, False], ids=["lock_on_start_true", "lock_on_start_false"])
-def test_duration_view_lock_toggle_always_visible(
-    user_with_settings: User,
-    end_datetime: dt.datetime | None,
-    lock_on_start: bool,
-):
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.end_datetime = end_datetime
-    meeting.lock_on_start = lock_on_start
-
-    view = meeting.duration_view
-
-    lock_cb = cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
-    lock_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == lock_cb]
-
-    # Lock toggle must be present regardless of whether end_datetime is set
-    assert len(lock_buttons) == 1  # exactly one lock toggle button
-
-
-def test_duration_view_keyboard_row0_has_set_and_lock_buttons_when_no_end_datetime(user_with_settings: User):
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.end_datetime = None
-
-    view = meeting.duration_view
-
-    row0 = view.keyboard[0]
-    assert len(row0) == 2  # "Set duration" + LOCK_ON_START toggle
-    assert row0[0].callback_data == cb.SET_MEETING_DURATION.with_id(meeting.db_id)
-    assert row0[1].callback_data == cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
-    # No delete row when duration is not set
-    delete_cb = cb.CLEAR_MEETING_DURATION.with_id(meeting.db_id)
-    all_buttons = [btn for row in view.keyboard for btn in row]
-    assert not any(btn.callback_data == delete_cb for btn in all_buttons)
-
-
-def test_duration_view_keyboard_row0_has_set_and_lock_and_row1_has_delete_when_end_datetime_set(
-    user_with_settings: User,
-):
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.end_datetime = dt.datetime(2024, 6, 15, 11, 0, tzinfo=dt.UTC)  # end datetime set
-
-    view = meeting.duration_view
-
-    row0 = view.keyboard[0]
-    assert len(row0) == 2  # "Set duration" + LOCK_ON_START toggle
-    assert row0[0].callback_data == cb.SET_MEETING_DURATION.with_id(meeting.db_id)
-    assert row0[1].callback_data == cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id)
-    # Delete button is in row 1
-    row1 = view.keyboard[1]
-    assert len(row1) == 1  # only "Delete duration"
 
 
 # --- _plain_datetime fallback branch ---

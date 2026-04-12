@@ -28,7 +28,7 @@ TEST_31ST_DATETIME = dt.datetime(2024, 10, 31, 12, 30, 0, tzinfo=dt.UTC)
 
 
 def set_new_date_view(lang: str, meeting_id: int, datetime: FormattedText) -> MitupView:
-    # Production code shows a single Done button (cb.EDIT_MEETING_CANCEL) after the first date is set.
+    # Production code shows a single Done button (cb.CANCEL_EDIT_START_TIME) after the first date is set.
     # The message has only a ${datetime} placeholder — no ${done_button}.
     return MitupView(
         description=MeetingMessages.NEW_DATE_SET_SUCCESS.get(
@@ -39,7 +39,7 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: FormattedText) -> Mi
             [
                 ButtonConfig(
                     text=ButtonMessages.DONE.get(lang=lang),
-                    callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
+                    callback_data=cb.CANCEL_EDIT_START_TIME.with_id(meeting_id),
                 ),
             ]
         ],
@@ -198,134 +198,49 @@ async def test_set_meeting_date_callback(
         context.api.assert_update_meeting_messages_called(mock_session, meeting, None, True)
 
 
-@pytest.mark.parametrize(
-    "update,meeting",
-    [
-        (
-            UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(10)),
-            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
-        ),
-    ],
-    indirect=["update"],
-    ids=["delete_meeting_date"],
-)
-async def test_delete_meeting_date(
-    mock_session: MockDbSession,
-    update: Update,
-    meeting: Meetup,
-    user_with_settings: User,
-    handler_context: HandlerContext,
-):
-    user_with_settings.meetups.append(meeting)
-    mock_session.add_object(meeting)
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    context, response = await call_handler(
-        EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK, handler_context=handler_context
-    )
-
-    assert response == ConversationMeetingState.EDIT_DATETIME
-    assert meeting.datetime == TEST_MEETING_DATETIME_UTC
-    mock_session.assert_not_added()
-    mock_session.assert_not_flushed()
-    context.api.assert_edit_message_called(
-        update,
-        factory.confirmation_view(
-            lang=user_with_settings.lang,
-            message=MeetingMessages.DELETE_DATE_CONFIRMATION.get(lang=user_with_settings.lang),
-            confirm_callback_data=cb.CONFIRM_DELETE_MEETING_DATE.with_id(10),
-            decline_callback_data=cb.DECLINE_DELETE_MEETING_DATE.with_id(10),
-        ),
-    )
-    context.api.assert_update_meeting_messages_not_called()
+# ---------------------------------------------------------------------------
+# SET_DATE_CALLBACK — date selection that clears end_datetime shows alert
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "update,meeting",
-    [
-        (
-            UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(10)),
-            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
-        ),
-    ],
-    indirect=["update"],
-    ids=["confirm_delete_meeting_date"],
+    "update",
+    # Set date to 2026-01-15 — with existing time 12:30 UTC this becomes 2026-01-15 12:30 UTC
+    # which is after END_DATETIME_FOR_ORDERING (2024-12-21 18:00 UTC), so end is cleared.
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(dt.date(2026, 1, 15)))],
+    indirect=True,
 )
-async def test_confirm_delete_meeting_date(
+async def test_set_date_past_end_datetime_clears_end_and_shows_alert(
     mock_session: MockDbSession,
     update: Update,
-    meeting: Meetup,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    # Set end_datetime and lock_on_start so the cascade-clear is exercised
-    meeting.end_datetime = dt.datetime(2024, 12, 21, 13, 0, tzinfo=dt.UTC)
+    """Updating the date so start > end triggers enforce_datetime_ordering and shows an alert popup."""
+    meeting = create_meetup(
+        id=10,
+        title="TestMeeting",
+        description="Description",
+        datetime=dt.datetime(2024, 11, 11, 12, 30, tzinfo=dt.UTC),
+    )
+    meeting.end_datetime = END_DATETIME_FOR_ORDERING
     meeting.lock_on_start = True
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
     MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
 
-    context, response = await call_handler(
-        EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
-        handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
-    )
-
-    assert response == ConversationHandler.END
-    assert meeting.datetime is None
-    assert meeting.end_datetime is None  # cascade: deleting datetime must also clear end_datetime
-    assert meeting.lock_on_start is False  # cascade: deleting datetime must also clear lock_on_start
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
-    # cleanup_states clears EDIT_MEETING_TIME from context
-    assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
-    context.api.assert_edit_message_called(
-        update,
-        meeting.edit_view.with_context(MeetingMessages.DATE_TIME_DELETED.get(lang=user_with_settings.lang)),
-    )
-    context.api.assert_update_meeting_messages_called(mock_session, meeting, None, True)
-
-
-@pytest.mark.parametrize(
-    "update,meeting",
-    [
-        (
-            UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(10)),
-            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
-        ),
-    ],
-    indirect=["update"],
-    ids=["decline_delete_meeting_date"],
-)
-async def test_decline_delete_meeting_date(
-    mock_session: MockDbSession,
-    update: Update,
-    meeting: Meetup,
-    user_with_settings: User,
-    handler_context: HandlerContext,
-):
-    user_with_settings.meetups.append(meeting)
-    mock_session.add_object(meeting)
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    context, response = await call_handler(
-        EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK, handler_context=handler_context
-    )
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
 
     assert response == ConversationMeetingState.EDIT_DATETIME
-    assert meeting.datetime == TEST_MEETING_DATETIME_UTC
-    mock_session.assert_not_added()
-    mock_session.assert_not_flushed()
-    # Use meeting.owner.now_in_tz().date() to get the same FakeDate that the handler computes under freeze_time
-    today = meeting.owner.now_in_tz().date()
-    context.api.assert_edit_message_called(
-        update,
-        _build_entry_view(meeting, user_with_settings.lang, today).with_context(
-            MeetingMessages.DELETE_DATE_DECLINE.get(lang=user_with_settings.lang)
-        ),
+    assert meeting.end_datetime is None
+    assert meeting.lock_on_start is False
+
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingMessages.END_DATETIME_CLEARED_BY_START.get_text(lang=meeting.lang),
+        show_alert=True,
     )
-    context.api.assert_update_meeting_messages_not_called()
 
 
 @pytest.mark.parametrize(
@@ -371,7 +286,7 @@ async def test_edit_meeting_time_callback(
             [
                 ButtonConfig(
                     text=ButtonMessages.CANCEL.get(lang=meeting.lang),
-                    callback_data=cb.EDIT_MEETING_CANCEL.with_id(10),
+                    callback_data=cb.CANCEL_EDIT_START_TIME.with_id(10),
                 )
             ]
         ],
@@ -446,7 +361,7 @@ async def test_set_time_message_with_valid_time(
 
     context.api.assert_send_message_called(
         update,
-        meeting.edit_view.with_context(
+        meeting.when_view.with_context(
             MeetingMessages.EDIT_TIME_SUCCESS.get(
                 lang=user_with_settings.lang,
                 datetime=datetime_entity(int(expected_meeting_time.timestamp())),
@@ -504,7 +419,7 @@ def entry_point_update(update: Update):
             id="123",
             from_user=cast(TgUser, update.effective_user),
             message=update.effective_message,
-            data=str(cb.EDIT_MEETING_TIME.with_id(10)),
+            data=str(cb.SET_MEETING_START_TIME.with_id(10)),
             chat_instance="instance",
         ),
     )
@@ -540,18 +455,20 @@ async def test_conversation_fallback_with_wrong_message_format(
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
 
-    # Now answer with a wrong message format
+    # Now answer with a wrong message format (in EDIT_DATETIME state, the fallback is WRONG_DATETIME_MESSAGE)
     context, _ = await call_handler(EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION, handler_context=handler_context)
 
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    # Message sent to retry
+    # Message sent to retry (EDIT_DATETIME state fallback)
     context.api.assert_send_message_called(
-        update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user_with_settings.lang), times=1
+        update,
+        MeetingMessages.WRONG_DATETIME_MESSAGE.get(lang=user_with_settings.lang, datetime_link=build_datetime_link()),
+        times=1,
     )
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
@@ -559,7 +476,7 @@ async def test_conversation_fallback_with_wrong_message_format(
 
 @pytest.mark.parametrize(
     "update",
-    [(UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(10)))],
+    [(UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(10)))],
     indirect=True,
 )
 async def test_edit_time_can_be_cancelled(
@@ -584,12 +501,12 @@ async def test_edit_time_can_be_cancelled(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    context.api.assert_edit_message_called(update, meeting.edit_view, times=1)
+    context.api.assert_edit_message_called(update, meeting.when_view, times=1)
 
 
 @pytest.mark.parametrize(
     "update",
-    [(UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(10)))],
+    [(UpdateRequest(callback_query=cb.SET_MEETING_START_TIME.with_id(10)))],
     indirect=True,
 )
 async def test_date_time_entry_callback(
@@ -628,27 +545,14 @@ async def test_date_time_entry_callback(
                     callback_data=cb.EDIT_MEETING_TIME.with_id(10),
                 ),
             ],
-            # Delete row is shown because meeting.datetime is set
-            [
-                ButtonConfig(
-                    text=ButtonMessages.DELETE_DATE.get(lang=user_with_settings.lang),
-                    callback_data=cb.DELETE_MEETING_DATE.with_id(10),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.EDIT.back(lang=user_with_settings.lang),
-                    callback_data=cb.EDIT_MEETING.with_id(10),
-                ),
-            ],
         ],
-    )
+    ).with_back_button(ButtonMessages.WHEN, user_with_settings.lang, cb.CANCEL_EDIT_START_TIME.with_id(10))
     context.api.assert_edit_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize(
     "update",
-    [(UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(10)))],
+    [(UpdateRequest(callback_query=cb.SET_MEETING_START_TIME.with_id(10)))],
     indirect=["update"],
     ids=["date_time_entry_no_datetime"],
 )
@@ -658,9 +562,8 @@ async def test_date_time_entry_callback_without_datetime(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """DATE_TIME_ENTRY_CALLBACK with meeting.datetime=None must NOT include the DELETE_DATE button."""
+    """DATE_TIME_ENTRY_CALLBACK with meeting.datetime=None uses the same keyboard (no conditional rows)."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
-    # Explicitly ensure no datetime is set (create_meetup defaults to None already)
     assert meeting.datetime is None
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -674,7 +577,6 @@ async def test_date_time_entry_callback_without_datetime(
 
     today = user_with_settings.now_in_tz().date()
     datetime_link = build_datetime_link()
-    # When meeting.datetime is None the DELETE_DATE row (branch 152→161) is skipped
     expected_view = MitupView(
         description=MeetingMessages.DATE_TIME_VIEW_MESSAGE.get(
             lang=user_with_settings.lang, datetime_link=datetime_link
@@ -690,15 +592,8 @@ async def test_date_time_entry_callback_without_datetime(
                     callback_data=cb.EDIT_MEETING_TIME.with_id(10),
                 ),
             ],
-            # No DELETE_DATE row — meeting.datetime is None
-            [
-                ButtonConfig(
-                    text=ButtonMessages.EDIT.back(lang=user_with_settings.lang),
-                    callback_data=cb.EDIT_MEETING.with_id(10),
-                ),
-            ],
         ],
-    )
+    ).with_back_button(ButtonMessages.WHEN, user_with_settings.lang, cb.CANCEL_EDIT_START_TIME.with_id(10))
     context.api.assert_edit_message_called(update, expected_view)
 
 
@@ -744,7 +639,7 @@ async def test_date_time_entity_message(
 
     context.api.assert_send_message_called(
         update,
-        meeting.edit_view.with_context(
+        meeting.when_view.with_context(
             MeetingMessages.DATE_UPDATE_SUCCESS.get(
                 lang=user_with_settings.lang,
                 datetime=datetime_entity(DATE_TIME_ENTITY_UNIX_TIME),
@@ -845,24 +740,24 @@ async def test_date_time_entity_message_meeting_not_owned(
 
 @pytest.mark.parametrize(
     "update",
-    [(UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(10)))],
+    [(UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(10)))],
     indirect=["update"],
-    ids=["back_to_edit_meeting"],
+    ids=["cancel_start_time"],
 )
-async def test_back_to_edit_meeting(
+async def test_cancel_start_time(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """BACK_TO_EDIT_MEETING_CALLBACK cleans up context and returns ConversationHandler.END."""
+    """CANCEL_START_TIME_CALLBACK cleans up context and returns ConversationHandler.END, showing when_view."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, response = await call_handler(
-        EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
+        EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
         handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
     )
@@ -870,7 +765,7 @@ async def test_back_to_edit_meeting(
     assert response == ConversationHandler.END
     # cleanup_states must have removed EDIT_MEETING_TIME from context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
-    context.api.assert_edit_message_called(update, meeting.edit_view)
+    context.api.assert_edit_message_called(update, meeting.when_view)
 
 
 @pytest.mark.parametrize(
@@ -900,3 +795,125 @@ async def test_back_to_edit_datetime(
     # Use meeting.owner.now_in_tz().date() to get the same FakeDate that the handler produces under freeze_time
     today = meeting.owner.now_in_tz().date()
     context.api.assert_edit_message_called(update, _build_entry_view(meeting, user_with_settings.lang, today))
+
+
+# --- enforce_datetime_ordering: setting start past end clears end_datetime ---
+
+
+END_DATETIME_FOR_ORDERING = dt.datetime(2024, 12, 21, 18, 0, tzinfo=dt.UTC)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(message_text="20:20")],
+    indirect=True,
+)
+@freeze_time("2024-12-31 23:20:00", tz_offset=0)
+async def test_set_time_past_end_datetime_clears_end(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """When new start time is after end time, enforce_datetime_ordering clears end_datetime."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
+    meeting.end_datetime = END_DATETIME_FOR_ORDERING
+    meeting.lock_on_start = True
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationHandler.END
+
+    # The user sets 20:20 in Europe/Madrid (UTC+1), stored as 19:20 UTC on 2025-01-01 (freeze_time date).
+    # 2025-01-01 19:20 UTC > 2024-12-21 18:00 UTC, so end_datetime is cleared.
+    assert meeting.end_datetime is None
+    assert meeting.lock_on_start is False
+    mock_session.assert_added(meeting)
+    mock_session.assert_flushed()
+
+    # The context message should include END_DATETIME_CLEARED_BY_START prepended
+    assert meeting.datetime is not None
+    expected_time_entity = datetime_entity(int(meeting.datetime.timestamp()))
+    expected_context_message = (
+        MeetingMessages.END_DATETIME_CLEARED_BY_START.get(lang=user_with_settings.lang)
+        .append("\n\n")
+        .append(
+            MeetingMessages.EDIT_TIME_SUCCESS.get(
+                lang=user_with_settings.lang,
+                datetime=expected_time_entity,
+            )
+        )
+    )
+    context.api.assert_send_message_called(
+        update,
+        meeting.when_view.with_context(expected_context_message),
+    )
+
+
+DATE_TIME_ENTITY_UNIX_TIME_FUTURE = 1770000000  # 2026-02-02 ~07:00 UTC — after END_DATETIME_FOR_ORDERING
+DATE_TIME_ENTITY_TEXT_FUTURE = "Next month at noon"
+DATE_TIME_ENTITY_REQUEST_FUTURE = UpdateRequest(
+    message_text=DATE_TIME_ENTITY_TEXT_FUTURE,
+    entities=[
+        MessageEntity(
+            type=MessageEntity.DATE_TIME,
+            offset=0,
+            length=len(DATE_TIME_ENTITY_TEXT_FUTURE),
+            unix_time=dt.datetime.fromtimestamp(DATE_TIME_ENTITY_UNIX_TIME_FUTURE, tz=dt.UTC),
+        )
+    ],
+)
+
+
+@pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST_FUTURE], indirect=True)
+async def test_datetime_entity_past_end_datetime_clears_end(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """When a datetime entity sets a start past end_datetime, enforce_datetime_ordering clears end_datetime."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
+    meeting.end_datetime = END_DATETIME_FOR_ORDERING
+    meeting.lock_on_start = True
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationHandler.END
+    expected_datetime = dt.datetime.fromtimestamp(DATE_TIME_ENTITY_UNIX_TIME_FUTURE, tz=dt.UTC)
+    assert meeting.datetime == expected_datetime
+    assert meeting.end_datetime is None
+    assert meeting.lock_on_start is False
+    mock_session.assert_added(meeting)
+    mock_session.assert_flushed()
+
+    expected_context_message = (
+        MeetingMessages.END_DATETIME_CLEARED_BY_START.get(lang=user_with_settings.lang)
+        .append("\n\n")
+        .append(
+            MeetingMessages.DATE_UPDATE_SUCCESS.get(
+                lang=user_with_settings.lang,
+                datetime=datetime_entity(DATE_TIME_ENTITY_UNIX_TIME_FUTURE),
+            )
+        )
+    )
+    context.api.assert_send_message_called(
+        update,
+        meeting.when_view.with_context(expected_context_message),
+    )
+    context.api.assert_update_meeting_messages_called(mock_session, meeting)

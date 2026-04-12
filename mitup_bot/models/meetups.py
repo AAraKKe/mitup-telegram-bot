@@ -1,6 +1,6 @@
 import datetime as dt
 from string.templatelib import Template
-from typing import TYPE_CHECKING, ClassVar, Literal, Self, overload
+from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
@@ -496,12 +496,8 @@ class Meetup(BaseModel, SQLModel, table=True):
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.DATE_TIME.get(lang=self.user_language),
-                    callback_data=cb.EDIT_MEETING_DATE_TIME.with_id(self.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.DURATION.get(lang=self.user_language),
-                    callback_data=cb.EDIT_MEETING_DURATION.with_id(self.db_id),
+                    text=ButtonMessages.WHEN.get(lang=self.user_language),
+                    callback_data=cb.EDIT_MEETING_WHEN.with_id(self.db_id),
                 ),
             ],
         ]
@@ -577,43 +573,85 @@ class Meetup(BaseModel, SQLModel, table=True):
             keyboard=keyboard,
         ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(self.db_id))
 
-    def _duration_keyboard(self) -> Keyboard:
-        keyboard: Keyboard = [
-            [
-                ButtonConfig(
-                    text=ButtonMessages.SET_DURATION.get(lang=self.user_language),
-                    callback_data=cb.SET_MEETING_DURATION.with_id(self.db_id),
-                ),
-                options_button(
-                    cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
-                    ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
-                    self.lock_on_start,
-                ),
-            ],
-        ]
-        if self.end_datetime is not None:
-            keyboard.append(
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.DELETE_DURATION.get(lang=self.user_language),
-                        callback_data=cb.CLEAR_MEETING_DURATION.with_id(self.db_id),
-                    )
-                ]
-            )
-        return keyboard
+    def _when_view_with_start(self) -> tuple[str | FormattedText, Keyboard]:
+        start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), cast(dt.datetime, self.datetime), "DT")
+        set_start_button = ButtonConfig(
+            text=ButtonMessages.SET_START_TIME.get(lang=self.user_language),
+            callback_data=cb.SET_MEETING_START_TIME.with_id(self.db_id),
+        )
+        set_end_button = ButtonConfig(
+            text=ButtonMessages.SET_END_TIME.get(lang=self.user_language),
+            callback_data=cb.SET_MEETING_END_TIME.with_id(self.db_id),
+        )
+        lock_toggle = options_button(
+            cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
+            ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
+            self.lock_on_start,
+        )
+        clear_button = ButtonConfig(
+            text=ButtonMessages.CLEAR_TIMES.get(lang=self.user_language),
+            callback_data=cb.DELETE_MEETING_TIMES.with_id(self.db_id),
+        )
 
-    @property
-    def duration_view(self) -> MitupView:
         if self.end_datetime is not None:
-            end_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.end_datetime, "DT")
-            description = MeetingMessages.DURATION_VIEW_DESCRIPTION.get(
-                lang=self.user_language, end_datetime=render(t"{end_entity}")
+            end_entity = EntityDateTime(
+                MeetingMessages.MEETING_TIME.get_text(), cast(dt.datetime, self.end_datetime), "DT"
+            )
+            description: str | FormattedText = MeetingMessages.WHEN_VIEW_BOTH.get(
+                lang=self.user_language,
+                start_datetime=render(t"{start_entity}"),
+                end_datetime=render(t"{end_entity}"),
             )
         else:
-            description = MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET.get(lang=self.user_language)
-        return MitupView(description, self._duration_keyboard()).with_back_button(
+            description = MeetingMessages.WHEN_VIEW_START_ONLY.get(
+                lang=self.user_language,
+                start_datetime=render(t"{start_entity}"),
+            )
+
+        keyboard: Keyboard = [
+            [set_start_button, set_end_button],
+            [lock_toggle],
+            [clear_button],
+        ]
+        return description, keyboard
+
+    @property
+    def when_view(self) -> MitupView:
+        if self.datetime is None:
+            description: str | FormattedText = MeetingMessages.WHEN_VIEW_NO_TIMES.get(lang=self.user_language)
+            keyboard: Keyboard = [
+                [
+                    ButtonConfig(
+                        text=ButtonMessages.SET_START_TIME.get(lang=self.user_language),
+                        callback_data=cb.SET_MEETING_START_TIME.with_id(self.db_id),
+                    ),
+                ],
+                [
+                    options_button(
+                        cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
+                        ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
+                        self.lock_on_start,
+                    ),
+                ],
+            ]
+        else:
+            description, keyboard = self._when_view_with_start()
+
+        return MitupView(description, keyboard).with_back_button(
             ButtonMessages.EDIT, self.user_language, cb.EDIT_MEETING.with_id(self.db_id)
         )
+
+    def enforce_datetime_ordering(self) -> bool:
+        """Clear end_datetime if it's no longer after datetime. Returns True if cleared."""
+        if self.end_datetime is None or self.datetime is None:
+            return False
+        start = self.datetime.replace(tzinfo=dt.UTC) if self.datetime.tzinfo is None else self.datetime
+        end = self.end_datetime.replace(tzinfo=dt.UTC) if self.end_datetime.tzinfo is None else self.end_datetime
+        if start >= end:
+            self.end_datetime = None
+            self.lock_on_start = False
+            return True
+        return False
 
     def inline_view(self, *, chat_instance: str | None = None) -> MitupInlineView:
         is_searchable = chat_instance is not None

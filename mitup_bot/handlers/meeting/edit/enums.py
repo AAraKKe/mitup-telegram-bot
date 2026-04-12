@@ -39,12 +39,18 @@ class EditMeetingHandlerId(HandlerId):
     LOCATION_COORDINATES_MESSAGE = auto()
     LOCATION_COORDINATES_WRONG_MESSAGE = auto()
 
+    # When screen
+    WHEN_ENTRY_CALLBACK = auto()
+    CLEAR_TIMES_CALLBACK = auto()
+    CONFIRM_CLEAR_TIMES_CALLBACK = auto()
+    DECLINE_CLEAR_TIMES_CALLBACK = auto()
+    LOCK_ON_START_CALLBACK = auto()
+
     # Edit meeting date and time
     DATE_TIME_ENTRY_CALLBACK = auto()
     DATE_CALLBACK = auto()
     SET_DATE_CALLBACK = auto()
     BACK_TO_EDIT_DATETIME_CALLBACK = auto()
-    BACK_TO_EDIT_MEETING_CALLBACK = auto()
     EDIT_TIME_CALLBACK = auto()
     EDIT_DATETIME_CONVERSATION = auto()
     SET_TIME_MESSAGE = auto()
@@ -53,9 +59,7 @@ class EditMeetingHandlerId(HandlerId):
     DATE_TIME_ENTITY_MESSAGE = auto()
     DATETIME_WRONG_TEXT_FORMAT = auto()
     DATETIME_WRONG_MESSAGE = auto()
-    DELETE_DATE_TIME_CALLBACK = auto()
-    CONFIRM_DELETE_DATE_TIME_CALLBACK = auto()
-    DECLINE_DELETE_DATE_TIME_CALLBACK = auto()
+    CANCEL_START_TIME_CALLBACK = auto()
 
     # Edit meeting language
     LANGUAGE_CALLBACK = auto()
@@ -69,22 +73,9 @@ class EditMeetingHandlerId(HandlerId):
     SET_MEETING_INCOGNITO_CALLBACK = auto()
 
     # Edit meeting duration
-    DURATION_ENTRY_CALLBACK = auto()
     DURATION_INPUT_CALLBACK = auto()
     DURATION_CANCEL_CALLBACK = auto()
-    DURATION_CLEAR_CALLBACK = auto()
     DURATION_CONVERSATION = auto()
-    LOCK_ON_START_CALLBACK = auto()
-
-    # Duration — set start datetime sub-flow
-    DURATION_START_DATE_NAV_CALLBACK = auto()
-    DURATION_START_SET_DATE_CALLBACK = auto()
-    DURATION_START_TIME_CALLBACK = auto()
-    DURATION_START_DATETIME_ENTITY_MESSAGE = auto()
-    DURATION_START_WRONG_INPUT = auto()
-    DURATION_START_SET_TIME_MESSAGE = auto()
-    DURATION_START_TIME_WRONG_INPUT = auto()
-    DURATION_BACK_TO_START_DATETIME_CALLBACK = auto()
 
     # Duration — set end datetime sub-flow
     DURATION_END_ENTRY_CALLBACK = auto()
@@ -112,9 +103,6 @@ class ConversationMeetingState(Enum):
     EDIT_TIME = auto()
 
     # Duration conversation states
-    DURATION_SET_START_DATETIME = auto()
-    DURATION_SET_START_DATE = auto()
-    DURATION_SET_START_TIME = auto()
     EDIT_END_DATETIME = auto()
     EDIT_END_DATE = auto()
     EDIT_END_TIME = auto()

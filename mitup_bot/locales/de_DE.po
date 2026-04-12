@@ -413,6 +413,9 @@ msgstr "Wähle das Datum."
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
 msgstr "Das Datum wurde auf <b>${datetime}</b> eingestellt. Die Uhrzeit ist auf 00:00 voreingestellt.\n\nSende die Uhrzeit im Format <i>HH:MM</i>, um sie zu ändern, oder drücke Fertig stellen, um 00:00 beizubehalten."
 
+msgid "MeetingMessages.NEW_END_DATE_SET_SUCCESS"
+msgstr "Das Enddatum wurde auf <b>${datetime}</b> eingestellt. Die Uhrzeit ist auf 23:59 voreingestellt.\n\nSende die Uhrzeit im Format <i>HH:MM</i>, um sie zu ändern, oder drücke Fertig stellen, um 23:59 beizubehalten."
+
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "Das Datum wurde auf ${datetime} eingestellt"
 
@@ -783,3 +786,39 @@ msgstr "Die Endzeit muss nach der Startzeit liegen."
 
 msgid "MeetingMessages.END_DATETIME_IN_PAST"
 msgstr "Die Endzeit muss in der Zukunft liegen."
+
+msgid "ButtonMessages.WHEN"
+msgstr "🕒 Zeitpunkt"
+
+msgid "ButtonMessages.SET_START_TIME"
+msgstr "▶️ Startzeit setzen"
+
+msgid "ButtonMessages.SET_END_TIME"
+msgstr "⏹️ Endzeit setzen"
+
+msgid "ButtonMessages.CLEAR_TIMES"
+msgstr "🗑️ Uhrzeiten löschen"
+
+msgid "MeetingMessages.WHEN_VIEW_NO_TIMES"
+msgstr "Stelle fest, wann dein Treffen stattfindet. Du kannst eine Startzeit, eine Endzeit oder beides festlegen. Du kannst auch die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
+
+msgid "MeetingMessages.WHEN_VIEW_START_ONLY"
+msgstr "Treffen beginnt um: <b>${start_datetime}</b>\n\nDu kannst eine Endzeit festlegen oder die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
+
+msgid "MeetingMessages.WHEN_VIEW_BOTH"
+msgstr "Treffen beginnt um: <b>${start_datetime}</b>\nTreffen endet um: <b>${end_datetime}</b>\n\nDu kannst die Uhrzeiten ändern oder die Teilnehmerliste sperren, wenn das Treffen beginnt, damit niemand beitreten oder gehen kann, während es läuft."
+
+msgid "MeetingMessages.TIMES_CLEARED"
+msgstr "Uhrzeiten entfernt."
+
+msgid "MeetingMessages.CLEAR_TIMES_CONFIRMATION"
+msgstr "Bist du sicher, dass du die Start- und Endzeit löschen möchtest?"
+
+msgid "MeetingMessages.CLEAR_TIMES_DECLINE"
+msgstr "Die Uhrzeiten werden nicht gelöscht."
+
+msgid "MeetingMessages.END_DATETIME_CLEARED_BY_START"
+msgstr "Die neue Startzeit liegt nach der Endzeit, daher wurde die Endzeit gelöscht."
+
+msgid "MeetingMessages.SET_END_TIME_STALE_ALERT"
+msgstr "Die Startzeit wurde gelöscht. Stelle sie erneut fest, bevor du eine Endzeit wählst."

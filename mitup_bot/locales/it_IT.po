@@ -470,6 +470,9 @@ msgstr "Seleziona la data."
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
 msgstr "La data è stata impostata a <b>${datetime}</b>. L'ora è predefinita alle 00:00.\n\nInvia l'ora nel formato <i>HH:MM</i> per cambiarla, oppure tocca Fine per mantenere 00:00."
 
+msgid "MeetingMessages.NEW_END_DATE_SET_SUCCESS"
+msgstr "La data di fine è stata impostata a <b>${datetime}</b>. L'ora è predefinita alle 23:59.\n\nInvia l'ora nel formato <i>HH:MM</i> per cambiarla, oppure tocca Fine per mantenere 23:59."
+
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "Data impostata a: ${datetime}"
 
@@ -751,3 +754,39 @@ msgstr "L'orario di fine deve essere dopo l'orario di inizio."
 
 msgid "MeetingMessages.END_DATETIME_IN_PAST"
 msgstr "L'orario di fine deve essere nel futuro."
+
+msgid "ButtonMessages.WHEN"
+msgstr "🕒 Quando"
+
+msgid "ButtonMessages.SET_START_TIME"
+msgstr "▶️ Imposta ora di inizio"
+
+msgid "ButtonMessages.SET_END_TIME"
+msgstr "⏹️ Imposta ora di fine"
+
+msgid "ButtonMessages.CLEAR_TIMES"
+msgstr "🗑️ Cancella orari"
+
+msgid "MeetingMessages.WHEN_VIEW_NO_TIMES"
+msgstr "Imposta quando avviene il tuo incontro. Puoi impostare un'ora di inizio, un'ora di fine, o entrambe. Puoi anche bloccare l'elenco dei partecipanti quando inizia l'incontro, in modo che nessuno possa unirsi o andarsene una volta che è in corso."
+
+msgid "MeetingMessages.WHEN_VIEW_START_ONLY"
+msgstr "L'incontro inizia a: <b>${start_datetime}</b>\n\nPuoi impostare un'ora di fine o bloccare l'elenco dei partecipanti quando inizia l'incontro, in modo che nessuno possa unirsi o andarsene una volta che è in corso."
+
+msgid "MeetingMessages.WHEN_VIEW_BOTH"
+msgstr "L'incontro inizia a: <b>${start_datetime}</b>\nL'incontro termina a: <b>${end_datetime}</b>\n\nPuoi modificare gli orari o bloccare l'elenco dei partecipanti quando inizia l'incontro, in modo che nessuno possa unirsi o andarsene una volta che è in corso."
+
+msgid "MeetingMessages.TIMES_CLEARED"
+msgstr "Orari rimossi."
+
+msgid "MeetingMessages.CLEAR_TIMES_CONFIRMATION"
+msgstr "Sei sicuro di voler cancellare gli orari di inizio e fine?"
+
+msgid "MeetingMessages.CLEAR_TIMES_DECLINE"
+msgstr "Gli orari non verranno cancellati."
+
+msgid "MeetingMessages.END_DATETIME_CLEARED_BY_START"
+msgstr "Il nuovo orario di inizio è dopo l'orario di fine, quindi l'orario di fine è stato cancellato."
+
+msgid "MeetingMessages.SET_END_TIME_STALE_ALERT"
+msgstr "L'orario di inizio è stato cancellato. Impostalo di nuovo prima di scegliere un orario di fine."

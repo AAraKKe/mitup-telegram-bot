@@ -506,6 +506,9 @@ msgstr "Selecione a data."
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
 msgstr "A data foi definida para <b>${datetime}</b>. A hora está predefinida como 00:00.\n\nEnvie a hora no formato <i>HH:MM</i> para alterá-la, ou toque em Concluído para manter 00:00."
 
+msgid "MeetingMessages.NEW_END_DATE_SET_SUCCESS"
+msgstr "A data de término foi definida para <b>${datetime}</b>. A hora está predefinida como 23:59.\n\nEnvie a hora no formato <i>HH:MM</i> para alterá-la, ou toque em Concluído para manter 23:59."
+
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "Data definida para: ${datetime}"
 
@@ -783,3 +786,39 @@ msgstr "O horário de término deve ser após o horário de início."
 
 msgid "MeetingMessages.END_DATETIME_IN_PAST"
 msgstr "O horário de término deve estar no futuro."
+
+msgid "ButtonMessages.WHEN"
+msgstr "🕒 Quando"
+
+msgid "ButtonMessages.SET_START_TIME"
+msgstr "▶️ Definir hora de início"
+
+msgid "ButtonMessages.SET_END_TIME"
+msgstr "⏹️ Definir hora de término"
+
+msgid "ButtonMessages.CLEAR_TIMES"
+msgstr "🗑️ Limpar horários"
+
+msgid "MeetingMessages.WHEN_VIEW_NO_TIMES"
+msgstr "Defina quando seu evento acontece. Você pode definir uma hora de início, uma hora de término ou ambas. Você também pode bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
+
+msgid "MeetingMessages.WHEN_VIEW_START_ONLY"
+msgstr "Evento começa em: <b>${start_datetime}</b>\n\nVocê pode definir uma hora de término ou bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
+
+msgid "MeetingMessages.WHEN_VIEW_BOTH"
+msgstr "Evento começa em: <b>${start_datetime}</b>\nEvento termina em: <b>${end_datetime}</b>\n\nVocê pode alterar os horários ou bloquear a lista de participantes quando o evento começa, para que ninguém possa entrar ou sair depois que começar."
+
+msgid "MeetingMessages.TIMES_CLEARED"
+msgstr "Horários removidos."
+
+msgid "MeetingMessages.CLEAR_TIMES_CONFIRMATION"
+msgstr "Tem certeza de que deseja limpar a hora de início e término?"
+
+msgid "MeetingMessages.CLEAR_TIMES_DECLINE"
+msgstr "Os horários não serão limpos"
+
+msgid "MeetingMessages.END_DATETIME_CLEARED_BY_START"
+msgstr "A nova hora de início é posterior à hora de término, portanto a hora de término foi limpa."
+
+msgid "MeetingMessages.SET_END_TIME_STALE_ALERT"
+msgstr "A hora de início foi limpa. Defina-a novamente antes de escolher uma hora de término."

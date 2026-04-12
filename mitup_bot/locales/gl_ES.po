@@ -515,6 +515,9 @@ msgstr "Escolle a data."
 msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
 msgstr "A data estableceuse a <b>${datetime}</b>. A hora predefinida é 00:00.\n\nEnvía a hora en formato <i>HH:MM</i> para cambiarla, ou preme Feito para manter 00:00."
 
+msgid "MeetingMessages.NEW_END_DATE_SET_SUCCESS"
+msgstr "A data de fin estableceuse a <b>${datetime}</b>. A hora predefinida é 23:59.\n\nEnvía a hora en formato <i>HH:MM</i> para cambiarla, ou preme Feito para manter 23:59."
+
 msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
 msgstr "A data estableceuse a: <b>${datetime}</b>"
 
@@ -783,3 +786,39 @@ msgstr "A hora de remate debe ser posterior á hora de inicio."
 
 msgid "MeetingMessages.END_DATETIME_IN_PAST"
 msgstr "A hora de remate debe estar no futuro."
+
+msgid "ButtonMessages.WHEN"
+msgstr "🕒 Cando"
+
+msgid "ButtonMessages.SET_START_TIME"
+msgstr "▶️ Establecer hora de inicio"
+
+msgid "ButtonMessages.SET_END_TIME"
+msgstr "⏹️ Establecer hora de remate"
+
+msgid "ButtonMessages.CLEAR_TIMES"
+msgstr "🗑️ Eliminar horas"
+
+msgid "MeetingMessages.WHEN_VIEW_NO_TIMES"
+msgstr "Estabelece cando acontece a túa quedada. Podes estabelecer unha hora de inicio, unha hora de remate, ou ambas. Tamén podes bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
+
+msgid "MeetingMessages.WHEN_VIEW_START_ONLY"
+msgstr "A quedada comeza en: <b>${start_datetime}</b>\n\nPodes estabelecer unha hora de remate ou bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
+
+msgid "MeetingMessages.WHEN_VIEW_BOTH"
+msgstr "A quedada comeza en: <b>${start_datetime}</b>\nA quedada remata en: <b>${end_datetime}</b>\n\nPodes cambiar as horas ou bloquear a lista de asistentes cando a quedada comeza, así ninguén pode unirse ou saír mentres está en curso."
+
+msgid "MeetingMessages.TIMES_CLEARED"
+msgstr "Horas eliminadas."
+
+msgid "MeetingMessages.CLEAR_TIMES_CONFIRMATION"
+msgstr "Seguro que queres eliminar as horas de inicio e remate?"
+
+msgid "MeetingMessages.CLEAR_TIMES_DECLINE"
+msgstr "As horas non se eliminarán."
+
+msgid "MeetingMessages.END_DATETIME_CLEARED_BY_START"
+msgstr "A nova hora de inicio é posterior á hora de remate, polo que a hora de remate foi eliminada."
+
+msgid "MeetingMessages.SET_END_TIME_STALE_ALERT"
+msgstr "A hora de inicio foi eliminada. Estabelécela de novo antes de escoller unha hora de remate."

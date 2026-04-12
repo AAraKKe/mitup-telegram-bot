@@ -111,6 +111,12 @@ class ButtonMessages(MessageBase):
     LOAD_CHAT_MEETINGS = f"{Emojis.SEARCH} Load meetings"
     SEARCH_CHAT_MEETINGS = f"{Emojis.SEARCH} Search meetings"
 
+    # When screen buttons
+    WHEN = f"{Emojis.CLOCK} When"
+    SET_START_TIME = f"{Emojis.START} Set start time"
+    SET_END_TIME = f"{Emojis.STOP} Set end time"
+    CLEAR_TIMES = f"{Emojis.DELETE} Clear times"
+
     # Duration buttons
     DURATION = f"{Emojis.HOURGLASS} Duration"
     SET_DURATION = f"{Emojis.HOURGLASS} Set duration"
@@ -518,6 +524,36 @@ class MeetingMessages(MessageBase):
         "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
     )
     LOCK_ON_START_STALE_ALERT = "You must set an end time before enabling this option."
+
+    # When sub-screen description variants
+    WHEN_VIEW_NO_TIMES = (
+        "Set when your meeting happens. You can set a start time, an end time, or both. "
+        "You can also lock the attendees list when the meeting starts, "
+        "so no one can join or leave once it is underway."
+    )
+    WHEN_VIEW_START_ONLY = (
+        "Meeting starts at: <b>${start_datetime}</b>\n\n"
+        "You can set an end time or lock the attendees list when the meeting starts, "
+        "so no one can join or leave once it is underway."
+    )
+    WHEN_VIEW_BOTH = (
+        "Meeting starts at: <b>${start_datetime}</b>\n"
+        "Meeting ends at: <b>${end_datetime}</b>\n\n"
+        "You can change the times or lock the attendees list when the meeting starts, "
+        "so no one can join or leave once it is underway."
+    )
+
+    # Clear times messages
+    TIMES_CLEARED = "Times removed."
+    CLEAR_TIMES_CONFIRMATION = "Are you sure you want to clear the start and end times?"
+    CLEAR_TIMES_DECLINE = "The times won't be cleared."
+    END_DATETIME_CLEARED_BY_START = "The new start time is after the end time, so the end time has been cleared."
+    SET_END_TIME_STALE_ALERT = "The start time was cleared. Set it again before choosing an end time."
+    NEW_END_DATE_SET_SUCCESS = (
+        "The end date has been set to <b>${datetime}</b>. "
+        "The time defaults to 23:59.\n\n"
+        "Send the time in <i>HH:MM</i> format to change it, or tap Done to keep 23:59."
+    )
 
     # Duration sub-screen description
     DURATION_VIEW_DESCRIPTION = (

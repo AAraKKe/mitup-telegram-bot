@@ -82,7 +82,7 @@ class Context:
 CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_date_time_entry",
     ),
@@ -108,50 +108,20 @@ CONTEXTS = [
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_time",
     ),
+    # CANCEL_START_TIME: calls cleanup_states when meeting is not accessible (not when user not found).
     Context(
-        handler_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="delete_meeting_datetime",
-    ),
-    # CONFIRM_DELETE: calls cleanup_states when meeting is not accessible (not when user not found).
-    # Split into two entries so each error mode gets the correct expected metrics.
-    Context(
-        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
-        id="confirm_delete_meeting_datetime",
-        # cleanup_states() emits 7 x CleanUserData when meeting is accessible but not owned
-        extra_metrics=[("CleanUserData", 7)],
-        # When meeting is not found, MeetingNotOwned/Error is never emitted, so CleanUserData is also emitted
-        extra_metrics_not_found=[("CleanUserData", 7)],
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.USER_NOT_FOUND},
-        id="confirm_delete_meeting_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="decline_delete_meeting_datetime",
-    ),
-    # BACK_TO_EDIT_MEETING: calls cleanup_states when meeting is not accessible (not when user not found).
-    Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
-        id="back_to_edit_meeting_from_datetime",
+        id="cancel_start_time",
         extra_metrics=[("CleanUserData", 7)],
         extra_metrics_not_found=[("CleanUserData", 7)],
     ),
     Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.USER_NOT_FOUND},
-        id="back_to_edit_meeting_from_datetime",
+        id="cancel_start_time",
     ),
     Context(
         handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
@@ -217,7 +187,7 @@ CONTEXTS = [
     ),
     Context(
         handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME),
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_START_TIME),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="edit_meeting_date_time_entry",
     ),
@@ -240,28 +210,10 @@ CONTEXTS = [
         id="edit_meeting_time",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE),
+        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="delete_meeting_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="confirm_delete_meeting_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="decline_delete_meeting_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="back_to_edit_meeting_from_datetime_malformed",
+        id="cancel_start_time_malformed",
     ),
     Context(
         handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
@@ -475,7 +427,7 @@ CONTEXTS = [
     ),
     Context(
         handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE_TIME.with_id(MEETING_ID_INACTIVE)),
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_START_TIME.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="edit_inactive_meeting_date_time_entry",
     ),
@@ -502,32 +454,10 @@ CONTEXTS = [
         id="edit_inactive_meeting_time",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
+        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="delete_inactive_meeting_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.CONFIRM_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
-        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="confirm_delete_inactive_meeting_datetime",
-        # Owner path: cleanup_states emits 7 x CleanUserData
-        extra_metrics=[("CleanUserData", 7)],
-        # Non-owner path: MeetingNotOwned/Error is emitted before cleanup_states; CleanUserData is still emitted
-        extra_metrics_non_owner_inactive=[("CleanUserData", 7)],
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DECLINE_DELETE_DATE_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DATE.with_id(MEETING_ID_INACTIVE)),
-        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="decline_delete_inactive_meeting_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_MEETING_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
-        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="back_to_edit_meeting_from_datetime_inactive",
+        id="cancel_start_time_inactive",
         extra_metrics=[("CleanUserData", 7)],
         extra_metrics_non_owner_inactive=[("CleanUserData", 7)],
     ),
@@ -558,22 +488,10 @@ CONTEXTS = [
         id="set_inactive_meeting_public",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="edit_meeting_duration",
-    ),
-    Context(
         handler_id=EditMeetingHandlerId.DURATION_INPUT_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_END_TIME.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="set_meeting_duration",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_CLEAR_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CLEAR_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="clear_meeting_duration",
+        id="set_meeting_end_time",
     ),
     Context(
         handler_id=EditMeetingHandlerId.LOCK_ON_START_CALLBACK,
@@ -634,75 +552,6 @@ CONTEXTS = [
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="duration_end_time_malformed",
     ),
-    # Start datetime sub-flow handlers
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_DATE_NAV_CALLBACK,
-        update_request=UpdateRequest(
-            callback_query=cb.DURATION_EDIT_START_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
-        ),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_start_date_nav",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_SET_DATE_CALLBACK,
-        update_request=UpdateRequest(
-            callback_query=cb.DURATION_SET_START_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
-        ),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_start_set_date",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DURATION_EDIT_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_start_time",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_DATE_NAV_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DURATION_EDIT_START_DATE.with_date(dt.date(2024, 12, 21))),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_start_date_nav_malformed",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_SET_DATE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DURATION_SET_START_DATE.with_date(dt.date(2024, 12, 21))),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_start_set_date_malformed",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DURATION_EDIT_START_TIME),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_start_time_malformed",
-    ),
-    # Duration start sub-flow message handlers
-    # Note: DURATION_START_DATETIME_ENTITY_MESSAGE and DURATION_END_DATETIME_ENTITY_MESSAGE use DateTimeEntityFilter
-    # which requires a message with a date_time entity — not expressible via UpdateRequest — so they are omitted here.
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_SET_TIME_MESSAGE,
-        update_request=UpdateRequest(message_text="10:00"),
-        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="duration_start_set_time_message",
-        meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_SET_TIME_MESSAGE,
-        update_request=UpdateRequest(message_text="10:00"),
-        error_modes={ErrorMode.MISSING_USER_DATA},
-        id="duration_start_set_time_message",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_WRONG_INPUT,
-        update_request=UpdateRequest(message_text="some text"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
-        id="duration_start_wrong_input",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_TIME_WRONG_INPUT,
-        update_request=UpdateRequest(message_text="bad time"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
-        id="duration_start_time_wrong_input",
-    ),
     # Duration end sub-flow message handlers
     Context(
         handler_id=EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
@@ -731,39 +580,6 @@ CONTEXTS = [
     ),
     # Duration entity message handlers — require a message with a date_time entity
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_DATETIME_ENTITY_MESSAGE,
-        update_request=UpdateRequest(
-            message_text="Tomorrow at noon",
-            entities=[
-                MessageEntity(
-                    type=MessageEntity.DATE_TIME,
-                    offset=0,
-                    length=16,
-                    unix_time=dt.datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt.UTC),
-                )
-            ],
-        ),
-        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="duration_start_datetime_entity_message",
-        meeting_id={ContextId.EDIT_MEETING_DURATION: 99},
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_START_DATETIME_ENTITY_MESSAGE,
-        update_request=UpdateRequest(
-            message_text="Tomorrow at noon",
-            entities=[
-                MessageEntity(
-                    type=MessageEntity.DATE_TIME,
-                    offset=0,
-                    length=16,
-                    unix_time=dt.datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt.UTC),
-                )
-            ],
-        ),
-        error_modes={ErrorMode.MISSING_USER_DATA},
-        id="duration_start_datetime_entity_message",
-    ),
-    Context(
         handler_id=EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
         update_request=UpdateRequest(
             message_text="Tomorrow at noon",
@@ -795,6 +611,79 @@ CONTEXTS = [
         ),
         error_modes={ErrorMode.MISSING_USER_DATA},
         id="duration_end_datetime_entity_message",
+    ),
+    # --- When screen handlers ---
+    Context(
+        handler_id=EditMeetingHandlerId.WHEN_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_WHEN.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="when_entry",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.WHEN_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_WHEN),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="when_entry_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.WHEN_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_WHEN.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="when_entry_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_TIMES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="clear_times",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_TIMES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="clear_times_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_TIMES.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="clear_times_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_clear_times",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_TIMES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_clear_times_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_clear_times_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_TIMES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_clear_times",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_TIMES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_clear_times_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_CLEAR_TIMES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_TIMES.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_clear_times_inactive",
     ),
     Context(
         handler_id=StaleCancelHandlerId.STALE_CANCEL_CALLBACK,
