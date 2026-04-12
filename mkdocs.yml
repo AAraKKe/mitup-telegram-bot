@@ -2,30 +2,28 @@ site_name: Mitup Telegram Bot
 site_url: https://mitup.social
 repo_url: https://gitlab.com/meetupbot/mitup-telegram-bot
 repo_name: MitupBot/mitup-telegram-bot
-exclude_docs: |
-  hooks
 nav:
   - MitupBot: index.md
   - User Guide:
     - Getting Started: user-guide/getting_started.md
     - Main Menu: user-guide/main_menu.md
     - Mitup Configuration: user-guide/configuration.md
-    - Meetings:
-      - Create a meeting: user-guide/create_meeting.md
-      - Configure a Meeting: user-guide/configure_meeting.md
-      - Lifecycle of a Meeting: user-guide/meeting_lifecycle.md
+    - Create a Meeting: user-guide/create_meeting.md
+    - Configure a Meeting: user-guide/configure_meeting.md
+    - Meeting Lifecycle: user-guide/meeting_lifecycle.md
   - FAQ:
     - Privacy: faq/privacy.md
   - Collaborate:
     - Being a supporter: collaborate/supporter.md
     - Donation: collaborate/donation.md
     - Become a Translator: collaborate/translator.md
-    - Code Contribution:
-      - Setup: collaborate/code_contributor.md
-      - Making contributions: collaborate/committing_to_repo.md
-      - Commit Message Format: collaborate/commit_message_format.md
-      - Local Validation: collaborate/local_validation.md
+    - Code Contributor: collaborate/code_contributor.md
     - Code of Conduct: collaborate/code_of_conduct.md
+  - Code Contributor:
+    - Setup: contribute/setup.md
+    - Making Contributions: contribute/making_contributions.md
+    - Local Validation: contribute/local_validation.md
+    - Commit Message Format: contribute/commit_message_format.md
 theme:
   name: material
   custom_dir: docs/overrides
@@ -33,7 +31,7 @@ theme:
   palette:
     scheme: default
     primary: indigo
-    accent: pink
+    accent: indigo
   icon:
     repo: fontawesome/brands/gitlab
   features:
@@ -71,5 +69,3 @@ extra:
     - icon: fontawesome/brands/telegram
       name: Bot
       link: https://t.me/mitupbot
-hooks:
-  - docs/hooks/hooks.py

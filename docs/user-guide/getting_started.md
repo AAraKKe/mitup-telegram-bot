@@ -1,3 +1,7 @@
+---
+icon: material/rocket-launch-outline
+---
+
 # Getting started
 
 Mitup doesn't work by adding it to your group. While other bots might need to be added to a group to gain context and permissions (this might be needed if the bot is intended to monitor conversations, like moderate the group), Mitup does not need anything from the group and, therefore, it has been developed with the goal of functioning entirely in a private conversation with each user.

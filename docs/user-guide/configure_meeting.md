@@ -1,3 +1,7 @@
+---
+icon: material/calendar-edit
+---
+
 # Configure Your Meeting :gear:
 
 After creating a meeting, Mitup provides a powerful set of tools to tailor it exactly to your needs. You can access these options right after creation or any time later by navigating to the meeting and tapping the *:pencil2: Edit*{.button-like} button.

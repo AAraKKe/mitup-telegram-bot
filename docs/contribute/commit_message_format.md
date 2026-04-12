@@ -1,3 +1,7 @@
+---
+icon: material/format-text
+---
+
 # :pen: Commit Message Format
 
 Mitup uses a custom commit message formatter that automatically transforms your commit messages into a consistent, emoji-based format. This makes the commit history more readable and visually informative.

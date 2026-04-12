@@ -191,8 +191,7 @@ dependencies = [
     "ruff==0.15.0",
     "boto3~=1.34",
     "debugpy",
-    "mkdocs",
-    "mkdocs-material",
+    "zensical",
     "deepdiff",
     "boto3-stubs[essential,ecs,cloudfront]",
     "testcontainers[postgres]==4.14.2",
@@ -231,8 +230,8 @@ debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for
 help = "python -m mitup_bot.cli.run launch --help"
 deploy = "python -m mitup_bot.cli.run deploy {args:}"
 validate-migrations = "python -m mitup_bot.cli.run validate-migrations"
-serve-docs = "mkdocs serve"
-build-docs = "mkdocs build --strict"
+serve-docs = "zensical serve"
+build-docs = "zensical build"
 push-docs = "python -m mitup_bot.cli.run publish-docs {args:}"
 update-source-language = "python -m mitup_bot.cli.run translations update"
 validate-ids = "python -m mitup_bot.cli.run translations validate-ids"

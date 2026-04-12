@@ -1,3 +1,7 @@
+---
+icon: material/gift-outline
+---
+
 # Supporting Mitup Financially :moneybag:
 
 Thank you for considering a financial contribution to Mitup! Your donations help us cover hosting costs, development time, and enables us to build new features.

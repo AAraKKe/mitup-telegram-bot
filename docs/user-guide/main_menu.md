@@ -1,3 +1,7 @@
+---
+icon: material/menu
+---
+
 # The Main Menu
 
 Once you are registered you will be welcomed to the Main Menu. This is Mitup's main hub and from here you will be able to access everything you can do within the bot.

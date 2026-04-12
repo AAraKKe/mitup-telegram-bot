@@ -1,3 +1,7 @@
+---
+icon: material/check-circle-outline
+---
+
 # Running Local Validation
 
 Before submitting a Merge Request, it's crucial to run the project's validation checks locally. This ensures your changes meet the required code quality standards and helps catch issues before they reach the CI pipeline, speeding up the review process.

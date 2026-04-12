@@ -42,6 +42,7 @@ include:
 .docs-files: &docs-files
   - docs/**/*
   - mkdocs.yml
+  - zensical.toml
   # Include also gitlab yaml files related with documentation
   - .gitlab-ci.yml
   - .gitlab/ci/base.yml

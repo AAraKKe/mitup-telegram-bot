@@ -1,3 +1,7 @@
+---
+icon: material/heart-outline
+---
+
 # Thank You for Supporting Mitup! :pray:
 
 Thank you for your interest in supporting the Mitup Telegram bot! Community support is what keeps this project alive and growing. We greatly appreciate your consideration to help us make Mitup better for everyone.

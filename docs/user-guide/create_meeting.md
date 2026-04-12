@@ -1,3 +1,7 @@
+---
+icon: material/calendar-plus
+---
+
 # Create your first meeting :sparkles:
 
 Once you are registered with Mitup, creating a new meeting is simple!

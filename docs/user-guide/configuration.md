@@ -1,3 +1,7 @@
+---
+icon: material/cog-outline
+---
+
 # Configuring Mitup Bot :gear:
 
 This guide explains all the settings available in Mitup and how to configure them through Telegram. Proper configuration ensures you get the best experience when organizing and participating in meetings.

@@ -1,3 +1,7 @@
+---
+icon: material/translate
+---
+
 # Become a Mitup Translator :globe_with_meridians:
 
 Help make Mitup accessible to more people around the world by contributing translations! Language barriers shouldn't prevent anyone from enjoying what Mitup has to offer.

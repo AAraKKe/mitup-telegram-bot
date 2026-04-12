@@ -1,3 +1,7 @@
+---
+icon: material/handshake-outline
+---
+
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge

@@ -1,79 +1,134 @@
 ---
 hide:
     - navigation
+    - toc
 ---
 
-# Mitup Telegram Bot
+<div class="hero" markdown>
 
-<div class="grid" markdown>
+![Mitup Logo](assets/images/mitup_logo.jpg){width=200px}
 
-<div markdown>
+# Organize events in Telegram — without the chaos
 
-![Mitup Logo](assets/images/mitup_logo.jpg){align=leftr width=60%}
+Born in 2014 to solve the chaos of organizing events in large groups. Now used by tens of thousands to coordinate everything from game nights to conferences with their friends.
 
-</div>
-
-<div markdown>
-We know how hard it can be to organize anything with friends in a Telegram group with over 20-50 people. We have seen it all:
-
-??? quote ":eye: **The Déjà vu**"
-    _If you are coming copy the message and add your name to the list!_
-
-??? quote ":fontawesome-brands-meta:{.lg} **The group**"
-    _Hey guys! We have created this group for the event, please join!_
-
-??? quote ":detective: **The private event**"
-    _For those of you that want to join the event, send me a private message so I can count you in_
-</div>
+[:fontawesome-solid-paper-plane: Start with MitupBot now!](https://t.me/mitupbot){ .md-button .md-button--primary }
 
 </div>
 
-Mitup Telegram Bot was born out of necessity when, back in 2014, we realized how hard it was to organize an online game in a group with 120 people. Since then, tens of thousands of users have used it to organize all kinds of events with their friends in Telegram.
+---
+
+## The Problem
+
+Organizing events in busy Telegram groups is messy. We've all seen it:
+
+<div class="grid cards" markdown>
+
+* :fontawesome-solid-rotate: **The Déjà vu**
+
+    ---
+    _If you're coming, copy the message and add your name to the list!_
+
+    Tedious, hard to track, easy to lose.
+
+* :fontawesome-solid-users: **The Group Chaos**
+
+    ---
+    _Hey guys! We created a separate group for the event, please join!_
+
+    Fragments your community across channels.
+
+* :fontawesome-solid-envelope: **The Private Shuffle**
+
+    ---
+    _Send me a DM if you want to join and I'll count you in_
+
+    Manually keeping track doesn't scale.
+
+</div>
+
+---
+
+## How It Works
+
+No bot in your group. No annoying notifications. Just seamless event coordination:
+
+<div class="grid cards" markdown>
+
+* :fontawesome-solid-comment-dots: **Chat with the bot**
+
+    ---
+    Interact privately with Mitup in your personal chat. No spam.
+
+* :fontawesome-solid-calendar-plus: **Create your event**
+
+    ---
+    Set the date, time, and customize it the way you need.
+
+* :fontawesome-solid-share-nodes: **Share with your group**
+
+    ---
+    Post a single message to your Telegram group — that's it.
+
+* :fontawesome-solid-list-check: **Track attendance**
+
+    ---
+    Friends tap to join or leave. You see the live count.
+
+</div>
+
+<figure markdown="span">
+  ![A shared meeting message in Telegram](assets/images/shared_meeting.png){ width="300" }
+  <figcaption>That's all it takes</figcaption>
+</figure>
+
+---
+
+## Built Your Way
+
+With Mitup, you're in control:
+
+<div class="grid cards" markdown>
+
+* :fontawesome-solid-language: **Language**
+
+    ---
+    Translated by the community in 10+ languages!
+
+* :fontawesome-solid-bell: **Notifications**
+
+    ---
+    Get alerts when the event is about to start.
+
+* :fontawesome-solid-earth-americas: **Timezone**
+
+    ---
+    Share events across the world without confusion.
+
+* :fontawesome-solid-sliders: **Custom Events**
+
+    ---
+    Tailor events to your needs with flexible options.
+
+* :fontawesome-solid-shield-halved: **Your Privacy**
+
+    ---
+    Only you see your attendee lists. We don't store chats.
+
+* :fontawesome-solid-heart: **Free, Forever**
+
+    ---
+    No ads, no premium, no surprises. It's free.
+
+</div>
+
+---
+
+## Ready to get started?
 
 <div markdown>
 
 [:fontawesome-solid-paper-plane: Start with MitupBot now!](https://t.me/mitupbot){ .md-button .md-button--primary }
 {.center}
-
-</div>
-## Easy to use
-
-With [@mitupbot] there is no need to add the bot to your groups and annoy everyone in it while the people going to the event interact with it.
-
-* :lock: Interact with the bot in your own chat
-* :pen: Create a meeting and configure it the way you want it
-* :envelope: Share the meeting in your group as a normal message
-* :check_mark: Keep track of the people who have joined
-
-<figure markdown="span">
-  ![Image title](assets/images/shared_meeting.png){ width="300" }
-  <figcaption>That's it!</figcaption>
-</figure>
-
-## Configurable
-
-You can configure:
-
-<div class="grid cards" markdown>
-
-* :globe_with_meridians: **Language**
-
-    ---
-    Translated by the community!
-
-* :bell: **Notifications**
-
-    ---
-    Be notified when the event is about to start
-
-* :one_thirty: **Timezone**
-
-    ---
-    So you can share events even if you are traveling to the other side of the world
-
-* :sparkles: **Custom events**
-
-    ---
-    Events can be customized with many options to suit your needs
 
 </div>
