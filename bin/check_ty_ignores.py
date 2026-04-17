@@ -41,6 +41,11 @@ TY_IGNORE_WITH_ISSUE = re.compile(
     r"(?P<url>https://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/issues/(?P<number>\d+))",
 )
 
+# Matches ty ignore directives that are explicitly exempted from requiring an issue URL.
+# Use `# nolink: <reason>` to document why no tracking issue exists (e.g. intentional
+# type mismatch in a test fixture rather than a ty bug).
+TY_IGNORE_NOLINK = re.compile(r"#\s*ty:\s*ignore\[(?P<rule>[^\]]+)\].*#\s*nolink:")
+
 
 class IssueState(StrEnum):
     OPEN = "open"
@@ -196,6 +201,8 @@ def scan_ty_ignores(root: Path) -> tuple[list[IgnoreEntry], list[UntrackedIgnore
                             ),
                         )
                     )
+                elif TY_IGNORE_NOLINK.search(line):
+                    pass  # explicitly exempted — nolink: reason documents why no issue is needed
                 elif bare_match := TY_IGNORE_BARE.search(line):
                     untracked.append(
                         UntrackedIgnore(

@@ -594,9 +594,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         )
 
         if self.end_datetime is not None:
-            end_entity = EntityDateTime(
-                MeetingMessages.MEETING_TIME.get_text(), cast(dt.datetime, self.end_datetime), "DT"
-            )
+            end_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.end_datetime, "DT")
             description: str | FormattedText = MeetingMessages.WHEN_VIEW_BOTH.get(
                 lang=self.user_language,
                 start_datetime=render(t"{start_entity}"),

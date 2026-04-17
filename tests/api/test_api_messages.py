@@ -27,9 +27,7 @@ def context(app, update, metrics_client: MetricsClient):
     # We want to test the real wrapper here, not the mock
     api = TelegramApi()
     api.adapter = cast(ContextOrBotAdapter, context)
-    # Ignoring the type below because the context type is expected to use mock api
-    # but in this case we want to use the real one
-    context.api = api
+    context.api = api  # ty: ignore[invalid-assignment]  # nolink: intentional — test fixture assigns real TelegramApi to a MockApi-typed field
     return context
 
 
