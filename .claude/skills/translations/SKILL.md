@@ -15,41 +15,22 @@ The bot supports multiple languages via GNU gettext. The list of supported langu
 - `mitup_bot/locales/` — Compiled `.mo` files and source `.po` files per language.
 - `crowdin.yml` — Configuration for Crowdin, the translation management platform.
 
-## Key rules
+## Relationship to `user-facing-text`
 
-1. **Never hardcode user-facing text** in handlers or views. Define it as a member of the appropriate `StrEnum` in `mitup_bot/utils/messages.py`.
-2. **English is the source language.** The enum value is the English text and the gettext key.
-3. After adding or modifying messages, update the source language file:
+This skill owns the **locale workflow** — gettext, `.po`/`.mo` files, Crowdin, the translator agents, and the CI validation jobs. The rules for how to *author* a string (never hardcoding, `MessageBase` subclasses, `${placeholder}` syntax, `<b>`/`<i>` inline tags, "never MarkdownV2") live in the `user-facing-text` skill. Don't restate them here; just know that once a string is added there, the workflow below takes over.
 
-```bash
-hatch run dev:update-source-language
-```
+## Key workflow rules
 
-4. Then rebuild the compiled locale files:
+1. **English is the source language.** The enum value in `messages.py` is both the English text shown to users *and* the gettext msgid.
+2. After adding or modifying a string, regenerate the source language file and the compiled locales:
 
 ```bash
-hatch run dev:build-locales
-```
+hatch run dev:update-source-language   # update .pot / en.po from code
+hatch run dev:build-locales             # compile .po → .mo
 
-Or do both in one step:
-
-```bash
+# or, equivalently, both in one step:
 hatch run dev:update-locales
 ```
-
-## Message content and formatting
-
-Messages use HTML-like tags for inline formatting and `${variable_name}` for template placeholders:
-
-```python
-MEETING_TITLE_LABEL = "<b>Title:</b> ${title}"
-INVITED_BY_USER = "<i>invited by ${user}</i>"
-```
-
-Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be nested.
-
-NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) — use `<b>`, `<i>` tags instead.
-NEVER use raw escaping (`\\(`, `\\)`) — write plain characters.
 
 ## Validating translations
 

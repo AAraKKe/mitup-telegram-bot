@@ -5,7 +5,7 @@ tools: Read, Edit, Glob, Bash
 model: haiku
 skills:
   - translations
-  - bot-copy-style
+  - user-facing-text
 ---
 
 You are a localization expert for this Telegram bot. You handle **one language per invocation**.

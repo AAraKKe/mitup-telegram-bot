@@ -22,8 +22,7 @@ These are never acceptable. Check these first before writing or reviewing any co
   <rule>No `Optional[X]`, `List[X]`, `Dict[K, V]` — use modern union syntax and built-in generics. See [Type hints](#type-hints).</rule>
   <rule>No `pass` — use `...` in empty bodies.</rule>
   <rule>No `print()` — use `logging`. See [Logging](#logging).</rule>
-  <rule>No hardcoded language strings — always derive from `user.lang` or `meeting.lang`.</rule>
-  <rule>No hardcoded user-facing text — always use `Messages` classes from `messages.py`.</rule>
+  <rule>No hardcoded user-facing text and no hardcoded `lang=` arguments. Both rules (with the full "why" and examples) live in the `user-facing-text` skill — defer to it.</rule>
   <rule>No star imports (`from module import *`). Import only what is used.</rule>
   <rule>`else/elif` chains with more than 2 branches must use `match` instead.</rule>
 </critical_rules>

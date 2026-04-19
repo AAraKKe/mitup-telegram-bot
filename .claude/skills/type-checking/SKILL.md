@@ -1,7 +1,9 @@
 ---
 name: type-checking
-description: Type annotations, suppression rules, and how to run the type checker in this project.
-user-invocable: false
+description: Everything about the `ty` type checker in this project — how to run it, type annotation conventions, when to prefer `cast` over `# type: ignore`, documented known-false-positives, the `check-ty-ignores` CI job, and the exact format required for `# ty: ignore[rule-name]` suppressions (including the mandatory GitHub issue URL). Use this skill whenever a `ty` error needs investigation, whenever a suppression is added/removed/reviewed, or whenever someone asks "how do I silence this type error" — even if the request is phrased as a quick task like "add a ty-ignore here". Also covers the interactive workflow for inserting a suppression on a specific file/line.
+user-invocable: true
+argument-hint: "[rule-name] [optional: file:line]"
+allowed-tools: Read, Edit, WebSearch, Bash, Grep
 ---
 
 # Type Checking
@@ -39,6 +41,18 @@ The CI job `check-ty-ignores` queries the GitHub API and warns when a referenced
 2. Run `hatch run dev:type-check`. If no error appears, the fix has landed — done.
 3. If the error reappears, verify the installed `ty` matches the version in `pyproject.toml`. If not, run `hatch env prune && hatch env create dev` to refresh the environment.
 4. If the version is correct and the error still appears, restore the comment — the fix has not fully landed yet.
+
+## Interactive suppression workflow
+
+Invoke this skill directly (via `/type-checking <rule-name> [file:line]`) when you want it to drive the suppression insertion for you. The workflow is the same rules above, run as an interactive task:
+
+1. Identify the `ty` rule name from the error message (e.g. `missing-argument`, `unresolved-import`, `invalid-return-type`). If the caller passed it as an argument, use that.
+2. Search <https://github.com/astral-sh/ty/issues> for an open issue covering the false positive. If a match exists, use its URL. If none exists, pause and tell the caller to open one before proceeding — the suppression cannot land without an issue link.
+3. Insert the comment on the flagged line in the exact format shown above (rule name in brackets, two spaces, full issue URL). If the caller passed `file:line`, go straight there; otherwise ask which location to modify.
+4. Warn the caller if the referenced issue is already **closed** — the `check-ty-ignores` CI job will flag the suppression as stale, and the fix may already be available in a newer `ty` version.
+5. Run `hatch run dev:type-check` to confirm the error clears.
+
+Before picking a fresh URL, check the "Known false positives" section below — many common suppressions already have a documented issue you can reuse.
 
 ## Prefer `cast` over `# type: ignore`
 

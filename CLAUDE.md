@@ -27,7 +27,7 @@ For single-domain tasks or targeted fixes, **always** delegate to the appropriat
 
 **After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done. If the reviewer reports violations, **resume the specialist agent that made the changes** and pass it the full violation report — do not fix violations yourself.
 
-Run `/project-guide` for a full reference of all available agents and skills.
+The canonical reference for available agents is `.claude/agents/` (one file per agent). The canonical reference for available skills is `.claude/skills/` (one directory per skill, each with a `SKILL.md`). Skills with `user-invocable: true` in their frontmatter can be run as `/<skill-name>`; the rest auto-load when their `description` triggers match the current work.
 
 ## Important rules
 

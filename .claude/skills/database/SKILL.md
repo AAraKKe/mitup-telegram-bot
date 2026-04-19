@@ -59,7 +59,7 @@ When adding a new model:
 
 Database migrations use [Alembic](https://alembic.sqlalchemy.org/). Migration scripts live in `mitup_bot/migrations/versions/`.
 
-Commands:
+Day-to-day commands when running the bot locally:
 
 ```bash
 hatch run dev:migrations-upgrade    # Apply pending migrations
@@ -67,7 +67,7 @@ hatch run dev:migrations-downgrade  # Roll back one migration
 hatch run dev:validate-migrations   # Validate migration graph integrity
 ```
 
-When adding or modifying a model, generate a new migration and confirm both the upgrade and downgrade paths apply cleanly against a local database.
+When a model change needs a new migration, invoke the `new-migration` skill — it walks through scaffolding the revision file, writing `upgrade()` / `downgrade()` by hand (autogenerate is disallowed), and validating that both paths apply cleanly. Don't repeat the walkthrough here; that skill owns it.
 
 ## Automatic timestamps
 

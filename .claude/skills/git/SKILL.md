@@ -23,26 +23,9 @@ whether pre-commit hooks are installed:
 - **Hooks installed** → write `Type[(scope)]: description` — the hook prepends the emoji automatically.
   Example: `Feat(auth): add JWT login`
 - **Hooks NOT installed** → write `{emoji} description` — include the emoji directly.
-  Example: `✨ Add JWT login`
+  Example: `✨ Add JWT login` (see `commits_check_config.yaml` for the emoji to use)
 
-Type/emoji mapping (also in `commits_check_config.yaml`):
-
-| Type | Emoji | When |
-|------|-------|------|
-| Feat | ✨ | New feature |
-| Fix | 🐛 | Bug fix |
-| Docs | 📚 | Documentation only |
-| Refactor | 🧹 | Code restructure, no behaviour change |
-| Test | 🧪 | Tests added or updated |
-| CI | 👷 | CI/CD pipeline changes |
-| Chore | ⚙️ | Config, tooling, housekeeping |
-| Infra | 🏗️ | Infrastructure changes |
-| Translations | 🗣️ | Locale/translation updates |
-| Monitoring | 📈 | Metrics/observability |
-| Update | ⬆️ | Dependency updates |
-| Merge | 🔀 | Merge branches |
-| WIP | 🚧 | Work in progress (avoid on main) |
-| Revert | ⏪ | Reverting a previous commit |
+**Type/emoji mapping** — the authoritative list lives in `commits_check_config.yaml` at the repo root. Read that file before picking a type; it is the single source of truth enforced by CI, and it evolves over time (types get added, emoji get tweaked). Don't rely on a mapping written into this skill — it will drift.
 
 ---
 
@@ -86,7 +69,7 @@ Review before staging — never blindly `git add .`:
      - Direct to main: require explicit confirmation ("yes, commit to main"). Do not proceed until confirmed.
 2. If nothing is staged, offer to run the staging workflow above.
 3. Check if pre-commit hooks are installed: `test -x .git/hooks/commit-msg && echo installed || echo not-installed`
-4. Infer the commit type from the diff (refer to the table above).
+4. Infer the commit type from the diff — consult `commits_check_config.yaml` for the list of valid types and their emoji.
 5. Ask for the commit description if not provided via `$ARGUMENTS`.
 6. Build the commit message based on hook status:
    - **Hooks installed:** `Type[(scope)]: description` (hook adds emoji automatically)

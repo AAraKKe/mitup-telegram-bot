@@ -91,7 +91,7 @@ All edit operations use the `handle_edit_errors()` context manager, which handle
 - **"Message is not modified"** — silently ignored (content unchanged, no-op)
 - **"Message to edit not found" / "Message_id_invalid"** — message deleted by user; the `Message` DB record is deleted and `MESSAGE_DELETED` metric is emitted
 
-These error patterns are defined as compiled regexes (`MESSAGE_NOT_FOUND_ERROR_PATTERNS`, `EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS`). Do not add custom try/except blocks for these cases — use the existing mechanism.
+The suppressed patterns are compiled regexes defined inside `mitup_bot/api_wrapper.py` (grep for `_ERROR_PATTERNS` / `_ERRORS_TO_IGNORE_PATTERNS` to see the current list — the exact names and set of patterns change as Telegram's error strings evolve). Do not add custom try/except blocks for these cases — extend the regex list in that module instead.
 
 ### Meeting message broadcast
 

@@ -24,18 +24,11 @@ Use the conversation context to infer which template fits best:
 | Wrong or missing translation string | Translation |
 | Support request, service desk | Service Desk Request |
 
-Only ask the user to choose if the context genuinely doesn't make it clear. If asking, present a numbered list of the 7 options.
+Only ask the user to choose if the context genuinely doesn't make it clear. If asking, list the available options by reading `.gitlab/issue_templates/` at that moment — don't trust the table above as exhaustive, templates get added or renamed over time.
 
 ## Step 2 — Read the template
 
-Read the corresponding file from `.gitlab/issue_templates/`:
-- Bug → `Bug.md`
-- Feature Proposal → `Feature Proposal.md`
-- Task → `Task.md`
-- New Language Request → `New Language Request.md`
-- Improve Documentation → `Improve Documentation.md`
-- Translation → `Translation.md`
-- Service Desk Request → `Service Desk Request.md`
+List `.gitlab/issue_templates/` and read the file whose name matches the template you picked. Template filenames are the same as the template label followed by `.md` (e.g., "Bug" → `Bug.md`, "New Language Request" → `New Language Request.md`). If the name doesn't match exactly, fall back to listing the directory and picking by visual similarity.
 
 ## Step 3 — Fill in the sections
 

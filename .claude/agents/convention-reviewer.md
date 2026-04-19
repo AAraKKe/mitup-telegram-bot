@@ -6,10 +6,9 @@ model: sonnet
 skills:
   - coding-standards
   - handler-conventions
-  - view-conventions
+  - views
   - guards
-  - messages
-  - bot-copy-style
+  - user-facing-text
   - database
   - monitoring
   - type-checking

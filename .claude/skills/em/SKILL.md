@@ -27,6 +27,8 @@ Each agent has a **default stage** listed below, but phases can override it. For
 
 **Splitting large work:** When a feature requires a lot of work from a single agent type, split it into multiple focused phases rather than one massive prompt. Smaller, focused prompts produce better results — a single handler-expert instance building three handlers will struggle; three phases with one handler each will succeed. Each phase gets its own agent instance.
 
+**Authoritative agent list.** The agents catalogued in this file are the ones this orchestration workflow knows how to stage and brief. The repo's real agent list lives in `.claude/agents/` (one `.md` file per agent). Before planning, run `ls .claude/agents/*.md` and cross-check: if a file exists there without a block below, the workflow cannot stage it correctly — either update this section to document it, or leave that agent out of the plan. If a block below references an agent that no longer has a file in `.claude/agents/`, remove the block. Do not silently stage an undocumented agent.
+
 ## Scaffolding stage
 Produces the building blocks the feature needs. All scaffolding phases run in parallel.
 
@@ -120,6 +122,20 @@ When you are done, list every file you created or modified under a "## Files tou
 After each agent completes, extract the file list from the `## Files touched` section (one path per bullet line). Accumulate all file lists across phases — you will need them for the convention review step.
 </worktree>
 
+<workspace>
+## Scratch location
+
+Any working artifacts generated while iterating on this skill itself — benchmark runs, iteration snapshots (`iteration-N/`), draft skill rewrites, eval outputs — live under:
+
+```
+.claude/skills/em/em-workspace/
+```
+
+That path is already listed in `.gitignore` and in `.vscode/settings.json` (both `files.exclude` and `search.exclude`) so nothing there is committed, indexed by editor search, or shown in the file tree. Do **not** put these artifacts at the top level of `.claude/skills/` — they would look like sibling skills and confuse skill enumeration.
+
+Nothing inside `em-workspace/` is considered part of the published skill. Treat it as ephemeral.
+</workspace>
+
 <handler_test_team>
 When the approved plan contains both a **handler-expert phase** and a **test-expert phase**, run them as a coordinated team instead of independent phases. This enables direct agent-to-agent communication so test-expert receives a structured test brief from handler-expert rather than inferring coverage from source code.
 
@@ -196,14 +212,15 @@ Once the user approves, write the phase files to `.plans/` before starting any i
 
 ## Implementation mode (Steps 6–9)
 
-**Step 6 — Enter worktree and load context**
+**Step 6 — Enter worktree, bootstrap it, and load context**
 
-Before any implementation begins, create a shared worktree for all phases:
+Before any implementation begins, create a shared worktree for all phases and bring it up to a runnable state:
 
 1. Derive the feature slug from the phase file names or task description (kebab-case, max 4 words).
 2. Call `EnterWorktree(name: "<slug>")`. This switches the session's CWD into the worktree.
-3. Store the absolute worktree path (the new CWD after `EnterWorktree`). You will embed this path in every agent prompt via the worktree preamble from `<worktree>`.
-4. Load `.plans/<slug>-overview.md` (if it exists alongside the phase files) plus all requested phase files. Read the `## Stage` field of each phase file to determine stage membership and execution order.
+3. **Bootstrap the worktree.** Run the `worktree-setup` skill (or inline its commands) before doing anything else — a fresh worktree doesn't have `.env` or `.envrc`, so specialist agents would pick up the wrong config. The skill only does safe offline work: it copies the local-only files from the main checkout and reports any follow-up steps (starting the local database, applying migrations, etc.) that need the user's attention. Do **not** run those follow-ups automatically — they require external services (Docker, Postgres) that may not be up, and blocking the orchestration on them causes hangs that are hard to recover from.
+4. Store the absolute worktree path (the new CWD after `EnterWorktree`). You will embed this path in every agent prompt via the worktree preamble from `<worktree>`.
+5. Load `.plans/<slug>-overview.md` (if it exists alongside the phase files) plus all requested phase files. Read the `## Stage` field of each phase file to determine stage membership and execution order.
 
 **Step 7 — Execute phases by stage**
 Create a `TaskCreate` task for each phase being implemented. Execute stages in order — each stage waits for the previous one to complete before starting. Skip any stage that has no phases.

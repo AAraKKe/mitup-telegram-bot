@@ -102,7 +102,7 @@ cb.MY_ACTION.with_id(meeting.db_id)
 
 ### Naming conventions
 
-- **Destructive flows** — any action that is irreversible or results in permanent data loss (hard deletes, meeting cancellation that removes all participants, any change users cannot undo through the bot) — must follow the three-step pattern: `DELETE_<X>` (trigger) → `CONFIRM_<X>` (confirm) → `DECLINE_<X>` (decline). Non-destructive actions (e.g. editing a description that can be re-edited) do not require this pattern.
+- **Destructive flows** — the `DELETE_<X>` / `CONFIRM_<X>` / `DECLINE_<X>` three-step pattern for irreversible actions is owned by the `views` skill. When you define callbacks for a destructive flow, follow that pattern.
 - Action and entity names use `snake_case`.
 - Keep action and entity strings short — callback data is limited to **64 bytes** total when encoded.
 
@@ -166,11 +166,7 @@ When deleting a handler entirely:
 
 ## Localization
 
-Always derive the language from the user (`user.lang`) or the meeting (`meeting.lang`). Fetch the user early in the handler — before branching on meeting existence — so `user.lang` is available in all code paths.
-
-<critical_rules>
-  <rule>NEVER hard-code a language (e.g., `lang="en"`). Always derive it from `user.lang` or `meeting.lang`.</rule>
-</critical_rules>
+Fetch the user early in the handler — before branching on meeting existence — so `user.lang` is available in all code paths. The "never hardcode `lang=`" rule itself lives in the `user-facing-text` skill; the handler-side concern is *when* to fetch the user so the language is in scope at every `.get()` call.
 
 ## `chat_instance`
 

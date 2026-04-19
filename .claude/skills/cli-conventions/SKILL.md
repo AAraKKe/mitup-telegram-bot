@@ -40,9 +40,11 @@ Top-level scripts in `mitup_bot/cli/` are not auto-discovered — they are impor
 
 ## Database and API access
 
-- **Database:** Use `@with_session` or `@with_async_session` from `mitup_bot.db`.
-- **Telegram API:** Use `BotAdapter` (not `MitupContext`) — CLI code runs outside the PTB application lifecycle. Construct it with an `ExtBot` instance.
-- **Configuration:** Load via `Config.from_providers()` with the appropriate `Env`.
+CLI commands run outside the PTB application lifecycle, so they use the non-handler variants of the shared infrastructure. The details live in the owning skills — this section is a pointer, not a second copy of the rules:
+
+- **Database:** sessions are injected by `@with_session` / `@with_async_session` from `mitup_bot.db`. See the `database` skill for the full pattern and the ty-ignore caveat.
+- **Telegram API:** use `BotAdapter` wrapping an `ExtBot` — never `MitupContext`, which only exists inside the PTB app. See the `api-wrapper` skill for how to construct it and supply a `MetricsClient`.
+- **Configuration:** load via `Config.from_providers()` with the appropriate `Env` — see the `mitup-config` skill.
 
 ## Helper utilities
 
