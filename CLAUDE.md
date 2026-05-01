@@ -12,7 +12,7 @@ For complex tasks that span multiple areas (handler + migration + tests + transl
 /em Add recurring meetings — needs a handler, DB migration, tests, and EN/ES translations.
 ```
 
-For single-domain tasks or targeted fixes, **always** delegate to the appropriate specialist agent — do not implement it directly. Check the table below to find the right agent:
+For single-domain tasks or targeted fixes, **always delegate to the appropriate specialist agent** — do not implement it directly. Specialists carry their area's conventions and stay in sync with the skills they own; the orchestrator session does not. Check the table below to find the right agent:
 
 | Work involves | Delegate to |
 |---|---|
@@ -25,31 +25,29 @@ For single-domain tasks or targeted fixes, **always** delegate to the appropriat
 | Translation `.po`/`.pot` files | `translator` |
 | Documentation in `docs/` | `docs-writer` |
 
-**After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done. If the reviewer reports violations, **resume the specialist agent that made the changes** and pass it the full violation report — do not fix violations yourself.
+**After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done. If the reviewer reports violations, **resume the specialist agent that made the changes** and pass it the full violation report — the specialist already has the full context of every change it made, while you would be reconstructing it from a diff.
 
 The canonical reference for available agents is `.claude/agents/` (one file per agent). The canonical reference for available skills is `.claude/skills/` (one directory per skill, each with a `SKILL.md`). Skills with `user-invocable: true` in their frontmatter can be run as `/<skill-name>`; the rest auto-load when their `description` triggers match the current work.
 
 ## Important rules
 
-- Never run tests, linters, formatters, or anything similar for validation.
-- Tests are run by a hook when you are done. If you want feedback mid-work, run a specific test with `hatch run dev -- <pytest args>`. Avoid full runs.
-- Formatters and linters are run by hooks after each modification. No need to run them manually.
-- **Never run `python` directly.** The system Python has no project dependencies. Always use `hatch run dev:python python <args>` to execute Python within the project's managed environment.
-- **Bulk updates**: when you decided that you need to modify multiple files at once for the same change, evaluate whether you can build a script that does it instead of updating all files by hand to avoid context exhaustion.
+- **Hooks own validation.** Tests, linters, formatters, and the type checker run automatically via hooks — once after each modification (lint/format/type-check) and once when work is complete (tests). Running them manually duplicates work and floods the conversation with output you don't need. If you want feedback mid-work on a specific test, run it directly: `hatch run dev -- <pytest args>`. Avoid full runs.
+- **Never run `python` directly.** The system Python has no project dependencies. Use `hatch run dev:python python <args>` to execute Python in the project's managed environment.
+- **Prefer scripts for bulk edits.** When the same change needs to land across many files, write a small script rather than editing each one by hand — it's faster and saves the conversation context for actual reasoning.
 
 ## When hooks fail
 
-Hooks run automatically after work is complete (type checker, tests, linter/formatter). If any hook fails, do NOT attempt to fix it yourself.
+If a hook fails, don't try to fix it yourself — the failure usually involves area-specific conventions a specialist already knows.
 
 **If the work was done by a specialist agent:** resume that agent's session with the error output. The resumed agent retains full context of every change it made.
 
-**If the work was done directly:** delegate to the appropriate specialist and provide the full `git diff` of the changes alongside the error output — not a prose summary. A diff gives the specialist the exact state of the code.
+**If the work was done directly:** delegate to the appropriate specialist and pass it the full `git diff` of the changes alongside the error output — not a prose summary. The diff is the only way the specialist sees the exact state of the code.
 
 | Failing hook | Delegate to |
 |--------------|-------------|
-| Type checker (`ty`) | type-checking agent |
-| Tests (`pytest`) | test-expert agent |
-| Linter (`ruff`) | convention-reviewer agent |
+| Type checker (`ty`) | the specialist that owns the failing file (see the table above), with an explicit instruction to load the `type-checking` skill |
+| Tests (`pytest`) | `test-expert` |
+| Linter (`ruff`) | the specialist that owns the failing file (see the table above), with an explicit instruction to load the `coding-standards` skill |
 
 ## Maintaining these instructions
 

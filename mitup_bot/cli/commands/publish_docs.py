@@ -6,6 +6,11 @@ from urllib.parse import urlparse
 import boto3
 import click
 from mypy_boto3_cloudfront import CloudFrontClient
+from mypy_boto3_cloudfront.type_defs import (
+    CreateInvalidationRequestTypeDef,
+    InvalidationBatchTypeDef,
+    PathsTypeDef,
+)
 
 from mitup_bot.cli.helpers import console, error, success
 
@@ -125,16 +130,14 @@ def cli(invalidate_all: bool):
     else:
         paths_to_invalidate = docs_files_updated
 
-    # Build the invalidation request
-    request = {
+    paths: PathsTypeDef = {"Quantity": len(paths_to_invalidate), "Items": paths_to_invalidate}
+    batch: InvalidationBatchTypeDef = {
+        "Paths": paths,
+        "CallerReference": f"mitup-ci-{os.environ['CI_COMMIT_SHORT_SHA']}",
+    }
+    request: CreateInvalidationRequestTypeDef = {
         "DistributionId": distribution_id,
-        "InvalidationBatch": {
-            "Paths": {
-                "Quantity": len(paths_to_invalidate),
-                "Items": paths_to_invalidate,
-            },
-            "CallerReference": f"mitup-ci-{os.environ['CI_COMMIT_SHORT_SHA']}",
-        },
+        "InvalidationBatch": batch,
     }
     console().print("[bold]Invalidation request[/bold]:")
     console().print(request)
