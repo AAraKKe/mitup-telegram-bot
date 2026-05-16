@@ -13,6 +13,7 @@ repos:
         stages: [pre-commit]
         exclude: (^.gitlab-ci.yml$|^mkdocs.yml$|^.gitlab/)
       - id: check-added-large-files
+        args: [--maxkb=700]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
     rev: v0.15.0

@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Mitup — Meeting flow</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0a0a; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; }
+  #root { width: 100vw; height: 100vh; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<div id="root"></div>
+
+<script type="text/babel" src="animations.jsx"></script>
+<script type="text/babel">
+  const { Stage, Sprite, useTime, useSprite, interpolate, animate, Easing } = window;
+
+  // ----- Telegram-ish palette -----
+  const TG = {
+    bg: '#17212B',
+    header: '#1F2D38',
+    botName: '#5EC78A',  // green sender name for bots
+    senderBlue: '#2AA1E0',
+    senderOrange: '#F59E5B',
+    senderPurple: '#9B6FE3',
+    senderGreen: '#5EC78A',
+    bubbleBot: '#1F2D38',
+    bubbleMe: '#2C6E8A',
+    bubbleGroup: '#1F2D38',
+    text: '#E8F0F5',
+    textDim: '#8FA3B0',
+    link: '#62B3DD',
+    accent: '#2AA1E0',
+    green: '#5EC78A',
+    red: '#E26565',
+    panelDark: '#0E1A23',
+    keyBg: '#2A3A48',
+    keyHover: '#3B4F61',
+  };
+
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const fade = (t, start, end, durIn=0.4, durOut=0.4) => {
+    if (t < start) return 0;
+    if (t > end) return 0;
+    if (t < start + durIn) return (t - start) / durIn;
+    if (t > end - durOut) return (end - t) / durOut;
+    return 1;
+  };
+
+  // ============================================================
+  // Phone frame (status bar + chat header + body)
+  // ============================================================
+  function PhoneFrame({ children, headerContent }) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          width: 380, height: 760,
+          background: '#000',
+          borderRadius: 44, padding: 8,
+          boxShadow: '0 40px 100px -20px rgba(0,0,0,.6), 0 0 0 2px rgba(255,255,255,.04)',
+        }}>
+          <div style={{
+            background: TG.bg, borderRadius: 36,
+            height: '100%', overflow: 'hidden',
+            position: 'relative',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Status bar */}
+            <div style={{
+              height: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '6px 24px 0', color: 'white', fontSize: 12, fontWeight: 600, flex: 'none',
+            }}>
+              <span>9:41</span>
+              <div style={{ width: 110, height: 22, background: '#000', marginTop: -6, clipPath: 'inset(0 0 0 0 round 14px)' }} />
+              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: 11 }}>
+                <span>5G</span>
+                <span style={{ display: 'inline-block', width: 22, height: 11, border: '1.2px solid white', borderRadius: 2, padding: 1 }}>
+                  <span style={{ display: 'block', width: '85%', height: '100%', background: 'white', borderRadius: 1 }} />
+                </span>
+              </span>
+            </div>
+            {headerContent}
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+              {children}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function ChatHeader({ name, subtitle, avatar, avatarBg = TG.accent }) {
+    return (
+      <div style={{
+        background: TG.header, padding: '10px 14px 12px',
+        display: 'flex', alignItems: 'center', gap: 10,
+        borderBottom: '1px solid rgba(255,255,255,.04)', flex: 'none',
+      }}>
+        <div style={{ color: TG.accent, fontSize: 22, fontWeight: 300, width: 16 }}>‹</div>
+        <div style={{
+          width: 34, height: 34, borderRadius: '50%',
+          background: avatarBg, display: 'grid', placeItems: 'center',
+          fontSize: 14, fontWeight: 700, color: 'white',
+        }}>{avatar}</div>
+        <div>
+          <div style={{ color: 'white', fontSize: 14, fontWeight: 600, letterSpacing: '-0.005em' }}>{name}</div>
+          <div style={{ color: TG.textDim, fontSize: 11 }}>{subtitle}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // Visual primitives
+  // ============================================================
+  function BotMessage({ children, sender = 'MitupStaging', senderColor = TG.botName, op = 1, ty = 0 }) {
+    return (
+      <div style={{
+        background: TG.bubbleBot,
+        color: TG.text,
+        padding: '8px 12px 10px',
+        borderRadius: 14, borderBottomLeftRadius: 4,
+        fontSize: 13, lineHeight: 1.45,
+        marginBottom: 6,
+        opacity: op,
+        transform: `translateY(${ty}px)`,
+        maxWidth: '90%',
+        alignSelf: 'flex-start',
+        boxShadow: '0 1px 2px rgba(0,0,0,.15)',
+      }}>
+        <div style={{ color: senderColor, fontWeight: 600, fontSize: 12.5, marginBottom: 3 }}>{sender}</div>
+        {children}
+      </div>
+    );
+  }
+
+  function MeBubble({ text, op = 1, ty = 0 }) {
+    return (
+      <div style={{
+        alignSelf: 'flex-end',
+        background: TG.bubbleMe, color: 'white',
+        padding: '8px 12px', borderRadius: 14, borderBottomRightRadius: 4,
+        fontSize: 13, lineHeight: 1.45,
+        marginBottom: 6, maxWidth: '85%',
+        opacity: op, transform: `translateY(${ty}px)`,
+      }}>{text}</div>
+    );
+  }
+
+  function ReplyKeyboard({ rows, op = 1, tap }) {
+    return (
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: TG.header, padding: '8px 6px 10px',
+        borderTop: '1px solid rgba(255,255,255,.05)',
+        display: 'flex', flexDirection: 'column', gap: 4,
+        opacity: op,
+      }}>
+        {rows.map((row, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: `repeat(${row.length}, 1fr)`, gap: 4 }}>
+            {row.map((btn, j) => (
+              <ReplyButton key={j} label={btn.label} tapped={tap && tap.row === i && tap.col === j} />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function ReplyButton({ label, tapped }) {
+    return (
+      <div style={{
+        background: tapped ? TG.accent : TG.keyBg,
+        color: 'white', fontSize: 12, fontWeight: 500,
+        padding: '10px 8px', textAlign: 'center',
+        borderRadius: 6,
+        transition: 'background .15s',
+        transform: tapped ? 'scale(0.97)' : 'scale(1)',
+      }}>{label}</div>
+    );
+  }
+
+  function TapRipple({ x, y, time, t0, dur = 0.5 }) {
+    const t = time - t0;
+    if (t < 0 || t > dur) return null;
+    const r = 10 + t * 60;
+    const o = Math.max(0, 1 - t / dur);
+    return (
+      <div style={{
+        position: 'absolute', left: x - r, top: y - r,
+        width: r * 2, height: r * 2,
+        borderRadius: '50%',
+        border: '2px solid #2AA1E0',
+        opacity: o,
+        pointerEvents: 'none', zIndex: 10,
+      }} />
+    );
+  }
+
+  function TypingTextField({ text, time, t0, dur = 1.5 }) {
+    const t = Math.max(0, time - t0);
+    const shown = Math.min(text.length, Math.floor((t / dur) * text.length));
+    const visible = text.substring(0, shown);
+    const caret = (Math.floor(time * 2) % 2 === 0);
+    return (
+      <span>
+        {visible}
+        <span style={{ display: 'inline-block', width: 1.5, height: 14, background: TG.accent, opacity: caret ? 1 : 0, verticalAlign: -2, marginLeft: 1 }} />
+      </span>
+    );
+  }
+
+  // ============================================================
+  // SCENE 1 — Main menu (0 - 3s)
+  // ============================================================
+  function SceneMainMenu() {
+    const { localTime: t, duration } = useSprite();
+    const fIn = clamp(t / 0.5, 0, 1);
+    const fOut = clamp((t - (duration - 0.5)) / 0.5, 0, 1);
+    const op = fIn * (1 - fOut);
+
+    const tapAt = duration - 0.7;
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: op }}>
+        <PhoneFrame headerContent={
+          <ChatHeader name="Mitup Bot" subtitle="bot · online" avatar="M" avatarBg={TG.green} />
+        }>
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            padding: '14px 12px',
+            height: '100%', overflow: 'hidden',
+          }}>
+            <BotMessage>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Welcome to Mitup Bot!</div>
+              <div>Choose one of the following options:</div>
+            </BotMessage>
+          </div>
+
+          <ReplyKeyboard
+            op={op}
+            tap={t > tapAt ? { row: 0, col: 0 } : null}
+            rows={[
+              [{ label: '➕  New meeting' }],
+              [{ label: '📂  Your active meetings' }],
+              [{ label: '💾  Your past meetings' }],
+              [{ label: '👥  Joined meetings' }, { label: '⚙️  Settings' }],
+              [{ label: '❓  Help' }, { label: '❤️  Collaborate' }],
+            ]}
+          />
+
+          <TapRipple x={190} y={520} time={t} t0={tapAt} />
+        </PhoneFrame>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // SCENE 2 — Title prompt + typing (3 - 6.5s)
+  // ============================================================
+  function SceneTitle() {
+    const { localTime: t, duration } = useSprite();
+    const fIn = clamp(t / 0.5, 0, 1);
+    const fOut = clamp((t - (duration - 0.5)) / 0.5, 0, 1);
+    const op = fIn * (1 - fOut);
+
+    // Bot prompt: 0.0
+    // Type field: 0.5
+    // Typing starts: 0.8, finishes: 2.3
+    // Send tap: 2.5
+    // Bubble appears: 2.6
+    const typeStart = 0.8;
+    const typeEnd = 2.3;
+    const sendTap = 2.5;
+    const bubbleAt = 2.6;
+
+    const title = 'Saturday brunch';
+
+    const bubbleOp = clamp((t - bubbleAt) / 0.3, 0, 1);
+
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: op }}>
+        <PhoneFrame headerContent={
+          <ChatHeader name="Mitup Bot" subtitle="bot · online" avatar="M" avatarBg={TG.green} />
+        }>
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            padding: '14px 12px 70px',
+            height: '100%', overflow: 'hidden',
+          }}>
+            <BotMessage op={clamp(t / 0.4, 0, 1)}>
+              <div>Lets create a meeting. What is the title?</div>
+              <div style={{ marginTop: 8, fontSize: 12, color: TG.textDim, fontStyle: 'italic' }}>
+                Tip: you can also use <span style={{ color: TG.link, textDecoration: 'underline' }}>Telegram's date &amp; time formatting</span> to include a date and time directly.
+              </div>
+              <div style={{
+                marginTop: 10, paddingTop: 8,
+                borderTop: '1px solid rgba(255,255,255,.06)',
+                textAlign: 'center', color: TG.red, fontSize: 12.5, fontWeight: 500,
+              }}>❌  Cancel</div>
+            </BotMessage>
+
+            {/* User bubble appears after send */}
+            {bubbleOp > 0 && (
+              <MeBubble text={title} op={bubbleOp} ty={(1 - bubbleOp) * 10} />
+            )}
+          </div>
+
+          {/* Input bar at bottom with typing animation */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            background: TG.header, padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            borderTop: '1px solid rgba(255,255,255,.05)',
+          }}>
+            <div style={{
+              flex: 1, background: 'rgba(255,255,255,.06)',
+              borderRadius: 18, padding: '8px 12px',
+              color: t > bubbleAt - 0.05 ? TG.textDim : 'white',
+              fontSize: 13, minHeight: 18,
+            }}>
+              {t > bubbleAt - 0.05
+                ? <span style={{ opacity: .55 }}>Message</span>
+                : (t < typeStart ? <span style={{ opacity: .55 }}>Message</span>
+                   : <TypingTextField text={title} time={t} t0={typeStart} dur={typeEnd - typeStart} />)}
+            </div>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: TG.accent, display: 'grid', placeItems: 'center',
+              color: 'white', fontSize: 14,
+              transform: t > sendTap && t < sendTap + 0.3 ? 'scale(0.85)' : 'scale(1)',
+              transition: 'transform .1s',
+            }}>↑</div>
+          </div>
+
+          <TapRipple x={340} y={700} time={t} t0={sendTap} />
+        </PhoneFrame>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // SCENE 3 — Configure meeting (6.5 - 13s)
+  // ============================================================
+  function SceneConfigure() {
+    const { localTime: t, duration } = useSprite();
+    const fIn = clamp(t / 0.5, 0, 1);
+    const fOut = clamp((t - (duration - 0.5)) / 0.5, 0, 1);
+    const op = fIn * (1 - fOut);
+
+    // Schedule
+    const whenTapAt = 1.6;   // user taps "When"
+    const whenSetAt = 2.0;   // time appears in card
+    const locTapAt = 3.2;    // user taps "Location"
+    const locSetAt = 3.6;    // location appears
+    const doneTapAt = 5.0;
+
+    const hasTime = t > whenSetAt;
+    const hasLoc  = t > locSetAt;
+
+    // Tap state for keyboard
+    let tap = null;
+    if (t > whenTapAt && t < whenTapAt + 0.4) tap = { row: 1, col: 0 };
+    else if (t > locTapAt && t < locTapAt + 0.4) tap = { row: 2, col: 1 };
+    else if (t > doneTapAt && t < doneTapAt + 0.4) tap = { row: 4, col: 0 };
+
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: op }}>
+        <PhoneFrame headerContent={
+          <ChatHeader name="Mitup Bot" subtitle="bot · online" avatar="M" avatarBg={TG.green} />
+        }>
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            padding: '12px 10px 270px',
+            height: '100%', overflow: 'hidden',
+          }}>
+            <BotMessage>
+              <div style={{ marginBottom: 6 }}>
+                Meeting created: <b>Saturday brunch</b>
+              </div>
+              <div style={{ fontSize: 12, color: TG.textDim, lineHeight: 1.45, marginBottom: 8 }}>
+                Add more information with the options below. Anything not added won't be shown when shared.
+              </div>
+              <div style={{ fontSize: 12, color: TG.textDim, marginBottom: 10 }}>
+                When finished click on <span style={{ color: TG.green }}>✅ Done</span>
+              </div>
+
+              {/* Preview card */}
+              <div style={{
+                background: TG.panelDark,
+                borderRadius: 10, padding: '10px 12px',
+                marginTop: 4,
+              }}>
+                <div style={{ fontWeight: 700, color: 'white', fontSize: 13, marginBottom: 6 }}>
+                  Saturday brunch <span style={{ color: TG.textDim, fontWeight: 400, fontSize: 12 }}>(Created by: Juanpe)</span>
+                </div>
+                <ConfigLine icon="📄" defined={false} placeholder="No description defined" value="" />
+                <ConfigLine
+                  icon="⏰"
+                  defined={hasTime}
+                  placeholder="No time defined"
+                  value="Sat 24 May · 11:00 → 14:00"
+                  setAt={whenSetAt} t={t}
+                />
+                <ConfigLine
+                  icon="📍"
+                  defined={hasLoc}
+                  placeholder="No location defined"
+                  value="Café Maló · Dublin 2"
+                  setAt={locSetAt} t={t}
+                />
+                <div style={{ fontSize: 11.5, color: TG.textDim, marginTop: 4 }}>— 👥 Empty (No limit)</div>
+              </div>
+            </BotMessage>
+          </div>
+
+          <ReplyKeyboard
+            op={op}
+            tap={tap}
+            rows={[
+              [{ label: '🇦  Title' }, { label: '📄  Description' }],
+              [{ label: '🕓  When' }],
+              [{ label: '👥  Participants' }, { label: '📍  Location' }],
+              [{ label: '🌐  Language' }, { label: '⚙️  Settings' }],
+              [{ label: '✅  Done' }],
+              [{ label: '«  Main Menu' }],
+            ]}
+          />
+
+          {/* Tap ripples */}
+          <TapRipple x={190} y={465} time={t} t0={whenTapAt} />
+          <TapRipple x={280} y={505} time={t} t0={locTapAt} />
+          <TapRipple x={190} y={620} time={t} t0={doneTapAt} />
+        </PhoneFrame>
+      </div>
+    );
+  }
+
+  function ConfigLine({ icon, defined, placeholder, value, setAt, t }) {
+    const op = defined ? clamp(((t || 0) - (setAt || 0)) / 0.4, 0, 1) : 1;
+    if (defined) {
+      return (
+        <div style={{
+          fontSize: 11.5, color: TG.text, lineHeight: 1.5,
+          opacity: op,
+        }}>— {icon} <span style={{ color: TG.green }}>✓</span> {value}</div>
+      );
+    }
+    return (
+      <div style={{ fontSize: 11.5, color: TG.textDim, lineHeight: 1.5 }}>
+        — {icon} <span style={{ color: TG.red }}>⊘</span> {placeholder}
+      </div>
+    );
+  }
+
+  // ============================================================
+  // SCENE 4 — Forward sheet (13 - 16s)
+  // ============================================================
+  function SceneForward() {
+    const { localTime: t, duration } = useSprite();
+    const fIn = clamp(t / 0.4, 0, 1);
+    const fOut = clamp((t - (duration - 0.4)) / 0.4, 0, 1);
+    const op = fIn * (1 - fOut);
+
+    // Sheet slides up over 0.5s
+    const sheetT = clamp(t / 0.55, 0, 1);
+    // User scrolls down then taps "Brunch crew" at 1.8
+    const tapAt = 1.6;
+    const forwardingAt = 2.0;
+
+    const chats = [
+      { name: 'Saved Messages', sub: 'Forward messages here for quick access', color: TG.accent, letter: '★' },
+      { name: 'Family group',   sub: '6 members',  color: '#5EC78A', letter: 'F' },
+      { name: 'Brunch crew 🥐', sub: '12 members, 3 online', color: '#F59E5B', letter: 'B', highlight: true },
+      { name: 'Climbing buddies', sub: '14 members', color: '#9B6FE3', letter: 'C' },
+      { name: 'Laura',          sub: 'last seen recently', color: '#E26565', letter: 'L' },
+      { name: 'Pizza & Cinema 🍕🎬', sub: '48 members', color: '#5EC78A', letter: 'P' },
+      { name: 'Climbing crew',  sub: '14 members', color: '#9B6FE3', letter: 'C' },
+    ];
+
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: op }}>
+        <PhoneFrame headerContent={
+          <ChatHeader name="Mitup Bot" subtitle="bot · online" avatar="M" avatarBg={TG.green} />
+        }>
+          {/* Dimmed chat behind */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0,0,0,.45)',
+            opacity: sheetT * 0.8,
+          }} />
+
+          {/* Forward sheet */}
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            background: '#212D38',
+            borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: '14px 0 22px',
+            transform: `translateY(${(1 - sheetT) * 500}px)`,
+            transition: 'transform .1s',
+            height: '70%',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,.18)', borderRadius: 2, margin: '0 auto 12px' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 12px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+              <span style={{ color: 'white', fontSize: 22, fontWeight: 300 }}>✕</span>
+              <span style={{ color: 'white', fontWeight: 600, fontSize: 14 }}>Forward to…</span>
+              <span style={{ width: 24 }} />
+            </div>
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+              <div style={{ background: 'rgba(255,255,255,.06)', borderRadius: 18, padding: '7px 12px', display: 'flex', alignItems: 'center', gap: 6, color: TG.textDim, fontSize: 12 }}>
+                <span>🔍</span> Search
+              </div>
+            </div>
+
+            <div style={{
+              flex: 1, overflow: 'hidden',
+              padding: '4px 8px',
+            }}>
+              {chats.map((c, i) => (
+                <ForwardRow key={c.name} {...c}
+                  forwarding={c.highlight && t > forwardingAt}
+                  tapped={c.highlight && t > tapAt && t < forwardingAt}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Tap on Brunch crew row (3rd row) */}
+          <TapRipple x={290} y={365} time={t} t0={tapAt} />
+        </PhoneFrame>
+      </div>
+    );
+  }
+
+  function ForwardRow({ name, sub, color, letter, highlight, tapped, forwarding }) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '9px 8px', borderRadius: 8,
+        background: tapped ? 'rgba(42,161,224,.18)' : 'transparent',
+      }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: color, display: 'grid', placeItems: 'center', color: 'white', fontWeight: 700, fontSize: 14 }}>{letter}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: 'white', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
+          <div style={{ color: TG.textDim, fontSize: 11 }}>{sub}</div>
+        </div>
+        {forwarding && <div style={{ color: TG.accent, fontSize: 11, fontWeight: 600 }}>Forwarding…</div>}
+      </div>
+    );
+  }
+
+  // ============================================================
+  // SCENE 5 — Group chat (16 - 26s)
+  // ============================================================
+  function SceneGroup() {
+    const { localTime: t, duration } = useSprite();
+    const fIn = clamp(t / 0.5, 0, 1);
+    const op = fIn;
+
+    const cardAt = 0.4;
+    const joiners = [
+      { name: 'Marta', text: "I'm in! 🙌",            at: 1.6, color: '#F59E5B' },
+      { name: 'Diego', text: "Same here, can't wait", at: 2.9, color: '#5EC78A' },
+      { name: 'Sara',  text: "Saving the date 📅",    at: 4.2, color: '#9B6FE3' },
+      { name: 'Tomás', text: "I'll bring the pastries", at: 5.6, color: '#2AA1E0' },
+    ];
+    const participants = ['Juanpe'];
+    joiners.forEach(j => { if (t > j.at + 0.45) participants.push(j.name); });
+
+    return (
+      <div style={{ position: 'absolute', inset: 0, opacity: op }}>
+        <PhoneFrame headerContent={
+          <div style={{
+            background: TG.header, padding: '10px 14px 12px',
+            display: 'flex', alignItems: 'center', gap: 10,
+            borderBottom: '1px solid rgba(255,255,255,.04)', flex: 'none',
+          }}>
+            <div style={{ color: TG.accent, fontSize: 22, fontWeight: 300, width: 16 }}>‹</div>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#F59E5B', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 700, color: 'white' }}>B</div>
+            <div>
+              <div style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>Brunch crew 🥐</div>
+              <div style={{ color: TG.textDim, fontSize: 11 }}>12 members, 3 online</div>
+            </div>
+          </div>
+        }>
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            padding: '14px 12px 60px',
+            height: '100%', overflow: 'hidden',
+          }}>
+            {/* Forwarded meeting card */}
+            <MeetingCardGroup time={t} t0={cardAt} participants={participants} />
+
+            {/* Friends chatting */}
+            {joiners.map(j => (
+              <GroupBubble
+                key={j.name}
+                time={t} t0={j.at}
+                name={j.name} color={j.color} text={j.text}
+              />
+            ))}
+          </div>
+
+          {/* Bottom toast for joins */}
+          <JoinToast time={t} joiners={joiners} />
+
+          {/* Input bar */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            background: TG.header, padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            borderTop: '1px solid rgba(255,255,255,.05)',
+          }}>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,.06)', borderRadius: 18, padding: '8px 12px', color: TG.textDim, fontSize: 12 }}>Message</div>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: TG.accent, display: 'grid', placeItems: 'center', color: 'white', fontSize: 14 }}>↑</div>
+          </div>
+        </PhoneFrame>
+      </div>
+    );
+  }
+
+  function MeetingCardGroup({ time, t0, participants }) {
+    const localT = Math.max(0, time - t0);
+    const op = clamp(localT / 0.5, 0, 1);
+    const ty = (1 - op) * 12;
+    if (op < 0.01) return null;
+    return (
+      <div style={{
+        background: TG.panelDark, borderRadius: 12,
+        padding: '12px 14px', color: TG.text,
+        fontSize: 12.5, lineHeight: 1.55,
+        opacity: op, transform: `translateY(${ty}px)`,
+        boxShadow: '0 4px 12px rgba(0,0,0,.2)',
+        maxWidth: 280, alignSelf: 'flex-start',
+        marginBottom: 8,
+      }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#F59E5B,#E26565)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, color: 'white' }}>J</div>
+          <div>
+            <div style={{ fontSize: 11.5, color: TG.accent, fontWeight: 600 }}>Juanpe AAraKKe</div>
+            <div style={{ fontSize: 10, color: TG.textDim }}>via <span style={{ color: TG.accent }}>@mitup_staging_bot</span></div>
+          </div>
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 13.5, color: 'white', marginBottom: 6 }}>Saturday brunch <span style={{ color: TG.textDim, fontWeight: 400, fontSize: 12 }}>(Created by: Juanpe)</span></div>
+        <div style={{ color: TG.textDim, fontSize: 11.5 }}>
+          <div>— ▶ <b style={{ color: 'white' }}>Starts:</b> <span style={{ color: TG.accent }}>Sat 24 May · 11:00 (Europe/Dublin)</span></div>
+          <div>— ⏹ <b style={{ color: 'white' }}>Ends:</b> <span style={{ color: TG.accent }}>Sat 24 May · 14:00</span></div>
+          <div>— 📍 Café Maló · Dublin 2</div>
+          <div>— 👥 <b style={{ color: 'white' }}>{participants.length} Participant{participants.length === 1 ? '' : 's'}</b> (No limit)</div>
+          <div style={{ marginTop: 4, paddingLeft: 12, color: TG.text }}>
+            {participants.map(p => <div key={p}>{p}</div>)}
+          </div>
+        </div>
+        <div style={{ fontSize: 10.5, color: TG.textDim, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>🔍</span> Make this meeting searchable in this chat.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 8 }}>
+          <Btn label="✅  Join" color="rgba(94,199,138,.18)" textColor="#7FE3A8" />
+          <Btn label="❌  Leave" color="rgba(226,101,101,.15)" textColor="#F08A8A" />
+          <Btn label="Make it searchable" wide color="rgba(255,255,255,.06)" textColor="white" />
+        </div>
+      </div>
+    );
+  }
+
+  function Btn({ label, color, textColor, wide }) {
+    return (
+      <div style={{
+        background: color, color: textColor,
+        padding: '7px', borderRadius: 7,
+        fontSize: 11, fontWeight: 600, textAlign: 'center',
+        gridColumn: wide ? 'span 2' : undefined,
+      }}>{label}</div>
+    );
+  }
+
+  function GroupBubble({ time, t0, name, color, text }) {
+    const t = Math.max(0, time - t0);
+    const op = clamp(t / 0.3, 0, 1);
+    if (op < 0.01) return null;
+    return (
+      <div style={{
+        alignSelf: 'flex-start',
+        background: TG.bubbleGroup,
+        padding: '7px 11px', borderRadius: 14, borderBottomLeftRadius: 4,
+        fontSize: 13, color: 'white',
+        opacity: op, transform: `translateY(${(1 - op) * 8}px)`,
+        marginBottom: 4, maxWidth: 240,
+        boxShadow: '0 1px 2px rgba(0,0,0,.15)',
+      }}>
+        <div style={{ fontSize: 11.5, fontWeight: 600, color, marginBottom: 1 }}>{name}</div>
+        {text}
+      </div>
+    );
+  }
+
+  function JoinToast({ time, joiners }) {
+    const active = joiners.find(j => time >= j.at + 0.45 && time < j.at + 0.45 + 1.4);
+    if (!active) return null;
+    const t = time - (active.at + 0.45);
+    const op = t < 0.2 ? t / 0.2 : t > 1.0 ? Math.max(0, 1 - (t - 1.0) / 0.4) : 1;
+    const ty = (1 - clamp(t / 0.3, 0, 1)) * 12;
+    return (
+      <div style={{
+        position: 'absolute', bottom: 70, left: '50%',
+        transform: `translate(-50%, ${ty}px)`,
+        background: 'rgba(42,161,224,.95)', color: 'white',
+        padding: '7px 14px', borderRadius: 999,
+        fontSize: 12.5, fontWeight: 600, opacity: op,
+        boxShadow: '0 8px 24px rgba(42,161,224,.4)',
+        whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6,
+      }}>
+        <span style={{ width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,.25)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800 }}>+</span>
+        {active.name} joined
+      </div>
+    );
+  }
+
+  // ============================================================
+  // Scene label
+  // ============================================================
+  function SceneLabel() {
+    const t = useTime();
+    const scenes = [
+      { end: 3.0,  num: '1 / 5', label: 'Start from the main menu' },
+      { end: 6.5,  num: '2 / 5', label: 'Give the meeting a title' },
+      { end: 13.0, num: '3 / 5', label: 'Configure the details' },
+      { end: 16.0, num: '4 / 5', label: 'Pick where to share it' },
+      { end: 26.0, num: '5 / 5', label: 'Watch friends join, live' },
+    ];
+    const current = scenes.find(s => t < s.end) || scenes[scenes.length - 1];
+    return (
+      <div style={{
+        position: 'absolute', top: 56, left: 28,
+        color: 'white', maxWidth: 210,
+      }}>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,.45)', fontWeight: 500, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>{current.num}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{current.label}</div>
+        <div style={{ marginTop: 24, width: 80, height: 2, background: 'rgba(42,161,224,.6)', borderRadius: 1 }} />
+        <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {scenes.map((s, i) => {
+            const active = s === current;
+            const done = t > s.end;
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5, color: active ? 'white' : (done ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.25)'), fontWeight: active ? 600 : 400 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: active ? TG.accent : (done ? 'rgba(255,255,255,.3)' : 'rgba(255,255,255,.15)') }} />
+                {s.label}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // App
+  // ============================================================
+  function App() {
+    return (
+      <Stage width={900} height={820} duration={26} background="#0a0a0a" loop={true}>
+        <Sprite start={0}     end={3.0}>  <SceneMainMenu /></Sprite>
+        <Sprite start={3.0}   end={6.5}>  <SceneTitle /></Sprite>
+        <Sprite start={6.5}   end={13.0}> <SceneConfigure /></Sprite>
+        <Sprite start={13.0}  end={16.0}> <SceneForward /></Sprite>
+        <Sprite start={16.0}  end={26.0}> <SceneGroup /></Sprite>
+        <SceneLabel />
+      </Stage>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>

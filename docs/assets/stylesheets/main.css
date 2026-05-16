@@ -1,78 +1,614 @@
-.center {
-    display: flex;
-    justify-content: center;
+/* ============================================================
+   Mitup — Zensical / mkdocs-material custom theme
+   File path in repo: docs/assets/stylesheets/main.css
+   ------------------------------------------------------------
+   Approach: override Material's CSS variables for color & fonts,
+   then add custom classes for the landing-page hero, animation
+   embed, feature grids, and Patreon strip. Material's own chrome
+   (header, tabs, sidebar, TOC) is restyled via its variables —
+   we don't redefine layout, only tokens.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ─── Mitup brand tokens ────────────────────────────────────── */
+:root {
+  --blue:           #2AA1E0;
+  --blue-deep:      #1F87BF;
+  --blue-soft:      #E8F5FD;
+  --yellow:         #FFC850;
+  --yellow-d:       #B58A1F;
+  --ink:            #0E1A23;
+  --ink-2:          #36505F;
+  --ink-3:          #7A8C97;
+  --paper:          #F6FAFD;
+  --paper-2:        #FFFFFF;
+  --line:           #E2ECF2;
+  --accent-green:   #4FB286;
+  --patreon:        #F0511C;
 }
 
-img:not(.twemoji) {
-    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.3);
+/* ─── Base rendering ────────────────────────────────────────── */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "cv11";
 }
 
-/* Hero section styling */
+/* ─── Material variable overrides (light scheme) ───────────── */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        var(--blue);
+  --md-primary-fg-color--light: var(--blue-soft);
+  --md-primary-fg-color--dark:  var(--blue-deep);
+
+  --md-accent-fg-color:         var(--blue);
+  --md-accent-fg-color--transparent: rgba(42, 161, 224, 0.1);
+
+  --md-default-bg-color:        var(--paper);
+  --md-default-fg-color:        var(--ink);
+  --md-default-fg-color--light: var(--ink-2);
+  --md-default-fg-color--lighter: var(--ink-3);
+  --md-default-fg-color--lightest: var(--line);
+
+  --md-typeset-color:           var(--ink);
+  --md-typeset-a-color:         var(--blue-deep);
+  --md-typeset-mark-color:      rgba(255, 200, 80, 0.4);
+
+  --md-code-bg-color:           #0E1A23;
+  --md-code-fg-color:           #E6F0F6;
+  --md-code-hl-comment-color:   #5A6E7A;
+  --md-code-hl-keyword-color:   #FFC850;
+  --md-code-hl-string-color:    #6FD3A4;
+  --md-code-hl-number-color:    #62B3DD;
+  --md-code-hl-function-color:  #93B3D8;
+
+  --md-footer-bg-color:         var(--paper-2);
+  --md-footer-bg-color--dark:   var(--ink);
+  --md-footer-fg-color:         var(--ink-2);
+  --md-footer-fg-color--light:  var(--ink-3);
+
+  --md-text-font: "Inter";
+  --md-code-font: "JetBrains Mono";
+}
+
+/* ─── Base typography polish ───────────────────────────────── */
+.md-typeset {
+  font-size: 0.78rem;
+  font-feature-settings: "ss01", "cv11";
+}
+.md-typeset h1, .md-typeset h2, .md-typeset h3 {
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.md-typeset h1 { font-weight: 800; font-size: 2.2rem; line-height: 1.05; }
+.md-typeset h2 { font-weight: 800; padding-top: 1.6rem; margin-top: 2.2rem; border-top: 1px solid var(--line); }
+.md-typeset h2:first-of-type { border-top: 0; padding-top: 0; }
+.md-typeset h3 { font-weight: 600; letter-spacing: -0.015em; }
+
+/* Inline code in body copy */
+.md-typeset code:not(pre code) {
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.86em;
+}
+
+/* Block code — dark navy */
+.md-typeset pre > code,
+.md-typeset .highlight pre {
+  background: var(--ink) !important;
+  color: #E6F0F6;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px -16px rgba(14,26,35,0.6);
+}
+
+/* Buttons */
+.md-typeset .md-button {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 0.55em 1.2em;
+  transition: all .15s;
+}
+.md-typeset .md-button:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+  background: var(--paper);
+}
+.md-typeset .md-button--primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+  box-shadow: 0 8px 20px -10px rgba(42,161,224,0.55);
+}
+.md-typeset .md-button--primary:hover {
+  background: var(--blue-deep);
+  border-color: var(--blue-deep);
+  color: white;
+}
+
+/* Admonitions: tighter, softer */
+.md-typeset .admonition,
+.md-typeset details {
+  background: var(--paper-2) !important;
+  border: 1px solid var(--line) !important;
+  border-left-width: 3px !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  font-size: 0.78rem;
+  margin: 1.4rem 0;
+  padding: 0;
+}
+.md-typeset .admonition > .admonition-title,
+.md-typeset details > summary {
+  background: transparent !important;
+  border-bottom: 1px solid var(--line);
+  border-radius: 12px 12px 0 0 !important;
+  margin: 0 !important;
+  padding: 0.7rem 1rem 0.6rem 2.4rem !important;
+  font-weight: 600 !important;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.md-typeset .admonition > .admonition-title::before,
+.md-typeset details > summary::before {
+  left: 0.85rem !important;
+  top: 0.65rem !important;
+  width: 1rem !important;
+  height: 1rem !important;
+}
+.md-typeset .admonition > :not(.admonition-title):not(summary),
+.md-typeset details > :not(summary) {
+  padding: 0.85rem 1.1rem !important;
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+.md-typeset .admonition p:last-child,
+.md-typeset details p:last-child { margin-bottom: 0; }
+
+/* Accent colors by type */
+.md-typeset .admonition.note,
+.md-typeset details.note,
+.md-typeset .admonition.info,
+.md-typeset details.info { border-left-color: var(--blue) !important; }
+.md-typeset .admonition.note > .admonition-title,
+.md-typeset .admonition.info > .admonition-title { color: var(--blue-deep); background: rgba(42,161,224,0.04) !important; }
+
+.md-typeset .admonition.tip,
+.md-typeset details.tip,
+.md-typeset .admonition.success,
+.md-typeset .admonition.abstract,
+.md-typeset .admonition.hint { border-left-color: var(--accent-green) !important; }
+.md-typeset .admonition.tip > .admonition-title,
+.md-typeset .admonition.success > .admonition-title,
+.md-typeset .admonition.abstract > .admonition-title,
+.md-typeset .admonition.hint > .admonition-title { color: #2D7A56; background: rgba(79,178,134,0.05) !important; }
+
+.md-typeset .admonition.warning,
+.md-typeset details.warning,
+.md-typeset .admonition.attention,
+.md-typeset .admonition.caution { border-left-color: var(--yellow) !important; }
+.md-typeset .admonition.warning > .admonition-title,
+.md-typeset .admonition.attention > .admonition-title,
+.md-typeset .admonition.caution > .admonition-title { color: var(--yellow-d); background: rgba(255,200,80,0.06) !important; }
+
+.md-typeset .admonition.danger,
+.md-typeset details.danger,
+.md-typeset .admonition.error,
+.md-typeset .admonition.failure,
+.md-typeset .admonition.bug { border-left-color: #E26565 !important; }
+.md-typeset .admonition.danger > .admonition-title,
+.md-typeset .admonition.error > .admonition-title,
+.md-typeset .admonition.failure > .admonition-title,
+.md-typeset .admonition.bug > .admonition-title { color: #C24A1A; background: rgba(226,101,101,0.05) !important; }
+
+.md-typeset .admonition.quote,
+.md-typeset details.quote,
+.md-typeset .admonition.example,
+.md-typeset .admonition.question { border-left-color: var(--ink-3) !important; }
+.md-typeset .admonition.quote > .admonition-title,
+.md-typeset .admonition.example > .admonition-title,
+.md-typeset .admonition.question > .admonition-title { color: var(--ink-2); }
+
+/* Grid cards: round + lift on hover */
+.md-typeset .grid.cards > * {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  transition: border-color .15s, transform .15s;
+}
+.md-typeset .grid.cards > *:hover {
+  border-color: var(--ink-3);
+  transform: translateY(-1px);
+}
+
+/* ─── Header (Material .md-header) — gentle frost ──────────── */
+.md-header {
+  background: rgba(246, 250, 253, 0.88) !important;
+  color: var(--ink) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none !important;
+}
+.md-header__title { color: var(--ink); font-weight: 700; }
+.md-header__button { color: var(--ink-2); }
+.md-header__button:hover { color: var(--ink); }
+
+/* Tabs bar */
+.md-tabs {
+  background: var(--paper) !important;
+  color: var(--ink-2) !important;
+  border-bottom: 1px solid var(--line);
+}
+.md-tabs__link {
+  color: var(--ink-2) !important;
+  opacity: 1 !important;
+  font-weight: 500;
+}
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  color: var(--blue-deep) !important;
+  font-weight: 600;
+}
+
+/* Search */
+.md-search__form {
+  background: var(--paper-2) !important;
+  border: 1px solid var(--line);
+  border-radius: 10px !important;
+}
+.md-search__input { color: var(--ink); }
+.md-search__input::placeholder { color: var(--ink-3); }
+
+/* Left nav */
+.md-nav__title { color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.65rem; }
+.md-nav__link { color: var(--ink-2); font-weight: 500; }
+.md-nav__link:hover { color: var(--ink); }
+.md-nav__link--active {
+  color: var(--blue-deep) !important;
+  font-weight: 600;
+}
+
+/* Repo card (top-right) */
+.md-source { color: var(--ink-2); }
+.md-source:hover { color: var(--ink); }
+
+/* ───────────────────────────────────────────────────────────
+   LANDING PAGE COMPONENTS (used by docs/index.md)
+   ─────────────────────────────────────────────────────────── */
+
+/* Centered hero */
 .hero {
-    text-align: center;
-    padding: 4rem 2rem;
-    margin: -4rem -0.5rem 2rem -0.5rem;
+  text-align: center;
+  padding: 3rem 1rem 2rem;
+  margin: -1.5rem -0.5rem 0;
 }
-
-.hero img {
-    box-shadow: none;
-    margin-bottom: 1.5rem;
-    display: inline-block;
+.hero img { box-shadow: none; margin-bottom: 1rem; }
+.hero .eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+  font-size: 0.8em; font-weight: 600;
+  margin-bottom: 1rem;
 }
-
+.hero .eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 0 4px rgba(79,178,134,0.18);
+}
 .hero h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin: 1rem 0 0.5rem 0;
-    line-height: 1.2;
+  font-size: 3.4rem !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.03em !important;
+  margin: 0.6rem auto 1rem !important;
+  font-weight: 800;
+  max-width: 18ch;
+  text-wrap: balance;
 }
-
-.hero h1 .headerlink {
-    display: none;
-}
-
+.hero h1 em { font-style: normal; color: var(--blue); }
+.hero h1 .headerlink { display: none; }
 .hero p {
-    font-size: 1.1rem;
-    color: var(--md-default-fg-color--light);
-    margin: 1rem 0 2rem 0;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+  max-width: 580px;
+  margin: 0 auto 1.6rem;
+  line-height: 1.55;
+}
+.hero-ctas { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.hero-meta {
+  display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;
+  margin-top: 2.2rem;
+  font-size: 0.78rem; color: var(--ink-3);
+}
+.hero-meta strong { color: var(--ink); font-weight: 600; font-size: 0.95rem; display: block; margin-bottom: 2px; }
+
+/* Animation showcase — full-bleed dark */
+.demo-section {
+  background: #0E1A23;
+  margin: 3rem -2rem 3rem;
+  padding: 3.5rem 1rem 4rem;
+  border-radius: 0;
+  position: relative;
+  overflow: hidden;
+}
+@media (min-width: 1220px) {
+  .demo-section { margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); }
+}
+.demo-section::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(42,161,224,0.18), transparent 60%);
+  pointer-events: none;
+}
+.demo-eyebrow {
+  text-align: center;
+  font-size: 0.78em; font-weight: 600;
+  color: var(--blue);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 0.6rem;
+  position: relative;
+}
+.demo-title {
+  text-align: center; color: white !important;
+  font-size: 2.1rem !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.025em !important;
+  margin: 0 auto 0.7rem !important;
+  font-weight: 800;
+  max-width: 22ch;
+  border: 0 !important;
+  padding: 0 !important;
+}
+.demo-title .headerlink { display: none; }
+.demo-sub {
+  text-align: center;
+  font-size: 0.95rem;
+  color: #B7C7D2;
+  max-width: 580px;
+  margin: 0 auto 2rem !important;
+  position: relative;
+}
+.demo-frame {
+  margin: 0 auto;
+  max-width: 1100px;
+  height: 820px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 40px 80px -30px rgba(0,0,0,0.6);
+  background: #0a0a0a;
+  position: relative;
+}
+.demo-frame iframe {
+  width: 100%; height: 100%; border: 0; display: block;
+}
+.demo-foot {
+  text-align: center;
+  margin-top: 1.4rem;
+  font-size: 0.8rem;
+  color: #B7C7D2;
+  position: relative;
+}
+.demo-foot kbd {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px; padding: 2px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: white;
 }
 
-@media (max-width: 768px) {
-    .hero {
-        padding: 2rem 1.5rem;
-        margin: -2rem -0.5rem 1.5rem -0.5rem;
-    }
-
-    .hero h1 {
-        font-size: 1.8rem;
-    }
-
-    .hero p {
-        font-size: 1rem;
-    }
+/* Patreon strip on landing / contribute */
+.patreon-strip {
+  background: linear-gradient(160deg, #FFF6E8, #FFE9CC);
+  border-radius: 18px;
+  padding: 2.4rem;
+  margin: 2.5rem 0;
+  border: 1px solid #F2D9B0;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 2rem;
+  align-items: center;
 }
+.patreon-strip h2 {
+  font-size: 1.6rem !important;
+  margin: 0 0 0.5rem !important;
+  border: 0 !important; padding: 0 !important;
+  color: var(--ink);
+}
+.patreon-strip p { color: var(--ink-2); margin: 0 0 0.8rem; }
+.patreon-strip .patreon-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.78em; font-weight: 600;
+  color: var(--patreon);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 0.6rem;
+}
+.patreon-strip .patreon-tag::before {
+  content: "P";
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--patreon);
+  color: white; font-weight: 800; font-size: 13px;
+}
+.patreon-tiers {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+.patreon-tier {
+  background: white;
+  border: 1.5px solid #F2D9B0;
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+}
+.patreon-tier.featured { border-color: var(--blue); background: var(--blue-soft); }
+.patreon-tier .tier-name {
+  font-size: 0.7rem; font-weight: 700;
+  color: var(--blue-deep);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 0.4rem;
+}
+.patreon-tier .tier-amt {
+  font-size: 1.4rem; font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.patreon-tier .tier-amt .per { font-size: 0.7rem; color: var(--ink-3); font-weight: 500; margin-left: 2px; }
+.patreon-tier .tier-tag { font-size: 0.72rem; color: var(--ink-2); margin-top: 0.2rem; }
 
-/* Style for inline button-like elements */
+/* Privacy callout — dark inverse */
+.privacy-strip {
+  background: var(--ink);
+  color: white;
+  border-radius: 18px;
+  padding: 2.4rem;
+  margin: 2.5rem 0;
+  position: relative;
+  overflow: hidden;
+}
+.privacy-strip::before {
+  content: "";
+  position: absolute; right: -100px; top: -100px;
+  width: 300px; height: 300px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(42,161,224,0.25), transparent 70%);
+}
+.privacy-strip h2 {
+  color: white !important;
+  font-size: 1.6rem !important;
+  border: 0 !important; padding: 0 !important;
+  margin: 0 0 0.5rem !important;
+  position: relative;
+}
+.privacy-strip h2 .headerlink { display: none; }
+.privacy-strip p { color: #B7C7D2; margin: 0 0 1rem; position: relative; }
+.privacy-strip .md-button {
+  background: white; color: var(--ink); border-color: white;
+}
+.privacy-strip .md-button:hover { background: var(--blue-soft); color: var(--ink); }
+
+/* Button-like inline element (existing pattern in user-guide pages) */
 .button-like {
-    background-color: #e0e0e0;
-    /* Light grey background */
-    padding: 0.1em 0.4em;
-    /* Small padding */
-    border-radius: 4px;
-    /* Rounded corners */
-    border: 1px solid #cccccc;
-    /* Slightly darker border for contrast */
-    white-space: nowrap;
-    /* Prevent wrapping */
+  background: #e0e0e0;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  border: 1px solid #cccccc;
+  white-space: nowrap;
+  font-size: 0.92em;
 }
 
-/* Adjust emoji position slightly within the button */
-.button-like .twemoji {
-    vertical-align: -0.15em;
-    /* Adjust vertical alignment */
-    margin-right: 0.1em;
-    /* Small space after emoji */
+/* ─── Tables — card style with row separators ──────────────
+   Markdown tables now render with the same look as the privacy
+   card: rounded outer container, hidden inner borders, soft
+   hover, monospace-friendly first column, right-aligned value.
+   ─────────────────────────────────────────────────────────── */
+.md-typeset__table { padding: 0 !important; }
+.md-typeset table:not([class]) {
+  background: var(--paper-2) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  overflow: hidden;
+  margin: 1.4rem 0;
+  width: 100%;
+  font-size: 0.8rem;
+}
+.md-typeset table:not([class]) thead {
+  background: var(--paper);
+}
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td {
+  border: 0 !important;
+  padding: 0.75rem 1.1rem !important;
+  text-align: left;
+  vertical-align: middle;
+}
+.md-typeset table:not([class]) th {
+  color: var(--ink-3);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--line) !important;
+}
+.md-typeset table:not([class]) tbody tr {
+  border-top: 1px solid var(--line);
+}
+.md-typeset table:not([class]) tbody tr:first-child {
+  border-top: 0;
+}
+.md-typeset table:not([class]) tbody tr:hover {
+  background: var(--paper);
+}
+.md-typeset table:not([class]) tbody td:first-child {
+  font-weight: 500;
+  color: var(--ink);
+}
+/* In two-column tables, right-align the value column for a key:value feel */
+.md-typeset table:not([class]) tbody td:nth-child(2):last-child {
+  text-align: right;
+  color: var(--ink-2);
+}
+.md-typeset table:not([class]) tbody td:nth-child(2):last-child code {
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+}
+/* Inline code anywhere in the table stays calm */
+.md-typeset table:not([class]) code {
+  background: var(--blue-soft) !important;
+  color: var(--blue-deep) !important;
+}
+
+/* ─── Reusable status badges (use inside any table cell or text)
+   Example: <span class="badge yes">stored</span>
+   ─────────────────────────────────────────────────────────── */
+.md-typeset .badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.md-typeset .badge.yes {
+  background: rgba(79, 178, 134, 0.18);
+  color: #2D7A56;
+}
+.md-typeset .badge.no {
+  background: #FFF1D4;
+  color: #B58A1F;
+}
+.md-typeset .badge.info {
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+}
+.md-typeset .badge.danger {
+  background: rgba(226, 101, 101, 0.15);
+  color: #C24A1A;
+}
+
+/* Generic image shadow — slightly softer than original */
+img:not(.twemoji):not(.hero img) {
+  box-shadow: 0 8px 24px -10px rgba(14,26,35,0.18);
+  border-radius: 10px;
+}
+
+/* Mobile fallbacks */
+@media (max-width: 768px) {
+  .hero { padding: 1.5rem 1rem; }
+  .hero h1 { font-size: 2rem !important; }
+  .hero p { font-size: 0.95rem; }
+  .demo-section { padding: 2rem 0.5rem; margin: 2rem -1rem; }
+  .demo-title { font-size: 1.5rem !important; }
+  .demo-frame { height: 620px; border-radius: 14px; }
+  .patreon-strip { grid-template-columns: 1fr; padding: 1.6rem; }
+  .patreon-tiers { grid-template-columns: 1fr; }
+  .privacy-strip { padding: 1.6rem; }
+  .hero-meta { gap: 1.2rem; }
 }

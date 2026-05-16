@@ -1,0 +1,506 @@
+/* ============================================================
+   Mitup Component Library — v1
+   ------------------------------------------------------------
+   Drop-in styles for repeated bits of Mitup content:
+
+   ・ .button-like                inline button reference in prose
+                                  ("tap the New meeting button")
+   ・ .mitup-phone                phone-bezel chat showcase
+                                  (animations, multi-step shots)
+   ・ .mitup-annotated            annotated chat showcase
+                                  (static explainers, user-guide)
+   ・ .md-typeset .admonition     mkdocs-material admonitions —
+                                  re-styled to the "single tint
+                                  with hairline under title" look.
+
+   Brand tokens are mirrored from Mitup Brand Identity v2.0.
+   If you already import theme.css the --mitup-* aliases just
+   shadow them so this file works stand-alone too.
+   ============================================================ */
+
+:root {
+  /* Brand */
+  --mitup-blue:        #2AA1E0;
+  --mitup-blue-deep:   #1F87BF;
+  --mitup-blue-soft:   #E8F5FD;
+  --mitup-blue-line:   #C7E4F6;
+  --mitup-yellow:      #FFC850;
+  --mitup-yellow-deep: #B58A1F;
+  --mitup-green:       #4FB286;
+  --mitup-green-deep:  #1E6E4A;
+  --mitup-ink:         #0E1A23;
+  --mitup-ink-2:       #36505F;
+  --mitup-ink-3:       #7A8C97;
+  --mitup-paper:       #F6FAFD;
+  --mitup-line:        #E2ECF2;
+
+  /* Telegram chat surface */
+  --mitup-tg-bg:        #17212B;
+  --mitup-tg-header:    #1F2D38;
+  --mitup-tg-bubble:    #1F2D38;
+  --mitup-tg-key:       #2A3A48;
+  --mitup-tg-text:      #E8F0F5;
+  --mitup-tg-dim:       #8FA3B0;
+  --mitup-tg-botname:   #5EC78A;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   .button-like  —  inline button reference
+   ─────────────────────────────────────────────────────────────
+   Use for "tap the X button" prose. The chip is short enough
+   vertically to never collide with a chip on the next line.
+
+   Markdown (mkdocs + attr_list):
+     Tap *:heavy_plus_sign: New meeting*{.button-like} to start.
+
+   Or raw HTML:
+     Tap <span class="button-like">➕ New meeting</span>.
+   ───────────────────────────────────────────────────────────── */
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--mitup-blue-soft);
+  color: var(--mitup-blue-deep);
+  font-family: inherit;
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid var(--mitup-blue-line);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   Chat building blocks (shared by .mitup-phone + .mitup-annotated)
+   ───────────────────────────────────────────────────────────── */
+
+/* Bot avatar (M mark inside a Mitup-blue disc) */
+.mitup-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mitup-blue);
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+}
+.mitup-avatar svg { width: 70%; height: 70%; display: block; }
+
+/* Chat header row (back arrow + avatar + name) */
+.mitup-chat-header {
+  background: var(--mitup-tg-header);
+  padding: 8px 12px 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex: none;
+}
+.mitup-chat-header__back {
+  color: var(--mitup-blue);
+  font-size: 18px;
+  font-weight: 300;
+  width: 12px;
+  flex: none;
+}
+.mitup-chat-header__name {
+  color: white;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.mitup-chat-header__sub {
+  color: var(--mitup-tg-dim);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+/* Bot's message bubble (with optional inline keyboard) */
+.mitup-bot-msg {
+  background: var(--mitup-tg-bubble);
+  color: var(--mitup-tg-text);
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  max-width: 92%;
+  align-self: flex-start;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.mitup-bot-msg__content { padding: 7px 11px 8px; }
+.mitup-bot-msg__sender {
+  color: var(--mitup-tg-botname);
+  font-weight: 600;
+  font-size: 11.5px;
+  margin-bottom: 2px;
+}
+.mitup-bot-msg__text strong { font-weight: 600; color: white; }
+
+/* Inline keyboard — sits inside the bubble, NOT at the bottom of the phone */
+.mitup-bot-msg__keyboard {
+  padding: 0 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mitup-bot-msg__row {
+  display: grid;
+  /* default 1-col; override with style="--cols: 2" or .mitup-bot-msg__row--2 */
+  grid-template-columns: repeat(var(--cols, 1), 1fr);
+  gap: 3px;
+}
+.mitup-bot-msg__row--2 { --cols: 2; }
+.mitup-bot-msg__row--3 { --cols: 3; }
+
+.mitup-key {
+  background: var(--mitup-tg-key);
+  color: white;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 8px 6px;
+  text-align: center;
+  border-radius: 5px;
+  border: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+/* Telegram input bar (lives at the bottom of the phone or chat —
+   visually separate from the inline keyboard). */
+.mitup-chat-input {
+  background: var(--mitup-tg-header);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  flex: none;
+}
+.mitup-chat-input__menu {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--mitup-blue);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  flex: none;
+}
+.mitup-chat-input__attach { color: var(--mitup-tg-dim); font-size: 13px; }
+.mitup-chat-input__placeholder {
+  color: var(--mitup-tg-dim);
+  font-size: 12px;
+  flex: 1;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   .mitup-phone  —  phone-bezel chat showcase  (use case: A)
+   ─────────────────────────────────────────────────────────────
+   Best for animations, hero shots, multi-step flows where the
+   chrome of "a phone" reads at a glance. Heavier visual weight.
+   ───────────────────────────────────────────────────────────── */
+.mitup-phone {
+  width: 280px;
+  height: 560px;
+  background: #000;
+  border-radius: 36px;
+  padding: 7px;
+  box-shadow:
+    0 30px 60px -25px rgba(14, 26, 35, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.mitup-phone__screen {
+  background: var(--mitup-tg-bg);
+  border-radius: 30px;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.mitup-phone__status {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 18px 0;
+  color: white;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  flex: none;
+}
+.mitup-phone__notch {
+  width: 82px;
+  height: 18px;
+  background: #000;
+  margin-top: -4px;
+  border-radius: 12px;
+}
+.mitup-phone__signal {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  font-size: 9.5px;
+}
+.mitup-phone__battery {
+  display: inline-block;
+  width: 18px;
+  height: 9px;
+  border: 1px solid white;
+  border-radius: 2px;
+  padding: 1px;
+  box-sizing: border-box;
+}
+.mitup-phone__battery::after {
+  content: "";
+  display: block;
+  width: 85%;
+  height: 100%;
+  background: white;
+  border-radius: 1px;
+}
+.mitup-phone__body {
+  flex: 1;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   .mitup-annotated  —  annotated chat showcase  (use case: C)
+   ─────────────────────────────────────────────────────────────
+   Use for static screenshots in user-guide / explainer pages.
+   Lighter than the phone — just the chat + labelled annotations
+   pointing to the parts the prose talks about.
+   ───────────────────────────────────────────────────────────── */
+.mitup-annotated {
+  position: relative;
+  max-width: 340px;
+  margin: 0 auto;
+  padding: 0 70px;
+  box-sizing: content-box;
+}
+
+@media (max-width: 480px) {
+  .mitup-annotated {
+    padding: 0 16px;
+    box-sizing: border-box;
+  }
+}
+.mitup-annotated__chat {
+  background: var(--mitup-tg-bg);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px -18px rgba(14, 26, 35, 0.4);
+  display: flex;
+  flex-direction: column;
+  /* No overflow:hidden — we need annotation chips in the gutter to be
+     visible. Round the chrome that touches the corners instead (below). */
+}
+.mitup-annotated .mitup-chat-header {
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+.mitup-annotated .mitup-chat-input {
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+.mitup-annotated__body {
+  padding: 12px 12px 8px;
+  position: relative;
+}
+.mitup-annotated__input-wrap { position: relative; }
+
+/* Annotation label that points at a part of the chat. Position it
+   with `top` (and optionally `bottom` instead). The label sits in
+   the gutter outside the chat on either the left or right. */
+.mitup-annotation {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--mitup-blue-deep);
+  font-weight: 600;
+}
+.mitup-annotation--right { left: 100%; padding-left: 10px; }
+.mitup-annotation--left  { right: 100%; padding-right: 10px; }
+.mitup-annotation__line {
+  width: 24px;
+  height: 1px;
+  background: var(--mitup-blue);
+}
+.mitup-annotation__label {
+  background: white;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--mitup-blue-line);
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   Admonitions  —  mkdocs-material
+   ─────────────────────────────────────────────────────────────
+   Single-tint card with a hairline under the title (Option C
+   from the explorations). Header is small (11.5px, tracked),
+   icon stays the native Material SVG so what you see here is
+   what mkdocs renders in production.
+
+   These rules override the corresponding block in main.css —
+   if you import both, this one wins by virtue of cascade order
+   (load mitup-components.css after main.css).
+   ───────────────────────────────────────────────────────────── */
+.md-typeset .admonition,
+.md-typeset details {
+  background: var(--mitup-blue-soft) !important;
+  border: 1px solid var(--mitup-blue-line) !important;
+  border-left-width: 1px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  font-size: 0.78rem;
+  margin: 1.4rem 0;
+  padding: 0;
+}
+.md-typeset .admonition > .admonition-title,
+.md-typeset details > summary {
+  background: transparent !important;
+  border-bottom: 1px solid var(--mitup-blue-line) !important;
+  border-radius: 10px 10px 0 0 !important;
+  margin: 0 !important;
+  padding: 6px 14px 6px 32px !important;
+  font-weight: 700 !important;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--mitup-blue-deep);
+}
+.md-typeset .admonition > .admonition-title::before,
+.md-typeset details > summary::before {
+  left: 11px !important;
+  top: 7px !important;
+  width: 14px !important;
+  height: 14px !important;
+  background-color: var(--mitup-blue);
+}
+.md-typeset .admonition > :not(.admonition-title):not(summary),
+.md-typeset details > :not(summary) {
+  padding: 10px 14px 12px !important;
+  color: var(--mitup-ink);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  background: transparent;
+}
+.md-typeset .admonition p:last-child,
+.md-typeset details p:last-child { margin-bottom: 0; }
+
+/* tip / success / hint — green */
+.md-typeset .admonition.tip,
+.md-typeset .admonition.success,
+.md-typeset .admonition.hint,
+.md-typeset details.tip {
+  background: #EEF7F1 !important;
+  border-color: #CFE6D7 !important;
+}
+.md-typeset .admonition.tip     > .admonition-title,
+.md-typeset .admonition.success > .admonition-title,
+.md-typeset .admonition.hint    > .admonition-title,
+.md-typeset details.tip         > summary {
+  border-bottom-color: #CFE6D7 !important;
+  color: var(--mitup-green-deep);
+}
+.md-typeset .admonition.tip     > .admonition-title::before,
+.md-typeset .admonition.success > .admonition-title::before,
+.md-typeset .admonition.hint    > .admonition-title::before,
+.md-typeset details.tip         > summary::before {
+  background-color: var(--mitup-green);
+}
+
+/* warning / caution / attention — yellow */
+.md-typeset .admonition.warning,
+.md-typeset .admonition.caution,
+.md-typeset .admonition.attention,
+.md-typeset details.warning {
+  background: #FFF6E0 !important;
+  border-color: #EFD68C !important;
+}
+.md-typeset .admonition.warning   > .admonition-title,
+.md-typeset .admonition.caution   > .admonition-title,
+.md-typeset .admonition.attention > .admonition-title,
+.md-typeset details.warning       > summary {
+  border-bottom-color: #EFD68C !important;
+  color: var(--mitup-yellow-deep);
+}
+.md-typeset .admonition.warning   > .admonition-title::before,
+.md-typeset .admonition.caution   > .admonition-title::before,
+.md-typeset .admonition.attention > .admonition-title::before,
+.md-typeset details.warning       > summary::before {
+  background-color: #D9A227;
+}
+
+/* danger / error / failure / bug — red */
+.md-typeset .admonition.danger,
+.md-typeset .admonition.error,
+.md-typeset .admonition.failure,
+.md-typeset .admonition.bug,
+.md-typeset details.danger {
+  background: #FBEDED !important;
+  border-color: #ECC2C2 !important;
+}
+.md-typeset .admonition.danger  > .admonition-title,
+.md-typeset .admonition.error   > .admonition-title,
+.md-typeset .admonition.failure > .admonition-title,
+.md-typeset .admonition.bug     > .admonition-title,
+.md-typeset details.danger      > summary {
+  border-bottom-color: #ECC2C2 !important;
+  color: #B33A3A;
+}
+.md-typeset .admonition.danger  > .admonition-title::before,
+.md-typeset .admonition.error   > .admonition-title::before,
+.md-typeset .admonition.failure > .admonition-title::before,
+.md-typeset .admonition.bug     > .admonition-title::before,
+.md-typeset details.danger      > summary::before {
+  background-color: #E26565;
+}
+
+/* quote / example / question — neutral grey */
+.md-typeset .admonition.quote,
+.md-typeset .admonition.example,
+.md-typeset .admonition.question,
+.md-typeset details.quote {
+  background: #F1F3F5 !important;
+  border-color: #D2D8DC !important;
+}
+.md-typeset .admonition.quote    > .admonition-title,
+.md-typeset .admonition.example  > .admonition-title,
+.md-typeset .admonition.question > .admonition-title,
+.md-typeset details.quote        > summary {
+  border-bottom-color: #D2D8DC !important;
+  color: var(--mitup-ink-2);
+}
+.md-typeset .admonition.quote    > .admonition-title::before,
+.md-typeset .admonition.example  > .admonition-title::before,
+.md-typeset .admonition.question > .admonition-title::before,
+.md-typeset details.quote        > summary::before {
+  background-color: var(--mitup-ink-3);
+}
