@@ -112,8 +112,10 @@ async def call_handler(
             user_id = update.effective_user.id if update.effective_user else None
         if handler.per_chat and handler.per_user:
             chat_id = update.effective_chat.id if update.effective_chat else None
-            conv_key: tuple[int | None, ...] = (chat_id, user_id)
-        else:
+            if chat_id is not None and user_id is not None:
+                conv_key: tuple[int, ...] = (chat_id, user_id)
+                handler_result = cast(Enum | None, handler._conversations.get(conv_key))
+        elif user_id is not None:
             conv_key = (user_id,)
-        handler_result = cast(Enum | None, handler._conversations.get(conv_key))
+            handler_result = cast(Enum | None, handler._conversations.get(conv_key))
     return context, handler_result
