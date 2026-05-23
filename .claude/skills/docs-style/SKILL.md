@@ -12,13 +12,21 @@ A working canon to model yourself on lives in three pages: `docs/index.md`, `doc
 
 ## Voice
 
-The Mitup voice is friendly without being cheerful, plain without being dry. It earns trust by being specific. The maintainer is one person writing to one user, not a brand writing to a market.
+Mitup talks like a friend, not a product. Friendly and a little playful, never theatrical. Imagine the maintainer answering a question from a friend who asked how the bot works — warm because the words are warm, not because every sentence ends in an exclamation mark. The goal is "talking with a friend", not "talking with someone who's had too much coffee".
 
+* **Friendly, not enthusiastic.** Warmth comes from being specific and helpful, not from `exciting`, `awesome`, `amazing`, or trailing exclamation marks. If a sentence would make the reader picture a brand mascot, rewrite it.
 * **Plain and declarative.** Short sentences. Second person. Say the thing, then move on.
-* **Specific over generic.** Real examples, real names, real numbers. `"Weekend Hike Prep", "Board Game Night", "Ana's Birthday Drinks"` beats `"your meetings"`. `~62% covers servers, managed Postgres, and email infrastructure` beats `most of the money goes to operations`.
+* **Specific over generic.** Real examples, real names, real numbers. `"Weekend Hike Prep", "Board Game Night", "Ana's Birthday Drinks"` beats `"your meetings"`. `~62% covers servers, managed Postgres, and email infrastructure` beats `most of the money goes to operations`. Vary scenarios: brunch, climbing, board games, birthdays, online game nights, book club. Never `team standup`, `OKR`, `sprint review` — Mitup is for friend groups, not offices.
 * **Tongue-in-cheek is allowed when the joke is concrete.** `the occasional pizza for whoever's debugging migrations at 1am` works because it commits to a detail. `The warm fuzzies, monthly` works because it deflates a tier list. Vague enthusiasm (`our amazing community`, `exciting new features`) doesn't.
 * **Don't oversell, don't apologize.** Skip framing like *Mitup provides a powerful set of tools to…*. Skip openers like *Thank you for considering…*. Open with the thing the reader came for.
 * **End when you're done.** No closing thank-you, no `Remember, you can always…`, no `Thank you for being part of our journey.` The page ends where the last fact ends.
+
+| Don't say | Say |
+|---|---|
+| `Unlock powerful event management` | `Create a meeting in four taps.` |
+| `Robust privacy infrastructure` | `Mitup never joins your group.` |
+| `Click here` | `Tap *:heavy_plus_sign: New meeting*{.button-like}` |
+| `Welcome! We're so excited to have you!` | `First time? Here's how it works.` |
 
 ## Anti-patterns
 
@@ -33,14 +41,14 @@ The good pages use sentence case. Title Case is the strongest single AI tell in 
 
 Exception: proper nouns and acronyms keep their casing (`# Telegram Stars`, `# MIT License`).
 
-### 2. Decorative emoji on every heading
+### 2. Emojis in documentation pages
 
-The skill allows shortcodes on headings, not on every heading. When every `##` ends with `:gear:` or `:bell:`, it reads as decoration, not signal.
+**Documentation pages don't use emojis.** Not on headings, not in body prose, not as decoration. The only place an emoji is allowed in a docs page is inside a `.button-like` chip, because it has to mirror the real bot button (see anti-pattern 12 and the `.button-like` component).
 
-* **Don't:** `## Language settings :earth_americas:` followed by `## Notification settings :bell:` followed by `## Timeout settings :hourglass_flowing_sand:`
-* **Do:** plain `## Language settings`. Reserve an emoji-tagged heading for the one or two places on a page where the icon genuinely helps scanning (e.g. the rocket on `### :rocket: Launch Mitup` in `setup.md` because it punctuates the payoff step).
+* **Don't:** `## Language settings :earth_americas:`, `## Notifications :bell:`, `Just tap :gear: to open settings.`, `🎉 Welcome to Mitup`.
+* **Do:** plain `## Language settings`, plain `Open `*:gear: Settings*{.button-like}` from the main menu.`
 
-Never put emoji shortcodes inside body paragraphs.
+Font Awesome shortcodes (`:fontawesome-solid-…:`, `:fontawesome-brands-…:`) are **not** emojis for this rule — they're component icons used inside `.grid cards` headers, `.md-button` CTAs, and the social links block in `zensical.toml`. Those stay. The rule is about Twemoji shortcodes and literal Unicode emoji in headings or body prose.
 
 ### 3. Forced enthusiasm and exclamation marks
 
@@ -98,6 +106,15 @@ When every section opens with bold-colon `**How to set your timezone:**` followe
 * **Don't:** `### 1. Donations`, `### 2. Translations`, `### 3. Code contributions`
 * **Do:** `### Donations`, `### Translations`, `### Code contributions`. The order is already visible in the source.
 
+### 12. Bot buttons in prose without `.button-like`
+
+Every mention of a bot button in body text uses the `.button-like` inline chip (see the component catalogue below). Plain bold, plain italics, monospace, or a quoted name don't match what the user sees on the screen.
+
+* **Don't:** `Tap **New meeting**.`, `Press the "New meeting" button.`, `` Tap `New meeting`. ``, `Tap New meeting (➕).`
+* **Do:** `Tap `*:heavy_plus_sign: New meeting*{.button-like}`.`
+
+This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must match the real `ButtonMessages` entry in `mitup_bot/utils/messages.py`.
+
 ## Headings
 
 * Sentence case (see anti-pattern 1).
@@ -131,9 +148,9 @@ The same blank-line rule applies to bullet lists themselves: surround them with 
 
 The repo uses three icon systems, each in its own slot. Don't mix them up.
 
-* **Material icons.** Page front-matter `icon:` only. Format: `material/xxx-outline`. Drives the nav sidebar.
-* **Font Awesome shortcodes.** UI flourishes: `.md-button` CTAs, `.grid cards` headers, and the social icons block in `zensical.toml`. Format: `:fontawesome-solid-paper-plane:`, `:fontawesome-solid-language:`, `:fontawesome-brands-gitlab:`. Use solid for actions, brands for logos.
-* **Twemoji shortcodes.** Content emoji on the rare heading or button-like chip that earns one. Format: `:heavy_plus_sign:`, `:gear:`, `:heart:`. Never in body prose; never on every heading (see anti-pattern 2).
+* **Material icons.** Page front-matter `icon:` only. Format: `material/xxx-outline`. Drives the nav sidebar. Browse icons at <https://pictogrammers.com/library/mdi/>.
+* **Font Awesome shortcodes.** Component icons only: `.md-button` CTAs, `.grid cards` headers, and the social icons block in `zensical.toml`. Format: `:fontawesome-solid-paper-plane:`, `:fontawesome-solid-language:`, `:fontawesome-brands-gitlab:`. Use solid for actions, brands for logos. Not for decorating headings or body prose.
+* **Twemoji shortcodes.** Allowed in exactly one place: inside a `.button-like` chip, to mirror the emoji on the real bot button (e.g. `:heavy_plus_sign:` for `➕`). Never on headings. Never in body prose. See anti-pattern 2.
 
 ## Validation
 
@@ -144,6 +161,20 @@ hatch run dev:build-docs
 ```
 
 For an iterative preview, run `hatch run dev:serve-docs` (`zensical serve`) and open the URL it prints.
+
+## Brand reference
+
+You almost never need to touch brand styling from a docs page — that's the job of `main.css` and `mitup-components.css`. But when you do (custom hero, new landing-style page, inline color), pick from the tokens already defined in `main.css`. Don't invent hex codes.
+
+* **Mitup Blue** `var(--blue)` `#2AA1E0` — primary action, links, accents. Hover: `var(--blue-deep)` `#1F87BF`. Tinted surfaces: `var(--blue-soft)` `#E8F5FD`.
+* **Moment Yellow** `var(--yellow)` `#FFC850` — *rare and precious*. Used for the i-dot in the wordmark, The Moment in the mark, the warning admonition. Never a primary surface, never large text. Yellow text on light backgrounds uses `var(--yellow-d)` `#B58A1F`.
+* **Ink** `var(--ink)` `#0E1A23` body / `var(--ink-2)` `#36505F` secondary / `var(--ink-3)` `#7A8C97` tertiary.
+* **Paper** `var(--paper)` `#F6FAFD` page bg / `var(--paper-2)` `#FFFFFF` cards. Borders: `var(--line)` `#E2ECF2`.
+* **Patreon** `var(--patreon)` `#F0511C` — only inside `.patreon-strip`.
+
+Typography: Inter (400–900) for everything, JetBrains Mono (400/500) for code and eyebrow labels. The `font-feature-settings: "ss01", "cv11"` plus antialiasing is set globally — don't override. Sentence case everywhere except the lowercase wordmark. No Inter italics for emphasis; use bold.
+
+If you ever need the long-form rationale (mark construction, lockup clearspace, what counts as misuse), it's in the standalone brand guide that ships with the brand assets bundle. The skill stays the authority for docs writing when they conflict.
 
 ## Component catalogue
 
@@ -217,19 +248,23 @@ Plain Markdown tables render as a rounded card with a header row and hover-tinte
 
 ### `.button-like`
 
-Inline reference to a bot interface button in prose:
+**Use this whenever the prose names a bot button the user should tap. No exceptions.** Plain bold, plain italics, backtick monospace, or a quoted name are all wrong (see anti-pattern 12).
 
-1. Identify the button mentioned (e.g., "New meeting").
-2. Find the corresponding entry in `ButtonMessages` in `mitup_bot/utils/messages.py` to confirm the exact text and emoji (e.g., `➕ New meeting`).
-3. Determine the Twemoji shortcode for the emoji (e.g., `➕` → `:heavy_plus_sign:`).
-4. Format as: `*:twemoji_shortcode: Button Text*{.button-like}`
+Recipe:
+
+1. Identify the button mentioned (e.g. "New meeting").
+2. Find the matching entry in `ButtonMessages` in `mitup_bot/utils/messages.py` to confirm the exact text and emoji (e.g. `➕ New meeting`).
+3. Look up the Twemoji shortcode for that emoji (e.g. `➕` → `:heavy_plus_sign:`).
+4. Format as `*:twemoji_shortcode: Button Text*{.button-like}`.
    * Example: `*:heavy_plus_sign: New meeting*{.button-like}`
 5. Rules:
    * Wrap in Markdown italics (`*...*`).
-   * Do **not** use backtick monospace.
-   * The `.button-like` class lives inside the closing asterisk.
+   * **Never** use backtick monospace.
+   * The `.button-like` class lives inside the closing asterisk, not outside.
+   * Sentence-case the button text as it appears in the bot.
+   * Keep the emoji — `.button-like` without the emoji isn't faithful to the real button.
 
-The CSS renders a soft blue chip with deep-blue text; no extra styling needed.
+The CSS renders a soft blue chip with deep-blue text; no extra styling needed. Two chips on adjacent wrapped lines are sized to never touch.
 
 ### Chat showcases: `.mitup-phone` and `.mitup-annotated`
 
@@ -261,14 +296,14 @@ Minimal template for the phone bezel (drops straight into a Markdown page becaus
       <div class="mitup-chat-header__back">‹</div>
       <div class="mitup-avatar"><!-- Mitup mark SVG --></div>
       <div>
-        <div class="mitup-chat-header__name">MitupStaging</div>
+        <div class="mitup-chat-header__name">mitupbot</div>
         <div class="mitup-chat-header__sub">bot · online</div>
       </div>
     </div>
     <div class="mitup-phone__body">
       <div class="mitup-bot-msg">
         <div class="mitup-bot-msg__content">
-          <div class="mitup-bot-msg__sender">MitupStaging</div>
+          <div class="mitup-bot-msg__sender">mitupbot</div>
           <div class="mitup-bot-msg__text">
             <strong>Welcome to Mitup Bot!</strong><br/>
             Choose one of the following options:
@@ -305,10 +340,9 @@ Minimal template for the phone bezel (drops straight into a Markdown page becaus
 
 The annotation chips render in the 70 px gutter on either side of the chat. Keep labels short, 1–3 words.
 
-**Bot username** in the chat header and bubble sender should match the environment shown:
+**Bot alias** in the chat header and bubble sender is always `mitupbot` (the real bot handle, lowercase). No `MitupStaging`, no `Mitup Bot`, no environment variants.
 
-* User-guide screenshots: `Mitup Bot`
-* Anything labelled as "staging" or showing dev features: `MitupStaging`
+**User names in chat showcases must be fictitious.** Use plausible first names or first-name-plus-surname, varied across pages. The canon examples are `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás` (already used in the home-page animation). Never use real maintainer or contributor names. The same rule applies anywhere a user identity appears — message senders, "Created by:" lines, avatar initials, participant lists, annotation labels.
 
 ### Admonitions
 

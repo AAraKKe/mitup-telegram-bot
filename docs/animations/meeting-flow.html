@@ -122,7 +122,7 @@
   // ============================================================
   // Visual primitives
   // ============================================================
-  function BotMessage({ children, sender = 'MitupStaging', senderColor = TG.botName, op = 1, ty = 0 }) {
+  function BotMessage({ children, sender = 'mitupbot', senderColor = TG.botName, op = 1, ty = 0 }) {
     return (
       <div style={{
         background: TG.bubbleBot,
@@ -400,7 +400,7 @@
                 marginTop: 4,
               }}>
                 <div style={{ fontWeight: 700, color: 'white', fontSize: 13, marginBottom: 6 }}>
-                  Saturday brunch <span style={{ color: TG.textDim, fontWeight: 400, fontSize: 12 }}>(Created by: Juanpe)</span>
+                  Saturday brunch <span style={{ color: TG.textDim, fontWeight: 400, fontSize: 12 }}>(Created by: Ana)</span>
                 </div>
                 <ConfigLine icon="📄" defined={false} placeholder="No description defined" value="" />
                 <ConfigLine
@@ -573,7 +573,7 @@
       { name: 'Sara',  text: "Saving the date 📅",    at: 4.2, color: '#9B6FE3' },
       { name: 'Tomás', text: "I'll bring the pastries", at: 5.6, color: '#2AA1E0' },
     ];
-    const participants = ['Juanpe'];
+    const participants = ['Ana'];
     joiners.forEach(j => { if (t > j.at + 0.45) participants.push(j.name); });
 
     return (
@@ -610,7 +610,7 @@
             ))}
           </div>
 
-          {/* Bottom toast for joins */}
+          {/* Top toast for joins */}
           <JoinToast time={t} joiners={joiners} />
 
           {/* Input bar */}
@@ -644,13 +644,13 @@
         marginBottom: 8,
       }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'center' }}>
-          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#F59E5B,#E26565)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, color: 'white' }}>J</div>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#F59E5B,#E26565)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, color: 'white' }}>A</div>
           <div>
-            <div style={{ fontSize: 11.5, color: TG.accent, fontWeight: 600 }}>Juanpe AAraKKe</div>
-            <div style={{ fontSize: 10, color: TG.textDim }}>via <span style={{ color: TG.accent }}>@mitup_staging_bot</span></div>
+            <div style={{ fontSize: 11.5, color: TG.accent, fontWeight: 600 }}>Ana Marín</div>
+            <div style={{ fontSize: 10, color: TG.textDim }}>via <span style={{ color: TG.accent }}>@mitupbot</span></div>
           </div>
         </div>
-        <div style={{ fontWeight: 700, fontSize: 13.5, color: 'white', marginBottom: 6 }}>Saturday brunch <span style={{ color: TG.textDim, fontWeight: 400, fontSize: 12 }}>(Created by: Juanpe)</span></div>
+        <div style={{ fontWeight: 700, fontSize: 13.5, color: 'white', marginBottom: 6 }}>Saturday brunch <span style={{ color: TG.textDim, fontWeight: 400, fontSize: 12 }}>(Created by: Ana)</span></div>
         <div style={{ color: TG.textDim, fontSize: 11.5 }}>
           <div>— ▶ <b style={{ color: 'white' }}>Starts:</b> <span style={{ color: TG.accent }}>Sat 24 May · 11:00 (Europe/Dublin)</span></div>
           <div>— ⏹ <b style={{ color: 'white' }}>Ends:</b> <span style={{ color: TG.accent }}>Sat 24 May · 14:00</span></div>
@@ -708,10 +708,10 @@
     if (!active) return null;
     const t = time - (active.at + 0.45);
     const op = t < 0.2 ? t / 0.2 : t > 1.0 ? Math.max(0, 1 - (t - 1.0) / 0.4) : 1;
-    const ty = (1 - clamp(t / 0.3, 0, 1)) * 12;
+    const ty = -(1 - clamp(t / 0.3, 0, 1)) * 12;
     return (
       <div style={{
-        position: 'absolute', bottom: 70, left: '50%',
+        position: 'absolute', top: 12, left: '50%',
         transform: `translate(-50%, ${ty}px)`,
         background: 'rgba(42,161,224,.95)', color: 'white',
         padding: '7px 14px', borderRadius: 999,

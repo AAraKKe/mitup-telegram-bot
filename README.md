@@ -1,36 +1,30 @@
-# Mitup - Organize meetings with friends :calendar:
-
 <div align="center">
-  <img src="/docs/assets/images/mitup_logo.jpg" alt="Mitup Logo" width="25%">
+  <img src="docs/assets/images/logo-horizontal-1200.png" alt="Mitup" width="50%">
 </div>
 
-Mitup is a Telegram bot designed to make organizing get-togethers with friends easy and fun, whether in private chats or groups.
+A Telegram bot that brings people together. Mitup lives in a private DM with you, never in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and timezones for you.
 
-🚀 **[Try Mitup now!](t.me/mitupbot)**
+[Open @mitupbot on Telegram →](https://t.me/mitupbot)
 
-<!-- ## ✨ Features
+## Documentation
 
-*(Placeholder: Add key features here, e.g., Create/manage meetings, Poll availability, Automatic reminders, etc.)* -->
+The full docs live at [mitup.social](https://mitup.social): user guides, configuration, FAQ, and contributor setup.
 
-## 📚 Documentation
+## Contribute
 
-Check out the full **[Mitup Documentation Site](https://staging.mitup.social/)** for detailed user guides, configuration options, and more.
+Mitup is MIT-licensed and built by a small group of people. A few ways in:
 
-## 🤝 Contribute
+* **[Code contributor guide](https://mitup.social/collaborate/code_contributor/)**: set up the dev environment, pick a good-first-issue, send a patch.
+* **[Translator guide](https://mitup.social/collaborate/translator/)**: help bring Mitup to your language on Crowdin. No code needed.
+* **[Become a supporter](https://mitup.social/collaborate/supporter/)**: back the bot monthly on Patreon.
+* **[Code of conduct](https://mitup.social/collaborate/code_of_conduct/)**: read this before opening issues or merge requests.
 
-We welcome contributions! Whether you want to fix a bug, propose a feature, improve the docs, or help with translations, your input is valuable.
+## Help
 
-*   **[Contribution Guidelines](https://staging.mitup.social/collaborate/commiting-to-repo/):** Learn how to contribute code, follow our development process, and set up your environment.
-*   **[Code of Conduct](https://staging.mitup.social/collaborate/code_of_conduct/):** Please read and follow our community standards.
+* Usage questions: check the [docs](https://mitup.social) first.
+* Bugs and feature requests: [open an issue](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues) using the right template.
+* Anything else: tap the *Help* button inside the bot, or email [the service desk](mailto:contact-project+meetupbot-mitup-telegram-bot-50258547-issue-@incoming.gitlab.com).
 
-Looking for ways to contribute beyond code? Check out our [Being a Supporter guide](https://staging.mitup.social/collaborate/supporter/).
-
-## ❓ Getting Help
-
-*   For usage questions, please refer to the [Documentation](https://staging.mitup.social/).
-*   For bugs, feature requests, or other issues, please check existing [GitLab Issues](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues) or create a new one using the appropriate template.
-*   For other support requests, you can contact the maintainers via our [Service Desk](mailto:contact-project+meetupbot-mitup-telegram-bot-50258547-issue-@incoming.gitlab.com) or throught he **Help** button on the Main of the Bot.
-
-## 📜 License
+## License
 
 Mitup is licensed under the [MIT License](LICENSE).
