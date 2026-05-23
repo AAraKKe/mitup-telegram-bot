@@ -252,14 +252,18 @@ def build_popen_mock(returncode: int = 0, output_lines: list[str] | None = None)
 
 @patch(f"{MODULE_PATH}.Path")
 @patch(f"{MODULE_PATH}.subprocess.Popen")
-def test_s3_sync_runs_two_passes_with_cache_control(
+def test_s3_sync_runs_two_sync_passes_with_cache_control(
     mock_popen: MagicMock,
     mock_path_cls: MagicMock,
 ):
     """
-    `s3_sync` touches local files, then runs (1) `aws s3 sync` with HTML
-    cache-control + `--delete`, then (2) `aws s3 cp` with REPLACE to apply
-    the longer asset cache-control to non-HTML objects.
+    `s3_sync` touches local files, then runs two scoped `aws s3 sync` passes:
+    (1) HTML files only with the short HTML cache-control, (2) everything
+    except HTML with the longer asset cache-control. Both passes use `--delete`
+    so files removed from the build are cleaned up in their respective scopes.
+    Both passes are `sync` rather than `cp --metadata-directive REPLACE` so
+    that Content-Type stays inferred from the file extension (REPLACE would
+    wipe it back to binary/octet-stream and break CSS/JS loading).
     """
     mock_path_cls.return_value.rglob.return_value = []
     mock_popen.return_value = build_popen_mock()
@@ -267,19 +271,28 @@ def test_s3_sync_runs_two_passes_with_cache_control(
     s3_sync()
 
     assert mock_popen.call_count == 2
-    sync_args = mock_popen.call_args_list[0][0][0]
-    cp_args = mock_popen.call_args_list[1][0][0]
+    html_args = mock_popen.call_args_list[0][0][0]
+    asset_args = mock_popen.call_args_list[1][0][0]
 
-    assert sync_args[:3] == ["aws", "s3", "sync"]
-    assert "--delete" in sync_args
-    assert "--size-only" not in sync_args
-    assert sync_args[sync_args.index("--cache-control") + 1] == HTML_CACHE_CONTROL
+    assert html_args[:3] == ["aws", "s3", "sync"]
+    assert "--delete" in html_args
+    assert "--size-only" not in html_args
+    assert html_args[html_args.index("--cache-control") + 1] == HTML_CACHE_CONTROL
+    assert html_args[html_args.index("--exclude") + 1] == "*"
+    assert html_args[html_args.index("--include") + 1] == "*.html"
 
-    assert cp_args[:3] == ["aws", "s3", "cp"]
-    assert "--recursive" in cp_args
-    assert cp_args[cp_args.index("--metadata-directive") + 1] == "REPLACE"
-    assert cp_args[cp_args.index("--cache-control") + 1] == ASSET_CACHE_CONTROL
-    assert cp_args[cp_args.index("--exclude") + 1] == "*.html"
+    assert asset_args[:3] == ["aws", "s3", "sync"]
+    assert "--delete" in asset_args
+    assert "--size-only" not in asset_args
+    assert asset_args[asset_args.index("--cache-control") + 1] == ASSET_CACHE_CONTROL
+    assert asset_args[asset_args.index("--exclude") + 1] == "*.html"
+
+    # `--metadata-directive REPLACE` was the exact regression: it wiped
+    # Content-Type back to binary/octet-stream. Assert it never appears in
+    # any of the publish-docs commands, not just the asset pass.
+    for popen_call in mock_popen.call_args_list:
+        argv = popen_call[0][0]
+        assert "--metadata-directive" not in argv, f"--metadata-directive must not appear in any aws call (got: {argv})"
 
 
 @patch(f"{MODULE_PATH}.Path")

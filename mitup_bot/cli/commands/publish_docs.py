@@ -41,7 +41,7 @@ def run_command(command: list[str]):
 
 
 def s3_sync():
-    """Push `site/` to S3 in two passes: HTML cache-control + `--delete`, then `cp REPLACE` to stamp asset cache-control on non-HTML objects."""  # noqa: E501
+    """Push `site/` to S3 as two scoped `sync` passes (HTML and non-HTML) so each upload gets the right cache-control AND the right Content-Type."""  # noqa: E501
     bucket = f"s3://{os.environ['BOT_DOMAIN']}/"
 
     # Refresh local mtimes so `aws s3 sync` always uploads.
@@ -49,7 +49,12 @@ def s3_sync():
         if path.is_file():
             path.touch()
 
-    console().rule(f"Syncing files to {bucket}")
+    # We deliberately use two `sync` passes instead of one `sync` + `cp REPLACE`:
+    # `cp --metadata-directive REPLACE` wipes Content-Type back to
+    # `binary/octet-stream` unless every header is restated explicitly, which
+    # would make browsers refuse to apply CSS/JS. `sync` instead infers
+    # Content-Type from the file extension at upload time.
+    console().rule(f"Syncing HTML to {bucket}")
     run_command(
         [
             "aws",
@@ -57,6 +62,10 @@ def s3_sync():
             "sync",
             "site",
             bucket,
+            "--exclude",
+            "*",
+            "--include",
+            "*.html",
             "--cache-control",
             HTML_CACHE_CONTROL,
             "--delete",
@@ -64,21 +73,19 @@ def s3_sync():
         ]
     )
 
-    console().rule("Stamping non-HTML objects with asset cache-control")
+    console().rule(f"Syncing assets to {bucket}")
     run_command(
         [
             "aws",
             "s3",
-            "cp",
+            "sync",
+            "site",
             bucket,
-            bucket,
-            "--recursive",
             "--exclude",
             "*.html",
             "--cache-control",
             ASSET_CACHE_CONTROL,
-            "--metadata-directive",
-            "REPLACE",
+            "--delete",
             "--no-progress",
         ]
     )
