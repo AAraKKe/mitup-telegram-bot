@@ -68,7 +68,7 @@ publish_docs_manual:
     - echo "Building documentation before manual publish..."
     - hatch run dev:build-docs # Run build step first
     - echo "Manually publishing documentation and invalidating entire cache..."
-    - hatch run dev:push-docs --invalidate-all
+    - hatch run dev:push-docs
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH' # Use default branch variable
       when: manual

@@ -41,8 +41,10 @@ include:
 # Use !reference [.docs-files] in rules for documentation changes
 .docs-files: &docs-files
   - docs/**/*
-  - mkdocs.yml
   - zensical.toml
+  # The CLI command that ships the site to S3 + CloudFront — changing how we
+  # publish must re-trigger the docs pipeline even if no docs page changed.
+  - mitup_bot/cli/commands/publish_docs.py
   # Include also gitlab yaml files related with documentation
   - .gitlab-ci.yml
   - .gitlab/ci/base.yml
