@@ -4,7 +4,7 @@ icon: material/shield-lock-outline
 
 # Privacy
 
-Mitup was designed before "minimal data" was a marketing line — it just made sense not to collect what we didn't need. This page is the human-readable summary of exactly what data we keep, what we don't, and how to wipe it.
+Mitup was designed before "minimal data" was a marketing line. It just made sense not to collect what we didn't need. This page is the human-readable summary of exactly what data we keep, what we don't, and how to wipe it.
 
 ## TL;DR
 
@@ -31,15 +31,15 @@ Mitup was designed before "minimal data" was a marketing line — it just made s
     Your data isn't sold or shared with third parties. There is no third party in this stack at all besides Telegram itself.
 
 !!! tip "You can wipe everything"
-    Hard delete is a button. No grace period, no recovery — when you say go, it's gone.
+    Hard delete is a button. No grace period, no recovery. When you say go, it's gone.
 
 ## What we store
 
-* **Telegram user ID** — the numeric identifier Telegram gives every account. It's how we know which meetings belong to whom.
-* **Display name & language code** — pulled from your Telegram profile so we can address you and reply in your language.
-* **Timezone** — set during onboarding. Used to schedule reminders in your local time.
-* **Meetings you own** — the events you've created, with their title, time, options and RSVP list. Kept until you delete them.
-* **Your RSVPs** — the meetings others invited you to and which ones you've joined.
+* **Telegram user ID**: the numeric identifier Telegram gives every account. It's how we know which meetings belong to whom.
+* **Display name & language code**: pulled from your Telegram profile so we can address you and reply in your language.
+* **Timezone**: set during onboarding. Used to schedule reminders in your local time.
+* **Meetings you own**: the events you've created, with their title, time, options and RSVP list. Kept until you delete them.
+* **Your RSVPs**: the meetings others invited you to and which ones you've joined.
 
 ## What we don't store
 
@@ -56,14 +56,14 @@ When you set up Mitup, you can either type your city name or send a Telegram loc
     1. Coordinates arrive over Telegram's API.
     2. We look up the timezone of those coordinates using a local geo database.
     3. We save **the timezone string** (e.g. `Europe/Dublin`).
-    4. The coordinates are discarded before the request finishes — they never touch the database.
+    4. The coordinates are discarded before the request finishes. They never touch the database.
 
 ## How to delete your data
 
 Type `/delete` in your chat with the bot. You'll be asked to confirm twice. Once confirmed, every record we have about you is removed, including:
 
 * Your user record (Telegram ID, name, timezone, language)
-* Every meeting you created — your participants will see them disappear too
+* Every meeting you created. Your participants will see them disappear too.
 * Every RSVP you've ever made on someone else's meeting
 
 !!! warning "This is permanent"
@@ -71,4 +71,4 @@ Type `/delete` in your chat with the bot. You'll be asked to confirm twice. Once
 
 ## Questions?
 
-Reach us via the bot's **Help** button or our Service Desk. Privacy-specific concerns get answered by the same person who built the privacy stack — usually within a couple of days.
+Reach us via the bot's **Help** button or our Service Desk. Privacy-specific concerns get answered by the same person who built the privacy stack, usually within a couple of days.

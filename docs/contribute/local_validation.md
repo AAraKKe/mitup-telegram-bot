@@ -2,11 +2,11 @@
 icon: material/check-circle-outline
 ---
 
-# Running Local Validation
+# Local validation
 
 Before submitting a Merge Request, it's crucial to run the project's validation checks locally. This ensures your changes meet the required code quality standards and helps catch issues before they reach the CI pipeline, speeding up the review process.
 
-We use [Hatch](https://hatch.pypa.io/latest/) to manage project environments and run tasks. After completing the [Setup steps](code_contributor.md), you can use the following Hatch commands. Ensure you are in the `dev` environment (enter it using `hatch shell dev`) before running them:
+We use [Hatch](https://hatch.pypa.io/latest/) to manage project environments and run tasks. After completing the [Setup steps](setup.md), you can use the following Hatch commands. Ensure you are in the `dev` environment (enter it using `hatch shell dev`) before running them:
 
 ## Formatting
 
@@ -19,7 +19,7 @@ We use [Hatch](https://hatch.pypa.io/latest/) to manage project environments and
 You can pass arguments to `ruff check` via hatch for more targeted linting (e.g., `hatch run dev:lint -- <ruff_args>`).
 *   `hatch run dev:fix-lint`: Runs the Ruff linter and automatically attempts to fix any detected issues.
 
-## Type Checking
+## Type checking
 
 *   `hatch run dev:type-check`: Performs static type checking using Pyright to catch type errors in the codebase.
 
@@ -29,8 +29,8 @@ You can pass arguments to `ruff check` via hatch for more targeted linting (e.g.
 You can pass arguments directly to `pytest` via hatch (e.g., `hatch run dev:test -- -k test_specific_feature`).
 *   `hatch run dev:test-cov`: Runs the full test suite and generates detailed coverage reports (XML, JUnit XML, JSON) typically used in CI.
 
-## Combined Validation
+## Combined validation
 
 *   `hatch run dev:validate`: Runs a sequence of checks: `format-check`, `lint`, `type-check`, and `test`. This is a comprehensive command to ensure that your changes pass all major local validation steps.
 
-**It is highly recommended to run `hatch run dev:validate` before pushing your changes and opening a Merge Request.**
+Run `hatch run dev:validate` before pushing your changes and opening a merge request.

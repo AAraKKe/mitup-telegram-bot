@@ -2,106 +2,52 @@
 icon: material/cog-outline
 ---
 
-# Configuring Mitup Bot :gear:
+# Configure Mitup
 
-This guide explains all the settings available in Mitup and how to configure them through Telegram. Proper configuration ensures you get the best experience when organizing and participating in meetings.
+Tap *:gear: Settings*{.button-like} from the main menu to access all configuration options.
 
-## Accessing Settings :wrench:
+## Language
 
-To access your settings, open the Mitup bot in Telegram and navigate to the main menu. Tap the *:gear: Settings*{.button-like} button to view all available configuration options.
+Tap *:symbols: Language*{.button-like} to choose your preferred language. All bot messages, buttons, and notifications will appear in that language.
 
-## Language Settings :earth_americas:
+## Timezone
 
-Mitup supports multiple languages, allowing you to use the bot in your preferred language.
+Tap *:globe_with_meridians: Timezone*{.button-like} to set your timezone. You can send a city name or share your location via Telegram. This ensures Mitup displays all meeting times accurately, which is especially important when joining meetings across timezones.
 
-**How to change language:**
+## Reminders
 
-1. Go to Settings
-2. Tap *:symbols: Language*{.button-like}
-3. Select your preferred language from the list
+Tap *:alarm_clock: Notifications*{.button-like} to configure reminders. Toggle them on or off, and set how many minutes before a meeting you want to be notified. The default is 5 minutes.
 
-Once set, all bot messages, buttons, and notifications will appear in your chosen language.
+## Timeout
 
-## Timezone Settings :clock2:
+Tap *:hourglass_flowing_sand: Timeout*{.button-like} to set how long meetings stay active in your list after they end. When this period expires, meetings move to your past meetings. You can reactivate them if needed.
 
-Setting the correct timezone ensures that all meeting times display accurately for you.
+## Default meeting options
 
-**How to set your timezone:**
+These pre-selected settings apply to new meetings you create (you can change them per meeting).
 
-1. Go to Settings
-2. Tap *:globe_with_meridians: Timezone*{.button-like}
-3. You can set your timezone in two ways:
-    * Send a text message with your city or location name
-    * Share your current location using Telegram's location feature
+Tap *:busts_in_silhouette: Default Options*{.button-like} to toggle:
 
-Mitup will use this timezone to display all meeting times. This is particularly important when joining meetings created by users in different timezones.
+### Waiting list
 
-## Notification Settings :bell:
+Allow people to join even when the meeting is full. They go on a waiting list and move to active when spots open.
 
-Mitup can send reminders before your meetings start so you don't miss them.
+### Public
 
-**How to configure notifications:**
+Let anyone who gets your invite share it with others.
 
-1. Go to Settings
-2. Tap *:alarm_clock: Notifications*{.button-like}
-3. You'll see two options:
-    * **Enable/Disable**: Toggle notifications on or off
-    * **Notification Time**: Set how many minutes before a meeting you want to be notified
+### Open invitations
 
-By default, Mitup notifies you 5 minutes before a meeting starts, but you can adjust this to suit your needs.
+Let participants add friends to the meeting, even if those friends aren't on Telegram.
 
-## Timeout Settings :hourglass_flowing_sand:
+### Incognito
 
-The timeout setting determines how long a meeting remains active in your list after it ends.
+Hide the participant list when your meeting is shared (show only the total count). As the creator, you always see the full list.
 
-**How to set timeout:**
+### Show timezone
 
-1. Go to Settings
-2. Tap *:hourglass_flowing_sand: Timeout*{.button-like}
-3. Enter the number of minutes you want meetings to remain active after they end
+Control whether timezone info appears in meeting messages. When off, both the timezone info and timezone button are hidden.
 
-When the timeout period expires, meetings automatically move to your past meetings list. You can always reactivate past meetings if needed.
+## Privacy
 
-## Default Meeting Options :clipboard:
-
-These settings determine the default configuration for new meetings you create. Each time you create a meeting, these settings will be pre-selected (though you can modify them for individual meetings).
-
-**How to configure default meeting options:**
-
-1. Go to Settings
-2. Tap *:busts_in_silhouette: Default Options*{.button-like}
-3. Toggle each option according to your preference:
-
-### Waiting List :raised_hand:
-
-This option allows people to join your meeting even when it's full. Participants will automatically be added to a waiting list and moved to the active list when spots become available.
-
-### Public :globe_with_meridians:
-
-Enabling this option allows anyone who receives your meeting invite to share it with others, helping you reach a wider audience.
-
-### Open Invitations :handshake:
-
-With this option, participants can add friends to the meeting even if those friends aren't on Telegram.
-
-### Incognito :spy:
-
-This privacy feature hides the participant list when your meeting is shared, showing only the total number of participants. As the creator, you'll still see the complete list of who has joined.
-
-### Show Timezone :world_map:
-
-This option controls whether timezone information appears in meeting messages. When disabled, both the timezone information and the timezone button are hidden from meeting messages.
-
-## Privacy Settings :lock:
-
-Privacy settings help you control your personal information within Mitup.
-
-**How to access privacy settings:**
-
-1. Go to Settings
-2. Tap *:shield: Privacy*{.button-like}
-3. Adjust the available options according to your preference
-
----
-
-You can modify these settings at any time through the Settings menu in the Mitup bot. If you have questions or need assistance, use the *:question: Help*{.button-like} option from the main menu.
+Tap *:shield: Privacy*{.button-like} to adjust settings that control your personal information within Mitup.

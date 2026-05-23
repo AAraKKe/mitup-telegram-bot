@@ -765,15 +765,29 @@
   // ============================================================
   // App
   // ============================================================
+  function useIsNarrow(breakpoint = 700) {
+    const [narrow, setNarrow] = React.useState(
+      () => typeof window !== 'undefined' && window.innerWidth < breakpoint
+    );
+    React.useEffect(() => {
+      const update = () => setNarrow(window.innerWidth < breakpoint);
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }, [breakpoint]);
+    return narrow;
+  }
+
   function App() {
+    const narrow = useIsNarrow();
+    const width = narrow ? 420 : 900;
     return (
-      <Stage width={900} height={820} duration={26} background="#0a0a0a" loop={true}>
+      <Stage width={width} height={820} duration={26} background="#0a0a0a" loop={true}>
         <Sprite start={0}     end={3.0}>  <SceneMainMenu /></Sprite>
         <Sprite start={3.0}   end={6.5}>  <SceneTitle /></Sprite>
         <Sprite start={6.5}   end={13.0}> <SceneConfigure /></Sprite>
         <Sprite start={13.0}  end={16.0}> <SceneForward /></Sprite>
         <Sprite start={16.0}  end={26.0}> <SceneGroup /></Sprite>
-        <SceneLabel />
+        {!narrow && <SceneLabel />}
       </Stage>
     );
   }

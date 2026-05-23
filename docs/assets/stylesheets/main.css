@@ -320,7 +320,15 @@ html, body {
   margin: 0 auto 1.6rem;
   line-height: 1.55;
 }
-.hero-ctas { display: inline-flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.hero-ctas { text-align: center; }
+.hero-ctas p {
+  margin: 0;
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .hero-meta {
   display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;
   margin-top: 2.2rem;
@@ -611,4 +619,5 @@ img:not(.twemoji):not(.hero img) {
   .patreon-tiers { grid-template-columns: 1fr; }
   .privacy-strip { padding: 1.6rem; }
   .hero-meta { gap: 1.2rem; }
+  .hero-ctas p { flex-direction: column; gap: 14px; }
 }

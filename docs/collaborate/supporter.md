@@ -2,28 +2,18 @@
 icon: material/heart-outline
 ---
 
-# Thank You for Supporting Mitup! :pray:
+# Support Mitup
 
-Thank you for your interest in supporting the Mitup Telegram bot! Community support is what keeps this project alive and growing. We greatly appreciate your consideration to help us make Mitup better for everyone.
+There are three main ways to help:
 
-## Ways to Support Mitup
+## Donate
 
-There are three main ways you can contribute to the project:
+Financial support keeps servers running, enables new features, and covers operational costs. See the [donation page](donation.md) for Patreon, Telegram Stars, and other payment options.
 
-### 1. Donations :moneybag:
+## Translate
 
-Financial contributions help us maintain servers, develop new features, and keep the bot running smoothly. Visit our [donation page](donation.md) to learn about the different ways you can contribute financially.
+Help bring Mitup to more people by translating into your language on Crowdin. See the [translator page](translator.md) for how to get started.
 
-### 2. Translations :globe_with_meridians:
+## Contribute code
 
-Help make Mitup accessible to more people around the world by joining our translation efforts. Check out our [translator page](translator.md) to see how you can help translate the bot into your language.
-
-### 3. Code Contributions :computer:
-
-Are you a developer? Your skills can help improve Mitup or add exciting new features. Visit our [code contributor page](code_contributor.md) to learn how to get involved with development.
-
-## Why Support Us?
-
-Mitup is a community-driven project that aims to help people connect and organize meetups easily through Telegram. With your support, we can continue to improve the bot, add new features, and make it available to more communities worldwide.
-
-Thank you for being part of our journey!
+Developers can improve Mitup by fixing bugs, adding features, or improving docs. See the [code contributor page](code_contributor.md) for setup and workflow.

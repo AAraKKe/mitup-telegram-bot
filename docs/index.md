@@ -10,7 +10,7 @@ hide:
 
 # Organize events in Telegram <em>without the chaos.</em> {.hero-title}
 
-A friendly bot that lives in your DMs — not in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and time-zones for you.
+A friendly bot that lives in your DMs, not in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and time-zones for you.
 
 <div class="hero-ctas" markdown>
 [:fontawesome-solid-paper-plane: Start with @mitupbot](https://t.me/mitupbot){.md-button .md-button--primary}
@@ -30,9 +30,9 @@ A friendly bot that lives in your DMs — not in your group chat. Create a meeti
 
 <div class="demo-eyebrow">From tap to RSVP, in 26 seconds</div>
 
-## A meeting from scratch — watch the whole flow. {.demo-title}
+## A meeting from scratch: watch the whole flow. {.demo-title}
 
-<p class="demo-sub">No bot in your group chat. No spreadsheets. Just five quiet steps inside Telegram — and a card friends can join with a tap.</p>
+<p class="demo-sub">No bot in your group chat. No spreadsheets. Just five quiet steps inside Telegram. Then a card friends can join with a tap.</p>
 
 <div class="demo-frame">
   <iframe src="animations/meeting-flow.html" title="Mitup meeting flow"></iframe>

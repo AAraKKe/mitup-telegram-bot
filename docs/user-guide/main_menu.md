@@ -2,28 +2,69 @@
 icon: material/menu
 ---
 
-# The Main Menu
+# Main menu
 
-Once you are registered you will be welcomed to the Main Menu. This is Mitup's main hub and from here you will be able to access everything you can do within the bot.
+After registration, you'll see the main menu. This is the hub for everything in Mitup.
 
-<figure class="center" markdown="span">
+<div class="mitup-phone">
+  <div class="mitup-phone__screen">
+    <div class="mitup-phone__status">
+      <span>9:41</span>
+      <div class="mitup-phone__notch"></div>
+      <span class="mitup-phone__signal"><span>5G</span><span class="mitup-phone__battery"></span></span>
+    </div>
+    <div class="mitup-chat-header">
+      <div class="mitup-chat-header__back">‹</div>
+      <div class="mitup-avatar"><!-- Mitup mark SVG --></div>
+      <div>
+        <div class="mitup-chat-header__name">mitupbot</div>
+        <div class="mitup-chat-header__sub">bot · online</div>
+      </div>
+    </div>
+    <div class="mitup-phone__body">
+      <div class="mitup-bot-msg">
+        <div class="mitup-bot-msg__content">
+          <div class="mitup-bot-msg__sender">mitupbot</div>
+          <div class="mitup-bot-msg__text">
+            What would you like to do?
+          </div>
+        </div>
+        <div class="mitup-bot-msg__keyboard">
+          <div class="mitup-bot-msg__row"><div class="mitup-key">➕ New meeting</div></div>
+          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
+            <div class="mitup-key">📁 Your active meetings</div>
+            <div class="mitup-key">💾 Your past meetings</div>
+          </div>
+          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
+            <div class="mitup-key">👥 Joined meetings</div>
+            <div class="mitup-key">⚙️ Settings</div>
+          </div>
+          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
+            <div class="mitup-key">❓ Help</div>
+            <div class="mitup-key">❤️ Collaborate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mitup-chat-input">
+      <div class="mitup-chat-input__menu">≡</div>
+      <span class="mitup-chat-input__attach">📎</span>
+      <span class="mitup-chat-input__placeholder">Write a message…</span>
+    </div>
+  </div>
+</div>
 
-![Main Menu](../assets/images/main_menu.png "Mitup Main Menu"){loading=lazy}
-<figcaption>Mitup Main Menu</figcaption>
+The buttons represent all actions you can take in Mitup. There are no slash commands except `/main_menu`, which returns you to this menu.
 
-</figure>
+Available actions:
 
-The buttons on the main menu represent the full set of actions that you can do within Mitup. There are no commands to take any actions other than the `/main_menu` command, which takes you to this menu.
-
-The different available actions are:
-
-* *:heavy_plus_sign: New meeting*{.button-like}: From here, you can create a new meeting, configure it and share it once finished. See [Creating a meeting](create_meeting.md).
-* *:open_file_folder: Your active meetings*{.button-like}: here you can find every active meeting you have created. A meeting becomes inactive after a given amount of time after the meeting has happened.
-* *:floppy_disk: Your past meetings*{.button-like}: contains a list of every inactive meeting that has not yet been deleted.
-* *:busts_in_silhouette: Joined meetings*{.button-like}: these are meetings you have joined but do not own. This is helpful if you want to access an upcoming meeting but can't find where it was sent. Since you do not own these meetings, editing options are unavailable for these meetings.
-* *:gear: Settings*{.button-like}: This is where you can configure Mitup. See [Mitup Configuration](configuration.md).
-* *:question: Help*{.button-like}: here you can find useful links within the bot and access support. We do our best to answer your questions in a timely manner.
-* *:heart: Collaborate*{.button-like}: Mitup does not monetize the bot with ads to avoid turning into a nuisance for its users. However, if you want to support the effort, help build Mitup or help with the operational costs of keeping this bot running, here you will find ways you can help. See the [Collaborate](../collaborate/supporter.md) page.
+* *:heavy_plus_sign: New meeting*{.button-like}: Create a new meeting, configure it, and share. See [Create a meeting](create_meeting.md).
+* *:open_file_folder: Your active meetings*{.button-like}: Meetings you've created that are still active. Meetings become inactive a set time after they happen.
+* *:floppy_disk: Your past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
+* *:busts_in_silhouette: Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find an event you were sent but can't locate the original message. You can view these but not edit them.
+* *:gear: Settings*{.button-like}: Configure Mitup. See [Configure Mitup](configuration.md).
+* *:question: Help*{.button-like}: Links within the bot and support access.
+* *:heart: Collaborate*{.button-like}: Support Mitup financially, contribute code, or translate. See [Support Mitup](../collaborate/supporter.md).
 
 !!! info "Meeting lifecycle"
 

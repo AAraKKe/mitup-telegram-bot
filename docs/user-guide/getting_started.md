@@ -4,15 +4,13 @@ icon: material/rocket-launch-outline
 
 # Getting started
 
-Mitup doesn't work by adding it to your group. While other bots might need to be added to a group to gain context and permissions (this might be needed if the bot is intended to monitor conversations, like moderate the group), Mitup does not need anything from the group and, therefore, it has been developed with the goal of functioning entirely in a private conversation with each user.
+Mitup runs entirely as a private conversation with you. Unlike other bots, it doesn't need to be added to your group. It works without any group context or permissions.
 
-To start using Mitup, just head to [@mitupbot] and start a conversation with it.
+Open @mitupbot and start a conversation.
 
-## Registration process
+## Set your timezone
 
-### Configuring the timezone
-
-Once you start your conversation with Mitup, you will be greeted by the following message:
+You'll be greeted with a message to set your timezone:
 
 !!! quote "Setting up the timezone"
 
@@ -22,17 +20,15 @@ Once you start your conversation with Mitup, you will be greeted by the followin
 
     **Important**: we do not store your location and this information is only used to configure your timezone.
 
-The first step in the registration process is to define your timezone. This is important because meetings created in Mitup can have a date and a time and users who have joined the meeting will be notified before the meeting starts. To ensure everyone knows the exact start time, regardless of their location, each user must set their timezone.
+You can set your timezone two ways:
 
-The timezone can be set in two ways:
+1. Send your city name
+2. Share your location via Telegram
 
-1. By providing the name of your city
-2. By sending a message with your location :round_pushpin:
+Mitup needs this because meetings have dates and times, and reminders go out in your local timezone. Ensuring everyone's timezone is set means everyone sees the same event time, regardless of where they are.
 
-!!! note "Privacy Notice"
+!!! note "Privacy notice"
 
-    Mitup does not store the location sent while configuring your timezone. This is used only to find the timezone of the location sent. Once the timezone is set, the location is discarded.
+    We don't store the location you send during timezone setup. We use it only to look up your timezone, then discard the coordinates. See the [Privacy page](../faq/privacy.md) for details on what Mitup stores.
 
-    For more information about what Mitup does with your data visit the [Privacy page](../faq/privacy.md)
-
-Once your timezone has been set you will be greeted by the main menu and you are now ready to use Mitup!
+Once your timezone is set, you'll see the main menu and can start using Mitup.

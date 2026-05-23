@@ -42,19 +42,19 @@ Mitup is funded by a community of monthly members on Patreon. Every member, rega
 * Patrons-only Telegram channel
 * The warm fuzzies, monthly
 
-**Supporter (€7/mo)** — everything in Friend, plus:
+**Supporter (€7/mo)**: everything in Friend, plus:
 
 * Vote on the public roadmap
 * Early access to new features
 * Quarterly maintainer Q&A
 
-**Patron (€15/mo)** — everything in Supporter, plus:
+**Patron (€15/mo)**: everything in Supporter, plus:
 
 * Your name on the contributors page
 * Direct line to the maintainer
 * Quarterly behind-the-scenes letter
 
-Want to pledge an amount that isn't on this list? Patreon lets you customise — pick any tier and adjust upward.
+Want to pledge an amount that isn't on this list? Patreon lets you customise. Pick any tier and adjust upward.
 
 ## Where your money goes
 
@@ -85,9 +85,9 @@ For one-time PayPal donations, [visit our PayPal page](https://www.paypal.com/cg
 
 ## Not into giving money?
 
-That's totally fine — there are other ways to help that matter just as much:
+That's totally fine. There are other ways to help that matter just as much:
 
 * [**Translate**](translator.md) Mitup into your language on Crowdin
 * [**Contribute code**](code_contributor.md) via GitLab
-* **Report bugs** with a screen recording — those get fixed fastest
-* **Spread the word** — mention Mitup in your group chats
+* **Report bugs** with a screen recording. Those get fixed fastest.
+* **Spread the word**: mention Mitup in your group chats

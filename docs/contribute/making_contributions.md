@@ -2,15 +2,15 @@
 icon: material/source-commit
 ---
 
-# Committing to the Repository
+# Making contributions
 
-Thank you for considering contributing to Mitup! We appreciate all contributions, from bug reports, documentation improvements, and code changes. Please review our [Code of Conduct](../collaborate/code_of_conduct.md) before participating.
+Please review our [Code of Conduct](../collaborate/code_of_conduct.md) before participating.
 
 While this page details the process for code submissions, you can find other ways to help in the [Being a Supporter guide](../collaborate/supporter.md).
 
 To contribute changes to this project, please follow these steps:
 
-## 1. Create an Issue
+## Create an issue
 
 Before starting development, open an issue first to track the proposed change. This ensures transparency and allows for discussion. Use the appropriate template for the type of issue:
 
@@ -23,11 +23,11 @@ Before starting development, open an issue first to track the proposed change. T
 
 Discuss the issue with maintainers if necessary before proceeding.
 
-## 2. Fork and Clone the Repository
+## Fork and clone the repository
 
 Fork the repository to your own namespace and clone it locally to begin development.
 
-## 3. Develop Your Changes
+## Develop your changes
 
 Create a new branch for your changes. Name the branch starting with the issue number followed by a descriptive name (e.g., `123-fix-validation-logic`). This helps automatically link the branch and subsequent merge request to the issue in GitLab.
 
@@ -35,7 +35,7 @@ Before committing your changes, ensure you have completed the [Setup steps](setu
 
 Implement the required changes in your local repository. Commit your work with clear, concise messages that follow the [Conventional Commits standard](https://www.conventionalcommits.org/en/v1.0.0/). This repository uses a custom commit message formatter that automatically transforms your commits into an emoji-based format. See the [Commit Message Format guide](commit_message_format.md) for detailed information on how to write commits and what transformations are applied. The formatter is enforced by a `pre-commit` hook defined in the [`.pre-commit-config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.pre-commit-config.yaml) file, and the specific types supported are configured in the [`commits_check_config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/commits_check_config.yaml) file.
 
-## 4. Merge Request Process
+## Merge request process
 
 Once development is complete, push your changes to your fork and then open a Merge Request (MR) against the project's `main` branch.
 
@@ -45,7 +45,6 @@ Once development is complete, push your changes to your fork and then open a Mer
 *   **Human Review:** After automated checks pass, a project maintainer will review the MR. Address any feedback received during the review.
 *   **Approval and Merge:** Once approved, the maintainer will merge your MR into the `main` branch.
 
-Thank you for your contribution.
-
 ---
-*By contributing, you agree that your contributions will be licensed under the [MIT License](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/LICENSE).*
+
+By contributing, you agree that your contributions will be licensed under the [MIT License](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/LICENSE).

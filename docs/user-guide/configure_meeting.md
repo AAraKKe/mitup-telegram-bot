@@ -2,31 +2,27 @@
 icon: material/calendar-edit
 ---
 
-# Configure Your Meeting :gear:
+# Configure a meeting
 
-After creating a meeting, Mitup provides a powerful set of tools to tailor it exactly to your needs. You can access these options right after creation or any time later by navigating to the meeting and tapping the *:pencil2: Edit*{.button-like} button.
+Tap *:pencil2: Edit*{.button-like} to access meeting options. You can edit right after creation or anytime later.
 
-Here's a breakdown of what you can configure:
+## Core details
 
-## Core Details
+* **Title**: Change the meeting name anytime.
+* **Description**: Add context or agenda details.
+* **Date & Time**: Set or update the event date and time. You can remove it later if this is a placeholder.
+* **Location**: Let people know where to meet.
+  * **Name**: Descriptive name (e.g., "The Usual Pub", "Park Entrance by the Fountain", "Zoom Call Link").
+  * **Coordinates**: Add map coordinates for physical locations.
+* **Participants**: Control meeting size.
+  * **Maximum Participants**: Set a limit, or leave blank for unlimited attendance.
 
--   **Title**: Need to rename your meeting? No problem! You can change the title anytime.
--   **Description**: Add important details, context, or an agenda to your meeting.
--   **Date & Time**: Set the specific date and time for your event. You can also update it later or remove the date and time altogether if it's more of a placeholder meeting.
--   **Location**: Let people know where to meet.
-    -   **Name**: Assign a descriptive name (e.g., "The Usual Pub", "Park Entrance by the Fountain", "Zoom Call Link").
-    -   **Coordinates**: For physical locations, you can add map coordinates for easy navigation.
--   **Participants**: Control the size of your meeting.
-    -   **Maximum Participants**: Set a limit on how many people can join. Leave it blank or choose "No Limit" for unrestricted attendance.
+## Advanced settings
 
-## Advanced Settings :wrench:
+Tap *:gear: Settings*{.button-like} within the edit view to access:
 
-Tap the *:gear: Settings*{.button-like} button within the edit view to access these options:
-
--   **Waiting List**: If you've set a maximum number of participants, enable this to allow users to join a waiting list when the meeting is full. They'll be automatically added if space becomes available.
--   **Public**: (This feature might still be under development) Make your meeting discoverable by others.
--   **Allow Invitations**: Decide if participants can invite others to the meeting.
--   **Incognito**: If enabled, the participant list will be hidden from anyone who hasn't joined.
--   **Show Timezone**: Choose whether to display the meeting's timezone next to the scheduled date and time.
-
-Remember, you can always come back and adjust these settings as needed!
+* **Waiting List**: If max participants is set, allow users to join a waiting list and auto-promote when spots open.
+* **Public**: Make your meeting discoverable by others.
+* **Allow Invitations**: Let participants invite others to the meeting.
+* **Incognito**: Hide the participant list from anyone who hasn't joined.
+* **Show Timezone**: Display timezone info next to the scheduled date and time.

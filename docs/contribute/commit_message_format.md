@@ -2,22 +2,20 @@
 icon: material/format-text
 ---
 
-# :pen: Commit Message Format
+# Commit message format
 
-Mitup uses a custom commit message formatter that automatically transforms your commit messages into a consistent, emoji-based format. This makes the commit history more readable and visually informative.
+Mitup uses a custom commit message formatter that automatically transforms your commits into a consistent, emoji-based format for a more readable history.
 
-## How It Works
+## How it works
 
 When you commit, the pre-commit hook automatically:
 
-* **Recognizes** your commit type (case-insensitive: `feat`, `Feat`, or `FEAT` all work)
-* **Replaces** the type prefix with an emoji from the configuration
-* **Capitalizes** the first letter of your description
-* **Preserves** scopes and breaking change indicators
+* Recognizes your commit type (case-insensitive: `feat`, `Feat`, or `FEAT` all work)
+* Replaces the type prefix with an emoji from the configuration
+* Capitalizes the first letter of your description
+* Preserves scopes and breaking change indicators
 
-### Example Transformations
-
-Here's what happens to your commits:
+### Example transformations
 
 ```
 feat: add user authentication        → ✨ Add user authentication
@@ -26,9 +24,9 @@ docs: update installation guide      → 📚 Update installation guide
 refactor(handlers)!: change callback → 🧹(handlers)! Change callback
 ```
 
-## :memo: Writing Commit Messages
+## Writing commit messages
 
-### Basic Format
+### Basic format
 
 Write your commits using the conventional commits format:
 
@@ -44,7 +42,7 @@ Type[(scope)][!]: description
 
 **Type** (required):
 
-* Case-insensitive (use `feat`, `Feat`, or `FEAT` - all work!)
+* Case-insensitive (use `feat`, `Feat`, or `FEAT` - all work)
 * Will be replaced with the corresponding emoji
 * Must be one of the [allowed types](#allowed-commit-types)
 
@@ -76,33 +74,33 @@ Type[(scope)][!]: description
 * Separated from body by a blank line
 * Common footers: `BREAKING CHANGE:`, `Closes #123`, `Co-authored-by:`
 
-### Valid Examples
+### Valid examples
 
 All these formats are valid:
 
 ```
-✅ feat: add user authentication
-✅ Feat: add user authentication
-✅ FEAT: add user authentication
-✅ fix(api): correct endpoint validation
-✅ docs(readme): update installation guide
-✅ refactor(handlers)!: change callback structure
-✅ test: add unit tests for api module
-✅ chore: update dependencies
+feat: add user authentication
+Feat: add user authentication
+FEAT: add user authentication
+fix(api): correct endpoint validation
+docs(readme): update installation guide
+refactor(handlers)!: change callback structure
+test: add unit tests for api module
+chore: update dependencies
 ```
 
-### Invalid Examples
+### Invalid examples
 
 These will fail with helpful error messages:
 
 ```
-❌ feat:missing space              # Missing space after colon
-❌ feat (scope): description       # Space between type and scope
-❌ build: compile project          # 'build' is not an allowed type
-❌ not a valid message             # No type prefix
+feat:missing space              # Missing space after colon
+feat (scope): description       # Space between type and scope
+build: compile project          # 'build' is not an allowed type
+not a valid message             # No type prefix
 ```
 
-## :sparkles: Allowed Commit Types
+## Allowed commit types
 
 The allowed types are defined in [`commits_check_config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/commits_check_config.yaml):
 
@@ -125,9 +123,9 @@ The allowed types are defined in [`commits_check_config.yaml`](https://gitlab.co
 | **WIP** | 🚧 | Work in progress |
 | **Translations** | 🗣️ | Translations updates |
 
-## :wrench: Adding Custom Types
+## Adding custom types
 
-If you need a commit type that's not in the list, you can add it to `commits_check_config.yaml`:
+If you need a commit type that's not in the list, add it to `commits_check_config.yaml`:
 
 ```yaml
 additional_commit_types:
@@ -138,11 +136,11 @@ additional_commit_types:
 
 The formatter will automatically recognize and use your new type.
 
-## :test_tube: Testing Locally
+## Testing locally
 
-### Test Your Commit Message
+### Test your commit message
 
-Before committing, you can test how your message will be formatted:
+Before committing, test how your message will be formatted:
 
 <details>
 <summary>Manual testing command</summary>
@@ -160,7 +158,7 @@ cat /tmp/test_commit.txt
 
 </details>
 
-### Run the Test Suite
+### Run the test suite
 
 The repository includes a comprehensive test suite:
 
@@ -176,22 +174,22 @@ This runs 18 test cases covering various scenarios including:
 * Description capitalization
 * Invalid format detection
 
-## :book: Technical Details
+## Technical details
 
 ### Implementation
 
 The commit message formatter is implemented in [`bin/check_commit_message.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/bin/check_commit_message.py) and integrated with pre-commit hooks via [`.pre-commit-config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.pre-commit-config.yaml).
 
-### How It's Different
+### How it's different
 
 Unlike traditional validators that only check format, this tool:
 
-* **Transforms** your messages instead of rejecting them
-* **Accepts** any case for commit types
-* **Automatically capitalizes** descriptions
-* **Uses emojis** for visual clarity in git history
+* Transforms your messages instead of rejecting them
+* Accepts any case for commit types
+* Automatically capitalizes descriptions
+* Uses emojis for visual clarity in git history
 
-### Customizing Validation
+### Customizing validation
 
 If you need to modify the validation rules, edit `bin/check_commit_message.py`:
 
@@ -206,9 +204,9 @@ For example, to change how descriptions are capitalized, modify the logic around
 
 </details>
 
-## :question: Troubleshooting
+## Troubleshooting
 
-### Hook Not Running
+### Hook not running
 
 If the formatter isn't running automatically:
 
@@ -217,7 +215,7 @@ If the formatter isn't running automatically:
 pre-commit install --hook-type commit-msg
 ```
 
-### Import Errors
+### Import errors
 
 The formatter requires PyYAML. If you get import errors:
 
@@ -232,22 +230,18 @@ Or if using hatch:
 hatch run dev:pip install pyyaml
 ```
 
-### Commit Rejected
+### Commit rejected
 
 If your commit is rejected:
 
-1. Read the error message - it explains what's wrong and shows examples
-2. Check that your type is in the [allowed types list](#allowed-commit-types)
-3. Ensure you have `: ` (colon + space) after the type/scope
-4. If you need a new type, add it to `commits_check_config.yaml`
+1. Read the error message. It explains what's wrong and shows examples.
+2. Check that your type is in the [allowed types list](#allowed-commit-types).
+3. Ensure you have `: ` (colon + space) after the type/scope.
+4. If you need a new type, add it to `commits_check_config.yaml`.
 
-## :link: Related Documentation
+## Related documentation
 
 * [Conventional Commits Specification](https://www.conventionalcommits.org/)
-* [Making Contributions](committing_to_repo.md)
-* [Local Validation](local_validation.md)
-* [Setup Development Environment](code_contributor.md)
-
----
-
-*The commit message formatter helps maintain a clean, consistent git history that's easy to read and understand at a glance.*
+* [Making contributions](making_contributions.md)
+* [Local validation](local_validation.md)
+* [Setup development environment](setup.md)

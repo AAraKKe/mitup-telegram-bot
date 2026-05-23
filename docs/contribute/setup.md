@@ -4,9 +4,9 @@ icon: material/wrench-outline
 
 # Setup
 
-If you are here, it means you are interested in helping build Mitup, thank you! This guide walks you through setting up your local development environment.
+This guide walks you through setting up your local development environment.
 
-## Contributor Requirements
+## Contributor requirements
 
 Mitup is built in Python, deployed in containers on AWS and managed using [Hatch](https://hatch.pypa.io) environments. Contributors must have:
 
@@ -66,7 +66,7 @@ While most of the dependencies are handled by Hatch, there are two libraries tha
     === "Windows"
         We currently do not develop on Windows and lack instructions about how to install the required libraries. We cannot validate any found information as we lack a Windows system for testing. We welcome contributions with instructions for Windows users.
 
-### Set Up Local Repository
+### Set up local repository
 
 Start by cloning the Mitup code from our [public repo](https://gitlab.com/meetupbot/mitup-telegram-bot)
 
@@ -97,7 +97,7 @@ hatch run dev:validate
     !!! tip
         For better IDE experience with type hints, you can use the `ide` environment (`hatch shell ide`) which includes boto3-stubs for enhanced autocompletion and type checking.
 
-### Configure Your Development Bot
+### Configure your development bot
 
 To test your changes through Telegram, you need to link a bot to Mitup. Head to [BotFather](https://t.me/BotFather) and register a new bot:
 
@@ -114,7 +114,7 @@ hatch run dev:set-local-bot <token>
 
 This creates a `dev.toml` configuration file used by Mitup when running the bot locally via Docker.
 
-### Set Up Your Database
+### Set up your database
 
 For local execution, we rely on a Docker instance of PostgreSQL. First, run all database migrations to ensure the database schema is correctly set up:
 
@@ -124,12 +124,12 @@ docker compose run migrations-upgrade
 
 This command spins up a PostgreSQL database with a local volume in `./postgres_data` that persists data between executions, and then runs the necessary migrations.
 
-### :rocket: Launch Mitup
+## Launch Mitup
 
-Once the setup is complete, you can start the bot using:
+Once setup is complete, start the bot:
 
 ```bash
 docker compose run mitup
 ```
 
-and begin using it from Telegram by opening the bot you created through BotFather.
+Open the bot in Telegram via BotFather.
