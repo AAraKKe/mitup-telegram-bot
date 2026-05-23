@@ -20,11 +20,11 @@ class MessageBase(StrEnum):
         lang: str = TranslationEngine.FALLBACK_LANG,
         **kwargs: MessageParams,
     ) -> FormattedText:
-        """Return the translated, tag-parsed message as a ``FormattedText``.
+        """Return the translated, tag-parsed message as a `FormattedText`.
 
-        Keyword arguments are substituted into ``${varname}`` placeholders.
-        Values may be plain scalars *or* a ``FormattedText`` from another
-        ``get()`` call — in which case its entities are preserved and their
+        Keyword arguments are substituted into `${varname}` placeholders.
+        Values may be plain scalars *or* a `FormattedText` from another
+        `get()` call — in which case its entities are preserved and their
         offsets are adjusted to their final position in the outer string.
         """
         translated = self.to_lang(lang)

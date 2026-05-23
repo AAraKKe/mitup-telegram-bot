@@ -188,7 +188,7 @@ dependencies = [
     "pytest-xdist~=3.8.0",
     "pytest-dotenv~=0.5.2",
     "pytest-json-report~=1.5.0",
-    "ty==0.0.38",
+    "ty==0.0.39",
     "freezegun~=1.5.5",
     "ruff==0.15.0",
     "boto3~=1.34",

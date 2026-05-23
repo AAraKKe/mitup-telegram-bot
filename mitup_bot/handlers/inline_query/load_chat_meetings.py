@@ -19,8 +19,8 @@ from .enums import SEARCH_QUERY_PREFIX, InlineQueryId
 async def load_chat_meetings(session: Session, update: Update, context: TMitupContext):
     """Handle the 'Load meetings' button click on the inline search message.
 
-    Captures the ``chat_instance`` from the callback query and edits the message
-    to show a ``switch_inline_query_current_chat`` button so the user can search
+    Captures the `chat_instance` from the callback query and edits the message
+    to show a `switch_inline_query_current_chat` button so the user can search
     for meetings attached to this chat.
     """
     lang = user_language(update, session)

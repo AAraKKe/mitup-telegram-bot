@@ -8,7 +8,7 @@ from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot, JobQueue
 
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.custom_context import MitupContext, MitupUserData
+from mitup_bot.custom_context import TAPI, TB, MitupContext, MitupUserData
 
 T = TypeVar("T")
 
@@ -25,12 +25,19 @@ UT = TypeVar("UT", bound=Update)
 """Type that defines and Update objects or a subclass of it"""
 
 
-TMitupContext = MitupContext[ExtBot, TelegramApiWrapper]
-"""Standard type of MitupContext used through the project"""
+TMitupContext = MitupContext[TB, TAPI]
+"""Polymorphic MitupContext alias used in handler / utility signatures.
+
+Because `TB` and `TAPI` are free type variables (bounded by `ExtBot` and
+`TelegramApiWrapper` respectively), any function that takes `context: TMitupContext`
+is implicitly generic in those parameters. This lets prod call sites pass
+`MitupContext[ExtBot, TelegramApiWrapper]` and test call sites pass
+`MitupContext[StubBot, MockApi]` to the same function.
+"""
 
 JQ = TypeVar("JQ", bound=JobQueue | None)
-MitupApp = Application[ExtBot, TMitupContext, MitupUserData, dict, dict, JQ]
-"""Standard application type for the MitupBot"""
+MitupApp = Application[ExtBot, MitupContext[ExtBot, TelegramApiWrapper], MitupUserData, dict, dict, JQ]
+"""Standard application type for the MitupBot — concrete prod parameterization."""
 
 
 if TYPE_CHECKING:

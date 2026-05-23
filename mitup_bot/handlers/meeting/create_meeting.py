@@ -23,7 +23,7 @@ from .enums import ConversationMeetingState, MeetingHandlerId
 
 
 class ValidTitleFilter(filters.MessageFilter):
-    """Accept text messages that contain at most one ``date_time`` entity and no BOT_COMMAND."""
+    """Accept text messages that contain at most one `date_time` entity and no BOT_COMMAND."""
 
     def filter(self, message: Message) -> bool:
         if not message.text:

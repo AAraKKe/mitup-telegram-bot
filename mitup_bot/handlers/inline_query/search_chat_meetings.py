@@ -17,10 +17,10 @@ from .utils import sort_meetings
 @HandlersRegistry.register_inline_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, pattern=r"search:.+")
 @with_async_session
 async def search_chat_meetings(session: Session, update: Update, context: TMitupContext):
-    """Search for meetings attached to a specific chat via ``chat_instance``.
+    """Search for meetings attached to a specific chat via `chat_instance`.
 
-    The inline query has the form ``search:<chat_instance>``.  The handler looks up
-    all messages stored with that ``chat_instance``, collects the unique active
+    The inline query has the form `search:<chat_instance>`.  The handler looks up
+    all messages stored with that `chat_instance`, collects the unique active
     meetings, sorts them by relevance, and returns them as inline results.
     """
     lang = user_language(update, session)

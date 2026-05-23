@@ -25,7 +25,7 @@ from tests.helpers.monitoring import MetricAssertions
 
 
 def date_time_entity_update(unix_dt: dt.datetime) -> Update:
-    """Build an Update containing a message with a ``date_time`` entity."""
+    """Build an Update containing a message with a `date_time` entity."""
     tg_user = TgUser(**DEFAULT_TG_USER_PARAMS)
     chat = Chat(id=DEFAULT_CHAT_ID, type="private")
     text = "Tomorrow at noon"

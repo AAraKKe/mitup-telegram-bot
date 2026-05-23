@@ -14,7 +14,7 @@ from telegram import MessageEntity
 class FormattedText:
     """Immutable plain-text + entity pair for Telegram messages.
 
-    Wraps the ``(text, entities)`` pair that Telegram expects and provides
+    Wraps the `(text, entities)` pair that Telegram expects and provides
     mutation-free helpers for composing messages without manually tracking
     UTF-16 entity offsets.
     """
@@ -35,7 +35,7 @@ class FormattedText:
         return self._entities
 
     def prepend(self, prefix: str | FormattedText) -> FormattedText:
-        """Return a new ``FormattedText`` with *prefix* prepended, shifting entity offsets."""
+        """Return a new `FormattedText` with *prefix* prepended, shifting entity offsets."""
         prefix_text = prefix if isinstance(prefix, str) else prefix.text
         prefix_entities = [] if isinstance(prefix, str) else prefix.entities
         offset = utf16_len(prefix_text)
@@ -43,7 +43,7 @@ class FormattedText:
         return FormattedText(prefix_text + self._text, list(prefix_entities) + shifted)
 
     def append(self, suffix: str | FormattedText) -> FormattedText:
-        """Return a new ``FormattedText`` with *suffix* appended, merging entities."""
+        """Return a new `FormattedText` with *suffix* appended, merging entities."""
         suffix_text = suffix if isinstance(suffix, str) else suffix.text
         suffix_entities = [] if isinstance(suffix, str) else suffix.entities
         offset = utf16_len(self._text)
@@ -54,7 +54,7 @@ class FormattedText:
     def join(cls, separator: str, parts: Iterable[str | FormattedText]) -> FormattedText:
         """Join *parts* with *separator*, preserving entities from each part.
 
-        Analogous to ``str.join`` but entity offsets are recalculated as parts
+        Analogous to `str.join` but entity offsets are recalculated as parts
         are concatenated so the final object is always consistent.
         """
         result: FormattedText | None = None
@@ -101,7 +101,7 @@ class Link:
 
 @dataclass
 class EntityDateTime:
-    """Telegram ``date_time`` entity — each viewer sees the time in their own locale."""
+    """Telegram `date_time` entity — each viewer sees the time in their own locale."""
 
     text: str
     unix_time: dt.datetime
@@ -187,7 +187,7 @@ def _render_entity_datetime(plain: str, value: EntityDateTime) -> list[MessageEn
 
 
 def render(template: Template) -> FormattedText:
-    """Convert a t-string into a ``FormattedText`` with UTF-16 entity offsets."""
+    """Convert a t-string into a `FormattedText` with UTF-16 entity offsets."""
     plain = ""
     entities: list[MessageEntity] = []
 
@@ -236,7 +236,7 @@ TELEGRAM_DATETIME_LINK_URL = "https://telegram.org/blog/member-tags-disable-shar
 
 
 def build_datetime_link() -> FormattedText:
-    """Build the ``FormattedText`` for Telegram's date & time formatting help link."""
+    """Build the `FormattedText` for Telegram's date & time formatting help link."""
     return render(t"{Link("Telegram's date & time formatting", TELEGRAM_DATETIME_LINK_URL)}")
 
 
@@ -256,19 +256,19 @@ STYLE_MAP: dict[str, str] = {
 
 
 def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) -> FormattedText:
-    """Parse a tag-annotated translated string into a ``FormattedText``.
+    """Parse a tag-annotated translated string into a `FormattedText`.
 
-    Supported formatting tags: ``<b>``, ``<i>``, ``<u>``, ``<s>``, ``<code>``,
-    ``<pre>``, ``<spoiler>``. Variable placeholders use ``${varname}`` syntax.
+    Supported formatting tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`,
+    `<pre>`, `<spoiler>`. Variable placeholders use `${varname}` syntax.
 
-    Substitution values may be plain ``str`` or ``FormattedText``.  When a
-    ``FormattedText`` value is substituted its entities are preserved with
+    Substitution values may be plain `str` or `FormattedText`.  When a
+    `FormattedText` value is substituted its entities are preserved with
     offsets adjusted to their final position.  Plain-string values are never
     scanned for tags, so user-supplied content cannot introduce spurious entities.
 
     Tags may be arbitrarily nested; each style tracks its own start offset
     independently.  Unclosed tags are silently dropped.  To add a new entity
-    type, insert an entry into ``STYLE_MAP``.
+    type, insert an entry into `STYLE_MAP`.
     """
     plain = ""
     utf16_offset = 0

@@ -162,7 +162,7 @@ class MitupInlineView(MitupView):
 class InlineResultsButton:
     """Button shown above inline query results.
 
-    Abstracts the Telegram ``InlineQueryResultsButton`` so handlers never
+    Abstracts the Telegram `InlineQueryResultsButton` so handlers never
     depend on the PTB type directly.
     """
 

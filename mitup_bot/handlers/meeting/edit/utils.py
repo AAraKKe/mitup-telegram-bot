@@ -8,7 +8,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 
 
 class DateTimeEntityFilter(filters.MessageFilter):
-    """Accept messages that contain at least one ``date_time`` entity."""
+    """Accept messages that contain at least one `date_time` entity."""
 
     def filter(self, message: Message) -> bool:
         return any(e.type == MessageEntity.DATE_TIME for e in (message.entities or []))

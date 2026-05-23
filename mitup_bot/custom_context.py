@@ -105,9 +105,15 @@ class MitupUserData:
         return entry.on_exit if entry is not None else None
 
 
-# Use old syntax to allow defining covariance
-TB = TypeVar("TB", bound=ExtBot, covariant=True)
-TAPI = TypeVar("TAPI", bound=TelegramApiWrapper, covariant=True)
+# Old TypeVar syntax kept (rather than PEP 695) so we can name TB/TAPI as importable
+# module-level symbols. The class itself is invariant in both parameters: covariance over
+# TB is unsound (CallbackContext is invariant in its bot type because Application.bot is a
+# writable attribute), and covariance over TAPI would be unsound for the same reason
+# (self.api is a writable attribute). Substitutability across prod and test parameterizations
+# is achieved by making downstream signatures (TMitupContext) parametric in TB/TAPI rather
+# than by lying about variance here.
+TB = TypeVar("TB", bound=ExtBot)
+TAPI = TypeVar("TAPI", bound=TelegramApiWrapper)
 
 
 class MitupContext(
@@ -317,7 +323,7 @@ class MitupContext(
 
     @contextmanager
     def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
-        """Measure elapsed time and emit a ``<prefix>Time`` metric in milliseconds on exit."""
+        """Measure elapsed time and emit a `<prefix>Time` metric in milliseconds on exit."""
         start_time = perf_counter()
         yield
         elapsed_time = 1000 * (perf_counter() - start_time)

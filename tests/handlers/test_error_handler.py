@@ -1,5 +1,3 @@
-from typing import cast
-
 import pytest
 
 from mitup_bot.config import Env
@@ -8,7 +6,6 @@ from mitup_bot.handlers import error_handler
 from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.mitup_types import TMitupContext
 from tests.helpers import MockDbSession, StubMitupContext
 from tests.helpers.monitoring import MetricAssertions
 
@@ -20,7 +17,7 @@ from tests.helpers.monitoring import MetricAssertions
 async def test_errors_ignored(error: type, message: str, context: StubMitupContext, metrics: MetricAssertions):
     error_obj = error(message)
 
-    await error_handler.handler(cast(TMitupContext, context), error_obj, Env.DEV)
+    await error_handler.handler(context, error_obj, Env.DEV)
     await context.metrics.flush()
 
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
@@ -44,9 +41,7 @@ async def test_handle_inactive_user_error(
 
     mock_session.add_object(user)
 
-    await error_handler.handler(
-        cast(TMitupContext, context), InactiveUserInteraction(user.db_id, private=True), Env.DEV
-    )
+    await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert not user.is_active
@@ -61,7 +56,7 @@ async def test_handle_error_for_uncaght_exception(context: StubMitupContext, met
         # We need to raise the exception to have exec_info available when the error is handled
         raise RuntimeError()
     except RuntimeError:
-        await error_handler.handler(cast(TMitupContext, context), RuntimeError(), Env.DEV)
+        await error_handler.handler(context, RuntimeError(), Env.DEV)
         await context.metrics.flush()
 
     # emit_global=True emits Fault twice: once with handler dims, once without (for global aggregation)
