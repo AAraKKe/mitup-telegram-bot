@@ -27,6 +27,8 @@ For single-domain tasks or targeted fixes, **always delegate to the appropriate 
 
 **After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done. If the reviewer reports violations, **resume the specialist agent that made the changes** and pass it the full violation report — the specialist already has the full context of every change it made, while you would be reconstructing it from a diff.
 
+**Always include the current working tree's absolute root in subagent prompts.** Compute it with `git rev-parse --show-toplevel` and tell the specialist to root every file path under it — don't pattern-match on directory names, since worktree layouts vary (`.claude/worktrees/<name>/`, `wt/<name>/`, anywhere else). Skills reference paths as relative (`mitup_bot/handlers/`, `tests/`); subagents otherwise resolve them against whatever directory they happen to start in, which is usually the main checkout. This matters most when you're working in a `git worktree` other than the main checkout, because the main checkout typically has unrelated in-flight work on a different branch and writes there silently collide with it.
+
 The canonical reference for available agents is `.claude/agents/` (one file per agent). The canonical reference for available skills is `.claude/skills/` (one directory per skill, each with a `SKILL.md`). Skills with `user-invocable: true` in their frontmatter can be run as `/<skill-name>`; the rest auto-load when their `description` triggers match the current work.
 
 ## Important rules
@@ -34,6 +36,7 @@ The canonical reference for available agents is `.claude/agents/` (one file per 
 - **Hooks own validation.** Tests, linters, formatters, and the type checker run automatically via hooks — once after each modification (lint/format/type-check) and once when work is complete (tests). Running them manually duplicates work and floods the conversation with output you don't need. If you want feedback mid-work on a specific test, run it directly: `hatch run dev -- <pytest args>`. Avoid full runs.
 - **Never run `python` directly.** The system Python has no project dependencies. Use `hatch run dev:python python <args>` to execute Python in the project's managed environment.
 - **Prefer scripts for bulk edits.** When the same change needs to land across many files, write a small script rather than editing each one by hand — it's faster and saves the conversation context for actual reasoning.
+- **Run `convention-reviewer` before opening any MR.** Review the full branch diff against the repo's default branch (`git diff "$(git symbolic-ref --short refs/remotes/origin/HEAD)"...HEAD`, typically `origin/main`) regardless of who wrote the code — manual edits skip the per-specialist post-task review and routinely slip past project conventions.
 
 ## When hooks fail
 
