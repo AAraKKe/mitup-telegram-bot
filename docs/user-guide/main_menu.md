@@ -10,7 +10,7 @@ After registration, you'll see the main menu. This is the hub for everything in 
   <div class="mitup-annotated__chat">
     <div class="mitup-chat-header">
       <div class="mitup-chat-header__back">‹</div>
-      <div class="mitup-avatar"><!-- Mitup mark SVG --></div>
+      <div class="mitup-avatar"><img src="../../assets/images/brand/mark-256.png" alt="Mitup"></div>
       <div>
         <div class="mitup-chat-header__name">mitupbot</div>
         <div class="mitup-chat-header__sub">bot · online</div>
@@ -46,13 +46,13 @@ The buttons represent all actions you can take in Mitup. There are no slash comm
 
 Available actions:
 
-* *:heavy_plus_sign: New meeting*{.button-like}: Create a new meeting, configure it, and share. See [Create a meeting](create_meeting.md).
-* *:open_file_folder: Your active meetings*{.button-like}: Meetings you've created that are still active. Meetings become inactive a set time after they happen.
-* *:floppy_disk: Your past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
-* *:busts_in_silhouette: Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find an event you were sent but can't locate the original message. You can view these but not edit them.
-* *:gear: Settings*{.button-like}: Configure Mitup. See [Configure Mitup](configuration.md).
-* *:question: Help*{.button-like}: Links within the bot and support access.
-* *:heart: Collaborate*{.button-like}: Support Mitup financially, contribute code, or translate. See [Support Mitup](../collaborate/supporter.md).
+* *➕ New meeting*{.button-like}: Create a new meeting, configure it, and share. See [Create a meeting](create_meeting.md).
+* *📂 Your active meetings*{.button-like}: Meetings you've created that are still active. Meetings become inactive a set time after they happen.
+* *💾 Your past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
+* *👥 Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find an event you were sent but can't locate the original message. You can view these but not edit them.
+* *⚙️ Settings*{.button-like}: Configure Mitup. See [Configure Mitup](configuration.md).
+* *❓ Help*{.button-like}: Links within the bot and support access.
+* *♥ Collaborate*{.button-like}: Support Mitup financially, contribute code, or translate. See [Support Mitup](../collaborate/supporter.md).
 
 !!! info "Meeting lifecycle"
 

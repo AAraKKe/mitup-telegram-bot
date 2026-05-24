@@ -52,7 +52,7 @@
    vertically to never collide with a chip on the next line.
 
    Markdown (mkdocs + attr_list):
-     Tap *:heavy_plus_sign: New meeting*{.button-like} to start.
+     Tap *➕ New meeting*{.button-like} to start.
 
    Or raw HTML:
      Tap <span class="button-like">➕ New meeting</span>.
@@ -79,17 +79,18 @@
    Chat building blocks (shared by .mitup-phone + .mitup-annotated)
    ───────────────────────────────────────────────────────────── */
 
-/* Bot avatar (M mark inside a Mitup-blue disc) */
+/* Bot avatar — Mitup mark inside a circular disc */
 .mitup-avatar {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--mitup-blue);
+  background: var(--paper-2, #fff);
   display: grid;
   place-items: center;
   flex: none;
   overflow: hidden;
 }
+.mitup-avatar img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .mitup-avatar svg { width: 70%; height: 70%; display: block; }
 
 /* Chat header row (back arrow + avatar + name) */

@@ -187,7 +187,7 @@ After 173 days of inactivity, you'll receive a notification that the meeting wil
 
 **Rectification.** Edit your display name, language, or timezone directly in the bot's settings menu. For other corrections, email us.
 
-**Erasure.** Tap *:shield: Privacy*{.button-like} from the main menu. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your user record, every meeting you own, and every RSVP you've made are removed permanently within seconds.
+**Erasure.** Tap *🛡️ Privacy*{.button-like} from the main menu. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your user record, every meeting you own, and every RSVP you've made are removed permanently within seconds.
 
 **Portability.** Email `privacy@mitup.social` and we'll send your data as JSON, formatted for import into another system if you wish.
 

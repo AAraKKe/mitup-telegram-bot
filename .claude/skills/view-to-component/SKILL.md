@@ -84,11 +84,13 @@ NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"      # → "➕ New meeting"
 SETTINGS    = f"{Emojis.SETTINGS} Settings"            # → "⚙️ Settings"
 ```
 
-So the `.mitup-key` content is the rendered string, emoji included. Look up the actual `Emojis.<NAME>` value in `mitup_bot/utils/emojis.py` if you need the glyph — never invent the emoji.
+So the `.mitup-key` content is the rendered string, emoji included. Look up the actual `Emojis.<NAME>` value in `mitup_bot/utils/emojis.py` if you need the glyph. Never invent the emoji.
+
+**Emojis are raw Unicode glyphs, not Twemoji shortcodes.** Mockups mirror what users see in Telegram, so the glyph in `.mitup-key` must match the glyph the bot actually sends. Do not convert to `:shortcode:` form — shortcodes can render a different image from the real button (e.g. `:heart:` renders as `❤️` but `ButtonMessages.COLLABORATE` is `♥`). This matches the same rule for `.button-like` chips in prose; see the `.button-like` recipe in `docs-style`.
 
 Back-button rule: `view.with_back_button(ButtonMessages.MAIN_MENU, …)` renders as `≪ Main Menu` (the `GO_BACK` glyph is `≪`). The same applies to `ButtonMessages.<X>.back(lang=...)` called inside a factory.
 
-If a button is built with `options_button(...)` from `factory.py`, the label is prefixed with ✅ (true) or 🔴 (false) — pick the state you want to illustrate.
+If a button is built with `options_button(...)` from `factory.py`, the label is prefixed with ✅ (true) or 🔴 (false). Pick the state you want to illustrate.
 
 ---
 
@@ -142,6 +144,7 @@ When in doubt about which page to render, pick `MIDDLE` (page 2 of 3) — it sho
 
 Every chat showcase MUST use:
 
+* **Avatar**: `<img src="../../assets/images/brand/mark-256.png" alt="Mitup">` inside `.mitup-avatar`. The `../../` depth is for a page at `docs/user-guide/foo.md` or `docs/faq/foo.md` (which renders to `/user-guide/foo/index.html`, i.e. two levels deep). Adjust the `..` count for deeper nesting. Do NOT use `{{ base_url }}` here: Zensical only processes Jinja inside `overrides/` partials, not in raw HTML embedded in markdown — the literal text passes through unchanged. Never a letter, never an SVG placeholder, never an empty disc. The same image is used in the React animation (`docs/animations/`) via a relative path from that folder.
 * **Header**: name `mitupbot` (the real bot handle, lowercase), subtitle `bot · online`. Never `Mitup Bot`, never staging variants.
 * **Body wrapper**: `.mitup-phone__body` inside `.mitup-phone`, or `.mitup-annotated__body` inside `.mitup-annotated__chat`.
 * **Input bar**: include for `.mitup-phone` (it's part of the bezel). Optional for `.mitup-annotated`.
@@ -183,7 +186,7 @@ Rendered as an annotated showcase:
   <div class="mitup-annotated__chat">
     <div class="mitup-chat-header">
       <div class="mitup-chat-header__back">‹</div>
-      <div class="mitup-avatar"><!-- Mitup mark SVG --></div>
+      <div class="mitup-avatar"><img src="../../assets/images/brand/mark-256.png" alt="Mitup"></div>
       <div>
         <div class="mitup-chat-header__name">mitupbot</div>
         <div class="mitup-chat-header__sub">bot · online</div>

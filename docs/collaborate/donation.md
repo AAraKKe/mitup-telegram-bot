@@ -73,7 +73,7 @@ If a recurring Patreon pledge isn't your thing, there are other paths:
 
 ### Telegram Stars
 
-The simplest one-off way to support: tap *:heart: Collaborate*{.button-like} from the main menu inside the bot and choose a Stars amount.
+The simplest one-off way to support: tap *♥ Collaborate*{.button-like} from the main menu inside the bot and choose a Stars amount.
 
 ### Telegram Payments
 

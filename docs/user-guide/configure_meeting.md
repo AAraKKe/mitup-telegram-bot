@@ -19,7 +19,7 @@ Tap *:pencil2: Edit*{.button-like} to access meeting options. You can edit right
 
 ## Advanced settings
 
-Tap *:gear: Settings*{.button-like} within the edit view to access:
+Tap *⚙️ Settings*{.button-like} within the edit view to access:
 
 * **Waiting List**: If max participants is set, allow users to join a waiting list and auto-promote when spots open.
 * **Public**: Make your meeting discoverable by others.

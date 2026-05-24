@@ -25,7 +25,7 @@ Mitup talks like a friend, not a product. Friendly and a little playful, never t
 |---|---|
 | `Unlock powerful event management` | `Create a meeting in four taps.` |
 | `Robust privacy infrastructure` | `Mitup never joins your group.` |
-| `Click here` | `Tap *:heavy_plus_sign: New meeting*{.button-like}` |
+| `Click here` | `Tap *➕ New meeting*{.button-like}` |
 | `Welcome! We're so excited to have you!` | `First time? Here's how it works.` |
 
 ## Anti-patterns
@@ -46,9 +46,9 @@ Exception: proper nouns and acronyms keep their casing (`# Telegram Stars`, `# M
 **Documentation pages don't use emojis.** Not on headings, not in body prose, not as decoration. The only place an emoji is allowed in a docs page is inside a `.button-like` chip, because it has to mirror the real bot button (see anti-pattern 12 and the `.button-like` component).
 
 * **Don't:** `## Language settings :earth_americas:`, `## Notifications :bell:`, `Just tap :gear: to open settings.`, `🎉 Welcome to Mitup`.
-* **Do:** plain `## Language settings`, plain `Open `*:gear: Settings*{.button-like}` from the main menu.`
+* **Do:** plain `## Language settings`, plain `Open *⚙️ Settings*{.button-like} from the main menu.`
 
-Font Awesome shortcodes (`:fontawesome-solid-…:`, `:fontawesome-brands-…:`) are **not** emojis for this rule — they're component icons used inside `.grid cards` headers, `.md-button` CTAs, and the social links block in `zensical.toml`. Those stay. The rule is about Twemoji shortcodes and literal Unicode emoji in headings or body prose.
+Font Awesome shortcodes (`:fontawesome-solid-…:`, `:fontawesome-brands-…:`) are **not** emojis for this rule. They're component icons used inside `.grid cards` headers, `.md-button` CTAs, and the social links block in `zensical.toml`. Those stay. The rule is about Unicode emoji and Twemoji shortcodes in headings or body prose.
 
 ### 3. Forced enthusiasm and exclamation marks
 
@@ -111,9 +111,9 @@ When every section opens with bold-colon `**How to set your timezone:**` followe
 Every mention of a bot button in body text uses the `.button-like` inline chip (see the component catalogue below). Plain bold, plain italics, monospace, or a quoted name don't match what the user sees on the screen.
 
 * **Don't:** `Tap **New meeting**.`, `Press the "New meeting" button.`, `` Tap `New meeting`. ``, `Tap New meeting (➕).`
-* **Do:** `Tap `*:heavy_plus_sign: New meeting*{.button-like}`.`
+* **Do:** `Tap *➕ New meeting*{.button-like}.`
 
-This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must match the real `ButtonMessages` entry in `mitup_bot/utils/messages.py`.
+This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must be the **raw Unicode glyph** copied verbatim from the matching `ButtonMessages` entry in `mitup_bot/utils/messages.py` (which sources `mitup_bot/locales/<lang>.po`). Don't use Twemoji shortcodes like `:heavy_plus_sign:` — shortcodes can render differently from the real button (e.g. `:heart:` renders as `❤️` but the bot button is `♥`), so they break the "this is what's on your phone" promise of `.button-like`.
 
 ## Headings
 
@@ -150,7 +150,8 @@ The repo uses three icon systems, each in its own slot. Don't mix them up.
 
 * **Material icons.** Page front-matter `icon:` only. Format: `material/xxx-outline`. Drives the nav sidebar. Browse icons at <https://pictogrammers.com/library/mdi/>.
 * **Font Awesome shortcodes.** Component icons only: `.md-button` CTAs, `.grid cards` headers, and the social icons block in `zensical.toml`. Format: `:fontawesome-solid-paper-plane:`, `:fontawesome-solid-language:`, `:fontawesome-brands-gitlab:`. Use solid for actions, brands for logos. Not for decorating headings or body prose.
-* **Twemoji shortcodes.** Allowed in exactly one place: inside a `.button-like` chip, to mirror the emoji on the real bot button (e.g. `:heavy_plus_sign:` for `➕`). Never on headings. Never in body prose. See anti-pattern 2.
+* **Twemoji shortcodes.** Not used in this codebase. `.button-like` chips use **raw Unicode glyphs** copied verbatim from `ButtonMessages` (see anti-pattern 12 and the `.button-like` recipe). Shortcodes are forbidden because they can render differently from the real bot button (e.g. `:heart:` renders as `❤️` but `ButtonMessages.COLLABORATE` is `♥`).
+* **Unicode emoji in prose.** Forbidden. The only place a raw glyph belongs is inside a `.button-like` chip.
 
 ## Validation
 
@@ -253,16 +254,16 @@ Plain Markdown tables render as a rounded card with a header row and hover-tinte
 Recipe:
 
 1. Identify the button mentioned (e.g. "New meeting").
-2. Find the matching entry in `ButtonMessages` in `mitup_bot/utils/messages.py` to confirm the exact text and emoji (e.g. `➕ New meeting`).
-3. Look up the Twemoji shortcode for that emoji (e.g. `➕` → `:heavy_plus_sign:`).
-4. Format as `*:twemoji_shortcode: Button Text*{.button-like}`.
-   * Example: `*:heavy_plus_sign: New meeting*{.button-like}`
+2. Find the matching entry in `ButtonMessages` in `mitup_bot/utils/messages.py` to confirm the exact text and emoji. The actual string lives in `mitup_bot/locales/en.po` under the corresponding `msgid`. Example: `ButtonMessages.NEW_MEETING` → `"➕ New meeting"`.
+3. Copy the emoji glyph **verbatim**. Do **not** convert to a Twemoji shortcode. Shortcodes can render a different glyph from what the bot actually sends (e.g. `:heart:` → `❤️`, but the bot button is `♥`), and the whole point of `.button-like` is to mirror what the user sees on their phone.
+4. Format as `*<glyph> Button Text*{.button-like}`.
+   * Example: `*➕ New meeting*{.button-like}`
 5. Rules:
    * Wrap in Markdown italics (`*...*`).
    * **Never** use backtick monospace.
    * The `.button-like` class lives inside the closing asterisk, not outside.
    * Sentence-case the button text as it appears in the bot.
-   * Keep the emoji — `.button-like` without the emoji isn't faithful to the real button.
+   * Keep the emoji as a raw glyph. `.button-like` without the emoji isn't faithful to the real button, and a Twemoji shortcode may not match either.
 
 The CSS renders a soft blue chip with deep-blue text; no extra styling needed. Two chips on adjacent wrapped lines are sized to never touch.
 
