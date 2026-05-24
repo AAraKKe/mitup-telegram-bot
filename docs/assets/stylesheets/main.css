@@ -135,7 +135,6 @@ html, body {
 .md-typeset details {
   background: var(--paper-2) !important;
   border: 1px solid var(--line) !important;
-  border-left-width: 3px !important;
   border-radius: 12px !important;
   box-shadow: none !important;
   font-size: 0.78rem;
@@ -171,46 +170,25 @@ html, body {
 .md-typeset .admonition p:last-child,
 .md-typeset details p:last-child { margin-bottom: 0; }
 
-/* Accent colors by type */
-.md-typeset .admonition.note,
-.md-typeset details.note,
-.md-typeset .admonition.info,
-.md-typeset details.info { border-left-color: var(--blue) !important; }
+/* Accent colors by type — tint title text + title background only.
+   The card border stays uniform on all sides (see mitup-components.css). */
 .md-typeset .admonition.note > .admonition-title,
 .md-typeset .admonition.info > .admonition-title { color: var(--blue-deep); background: rgba(42,161,224,0.04) !important; }
 
-.md-typeset .admonition.tip,
-.md-typeset details.tip,
-.md-typeset .admonition.success,
-.md-typeset .admonition.abstract,
-.md-typeset .admonition.hint { border-left-color: var(--accent-green) !important; }
 .md-typeset .admonition.tip > .admonition-title,
 .md-typeset .admonition.success > .admonition-title,
 .md-typeset .admonition.abstract > .admonition-title,
 .md-typeset .admonition.hint > .admonition-title { color: #2D7A56; background: rgba(79,178,134,0.05) !important; }
 
-.md-typeset .admonition.warning,
-.md-typeset details.warning,
-.md-typeset .admonition.attention,
-.md-typeset .admonition.caution { border-left-color: var(--yellow) !important; }
 .md-typeset .admonition.warning > .admonition-title,
 .md-typeset .admonition.attention > .admonition-title,
 .md-typeset .admonition.caution > .admonition-title { color: var(--yellow-d); background: rgba(255,200,80,0.06) !important; }
 
-.md-typeset .admonition.danger,
-.md-typeset details.danger,
-.md-typeset .admonition.error,
-.md-typeset .admonition.failure,
-.md-typeset .admonition.bug { border-left-color: #E26565 !important; }
 .md-typeset .admonition.danger > .admonition-title,
 .md-typeset .admonition.error > .admonition-title,
 .md-typeset .admonition.failure > .admonition-title,
 .md-typeset .admonition.bug > .admonition-title { color: #C24A1A; background: rgba(226,101,101,0.05) !important; }
 
-.md-typeset .admonition.quote,
-.md-typeset details.quote,
-.md-typeset .admonition.example,
-.md-typeset .admonition.question { border-left-color: var(--ink-3) !important; }
 .md-typeset .admonition.quote > .admonition-title,
 .md-typeset .admonition.example > .admonition-title,
 .md-typeset .admonition.question > .admonition-title { color: var(--ink-2); }
@@ -601,10 +579,202 @@ html, body {
   color: #C24A1A;
 }
 
-/* Generic image shadow — slightly softer than original */
-img:not(.twemoji):not(.hero img) {
+/* ─── Privacy TL;DR — grouped section cards ───────────────── */
+.tldr-stack { display: flex; flex-direction: column; gap: 18px; margin: 1.8rem 0; }
+.tldr-card { background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.tldr-card__head {
+  display: grid; grid-template-columns: 1fr auto; gap: 18px;
+  align-items: start; padding: 20px 28px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.tldr-card__head h3 {
+  margin: 0; font: 700 18px/1.25 "Inter", sans-serif;
+  letter-spacing: -0.012em; color: var(--ink);
+}
+.tldr-card__head p {
+  margin: 6px 0 0; font-size: 14px; color: var(--ink-2);
+  line-height: 1.55; max-width: 720px;
+}
+.tldr-rows { display: flex; flex-direction: column; }
+.tldr-row {
+  display: grid; grid-template-columns: 260px 1fr; gap: 28px;
+  padding: 14px 28px; align-items: baseline;
+  border-top: 1px solid var(--line);
+}
+.tldr-row:first-child { border-top: 0; }
+.tldr-row__label {
+  font: 600 14.5px/1.4 "Inter", sans-serif;
+  letter-spacing: -0.005em; color: var(--ink);
+}
+.tldr-row__sub {
+  font-size: 12px; color: var(--ink-3);
+  margin-top: 2px; font-style: italic; display: block;
+}
+.tldr-row__why { font-size: 14.5px; color: var(--ink-2); line-height: 1.55; }
+
+/* Status tints — apply to .tldr-card */
+.tldr--stored    .tldr-card__head { background: #E8F4ED; }
+.tldr--stored    .tldr-pill       { background: rgba(79,178,134,0.20); color: #1E6E4A; }
+.tldr--stored    .tldr-pill .dot  { background: #4FB286; }
+
+.tldr--temporary .tldr-card__head { background: var(--blue-soft); }
+.tldr--temporary .tldr-pill       { background: rgba(42,161,224,0.18); color: var(--blue-deep); }
+.tldr--temporary .tldr-pill .dot  { background: var(--blue); }
+
+.tldr--transient .tldr-card__head { background: #FFF1D4; border-bottom-color: #FFF1D4; }
+.tldr--transient .tldr-pill       { background: rgba(255,200,80,0.30); color: #B58A1F; }
+.tldr--transient .tldr-pill .dot  { background: #FFC850; }
+
+.tldr--never     .tldr-card__head { background: #EEF2F5; border-bottom-color: #EEF2F5; }
+.tldr--never     .tldr-pill       { background: rgba(122,140,151,0.20); color: var(--ink-2); }
+.tldr--never     .tldr-pill .dot  { background: var(--ink-3); }
+
+/* Status pill (shared shape) */
+.tldr-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  font: 600 11.5px/1.4 "Inter", sans-serif;
+  white-space: nowrap;
+}
+.tldr-pill .dot { width: 6px; height: 6px; border-radius: 99px; }
+
+/* Inline "Temporary" sub-pill (used inside a row for one specific field) */
+.tldr-row__flag { margin-top: 6px; display: block; }
+.tldr-row__flag .tldr-pill {
+  background: rgba(42,161,224,0.18);
+  color: var(--blue-deep);
+}
+.tldr-row__flag .tldr-pill .dot {
+  background: var(--blue);
+}
+
+/* Mobile */
+@media (max-width: 720px) {
+  .tldr-card__head { grid-template-columns: 1fr; }
+  .tldr-row { grid-template-columns: 1fr; gap: 4px; padding: 12px 20px; }
+  .tldr-row__label { font-size: 14px; }
+  .tldr-card__head { padding: 16px 20px 14px; }
+}
+
+/* Soft shadow + rounded corners for screenshots in article body.
+   Scoped to .md-typeset so it never bleeds into chrome (header, footer,
+   sidebar). The :not(.twemoji) exclusion is required — pymdownx.emoji
+   renders shortcodes as inline <img class="twemoji"> SVGs, and they
+   appear inside every .button-like chip. The :not(.hero img) exclusion
+   keeps the landing hero art clean (its reset rule lives above). */
+.md-typeset img:not(.twemoji):not(.hero img) {
   box-shadow: 0 8px 24px -10px rgba(14,26,35,0.18);
   border-radius: 10px;
+}
+
+/* ─── Footer (custom Mitup footer partial) ──────────────────
+   Three-column grid layout with brand, use, help sections,
+   plus a bottom strip with copyright and disclaimers.
+   Compact and quiet — a gentle sign-off.
+   ────────────────────────────────────────────────────────── */
+
+.mitup-footer {
+  margin-top: 4rem;
+  padding: 1.6rem 1rem;
+  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+}
+
+.mitup-footer__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.4rem;
+  max-width: 1200px;
+  margin: 0 auto 1.2rem;
+}
+
+.mitup-footer__column { }
+
+.mitup-footer__logo {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.mitup-footer__logo img {
+  height: 44px;
+  width: auto;
+  display: block;
+  /* The PNG bakes in one cap-height of clearspace on every side.
+     Negative margins pull the visible wordmark flush with the column edge
+     and remove the dead top/bottom space the clearspace would add. */
+  margin: -10px 0 -10px -10px;
+}
+
+.mitup-footer__tagline {
+  margin: 0.5rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.mitup-footer__heading {
+  font-weight: 700;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  margin: 0 0 0.7rem;
+}
+
+.mitup-footer__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mitup-footer__link {
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: color 0.15s;
+  font-size: 0.8rem;
+}
+
+.mitup-footer__link:hover {
+  color: var(--blue-deep);
+}
+
+.mitup-footer__bottom {
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.mitup-footer__bottom p {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Mobile: stack columns */
+@media (max-width: 768px) {
+  .mitup-footer {
+    padding: 1.2rem 1rem;
+    margin-top: 2rem;
+  }
+  .mitup-footer__grid {
+    grid-template-columns: 1fr;
+    gap: 1.4rem;
+  }
+  .mitup-footer__bottom {
+    padding-top: 0.6rem;
+  }
+  .mitup-footer__bottom p {
+    white-space: normal;
+  }
 }
 
 /* Mobile fallbacks */

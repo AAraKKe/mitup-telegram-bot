@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/assets/images/logo-horizontal-1200.png" alt="Mitup" width="50%">
+  <img src="docs/assets/images/logo-stacked-transparent-800.png" alt="Mitup" width="40%">
 </div>
 
 A Telegram bot that brings people together. Mitup lives in a private DM with you, never in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and timezones for you.

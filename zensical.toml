@@ -20,6 +20,7 @@ nav = [
   ] },
   { "FAQ" = [
     { "Privacy" = "faq/privacy.md" },
+    { "About us" = "faq/about.md" },
   ] },
   { "Contribute" = [
     { "Being a supporter" = "collaborate/supporter.md" },

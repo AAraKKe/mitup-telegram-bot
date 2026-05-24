@@ -6,13 +6,8 @@ icon: material/menu
 
 After registration, you'll see the main menu. This is the hub for everything in Mitup.
 
-<div class="mitup-phone">
-  <div class="mitup-phone__screen">
-    <div class="mitup-phone__status">
-      <span>9:41</span>
-      <div class="mitup-phone__notch"></div>
-      <span class="mitup-phone__signal"><span>5G</span><span class="mitup-phone__battery"></span></span>
-    </div>
+<div class="mitup-annotated">
+  <div class="mitup-annotated__chat">
     <div class="mitup-chat-header">
       <div class="mitup-chat-header__back">‹</div>
       <div class="mitup-avatar"><!-- Mitup mark SVG --></div>
@@ -21,35 +16,28 @@ After registration, you'll see the main menu. This is the hub for everything in 
         <div class="mitup-chat-header__sub">bot · online</div>
       </div>
     </div>
-    <div class="mitup-phone__body">
+    <div class="mitup-annotated__body">
       <div class="mitup-bot-msg">
         <div class="mitup-bot-msg__content">
           <div class="mitup-bot-msg__sender">mitupbot</div>
           <div class="mitup-bot-msg__text">
-            What would you like to do?
+            <strong>Welcome to Mitup Bot!</strong><br/><br/>Choose one of the following options:
           </div>
         </div>
         <div class="mitup-bot-msg__keyboard">
           <div class="mitup-bot-msg__row"><div class="mitup-key">➕ New meeting</div></div>
-          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
-            <div class="mitup-key">📁 Your active meetings</div>
-            <div class="mitup-key">💾 Your past meetings</div>
-          </div>
+          <div class="mitup-bot-msg__row"><div class="mitup-key">📂 Your active meetings</div></div>
+          <div class="mitup-bot-msg__row"><div class="mitup-key">💾 Your past meetings</div></div>
           <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
             <div class="mitup-key">👥 Joined meetings</div>
             <div class="mitup-key">⚙️ Settings</div>
           </div>
           <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
             <div class="mitup-key">❓ Help</div>
-            <div class="mitup-key">❤️ Collaborate</div>
+            <div class="mitup-key">♥ Collaborate</div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="mitup-chat-input">
-      <div class="mitup-chat-input__menu">≡</div>
-      <span class="mitup-chat-input__attach">📎</span>
-      <span class="mitup-chat-input__placeholder">Write a message…</span>
     </div>
   </div>
 </div>

@@ -6,6 +6,44 @@ icon: material/cog-outline
 
 Tap *:gear: Settings*{.button-like} from the main menu to access all configuration options.
 
+<div class="mitup-annotated">
+  <div class="mitup-annotated__chat">
+    <div class="mitup-chat-header">
+      <div class="mitup-chat-header__back">‹</div>
+      <div class="mitup-avatar"><!-- Mitup mark SVG --></div>
+      <div>
+        <div class="mitup-chat-header__name">mitupbot</div>
+        <div class="mitup-chat-header__sub">bot · online</div>
+      </div>
+    </div>
+    <div class="mitup-annotated__body">
+      <div class="mitup-bot-msg">
+        <div class="mitup-bot-msg__content">
+          <div class="mitup-bot-msg__sender">mitupbot</div>
+          <div class="mitup-bot-msg__text">Configure MitUp.</div>
+        </div>
+        <div class="mitup-bot-msg__keyboard">
+          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
+            <div class="mitup-key">🔣 Language</div>
+            <div class="mitup-key">⌛ Timeout</div>
+          </div>
+          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
+            <div class="mitup-key">⏰ Notifications</div>
+            <div class="mitup-key">🌐 Timezone</div>
+          </div>
+          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
+            <div class="mitup-key">👥 Default Options</div>
+            <div class="mitup-key">🛡️ Privacy</div>
+          </div>
+          <div class="mitup-bot-msg__row">
+            <div class="mitup-key">≪ Main Menu</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 ## Language
 
 Tap *:symbols: Language*{.button-like} to choose your preferred language. All bot messages, buttons, and notifications will appear in that language.

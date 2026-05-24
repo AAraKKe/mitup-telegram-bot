@@ -2,9 +2,10 @@
 name: docs-writer
 description: Expert agent for writing and maintaining documentation in docs/. Delegate to this agent whenever documentation pages need to be created, updated, or reviewed.
 tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch
-model: haiku
+model: sonnet
 skills:
   - docs-style
+  - view-to-component
 ---
 
 <role>
