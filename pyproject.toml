@@ -28,6 +28,8 @@ dependencies = [
     "googlemaps==4.10.0",
     "aws-embedded-metrics==3.5.0",
     "pyyaml==6.0.3",
+    "fastapi==0.136.3",
+    "uvicorn[standard]==0.47.0",
 ]
 
 [project.urls]
@@ -197,6 +199,8 @@ dependencies = [
     "deepdiff",
     "boto3-stubs[essential,ecs,cloudfront]",
     "testcontainers[postgres]==4.14.2",
+    "httpx==0.28.1",
+    "asgi-lifespan==2.1.0",
 ]
 
 [tool.hatch.envs.dev.scripts]

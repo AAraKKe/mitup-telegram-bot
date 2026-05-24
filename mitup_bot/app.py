@@ -1,9 +1,11 @@
 import logging
+from typing import TYPE_CHECKING, assert_never
 
 import click
 import sqlalchemy
 import telegram
 import telegram.ext
+import uvicorn
 from rich.console import Console
 from rich.logging import RichHandler
 from telegram.ext import AIORateLimiter, Application, ContextTypes
@@ -12,7 +14,12 @@ from mitup_bot import db, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.monitoring.backend import configure_emf_backend
+from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
+from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.web import create_app
+
+if TYPE_CHECKING:  # pragma: no cover
+    from fastapi import FastAPI
 
 
 class MitupRuntime:
@@ -81,25 +88,64 @@ class MitupRuntime:
         # Set rate limiter
         builder.rate_limiter(AIORateLimiter(max_retries=self.config.bot.retries_on_throttle))
 
+        # In webhook mode, FastAPI feeds updates directly into Application.process_update so
+        # the built-in Updater is unused. Polling mode keeps the default Updater (we drive it
+        # manually from the FastAPI lifespan via Updater.start_polling()).
+        if self.config.app.run_mode is RunModes.WEBHOOK:
+            builder.updater(None)
+
         app = builder.build()
 
         HandlersRegistry.bind(app)
 
         return app
 
+    def __build_polling_fastapi_app(self, metrics_client: MetricsClient) -> FastAPI:
+        return create_app(
+            self.app,
+            secret_token=None,
+            metrics_client=metrics_client,
+            run_mode=RunModes.POLLING,
+        )
+
+    def __build_webhook_fastapi_app(self, metrics_client: MetricsClient) -> FastAPI:
+        if self.config.bot.domain is None:
+            raise ValueError("Domain must be set when running with webhook")
+        if self.config.bot.secret_token is None:
+            raise ValueError("Secret token must be set when running with webhook")
+
+        return create_app(
+            self.app,
+            secret_token=self.config.bot.secret_token.get_secret_value(),
+            metrics_client=metrics_client,
+            run_mode=RunModes.WEBHOOK,
+            webhook_url=f"https://{self.config.bot.domain}:{self.config.bot.port}/telegram",
+            max_connections=self.config.bot.max_connections,
+        )
+
     def run(self):
         logging.info(f"Running Mitup for environment: {self.env}")
-        if self.config.app.run_mode is RunModes.POLLING:
-            self.app.run_polling()
-        else:
-            if self.config.bot.domain is None:
-                raise ValueError("Domain must be set when running with webhook")
-            if self.config.bot.secret_token is None:
-                raise ValueError("Secret token must be set when running with webhook")
 
-            self.app.run_webhook(
-                listen="0.0.0.0",  # This is the address to listen to in the docker container
-                secret_token=self.config.bot.secret_token.get_secret_value(),
-                webhook_url=f"https://{self.config.bot.domain}:{self.config.bot.port}",
-                max_connections=self.config.bot.max_connections,
+        metrics_client = MetricsClient(EmfBackend())
+
+        match self.config.app.run_mode:
+            case RunModes.POLLING:
+                fastapi_app = self.__build_polling_fastapi_app(metrics_client)
+            case RunModes.WEBHOOK:
+                fastapi_app = self.__build_webhook_fastapi_app(metrics_client)
+            case _ as unreachable:
+                assert_never(unreachable)
+
+        # workers=1: PTB Application owns in-memory state (user_data, conversation states) and
+        # is not safe to run across multiple worker processes.
+        server = uvicorn.Server(
+            uvicorn.Config(
+                app=fastapi_app,
+                host="0.0.0.0",
+                port=self.config.bot.listen_port,
+                workers=1,
+                log_config=None,
+                lifespan="on",
             )
+        )
+        server.run()

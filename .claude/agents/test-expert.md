@@ -67,6 +67,8 @@ hatch run dev:test -- tests/path/to/test_file.py -k "test_name[param_id]"
 
 Write or modify the test, run it, read failures, fix, re-run. Repeat until passing.
 
+**Never claim tests pass without having actually run them.** Before reporting "tests pass" or quoting a pass count in your summary, run `hatch run dev:test -- <files>` and copy the exact `N passed` line from the output into your summary. If you cannot run the tests (e.g. environment problem), say so explicitly — do not fabricate or estimate a count.
+
 To check whether the full suite is healthy (e.g., after broad changes):
 
 ```bash

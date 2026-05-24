@@ -79,6 +79,14 @@ class MetricKey(CamelCaseStrEnum):
     STARTED_NOTIFICATIONS_SENT = auto()
     """Number of started-meeting notifications that failed to send"""
     STARTED_NOTIFICATIONS_FAILED = auto()
+    """Telegram rejected the webhook request with a 403 Forbidden response"""
+    WEBHOOK_FORBIDDEN = auto()
+    """Webhook received a payload that could not be parsed as a Telegram Update"""
+    WEBHOOK_MALFORMED_UPDATE = auto()
+    """FastAPI/uvicorn lifespan failed during startup"""
+    LIFESPAN_STARTUP_FAILED = auto()
+    """FastAPI/uvicorn lifespan failed during shutdown"""
+    LIFESPAN_SHUTDOWN_FAILED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

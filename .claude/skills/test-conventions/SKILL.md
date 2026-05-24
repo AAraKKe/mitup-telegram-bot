@@ -26,3 +26,7 @@ Before writing a test, read the reference that matches what you're testing:
 | DB integration tests against real Postgres | `references/db-integration.md` |
 
 Always also read the closest existing test file in the same directory — existing tests are the best exemplars for local patterns.
+
+## Test signatures must be fully typed
+
+Every parameter in a test or fixture signature must have a type annotation, including parameters that pytest injects from fixtures. A signature like `async def test_foo(web_app, ptb_app: MagicMock):` is **incomplete** — annotate every parameter (`async def test_foo(web_app: FastAPI, ptb_app: MagicMock):`). The annotation requirement from the `coding-standards` skill applies to test parameters with no exception.

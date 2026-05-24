@@ -11,6 +11,7 @@ skills:
   - api-wrapper
   - error-handling
   - type-checking
+  - web-conventions
 ---
 
 <role>

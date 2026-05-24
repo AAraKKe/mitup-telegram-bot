@@ -24,6 +24,10 @@ __all__ = [
     "telegram_user_from_user",
     "ConversationTester",
     "ConversationStep",
+    "build_ptb_app_mock",
+    "build_test_web_app",
+    "build_web_client",
+    "lifespan_runner",
 ]
 
 from .constants import DEFAULT_CURRENT_MESSAGE
@@ -46,3 +50,4 @@ from .filesystem import MITUP_DIR
 from . import console, calendar_july_2024
 from .handler_context import HandlerContext
 from .conversation import ConversationTester, ConversationStep
+from .web import build_ptb_app_mock, build_test_web_app, build_web_client, lifespan_runner

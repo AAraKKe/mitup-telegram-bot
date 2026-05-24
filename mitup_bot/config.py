@@ -146,6 +146,9 @@ class BotConfig(BaseModel):
     # Port where Telegram should connect to. This is not the port in the host
     # where the bot listens
     port: int = 443
+    # Port on which the uvicorn server listens inside the container. Defaults to 80
+    # to match the ECS task containerPort without requiring any infra change.
+    listen_port: int = 80
     # Secret token provided to Telegram to validate connections
     secret_token: SecretStr | None = None
     max_connections: int = 100

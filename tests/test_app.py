@@ -221,32 +221,95 @@ def test_ext_bot_logger_level_by_env(
 # --- Run ---
 
 
-def test_polling_mode_calls_run_polling(runtime: MitupRuntime):
-    runtime.config = _build_config(run_mode=RunModes.POLLING)
-    runtime.app = mock.MagicMock()
-
-    runtime.run()
-
-    runtime.app.run_polling.assert_called_once()
-    runtime.app.run_webhook.assert_not_called()
-
-
-def test_webhook_mode_calls_run_webhook(runtime: MitupRuntime):
-    runtime.config = _build_config(
+def test_webhook_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: RuntimeDeps):
+    """Webhook mode disables PTB's internal updater, builds the FastAPI app via
+    create_app with RunModes.WEBHOOK and a /telegram URL, and starts uvicorn with
+    the configured host/port/workers/log_config. PTB's run_webhook must NOT run."""
+    config = _build_config(
         run_mode=RunModes.WEBHOOK,
         domain="example.com",
         secret_token=SecretStr("my-secret"),
     )
-    runtime.app = mock.MagicMock()
 
-    runtime.run()
+    with (
+        mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
+        mock.patch("mitup_bot.app.create_app") as mock_create_app,
+        mock.patch("mitup_bot.app.uvicorn") as mock_uvicorn,
+    ):
+        fastapi_app = mock.MagicMock(name="fastapi_app")
+        mock_create_app.return_value = fastapi_app
 
-    runtime.app.run_webhook.assert_called_once_with(
-        listen="0.0.0.0",
-        secret_token="my-secret",
-        webhook_url="https://example.com:443",
-        max_connections=100,
-    )
+        runtime = MitupRuntime(Env.DEV)
+        runtime.run()
+
+    # Webhook mode must disable PTB's Updater so FastAPI feeds updates directly.
+    _patch_runtime_deps.builder_instance.updater.assert_called_once_with(None)
+
+    mock_create_app.assert_called_once()
+    create_call = mock_create_app.call_args
+    assert create_call.args[0] is runtime.app
+    assert create_call.kwargs["secret_token"] == "my-secret"
+    assert create_call.kwargs["run_mode"] is RunModes.WEBHOOK
+    assert create_call.kwargs["webhook_url"].endswith("/telegram")
+    assert create_call.kwargs["max_connections"] == 100  # default in BotConfig
+    # metrics_client must be a MetricsClient instance — assert presence, not identity.
+    assert "metrics_client" in create_call.kwargs
+
+    # uvicorn.Config wraps the FastAPI app with the expected runtime parameters.
+    mock_uvicorn.Config.assert_called_once()
+    config_kwargs = mock_uvicorn.Config.call_args.kwargs
+    assert config_kwargs["app"] is fastapi_app
+    assert config_kwargs["host"] == "0.0.0.0"
+    assert config_kwargs["port"] == 80  # BotConfig.listen_port default
+    assert config_kwargs["workers"] == 1
+    assert config_kwargs["log_config"] is None
+
+    # uvicorn.Server is constructed with the Config and run() is invoked.
+    mock_uvicorn.Server.assert_called_once_with(mock_uvicorn.Config.return_value)
+    mock_uvicorn.Server.return_value.run.assert_called_once_with()
+
+    # PTB's run_webhook is gone — make sure we did not regress to it.
+    runtime.app.run_webhook.assert_not_called()
+
+
+def test_polling_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: RuntimeDeps):
+    """Polling mode keeps PTB's default Updater, builds FastAPI with RunModes.POLLING
+    and no webhook URL, and runs uvicorn. PTB's run_polling must NOT run."""
+    config = _build_config(run_mode=RunModes.POLLING)
+
+    with (
+        mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
+        mock.patch("mitup_bot.app.create_app") as mock_create_app,
+        mock.patch("mitup_bot.app.uvicorn") as mock_uvicorn,
+    ):
+        fastapi_app = mock.MagicMock(name="fastapi_app")
+        mock_create_app.return_value = fastapi_app
+
+        runtime = MitupRuntime(Env.DEV)
+        runtime.run()
+
+    # Polling mode must NOT disable PTB's Updater — it drives polling.
+    _patch_runtime_deps.builder_instance.updater.assert_not_called()
+
+    mock_create_app.assert_called_once()
+    create_call = mock_create_app.call_args
+    assert create_call.args[0] is runtime.app
+    assert create_call.kwargs["run_mode"] is RunModes.POLLING
+    # No webhook URL in polling mode — either absent or explicitly None.
+    assert create_call.kwargs.get("webhook_url") is None
+
+    mock_uvicorn.Config.assert_called_once()
+    config_kwargs = mock_uvicorn.Config.call_args.kwargs
+    assert config_kwargs["app"] is fastapi_app
+    assert config_kwargs["host"] == "0.0.0.0"
+    assert config_kwargs["port"] == 80  # BotConfig.listen_port default
+    assert config_kwargs["workers"] == 1
+    assert config_kwargs["log_config"] is None
+
+    mock_uvicorn.Server.assert_called_once_with(mock_uvicorn.Config.return_value)
+    mock_uvicorn.Server.return_value.run.assert_called_once_with()
+
+    # PTB's run_polling is gone — make sure we did not regress to it.
     runtime.app.run_polling.assert_not_called()
 
 

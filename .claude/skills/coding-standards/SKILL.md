@@ -121,6 +121,10 @@ def utf16_len(s: str) -> int:
 
 Always required. Use modern union syntax and built-in generics (see [Hard antipatterns](#hard-antipatterns)). Always declare an explicit return type when the function returns a value (`-> T`). `-> None` is implicit and **must not** be written — omitting it is the correct style.
 
+**Parameters must be annotated too**, including pytest fixture-injected parameters. A test signature like `def test_foo(web_app, ptb_app: MagicMock):` is incomplete — annotate every parameter (`def test_foo(web_app: FastAPI, ptb_app: MagicMock):`). Fixture injection does not exempt a parameter from the annotation rule.
+
+**`except A, B:` (no parentheses) is valid Python 3.14 syntax** — per [PEP 758](https://peps.python.org/pep-0758/), `except` accepts a comma-separated list without parentheses, and the project's `ruff format` actively rewrites `except (A, B):` to `except A, B:`. This is **not** a Python 2 syntax error; treat the unparenthesised form as canonical. Reviews that flag it as a bug are wrong.
+
 **Conversation handler return types.** `ConversationMeetingState` is a plain `Enum`, not `IntEnum` — its members are **not** `int`. Handlers that return both a state and `ConversationHandler.END` (which is `int`) must be typed as `-> ConversationMeetingState | int`, not `-> int`:
 
 ```python
