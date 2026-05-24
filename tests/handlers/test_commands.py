@@ -23,7 +23,7 @@ from mitup_bot.handlers.registration_process.enums import (
     RegistrationProcessHandlerId,
 )
 from mitup_bot.models import User
-from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, NullBackend
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
@@ -32,6 +32,7 @@ from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
     call_handler,
+    make_test_metrics_client,
 )
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -61,7 +62,7 @@ async def test_command_registry_can_register_command_handlers(update: Update):
 
     callback_return = await handler.callback(
         update,
-        StubMitupContext(mock.MagicMock(), update, MetricsClient(NullBackend()), MockApi()),
+        StubMitupContext(mock.MagicMock(), update, make_test_metrics_client(), MockApi()),
     )
     assert callback_return == "Done!"
 

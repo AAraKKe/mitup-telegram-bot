@@ -7,8 +7,9 @@ from telegram.ext import ConversationHandler
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.monitoring import MetricsClient, NullBackend
+from mitup_bot.monitoring import MetricsClient
 from tests.helpers.handler_context import HandlerContext
+from tests.helpers.monitoring import make_test_metrics_client
 
 from .api import MockApi
 from .types import StubMitupApp, StubMitupContext
@@ -23,7 +24,7 @@ def build_context(
     if update.effective_message:
         update.effective_message.set_bot(app.bot)
 
-    client = metrics or MetricsClient(NullBackend())
+    client = metrics or make_test_metrics_client()
 
     context = MitupContext.from_update(update=update, application=app)
     context.api = MockApi()

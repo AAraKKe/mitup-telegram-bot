@@ -46,8 +46,18 @@ class MetricsClient:
         self,
         backend: MetricsBackend,
         base_dimensions: dict[str, str] | None = None,
+        *,
+        record_history: bool = False,
     ):
+        """Build a metrics client.
+
+        `record_history=True` keeps every emitted `MetricRecord` in memory so tests can
+        introspect them via `client.records`. **Do not enable in production** — long-lived
+        processes (workers, bots, one-shot migrations of large datasets) will leak memory
+        proportional to the number of metrics emitted.
+        """
         self._backend = backend
+        self._record_history = record_history
         self._records: list[MetricRecord] = []
         self._base_dimensions = base_dimensions or {}
 
@@ -68,7 +78,8 @@ class MetricsClient:
             dimensions=frozenset(merged_dims.items()),
             properties=properties or {},
         )
-        self._records.append(record)
+        if self._record_history:
+            self._records.append(record)
         self._backend.emit(record)
 
     def emit_feature(

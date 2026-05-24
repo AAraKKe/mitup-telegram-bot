@@ -15,6 +15,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
+from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 
 
@@ -25,9 +26,8 @@ def bot() -> AsyncMock:
 
 @pytest.fixture
 def adapter(bot: AsyncMock) -> BotAdapter:
-    from mitup_bot.monitoring import MetricsClient, NullBackend
 
-    return BotAdapter(bot=bot, metrics=MetricsClient(NullBackend()))
+    return BotAdapter(bot=bot, metrics=make_test_metrics_client())
 
 
 @pytest.fixture
@@ -514,9 +514,8 @@ async def test_update_meeting_messages_state_flag_propagated(
 
 
 async def test_bot_adapter_flush_metrics(bot: AsyncMock):
-    from mitup_bot.monitoring import MetricsClient, NullBackend
 
-    adapter = BotAdapter(bot=bot, metrics=MetricsClient(NullBackend()))
+    adapter = BotAdapter(bot=bot, metrics=make_test_metrics_client())
     await adapter.flush_metrics()
 
 

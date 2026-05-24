@@ -87,6 +87,22 @@ class MetricKey(CamelCaseStrEnum):
     LIFESPAN_STARTUP_FAILED = auto()
     """FastAPI/uvicorn lifespan failed during shutdown"""
     LIFESPAN_SHUTDOWN_FAILED = auto()
+    """Number of rows read from the source Rails table during a Rails → Python migration run"""
+    MIGRATION_ROWS_READ = auto()
+    """Number of rows written (or that would be written, in dry-run) to the new schema"""
+    MIGRATION_ROWS_INSERTED = auto()
+    """Number of rows skipped during migration (already imported, deduped, phantom user, etc.)"""
+    MIGRATION_ROWS_SKIPPED = auto()
+    """Number of rows that failed to migrate due to mapping or insert errors"""
+    MIGRATION_ROWS_FAILED = auto()
+    """Wall-clock duration of a migration phase, in milliseconds"""
+    MIGRATION_PHASE_DURATION_MS = auto()
+    """Difference between Rails row count and new-DB row count for a given table after verification"""
+    MIGRATION_VERIFICATION_DELTA = auto()
+    """Total bytes written (or stubbed in dry-run) to S3 for an archived table"""
+    MIGRATION_ARCHIVE_BYTES = auto()
+    """Number of rows streamed to S3 for an archived table"""
+    MIGRATION_ARCHIVE_ROWS = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

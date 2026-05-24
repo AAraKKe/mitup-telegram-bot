@@ -5,7 +5,7 @@ import pytest
 
 from mitup_bot.cli import inactive_meetings
 from mitup_bot.cli.commands.recurrent_events import EventType
-from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import (
     MockApi,
     MockDbSession,
@@ -14,12 +14,12 @@ from tests.helpers import (
     create_settings,
     create_user,
 )
-from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 
 @pytest.fixture
 def metrics_client() -> MetricsClient:
-    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value})
+    return make_test_metrics_client(base_dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value})
 
 
 @pytest.fixture

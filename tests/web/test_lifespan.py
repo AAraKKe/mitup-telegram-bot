@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from mitup_bot.config import RunModes
-from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import MetricAssertions, build_test_web_app, lifespan_runner
 
 WEBHOOK_URL = "https://example.com/telegram"
@@ -56,9 +56,8 @@ def call_names(parent: MagicMock) -> list[str]:
 # --- Webhook lifespan ---
 
 
-async def test_webhook_lifespan_startup_order_initialize_start_set_webhook():
+async def test_webhook_lifespan_startup_order_initialize_start_set_webhook(metrics_client: MetricsClient):
     ptb_app, parent = build_tracked_ptb_app()
-    metrics_client = MetricsClient(NullBackend())
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET,
@@ -74,9 +73,8 @@ async def test_webhook_lifespan_startup_order_initialize_start_set_webhook():
     assert startup_calls[:3] == ["initialize", "start", "set_webhook"]
 
 
-async def test_webhook_lifespan_set_webhook_args():
+async def test_webhook_lifespan_set_webhook_args(metrics_client: MetricsClient):
     ptb_app, _parent = build_tracked_ptb_app()
-    metrics_client = MetricsClient(NullBackend())
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET,
@@ -99,9 +97,8 @@ async def test_webhook_lifespan_set_webhook_args():
     assert "allowed_updates" not in kwargs
 
 
-async def test_webhook_lifespan_shutdown_order_stop_shutdown():
+async def test_webhook_lifespan_shutdown_order_stop_shutdown(metrics_client: MetricsClient):
     ptb_app, parent = build_tracked_ptb_app()
-    metrics_client = MetricsClient(NullBackend())
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET,
@@ -122,9 +119,8 @@ async def test_webhook_lifespan_shutdown_order_stop_shutdown():
 # --- Polling lifespan ---
 
 
-async def test_polling_lifespan_startup_order_initialize_start_polling_start():
+async def test_polling_lifespan_startup_order_initialize_start_polling_start(metrics_client: MetricsClient):
     ptb_app, parent = build_tracked_ptb_app()
-    metrics_client = MetricsClient(NullBackend())
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=None,
@@ -140,9 +136,8 @@ async def test_polling_lifespan_startup_order_initialize_start_polling_start():
     assert startup_calls[:3] == ["initialize", "updater_start_polling", "start"]
 
 
-async def test_polling_lifespan_does_not_call_set_webhook():
+async def test_polling_lifespan_does_not_call_set_webhook(metrics_client: MetricsClient):
     ptb_app, _parent = build_tracked_ptb_app()
-    metrics_client = MetricsClient(NullBackend())
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=None,
@@ -158,9 +153,8 @@ async def test_polling_lifespan_does_not_call_set_webhook():
     ptb_app.bot.set_webhook.assert_not_called()
 
 
-async def test_polling_lifespan_shutdown_order_updater_stop_stop_shutdown():
+async def test_polling_lifespan_shutdown_order_updater_stop_stop_shutdown(metrics_client: MetricsClient):
     ptb_app, parent = build_tracked_ptb_app()
-    metrics_client = MetricsClient(NullBackend())
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=None,
@@ -180,11 +174,11 @@ async def test_polling_lifespan_shutdown_order_updater_stop_stop_shutdown():
 # --- Failures ---
 
 
-async def test_startup_failure_when_initialize_raises_emits_metric_and_propagates():
+async def test_startup_failure_when_initialize_raises_emits_metric_and_propagates(
+    metrics_client: MetricsClient, metrics: MetricAssertions
+):
     ptb_app, _parent = build_tracked_ptb_app()
     ptb_app.initialize = AsyncMock(side_effect=RuntimeError("init boom"))
-    metrics_client = MetricsClient(NullBackend())
-    metrics = MetricAssertions(metrics_client)
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET,
@@ -201,11 +195,11 @@ async def test_startup_failure_when_initialize_raises_emits_metric_and_propagate
     metrics.assert_emitted(name=MetricKey.LIFESPAN_STARTUP_FAILED, value=1)
 
 
-async def test_startup_failure_when_set_webhook_raises_emits_metric_and_propagates():
+async def test_startup_failure_when_set_webhook_raises_emits_metric_and_propagates(
+    metrics_client: MetricsClient, metrics: MetricAssertions
+):
     ptb_app, _parent = build_tracked_ptb_app()
     ptb_app.bot.set_webhook = AsyncMock(side_effect=RuntimeError("set_webhook boom"))
-    metrics_client = MetricsClient(NullBackend())
-    metrics = MetricAssertions(metrics_client)
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET,
@@ -222,12 +216,12 @@ async def test_startup_failure_when_set_webhook_raises_emits_metric_and_propagat
     metrics.assert_emitted(name=MetricKey.LIFESPAN_STARTUP_FAILED, value=1)
 
 
-async def test_shutdown_failure_when_stop_raises_emits_metric_and_continues():
+async def test_shutdown_failure_when_stop_raises_emits_metric_and_continues(
+    metrics_client: MetricsClient, metrics: MetricAssertions
+):
     ptb_app, parent = build_tracked_ptb_app()
     ptb_app.stop = AsyncMock(side_effect=RuntimeError("stop boom"))
     parent.attach_mock(ptb_app.stop, "stop")
-    metrics_client = MetricsClient(NullBackend())
-    metrics = MetricAssertions(metrics_client)
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET,
@@ -245,12 +239,12 @@ async def test_shutdown_failure_when_stop_raises_emits_metric_and_continues():
     ptb_app.shutdown.assert_awaited_once()
 
 
-async def test_polling_shutdown_failure_when_updater_stop_raises_emits_metric_and_continues():
+async def test_polling_shutdown_failure_when_updater_stop_raises_emits_metric_and_continues(
+    metrics_client: MetricsClient, metrics: MetricAssertions
+):
     ptb_app, parent = build_tracked_ptb_app()
     ptb_app.updater.stop = AsyncMock(side_effect=RuntimeError("updater stop boom"))
     parent.attach_mock(ptb_app.updater.stop, "updater_stop")
-    metrics_client = MetricsClient(NullBackend())
-    metrics = MetricAssertions(metrics_client)
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=None,
@@ -274,12 +268,12 @@ async def test_polling_shutdown_failure_when_updater_stop_raises_emits_metric_an
     [RunModes.WEBHOOK, RunModes.POLLING],
     ids=["webhook", "polling"],
 )
-async def test_shutdown_failure_when_shutdown_raises_emits_metric(run_mode: RunModes):
+async def test_shutdown_failure_when_shutdown_raises_emits_metric(
+    run_mode: RunModes, metrics_client: MetricsClient, metrics: MetricAssertions
+):
     ptb_app, parent = build_tracked_ptb_app()
     ptb_app.shutdown = AsyncMock(side_effect=RuntimeError("shutdown boom"))
     parent.attach_mock(ptb_app.shutdown, "shutdown")
-    metrics_client = MetricsClient(NullBackend())
-    metrics = MetricAssertions(metrics_client)
     web_app = build_test_web_app(
         ptb_app=ptb_app,
         secret_token=SECRET if run_mode is RunModes.WEBHOOK else None,

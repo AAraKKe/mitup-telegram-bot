@@ -12,10 +12,17 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback
-from mitup_bot.monitoring import MetricsClient, MetricUnit, NullBackend
+from mitup_bot.monitoring import MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import callbacks as cb
-from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, UpdateRequest, build_context
+from tests.helpers import (
+    AnyFloat,
+    StubMitupApp,
+    StubMitupContext,
+    UpdateRequest,
+    build_context,
+    make_test_metrics_client,
+)
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -198,7 +205,7 @@ async def test_all_handlers_emit_global_metrics(app: StubMitupApp, update: Updat
     check_state = [ConversationHandler.END, None, mock.AsyncMock(return_value=ConversationHandler.END), True]
 
     # Use a shared metrics client so we can aggregate all records across handler calls
-    shared_client = MetricsClient(NullBackend())
+    shared_client = make_test_metrics_client()
     valid_handlers = 0
 
     for wrapper in HandlersRegistry.handlers.values():

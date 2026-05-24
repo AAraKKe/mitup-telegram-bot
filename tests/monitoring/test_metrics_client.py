@@ -1,11 +1,11 @@
 """Tests for the MetricsClient and NullBackend."""
 
-from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, MetricUnit, NullBackend
-from tests.helpers.monitoring import MetricAssertions
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, MetricUnit
+from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 
 def _client() -> MetricsClient:
-    return MetricsClient(NullBackend())
+    return make_test_metrics_client()
 
 
 def test_emit_records_a_metric():
@@ -34,7 +34,7 @@ def test_emit_stores_dimensions():
 
 
 def test_emit_merges_base_dimensions():
-    client = MetricsClient(NullBackend(), base_dimensions={"EventType": "cleanup"})
+    client = make_test_metrics_client(base_dimensions={"EventType": "cleanup"})
     client.emit("MyMetric", 1, dimensions={"Extra": "dim"})
 
     dims = client.records[0].dimensions_dict
@@ -43,7 +43,7 @@ def test_emit_merges_base_dimensions():
 
 
 def test_emit_base_dimensions_do_not_override_explicit():
-    client = MetricsClient(NullBackend(), base_dimensions={"Key": "base"})
+    client = make_test_metrics_client(base_dimensions={"Key": "base"})
     client.emit("MyMetric", 1, dimensions={"Key": "explicit"})
 
     assert client.records[0].dimensions_dict["Key"] == "explicit"

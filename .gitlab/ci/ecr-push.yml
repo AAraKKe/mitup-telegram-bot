@@ -77,6 +77,15 @@ push-migrations-lambda-staging:
     DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
 
+# build-translations is inherited from push-bot-tagged-staging because the
+# Dockerfile copies compiled .mo translation files at build time.
+push-migrate-rails-lambda-staging:
+  extends: push-bot-tagged-staging
+  resource_group: migrate-rails-tagged-staging
+  variables:
+    DOCKERFILE: Dockerfile.migrate-rails
+    PUSH_DESTINATION: $MIGRATE_RAILS_IMAGE_TAG
+
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
   # We can reuse the one for staging and change the environment
@@ -98,3 +107,12 @@ push-migrations-lambda-prod:
   variables:
     DOCKERFILE: Dockerfile.migrations
     PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
+
+# build-translations is inherited from push-bot-tagged-prod because the
+# Dockerfile copies compiled .mo translation files at build time.
+push-migrate-rails-lambda-prod:
+  extends: push-bot-tagged-prod
+  resource_group: migrate-rails-tagged-prod
+  variables:
+    DOCKERFILE: Dockerfile.migrate-rails
+    PUSH_DESTINATION: $MIGRATE_RAILS_IMAGE_TAG

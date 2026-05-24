@@ -2,6 +2,17 @@ import inspect
 from typing import Any
 
 from mitup_bot.monitoring import MetricKey, MetricRecord, MetricsClient, MetricUnit
+from mitup_bot.monitoring.backend import NullBackend
+
+
+def make_test_metrics_client(base_dimensions: dict[str, str] | None = None) -> MetricsClient:
+    """Build a MetricsClient suitable for tests.
+
+    Always uses `NullBackend` (no I/O) and enables `record_history=True` so
+    `MetricAssertions` can introspect emitted records. Centralizes the test-side
+    construction so the production default (`record_history=False`) stays untouched.
+    """
+    return MetricsClient(NullBackend(), base_dimensions=base_dimensions, record_history=True)
 
 
 class MetricAssertions:

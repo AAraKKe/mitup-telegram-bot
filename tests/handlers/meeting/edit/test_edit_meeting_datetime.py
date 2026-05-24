@@ -12,13 +12,21 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_dat
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
+from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link
 from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, HandlerContext, StubMitupApp, UpdateRequest, call_handler, create_meetup
+from tests.helpers import (
+    AnyFloat,
+    HandlerContext,
+    StubMitupApp,
+    UpdateRequest,
+    call_handler,
+    create_meetup,
+    make_test_metrics_client,
+)
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -448,7 +456,7 @@ async def test_conversation_fallback_with_wrong_message_format(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     # Lets first trigger the conversation (use a separate client to not pollute the metrics we want to assert)
-    ctx = HandlerContext(update=entry_point_update(update), app=app, metrics_client=MetricsClient(NullBackend()))
+    ctx = HandlerContext(update=entry_point_update(update), app=app, metrics_client=make_test_metrics_client())
     context, _ = await call_handler(
         EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION,
         handler_context=ctx,
@@ -491,7 +499,7 @@ async def test_edit_time_can_be_cancelled(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    ctx = HandlerContext(update=entry_point_update(update), app=app, metrics_client=MetricsClient(NullBackend()))
+    ctx = HandlerContext(update=entry_point_update(update), app=app, metrics_client=make_test_metrics_client())
     context, _ = await call_handler(
         EditMeetingHandlerId.EDIT_DATETIME_CONVERSATION,
         handler_context=ctx,

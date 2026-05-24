@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from telegram import Update
 
 from mitup_bot.config import RunModes
-from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.web.telegram import TELEGRAM_SECRET_HEADER
 from tests.helpers import MetricAssertions, build_ptb_app_mock, build_test_web_app, build_web_client
 
@@ -17,16 +17,6 @@ VALID_UPDATE_PAYLOAD = {"update_id": 1}
 @pytest.fixture
 def ptb_app() -> MagicMock:
     return build_ptb_app_mock()
-
-
-@pytest.fixture
-def metrics_client() -> MetricsClient:
-    return MetricsClient(NullBackend())
-
-
-@pytest.fixture
-def metrics(metrics_client: MetricsClient) -> MetricAssertions:
-    return MetricAssertions(metrics_client)
 
 
 @pytest.fixture

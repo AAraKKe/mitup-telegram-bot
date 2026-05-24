@@ -5,7 +5,7 @@ from telegram.error import Forbidden
 
 from mitup_bot.cli import notify_meetings_started
 from mitup_bot.cli.commands.recurrent_events import EventType
-from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 from tests.helpers import (
@@ -16,12 +16,12 @@ from tests.helpers import (
     create_settings,
     create_user,
 )
-from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 
 @pytest.fixture
 def metrics_client() -> MetricsClient:
-    return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.NOTIFY_START_MEETING.value})
+    return make_test_metrics_client(base_dimensions={"EventType": EventType.NOTIFY_START_MEETING.value})
 
 
 @pytest.fixture

@@ -29,6 +29,7 @@ include:
   - dev/docker/Dockerfile
   - dev/docker/Dockerfile.ci
   - dev/docker/Dockerfile.migrations
+  - dev/docker/Dockerfile.migrate-rails
   - pyproject.toml
   # Include also gitlab yaml files related with deployments
   - .gitlab-ci.yml

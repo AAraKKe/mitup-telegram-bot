@@ -16,7 +16,7 @@ from mitup_bot.cli.commands.recurrent_events import (
 )
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
 from tests.helpers import MockApi
-from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 INTERVAL_PARAMS = [
     (EventType.USER_CLEANUP, "user_cleanup"),
@@ -81,7 +81,7 @@ SYNC_LAUNCH_PARAMS = [
 )
 async def test_launch_event_async(event_type: EventType, module_path: str):
     api = MockApi()
-    client = MetricsClient(NullBackend())
+    client = make_test_metrics_client()
 
     with patch(f"{module_path}.run", new_callable=AsyncMock) as mock_run:
         await launch_event(event_type, api, client)
@@ -95,7 +95,7 @@ async def test_launch_event_async(event_type: EventType, module_path: str):
 )
 async def test_launch_event_sync(event_type: EventType, module_path: str):
     api = MockApi()
-    client = MetricsClient(NullBackend())
+    client = make_test_metrics_client()
 
     with patch(f"{module_path}.run") as mock_run:
         await launch_event(event_type, api, client)
@@ -125,7 +125,7 @@ async def test_handle_maintainance(
     fake_api = MagicMock()
 
     def make_client(backend, base_dimensions=None):
-        client = MetricsClient(NullBackend(), base_dimensions=base_dimensions)
+        client = make_test_metrics_client(base_dimensions=base_dimensions)
         captured_client.append(client)
         return client
 
@@ -174,7 +174,7 @@ async def test_handle_maintainance_emits_telegram_api_time_metrics():
 
     def make_client(backend, base_dimensions=None):
         assert not isinstance(backend, NullBackend), "Expected a real backend, not NullBackend"
-        client = MetricsClient(NullBackend(), base_dimensions=base_dimensions)
+        client = make_test_metrics_client(base_dimensions=base_dimensions)
         captured_client.append(client)
         return client
 

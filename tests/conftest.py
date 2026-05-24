@@ -15,7 +15,7 @@ from mitup_bot.cli.cli_commands import MitupCliCommand
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
-from mitup_bot.monitoring import MetricsClient, NullBackend
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.monitoring.backend import configure_emf_backend
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from tests.helpers.constants import (
@@ -28,7 +28,7 @@ from tests.helpers.context import build_context
 from tests.helpers.conversation import ConversationTester
 from tests.helpers.fixtures import UpdateRequest, create_meetup, create_test_app, create_update
 from tests.helpers.handler_context import HandlerContext
-from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 from tests.helpers.stub_db import MockDbSession
 from tests.helpers.types import CliRunner as TypeRunner
 from tests.helpers.types import StubMitupContext
@@ -232,7 +232,7 @@ def cli() -> TypeRunner:
 
 @pytest.fixture
 def metrics_client() -> MetricsClient:
-    return MetricsClient(NullBackend())
+    return make_test_metrics_client()
 
 
 @pytest.fixture

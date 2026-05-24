@@ -1,0 +1,45 @@
+# This Dockerfile is used to generate the docker image used to run the one-shot
+# Rails → Python data migration Lambda.
+# It mirrors Dockerfile.migrations and only differs in the CMD that points at this
+# Lambda's handler.
+
+# Stage 1: Builder - Build and install package with all dependencies
+FROM public.ecr.aws/lambda/python:3.14 AS builder
+
+# Install build-time system dependencies
+RUN dnf install -y --setopt=install_weak_deps=0 \
+  libpq-devel \
+  gcc && \
+  dnf clean all && \
+  rm -rf /var/cache/yum
+
+# Set the working directory
+WORKDIR /build
+
+# Copy all necessary files for installation
+COPY pyproject.toml LICENSE alembic.ini /build/
+COPY mitup_bot /build/mitup_bot
+
+# Remove source translation files (keep only compiled .mo files from CI)
+RUN find /build/mitup_bot/locales -type f \( -name "*.po" -o -name "*.pot" \) -delete
+
+# Install all dependencies and the application in one step
+RUN pip install --no-cache-dir --target=/install .
+
+
+# Stage 2: Runtime - Create the final, lean image
+FROM public.ecr.aws/lambda/python:3.14 AS runtime
+
+# Install only runtime system dependencies
+RUN dnf install -y --setopt=install_weak_deps=0 libpq && \
+  dnf clean all && \
+  rm -rf /var/cache/yum
+
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+ENV PYTHONPATH="${LAMBDA_TASK_ROOT}"
+
+COPY --from=builder /install ${LAMBDA_TASK_ROOT}
+COPY --from=builder /build/alembic.ini ${LAMBDA_TASK_ROOT}/alembic.ini
+
+CMD ["mitup_bot.lambdas.migrate_from_rails.handler"]

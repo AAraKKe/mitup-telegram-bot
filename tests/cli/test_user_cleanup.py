@@ -5,14 +5,14 @@ from sqlalchemy.dialects import postgresql
 
 from mitup_bot.cli import user_cleanup
 from mitup_bot.cli.user_cleanup import INACTIVE_USERS_SELECT_STATEMENT
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from tests.helpers import MockDbSession, create_user
-from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 
 @pytest.fixture
 def metrics_client() -> MetricsClient:
-    return MetricsClient(NullBackend())
+    return make_test_metrics_client()
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ async def test_inactive_users_deleted(
 def test_select_query_filters_correctly(mock_session: MockDbSession):
     """Verify the SQL query selects inactive users excluding invited ones (tg_user_id != -1)."""
     api = MagicMock()
-    client = MetricsClient(NullBackend())
+    client = make_test_metrics_client()
 
     user_cleanup.run(api, client)
 
