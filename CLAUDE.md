@@ -16,7 +16,7 @@ For single-domain tasks or targeted fixes, **always delegate to the appropriate 
 
 | Work involves | Delegate to |
 |---|---|
-| Files in `mitup_bot/handlers/` or `mitup_bot/utils/callbacks.py` | `handler-expert` |
+| Handler, model, and migration work (see `handler-expert` agent for full scope) | `handler-expert` |
 | Files in `mitup_bot/views/` | `view-expert` |
 | Files in `tests/` | `test-expert` |
 | Files in `mitup_bot/lambdas/` | `lambda-expert` |
