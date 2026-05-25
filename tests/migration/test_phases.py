@@ -52,16 +52,16 @@ def _make_metrics() -> tuple[MetricsClient, MetricAssertions]:
 
 
 def _make_session_with_zero_counts() -> MagicMock:
-    """Return a Session-shaped mock whose `execute().scalar()` always returns 0.
+    """Return a Session-shaped mock whose `exec().first()` always returns 0.
 
     `verify` runs `SELECT COUNT(*)` queries against the new DB; tests don't care about
     actual rows, only that the delta metric is emitted.
     """
     session = MagicMock()
-    scalar_result = MagicMock()
-    scalar_result.scalar.return_value = 0
-    scalar_result.all.return_value = []
-    session.execute.return_value = scalar_result
+    exec_result = MagicMock()
+    exec_result.first.return_value = 0
+    exec_result.all.return_value = []
+    session.exec.return_value = exec_result
     return session
 
 

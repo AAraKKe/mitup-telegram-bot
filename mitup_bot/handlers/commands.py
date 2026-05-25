@@ -7,14 +7,14 @@ from mitup_bot.db import with_async_session
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from .command_enums import CommandsId
-from .personal_filters import UserExistFilter
+from .personal_filters import MemberUserFilter
 from .registry import HandlersRegistry
 
 
 @HandlersRegistry.register_command(
     CommandsId.START_WITH_EXISTING_USER,
     command="start",
-    filters=UserExistFilter(),
+    filters=MemberUserFilter(),
 )
 @with_async_session
 async def command_start_with_existing_user(session: Session, update: Update, context: TMitupContext):

@@ -4,9 +4,10 @@ import pytest
 
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
-from tests.helpers import MockDbSession, create_meetup
+from tests.helpers import MockDbSession, create_meetup, create_user
 
 
 def test_user_does_not_exist(mock_session: MockDbSession):
@@ -58,3 +59,33 @@ def test_own_meeting(meeting_id: int, expected_meeting: Meetup):
     meeting = user.own_meeting(meeting_id)
 
     assert expected_meeting == meeting
+
+
+def test_mark_inactive_transitions_member_to_left_and_returns_true():
+    """The metric path keys off the True return — only real transitions should flip it."""
+    user = create_user(id=1, tg_user_id=1, status=UserStatus.MEMBER)
+
+    transitioned = user.mark_inactive()
+
+    assert transitioned is True
+    assert user.status is UserStatus.LEFT
+
+
+def test_mark_inactive_on_joined_only_is_a_noop_returning_false():
+    """JOINED_ONLY users were never reachable; flipping them to LEFT would corrupt the model."""
+    user = create_user(id=2, tg_user_id=2, status=UserStatus.JOINED_ONLY)
+
+    transitioned = user.mark_inactive()
+
+    assert transitioned is False
+    assert user.status is UserStatus.JOINED_ONLY
+
+
+def test_mark_inactive_on_left_is_a_noop_returning_false():
+    """Re-running mark_inactive() on a LEFT user must not re-fire INACTIVE_USER_SET."""
+    user = create_user(id=3, tg_user_id=3, status=UserStatus.LEFT)
+
+    transitioned = user.mark_inactive()
+
+    assert transitioned is False
+    assert user.status is UserStatus.LEFT

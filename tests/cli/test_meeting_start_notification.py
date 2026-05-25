@@ -41,7 +41,7 @@ FROM joined_users
     JOIN users ON users.id = meetups.owner_id
     JOIN settings ON users.id = settings.user_id
 WHERE meetups.datetime IS NOT NULL
-    AND users.is_active = true
+    AND users.status = 'member'
     AND settings.notification = true
     AND joined_users.is_waiting_list = false
     AND joined_users.notification_sent = false

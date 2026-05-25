@@ -10,6 +10,7 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Settings, User
 from mitup_bot.models import Message as MeetupMessage
+from mitup_bot.models.users import UserStatus
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
     DEFAULT_MESSAGE_ID,
@@ -122,7 +123,7 @@ def create_user(
     tg_user_id: int = 123,
     first_name: str = "Test FirstName",
     last_name: str | None = None,
-    is_active: bool = True,
+    status: UserStatus = UserStatus.MEMBER,
     owned_meetings: list[Meetup] | None = None,
     settings: Settings | None = None,
 ) -> User:
@@ -132,7 +133,7 @@ def create_user(
         username=username,
         first_name=first_name,
         last_name=last_name,
-        is_active=is_active,
+        status=status,
         meetups=owned_meetings or [],
         settings=settings or create_settings(),
     )

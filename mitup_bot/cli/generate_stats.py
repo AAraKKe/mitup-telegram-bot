@@ -1,8 +1,9 @@
-from sqlmodel import Integer, Session, cast, distinct, func, null, select
+from sqlmodel import Integer, Session, and_, cast, distinct, func, null, select
 
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.db import with_session
 from mitup_bot.models import Meetup, Message, Settings, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 EMPTY_USERS_TABLE_ERROR = "EmptyUsersTable"
@@ -10,18 +11,25 @@ EMPTY_MEETINGS_TABLE_ERROR = "EmptyMeetingsTable"
 
 
 def users_stats(session: Session, metrics: MetricsClient):
-    active_users = func.sum(cast(User.is_active, Integer))
+    member_users = func.sum(cast(User.status == UserStatus.MEMBER, Integer))
+    left_users = func.sum(cast(User.status == UserStatus.LEFT, Integer))
+    joined_only_users = func.sum(cast(and_(User.status == UserStatus.JOINED_ONLY, User.tg_user_id != -1), Integer))
     total_users = func.count()
     invited_users = func.sum(cast(User.tg_user_id == -1, Integer))
-    result = session.exec(select(active_users, total_users, invited_users)).first()
+    result = session.exec(
+        select(  # type: ignore no overload for "exec" matches argument types
+            member_users, left_users, joined_only_users, total_users, invited_users
+        )
+    ).first()
 
     if result is None:
         metrics.emit(MetricKey.FAULT.with_prefix(EMPTY_USERS_TABLE_ERROR), 1, MetricUnit.COUNT)
         return
 
     metrics.emit(MetricKey.ACTIVE_USERS, result[0], MetricUnit.COUNT)
-    metrics.emit(MetricKey.INACTIVE_USERS, result[1] - result[0], MetricUnit.COUNT)
-    metrics.emit(MetricKey.INVITED_USERS, result[2], MetricUnit.COUNT)
+    metrics.emit(MetricKey.INACTIVE_USERS, result[1], MetricUnit.COUNT)
+    metrics.emit(MetricKey.JOINED_ONLY_USERS, result[2], MetricUnit.COUNT)
+    metrics.emit(MetricKey.INVITED_USERS, result[4], MetricUnit.COUNT)
     metrics.emit(MetricKey.FAULT.with_prefix(EMPTY_USERS_TABLE_ERROR), 0, MetricUnit.COUNT)
 
     # Get user language stats

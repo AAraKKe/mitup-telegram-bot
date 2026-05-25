@@ -4,12 +4,13 @@ import traceback
 from typing import cast
 
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import Session, and_, delete, func, literal, null, or_, select, true
+from sqlmodel import Session, and_, delete, exists, func, literal, null, or_, select, true
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.models import Meetup, Message, Settings, User
+from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 # The amount of time a meeting stays active after it has been created when there is no datetime set
@@ -93,6 +94,24 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
                 f"Stack trace: {traceback.format_exc()}"
             )
 
+    # Delete JOINED_ONLY users who have no remaining active-meeting links.
+    # These users were only ever reachable through the inline-join flow and have
+    # no further meetings to attend, so retaining them wastes space and pollutes
+    # user-count metrics.
+    stmt = delete(User).where(
+        and_(
+            User.status == UserStatus.JOINED_ONLY,
+            ~exists(
+                select(1)
+                .select_from(JoinedUsers)
+                .join(Meetup)
+                .where(and_(JoinedUsers.user_id == User.id, Meetup.active == true()))
+            ),
+        )
+    )
+    result = session.exec(stmt)
+    joined_only_deleted = result.rowcount or 0
+
     metrics.emit(MetricKey.MEETINGS_DEACTIVATED, deactivated, MetricUnit.COUNT)
     metrics.emit(
         MetricKey.MEETINGS_DEACTIVATION_FAILED,
@@ -100,6 +119,7 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
         MetricUnit.COUNT,
         properties={"failed_details": failed_details} if failed_details else None,
     )
+    metrics.emit(MetricKey.JOINED_ONLY_USERS_DELETED, joined_only_deleted, MetricUnit.COUNT)
 
     if failed:
         raise RuntimeError(

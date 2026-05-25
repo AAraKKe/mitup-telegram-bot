@@ -16,6 +16,7 @@ class Result:
     """This is a stub of the SQLAlchemy ScalarResult class. Implement any method we might need for testing"""
 
     results: tuple[SQLModel, ...] = field(default_factory=tuple)
+    rowcount: int | None = None
 
     def first(self) -> SQLModel | None:
         return self.results[0] if self.results else None

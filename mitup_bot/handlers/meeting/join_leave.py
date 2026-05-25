@@ -8,6 +8,7 @@ from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, Message, User, utils
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
@@ -65,7 +66,7 @@ def register_default_user(session: Session, update: Update) -> User:
     if update.effective_user is None:  # pragma: no cover
         raise EffectiveUserNotSet(update)
 
-    new_user = utils.user_from_update(update)
+    new_user = utils.user_from_update(update, status=UserStatus.JOINED_ONLY)
     session.add(new_user)
     session.flush()
 

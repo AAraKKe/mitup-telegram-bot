@@ -9,6 +9,7 @@ from telegram.error import Forbidden
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
@@ -28,7 +29,7 @@ def handle_forbidden(joined_link: JoinedUsers):
     try:
         yield
     except Forbidden:
-        joined_link.user.is_active = False
+        joined_link.user.mark_inactive()
         joined_link.notification_sent = True
 
 
@@ -56,7 +57,11 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
 
     for meeting in meetings:
         try:
-            participants = [link for link in meeting.joined_links if not link.is_waiting_list]
+            participants = [
+                link
+                for link in meeting.joined_links
+                if not link.is_waiting_list and link.user.status is UserStatus.MEMBER
+            ]
             notifications = [send_started_notification(link, api) for link in participants]
             results = await gather(*notifications, return_exceptions=True)
 

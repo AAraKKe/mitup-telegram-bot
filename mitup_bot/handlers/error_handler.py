@@ -24,8 +24,7 @@ SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
 
 @db.with_async_session
 async def handle_inactive_user(session: Session, context: TMitupContext, user_id: int):
-    if user := session.exec(select(User).where(User.id == user_id)).first():
-        user.is_active = False
+    if (user := session.exec(select(User).where(User.id == user_id)).first()) and user.mark_inactive():
         context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_dimensions=False)
 
 

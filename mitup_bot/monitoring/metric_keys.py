@@ -31,7 +31,7 @@ class MetricKey(CamelCaseStrEnum):
     MESSAGE_DELETED = auto()
     """This metrics is emitted when someone interacts with a message of a meeting that should not be available."""
     STALE_MEETING_MESSAGE = auto()
-    """Metric emitted when an inactive user has been detected and is_active is set to False."""
+    """Metric emitted when a MEMBER user has been detected as unreachable and transitioned to LEFT."""
     INACTIVE_USER_SET = auto()
     """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
     INACTIVE_USERS_DELETED = auto()
@@ -103,6 +103,10 @@ class MetricKey(CamelCaseStrEnum):
     MIGRATION_ARCHIVE_BYTES = auto()
     """Number of rows streamed to S3 for an archived table"""
     MIGRATION_ARCHIVE_ROWS = auto()
+    """Gauge for users with status JOINED_ONLY (joined via inline button, never DM-ed the bot)"""
+    JOINED_ONLY_USERS = auto()
+    """Number of JOINED_ONLY users deleted after all their meetings were deactivated"""
+    JOINED_ONLY_USERS_DELETED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

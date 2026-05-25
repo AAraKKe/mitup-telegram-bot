@@ -7,39 +7,31 @@ from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, timezone_api
 from mitup_bot.db import with_async_session
-from mitup_bot.exceptions import EffectiveUserNotSet
-from mitup_bot.handlers.personal_filters import UserExistFilter
+from mitup_bot.handlers.personal_filters import MemberUserFilter
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.models import Settings, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
 from .enums import ConversationRegistrationProcessState, RegistrationProcessHandlerId
+from .utils import get_or_create_onboarding_user
 
 
 @HandlersRegistry.register_command(
     RegistrationProcessHandlerId.TIMEZONE_COMMAND,
     command="start",
-    filters=~UserExistFilter(),
+    filters=~MemberUserFilter(),
     bindable=False,
 )
 @with_async_session
-async def command_start_with_new_user(session: Session, update: Update, context: TMitupContext):
+async def command_start_with_new_user(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationRegistrationProcessState:
     logging.debug("Enter into command_start_with_new_user")
 
-    if update.effective_user is None:
-        raise EffectiveUserNotSet(update)
-
-    user = User(
-        first_name=update.effective_user.first_name,
-        tg_user_id=update.effective_user.id,
-        last_name=update.effective_user.last_name,
-        username=update.effective_user.username,
-        settings=Settings(),
-    )
-    session.add(user)
+    user = get_or_create_onboarding_user(session, update)
     message = SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=user.first_name)
 
     await context.api.send_message(update=update, view=message)
@@ -52,7 +44,9 @@ async def command_start_with_new_user(session: Session, update: Update, context:
     RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT & ~filters.COMMAND, bindable=False
 )
 @with_async_session
-async def registration_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
+async def registration_timezone_text_message_handler(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationRegistrationProcessState | int:
     logging.debug("Enter into registration_timezone_text_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
 
@@ -73,6 +67,10 @@ async def registration_timezone_text_message_handler(session: Session, update: U
 
     session.add(user)
     session.flush()
+    # The end of the conversation is the only legitimate JOINED_ONLY/LEFT → MEMBER
+    # transition site. Brand-new users are already MEMBER (model default), so this
+    # is a no-op for them.
+    user.status = UserStatus.MEMBER
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.main_menu_view(lang=user.lang).with_context(message)
@@ -88,7 +86,9 @@ async def registration_timezone_text_message_handler(session: Session, update: U
     RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION, filters.LOCATION, bindable=False
 )
 @with_async_session
-async def registration_timezone_location_message_handler(session: Session, update: Update, context: TMitupContext):
+async def registration_timezone_location_message_handler(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationRegistrationProcessState | int:
     logging.debug("Enter into registration_timezone_location_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
 
@@ -109,6 +109,10 @@ async def registration_timezone_location_message_handler(session: Session, updat
 
     session.add(user)
     session.flush()
+    # The end of the conversation is the only legitimate JOINED_ONLY/LEFT → MEMBER
+    # transition site. Brand-new users are already MEMBER (model default), so this
+    # is a no-op for them.
+    user.status = UserStatus.MEMBER
 
     message = SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=user.settings.timezone)
     view = factory.main_menu_view(lang=user.lang).with_context(message)
@@ -126,7 +130,9 @@ async def registration_timezone_location_message_handler(session: Session, updat
     bindable=False,
 )
 @with_async_session
-async def registration_timezone_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
+async def registration_timezone_invalid_input_handler(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationRegistrationProcessState:
     user = guards.current_user(update, session)
     await context.api.send_message(
         update=update,

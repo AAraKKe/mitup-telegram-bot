@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from functools import partial
 from typing import cast
@@ -46,10 +47,9 @@ async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiW
     callbacks: list[Callable[[User], None]] = []
 
     def on_success_callback(_: User, meetup_to_update: Meetup):
-        print("on_success_callback", meetup_to_update.id)
-        print(f"meetup_to_update.expiration_notification_sent: {meetup_to_update.expiration_notification_sent}")
+        logging.debug(f"on_success_callback for meetup {meetup_to_update.id}")
         meetup_to_update.expiration_notification_sent = True
-        print(f"meetup_to_update.expiration_notification_sent: {meetup_to_update.expiration_notification_sent}")
+        logging.debug(f"expiration_notification_sent set to True for meetup {meetup_to_update.id}")
 
     for meetup in meetups:
         users.append(meetup.owner)

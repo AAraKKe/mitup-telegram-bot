@@ -4,6 +4,7 @@ from typing import Any, cast
 import yaml
 
 from mitup_bot.models import MeetupLocation, MessageButtons
+from mitup_bot.models.users import UserStatus
 from mitup_bot.views.mitup_view import ButtonConfig
 
 
@@ -11,9 +12,9 @@ class RowMappingError(ValueError): ...
 
 
 # Rails (and the new bot) use this sentinel for invited contacts that never registered.
-# Each invitation creates its own User row with tg_user_id=-1 + is_active=False, so we
-# migrate them just like regular users — the JoinedUsers + invitations phases need the
-# row in the audit table to graft `invited_by_id` later.
+# Each invitation creates its own User row with tg_user_id=-1, so we migrate them just
+# like regular users — the JoinedUsers + invitations phases need the row in the audit
+# table to graft `invited_by_id` later.
 PHANTOM_TG_USER_ID = -1
 
 
@@ -28,7 +29,7 @@ def map_user_and_settings(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str
         "first_name": row["first_name"],
         "last_name": row.get("last_name"),
         "username": row.get("username"),
-        "is_active": coerce_bool(row.get("active"), default=False),
+        "status": map_status(tg_user_id, row.get("active")),
         "created_time": created_at,
         "updated_time": updated_at,
     }
@@ -203,6 +204,19 @@ def to_float(value: object) -> float | None:
         except ValueError:
             return None
     return None
+
+
+def map_status(tg_user_id: object, active: object) -> UserStatus:
+    """Translate Rails `(tg_user_id, active)` into the new `UserStatus` enum.
+
+    Sentinel rows (tg_user_id == -1) are invitee placeholders that never engaged with
+    the bot, so JOINED_ONLY captures them more accurately than the legacy
+    `active=False` they carry in Rails. Real users follow active → MEMBER, !active →
+    LEFT (matches the issue #163 backfill rule).
+    """
+    if tg_user_id == PHANTOM_TG_USER_ID:
+        return UserStatus.JOINED_ONLY
+    return UserStatus.MEMBER if coerce_bool(active, default=False) else UserStatus.LEFT
 
 
 def coerce_bool(value: object, *, default: bool) -> bool:

@@ -210,3 +210,36 @@ async def test_multiple_meetings_deactivated(
         value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
+
+
+# ---------------------------------------------------------------------------
+# JOINED_ONLY cleanup metric — fires even when no JOINED_ONLY users exist
+# ---------------------------------------------------------------------------
+
+
+async def test_joined_only_users_deleted_metric_emitted_when_no_orphans(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """`JOINED_ONLY_USERS_DELETED` is always emitted, even with no candidates to delete.
+
+    The metric is a counter, not a conditional emission — it gets the count of users
+    deleted in this run, including zero. Operators rely on the gauge being present.
+    """
+    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, ())
+
+    await inactive_meetings.run(api, metrics_client)
+    await metrics_client.flush()
+
+    metrics.assert_emitted(
+        name=MetricKey.JOINED_ONLY_USERS_DELETED,
+        value=0,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+
+
+# ---------------------------------------------------------------------------
+# JOINED_ONLY cleanup — DB integration tests live in
+# tests/models/db_behavior/test_joined_only_cleanup.py because the cleanup
+# query relies on `NOT EXISTS … active=true` semantics that the mock session
+# cannot replay. Keep this file mock-only.
+# ---------------------------------------------------------------------------

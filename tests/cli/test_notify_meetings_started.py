@@ -5,6 +5,7 @@ from telegram.error import Forbidden
 
 from mitup_bot.cli import notify_meetings_started
 from mitup_bot.cli.commands.recurrent_events import EventType
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
@@ -191,6 +192,55 @@ async def test_waiting_list_participants_not_notified(
 
 
 # ---------------------------------------------------------------------------
+# JOINED_ONLY participants are skipped at iteration time
+# ---------------------------------------------------------------------------
+
+
+async def test_joined_only_participants_not_notified(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+):
+    """JOINED_ONLY users cannot be DM-ed; they must be filtered before send_message_to_user.
+
+    Were they included, every send would raise Forbidden — the iteration-time filter avoids that.
+    """
+    meeting = create_meetup(id=1, title="Demo meetup")
+    member_participant = create_user(
+        id=1, tg_user_id=1, status=UserStatus.MEMBER, settings=create_settings(id=1, language=lang)
+    )
+    joined_only_participant = create_user(
+        id=2, tg_user_id=2, status=UserStatus.JOINED_ONLY, settings=create_settings(id=2, language=lang)
+    )
+    create_joined_link(user=member_participant, meetup=meeting, id=1, is_waiting_list=False)
+    create_joined_link(user=joined_only_participant, meetup=meeting, id=2, is_waiting_list=False)
+
+    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
+
+    await notify_meetings_started.run(api, metrics_client)
+    await metrics_client.flush()
+
+    # Only the MEMBER participant gets a notification — the JOINED_ONLY user is filtered out.
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+
+    # The JOINED_ONLY user was never targeted.
+    send_mock = api.mock_mapping.get("send_message_to_user")
+    if send_mock is not None:
+        for call in send_mock.call_args_list:
+            assert call.kwargs.get("user") is not joined_only_participant
+
+    # The JOINED_ONLY user's status is unchanged — handle_forbidden never ran for them.
+    assert joined_only_participant.status is UserStatus.JOINED_ONLY
+
+
+# ---------------------------------------------------------------------------
 # Forbidden → user marked inactive, no re-raise
 # ---------------------------------------------------------------------------
 
@@ -214,9 +264,9 @@ async def test_forbidden_marks_user_inactive_and_does_not_raise(
     await metrics_client.flush()
 
     # User whose send raised Forbidden is marked inactive via handle_forbidden
-    assert participant_a.is_active is False
+    assert participant_a.status is UserStatus.LEFT
     # Second user should remain active
-    assert participant_b.is_active is True
+    assert participant_b.status is UserStatus.MEMBER
 
     # The meeting's started flag is still set
     assert meeting.started_notification_sent is True

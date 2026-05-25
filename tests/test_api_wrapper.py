@@ -13,10 +13,13 @@ from mitup_bot.api_wrapper import TELEMGRAM_API_TIME_PREFIX, BotAdapter, Telegra
 from mitup_bot.exceptions import AnswerInlineQueryError, InactiveUserInteraction, NoMessageAvailable
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
+from mitup_bot.models.users import UserStatus
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.fixture
@@ -25,9 +28,18 @@ def bot() -> AsyncMock:
 
 
 @pytest.fixture
-def adapter(bot: AsyncMock) -> BotAdapter:
+def api_metrics_client() -> MetricsClient:
+    return make_test_metrics_client()
 
-    return BotAdapter(bot=bot, metrics=make_test_metrics_client())
+
+@pytest.fixture
+def adapter(bot: AsyncMock, api_metrics_client: MetricsClient) -> BotAdapter:
+    return BotAdapter(bot=bot, metrics=api_metrics_client)
+
+
+@pytest.fixture
+def api_metrics(api_metrics_client: MetricsClient) -> MetricAssertions:
+    return MetricAssertions(api_metrics_client)
 
 
 @pytest.fixture
@@ -239,7 +251,10 @@ async def test_send_messages_to_users_on_success_called_for_each(telegram_api: T
     on_success_2.assert_called_once_with(user2)
 
 
-async def test_send_messages_to_users_inactive_user_marked_inactive(telegram_api: TelegramApi, bot: AsyncMock):
+async def test_send_messages_to_users_inactive_user_marked_inactive(
+    telegram_api: TelegramApi, bot: AsyncMock, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    """MEMBER user blocking the bot must transition to LEFT and emit INACTIVE_USER_SET."""
     user1 = create_user(id=1, tg_user_id=100)
     user2 = create_user(id=2, tg_user_id=200)
     bot.send_message.side_effect = [
@@ -248,9 +263,33 @@ async def test_send_messages_to_users_inactive_user_marked_inactive(telegram_api
     ]
 
     await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"])
+    await api_metrics_client.flush()
 
-    assert user1.is_active is False
-    assert user2.is_active is True
+    assert user1.status is UserStatus.LEFT
+    assert user2.status is UserStatus.MEMBER
+    # Only the MEMBER → LEFT transition emits the metric.
+    api_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)
+
+
+async def test_send_messages_to_users_joined_only_user_not_transitioned(
+    telegram_api: TelegramApi, bot: AsyncMock, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    """A JOINED_ONLY user that Forbidden-fails must NOT transition and must NOT emit the metric.
+
+    In practice the query filters prevent this from happening in the notify CLIs, but
+    `send_messages_to_users` is general-purpose. The `mark_inactive` no-op gate is the
+    only thing keeping the INACTIVE_USER_SET counter honest if a JOINED_ONLY ever sneaks
+    through.
+    """
+    joined_only_user = create_user(id=1, tg_user_id=100, status=UserStatus.JOINED_ONLY)
+    bot.send_message.side_effect = Forbidden("Forbidden: bot was blocked by the user")
+
+    await telegram_api.send_messages_to_users([joined_only_user], ["msg1"])
+    await api_metrics_client.flush()
+
+    # Status stays JOINED_ONLY — mark_inactive() returns False.
+    assert joined_only_user.status is UserStatus.JOINED_ONLY
+    api_metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
 
 
 async def test_send_messages_to_users_general_error_calls_on_error(telegram_api: TelegramApi, bot: AsyncMock):

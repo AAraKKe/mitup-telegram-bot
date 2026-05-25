@@ -6,6 +6,7 @@ from mitup_bot.cli import meetups_cleanup
 from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.cli.meetups_cleanup import MEETUPS_DELETION_FAILED
 from mitup_bot.exceptions import InactiveUserInteraction
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
@@ -208,7 +209,7 @@ async def test_delete_partial_failure_inactive_user(
     await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
     await metrics_client.flush()
 
-    assert owner_fail.is_active is False
+    assert owner_fail.status is UserStatus.LEFT
 
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,

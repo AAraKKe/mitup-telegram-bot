@@ -260,9 +260,9 @@ class TelegramApi:
             if isinstance(result, InactiveUserInteraction):
                 # Handle inactive user different for other errors
                 # we do not want to error out but mark the user as inactive
-                logging.info(f"Marking user {user.tg_user_id} as inactive")
-                user.is_active = False
-                self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
+                if user.mark_inactive():
+                    logging.info(f"Marking user {user.tg_user_id} as inactive")
+                    self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
                 continue
 
             # Handle Callbacks

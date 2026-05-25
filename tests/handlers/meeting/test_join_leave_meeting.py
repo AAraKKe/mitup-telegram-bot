@@ -4,6 +4,7 @@ from telegram import Update
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.utils.messages import MeetingMessages
 from mitup_bot.views import MitupView
@@ -196,7 +197,7 @@ async def test_non_existent_user_joins_meeting(
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # Assert user has been registered
-    user = utils.user_from_update(handler_context.update)
+    user = utils.user_from_update(handler_context.update, status=UserStatus.JOINED_ONLY)
     mock_session.assert_object_added(user)
 
     # Message has been updated
@@ -254,7 +255,7 @@ async def test_non_existing_user_leaves_meeting(
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # Assert user has been registered
-    user = utils.user_from_update(handler_context.update)
+    user = utils.user_from_update(handler_context.update, status=UserStatus.JOINED_ONLY)
     mock_session.assert_object_added(user)
 
     # Message has been updated

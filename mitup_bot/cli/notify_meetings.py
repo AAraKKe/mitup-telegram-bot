@@ -11,6 +11,7 @@ from telegram.error import Forbidden
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
@@ -23,7 +24,7 @@ USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
     .where(
         and_(
             Meetup.datetime != null(),
-            User.is_active == true(),
+            User.status == UserStatus.MEMBER,
             Settings.notification == true(),
             JoinedUsers.is_waiting_list == false(),
             JoinedUsers.notification_sent == false(),
@@ -37,12 +38,6 @@ USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
 
 
 def joined_links_to_notify(session: Session) -> Sequence[JoinedUsers]:
-    """
-    Returns all users to notify:
-    - The user is not in the waiting list
-    - The meeting has a datetime set
-    - The meeting start time is between now and now + notification_time on the user settings
-    """
     return session.exec(USERS_TO_NOTIFY_STATEMENT).all()
 
 
@@ -51,7 +46,7 @@ def handle_forbidden(link: JoinedUsers):
     try:
         yield
     except Forbidden:
-        link.user.is_active = False
+        link.user.mark_inactive()
         # If we cannot send notification lets avoid doing it again
         link.notification_sent = True
 
@@ -73,17 +68,13 @@ async def send_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
 async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Send a notification to all users that have joined a meeting that is about to start"""
     joined_links = joined_links_to_notify(session)
-    deactivated_users = 0
     failed = 0
     sent = 0
 
     metrics.emit(MetricKey.NOTIFICATIONS_TO_SEND, len(joined_links), MetricUnit.COUNT)
 
-    notifications = []
-
-    for joined_link in joined_links:
-        notifications.append(send_notification(joined_link, api))
-
+    pre_send_statuses = {link.user.id: link.user.status for link in joined_links}
+    notifications = [send_notification(joined_link, api) for joined_link in joined_links]
     results = await gather(*notifications, return_exceptions=True)
 
     for joined_link, result in zip(joined_links, results, strict=False):
@@ -97,7 +88,12 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
         else:
             sent += 1
 
-    deactivated_users = sum(not link.user.is_active for link in joined_links)
+    deactivated_user_ids = {
+        link.user.id
+        for link in joined_links
+        if pre_send_statuses[link.user.id] is UserStatus.MEMBER and link.user.status is UserStatus.LEFT
+    }
+    deactivated_users = len(deactivated_user_ids)
 
     metrics.emit(MetricKey.NOTIFICATIONS_SENT, sent, MetricUnit.COUNT)
     metrics.emit(MetricKey.NOTIFICATIONS_FAILED, failed, MetricUnit.COUNT)

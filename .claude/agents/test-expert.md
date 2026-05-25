@@ -6,6 +6,7 @@ model: opus
 skills:
   - test-conventions
   - coding-standards
+  - type-checking
   - guards
   - api-wrapper
 ---
@@ -84,6 +85,7 @@ hatch run dev:test-hook -- --tb=no
 - **Mirror source paths** — `mitup_bot/handlers/x.py` → `tests/handlers/test_x.py`.
 - **Parametrize aggressively** — use `@pytest.mark.parametrize`. For complex setups, use private callable factories (e.g., `def _scenario_a(owner: User)`) passed as parameters.
 - **Failure mode centralization** — do not test common guards (User not found, Meeting not owned, malformed callback data) in individual handler test files. Register them centrally in `tests/handlers/test_failure_modes.py`. See the `references/failure-modes.md` reference for details.
+- **Type annotations** — never write `-> None` on test functions (it's implicit; see `coding-standards`). Every `# ty: ignore[rule-name]` you add must include a GitHub issue URL on the same line (see `type-checking`); convention-reviewer and CI's `check-ty-ignores` job both enforce this.
 
 ## Critical pitfalls
 

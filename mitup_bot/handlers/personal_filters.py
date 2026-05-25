@@ -1,17 +1,30 @@
+from sqlmodel import select
 from telegram import Update
 from telegram.ext.filters import UpdateFilter
 
 from mitup_bot import db
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 
 
-class UserExistFilter(UpdateFilter):
+class MemberUserFilter(UpdateFilter):
+    """Match updates whose effective user has a MEMBER `User` row.
+
+    Gates `/start` between the existing-member flow and the new/joined-only
+    re-onboarding flow. JOINED_ONLY and LEFT users intentionally fall through
+    to the re-onboarding handler.
+    """
+
     def filter(self, update: Update) -> bool:
-        if update.effective_user is not None:
-            with db.begin() as session:
-                return User.by_tg_user_id(session, update.effective_user.id) is not None
+        if update.effective_user is None:
+            return False
 
-        return False
+        with db.begin() as session:
+            statement = select(User).where(
+                User.tg_user_id == update.effective_user.id,
+                User.status == UserStatus.MEMBER,
+            )
+            return session.exec(statement).first() is not None
 
 
 class PositiveNumberFilter(UpdateFilter):

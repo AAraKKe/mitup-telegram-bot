@@ -171,7 +171,9 @@ In both cases, the Google Maps lookups are stateless queries that cannot be tied
 
 ## How long we keep your data
 
-**Your user record** persists while you're an active Mitup user. When Telegram tells us you've blocked the bot (or when a message we send to you fails), we set a flag on your account. A cleanup job runs periodically and deletes all flagged users, which cascades to your settings, owned meetings, and RSVPs.
+**Your user record** persists while you're an active Mitup user. If you were once a member and then block the bot (or if a message we send to you fails), we set a flag on your account. A cleanup job runs periodically and deletes all flagged users, which cascades to your settings, owned meetings, and RSVPs.
+
+If you joined a meeting via someone else's group message without ever opening the bot directly, your record exists only for the lifetime of those meetings and is removed when they end.
 
 **Meetings you own:** once a meeting's end time plus your configured timeout has passed, the meeting is marked inactive. (If a meeting has no datetime set, it's marked inactive one year after creation.) When a meeting goes inactive, invited-only users (people who were added to the meeting but don't have a Mitup account themselves) are deleted, and so are the meeting's messages.
 

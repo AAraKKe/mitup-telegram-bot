@@ -7,6 +7,7 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import MeetingMessages
 from mitup_bot.utils import callbacks as cb
@@ -203,7 +204,7 @@ async def callback_query_confirm_user_invitation(session: Session, update: Updat
             )
             return ConversationHandler.END
 
-        invited_user = User(first_name=invited_user_name, tg_user_id=-1, is_active=False)
+        invited_user = User(first_name=invited_user_name, tg_user_id=-1, status=UserStatus.JOINED_ONLY)
         joined_link = meeting.add_participant(invited_user, invited_by=user)
 
         if joined_link is None:  # pragma: no cover

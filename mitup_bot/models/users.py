@@ -1,7 +1,8 @@
 import datetime as dt
+from enum import StrEnum
 from typing import TYPE_CHECKING, Literal, Self, overload
 
-from sqlalchemy import Column, DateTime, FetchedValue
+from sqlalchemy import Column, DateTime, FetchedValue, String
 from sqlmodel import Field, Relationship, Session, SQLModel, select
 from telegram.ext import ExtBot
 
@@ -13,6 +14,19 @@ from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from . import JoinedUsers, Meetup, Settings
+
+
+class UserStatus(StrEnum):
+    """Lifecycle state of a `User` row.
+
+    MEMBER users have engaged via DM and are reachable; JOINED_ONLY users joined a
+    meeting via inline button and are not reachable until they `/start`; LEFT users
+    were MEMBERs who blocked or deleted the bot.
+    """
+
+    MEMBER = "member"
+    JOINED_ONLY = "joined_only"
+    LEFT = "left"
 
 
 class User(BaseModel, SQLModel, table=True):
@@ -27,7 +41,10 @@ class User(BaseModel, SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
     )
-    is_active: bool = True
+    status: UserStatus = Field(
+        default=UserStatus.MEMBER,
+        sa_column=Column(String(16), nullable=False, server_default=UserStatus.MEMBER.value),
+    )
     last_name: str | None = None
     username: str | None = None
     settings: Settings = Relationship(
@@ -79,6 +96,18 @@ class User(BaseModel, SQLModel, table=True):
     @property
     def lang(self) -> str:
         return self.settings.language
+
+    def mark_inactive(self) -> bool:
+        """Transition a MEMBER user to LEFT.
+
+        Returns `True` iff a real transition happened. JOINED_ONLY and LEFT
+        users are no-ops so callers (e.g. the `INACTIVE_USER_SET` metric path)
+        only react on genuine member departures.
+        """
+        if self.status is UserStatus.MEMBER:
+            self.status = UserStatus.LEFT
+            return True
+        return False
 
     def joined_meeting(self, meeting_id: int) -> JoinedUsers | None:
         joined_links = [joined for joined in self.joined_links if joined.meetup_id == meeting_id]

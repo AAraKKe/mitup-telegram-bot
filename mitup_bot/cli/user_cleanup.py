@@ -1,15 +1,21 @@
-from sqlmodel import Session, and_, delete, false, select
+from sqlmodel import Session, and_, delete, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 INACTIVE_USERS_SELECT_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
-    and_(User.is_active == false(), User.tg_user_id != -1)
+    and_(User.status == UserStatus.LEFT, User.tg_user_id != -1)
 )
-"""Selects IDs of inactive users who are not invited (outside) users. Invited users have tg_user_id == -1."""
+"""Selects IDs of LEFT users who are not invited (outside) users.
+
+JOINED_ONLY users are intentionally excluded — they are cleaned up exclusively
+by `inactive_meetings` once none of their meetings remain active.
+Invited users (tg_user_id == -1) are handled by `inactive_meetings` too.
+"""
 
 
 @db.with_session

@@ -15,6 +15,7 @@ from mitup_bot.migration.mappers import (
     parse_buttons,
     parse_location,
 )
+from mitup_bot.models.users import UserStatus
 
 
 def test_map_user_and_settings_copies_core_fields_and_splits_settings():
@@ -48,7 +49,7 @@ def test_map_user_and_settings_copies_core_fields_and_splits_settings():
         "first_name": "Ada",
         "last_name": "Lovelace",
         "username": "ada",
-        "is_active": True,
+        "status": UserStatus.MEMBER,
         "created_time": created,
         "updated_time": updated,
     }
@@ -68,22 +69,30 @@ def test_map_user_and_settings_copies_core_fields_and_splits_settings():
     assert settings["updated_time"] == updated
 
 
-def test_map_user_migrates_phantom_as_inactive_invited_placeholder():
-    # Phantom rows (tg_user_id == -1) are the same convention the new bot uses for invited
-    # people who never registered. We migrate them like any other user; downstream phases
-    # rely on the audit-table mapping to attach their joined_users + invitations rows.
+def test_map_user_migrates_phantom_as_joined_only_invited_placeholder():
+    # Phantom rows (tg_user_id == -1) are invitee placeholders that never engaged with
+    # the bot. JOINED_ONLY captures that more accurately than the legacy `active=False`
+    # they carry in Rails. Downstream phases rely on the audit-table mapping to attach
+    # their joined_users + invitations rows.
     row = {"id": 1, "tg_user_id": PHANTOM_TG_USER_ID, "first_name": "ghost", "active": False}
     user, settings = map_user_and_settings(row)
     assert user["tg_user_id"] == PHANTOM_TG_USER_ID
     assert user["first_name"] == "ghost"
-    assert user["is_active"] is False
+    assert user["status"] is UserStatus.JOINED_ONLY
     assert settings["language"] == "en"
+
+
+def test_map_user_inactive_real_user_becomes_left():
+    row = {"id": 8, "tg_user_id": 100, "first_name": "Gone", "active": False}
+    user, _ = map_user_and_settings(row)
+    assert user["status"] is UserStatus.LEFT
 
 
 def test_map_user_defaults_missing_fields():
     row = {"id": 7, "tg_user_id": 99, "first_name": "Bare"}
     user, settings = map_user_and_settings(row)
-    assert user["is_active"] is False
+    # Missing `active` defaults to False → LEFT for real users.
+    assert user["status"] is UserStatus.LEFT
     assert settings["language"] == "en"
     assert settings["timezone"] == "UTC"
     assert settings["notification"] is True

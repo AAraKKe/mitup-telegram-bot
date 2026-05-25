@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from mitup_bot.migration.archive import ArchiveWriter
@@ -440,7 +440,7 @@ def verify(
     )
     for rails_table, model in pairs:
         rails_count = reader.count(rails_table)
-        new_count = session.execute(text(f"SELECT COUNT(*) FROM {model.__tablename__}")).scalar() or 0  # noqa: S608
+        new_count = session.exec(select(func.count()).select_from(model)).first() or 0
         delta = rails_count - int(new_count)
         deltas[rails_table] = delta
         metrics.emit(
@@ -451,7 +451,7 @@ def verify(
         )
     # joined_users delta uses the sum of both Rails join tables.
     rails_joins = reader.count("user_join_meetups") + reader.count("user_waiting_lists")
-    new_joins = session.execute(text("SELECT COUNT(*) FROM joined_users")).scalar() or 0
+    new_joins = session.exec(select(func.count()).select_from(JoinedUsers)).first() or 0
     deltas["joined_users"] = rails_joins - int(new_joins)
     metrics.emit(
         MetricKey.MIGRATION_VERIFICATION_DELTA,

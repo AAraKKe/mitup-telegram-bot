@@ -5,8 +5,9 @@ from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.handlers import error_handler
 from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
-from tests.helpers import MockDbSession, StubMitupContext
+from tests.helpers import MockDbSession, StubMitupContext, create_user
 from tests.helpers.monitoring import MetricAssertions
 
 
@@ -37,15 +38,50 @@ async def test_handle_inactive_user_not_found(
 async def test_handle_inactive_user_error(
     context: StubMitupContext, user: User, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    assert user.is_active
+    """MEMBER → LEFT transition: the metric MUST fire."""
+    assert user.status is UserStatus.MEMBER
 
     mock_session.add_object(user)
 
     await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
     await context.metrics.flush()
 
-    assert not user.is_active
+    assert user.status is UserStatus.LEFT
     metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_handle_inactive_user_joined_only_is_noop(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """JOINED_ONLY users can never be DM-ed, so the error path must NOT transition them or emit the metric.
+
+    Without this guard, every reminder send to a JOINED_ONLY user would mark them LEFT and
+    eventually delete them via user_cleanup, defeating the entire purpose of the new enum.
+    """
+    user = create_user(id=10, tg_user_id=500, status=UserStatus.JOINED_ONLY)
+    mock_session.add_object(user)
+
+    await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
+    await context.metrics.flush()
+
+    assert user.status is UserStatus.JOINED_ONLY
+    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_handle_inactive_user_left_is_noop(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """Re-hitting an already-LEFT user must not double-emit the INACTIVE_USER_SET metric."""
+    user = create_user(id=11, tg_user_id=501, status=UserStatus.LEFT)
+    mock_session.add_object(user)
+
+    await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
+    await context.metrics.flush()
+
+    assert user.status is UserStatus.LEFT
+    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 

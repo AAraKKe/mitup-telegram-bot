@@ -3,6 +3,7 @@ from typing import cast
 from unittest import mock
 
 import pytest
+from sqlmodel import select
 from telegram import Update
 from telegram.ext import CommandHandler, ConversationHandler
 from telegram.ext.filters import CAPTION, PHOTO
@@ -23,6 +24,7 @@ from mitup_bot.handlers.registration_process.enums import (
     RegistrationProcessHandlerId,
 )
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import SettingsMessages
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
@@ -186,7 +188,14 @@ async def test_start_inline_deep_link_sends_create_meeting_view(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
+    user_with_settings.status = UserStatus.MEMBER
     mock_session.add_user(user_with_settings)
+    # MemberUserFilter issues a distinct lookup (tg_user_id AND status == MEMBER); register it too.
+    member_lookup = select(User).where(
+        User.tg_user_id == user_with_settings.tg_user_id,
+        User.status == UserStatus.MEMBER,
+    )
+    mock_session.add_objects_with_statement(member_lookup, (user_with_settings,))
 
     context, result = await call_handler(CommandsId.START_WITH_EXISTING_USER, handler_context=handler_context)
 
