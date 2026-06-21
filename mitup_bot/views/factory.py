@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime as dt
-from math import ceil
 from typing import TYPE_CHECKING
 
 from mitup_bot.callback_data import CallbackData, DateCallbackData
@@ -10,7 +9,7 @@ from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import Languages, SettingsMessages
-from mitup_bot.views import ButtonConfig, CalendarKeyboard, Keyboard, MitupView, PaginatedMitupView
+from mitup_bot.views import ButtonConfig, CalendarKeyboard, GridMitupView, Keyboard, MitupView
 
 if TYPE_CHECKING:
     from mitup_bot.models import Meetup, User
@@ -146,20 +145,17 @@ def meeting_set_language_view(*, meeting: Meetup) -> MitupView:
     ).with_back_button(ButtonMessages.EDIT, meeting.user_language, cb.EDIT_MEETING.with_id(meeting.db_id))
 
 
-def set_language_view(lang: str, message: str | FormattedText, callback_data: CallbackData) -> PaginatedMitupView:
-    n_languages = len(SUPPORTED_LANGUAGES)
-    n_columns = min(n_languages, 3)
+def set_language_view(lang: str, message: str | FormattedText, callback_data: CallbackData) -> GridMitupView:
+    n_columns = min(len(SUPPORTED_LANGUAGES), 3)
     buttons = [
         ButtonConfig(text=LANGUAGE_BUTTONS[lang_code].get(lang=lang), callback_data=callback_data.with_id(idx))
         for idx, lang_code in enumerate(SUPPORTED_LANGUAGES)
     ]
 
-    return PaginatedMitupView(
+    return GridMitupView(
         description=message,
         buttons=buttons,
         column_size=n_columns,
-        row_size=ceil(n_languages / n_columns),
-        page_number=1,
     )
 
 

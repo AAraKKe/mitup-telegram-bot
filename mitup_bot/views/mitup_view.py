@@ -177,6 +177,30 @@ class PaginatedViewPosition(Enum):
     LAST = auto()
 
 
+def arrange_in_grid(buttons: list[ButtonConfig], column_size: int) -> list[ButtonRow]:
+    return [list(row) for row in batched(buttons, column_size, strict=False)]
+
+
+class GridMitupView(MitupView):
+    """
+    A non-paginated view that arranges a flat button list into a grid.
+
+    Use this instead of `PaginatedMitupView` when all buttons fit on a single
+    screen and pagination is never needed — e.g. a fixed-size language picker.
+    The number of rows grows with the button count; only the column count is
+    specified by the caller.
+    """
+
+    def __init__(
+        self,
+        *,
+        description: str | FormattedText,
+        buttons: list[ButtonConfig],
+        column_size: int = 2,
+    ):
+        super().__init__(description, arrange_in_grid(buttons, column_size))
+
+
 class PaginatedMitupView(MitupView):
     """
     A view that displays buttons in a paginated format.
@@ -234,7 +258,7 @@ class PaginatedMitupView(MitupView):
         last_button = min(len(self.buttons), first_button + self.page_size)
 
         button_in_page = self.buttons[first_button:last_button]
-        keyboard = [list(row) for row in batched(button_in_page, self.column_size, strict=False)]
+        keyboard = arrange_in_grid(button_in_page, self.column_size)
         if self.position is not PaginatedViewPosition.UNIQUE:
             if navigation_callback_data is None:
                 raise ValueError("navigation_callback_data is required when there are more than one page")

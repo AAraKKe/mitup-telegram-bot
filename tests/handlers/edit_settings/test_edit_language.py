@@ -1,5 +1,3 @@
-from math import ceil
-
 import pytest
 from telegram import Update
 
@@ -9,7 +7,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
-from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
+from mitup_bot.views import ButtonConfig, GridMitupView, factory
 from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler
 from tests.helpers.monitoring import MetricAssertions
 
@@ -31,15 +29,13 @@ async def test_edit_language(
     mock_session.add_object(user_with_settings, "tg_user_id")
     context, _ = await call_handler(EditSettingsHandlerId.LANGUAGE_CALLBACK, handler_context=handler_context)
 
-    expected_view = PaginatedMitupView(
+    expected_view = GridMitupView(
         description=SettingsMessages.SELECT_LANGUAGE.get(
             lang=user_with_settings.lang,
             language=factory.LANGUAGE_BUTTONS[user_with_settings.lang].get(lang=user_with_settings.lang),
         ),
         buttons=language_buttons(user_with_settings.lang),
-        page_number=1,
-        row_size=ceil(len(SUPPORTED_LANGUAGES) / 3),
-        column_size=3,
+        column_size=min(len(SUPPORTED_LANGUAGES), 3),
     ).with_context_menu(
         [
             [
@@ -74,15 +70,13 @@ async def test_set_language(
     context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
 
     expected_view = (
-        PaginatedMitupView(
+        GridMitupView(
             description=SettingsMessages.SELECT_LANGUAGE.get(
                 lang=language,
                 language=factory.LANGUAGE_BUTTONS[language].get(lang=language),
             ),
             buttons=language_buttons(language),
-            page_number=1,
-            row_size=ceil(len(SUPPORTED_LANGUAGES) / 3),
-            column_size=3,
+            column_size=min(len(SUPPORTED_LANGUAGES), 3),
         )
         .with_context_menu(
             [
