@@ -92,7 +92,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
-        logging.warning(f"The user {user.db_id} tried to set a location {location} that is not correct. Trying again")
+        logging.warning(f"The user {user.db_id} sent a location that could not be resolved to a timezone. Trying again")
 
         view = MitupView(
             description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang),

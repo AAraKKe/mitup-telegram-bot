@@ -169,7 +169,7 @@ async def test_edit_timezone_with_location_update_correctly(
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)
-async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
+async def test_edit_timezone_location_log_excludes_coordinates(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
@@ -185,10 +185,12 @@ async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
 
     result = await settings_timezone_location_message_handler(update, context)
 
+    # Issue #161: the warning must not leak the user's GPS coordinates.
+    assert "123.6" not in caplog.text  # latitude
+    assert "103.5" not in caplog.text  # longitude
+    assert "tried to set a location" not in caplog.text  # old leaking phrase
     assert (
-        f"The user {user_with_settings.id} tried to set a location "
-        f"{update.effective_message.location} that is not correct. "
-        "Trying again" in caplog.text
+        f"The user {user_with_settings.db_id} sent a location that could not be resolved to a timezone" in caplog.text
     )
 
     view = MitupView(

@@ -1,3 +1,4 @@
+import logging
 from unittest import mock
 
 import pytest
@@ -127,7 +128,9 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
     user_with_settings: User,
     mock_session: MockDbSession,
     get_location_from_api: mock.MagicMock,
+    caplog: pytest.LogCaptureFixture,
 ):
+    caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
     get_location_from_api.return_value = None
 
@@ -138,6 +141,14 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
         RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
+
+    # Issue #161: the warning must not leak the user's GPS coordinates.
+    assert "123.6" not in caplog.text  # latitude
+    assert "103.5" not in caplog.text  # longitude
+    assert "tried to set a location" not in caplog.text  # old leaking phrase
+    assert (
+        f"The user {user_with_settings.db_id} sent a location that could not be resolved to a timezone" in caplog.text
+    )
 
 
 # ---------------------------------------------------------------------------
