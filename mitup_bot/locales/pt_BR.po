@@ -781,6 +781,9 @@ msgstr "Tem certeza de que deseja limpar a hora de início e término?"
 msgid "MeetingEditWhenMessages.CLEAR_DECLINED"
 msgstr "Os horários não serão limpos"
 
+msgid "MeetingEditDateTimeMessages.START_IN_PAST"
+msgstr "O horário de início deve estar no futuro."
+
 msgid "MeetingEditDateTimeMessages.END_CLEARED_BY_START"
 msgstr "A nova hora de início é posterior à hora de término, portanto a hora de término foi limpa."
 

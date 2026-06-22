@@ -20,7 +20,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
-from .utils import DateTimeEntityFilter, cleanup_states, safe_anchor_date
+from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date
 
 # This module manages the start-time editing sub-flow for a meeting.
 #
@@ -40,6 +40,16 @@ from .utils import DateTimeEntityFilter, cleanup_states, safe_anchor_date
 
 
 # --- Shared helpers ---
+
+
+def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -> str | None:
+    """Return an error message string if start_dt is in the past, or None if valid.
+
+    Symmetric with ``validate_end_datetime`` in edit_meeting_duration.py.
+    """
+    if is_in_past(start_dt, meeting):
+        return MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=lang)
+    return None
 
 
 def prepend_end_cleared_notice(*, lang: str, base_message: str | FormattedText) -> FormattedText:
@@ -248,7 +258,12 @@ async def callback_query_back_to_edit_datetime(
 async def handle_first_datetime_set(
     session: Session, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
-    meeting.datetime = dt.datetime.combine(cb_date, dt.time(0, 0, tzinfo=meeting.timezone)).astimezone(dt.UTC)
+    proposed_start = dt.datetime.combine(cb_date, dt.time(0, 0, tzinfo=meeting.timezone)).astimezone(dt.UTC)
+    if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
+        await context.api.answer_callback_query(update, text=error, show_alert=True)
+        return ConversationMeetingState.EDIT_DATE
+
+    meeting.datetime = proposed_start
     end_cleared = meeting.enforce_datetime_ordering()
     session.add(meeting)
     session.flush()
@@ -298,11 +313,16 @@ async def handle_first_datetime_set(
 async def handle_datetime_update(
     session: Session, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
-    meeting.datetime = dt.datetime.combine(
+    proposed_start = dt.datetime.combine(
         dt.date(cb_date.year, cb_date.month, cb_date.day),
         cast(dt.datetime, meeting.datetime).time(),
         tzinfo=dt.UTC,
     )
+    if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
+        await context.api.answer_callback_query(update, text=error, show_alert=True)
+        return ConversationMeetingState.EDIT_DATE
+
+    meeting.datetime = proposed_start
     end_cleared = meeting.enforce_datetime_ordering()
     session.add(meeting)
     session.flush()
@@ -396,7 +416,9 @@ async def callback_query_set_meeting_time(
     bindable=False,
 )
 @with_async_session
-async def date_time_entity_message_handler(session: Session, update: Update, context: TMitupContext) -> int:
+async def date_time_entity_message_handler(
+    session: Session, update: Update, context: TMitupContext
+) -> ConversationMeetingState | int:
     logging.debug("Enter into date_time_entity_message_handler")
 
     message = guards.message(update)
@@ -413,6 +435,10 @@ async def date_time_entity_message_handler(session: Session, update: Update, con
 
         if meeting is None:
             return ConversationHandler.END
+
+        if error := validate_start_datetime(unix_time, meeting, current_user.lang):
+            await context.api.send_message(update=update, view=error)
+            return ConversationMeetingState.EDIT_DATETIME
 
         meeting.datetime = unix_time
         end_cleared = meeting.enforce_datetime_ordering()
@@ -470,7 +496,13 @@ async def set_time_message_handler(
             return ConversationHandler.END
 
         date_to_set = current_user.datetime_in_tz(meeting.datetime or dt.datetime.now(dt.UTC)).date()
-        meeting.datetime = dt.datetime.combine(date_to_set, user_time).astimezone(dt.UTC)
+        proposed_start = dt.datetime.combine(date_to_set, user_time).astimezone(dt.UTC)
+
+        if error := validate_start_datetime(proposed_start, meeting, current_user.lang):
+            await context.api.send_message(update=update, view=error)
+            return ConversationMeetingState.EDIT_TIME
+
+        meeting.datetime = proposed_start
         end_cleared = meeting.enforce_datetime_ordering()
 
         session.add(meeting)

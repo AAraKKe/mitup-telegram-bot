@@ -155,6 +155,40 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="datetime_wrong_message",
     ),
+    # DATE_TIME_ENTITY_MESSAGE — requires a message with a date_time entity and a stored meeting id
+    Context(
+        handler_id=EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        update_request=UpdateRequest(
+            message_text="Tomorrow at noon",
+            entities=[
+                MessageEntity(
+                    type=MessageEntity.DATE_TIME,
+                    offset=0,
+                    length=16,
+                    unix_time=dt.datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt.UTC),
+                )
+            ],
+        ),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="date_time_entity_message",
+        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        update_request=UpdateRequest(
+            message_text="Tomorrow at noon",
+            entities=[
+                MessageEntity(
+                    type=MessageEntity.DATE_TIME,
+                    offset=0,
+                    length=16,
+                    unix_time=dt.datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt.UTC),
+                )
+            ],
+        ),
+        error_modes={ErrorMode.MISSING_USER_DATA},
+        id="date_time_entity_message",
+    ),
     Context(
         handler_id=MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
         update_request=UpdateRequest(message_text="My Meeting"),
@@ -551,6 +585,31 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_TIME),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="duration_end_time_malformed",
+    ),
+    # Duration end-datetime entry / back navigation (both keyed on EDIT_MEETING_END_DATE_TIME)
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="duration_end_entry",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="duration_end_entry_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="duration_back_to_end_datetime",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="duration_back_to_end_datetime_malformed",
     ),
     # Duration end sub-flow message handlers
     Context(

@@ -1,6 +1,7 @@
 import datetime as dt
 
 import pytest
+from freezegun import freeze_time
 from telegram import Chat, Message, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
@@ -57,14 +58,18 @@ def owner_with_meeting(
 
 @pytest.fixture
 def start_datetime() -> dt.datetime:
-    """A fixed UTC start datetime in the past to use in tests."""
-    return dt.datetime(2024, 6, 15, 10, 0, tzinfo=dt.UTC)
+    """A fixed UTC start datetime in the future to use in tests.
+
+    The now-relative past validation (validate_end_datetime) compares against
+    wall-clock now, so tests freeze time before 2026-06-15 and use future dates.
+    """
+    return dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC)
 
 
 @pytest.fixture
 def end_datetime() -> dt.datetime:
     """A fixed UTC end datetime 90 minutes after start_datetime()."""
-    return dt.datetime(2024, 6, 15, 11, 30, tzinfo=dt.UTC)
+    return dt.datetime(2026, 6, 15, 11, 30, tzinfo=dt.UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +171,7 @@ async def test_cancel_during_duration_input_returns_to_view(
     [UpdateRequest(message_text="09:00")],  # 09:00 UTC — before the 10:00 UTC start
     indirect=True,
 )
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
 async def test_end_time_before_start_shows_error_and_stays_in_state(
     mock_session: MockDbSession,
     update: Update,
@@ -176,11 +182,12 @@ async def test_end_time_before_start_shows_error_and_stays_in_state(
 
     The handler derives the end date from meeting.end_datetime (if set). We pre-populate
     end_datetime with a placeholder on the same day as start so the time combination
-    2024-06-15 09:00 UTC falls before start (2024-06-15 10:00 UTC).
+    2026-06-15 09:00 UTC falls before start (2026-06-15 10:00 UTC). Now is frozen to 08:00 so
+    09:00 is still in the future — this isolates the END_BEFORE_START path from END_IN_PAST.
     """
-    # start = 2024-06-15 10:00 UTC; end placeholder is at midnight same day (will be replaced by user time input)
-    start = start_datetime  # 2024-06-15 10:00 UTC
-    end_placeholder = dt.datetime(2024, 6, 15, 0, 0, tzinfo=dt.UTC)  # same day, midnight
+    # start = 2026-06-15 10:00 UTC; end placeholder is at midnight same day (will be replaced by user time input)
+    start = start_datetime  # 2026-06-15 10:00 UTC
+    end_placeholder = dt.datetime(2026, 6, 15, 0, 0, tzinfo=dt.UTC)  # same day, midnight
 
     user, meeting = owner_with_meeting(
         meeting_id=1,
@@ -215,12 +222,15 @@ async def test_end_time_before_start_shows_error_and_stays_in_state(
     [UpdateRequest(message_text="11:30")],  # 90 min after start (10:00 UTC)
     indirect=True,
 )
+@freeze_time("2026-06-15 09:00:00", tz_offset=0)
 async def test_valid_end_time_saves_end_datetime_and_exits_conversation(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
+    # No end_datetime, so the handler derives the date from now (frozen 2026-06-15 09:00);
+    # 11:30 lands after both now and start (10:00) → valid.
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
@@ -248,9 +258,10 @@ async def test_valid_end_time_saves_end_datetime_and_exits_conversation(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2024, 6, 15)))],
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 15)))],
     indirect=True,
 )
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
 async def test_set_end_date_first_time_defaults_to_2359(
     mock_session: MockDbSession,
     update: Update,
@@ -267,7 +278,7 @@ async def test_set_end_date_first_time_defaults_to_2359(
         handler_context=handler_context,
     )
 
-    # end_datetime should be set (23:59 in user TZ on 2024-06-15)
+    # end_datetime should be set (23:59 in user TZ on 2026-06-15)
     assert meeting.end_datetime is not None
     assert state == ConversationMeetingState.EDIT_END_TIME
     mock_session.assert_added(meeting)
@@ -276,10 +287,13 @@ async def test_set_end_date_first_time_defaults_to_2359(
 
 @pytest.mark.parametrize(
     "update",
-    # Pick a date BEFORE the start date (2024-06-15) so 23:59 on Jun 14 < start at 10:00 on Jun 15
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2024, 6, 14)))],
+    # Pick a date BEFORE the start date (2026-06-15) so 23:59 on Jun 14 < start at 10:00 on Jun 15
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
     indirect=True,
 )
+# Freeze before Jun 14 so the Jun 14 23:59 end is still in the future — isolates END_BEFORE_START
+# from the END_IN_PAST check, which would otherwise take precedence.
+@freeze_time("2026-06-13 12:00:00", tz_offset=0)
 async def test_set_end_date_before_start_shows_alert(
     mock_session: MockDbSession,
     update: Update,
@@ -307,9 +321,10 @@ async def test_set_end_date_before_start_shows_alert(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2024, 6, 16)))],
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 16)))],
     indirect=True,
 )
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
 async def test_update_existing_end_date_valid(
     mock_session: MockDbSession,
     update: Update,
@@ -329,7 +344,7 @@ async def test_update_existing_end_date_valid(
 
     # Date changed to Jun 16, time kept from original end_datetime (11:30 UTC)
     assert meeting.end_datetime is not None
-    assert meeting.end_datetime.date() == dt.date(2024, 6, 16)
+    assert meeting.end_datetime.date() == dt.date(2026, 6, 16)
     assert state == ConversationMeetingState.EDIT_END_DATETIME
     mock_session.assert_flushed()
 
@@ -337,9 +352,11 @@ async def test_update_existing_end_date_valid(
 @pytest.mark.parametrize(
     "update",
     # Move end date to Jun 14 — with existing end time 11:30 UTC, that's before start (Jun 15 10:00)
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2024, 6, 14)))],
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
     indirect=True,
 )
+# Freeze before Jun 14 so the Jun 14 11:30 end is still future — isolates END_BEFORE_START.
+@freeze_time("2026-06-13 12:00:00", tz_offset=0)
 async def test_update_existing_end_date_before_start_shows_alert(
     mock_session: MockDbSession,
     update: Update,
@@ -372,12 +389,17 @@ async def test_update_existing_end_date_before_start_shows_alert(
 # ---------------------------------------------------------------------------
 
 
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
 async def test_end_datetime_entity_before_start_shows_error_and_stays_in_state(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """A datetime entity whose unix_time is before the start datetime triggers a validation error."""
+    """A datetime entity whose unix_time is before the start datetime triggers a validation error.
+
+    The entity time (start - 1s = 2026-06-15 09:59:59) is still in the future relative to the
+    frozen now (08:00), so this isolates END_BEFORE_START from the END_IN_PAST check.
+    """
     # The entity unix_time is 1 second before the start datetime
     before_start = start_datetime - dt.timedelta(seconds=1)
     handler_context.update = date_time_entity_update(before_start)
@@ -462,6 +484,7 @@ async def test_end_datetime_entry_callback_meeting_not_accessible_returns_none(
 # ---------------------------------------------------------------------------
 
 
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
 async def test_end_datetime_entity_valid_saves_and_sends(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
@@ -501,9 +524,10 @@ async def test_end_datetime_entity_valid_saves_and_sends(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2024, 6, 16)))],
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 16)))],
     indirect=True,
 )
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
 async def test_update_existing_end_date_goes_back_to_entry_using_edit_message(
     mock_session: MockDbSession,
     update: Update,
@@ -800,3 +824,195 @@ async def test_duration_end_time_wrong_input_shows_error_and_stays_in_state(
     assert state == ConversationMeetingState.EDIT_END_TIME
     context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang))
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+
+
+# ---------------------------------------------------------------------------
+# validate_end_datetime — now-relative past validation (END_IN_PAST)
+#
+# "now" is meeting.owner.now_in_tz().astimezone(UTC); the owner here uses UTC
+# (Settings(id=1)), so frozen UTC time equals the comparison "now". The past
+# check (<=) runs before the END_BEFORE_START check, so it takes precedence.
+# ---------------------------------------------------------------------------
+
+
+FROZEN_NOW = "2026-06-15 12:00:00"  # UTC
+# A start in the future, so the only reason to reject the end is that it is in the past.
+FUTURE_START = dt.datetime(2026, 6, 15, 20, 0, tzinfo=dt.UTC)
+
+
+@freeze_time(FROZEN_NOW, tz_offset=0)
+async def test_end_datetime_entity_in_past_shows_error_and_stays_in_state(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """A datetime entity whose end is in the past returns END_IN_PAST and stays in EDIT_END_DATETIME."""
+    # End is one hour before now (2026-06-15 11:00 UTC) but after a far-past start, so only the
+    # past check applies.
+    past_end = dt.datetime(2026, 6, 15, 11, 0, tzinfo=dt.UTC)
+    handler_context.update = date_time_entity_update(past_end)
+
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC))
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+    )
+
+    assert meeting.end_datetime is None  # not saved
+    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    context.api.assert_send_message_called(
+        handler_context.update, MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    # 10:00 UTC end on the frozen day — before now (12:00), so in the past.
+    [UpdateRequest(message_text="10:00")],
+    indirect=True,
+)
+@freeze_time(FROZEN_NOW, tz_offset=0)
+async def test_end_time_in_past_shows_error_and_stays_in_state(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """An HH:MM end time that resolves to the past returns END_IN_PAST and stays in EDIT_END_TIME."""
+    # Existing end_datetime carries the date used when combining the typed time, so 10:00 lands on
+    # the frozen day (2026-06-15 10:00 UTC), two hours before now.
+    user, meeting = owner_with_meeting(
+        meeting_id=1,
+        meeting_datetime=dt.datetime(2026, 6, 15, 8, 0, tzinfo=dt.UTC),
+        end_datetime=dt.datetime(2026, 6, 15, 9, 0, tzinfo=dt.UTC),
+    )
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+    end_before = meeting.end_datetime
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+    )
+
+    assert meeting.end_datetime == end_before  # unchanged
+    assert state == ConversationMeetingState.EDIT_END_TIME
+    context.api.assert_send_message_called(update, MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang))
+
+
+@pytest.mark.parametrize(
+    "update",
+    # First end-date selection on a past day → 23:59 on that day is still before now.
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
+    indirect=True,
+)
+@freeze_time(FROZEN_NOW, tz_offset=0)
+async def test_set_end_date_in_past_shows_alert(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """Selecting a first end date in the past (23:59 < now) shows the END_IN_PAST alert."""
+    # Owner is UTC, so 23:59 on Jun 14 is 2026-06-14 23:59 UTC, before now (Jun 15 12:00).
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=dt.datetime(2026, 6, 13, 10, 0, tzinfo=dt.UTC))
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        handler_context=handler_context,
+    )
+
+    assert meeting.end_datetime is None
+    assert state == ConversationMeetingState.EDIT_END_DATE
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang),
+        show_alert=True,
+    )
+
+
+@freeze_time(FROZEN_NOW, tz_offset=0)
+async def test_end_in_past_takes_precedence_over_before_start(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """When the end is BOTH in the past AND before start, END_IN_PAST is reported, not END_BEFORE_START."""
+    # End (Jun 15 11:00 UTC) is before start (Jun 15 20:00, future) AND before now (Jun 15 12:00).
+    past_and_before_start = dt.datetime(2026, 6, 15, 11, 0, tzinfo=dt.UTC)
+    handler_context.update = date_time_entity_update(past_and_before_start)
+
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=FUTURE_START)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+    )
+
+    assert meeting.end_datetime is None
+    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    # END_IN_PAST wins over END_BEFORE_START because the past check runs first.
+    context.api.assert_send_message_called(
+        handler_context.update, MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
+    )
+
+
+@freeze_time(FROZEN_NOW, tz_offset=0)
+async def test_end_exactly_now_is_rejected(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """An end datetime exactly equal to now is rejected (comparison is <=, not <)."""
+    exactly_now = dt.datetime(2026, 6, 15, 12, 0, tzinfo=dt.UTC)  # == frozen now
+    handler_context.update = date_time_entity_update(exactly_now)
+
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=dt.datetime(2026, 6, 15, 8, 0, tzinfo=dt.UTC))
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+    )
+
+    assert meeting.end_datetime is None
+    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    context.api.assert_send_message_called(
+        handler_context.update, MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
+    )
+
+
+@freeze_time(FROZEN_NOW, tz_offset=0)
+async def test_past_end_with_naive_stored_start_does_not_raise(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """A naive stored meeting.datetime must not raise TypeError when comparing against the aware end."""
+    # Stored start is naive (no tzinfo) — validate_end_datetime normalises it to aware UTC.
+    naive_start = dt.datetime(2026, 6, 15, 8, 0)  # naive
+    assert naive_start.tzinfo is None
+    past_end = dt.datetime(2026, 6, 15, 11, 0, tzinfo=dt.UTC)  # before now (12:00)
+    handler_context.update = date_time_entity_update(past_end)
+
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=naive_start)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+    )
+
+    assert meeting.end_datetime is None
+    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    context.api.assert_send_message_called(
+        handler_context.update, MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
+    )

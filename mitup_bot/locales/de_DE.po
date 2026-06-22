@@ -784,5 +784,8 @@ msgstr "Die Uhrzeiten werden nicht gelöscht."
 msgid "MeetingEditDateTimeMessages.END_CLEARED_BY_START"
 msgstr "Die neue Startzeit liegt nach der Endzeit, daher wurde die Endzeit gelöscht."
 
+msgid "MeetingEditDateTimeMessages.START_IN_PAST"
+msgstr "Die Startzeit muss in der Zukunft liegen."
+
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "Die Startzeit wurde gelöscht. Stelle sie erneut fest, bevor du eine Endzeit wählst."

@@ -543,6 +543,7 @@ class MeetingEditDateTimeMessages(MessageBase):
         "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
     )
     END_CLEARED_BY_START = "The new start time is after the end time, so the end time has been cleared."
+    START_IN_PAST = "The start time must be in the future."
 
 
 # --- Meeting edit: when (start/end times sub-screen) ---

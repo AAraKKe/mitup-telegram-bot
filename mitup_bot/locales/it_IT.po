@@ -470,6 +470,9 @@ msgstr "Inviami l'ora dell'incontro nel formato <i>HH:MM</i>"
 msgid "MeetingEditDateTimeMessages.TIME_SUCCESS"
 msgstr "Ora impostata a ${datetime}"
 
+msgid "MeetingEditDateTimeMessages.START_IN_PAST"
+msgstr "L'orario di inizio deve essere nel futuro."
+
 msgid "CommonMessages.TIME_INVALID_FORMAT"
 msgstr "Non sono sicuro di capire quell'ora 🤔...\n\nPer favore, invia l'ora nel formato <i>HH:MM</i>, ad esempio <i>15:30</i> o <i>09:15</i>"
 

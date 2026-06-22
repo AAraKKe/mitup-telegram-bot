@@ -4,7 +4,22 @@ from telegram import Message, MessageEntity
 from telegram.ext import filters
 
 from mitup_bot.custom_context import ContextId
+from mitup_bot.models import Meetup
 from mitup_bot.utils.mitup_types import TMitupContext
+
+
+def to_utc(value: dt.datetime) -> dt.datetime:
+    """Normalise a possibly-naive datetime to aware UTC.
+
+    Meeting datetimes are stored as UTC but may be persisted naive, so a naive value is
+    tagged as UTC rather than reinterpreted; mirrors ``Meetup.enforce_datetime_ordering``.
+    """
+    return value.replace(tzinfo=dt.UTC) if value.tzinfo is None else value
+
+
+def is_in_past(candidate: dt.datetime, meeting: Meetup) -> bool:
+    """True if candidate is at or before the meeting owner's current time (both compared in UTC)."""
+    return to_utc(candidate) <= meeting.owner.now_in_tz().astimezone(dt.UTC)
 
 
 class DateTimeEntityFilter(filters.MessageFilter):

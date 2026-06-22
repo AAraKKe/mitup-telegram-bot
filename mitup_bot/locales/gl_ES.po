@@ -748,6 +748,9 @@ msgstr "A quedada comeza en <b>${start_datetime}</b>. A quedada actualmente term
 msgid "MeetingEditDurationMessages.END_BEFORE_START"
 msgstr "A hora de remate debe ser posterior á hora de inicio."
 
+msgid "MeetingEditDateTimeMessages.START_IN_PAST"
+msgstr "A hora de inicio debe estar no futuro."
+
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "A hora de remate debe estar no futuro."
 

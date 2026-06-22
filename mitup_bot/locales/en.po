@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-06-22 08:20\n"
+"PO-Revision-Date: 2026-06-22 09:01\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -565,6 +565,9 @@ msgstr "Sorry, I was expecting the new time for your meeting. Would you like to 
 
 msgid "MeetingEditDateTimeMessages.END_CLEARED_BY_START"
 msgstr "The new start time is after the end time, so the end time has been cleared."
+
+msgid "MeetingEditDateTimeMessages.START_IN_PAST"
+msgstr "The start time must be in the future."
 
 msgid "MeetingEditWhenMessages.DESCRIPTION_NO_TIMES"
 msgstr "Set when your meeting happens. You can set a start time, an end time, or both. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."

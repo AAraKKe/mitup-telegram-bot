@@ -8,7 +8,7 @@ from telegram import User as TgUser
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as _build_entry_view
+from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as build_entry_view
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
@@ -198,7 +198,7 @@ async def test_set_meeting_date_callback(
         assert response == ConversationMeetingState.EDIT_DATETIME
         today = meeting.owner.now_in_tz().date()
         dt_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), expected_datetime, "DT")
-        expected_view = _build_entry_view(meeting, meeting.lang, today).with_context(
+        expected_view = build_entry_view(meeting, meeting.lang, today).with_context(
             MeetingEditDateTimeMessages.DATE_UPDATED.get(
                 lang=meeting.lang,
                 datetime=render(t"{dt_entity}"),
@@ -322,8 +322,14 @@ async def test_edit_meeting_time_callback(
     [
         (
             UpdateRequest(message_text="20:20"),
-            create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
-            dt.datetime(2024, 12, 21, 19, 20, tzinfo=dt.UTC),
+            # Future meeting date (after the frozen now) so the new start passes the past-datetime check.
+            create_meetup(
+                id=10,
+                title="TestMeeting",
+                description="Description",
+                datetime=dt.datetime(2025, 1, 15, 12, 0, tzinfo=dt.UTC),
+            ),
+            dt.datetime(2025, 1, 15, 19, 20, tzinfo=dt.UTC),
         ),
         (
             UpdateRequest(message_text="20:20"),
@@ -804,7 +810,7 @@ async def test_back_to_edit_datetime(
     assert response == ConversationMeetingState.EDIT_DATETIME
     # Use meeting.owner.now_in_tz().date() to get the same FakeDate that the handler produces under freeze_time
     today = meeting.owner.now_in_tz().date()
-    context.api.assert_edit_message_called(update, _build_entry_view(meeting, user_with_settings.lang, today))
+    context.api.assert_edit_message_called(update, build_entry_view(meeting, user_with_settings.lang, today))
 
 
 # --- enforce_datetime_ordering: setting start past end clears end_datetime ---
@@ -826,7 +832,14 @@ async def test_set_time_past_end_datetime_clears_end(
     handler_context: HandlerContext,
 ):
     """When new start time is after end time, enforce_datetime_ordering clears end_datetime."""
-    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
+    # Future meeting date (after the frozen now) so the new start passes the past-datetime check;
+    # the handler keeps this date and applies the typed 20:20.
+    meeting = create_meetup(
+        id=10,
+        title="TestMeeting",
+        description="Description",
+        datetime=dt.datetime(2025, 1, 15, 12, 0, tzinfo=dt.UTC),
+    )
     meeting.end_datetime = END_DATETIME_FOR_ORDERING
     meeting.lock_on_start = True
     user_with_settings.meetups.append(meeting)
@@ -841,8 +854,8 @@ async def test_set_time_past_end_datetime_clears_end(
 
     assert response == ConversationHandler.END
 
-    # The user sets 20:20 in Europe/Madrid (UTC+1), stored as 19:20 UTC on 2025-01-01 (freeze_time date).
-    # 2025-01-01 19:20 UTC > 2024-12-21 18:00 UTC, so end_datetime is cleared.
+    # The user sets 20:20 in Europe/Madrid (UTC+1) on the meeting's date, stored as 2025-01-15 19:20 UTC.
+    # 2025-01-15 19:20 UTC > 2024-12-21 18:00 UTC end, so end_datetime is cleared.
     assert meeting.end_datetime is None
     assert meeting.lock_on_start is False
     mock_session.assert_added(meeting)
@@ -1019,3 +1032,230 @@ async def test_datetime_entity_past_end_datetime_clears_end(
         meeting.when_view.with_context(expected_context_message),
     )
     context.api.assert_update_meeting_messages_called(mock_session, meeting)
+
+
+# ---------------------------------------------------------------------------
+# validate_start_datetime — now-relative past validation (START_IN_PAST)
+#
+# "now" is meeting.owner.now_in_tz().astimezone(UTC). The owner uses Europe/Madrid
+# (user_with_settings), so tests freeze a fixed UTC instant and use past/future dates
+# relative to it. Comparison is <=, so exactly "now" is rejected.
+# ---------------------------------------------------------------------------
+
+
+# Frozen in winter so Europe/Madrid is a clean UTC+1 (no DST ambiguity).
+START_PAST_FROZEN_NOW = "2025-01-15 12:00:00"  # UTC
+# A date well before the frozen now, used for past-start scenarios.
+PAST_DATE = dt.date(2025, 1, 10)
+
+
+def datetime_entity_request(unix_time: int) -> UpdateRequest:
+    """Build an UpdateRequest carrying a single date_time entity at *unix_time*."""
+    text = "Some moment"
+    return UpdateRequest(
+        message_text=text,
+        entities=[
+            MessageEntity(
+                type=MessageEntity.DATE_TIME,
+                offset=0,
+                length=len(text),
+                unix_time=dt.datetime.fromtimestamp(unix_time, tz=dt.UTC),
+            )
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(PAST_DATE))],
+    indirect=True,
+)
+@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
+async def test_set_date_first_time_in_past_shows_alert_and_stays_in_edit_date(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """handle_first_datetime_set: a past first date shows the START_IN_PAST alert and stays in EDIT_DATE."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    assert meeting.datetime is None
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATE
+    assert meeting.datetime is None  # not saved
+    mock_session.assert_not_flushed()
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=meeting.lang),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(PAST_DATE))],
+    indirect=True,
+)
+@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
+async def test_set_date_update_to_past_shows_alert_and_stays_in_edit_date(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """handle_datetime_update: moving an existing datetime onto a past date shows the alert and stays in EDIT_DATE."""
+    # Existing future datetime; the click keeps its 10:00 time but moves it to the past PAST_DATE.
+    existing = dt.datetime(2025, 1, 20, 10, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATE
+    assert meeting.datetime == existing  # unchanged
+    mock_session.assert_not_flushed()
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=meeting.lang),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(PAST_DATE))],
+    indirect=True,
+)
+@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
+async def test_set_date_update_to_past_with_naive_stored_datetime_does_not_raise(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """handle_datetime_update tolerates a naive stored meeting.datetime when validating the past start."""
+    naive_existing = dt.datetime(2025, 1, 20, 10, 0)  # naive
+    assert naive_existing.tzinfo is None
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=naive_existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATE
+    assert meeting.datetime == naive_existing  # unchanged, no TypeError raised
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=meeting.lang),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    # date_time entity at 2025-01-10 10:00 UTC — before the frozen now (2025-01-15).
+    [datetime_entity_request(int(dt.datetime(2025, 1, 10, 10, 0, tzinfo=dt.UTC).timestamp()))],
+    indirect=True,
+)
+@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
+async def test_date_time_entity_in_past_sends_error_and_stays_in_edit_datetime(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """date_time_entity_message_handler: a past entity sends START_IN_PAST and stays in EDIT_DATETIME."""
+    existing = dt.datetime(2025, 1, 20, 10, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+    assert meeting.datetime == existing  # unchanged
+    mock_session.assert_not_flushed()
+    context.api.assert_send_message_called(
+        update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    # Entity exactly at the frozen now — rejected because the comparison is <=.
+    [datetime_entity_request(int(dt.datetime(2025, 1, 15, 12, 0, tzinfo=dt.UTC).timestamp()))],
+    indirect=True,
+)
+@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
+async def test_date_time_entity_exactly_now_is_rejected(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """A start datetime exactly equal to now is rejected (comparison is <=, not <)."""
+    existing = dt.datetime(2025, 1, 20, 10, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+    assert meeting.datetime == existing  # unchanged
+    context.api.assert_send_message_called(
+        update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(message_text="10:00")],  # 10:00 Madrid on a past meeting date → past start
+    indirect=True,
+)
+@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
+async def test_set_time_in_past_sends_error_and_stays_in_edit_time(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """set_time_message_handler: a time on a past meeting date sends START_IN_PAST and stays in EDIT_TIME."""
+    # Meeting date is in the past (PAST_DATE); the handler keeps that date and applies 10:00 Madrid,
+    # producing a past start (2025-01-10 09:00 UTC) relative to the frozen now.
+    past_meeting = dt.datetime(2025, 1, 10, 8, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=past_meeting)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    assert meeting.datetime == past_meeting  # unchanged
+    mock_session.assert_not_flushed()
+    context.api.assert_send_message_called(
+        update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
+    )

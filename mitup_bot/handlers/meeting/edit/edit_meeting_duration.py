@@ -20,7 +20,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
-from .utils import DateTimeEntityFilter, cleanup_states, safe_anchor_date
+from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date, to_utc
 
 # This module manages the end-time editing sub-flow for a meeting.
 #
@@ -190,9 +190,16 @@ async def callback_query_end_datetime_entry(
 
 
 def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> str | None:
-    """Return an error message string if end_dt is invalid, or None if valid."""
+    """Return an error message string if end_dt is invalid, or None if valid.
+
+    Checks the past constraint before the ordering constraint: a past end time is
+    the more fundamental problem (the meeting would be auto-deactivated), so it takes
+    precedence in the error shown.
+    """
     assert meeting.datetime is not None
-    if end_dt <= meeting.datetime:
+    if is_in_past(end_dt, meeting):
+        return MeetingEditDurationMessages.END_IN_PAST.get_text(lang=lang)
+    if to_utc(end_dt) <= to_utc(meeting.datetime):
         return MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=lang)
     return None
 
