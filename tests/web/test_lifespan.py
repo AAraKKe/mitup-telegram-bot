@@ -92,8 +92,10 @@ async def test_webhook_lifespan_set_webhook_args(metrics_client: MetricsClient):
     assert kwargs["url"] == WEBHOOK_URL
     assert kwargs["secret_token"] == SECRET
     assert kwargs["max_connections"] == MAX_CONNECTIONS
-    # allowed_updates must NOT be passed — letting Telegram default avoids accidentally
-    # opting in to update types the bot does not handle.
+    # allowed_updates must NOT be passed — omitting it preserves Telegram's previous
+    # subscription, whose default set already includes my_chat_member (needed to detect
+    # users blocking the bot). Passing an explicit list could silently drop update types
+    # the bot relies on, such as inline queries.
     assert "allowed_updates" not in kwargs
 
 

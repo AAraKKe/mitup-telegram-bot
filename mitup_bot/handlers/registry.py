@@ -13,6 +13,7 @@ from telegram.ext import (
     Application,
     BaseHandler,
     CallbackQueryHandler,
+    ChatMemberHandler,
     CommandHandler,
     ConversationHandler,
     InlineQueryHandler,
@@ -322,6 +323,43 @@ class HandlersRegistry:
             bindable=bindable,
             group=group,
         )
+
+    @classmethod
+    def register_chat_member(
+        cls,
+        handler_id: HandlerId,
+        bindable: bool = True,
+        group: int = 0,
+        block: bool = True,
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
+        """
+        Decorator used to register a callback for a ChatMemberHandler restricted to ``my_chat_member`` updates.
+
+        ``my_chat_member`` updates arrive whenever the bot's own membership status changes, e.g. when a user
+        blocks or unblocks the bot in a private chat.
+
+        For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.chatmemberhandler.html
+        """  # noqa: E501
+
+        def wrapper(
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
+            if handler_id in cls.handlers:
+                raise HandlerRegisteredError(handler_id)
+
+            cls.handlers[handler_id] = HandlerWrapper(
+                handler=ChatMemberHandler(
+                    callback=callback_with_metrics(handler_id, "ChatMember", callback, cls.env),
+                    chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER,
+                    block=block,
+                ),
+                bindable=bindable,
+                group=group,
+            )
+
+            return callback
+
+        return wrapper
 
     @classmethod
     def register_inline_handler(

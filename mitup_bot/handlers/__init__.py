@@ -11,6 +11,7 @@ __all__ = (
     "registration_process",
     "meeting",
     "main_menu",
+    "chat_member",
     "stale_cancel",
 )
 
@@ -23,6 +24,9 @@ from .personal_filters import MemberUserFilter, PositiveNumberFilter
 
 # Then subpackages with different handlers registered
 from . import registration_process, edit_settings, inline_query, meeting, main_menu
+
+# Flat handler modules registered directly on the registry
+from . import chat_member
 
 # Global catch-all handlers (must be imported after conversation handlers so
 # PTB conversation handlers claim matching callbacks first)
