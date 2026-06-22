@@ -4,7 +4,7 @@ from telegram import Update
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
     HandlerContext,
@@ -24,7 +24,7 @@ def inactive_meeting(user_with_settings: User):
 
 
 def expected_past_meeting_view(meeting, user: User) -> MitupView:
-    description = MeetingMessages.PAST_MEETING_DESCRIPTION.get(lang=user.lang)
+    description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
     return MitupView(
         meeting.message,
         [
@@ -68,7 +68,7 @@ async def test_delete_past_meeting_shows_confirmation(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
-            message=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID),
         ),
@@ -115,7 +115,7 @@ async def test_confirm_delete_past_meeting_deletes_and_redirects_to_past_meeting
     context.api.assert_send_message_called(
         update,
         MitupView(
-            description=MeetingMessages.DELETE_MEETING_SUCCESS.get(lang=user_with_settings.lang),
+            description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
             keyboard=[
                 [
                     ButtonConfig(

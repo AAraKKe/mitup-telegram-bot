@@ -7,9 +7,8 @@ from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.main_menu.show_active_meetings import callback_query_show_meetings
 from mitup_bot.models import User
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
@@ -57,7 +56,7 @@ async def test_show_meetings_use_correct_view(
     ]
 
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.ACTIVE_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.ACTIVE_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=user_meetings_buttons,
         page_number=1,
         column_size=2,
@@ -90,7 +89,7 @@ async def test_show_meetings_without_meetings_to_show_works(
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.NO_MEETINGS_FOUND.get(
+        message=MeetingListMessages.ACTIVE_EMPTY.get(
             lang=user_with_settings.lang,
             new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang),
         ),
@@ -138,7 +137,7 @@ async def test_show_meetings_skips_meetings_with_blank_titles(
         )
     ]
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.ACTIVE_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.ACTIVE_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=expected_buttons,
         page_number=1,
         navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
@@ -178,7 +177,7 @@ async def test_show_meetings_falls_back_to_no_meetings_view_when_all_titles_are_
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.NO_MEETINGS_FOUND.get(
+        message=MeetingListMessages.ACTIVE_EMPTY.get(
             lang=user_with_settings.lang,
             new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang),
         ),

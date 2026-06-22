@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-04-12 08:23\n"
+"PO-Revision-Date: 2026-06-22 08:20\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -203,58 +203,94 @@ msgstr "⌛ Meeting duration"
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivate meeting"
 
-msgid "Messages.DEFAULT_MAIN_MENU_DESCRIPTION"
+msgid "MainMenuMessages.DESCRIPTION"
 msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
 
-msgid "Messages.DEFAULT_SETTINGS_DESCRIPTION"
-msgstr "Configure MitUp."
+msgid "MeetingListMessages.ACTIVE_DESCRIPTION"
+msgstr "These are all your active meetings."
 
-msgid "SettingsMessages.SET_TIMEZONE_SETTINGS"
-msgstr "Your timezone is set to <b>${timezone}</b>. \nSend me the name of your city or your location to set your timezone or touch in <b>Cancel</b> to go back."
+msgid "MeetingListMessages.ACTIVE_EMPTY"
+msgstr "You don't have any meetings yet.\n\nClick on <b>${new_meeting_button}</b> in the main menu to create one."
 
-msgid "SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS"
-msgstr "Your timezone has been set to: <b>${timezone}</b> "
+msgid "MeetingListMessages.JOINED_DESCRIPTION"
+msgstr "These are the meetings you have joined."
 
-msgid "SettingsMessages.SET_REGISTRATION_TIMEZONE"
-msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."
+msgid "MeetingListMessages.JOINED_EMPTY"
+msgstr "<i>You have not joined any meeting yet.</i>"
 
-msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS"
-msgstr "Your timezone is ${timezone}"
+msgid "MeetingListMessages.PAST_DESCRIPTION"
+msgstr "These are all your past meetings."
 
-msgid "SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL"
-msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
+msgid "MeetingListMessages.PAST_EMPTY"
+msgstr "<i>You have no past meetings yet.</i>"
 
-msgid "SettingsMessages.EDIT_TIMEZONE_ON_EXIT"
-msgstr "You were in the middle of changing your timezone. Send me either the name of your city or your location to continue.  If you don't want to continue, tap Cancel to exit."
+msgid "CommonMessages.STALE_CANCEL_ALERT"
+msgstr "You've already answered this question"
 
-msgid "SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT"
-msgstr "Please send your city name as text or share your location."
-
-msgid "SettingsMessages.SELECT_LANGUAGE"
-msgstr "Current language: <b>${language}</b>.\n\nSelect a language."
-
-msgid "SettingsMessages.LANGUAGE_SET_SUCCESS"
-msgstr "Language set."
-
-msgid "SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE"
-msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the <i>Timezone</i> button shown when the meeting is shared.\n\n<b>Lock on start</b>: when enabled and a meeting has a duration set, participants cannot join or leave once the meeting starts. When disabled, participants can still join or leave freely."
-
-msgid "SettingsMessages.SET_TIMEOUT_SETTINGS"
-msgstr "Timeout defines how long after a meeting starts it is kept active. Meetings without a set duration are deactivated once this time has passed. After deactivation, you can reactivate a meeting from your <b>Past meetings menu</b>.\n\nThe current timeout is <b>${timeout} minutes</b>\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back."
-
-msgid "SettingsMessages.INVALID_POSITIVE_INTEGER"
+msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
 
-msgid "SettingsMessages.TIMEOUT_SET_SUCCESS"
+msgid "CommonMessages.TIME_PROMPT"
+msgstr "Send me the time of the meeting in the format <i>HH:MM</i>"
+
+msgid "CommonMessages.TIME_INVALID_VALUE"
+msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours (00-23) and minutes (00-59), I am sure I can work with that 🧠."
+
+msgid "CommonMessages.TIME_INVALID_FORMAT"
+msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"
+
+msgid "CommonMessages.DATETIME_INVALID"
+msgstr "Tap <b>Date</b> or <b>Time</b> to update them, or send a message with a ${datetime_link} to set both at once."
+
+msgid "CommonMessages.DELETED_MEETING_ALERT"
+msgstr "This meeting has been deleted"
+
+msgid "RegistrationMessages.TIMEZONE_PROMPT"
+msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."
+
+msgid "RegistrationMessages.TIMEZONE_SUCCESS"
+msgstr "Your timezone is ${timezone}"
+
+msgid "RegistrationMessages.TIMEZONE_FAIL"
+msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
+
+msgid "RegistrationMessages.TIMEZONE_INVALID_INPUT"
+msgstr "Please send your city name as text or share your location."
+
+msgid "SettingsMessages.DESCRIPTION"
+msgstr "Configure MitUp."
+
+msgid "SettingsMessages.TIMEZONE_PROMPT"
+msgstr "Your timezone is set to <b>${timezone}</b>. \nSend me the name of your city or your location to set your timezone or touch in <b>Cancel</b> to go back."
+
+msgid "SettingsMessages.TIMEZONE_SUCCESS"
+msgstr "Your timezone has been set to: <b>${timezone}</b> "
+
+msgid "SettingsMessages.TIMEZONE_ON_EXIT"
+msgstr "You were in the middle of changing your timezone. Send me either the name of your city or your location to continue.  If you don't want to continue, tap Cancel to exit."
+
+msgid "SettingsMessages.LANGUAGE_PROMPT"
+msgstr "Current language: <b>${language}</b>.\n\nSelect a language."
+
+msgid "SettingsMessages.LANGUAGE_SUCCESS"
+msgstr "Language set."
+
+msgid "SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION"
+msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the <i>Timezone</i> button shown when the meeting is shared.\n\n<b>Lock on start</b>: when enabled and a meeting has a duration set, participants cannot join or leave once the meeting starts. When disabled, participants can still join or leave freely."
+
+msgid "SettingsMessages.TIMEOUT_PROMPT"
+msgstr "Timeout defines how long after a meeting starts it is kept active. Meetings without a set duration are deactivated once this time has passed. After deactivation, you can reactivate a meeting from your <b>Past meetings menu</b>.\n\nThe current timeout is <b>${timeout} minutes</b>\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back."
+
+msgid "SettingsMessages.TIMEOUT_SUCCESS"
 msgstr "Timeout set to: <b>${timeout} minutes</b>"
 
-msgid "SettingsMessages.NOTIFICATIONS_SETTINGS"
+msgid "SettingsMessages.NOTIFICATIONS_DESCRIPTION"
 msgstr "Configure MeetUp notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, MeetUp will notify you <b>${notifications_time} minutes</b> before a meeting starts."
 
-msgid "SettingsMessages.NOTIFICATION_SET_TIME"
+msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
 
-msgid "SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS"
+msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
 msgstr "Notification time set to <b>${notifications_time} minutes</b>."
 
 msgid "SettingsMessages.ENABLED"
@@ -263,424 +299,352 @@ msgstr "Enabled ✅"
 msgid "SettingsMessages.DISABLED"
 msgstr "Disabled ❌"
 
-msgid "MeetingMessages.CREATE"
+msgid "MeetingCreationMessages.PROMPT"
 msgstr "Lets create a meeting. What is the title?\n\n<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
 
-msgid "MeetingMessages.CREATED_SUCCESS"
+msgid "MeetingCreationMessages.SUCCESS"
 msgstr "Meeting created: <b>${title}</b>\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
 
-msgid "MeetingMessages.INVALID_TITLE"
+msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on <b>Cancel</b>."
 
-msgid "MeetingMessages.MEETING_TIME"
-msgstr "Meeting time"
-
-msgid "MeetingMessages.MEETING_START_TIME"
-msgstr "Starts"
-
-msgid "MeetingMessages.MEETING_STOP_TIME"
-msgstr "Ends"
-
-msgid "MeetingMessages.CREATED_BY"
-msgstr "Created by: ${owner}"
-
-msgid "MeetingMessages.DESCRIPTION_NOT_SET"
-msgstr "🚫 No description defined 🚫"
-
-msgid "MeetingMessages.DATE_NOT_SET"
-msgstr "🚫 No time defined 🚫"
-
-msgid "MeetingMessages.LOCATION_NOT_SET"
-msgstr "🚫 No location defined 🚫"
-
-msgid "MeetingMessages.EMPTY"
-msgstr "Empty"
-
-msgid "MeetingMessages.PARTICIPANT"
-msgstr "Participant"
-
-msgid "MeetingMessages.PARTICIPANTS"
-msgstr "Participants"
-
-msgid "MeetingMessages.MAX_PARTICIPANTS"
-msgstr "(Max: ${max_participants})"
-
-msgid "MeetingMessages.INVITED_BY_USER"
-msgstr "<i>invited by ${user}</i>"
-
-msgid "MeetingMessages.MEETING_WITHOUT_DESCRIPTION"
-msgstr "<i>This meeting has no description yet</i>"
-
-msgid "MeetingMessages.MEETING_WITHOUT_PARTICIPANTS"
-msgstr "<i>This meeting has no participants yet</i>"
-
-msgid "MeetingMessages.JOINED_MEETING_SUCCESS"
-msgstr "You joined the meeting!"
-
-msgid "MeetingMessages.JOINED_MEETING_ALREADY"
-msgstr "You have already joined this meeting"
-
-msgid "MeetingMessages.JOINED_MEETING_NOT_FOUND"
-msgstr "The meeting you tried to join does not exist"
-
-msgid "MeetingMessages.JOINED_MEETING_FULL"
-msgstr "Sorry! The meeting is full"
-
-msgid "MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST"
-msgstr "The meeting is full. You have been added to the waiting list."
-
-msgid "MeetingMessages.JOINED_MEETING_UNREGISTERED"
-msgstr "You have joined the meeting, ${user}! It seems you have never used Mitup before, open a chat with @mitupbot to be receive notifications and create new meetings!"
-
-msgid "MeetingMessages.LEFT_MEETING_SUCCESS"
-msgstr "You have left the meeting"
-
-msgid "MeetingMessages.LEFT_MEETING_ALREADY"
-msgstr "You cannot leave a meeting you have not joined"
-
-msgid "MeetingMessages.LEFT_MEETING_NOT_FOUND"
-msgstr "The meeting you tried to leave does not exist"
-
-msgid "MeetingMessages.LEFT_MEETING_UNREGISTERED"
-msgstr "You have left the meeting, ${user}! It seems you have never used Mitup before, open a chat with @mitupbot to receive notifications and create new meetings!"
-
-msgid "MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST"
-msgstr "There is an open spot in the meeting <b>${meeting_title}</b>. You have now been promoted from the waiting list!"
-
-msgid "MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY"
+msgid "MeetingCreationMessages.INVALID_TITLE_ENTITY"
 msgstr "I only understand a title or a title with a date 🤔.\n\nPlease send just the meeting title, or the title with a date formatted by Telegram. Click <b>Cancel</b> to exit."
 
-msgid "MeetingMessages.CREATE_MEETING_ON_EXIT"
+msgid "MeetingCreationMessages.ON_EXIT"
 msgstr "You were in the middle of creating a meeting. Send the title of the meeting to continue. If you would not like to continue, tap Cancel to exit."
 
-msgid "MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT"
-msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.DATETIME_ENTITY_LABEL"
+msgstr "Meeting time"
 
-msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION_ON_EXIT"
-msgstr "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.START_LABEL"
+msgstr "Starts"
 
-msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT"
-msgstr "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.END_LABEL"
+msgstr "Ends"
 
-msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT"
-msgstr "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.CREATED_BY"
+msgstr "Created by: ${owner}"
 
-msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT"
-msgstr "Sorry, I was expecting the maximum number of participants. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.DESCRIPTION_NOT_SET"
+msgstr "🚫 No description defined 🚫"
 
-msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_ON_EXIT"
-msgstr "Sorry, I was expecting your selection for removing a participant. If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.DATE_NOT_SET"
+msgstr "🚫 No time defined 🚫"
 
-msgid "MeetingMessages.EDIT_MEETING_TIME_ON_EXIT"
-msgstr "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.LOCATION_NOT_SET"
+msgstr "🚫 No location defined 🚫"
 
-msgid "MeetingMessages.INVITE_USER_ON_EXIT"
-msgstr "Sorry, I was expecting the name of the person you want to invite. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY"
+msgstr "Empty"
 
-msgid "MeetingMessages.INVITE_USER_PROMPT"
-msgstr "<b>Add to Guest List</b>\n\nPlease reply with the name of the person you want to add."
+msgid "MeetingDisplayMessages.PARTICIPANT_LABEL"
+msgstr "Participant"
 
-msgid "MeetingMessages.INVITE_USER_CONFIRMATION"
-msgstr "<b>Confirm Addition</b>\n\nAre you sure you want to add <b>${name}</b> to the meeting <b>${meeting_title}</b>?"
+msgid "MeetingDisplayMessages.PARTICIPANTS_LABEL"
+msgstr "Participants"
 
-msgid "MeetingMessages.INVITE_USER_OPEN_CHAT"
-msgstr "Start Private Chat\n\nTo add participants, you need to open a chat with me first."
+msgid "MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL"
+msgstr "(Max: ${max_participants})"
 
-msgid "MeetingMessages.INVITE_USER_GO_PRIVATE"
-msgstr "Continue in Private\n\nPlease switch to our private chat to send me the name."
+msgid "MeetingDisplayMessages.INVITED_BY"
+msgstr "<i>invited by ${user}</i>"
 
-msgid "MeetingMessages.INVITE_USER_SUCCESS"
-msgstr "<b>List Updated</b>\n\nUser <b>${name}</b> has been added to the meeting <b>${meeting_title}</b>."
+msgid "MeetingDisplayMessages.DESCRIPTION_EMPTY"
+msgstr "<i>This meeting has no description yet</i>"
 
-msgid "MeetingMessages.INVITE_USER_MEETING_FULL"
-msgstr "<b>No Spots Left</b>\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
-
-msgid "MeetingMessages.INVITE_USER_INVITES_DISABLED"
-msgstr "<b>Guest List Closed</b>\n\nNew additions are no longer allowed for this meeting. The organizer has closed the list."
-
-msgid "MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND"
-msgstr "<b>That Was Unexpected...</b>\n\nI suddenly lost track of the meeting details. This shouldn't happen.\n\nPlease try sending the name again."
-
-msgid "MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK"
-msgstr "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
-
-msgid "MeetingMessages.INVITE_USERS_CANCELED"
-msgstr "The invitation process has been canceled."
-
-msgid "MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES"
-msgstr "Something unexpected happened while adding the invited user. Please try again."
-
-msgid "MeetingMessages.EDIT_MEETING_TITLE"
-msgstr "This is the current title of your meeting:\n<b>${title}</b>\n\n Send me the new one"
-
-msgid "MeetingMessages.EDIT_MEETING_DESCRIPTION"
-msgstr "This is the current description of your meeting:\n${description}\n\n Send me the new one"
-
-msgid "MeetingMessages.TITLE_SET_SUCCESS"
-msgstr "Title updated to: <b>${title}</b>"
-
-msgid "MeetingMessages.DESCRIPTION_SET_SUCCESS"
-msgstr "Description updated to: <b>${description}</b>"
-
-msgid "MeetingMessages.EDIT_MEETING_LOCATION"
-msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
-
-msgid "MeetingMessages.EDIT_MEETING_LOCATION_NAME"
-msgstr "Send me the name of the place."
-
-msgid "MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES"
-msgstr "<i>Only from the phone 📱</i>\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
-
-msgid "MeetingMessages.LOCATION_NAME_SET_SUCCESS"
-msgstr "Location name set to: <b>${name}</b>"
-
-msgid "MeetingMessages.LOCATION_COORDINATES_SUCCESS"
-msgstr "Location saved."
-
-msgid "MeetingMessages.LOCATION_COORDINATES_WRONG"
-msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
-
-msgid "MeetingMessages.EDIT_MEETING_PARTICIPANTS"
-msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
-
-msgid "MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS"
-msgstr "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) or press in <i>No limit</i> to allow an unlimited number of participants."
-
-msgid "MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS"
-msgstr "Max participants set to: <b>${max_participants}</b>"
-
-msgid "MeetingMessages.NO_LIMIT_PARTICIPANTS"
-msgstr "No limit"
-
-msgid "MeetingMessages.MAX_PARTICIPANTS_SET_FAIL"
-msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
-
-msgid "MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS"
-msgstr "These are the users that joined the meeting. Choose who you want to kick out."
-
-msgid "MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE"
-msgstr "Are you sure you want to kick out <b>${participant}</b> from the meeting <b>${meeting_title}</b>?"
-
-msgid "MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING"
-msgstr "The participant you tried to kick out is no longer in the meeting."
-
-msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS"
-msgstr "<b>${participant}</b> removed."
-
-msgid "MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS"
-msgstr "<b>${participant}</b> removed. No more participants to manage."
-
-msgid "MeetingMessages.EDIT_MEETING_LANGUAGE"
-msgstr "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\nCurrent language: <b>${language}</b>."
-
-msgid "MeetingMessages.LANGUAGE_SET_SUCCESS"
-msgstr "Language set."
-
-msgid "MeetingMessages.PAST_MEETING_DESCRIPTION"
-msgstr "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
-
-msgid "MeetingMessages.REACTIVATE_MEETING_SUCCESS"
-msgstr "Meeting reactivated. You can edit and share it again."
-
-msgid "MeetingMessages.DELETE_MEETING"
-msgstr "Are you sure you want to delete this meeting?"
-
-msgid "MeetingMessages.DELETE_MEETING_SUCCESS"
-msgstr "Meeting deleted."
-
-msgid "MeetingMessages.DELETE_MEETING_DECLINE"
-msgstr "The meeting won't be deleted"
-
-msgid "MeetingMessages.ACCESS_TO_DELETED_MEETING"
-msgstr "This meeting has been deleted"
-
-msgid "MeetingMessages.DATE_TIME_VIEW_MESSAGE"
-msgstr "Choose what you want to set for your meeting.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
-
-msgid "MeetingMessages.WRONG_DATETIME_MESSAGE"
-msgstr "Tap <b>Date</b> or <b>Time</b> to update them, or send a message with a ${datetime_link} to set both at once."
-
-msgid "MeetingMessages.EDIT_DATE"
-msgstr "Select the new date. Press <b>🗑️ Delete date</b> if you want to unset the date and time of the meeting."
-
-msgid "MeetingMessages.ADD_DATE"
-msgstr "Select the date."
-
-msgid "MeetingMessages.NEW_DATE_SET_SUCCESS"
-msgstr "The date has been set to <b>${datetime}</b>. The time defaults to 00:00.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 00:00."
-
-msgid "MeetingMessages.DATE_UPDATE_SUCCESS"
-msgstr "Date set to: ${datetime}"
-
-msgid "MeetingMessages.EDIT_TIME"
-msgstr "Send me the time of the meeting in the format <i>HH:MM</i>"
-
-msgid "MeetingMessages.EDIT_TIME_SUCCESS"
-msgstr "Time set to ${datetime}"
-
-msgid "MeetingMessages.WRONG_TIME_FORMAT"
-msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"
-
-msgid "MeetingMessages.INVALID_TIME"
-msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours (00-23) and minutes (00-59), I am sure I can work with that 🧠."
-
-msgid "MeetingMessages.DELETE_DATE_CONFIRMATION"
-msgstr "Are you sure you want to delete the date and time of the meeting?"
-
-msgid "MeetingMessages.DELETE_DATE_DECLINE"
-msgstr "The date and time won't be deleted"
-
-msgid "MeetingMessages.DATE_TIME_DELETED"
-msgstr "Date and time removed."
-
-msgid "MeetingMessages.MEETING_HAS_BEEN_DELETED"
-msgstr "🚫 This meeting has been deleted 🚫"
-
-msgid "MeetingMessages.MEETING_HAS_FINISHED"
-msgstr "✅ This meeting has finished ✅"
-
-msgid "MeetingMessages.EDIT_SETTINGS_MESSAGE"
-msgstr "You can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the <i>Timezone</i> button shown when the meeting is shared."
-
-msgid "MeetingMessages.NOT_SEARCHABLE_FOOTNOTE"
-msgstr "🔍 Make this meeting searchable in this chat."
-
-msgid "MeetingMessages.SEARCHABLE_FOOTNOTE"
-msgstr "✅ This meeting is now searchable in this chat."
-
-msgid "MeetingMessages.NOW_SEARCHABLE_ALERT"
-msgstr "✅ Now Searchable!\n\nThis meeting is now attached to this chat. It will be included in your search results when you look for meetings using the bot's inline mode."
-
-msgid "MeetingMessages.ALREADY_SEARCHABLE_ALERT"
-msgstr "✅ Already Searchable!\n\nThis meeting was already attached to this chat from a previous share. It is already included in your search results."
-
-msgid "MeetingMessages.NO_MEETINGS_FOUND"
-msgstr "You don't have any meetings yet.\n\nClick on <b>${new_meeting_button}</b> in the main menu to create one."
-
-msgid "MeetingMessages.ACTIVE_MEETINGS_PAGE"
-msgstr "These are all your active meetings."
-
-msgid "MeetingMessages.JOINED_MEETINGS_PAGE"
-msgstr "These are the meetings you have joined."
-
-msgid "MeetingMessages.NO_JOINED_MEETINGS"
-msgstr "<i>You have not joined any meeting yet.</i>"
-
-msgid "MeetingMessages.PAST_MEETINGS_PAGE"
-msgstr "These are all your past meetings."
-
-msgid "MeetingMessages.NO_PAST_MEETINGS"
-msgstr "<i>You have no past meetings yet.</i>"
-
-msgid "MeetingMessages.MEETING_IN_PROGRESS"
+msgid "MeetingDisplayMessages.IN_PROGRESS_BANNER"
 msgstr "▶️ This meeting is in progress ▶️"
 
-msgid "MeetingMessages.MEETING_FINISHED_SUMMARY"
+msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
 msgstr "✅ This meeting has finished ✅\n\n<b>From:</b> ${start_datetime} · <b>To:</b> ${end_datetime} · <b>Attendees:</b> ${attendee_count}"
 
-msgid "MeetingMessages.DURATION_NO_START_DATETIME"
-msgstr "To set a duration, first set when the meeting starts. Choose a date and time below.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+msgid "MeetingDisplayMessages.DELETED_BANNER"
+msgstr "🚫 This meeting has been deleted 🚫"
 
-msgid "MeetingMessages.DURATION_START_DATETIME_SET"
-msgstr "Start time set. Now set when the meeting ends."
+msgid "MeetingDisplayMessages.FINISHED_BANNER"
+msgstr "✅ This meeting has finished ✅"
 
-msgid "MeetingMessages.SET_END_DATETIME_PROMPT"
-msgstr "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+msgid "MeetingJoinMessages.JOIN_SUCCESS"
+msgstr "You joined the meeting!"
 
-msgid "MeetingMessages.EDIT_END_DATETIME_PROMPT"
-msgstr "Meeting starts at <b>${start_datetime}</b>. The meeting currently ends at <b>${end_datetime}</b>.\n\nSet the new end time.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+msgid "MeetingJoinMessages.JOIN_ALREADY_JOINED"
+msgstr "You have already joined this meeting"
 
-msgid "MeetingMessages.END_DATETIME_BEFORE_START"
-msgstr "The end time must be after the start time."
+msgid "MeetingJoinMessages.JOIN_FULL"
+msgstr "Sorry! The meeting is full"
 
-msgid "MeetingMessages.END_DATETIME_IN_PAST"
-msgstr "The end time must be in the future."
+msgid "MeetingJoinMessages.JOIN_FULL_WAITING_LIST"
+msgstr "The meeting is full. You have been added to the waiting list."
 
-msgid "MeetingMessages.DURATION_CLEARED"
-msgstr "Duration removed."
+msgid "MeetingJoinMessages.JOIN_UNREGISTERED"
+msgstr "You have joined the meeting, ${user}! It seems you have never used Mitup before, open a chat with @mitupbot to be receive notifications and create new meetings!"
 
-msgid "MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT"
-msgstr "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
+msgid "MeetingJoinMessages.LEAVE_SUCCESS"
+msgstr "You have left the meeting"
 
-msgid "MeetingMessages.LOCK_ON_START_STALE_ALERT"
-msgstr "You must set an end time before enabling this option."
+msgid "MeetingJoinMessages.LEAVE_NOT_JOINED"
+msgstr "You cannot leave a meeting you have not joined"
 
-msgid "MeetingMessages.WHEN_VIEW_NO_TIMES"
-msgstr "Set when your meeting happens. You can set a start time, an end time, or both. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+msgid "MeetingJoinMessages.LEAVE_UNREGISTERED"
+msgstr "You have left the meeting, ${user}! It seems you have never used Mitup before, open a chat with @mitupbot to receive notifications and create new meetings!"
 
-msgid "MeetingMessages.WHEN_VIEW_START_ONLY"
-msgstr "Meeting starts at: <b>${start_datetime}</b>\n\nYou can set an end time or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+msgid "MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST"
+msgstr "There is an open spot in the meeting <b>${meeting_title}</b>. You have now been promoted from the waiting list!"
 
-msgid "MeetingMessages.WHEN_VIEW_BOTH"
-msgstr "Meeting starts at: <b>${start_datetime}</b>\nMeeting ends at: <b>${end_datetime}</b>\n\nYou can change the times or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
-
-msgid "MeetingMessages.TIMES_CLEARED"
-msgstr "Times removed."
-
-msgid "MeetingMessages.CLEAR_TIMES_CONFIRMATION"
-msgstr "Are you sure you want to clear the start and end times?"
-
-msgid "MeetingMessages.CLEAR_TIMES_DECLINE"
-msgstr "The times won't be cleared."
-
-msgid "MeetingMessages.END_DATETIME_CLEARED_BY_START"
-msgstr "The new start time is after the end time, so the end time has been cleared."
-
-msgid "MeetingMessages.SET_END_TIME_STALE_ALERT"
-msgstr "The start time was cleared. Set it again before choosing an end time."
-
-msgid "MeetingMessages.NEW_END_DATE_SET_SUCCESS"
-msgstr "The end date has been set to <b>${datetime}</b>. The time defaults to 23:59.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 23:59."
-
-msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION"
-msgstr "Meeting ends at: <b>${end_datetime}</b>\n\nYou can change the end time or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
-
-msgid "MeetingMessages.DURATION_VIEW_DESCRIPTION_NOT_SET"
-msgstr "Set an end time for the meeting to give it a duration. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
-
-msgid "MeetingMessages.JOIN_LOCKED_IN_PROGRESS"
+msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "This meeting has already started and its attendees list is locked."
 
-msgid "MeetingMessages.STALE_CANCEL_BUTTON"
-msgstr "You've already answered this question"
+msgid "MeetingInviteMessages.ON_EXIT"
+msgstr "Sorry, I was expecting the name of the person you want to invite. Would you like to send it? If not, tap Cancel to exit."
 
-msgid "InlineViewMessages.CREATE_NEW_MEETING_BUTTON"
+msgid "MeetingInviteMessages.PROMPT"
+msgstr "<b>Add to Guest List</b>\n\nPlease reply with the name of the person you want to add."
+
+msgid "MeetingInviteMessages.CONFIRMATION"
+msgstr "<b>Confirm Addition</b>\n\nAre you sure you want to add <b>${name}</b> to the meeting <b>${meeting_title}</b>?"
+
+msgid "MeetingInviteMessages.OPEN_CHAT"
+msgstr "Start Private Chat\n\nTo add participants, you need to open a chat with me first."
+
+msgid "MeetingInviteMessages.GO_PRIVATE"
+msgstr "Continue in Private\n\nPlease switch to our private chat to send me the name."
+
+msgid "MeetingInviteMessages.SUCCESS"
+msgstr "<b>List Updated</b>\n\nUser <b>${name}</b> has been added to the meeting <b>${meeting_title}</b>."
+
+msgid "MeetingInviteMessages.MEETING_FULL"
+msgstr "<b>No Spots Left</b>\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
+
+msgid "MeetingInviteMessages.INVITES_DISABLED"
+msgstr "<b>Guest List Closed</b>\n\nNew additions are no longer allowed for this meeting. The organizer has closed the list."
+
+msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
+msgstr "<b>That Was Unexpected...</b>\n\nI suddenly lost track of the meeting details. This shouldn't happen.\n\nPlease try sending the name again."
+
+msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
+msgstr "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
+
+msgid "MeetingInviteMessages.CANCELED"
+msgstr "The invitation process has been canceled."
+
+msgid "MeetingInviteMessages.ADD_FAILED_RETRY"
+msgstr "Something unexpected happened while adding the invited user. Please try again."
+
+msgid "MeetingLifecycleMessages.PAST_DESCRIPTION"
+msgstr "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
+
+msgid "MeetingLifecycleMessages.REACTIVATE_SUCCESS"
+msgstr "Meeting reactivated. You can edit and share it again."
+
+msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
+msgstr "Are you sure you want to delete this meeting?"
+
+msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
+msgstr "Meeting deleted."
+
+msgid "MeetingLifecycleMessages.DELETE_DECLINED"
+msgstr "The meeting won't be deleted"
+
+msgid "MeetingAttachMessages.FOOTNOTE_INACTIVE"
+msgstr "🔍 Make this meeting searchable in this chat."
+
+msgid "MeetingAttachMessages.FOOTNOTE_ACTIVE"
+msgstr "✅ This meeting is now searchable in this chat."
+
+msgid "MeetingAttachMessages.ENABLED_ALERT"
+msgstr "✅ Now Searchable!\n\nThis meeting is now attached to this chat. It will be included in your search results when you look for meetings using the bot's inline mode."
+
+msgid "MeetingAttachMessages.ALREADY_ENABLED_ALERT"
+msgstr "✅ Already Searchable!\n\nThis meeting was already attached to this chat from a previous share. It is already included in your search results."
+
+msgid "MeetingEditContentMessages.TITLE_PROMPT"
+msgstr "This is the current title of your meeting:\n<b>${title}</b>\n\n Send me the new one"
+
+msgid "MeetingEditContentMessages.TITLE_SUCCESS"
+msgstr "Title updated to: <b>${title}</b>"
+
+msgid "MeetingEditContentMessages.TITLE_ON_EXIT"
+msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditContentMessages.DESCRIPTION_PROMPT"
+msgstr "This is the current description of your meeting:\n${description}\n\n Send me the new one"
+
+msgid "MeetingEditContentMessages.DESCRIPTION_SUCCESS"
+msgstr "Description updated to: <b>${description}</b>"
+
+msgid "MeetingEditContentMessages.DESCRIPTION_ON_EXIT"
+msgstr "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditLocationMessages.DESCRIPTION"
+msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
+
+msgid "MeetingEditLocationMessages.NAME_PROMPT"
+msgstr "Send me the name of the place."
+
+msgid "MeetingEditLocationMessages.COORDINATES_PROMPT"
+msgstr "<i>Only from the phone 📱</i>\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
+
+msgid "MeetingEditLocationMessages.NAME_SUCCESS"
+msgstr "Location name set to: <b>${name}</b>"
+
+msgid "MeetingEditLocationMessages.COORDINATES_SUCCESS"
+msgstr "Location saved."
+
+msgid "MeetingEditLocationMessages.COORDINATES_INVALID"
+msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
+
+msgid "MeetingEditLocationMessages.NAME_ON_EXIT"
+msgstr "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditLocationMessages.COORDINATES_ON_EXIT"
+msgstr "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditParticipantsMessages.DESCRIPTION"
+msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
+
+msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
+msgstr "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) or press in <i>No limit</i> to allow an unlimited number of participants."
+
+msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
+msgstr "Max participants set to: <b>${max_participants}</b>"
+
+msgid "MeetingEditParticipantsMessages.NO_LIMIT_LABEL"
+msgstr "No limit"
+
+msgid "MeetingEditParticipantsMessages.MAX_INVALID"
+msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
+
+msgid "MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION"
+msgstr "These are the users that joined the meeting. Choose who you want to kick out."
+
+msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
+msgstr "Are you sure you want to kick out <b>${participant}</b> from the meeting <b>${meeting_title}</b>?"
+
+msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
+msgstr "The participant you tried to kick out is no longer in the meeting."
+
+msgid "MeetingEditParticipantsMessages.KICK_OUT_SUCCESS"
+msgstr "<b>${participant}</b> removed."
+
+msgid "MeetingEditParticipantsMessages.KICK_OUT_SUCCESS_NO_MORE"
+msgstr "<b>${participant}</b> removed. No more participants to manage."
+
+msgid "MeetingEditParticipantsMessages.MAX_ON_EXIT"
+msgstr "Sorry, I was expecting the maximum number of participants. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditLanguageMessages.DESCRIPTION"
+msgstr "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\nCurrent language: <b>${language}</b>."
+
+msgid "MeetingEditLanguageMessages.SUCCESS"
+msgstr "Language set."
+
+msgid "MeetingEditSettingsMessages.DESCRIPTION"
+msgstr "You can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. If you don't need this information displayed on the meeting message you can disable it here. This will also disable the <i>Timezone</i> button shown when the meeting is shared."
+
+msgid "MeetingEditDateTimeMessages.DESCRIPTION"
+msgstr "Choose what you want to set for your meeting.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+
+msgid "MeetingEditDateTimeMessages.DATE_EDIT_PROMPT"
+msgstr "Select the new date. Press <b>🗑️ Delete date</b> if you want to unset the date and time of the meeting."
+
+msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
+msgstr "Select the date."
+
+msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
+msgstr "The date has been set to <b>${datetime}</b>. The time defaults to 00:00.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 00:00."
+
+msgid "MeetingEditDateTimeMessages.DATE_UPDATED"
+msgstr "Date set to: ${datetime}"
+
+msgid "MeetingEditDateTimeMessages.TIME_SUCCESS"
+msgstr "Time set to ${datetime}"
+
+msgid "MeetingEditDateTimeMessages.ON_EXIT"
+msgstr "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditDateTimeMessages.END_CLEARED_BY_START"
+msgstr "The new start time is after the end time, so the end time has been cleared."
+
+msgid "MeetingEditWhenMessages.DESCRIPTION_NO_TIMES"
+msgstr "Set when your meeting happens. You can set a start time, an end time, or both. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+
+msgid "MeetingEditWhenMessages.DESCRIPTION_START_ONLY"
+msgstr "Meeting starts at: <b>${start_datetime}</b>\n\nYou can set an end time or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+
+msgid "MeetingEditWhenMessages.DESCRIPTION_BOTH"
+msgstr "Meeting starts at: <b>${start_datetime}</b>\nMeeting ends at: <b>${end_datetime}</b>\n\nYou can change the times or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+
+msgid "MeetingEditWhenMessages.CLEAR_CONFIRMATION"
+msgstr "Are you sure you want to clear the start and end times?"
+
+msgid "MeetingEditWhenMessages.CLEAR_DECLINED"
+msgstr "The times won't be cleared."
+
+msgid "MeetingEditWhenMessages.CLEAR_SUCCESS"
+msgstr "Times removed."
+
+msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
+msgstr "You must set an end time before enabling this option."
+
+msgid "MeetingEditDurationMessages.END_PROMPT"
+msgstr "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+
+msgid "MeetingEditDurationMessages.END_EDIT_PROMPT"
+msgstr "Meeting starts at <b>${start_datetime}</b>. The meeting currently ends at <b>${end_datetime}</b>.\n\nSet the new end time.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+
+msgid "MeetingEditDurationMessages.END_BEFORE_START"
+msgstr "The end time must be after the start time."
+
+msgid "MeetingEditDurationMessages.END_IN_PAST"
+msgstr "The end time must be in the future."
+
+msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
+msgstr "The end date has been set to <b>${datetime}</b>. The time defaults to 23:59.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 23:59."
+
+msgid "MeetingEditDurationMessages.END_STALE_ALERT"
+msgstr "The start time was cleared. Set it again before choosing an end time."
+
+msgid "MeetingEditDurationMessages.ON_EXIT"
+msgstr "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Create a new meeting"
 
-msgid "InlineViewMessages.EXPLORE_MITUP_BUTTON"
+msgid "InlineQueryMessages.EXPLORE_BUTTON"
 msgstr "🚀 Explore Mitup"
 
-msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE"
+msgid "InlineQueryMessages.CHAT_MEETINGS_TITLE"
 msgstr "🔍 Meetings in this chat"
 
-msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION"
+msgid "InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION"
 msgstr "Search for meetings shared in this chat"
 
-msgid "InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE"
+msgid "InlineQueryMessages.CHAT_MEETINGS_MESSAGE"
 msgstr "Tap the button below to load meetings shared in this chat."
 
-msgid "InlineViewMessages.READY_TO_SEARCH_MESSAGE"
+msgid "InlineQueryMessages.READY_TO_SEARCH_MESSAGE"
 msgstr "Tap the button below to search for meetings shared in this chat."
 
-msgid "InlineViewMessages.NO_MEETINGS_FOUND_TITLE"
+msgid "InlineQueryMessages.NO_RESULTS_TITLE"
 msgstr "No meetings found"
 
-msgid "InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION"
+msgid "InlineQueryMessages.NO_RESULTS_DESCRIPTION"
 msgstr "No meetings have been shared in this chat yet"
 
-msgid "InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE"
+msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>No meetings have been shared in this chat yet.</i>"
 
-msgid "NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED"
+msgid "NotificationMessages.DELETION_WARNING"
 msgstr "The meeting <b>${meeting_title}</b> will be permanently deleted in <b>${days_until_deletion} days</b>.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the <b>${reactivate_meeting_button}</b> button below.\n\nRemember that you can always reactivate any past meeting from the <b>${past_meetings_button}</b> button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."
 
-msgid "NotificationMessages.MEETING_PERMANENTLY_DELETED"
+msgid "NotificationMessages.DELETED"
 msgstr "The meeting <b>${meeting_title}</b> has been permanently deleted."
 
-msgid "NotificationMessages.MEETING_STARTING"
+msgid "NotificationMessages.STARTING_SOON"
 msgstr "The meeting <b>${meeting_title}</b> is starting soon!"
 
-msgid "NotificationMessages.MEETING_STARTED"
+msgid "NotificationMessages.STARTED"
 msgstr "The meeting <b>${meeting_title}</b> has started!"
 
 msgid "Weekday.MONDAY"

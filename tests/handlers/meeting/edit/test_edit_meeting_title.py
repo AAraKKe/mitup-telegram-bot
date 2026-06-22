@@ -10,7 +10,7 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_title import callback_query_ed
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
 from tests.helpers import StubMitupContext, create_meetup
 from tests.helpers.stub_db import MockDbSession
@@ -33,7 +33,7 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
 
     view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_TITLE.get(title=user_with_settings.meetups[0].title),
+        description=MeetingEditContentMessages.TITLE_PROMPT.get(title=user_with_settings.meetups[0].title),
         keyboard=[
             [
                 ButtonConfig(

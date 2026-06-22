@@ -7,7 +7,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingEditLanguageMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import EditMeetingHandlerId
@@ -62,7 +62,7 @@ async def callback_set_meeting_language(session: Session, update: Update, contex
     await context.api.edit_message(
         update=update,
         view=views.factory.meeting_set_language_view(meeting=meeting).with_context(
-            MeetingMessages.LANGUAGE_SET_SUCCESS.get(lang=meeting.user_language)
+            MeetingEditLanguageMessages.SUCCESS.get(lang=meeting.user_language)
         ),
     )
 

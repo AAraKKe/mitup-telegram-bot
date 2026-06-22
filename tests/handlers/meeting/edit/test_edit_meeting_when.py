@@ -6,7 +6,7 @@ from telegram import Update
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingEditWhenMessages
 from mitup_bot.views import factory
 from tests.helpers import (
     HandlerContext,
@@ -98,7 +98,7 @@ async def test_clear_times_shows_confirmation(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
-            message=MeetingMessages.CLEAR_TIMES_CONFIRMATION.get(lang=user_with_settings.lang),
+            message=MeetingEditWhenMessages.CLEAR_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING_TIMES.with_id(1),
         ),
@@ -138,7 +138,7 @@ async def test_confirm_clear_times(
 
     context.api.assert_edit_message_called(
         update,
-        meeting.when_view.with_context(MeetingMessages.TIMES_CLEARED.get(lang=user_with_settings.lang)),
+        meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user_with_settings.lang)),
     )
     context.api.assert_update_meeting_messages_called(
         session=mock_session,
@@ -182,7 +182,7 @@ async def test_decline_clear_times(
 
     context.api.assert_edit_message_called(
         update,
-        meeting.when_view.with_context(MeetingMessages.CLEAR_TIMES_DECLINE.get(lang=user_with_settings.lang)),
+        meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user_with_settings.lang)),
     )
     context.api.assert_update_meeting_messages_not_called()
 
@@ -251,7 +251,7 @@ async def test_lock_on_start_stale_alert_when_no_end_datetime(
 
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=MeetingMessages.LOCK_ON_START_STALE_ALERT.get_text(lang=meeting.user_language),
+        text=MeetingEditWhenMessages.LOCK_ON_START_ALERT.get_text(lang=meeting.user_language),
         show_alert=True,
     )
 

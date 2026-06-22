@@ -28,7 +28,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages, MessageBase
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
@@ -199,7 +199,7 @@ async def meeting_accessible(
     await context.api.edit_message(
         update=update,
         view=MitupView(
-            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user.settings.language),
+            description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user.settings.language),
             keyboard=custom_keyboard
             or [
                 [

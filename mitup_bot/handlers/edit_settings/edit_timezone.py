@@ -10,7 +10,7 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.utils import ButtonMessages, SettingsMessages
+from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -26,11 +26,11 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
     logging.debug("Enter into callback_query_settings_timezone")
 
     user = guards.current_user(update, session)
-    message = SettingsMessages.SET_TIMEZONE_SETTINGS.get(lang=user.lang, timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
 
     context.store_on_exit(
         ContextId.EDIT_SETTINGS_TIMEZONE,
-        SettingsMessages.EDIT_TIMEZONE_ON_EXIT.get(lang=user.lang),
+        SettingsMessages.TIMEZONE_ON_EXIT.get(lang=user.lang),
         cb.CANCEL_SETTINGS,
     )
 
@@ -55,7 +55,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
         logging.warning(f"The user {user.db_id} tried to set a timezone {address} that is not correct. Trying again")
 
         view = MitupView(
-            description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang),
+            description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
@@ -73,7 +73,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
 
     session.flush()
 
-    message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
 
     await context.api.send_message(update=update, view=view)
@@ -95,7 +95,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
         logging.warning(f"The user {user.db_id} tried to set a location {location} that is not correct. Trying again")
 
         view = MitupView(
-            description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user.lang),
+            description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
@@ -113,7 +113,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
 
     session.flush()
 
-    message = SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
 
     await context.api.send_message(update=update, view=view)

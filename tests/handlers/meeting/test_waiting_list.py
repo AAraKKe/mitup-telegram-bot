@@ -5,7 +5,7 @@ import pytest
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingJoinMessages
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -28,7 +28,7 @@ def full_meeting():
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(123))], indirect=True)
 @pytest.mark.parametrize(
     "is_full,response",
-    [[True, MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST], [False, MeetingMessages.JOINED_MEETING_SUCCESS]],
+    [[True, MeetingJoinMessages.JOIN_FULL_WAITING_LIST], [False, MeetingJoinMessages.JOIN_SUCCESS]],
     ids=["full", "not_full"],
 )
 async def test_user_joins_waiting_list_with_full_meeting(
@@ -37,7 +37,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     is_full: bool,
-    response: MeetingMessages,
+    response: MeetingJoinMessages,
 ):
     full_meeting.max_members = 1 if is_full else 2
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
@@ -109,7 +109,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     # The user who was promoted has been notified
     context.api.assert_send_message_to_user_called(
         user=second_user,
-        view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
             lang=second_user.lang, meeting_title=full_meeting.title
         ),
     )
@@ -175,7 +175,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     # The user who was promoted has been notified
     context.api.assert_send_message_to_user_called(
         user=second_waiting_user,
-        view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
     )
@@ -227,14 +227,14 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     # The users who were promoted have been notified
     context.api.assert_send_message_to_user_called(
         user=first_waiting_user,
-        view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,
     )
     context.api.assert_send_message_to_user_called(
         user=second_waiting_user,
-        view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
             lang=second_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,

@@ -11,7 +11,7 @@ from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingEditLocationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -74,14 +74,14 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, callback_data.id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_LOCATION_NAME,
-        MeetingMessages.EDIT_MEETING_LOCATION_NAME_ON_EXIT.get(lang=user.lang),
+        MeetingEditLocationMessages.NAME_ON_EXIT.get(lang=user.lang),
         cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
     )
 
     await context.api.send_message(
         update=update,
         view=MitupView(
-            description=MeetingMessages.EDIT_MEETING_LOCATION_NAME.get(lang=user.lang),
+            description=MeetingEditLocationMessages.NAME_PROMPT.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
@@ -139,14 +139,14 @@ async def callback_edit_meeting_location_coordinates(session: Session, update: U
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, callback_data.id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_LOCATION_COORDINATES,
-        MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES_ON_EXIT.get(lang=user.lang),
+        MeetingEditLocationMessages.COORDINATES_ON_EXIT.get(lang=user.lang),
         cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
     )
 
     await context.api.send_message(
         update=update,
         view=MitupView(
-            description=MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES.get(lang=user.lang),
+            description=MeetingEditLocationMessages.COORDINATES_PROMPT.get(lang=user.lang),
             keyboard=[
                 [
                     ButtonConfig(
@@ -184,7 +184,7 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
     session.flush()
 
     response_view = edit_location_view(meeting).with_context(
-        MeetingMessages.LOCATION_NAME_SET_SUCCESS.get(name=meeting.location.name)
+        MeetingEditLocationMessages.NAME_SUCCESS.get(name=meeting.location.name)
     )
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(session=session, meeting=meeting)
@@ -220,7 +220,7 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
     session.flush()
 
     response_view = edit_location_view(meeting).with_context(
-        MeetingMessages.LOCATION_COORDINATES_SUCCESS.get(lang=user.lang)
+        MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user.lang)
     )
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(session=session, meeting=meeting)
@@ -238,7 +238,7 @@ async def edit_coordinates_without_location(session: Session, update: Update, co
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, ensure_clean=False) as meeting_id:
             view = MitupView(
-                description=MeetingMessages.LOCATION_COORDINATES_WRONG.get(lang=user.lang),
+                description=MeetingEditLocationMessages.COORDINATES_INVALID.get(lang=user.lang),
                 keyboard=[
                     [
                         ButtonConfig(

@@ -7,7 +7,7 @@ from telegram import Update
 from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.models import User
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -37,7 +37,7 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
         update=update,
         view=factory.confirmation_view(
             lang=user.lang,
-            message=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(callback_data.id),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(callback_data.id),
         ),
@@ -70,7 +70,7 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
     session.delete(meeting)
 
     view = MitupView(
-        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(lang=user.lang),
+        description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -102,5 +102,5 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
 
     await context.api.edit_message(
         update=update,
-        view=meeting.main_view.with_context(MeetingMessages.DELETE_MEETING_DECLINE.get(lang=user.lang)),
+        view=meeting.main_view.with_context(MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user.lang)),
     )

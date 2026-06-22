@@ -9,7 +9,7 @@ from mitup_bot.handlers.meeting import MeetingHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.fixtures import create_joined_link, create_user
@@ -57,7 +57,7 @@ async def test_delete_meeting_works(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
-            message=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
         ),
@@ -169,7 +169,7 @@ async def test_confirm_delete_meeting_works(
     mock_session.assert_deleted(meeting_deleted)
 
     expected_view = MitupView(
-        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(lang=user_with_settings.lang),
+        description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -200,7 +200,7 @@ async def test_decline_delete_meeting_works(
     context.api.assert_edit_message_called(
         update,
         user_with_settings.meetups[0].main_view.with_context(
-            MeetingMessages.DELETE_MEETING_DECLINE.get(lang=user_with_settings.lang)
+            MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user_with_settings.lang)
         ),
     )
 

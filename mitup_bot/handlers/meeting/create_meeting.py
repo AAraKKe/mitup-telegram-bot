@@ -12,7 +12,7 @@ from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -51,7 +51,7 @@ async def callback_query_create_meeting(
 
     context.store_on_exit(
         ContextId.CREATE_MEETING,
-        MeetingMessages.CREATE_MEETING_ON_EXIT.get(lang=user.lang),
+        MeetingCreationMessages.ON_EXIT.get(lang=user.lang),
         cb.CANCEL_CREATE_MEETING,
     )
 
@@ -94,7 +94,7 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
     session.add(meetup)
     session.flush()
 
-    success_message = MeetingMessages.CREATED_SUCCESS.get(title=meetup.title, lang=user.lang)
+    success_message = MeetingCreationMessages.SUCCESS.get(title=meetup.title, lang=user.lang)
     view = meetup.edit_view.with_context(success_message)
     await context.api.send_message(update=update, view=view)
     context.put_feature_metric(Feature.CREATE_MEETING)
@@ -111,7 +111,7 @@ async def create_meeting_invalid_title_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     user = guards.current_user(update, session)
-    error_msg = MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY.get(lang=user.lang)
+    error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user.lang)
     view = views.factory.create_meeting_view(lang=user.lang, message=error_msg)
     await context.api.send_message(update=update, view=view)
     return ConversationMeetingState.TITLE

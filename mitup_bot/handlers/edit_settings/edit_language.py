@@ -46,7 +46,7 @@ async def callback_query_set_timezone(session: Session, update: Update, context:
     session.flush()
 
     view = views.factory.settings_set_language_view(lang=new_language).with_context(
-        SettingsMessages.LANGUAGE_SET_SUCCESS.get(lang=new_language)
+        SettingsMessages.LANGUAGE_SUCCESS.get(lang=new_language)
     )
 
     await context.api.edit_message(update=update, view=view)

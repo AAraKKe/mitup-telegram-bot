@@ -12,7 +12,7 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_description import callback_qu
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
 from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
@@ -27,7 +27,7 @@ from tests.helpers.stub_db import MockDbSession
         ),
         (
             UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(2)),
-            lambda lang: MeetingMessages.MEETING_WITHOUT_DESCRIPTION.get(lang=lang),
+            lambda lang: MeetingDisplayMessages.DESCRIPTION_EMPTY.get(lang=lang),
         ),
     ],
     ids=["meeting_with_a_previous_description", "meeting_without_a_previous_description"],
@@ -55,7 +55,7 @@ async def test_callback_query_edit_meeting_description_works(
     meeting_id = context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id
 
     view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_DESCRIPTION.get(
+        description=MeetingEditContentMessages.DESCRIPTION_PROMPT.get(
             lang=user_with_settings.lang, description=expected_description(user_with_settings.lang)
         ),
         keyboard=[

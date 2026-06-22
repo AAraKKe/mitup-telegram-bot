@@ -6,7 +6,7 @@ from telegram import Update
 from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
@@ -38,7 +38,7 @@ async def callback_query_show_meetings(session: Session, update: Update, context
         if meeting.title and meeting.title.strip()
     ]:
         view = PaginatedMitupView(
-            description=MeetingMessages.ACTIVE_MEETINGS_PAGE.get(lang=user.lang),
+            description=MeetingListMessages.ACTIVE_DESCRIPTION.get(lang=user.lang),
             buttons=user_meetings_buttons,
             page_number=callback_data.id,
             navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
@@ -56,7 +56,7 @@ async def callback_query_show_meetings(session: Session, update: Update, context
     else:
         view = factory.main_menu_view(
             lang=user.lang,
-            message=MeetingMessages.NO_MEETINGS_FOUND.get(
+            message=MeetingListMessages.ACTIVE_EMPTY.get(
                 lang=user.settings.language,
                 new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user.settings.language),
             ),

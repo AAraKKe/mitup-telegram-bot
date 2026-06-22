@@ -9,7 +9,7 @@ from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHan
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingInviteMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
 from tests.helpers import AnyFloat, MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
@@ -58,14 +58,14 @@ async def test_invite_users_by_registered_user(
 
     expected_view = views.factory.request_information_with_cancel_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.INVITE_USER_PROMPT.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.PROMPT.get(lang=user_with_settings.lang),
         callback_data=cb.CANCEL_INVITE_USER.with_id(MEETING_ID),
     )
 
     if external_chat:
         context.api.assert_answer_callback_query_called(
             handler_context.update,
-            text=MeetingMessages.INVITE_USER_GO_PRIVATE.get(lang=user_with_settings.lang),
+            text=MeetingInviteMessages.GO_PRIVATE.get(lang=user_with_settings.lang),
             show_alert=True,
         )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
@@ -91,7 +91,7 @@ async def test_invite_users_by_unregistered_user(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.INVITE_USER_OPEN_CHAT.get(lang=user_with_settings.lang),
+        text=MeetingInviteMessages.OPEN_CHAT.get(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -114,7 +114,7 @@ async def test_invite_with_id_of_meeting_does_not_exist(
 
     result.last_context.api.assert_answer_callback_query_called(
         update=result.last_context.get_update(),
-        text=MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK.get(lang=user_with_settings.lang),
+        text=MeetingInviteMessages.MEETING_NOT_FOUND.get(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -147,7 +147,7 @@ async def test_invite_users_ask_for_name(
     # User has been asked to confirm the name
     expected_view = views_factory.confirmation_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.INVITE_USER_CONFIRMATION.get(
+        message=MeetingInviteMessages.CONFIRMATION.get(
             lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
         ),
         confirm_callback_data=cb.CONFIRM_INVITE_USER.with_id(MEETING_ID),
@@ -192,7 +192,7 @@ async def test_cancel_name_request(
     # User has been sent back to the main menu
     expected_view = views.factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.INVITE_USERS_CANCELED.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang),
     )
 
     cancel_step.context.api.assert_edit_message_called(
@@ -238,9 +238,7 @@ async def test_complete_user_invitation(
     # With the proper view depending on who invited the user
     expected_view = meeting.main_view if owner_id == 123 else meeting.external_view
     expected_view = expected_view.with_context(
-        MeetingMessages.INVITE_USER_SUCCESS.get(
-            lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
-        )
+        MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )
 
     confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
@@ -286,7 +284,7 @@ async def test_invite_user_decline_confirmation(
 
     cancel_context = result.last_context
 
-    message = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user_with_settings.lang)
+    message = MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang)
 
     if owner_id == 123:
         expected_view = meeting.view_for(user_with_settings).with_context(message)
@@ -339,9 +337,7 @@ async def test_invite_user_adds_to_the_waiting_list(
 
     # User has been sent confirmation of the invitation to the waiting list
     expected_view = meeting.main_view.with_context(
-        MeetingMessages.INVITE_USER_SUCCESS.get(
-            lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
-        )
+        MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )
 
     confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
@@ -376,7 +372,7 @@ def deacivate_meeting(meeting: Meetup):
                 ConversationStep.message("Bruce Wayne"),
             ],
             [fill_meeting, None],
-            MeetingMessages.INVITE_USER_MEETING_FULL,
+            MeetingInviteMessages.MEETING_FULL,
         ],
         [
             [
@@ -384,7 +380,7 @@ def deacivate_meeting(meeting: Meetup):
                 ConversationStep.message("Bruce Wayne"),
             ],
             [disable_invitations, None],
-            MeetingMessages.INVITE_USER_INVITES_DISABLED,
+            MeetingInviteMessages.INVITES_DISABLED,
         ],
         [
             [
@@ -393,7 +389,7 @@ def deacivate_meeting(meeting: Meetup):
                 ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID)),
             ],
             [None, fill_meeting, None],
-            MeetingMessages.INVITE_USER_MEETING_FULL,
+            MeetingInviteMessages.MEETING_FULL,
         ],
         [
             [
@@ -402,7 +398,7 @@ def deacivate_meeting(meeting: Meetup):
                 ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID)),
             ],
             [None, disable_invitations, None],
-            MeetingMessages.INVITE_USER_INVITES_DISABLED,
+            MeetingInviteMessages.INVITES_DISABLED,
         ],
         [
             [
@@ -410,7 +406,7 @@ def deacivate_meeting(meeting: Meetup):
                 ConversationStep.message("Bruce Wayne"),
             ],
             [deacivate_meeting, None],
-            MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND,
+            MeetingInviteMessages.MEETING_LOST_RETRY,
         ],
         [
             [
@@ -419,7 +415,7 @@ def deacivate_meeting(meeting: Meetup):
                 ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID)),
             ],
             [None, deacivate_meeting, None],
-            MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND,
+            MeetingInviteMessages.MEETING_LOST_RETRY,
         ],
     ],
     ids=[
@@ -438,7 +434,7 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
     meeting: Meetup,
     steps: list[ConversationStep],
     after_callbacks: list[None | Callable[[Meetup], None]],
-    expected_message: MeetingMessages,
+    expected_message: MeetingInviteMessages,
 ):
     setup_db(mock_session, user_with_settings, meeting)
 
@@ -482,9 +478,9 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 @pytest.mark.parametrize(
     "meeting_modifier, expected_message",
     [
-        [disable_invitations, MeetingMessages.INVITE_USER_INVITES_DISABLED],
-        [fill_meeting, MeetingMessages.INVITE_USER_MEETING_FULL],
-        [deacivate_meeting, MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK],
+        [disable_invitations, MeetingInviteMessages.INVITES_DISABLED],
+        [fill_meeting, MeetingInviteMessages.MEETING_FULL],
+        [deacivate_meeting, MeetingInviteMessages.MEETING_NOT_FOUND],
     ],
     ids=[
         "invitations_disabled",
@@ -498,7 +494,7 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
     mock_session: MockDbSession,
     meeting: Meetup,
     meeting_modifier: Callable[[Meetup], None],
-    expected_message: MeetingMessages,
+    expected_message: MeetingInviteMessages,
 ):
     setup_db(mock_session, user_with_settings, meeting)
     meeting_modifier(meeting)
@@ -539,7 +535,7 @@ async def test_decline_user_invitation_when_meeting_no_longer_allows_invitations
 
     expected_view = views_factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.INVITE_USERS_CANCELED.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang),
     )
     context.api.assert_edit_message_called(handler_context.update, expected_view)
 
@@ -569,7 +565,7 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
     # Main menu should have been sent with the unexpected-updates message
     expected_view = views_factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user_with_settings.lang),
     )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
 

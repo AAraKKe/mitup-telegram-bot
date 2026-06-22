@@ -7,7 +7,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils import ButtonMessages, InlineViewMessages
+from mitup_bot.utils import ButtonMessages, InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
@@ -27,7 +27,7 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
     user = User.by_tg_user_id(session, update.effective_user.id) if update.effective_user else None
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
 
-    button_text = InlineViewMessages.CREATE_NEW_MEETING_BUTTON if user else InlineViewMessages.EXPLORE_MITUP_BUTTON
+    button_text = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON
     button = InlineResultsButton(
         text=button_text.get_text(lang=lang),
         start_parameter="inline",
@@ -35,7 +35,7 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
 
     results: list[MitupInlineView] = [
         MitupInlineView(
-            description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE.get(lang=lang),
+            description=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.get(lang=lang),
             keyboard=[
                 [
                     ButtonConfig(
@@ -45,8 +45,8 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
                 ],
             ],
             id="meetings_in_this_chat",
-            title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang),
-            inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang),
+            title=InlineQueryMessages.CHAT_MEETINGS_TITLE.get(lang=lang),
+            inline_description=InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION.get(lang=lang),
         ),
     ]
 

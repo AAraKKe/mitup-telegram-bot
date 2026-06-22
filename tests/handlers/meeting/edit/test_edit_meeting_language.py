@@ -6,7 +6,7 @@ from mitup_bot.models import Message, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingEditLanguageMessages
 from mitup_bot.views import factory
 from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
@@ -86,7 +86,7 @@ async def test_callback_set_meeting_language(
     context.api.assert_edit_message_called(
         update,
         factory.meeting_set_language_view(meeting=meeting).with_context(
-            MeetingMessages.LANGUAGE_SET_SUCCESS.get(lang=meeting.user_language)
+            MeetingEditLanguageMessages.SUCCESS.get(lang=meeting.user_language)
         ),
     )
 

@@ -70,11 +70,11 @@ async def test_meeting_start(
     assert link_2.notification_sent
 
     view1 = MitupView(
-        description=NotificationMessages.MEETING_STARTING.get(lang=joined_1.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTING_SOON.get(lang=joined_1.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     view2 = MitupView(
-        description=NotificationMessages.MEETING_STARTING.get(lang=joined_2.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTING_SOON.get(lang=joined_2.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     api.assert_send_message_to_user_called(user=joined_1, view=view1, times=2)
@@ -190,11 +190,11 @@ async def test_forbidden_message_sent(
     assert link_2.notification_sent
 
     view1 = MitupView(
-        description=NotificationMessages.MEETING_STARTING.get(lang=joined_1.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTING_SOON.get(lang=joined_1.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     view2 = MitupView(
-        description=NotificationMessages.MEETING_STARTING.get(lang=joined_2.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTING_SOON.get(lang=joined_2.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     api.assert_send_message_to_user_called(user=joined_1, view=view1, times=2)

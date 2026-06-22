@@ -93,6 +93,6 @@ class Settings(BaseModel, SQLModel, table=True):
         ]
 
         return MitupView(
-            SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE.get(lang=self.language),
+            SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION.get(lang=self.language),
             keyboard=keyboard,
         ).with_back_button(ButtonMessages.SETTINGS, self.language, cb.SETTINGS)

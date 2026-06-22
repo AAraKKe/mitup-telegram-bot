@@ -7,9 +7,8 @@ from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.main_menu.show_past_meetings import callback_query_show_past_meeting_page
 from mitup_bot.models import User
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
@@ -46,7 +45,7 @@ async def test_show_past_meetings_entry_shows_correct_view(
         ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
     ]
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=expected_buttons,
         page_number=1,
         navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
@@ -80,7 +79,7 @@ async def test_show_past_meetings_page_navigation_shows_correct_view(
         ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
     ]
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=expected_buttons,
         page_number=1,
         navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
@@ -113,7 +112,7 @@ async def test_show_past_meetings_excludes_active_meetings(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=[ButtonConfig(text=str(past.title), callback_data=cb.SHOW_PAST_MEETING.with_id(past.db_id))],
         page_number=1,
         navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
@@ -144,6 +143,6 @@ async def test_show_past_meetings_without_past_meetings_shows_main_menu(
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.NO_PAST_MEETINGS.get(lang=user_with_settings.lang),
+        message=MeetingListMessages.PAST_EMPTY.get(lang=user_with_settings.lang),
     )
     context.api.assert_edit_message_called(update, expected_view)

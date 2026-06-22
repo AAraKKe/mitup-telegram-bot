@@ -6,7 +6,7 @@ from telegram import Update
 from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Meetup, User
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
@@ -16,7 +16,7 @@ from .enums import MeetingHandlerId
 
 
 def _past_meeting_view(meeting: Meetup, user: User) -> MitupView:
-    description = MeetingMessages.PAST_MEETING_DESCRIPTION.get(lang=user.lang)
+    description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
     return MitupView(
         meeting.message,
         [
@@ -61,7 +61,7 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
         update=update,
         view=factory.confirmation_view(
             lang=user.lang,
-            message=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(callback_data.id),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(callback_data.id),
         ),
@@ -121,7 +121,7 @@ async def callback_query_confirm_delete_past_meeting(session: Session, update: U
     session.delete(full_meeting)
 
     view = MitupView(
-        description=MeetingMessages.DELETE_MEETING_SUCCESS.get(lang=user.lang),
+        description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user.lang),
         keyboard=[
             [
                 ButtonConfig(

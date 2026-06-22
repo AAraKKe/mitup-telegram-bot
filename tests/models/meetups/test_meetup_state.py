@@ -6,7 +6,7 @@ import pytest
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.emojis import Emojis
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import create_meetup, create_user
 
@@ -121,7 +121,7 @@ def test_datetime_section_no_datetime_shows_single_clock_line(user_with_settings
 
     # A single "--- CLOCK <not set>" line followed by \n
     assert text.startswith(f"--- {Emojis.CLOCK.value} ")
-    assert MeetingMessages.DATE_NOT_SET.get_text(lang=meeting.lang) in text
+    assert MeetingDisplayMessages.DATE_NOT_SET.get_text(lang=meeting.lang) in text
     assert Emojis.START.value not in text
     assert Emojis.STOP.value not in text
 
@@ -156,8 +156,8 @@ def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user
     assert Emojis.START.value in text
     assert Emojis.STOP.value in text
     # Both lines are present
-    start_label = MeetingMessages.MEETING_START_TIME.get_text(lang=meeting.lang)
-    stop_label = MeetingMessages.MEETING_STOP_TIME.get_text(lang=meeting.lang)
+    start_label = MeetingDisplayMessages.START_LABEL.get_text(lang=meeting.lang)
+    stop_label = MeetingDisplayMessages.END_LABEL.get_text(lang=meeting.lang)
     assert start_label in text
     assert stop_label in text
 
@@ -173,7 +173,7 @@ def test_plain_datetime_fallback_when_no_datetime_set(user_with_settings: User):
     result = meeting._plain_datetime
 
     # Line 251: the else-branch returning the localised "date not set" string
-    expected = MeetingMessages.DATE_NOT_SET.get_text(lang=meeting.lang)
+    expected = MeetingDisplayMessages.DATE_NOT_SET.get_text(lang=meeting.lang)
     assert result == expected  # plain str, not FormattedText
 
 
@@ -283,7 +283,7 @@ def test_view_includes_in_progress_label_when_in_progress(user_with_settings: Us
 
     view = get_view(meeting)
     # main_view and external_view always use the owner's settings language
-    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.user_language)
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.user_language)
     assert expected_text in view.description.text
 
 
@@ -297,7 +297,7 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_language(user_w
 
     view = meeting.inline_view()
     # meeting.lang resolves to meeting.language ("en") since it is explicitly set
-    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
     assert expected_text in view.description.text
 
 
@@ -313,7 +313,7 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(use
 
     view = meeting.inline_view()
     # meeting.lang falls through to meeting.user_language when language is None
-    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
     assert expected_text in view.description.text
 
 
@@ -332,7 +332,7 @@ def test_view_excludes_in_progress_label_when_not_in_progress(user_with_settings
 
     view = get_view(meeting)
     # main_view and external_view always use the owner's settings language
-    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.user_language)
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.user_language)
     assert expected_text not in view.description.text
 
 
@@ -343,7 +343,7 @@ def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_s
 
     view = meeting.inline_view()
     # inline_view uses meeting.lang (meeting.language or meeting.user_language)
-    expected_text = MeetingMessages.MEETING_IN_PROGRESS.get_text(lang=meeting.lang)
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
     assert expected_text not in view.description.text
 
 

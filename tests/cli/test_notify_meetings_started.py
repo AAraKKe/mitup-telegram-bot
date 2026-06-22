@@ -106,11 +106,11 @@ async def test_started_notification_sent_to_participants(
 
     # Both participants received the notification
     view_a = MitupView(
-        description=NotificationMessages.MEETING_STARTED.get(lang=participant_a.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTED.get(lang=participant_a.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     view_b = MitupView(
-        description=NotificationMessages.MEETING_STARTED.get(lang=participant_b.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTED.get(lang=participant_b.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     # Both assertions use times=2 because the mock tracks all calls to send_message_to_user
@@ -181,7 +181,7 @@ async def test_waiting_list_participants_not_notified(
 
     # The waiting-list user's send_message_to_user was never called
     MitupView(
-        description=NotificationMessages.MEETING_STARTED.get(lang=waiting.lang, meeting_title=meeting.title),
+        description=NotificationMessages.STARTED.get(lang=waiting.lang, meeting_title=meeting.title),
         keyboard=[],
     )
     # assert it was called 0 times for the waiting user — use the low-level mock

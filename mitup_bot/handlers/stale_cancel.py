@@ -8,7 +8,7 @@ from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.db import with_async_session
 from mitup_bot.handler_id import HandlerId
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import CommonMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from .registry import HandlersRegistry
@@ -35,7 +35,7 @@ async def callback_query_stale_cancel(session: Session, update: Update, context:
     logger.debug("Enter into callback_query_stale_cancel")
     user = guards.current_user(update, session)
 
-    alert_text = MeetingMessages.STALE_CANCEL_BUTTON.get(lang=user.lang)
+    alert_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user.lang)
     await context.api.answer_callback_query(update, text=alert_text, show_alert=True)
 
     await context.api.clear_reply_markup(update)

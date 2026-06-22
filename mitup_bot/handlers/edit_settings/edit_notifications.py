@@ -10,7 +10,7 @@ from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
-from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
 
@@ -24,7 +24,7 @@ def notification_status(user: User) -> FormattedText:
 
 
 def edit_notification_view(user: User) -> MitupView:
-    message = SettingsMessages.NOTIFICATIONS_SETTINGS.get(
+    message = SettingsMessages.NOTIFICATIONS_DESCRIPTION.get(
         lang=user.lang,
         notifications_status=notification_status(user),
         notifications_time=user.settings.notification_time,
@@ -74,7 +74,7 @@ async def callback_query_toggle_notifications(session: Session, update: Update, 
 @with_async_session
 async def callback_query_set_notification_time(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
-    message = SettingsMessages.NOTIFICATION_SET_TIME.get(lang=user.lang)
+    message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(
         lang=user.lang, message=message, callback_data=cb.EDIT_NOTIFICATIONS
@@ -98,7 +98,7 @@ async def settings_notification_time_text_message_handler(session: Session, upda
     user.settings.notification_time = notification_time
     session.flush()
 
-    message = SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS.get(
+    message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.get(
         lang=user.lang, notifications_time=user.settings.notification_time
     )
     view = edit_notification_view(user).with_context(message)
@@ -114,7 +114,7 @@ async def settings_notification_time_text_message_handler(session: Session, upda
 @with_async_session
 async def settings_notification_time_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
-    message = SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user.lang)
+    message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(
         lang=user.lang, message=message, callback_data=cb.EDIT_NOTIFICATIONS

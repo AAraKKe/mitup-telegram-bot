@@ -24,7 +24,7 @@ from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
 from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
@@ -810,7 +810,7 @@ async def test_callback_fails_when_meeting_not_found(
     context.api.assert_edit_message_called(
         update,
         MitupView(
-            description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
+            description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user_with_settings.lang),
             keyboard=keyboard,
         ),
     )

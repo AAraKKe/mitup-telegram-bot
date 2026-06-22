@@ -6,7 +6,7 @@ from mitup_bot.guards import user_language, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, Message
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils import InlineViewMessages
+from mitup_bot.utils import InlineQueryMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView
 
@@ -47,11 +47,11 @@ async def search_chat_meetings(session: Session, update: Update, context: TMitup
     else:
         results = [
             MitupInlineView(
-                description=InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE.get(lang=lang),
+                description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
                 keyboard=[],
                 id="no_meetings_found",
-                title=InlineViewMessages.NO_MEETINGS_FOUND_TITLE.get(lang=lang),
-                inline_description=InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION.get(lang=lang),
+                title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
+                inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),
             ),
         ]
 

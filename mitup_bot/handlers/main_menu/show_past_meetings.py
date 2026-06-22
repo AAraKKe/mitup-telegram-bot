@@ -7,7 +7,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import User
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
@@ -26,7 +26,7 @@ async def _show_past_meetings(user: User, page_number: int, update: Update, cont
         for meeting in past_meetings
     ]:
         view = PaginatedMitupView(
-            description=MeetingMessages.PAST_MEETINGS_PAGE.get(lang=user.lang),
+            description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user.lang),
             buttons=buttons,
             page_number=page_number,
             navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
@@ -43,7 +43,7 @@ async def _show_past_meetings(user: User, page_number: int, update: Update, cont
     else:
         view = factory.main_menu_view(
             lang=user.lang,
-            message=MeetingMessages.NO_PAST_MEETINGS.get(lang=user.lang),
+            message=MeetingListMessages.PAST_EMPTY.get(lang=user.lang),
         )
 
     await context.api.edit_message(update=update, view=view)

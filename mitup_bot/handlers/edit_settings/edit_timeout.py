@@ -8,7 +8,7 @@ from mitup_bot import guards, views
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import SettingsMessages
+from mitup_bot.utils.messages import CommonMessages, SettingsMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId
@@ -20,7 +20,7 @@ from .enums import ConversationSettingsState, EditSettingsHandlerId
 @with_async_session
 async def callback_query_timeout(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
-    message = SettingsMessages.SET_TIMEOUT_SETTINGS.get(lang=user.lang, timeout=user.settings.timeout)
+    message = SettingsMessages.TIMEOUT_PROMPT.get(lang=user.lang, timeout=user.settings.timeout)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
@@ -42,7 +42,7 @@ async def settings_timeout_text_message_handler(session: Session, update: Update
     user.settings.timeout = timeout
     session.flush()
 
-    message = SettingsMessages.TIMEOUT_SET_SUCCESS.get(lang=user.lang, timeout=user.settings.timeout)
+    message = SettingsMessages.TIMEOUT_SUCCESS.get(lang=user.lang, timeout=user.settings.timeout)
     view = views.factory.settings_view(lang=user.lang, message=message)
 
     await context.api.send_message(update=update, view=view)
@@ -54,7 +54,7 @@ async def settings_timeout_text_message_handler(session: Session, update: Update
 @with_async_session
 async def settings_timeout_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
     user = guards.current_user(update, session)
-    message = SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user.lang)
+    message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 

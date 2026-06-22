@@ -60,7 +60,7 @@ async def test_notify_meeting_about_to_be_deleted(
     await metrics_client.flush()
 
     expected_view = MitupView(
-        description=NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED.get(
+        description=NotificationMessages.DELETION_WARNING.get(
             lang=meeting.lang,
             meeting_title=meeting.title,
             days_until_deletion=7,
@@ -130,9 +130,7 @@ async def test_delete_meeting_successfully(
     await metrics_client.flush()
 
     expected_view = MitupView(
-        description=NotificationMessages.MEETING_PERMANENTLY_DELETED.get(
-            lang=meeting.lang, meeting_title=meeting.title
-        ),
+        description=NotificationMessages.DELETED.get(lang=meeting.lang, meeting_title=meeting.title),
         keyboard=[],
     )
 

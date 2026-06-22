@@ -8,7 +8,7 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_description import edit_descri
 from mitup_bot.handlers.meeting.edit.edit_meeting_title import edit_title_meeting_message_handler
 from mitup_bot.handlers.messages import filter_messages_without_text
 from mitup_bot.models import User
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import StubMitupContext, UpdateRequest
@@ -46,7 +46,9 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
     mock_session.assert_added(meeting)
     mock_session.assert_flushed()
 
-    view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=update.effective_message.text))
+    view = meeting.edit_view.with_context(
+        MeetingEditContentMessages.TITLE_SUCCESS.get(title=update.effective_message.text)
+    )
     context.api.assert_send_message_called(update, view)
 
 
@@ -71,7 +73,7 @@ async def test_edit_description_message_handler_update_the_description_and_send_
     mock_session.assert_flushed()
 
     view = meeting.edit_view.with_context(
-        MeetingMessages.DESCRIPTION_SET_SUCCESS.get(description=update.effective_message.text)
+        MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=update.effective_message.text)
     )
     context.api.assert_send_message_called(update, view)
 
@@ -99,7 +101,7 @@ async def test_filter_messages_without_text_shows_on_exit_prompt_when_active_con
     assert context.user_data is not None
 
     cancel_callback = cb.EDIT_MEETING_CANCEL.with_id(1)
-    on_exit_message = MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT.get(lang=user_with_settings.lang)
+    on_exit_message = MeetingEditContentMessages.TITLE_ON_EXIT.get(lang=user_with_settings.lang)
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
     context.store_on_exit(ContextId.EDIT_MEETING_TITLE, on_exit_message, cancel_callback)
 

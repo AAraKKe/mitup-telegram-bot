@@ -4,9 +4,8 @@ from telegram import Update
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_participants_view, kick_out_users_view
 from mitup_bot.models.users import User
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingEditParticipantsMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views.factory import confirmation_view
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
@@ -183,7 +182,7 @@ async def test_edit_meeting_kickout_given_participant(
         update,
         confirmation_view(
             lang=user_with_settings.lang,
-            message=MeetingMessages.KICK_OUT_PARTICIPANT_CONFIRMATION_MESSAGE.get(
+            message=MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION.get(
                 lang=user_with_settings.lang, participant="joined_user_15", meeting_title="Test Meeting 1"
             ),
             confirm_callback_data=cb.CONFIRM_KICK_OUT.with_ids(meeting_id=1, id=15),
@@ -210,7 +209,7 @@ async def test_edit_meeting_kickout_participant_no_longer_in_meeting(
     context.api.assert_edit_message_called(
         update,
         edit_participants_view(user_with_settings.meetups[0]).with_context(
-            MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING.get(lang=user_with_settings.lang)
+            MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING.get(lang=user_with_settings.lang)
         ),
     )
 
@@ -241,7 +240,7 @@ async def test_edit_meeting_kickout_participant_confirm(
         current_user=user_with_settings,
         page_number=1,
     ).with_context(
-        MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
+        MeetingEditParticipantsMessages.KICK_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
     )
 
     context.api.assert_edit_message_called(
@@ -303,7 +302,7 @@ async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
         current_user=user_with_settings,
         page_number=1,
     ).with_context(
-        MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
+        MeetingEditParticipantsMessages.KICK_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
     )
 
     context.api.assert_edit_message_called(handler_context.update, expected_view)
@@ -313,7 +312,7 @@ async def test_edit_meeting_kickout_participant_confirm_promotes_waiting_list(
 
     context.api.assert_send_message_to_user_called(
         user=participant_in_waiting_list.user,
-        view=MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
             lang=participant_in_waiting_list.user.lang, meeting_title=meeting.title
         ),
         times=times_message_sent,
@@ -347,7 +346,7 @@ async def test_edit_meeting_kickout_participant_confirm_no_more_participants(
     context.api.assert_edit_message_called(
         update,
         edit_participants_view(meeting).with_context(
-            MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS_NO_MORE_PARTICIPANTS.get(
+            MeetingEditParticipantsMessages.KICK_OUT_SUCCESS_NO_MORE.get(
                 lang=user_with_settings.lang, participant="user_5"
             )
         ),
@@ -373,7 +372,7 @@ async def test_edit_meeting_kickout_participant_confirm_no_longer_in_meeting(
     context.api.assert_edit_message_called(
         update,
         edit_participants_view(user_with_settings.meetups[0]).with_context(
-            MeetingMessages.PARTICIPANT_NO_LONGER_IN_MEETING.get(lang=user_with_settings.lang)
+            MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING.get(lang=user_with_settings.lang)
         ),
     )
 
@@ -406,7 +405,7 @@ async def test_kick_out_invited_participant(
         current_user=user_with_settings,
         page_number=1,
     ).with_context(
-        MeetingMessages.PARTICIPANT_KICKED_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
+        MeetingEditParticipantsMessages.KICK_OUT_SUCCESS.get(lang=user_with_settings.lang, participant="joined_user_10")
     )
 
     # Ensure the list of buttons does not include the participant that has been kicked out

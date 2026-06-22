@@ -35,7 +35,7 @@ def handle_forbidden(joined_link: JoinedUsers):
 
 async def send_started_notification(joined_link: JoinedUsers, api: TelegramApiWrapper) -> None:
     view = MitupView(
-        description=NotificationMessages.MEETING_STARTED.get(
+        description=NotificationMessages.STARTED.get(
             lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
         ),
         keyboard=[],

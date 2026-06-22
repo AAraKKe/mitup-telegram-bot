@@ -6,7 +6,7 @@ from telegram import Update
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingJoinMessages
 from tests.helpers import MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
 from tests.helpers.handler_context import HandlerContext
 
@@ -68,7 +68,7 @@ async def test_join_leave_blocked_when_lock_on_start_and_in_progress(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOIN_LOCKED_IN_PROGRESS.get_text(lang=user.lang),
+        text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
         show_alert=True,
     )
 

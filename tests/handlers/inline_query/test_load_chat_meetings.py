@@ -4,14 +4,14 @@ import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from mitup_bot.models import User
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import ButtonMessages, InlineViewMessages
+from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
 def _expected_view(lang: str) -> MitupView:
     return MitupView(
-        description=InlineViewMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),
+        description=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),
         keyboard=[
             [
                 ButtonConfig(

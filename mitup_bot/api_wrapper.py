@@ -30,7 +30,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 
@@ -279,7 +279,7 @@ class TelegramApi:
     ):
         users = [link.user for link in joined_users if link.invited_by is None]
         views_to_send = [
-            MeetingMessages.PROMOTED_FROM_THE_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title)
+            MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title)
             for user in users
         ]
         await self.send_messages_to_users(
@@ -409,20 +409,20 @@ class TelegramApi:
 
         # Determine the text, entities and markup based on meeting state
         if was_deleted:
-            ftext = MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=meeting.lang)
+            ftext = MeetingDisplayMessages.DELETED_BANNER.get(lang=meeting.lang)
             text = ftext.text
             entities = ftext.entities or None
             reply_markup = None
         elif has_finished:
             finished_message = (
-                MeetingMessages.MEETING_FINISHED_SUMMARY.get(
+                MeetingDisplayMessages.FINISHED_SUMMARY_BANNER.get(
                     lang=meeting.lang,
                     start_datetime=f"{meeting.datetime:%Y-%m-%d %H:%M}" if meeting.datetime else "?",
                     end_datetime=f"{meeting.end_datetime:%Y-%m-%d %H:%M}" if meeting.end_datetime else "?",
                     attendee_count=meeting.n_participants,
                 )
                 if meeting.end_datetime is not None
-                else MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang)
+                else MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang)
             )
             finished_view = view.with_context(finished_message)
             text = finished_view.description.text

@@ -12,7 +12,7 @@ from mitup_bot.handlers.meeting.edit.views import edit_location_view
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingEditLocationMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
     AnyFloat,
@@ -55,7 +55,7 @@ def test_edit_location_view(meeting: Meetup, lang: str):
 
     result = edit_location_view(meeting=meeting)
     expected_view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_LOCATION.get(lang=lang),
+        description=MeetingEditLocationMessages.DESCRIPTION.get(lang=lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -161,7 +161,7 @@ async def test_edit_location_name_works(
 
     context, result = await call_handler(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, handler_context=handler_context)
     expected_view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_LOCATION_NAME.get(lang=user_with_settings.lang),
+        description=MeetingEditLocationMessages.NAME_PROMPT.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -255,7 +255,7 @@ async def test_edit_location_coordinates_works(
         EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, handler_context=handler_context
     )
     expected_view = MitupView(
-        description=MeetingMessages.EDIT_MEETING_LOCATION_COORDINATES.get(lang=user_with_settings.lang),
+        description=MeetingEditLocationMessages.COORDINATES_PROMPT.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -354,7 +354,7 @@ async def test_edit_location_name_message_works(
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 1},
     )
     expected_view = edit_location_view(meeting).with_context(
-        MeetingMessages.LOCATION_NAME_SET_SUCCESS.get(name=meeting.location.name)
+        MeetingEditLocationMessages.NAME_SUCCESS.get(name=meeting.location.name)
     )
 
     assert meeting.location.name == "My Location"
@@ -406,7 +406,7 @@ async def test_edit_location_coordinates_message_works(
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
     expected_view = edit_location_view(meeting).with_context(
-        MeetingMessages.LOCATION_COORDINATES_SUCCESS.get(lang=user_with_settings.lang)
+        MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user_with_settings.lang)
     )
 
     assert meeting.location.coordinates == (123.4, 567.8)
@@ -459,7 +459,7 @@ async def test_edit_location_coordinates_message_with_wrong_message(
     )
 
     expected_view = MitupView(
-        description=MeetingMessages.LOCATION_COORDINATES_WRONG.get(lang=user_with_settings.lang),
+        description=MeetingEditLocationMessages.COORDINATES_INVALID.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(

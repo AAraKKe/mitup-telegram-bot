@@ -14,7 +14,13 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.entities import FormattedText
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import (
+    ButtonMessages,
+    MeetingAttachMessages,
+    MeetingDisplayMessages,
+    MeetingEditParticipantsMessages,
+    MeetingEditSettingsMessages,
+)
 from mitup_bot.views import ButtonConfig, Keyboard, MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
 from tests.helpers import UpdateRequest, create_meetup, create_user
@@ -36,20 +42,20 @@ COORDINATES = (123.1, -321.1)
 
 def expected_location_name(lang: str, expected_name: str | None, expected_coordinates: str | None) -> FormattedText:
     if expected_name is None and expected_coordinates is None:
-        return MeetingMessages.LOCATION_NOT_SET.get(lang=lang)
+        return MeetingDisplayMessages.LOCATION_NOT_SET.get(lang=lang)
     return FormattedText(f"{expected_name or ''} {expected_coordinates or ''}".strip())
 
 
 def expected_participants_message(max_participants: bool, lang: str, n_participants: int) -> str:
     participant_label = (
-        MeetingMessages.PARTICIPANT.get(lang=lang).text
+        MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text
         if n_participants == 1
-        else MeetingMessages.PARTICIPANTS.get(lang=lang).text
+        else MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=lang).text
     )
     max_text = (
-        MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=5).text
+        MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=5).text
         if max_participants
-        else f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})"
+        else f"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"
     )
     return f"{n_participants} {participant_label} {max_text}"
 
@@ -65,9 +71,9 @@ def expected_message(
     incognito: bool,
     invited_user: bool = False,
 ) -> str:
-    str_description = "Test Description" if description else MeetingMessages.DESCRIPTION_NOT_SET.get(lang=lang)
+    str_description = "Test Description" if description else MeetingDisplayMessages.DESCRIPTION_NOT_SET.get(lang=lang)
     # When datetime is set, _datetime_section returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
-    str_date = "Meeting time" if datetime else MeetingMessages.DATE_NOT_SET.get(lang=lang)
+    str_date = "Meeting time" if datetime else MeetingDisplayMessages.DATE_NOT_SET.get(lang=lang)
     owner_inline = "john_doe" if username else "John"
     location = expected_location_name(
         lang=lang,
@@ -80,11 +86,11 @@ def expected_message(
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
     str_participants = f"{incognito_prefix}{str_participants}\n  {owner_inline}"
     if invited_user:
-        invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner_inline).text
+        invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=lang, user=owner_inline).text
         str_participants += f"\n  invited_user ({invited_by_text})"
 
     return render(
-        t"Test Meeting ({MeetingMessages.CREATED_BY.get(lang=lang, owner=owner_inline)})\n\n"
+        t"Test Meeting ({MeetingDisplayMessages.CREATED_BY.get(lang=lang, owner=owner_inline)})\n\n"
         t"--- {Emojis.DESCRIPTION} {str_description}\n"
         t"--- {Emojis.CLOCK} {str_date}\n"
         t"--- {Emojis.MAP} {location}\n"
@@ -104,7 +110,7 @@ def expected_inline_message(
     invited_user: bool = False,
 ) -> str:
     owner_inline = "john_doe" if username else "John"
-    created_by = MeetingMessages.CREATED_BY.get(lang=lang, owner=owner_inline).text
+    created_by = MeetingDisplayMessages.CREATED_BY.get(lang=lang, owner=owner_inline).text
 
     str_participants = expected_participants_message(
         max_participants, lang=lang, n_participants=2 if invited_user else 1
@@ -112,7 +118,7 @@ def expected_inline_message(
     incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
     participants_list = "" if incognito else f"\n  {owner_inline}"
     if invited_user and not incognito:
-        invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=owner_inline).text
+        invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=lang, user=owner_inline).text
         participants_list += f"\n  invited_user ({invited_by_text})"
     str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
 
@@ -303,14 +309,14 @@ def test_meetup_message(
 @pytest.mark.parametrize(
     "participants,max_participants,expected",
     [
-        (1, None, lambda lang: f"1 ({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})"),
-        (0, None, lambda lang: MeetingMessages.EMPTY.get(lang=lang).text),
+        (1, None, lambda lang: f"1 ({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"),
+        (0, None, lambda lang: MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text),
         (
             0,
             2,
             lambda lang: (
-                f"{MeetingMessages.EMPTY.get(lang=lang).text} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2).text}"
+                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=2).text}"
             ),
         ),
         (1, 2, lambda lang: "(1/2)"),
@@ -374,7 +380,7 @@ def test_short_description(description: str | None, expected_description: str | 
 
 
 def build_inline_message(lang: str, meeting_datetime: datetime | None) -> str:
-    result = [f"{Emojis.JOINED} {MeetingMessages.EMPTY.get(lang=lang).text}"]
+    result = [f"{Emojis.JOINED} {MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text}"]
     if meeting_datetime:
         # inline_query_message uses _plain_datetime: plain UTC string with no timezone suffix
         result.append(f"{Emojis.CLOCK} 2024-01-12 12:30")
@@ -414,24 +420,24 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
             0,
             None,
             lambda lang: (
-                f"{MeetingMessages.EMPTY.get(lang=lang).text} "
-                f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})"
+                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
+                f"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"
             ),
         ),
         (
             1,
             None,
             lambda lang: (
-                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang).text} "
-                f"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=lang).text})|\n  Joined_0"
+                f"1 {MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text} "
+                f"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})|\n  Joined_0"
             ),
         ),
         (
             2,
             2,
             lambda lang: (
-                f"2 {MeetingMessages.PARTICIPANTS.get(lang=lang).text} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2).text}"
+                f"2 {MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=lang).text} "
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=2).text}"
                 f"|\n  Joined_0\n  Joined_1"
             ),
         ),
@@ -439,8 +445,8 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
             1,
             2,
             lambda lang: (
-                f"1 {MeetingMessages.PARTICIPANT.get(lang=lang).text} "
-                f"{MeetingMessages.MAX_PARTICIPANTS.get(lang=lang, max_participants=2).text}|\n  Joined_0"
+                f"1 {MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text} "
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=2).text}|\n  Joined_0"
             ),
         ),
     ],
@@ -583,7 +589,7 @@ def expected_meeting_settings_view(
     invitation = meeting.allow_invitation
     incognito = meeting.incognito
 
-    message = MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=lang)
+    message = MeetingEditSettingsMessages.DESCRIPTION.get(lang=lang)
     waiting_list_button = options_button(
         cb.SET_MEETING_WAITING_LIST.with_id(meeting.db_id),
         ButtonMessages.WAITING_LIST.get(lang=lang),
@@ -679,7 +685,7 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None):
         id="123",
         title=meeting.title,
         inline_description=meeting.inline_query_message,
-    ).with_footnote(MeetingMessages.NOT_SEARCHABLE_FOOTNOTE.get(lang=used_language))
+    ).with_footnote(MeetingAttachMessages.FOOTNOTE_INACTIVE.get(lang=used_language))
 
     assert expected_view == view
 
@@ -701,6 +707,6 @@ def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
         id="123",
         title=meeting.title,
         inline_description=meeting.inline_query_message,
-    ).with_footnote(MeetingMessages.SEARCHABLE_FOOTNOTE.get(lang=used_language))
+    ).with_footnote(MeetingAttachMessages.FOOTNOTE_ACTIVE.get(lang=used_language))
 
     assert expected_view == view

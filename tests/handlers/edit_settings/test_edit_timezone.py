@@ -15,7 +15,7 @@ from mitup_bot.handlers.edit_settings.edit_timezone import (
 from mitup_bot.handlers.edit_settings.entry import callback_query_settings
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
-from mitup_bot.utils import ButtonMessages, SettingsMessages
+from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import StubMitupContext, UpdateRequest
@@ -44,7 +44,7 @@ async def test_callback_query_timezone_with_correct_view(
 
     view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.SET_TIMEZONE_SETTINGS.get(
+        message=SettingsMessages.TIMEZONE_PROMPT.get(
             lang=user_with_settings.lang, timezone=user_with_settings.settings.timezone
         ),
     )
@@ -66,7 +66,7 @@ async def test_callback_query_timezone_stores_on_exit(
     assert context.user_data is not None
     on_exit = context.user_data.registry[ContextId.EDIT_SETTINGS_TIMEZONE].on_exit
     assert on_exit is not None
-    assert on_exit.message == SettingsMessages.EDIT_TIMEZONE_ON_EXIT.get(lang=user_with_settings.lang)
+    assert on_exit.message == SettingsMessages.TIMEZONE_ON_EXIT.get(lang=user_with_settings.lang)
     assert on_exit.cancel_callback == cb.CANCEL_SETTINGS
 
 
@@ -94,7 +94,7 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
 
     view = factory.settings_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(
+        message=SettingsMessages.TIMEZONE_SUCCESS.get(
             lang=user_with_settings.lang, timezone=update.effective_message.text
         ),
     )
@@ -127,7 +127,7 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
     )
 
     view = MitupView(
-        description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang),
+        description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -159,9 +159,7 @@ async def test_edit_timezone_with_location_update_correctly(
 
     view = factory.settings_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.TIMEZONE_SETTINGS_SET_SUCCESS.get(
-            lang=user_with_settings.lang, timezone="Europe/Madrid"
-        ),
+        message=SettingsMessages.TIMEZONE_SUCCESS.get(lang=user_with_settings.lang, timezone="Europe/Madrid"),
     )
 
     mock_session.assert_flushed()
@@ -194,7 +192,7 @@ async def test_edit_timezone_with_location_log_with_incorrect_coordinates(
     )
 
     view = MitupView(
-        description=SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang),
+        description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(

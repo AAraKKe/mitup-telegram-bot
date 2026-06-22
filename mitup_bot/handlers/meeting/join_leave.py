@@ -10,7 +10,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, Message, User, utils
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
@@ -41,20 +41,20 @@ async def user_joins_meeting(
     The provided user joins the meeting.
     """
 
-    async def join_operation(meeting: Meetup, user: User) -> MeetingMessages:
+    async def join_operation(meeting: Meetup, user: User) -> MeetingJoinMessages:
         if not user.joined_meeting(meeting.db_id):
             if (joined_link := meeting.add_participant(user)) is not None:
                 session.add(joined_link)
                 context.put_feature_metric(Feature.JOIN_MEETING)
                 return (
-                    MeetingMessages.JOINED_MEETING_FULL_WAITING_LIST
+                    MeetingJoinMessages.JOIN_FULL_WAITING_LIST
                     if joined_link.is_waiting_list
-                    else MeetingMessages.JOINED_MEETING_SUCCESS
+                    else MeetingJoinMessages.JOIN_SUCCESS
                 )
             else:
-                return MeetingMessages.JOINED_MEETING_FULL
+                return MeetingJoinMessages.JOIN_FULL
 
-        return MeetingMessages.JOINED_MEETING_ALREADY
+        return MeetingJoinMessages.JOIN_ALREADY_JOINED
 
     await handle_join_leave_operation(session, update, context, user, join_operation, with_notification)
 
@@ -82,7 +82,7 @@ async def handle_non_existing_user_join(session: Session, update: Update, contex
     await user_joins_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
-        text=MeetingMessages.JOINED_MEETING_UNREGISTERED.get(),
+        text=MeetingJoinMessages.JOIN_UNREGISTERED.get(),
         show_alert=True,
     )
 
@@ -105,7 +105,7 @@ async def leave_meetup(session: Session, update: Update, context: TMitupContext)
 async def user_leaves_meeting(
     session: Session, update: Update, context: TMitupContext, user: User, with_notification: bool = True
 ):
-    async def leave_operation(meeting: Meetup, user: User) -> MeetingMessages:
+    async def leave_operation(meeting: Meetup, user: User) -> MeetingJoinMessages:
         if joined_link := meeting.participant(user.db_id):
             promoted_links = meeting.remove_participant(joined_link)
             context.put_feature_metric(Feature.LEAVE_MEETING)
@@ -115,9 +115,9 @@ async def user_leaves_meeting(
                 meeting=meeting,
             )
 
-            return MeetingMessages.LEFT_MEETING_SUCCESS
+            return MeetingJoinMessages.LEAVE_SUCCESS
 
-        return MeetingMessages.LEFT_MEETING_ALREADY
+        return MeetingJoinMessages.LEAVE_NOT_JOINED
 
     await handle_join_leave_operation(session, update, context, user, leave_operation, with_notification)
 
@@ -131,7 +131,7 @@ async def handle_non_existing_user_leave(session: Session, update: Update, conte
     await user_leaves_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
-        text=MeetingMessages.LEFT_MEETING_UNREGISTERED.get(),
+        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get(),
         show_alert=True,
     )
 
@@ -141,7 +141,7 @@ async def handle_join_leave_operation(
     update: Update,
     context: TMitupContext,
     user: User,
-    operation: Callable[[Meetup, User], Awaitable[MeetingMessages]],
+    operation: Callable[[Meetup, User], Awaitable[MeetingJoinMessages]],
     with_notification: bool = True,
 ):
     """Handle common infrastructure for meeting operations (join/leave)."""
@@ -151,7 +151,7 @@ async def handle_join_leave_operation(
             await context.api.edit_message(
                 update=update,
                 view=MitupView(
-                    description=MeetingMessages.MEETING_HAS_FINISHED.get(lang=meeting.lang),
+                    description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang),
                     keyboard=[],
                 ),
             )
@@ -160,7 +160,7 @@ async def handle_join_leave_operation(
         if meeting.lock_on_start and meeting.is_in_progress:
             await context.api.answer_callback_query(
                 update=update,
-                text=MeetingMessages.JOIN_LOCKED_IN_PROGRESS.get_text(lang=user.lang),
+                text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
                 show_alert=True,
             )
             return
@@ -186,5 +186,5 @@ async def handle_join_leave_operation(
     else:
         # The meeting was not found, update the message to inform the user
         # This should never happen because when the meeting is deleted all messages are updated
-        await context.api.edit_message(update=update, view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang))
+        await context.api.edit_message(update=update, view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang))
         context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_dimensions=False)

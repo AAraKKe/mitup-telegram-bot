@@ -15,7 +15,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link, render
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDateTimeMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
@@ -43,7 +43,7 @@ from .utils import DateTimeEntityFilter, cleanup_states, safe_anchor_date
 
 
 def prepend_end_cleared_notice(*, lang: str, base_message: str | FormattedText) -> FormattedText:
-    return MeetingMessages.END_DATETIME_CLEARED_BY_START.get(lang=lang).append("\n\n").append(base_message)
+    return MeetingEditDateTimeMessages.END_CLEARED_BY_START.get(lang=lang).append("\n\n").append(base_message)
 
 
 async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting: Meetup) -> ConversationMeetingState:
@@ -51,11 +51,11 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
     context.store_meeting_id(ContextId.EDIT_MEETING_TIME, meeting.db_id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_TIME,
-        MeetingMessages.EDIT_MEETING_TIME_ON_EXIT.get(lang=lang),
+        MeetingEditDateTimeMessages.ON_EXIT.get(lang=lang),
         cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
     )
     view = MitupView(
-        description=MeetingMessages.EDIT_TIME.get(lang=lang),
+        description=CommonMessages.TIME_PROMPT.get(lang=lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -102,7 +102,7 @@ async def callback_query_date_time_entry(
     context.store_meeting_id(ContextId.EDIT_MEETING_TIME, meeting_id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_TIME,
-        MeetingMessages.EDIT_MEETING_TIME_ON_EXIT.get(lang=lang),
+        MeetingEditDateTimeMessages.ON_EXIT.get(lang=lang),
         cb.CANCEL_EDIT_START_TIME.with_id(meeting_id),
     )
 
@@ -127,7 +127,7 @@ def build_edit_datetime_entry_view(meeting: Meetup, lang: str, today: dt.date) -
         ],
     ]
     return MitupView(
-        description=MeetingMessages.DATE_TIME_VIEW_MESSAGE.get(lang=lang, datetime_link=datetime_link),
+        description=MeetingEditDateTimeMessages.DESCRIPTION.get(lang=lang, datetime_link=datetime_link),
         keyboard=keyboard,
     ).with_back_button(ButtonMessages.WHEN, lang, cb.CANCEL_EDIT_START_TIME.with_id(meeting_id))
 
@@ -258,14 +258,14 @@ async def handle_first_datetime_set(
     if end_cleared:
         await context.api.answer_callback_query(
             update,
-            text=MeetingMessages.END_DATETIME_CLEARED_BY_START.get_text(lang=lang),
+            text=MeetingEditDateTimeMessages.END_CLEARED_BY_START.get_text(lang=lang),
             show_alert=True,
         )
 
     context.store_meeting_id(ContextId.EDIT_MEETING_TIME, meeting.db_id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_TIME,
-        MeetingMessages.EDIT_MEETING_TIME_ON_EXIT.get(lang=lang),
+        MeetingEditDateTimeMessages.ON_EXIT.get(lang=lang),
         cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
     )
     done_button = ButtonConfig(
@@ -273,8 +273,8 @@ async def handle_first_datetime_set(
         callback_data=cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
     )
     assert meeting.datetime is not None
-    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
-    description = MeetingMessages.NEW_DATE_SET_SUCCESS.get(
+    datetime_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.datetime, "DT")
+    description = MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT.get(
         lang=lang,
         datetime=render(t"{datetime_entity}"),
     )
@@ -310,14 +310,16 @@ async def handle_datetime_update(
     if end_cleared:
         await context.api.answer_callback_query(
             update,
-            text=MeetingMessages.END_DATETIME_CLEARED_BY_START.get_text(lang=meeting.lang),
+            text=MeetingEditDateTimeMessages.END_CLEARED_BY_START.get_text(lang=meeting.lang),
             show_alert=True,
         )
 
     assert meeting.datetime is not None
-    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
+    datetime_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.datetime, "DT")
     today = meeting.owner.now_in_tz().date()
-    context_message = MeetingMessages.DATE_UPDATE_SUCCESS.get(lang=meeting.lang, datetime=render(t"{datetime_entity}"))
+    context_message = MeetingEditDateTimeMessages.DATE_UPDATED.get(
+        lang=meeting.lang, datetime=render(t"{datetime_entity}")
+    )
     if end_cleared:
         context_message = prepend_end_cleared_notice(lang=meeting.lang, base_message=context_message)
 
@@ -418,8 +420,10 @@ async def date_time_entity_message_handler(session: Session, update: Update, con
         session.flush()
 
         assert meeting.datetime is not None
-        datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
-        context_message = MeetingMessages.DATE_UPDATE_SUCCESS.get(
+        datetime_entity = EntityDateTime(
+            MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.datetime, "DT"
+        )
+        context_message = MeetingEditDateTimeMessages.DATE_UPDATED.get(
             lang=current_user.lang, datetime=render(t"{datetime_entity}")
         )
         if end_cleared:
@@ -450,7 +454,7 @@ async def set_time_message_handler(
         current_user = guards.current_user(update, session)
         await context.api.send_message(
             update=update,
-            view=MeetingMessages.INVALID_TIME.get(lang=current_user.lang),
+            view=CommonMessages.TIME_INVALID_VALUE.get(lang=current_user.lang),
         )
         context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
         return ConversationMeetingState.EDIT_TIME
@@ -473,8 +477,10 @@ async def set_time_message_handler(
         session.flush()
 
         assert meeting.datetime is not None
-        datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
-        context_message = MeetingMessages.EDIT_TIME_SUCCESS.get(
+        datetime_entity = EntityDateTime(
+            MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.datetime, "DT"
+        )
+        context_message = MeetingEditDateTimeMessages.TIME_SUCCESS.get(
             lang=current_user.lang, datetime=render(t"{datetime_entity}")
         )
         if end_cleared:
@@ -493,7 +499,7 @@ async def fallback_answer(session: Session, update: Update, context: TMitupConte
 
     await context.api.send_message(
         update=update,
-        view=MeetingMessages.WRONG_TIME_FORMAT.get(lang=current_user.lang),
+        view=CommonMessages.TIME_INVALID_FORMAT.get(lang=current_user.lang),
     )
 
     context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
@@ -536,7 +542,7 @@ async def datetime_state_fallback_answer(
 
     await context.api.send_message(
         update=update,
-        view=MeetingMessages.WRONG_DATETIME_MESSAGE.get(lang=current_user.lang, datetime_link=build_datetime_link()),
+        view=CommonMessages.DATETIME_INVALID.get(lang=current_user.lang, datetime_link=build_datetime_link()),
     )
 
     context.emit_metric(MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), 1)

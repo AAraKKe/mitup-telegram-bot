@@ -6,7 +6,7 @@ from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.views import MitupView
 from tests.helpers import (
     AnyFloat,
@@ -50,7 +50,7 @@ async def test_existing_user_joins_own_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_SUCCESS.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_SUCCESS.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -91,7 +91,7 @@ async def test_user_already_join_does_not_join(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_ALREADY.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -155,7 +155,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_FULL.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_FULL.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -181,7 +181,7 @@ async def test_user_join_for_non_existing_meeting(
     # The user has been notified
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user_with_settings.lang),
+        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
     )
 
 
@@ -203,7 +203,7 @@ async def test_non_existent_user_joins_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.JOINED_MEETING_UNREGISTERED.get(),
+        text=MeetingJoinMessages.JOIN_UNREGISTERED.get(),
         show_alert=True,
     )
 
@@ -231,7 +231,7 @@ async def test_user_leaves_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.LEFT_MEETING_SUCCESS.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.LEAVE_SUCCESS.get(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -261,7 +261,7 @@ async def test_non_existing_user_leaves_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.LEFT_MEETING_UNREGISTERED.get(),
+        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get(),
         show_alert=True,
     )
 
@@ -287,7 +287,7 @@ async def test_user_leave_for_non_existing_meeting(
     # The user has been notified
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user_with_settings.lang),
+        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
     )
 
 
@@ -347,7 +347,7 @@ async def test_action_on_inactive_meeting_shows_finished_message(
     context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MitupView(
-            description=MeetingMessages.MEETING_HAS_FINISHED.get(lang=inactive_meeting.lang),
+            description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=inactive_meeting.lang),
             keyboard=[],
         ),
     )

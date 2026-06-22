@@ -55,7 +55,7 @@ async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiW
         users.append(meetup.owner)
         views.append(
             MitupView(
-                description=NotificationMessages.MEETING_WILL_BE_PERMANENTLY_DELETED.get(
+                description=NotificationMessages.DELETION_WARNING.get(
                     lang=meetup.lang,
                     meeting_title=meetup.title,
                     days_until_deletion=7,
@@ -104,9 +104,7 @@ async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: Met
         users.append(meetup.owner)
         views.append(
             MitupView(
-                description=NotificationMessages.MEETING_PERMANENTLY_DELETED.get(
-                    lang=meetup.lang, meeting_title=meetup.title
-                ),
+                description=NotificationMessages.DELETED.get(lang=meetup.lang, meeting_title=meetup.title),
                 keyboard=[],
             )
         )

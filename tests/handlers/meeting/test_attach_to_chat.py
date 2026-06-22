@@ -5,7 +5,7 @@ from mitup_bot.handlers.meeting.attach_to_chat import _is_already_attached
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingAttachMessages, MeetingDisplayMessages
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -46,7 +46,7 @@ async def test_attach_to_chat_new_message(
     # The alert should be the "now searchable" one
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.NOW_SEARCHABLE_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get(),
         show_alert=True,
     )
 
@@ -89,7 +89,7 @@ async def test_attach_to_chat_existing_message_without_chat_instance(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.NOW_SEARCHABLE_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get(),
         show_alert=True,
     )
 
@@ -134,7 +134,7 @@ async def test_attach_to_chat_already_attached_in_other_chat(
     # The alert should be "now searchable" (not "already searchable")
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.NOW_SEARCHABLE_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get(),
         show_alert=True,
     )
 
@@ -170,7 +170,7 @@ async def test_attach_to_chat_already_attached_in_same_chat(
     # The "already searchable" alert should be shown
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingMessages.ALREADY_SEARCHABLE_ALERT.get(),
+        text=MeetingAttachMessages.ALREADY_ENABLED_ALERT.get(),
         show_alert=True,
     )
 
@@ -197,7 +197,7 @@ async def test_attach_to_chat_meeting_not_found(
     # The user has been notified that the meeting was deleted
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user_with_settings.lang),
+        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
     )
 
     # Stale meeting metric emitted

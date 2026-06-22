@@ -5,7 +5,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.models import Meetup, Message
 from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingAttachMessages, MeetingDisplayMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 
@@ -44,7 +44,7 @@ async def attach_to_chat(session: Session, update: Update, context: TMitupContex
 
         session.flush()
 
-        alert = MeetingMessages.ALREADY_SEARCHABLE_ALERT if already_attached else MeetingMessages.NOW_SEARCHABLE_ALERT
+        alert = MeetingAttachMessages.ALREADY_ENABLED_ALERT if already_attached else MeetingAttachMessages.ENABLED_ALERT
         await context.api.answer_callback_query(
             update=update,
             text=alert.get(),
@@ -56,6 +56,6 @@ async def attach_to_chat(session: Session, update: Update, context: TMitupContex
     else:
         await context.api.edit_message(
             update=update,
-            view=MeetingMessages.MEETING_HAS_BEEN_DELETED.get(lang=user.lang),
+            view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang),
         )
         context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_dimensions=False)

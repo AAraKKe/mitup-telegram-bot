@@ -10,7 +10,7 @@ from mitup_bot.db import with_async_session
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
-from mitup_bot.utils import ButtonMessages, MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView
@@ -45,14 +45,14 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_TITLE,
-        MeetingMessages.EDIT_MEETING_TITLE_ON_EXIT.get(lang=user.lang),
+        MeetingEditContentMessages.TITLE_ON_EXIT.get(lang=user.lang),
         cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
     )
 
     await context.api.edit_message(
         update=update,
         view=MitupView(
-            description=MeetingMessages.EDIT_MEETING_TITLE.get(title=meeting.title),
+            description=MeetingEditContentMessages.TITLE_PROMPT.get(title=meeting.title),
             keyboard=[
                 [
                     ButtonConfig(
@@ -81,7 +81,7 @@ async def edit_title_meeting_message_handler(session: Session, update: Update, c
         session.add(meeting)
         session.flush()
 
-        view = meeting.edit_view.with_context(MeetingMessages.TITLE_SET_SUCCESS.get(title=meeting.title))
+        view = meeting.edit_view.with_context(MeetingEditContentMessages.TITLE_SUCCESS.get(title=meeting.title))
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(session=session, meeting=meeting)
 

@@ -8,7 +8,7 @@ from telegram import Update
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
-from mitup_bot.utils.messages import InlineViewMessages
+from mitup_bot.utils.messages import InlineQueryMessages
 from mitup_bot.views import MitupInlineView
 from tests.helpers import (
     HandlerContext,
@@ -35,11 +35,11 @@ def make_message(*, id: int, meetup_id: int) -> Message:
 
 def no_meetings_found_view(lang: str) -> MitupInlineView:
     return MitupInlineView(
-        description=InlineViewMessages.NO_MEETINGS_FOUND_MESSAGE.get(lang=lang),
+        description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
         keyboard=[],
         id="no_meetings_found",
-        title=InlineViewMessages.NO_MEETINGS_FOUND_TITLE.get(lang=lang),
-        inline_description=InlineViewMessages.NO_MEETINGS_FOUND_DESCRIPTION.get(lang=lang),
+        title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
+        inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),
     )
 
 

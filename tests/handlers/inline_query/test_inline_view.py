@@ -8,7 +8,7 @@ import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.models import User
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import ButtonMessages, InlineViewMessages
+from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
 from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
 from tests.helpers import HandlerContext, create_meetup, create_user
 from tests.helpers.context import call_handler
@@ -18,7 +18,7 @@ from tests.helpers.stub_db import MockDbSession
 
 def _chat_card(lang: str) -> MitupInlineView:
     return MitupInlineView(
-        description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_MESSAGE.get(lang=lang),
+        description=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.get(lang=lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -28,21 +28,21 @@ def _chat_card(lang: str) -> MitupInlineView:
             ],
         ],
         id="meetings_in_this_chat",
-        title=InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get(lang=lang),
-        inline_description=InlineViewMessages.MEETINGS_IN_THIS_CHAT_DESCRIPTION.get(lang=lang),
+        title=InlineQueryMessages.CHAT_MEETINGS_TITLE.get(lang=lang),
+        inline_description=InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION.get(lang=lang),
     )
 
 
 def _inline_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
-        text=InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get_text(lang=lang),
+        text=InlineQueryMessages.CREATE_MEETING_BUTTON.get_text(lang=lang),
         start_parameter="inline",
     )
 
 
 def _explore_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
-        text=InlineViewMessages.EXPLORE_MITUP_BUTTON.get_text(lang=lang),
+        text=InlineQueryMessages.EXPLORE_BUTTON.get_text(lang=lang),
         start_parameter="inline",
     )
 
@@ -94,10 +94,10 @@ async def test_inline_view_uses_user_language(
 
     _, kwargs = context.api.call_args("answer_inline_query")
     button = kwargs["button"]
-    assert button.text == InlineViewMessages.CREATE_NEW_MEETING_BUTTON.get_text(lang=lang)
+    assert button.text == InlineQueryMessages.CREATE_MEETING_BUTTON.get_text(lang=lang)
 
     results = kwargs["results"]
-    assert results[0].title == InlineViewMessages.MEETINGS_IN_THIS_CHAT_TITLE.get_text(lang=lang)
+    assert results[0].title == InlineQueryMessages.CHAT_MEETINGS_TITLE.get_text(lang=lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)

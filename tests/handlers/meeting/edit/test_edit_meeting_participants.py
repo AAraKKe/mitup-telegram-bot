@@ -12,7 +12,7 @@ from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view, ed
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages
 from mitup_bot.views import factory
 from tests.helpers import (
     AnyFloat,
@@ -237,8 +237,8 @@ async def test_edit_meeting_no_limit_participants_works(
     assert not meeting.max_members
 
     response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
-        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(
-            max_participants=MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=user_with_settings.lang)
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(
+            max_participants=MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user_with_settings.lang)
         )
     )
     context.api.assert_send_message_called(update, response_view)
@@ -380,7 +380,7 @@ async def test_edit_meeting_max_participants_message_works(
     )
 
     expected_view = edit_participants_view(meeting).with_context(
-        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=meeting.max_members)
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
     )
 
     assert meeting.max_members == 4

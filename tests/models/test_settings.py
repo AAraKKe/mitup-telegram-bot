@@ -29,7 +29,7 @@ def expected_default_meeting_options_view(settings: Settings) -> MitupView:
     incognito = settings.default_incognito
     lock_on_start = settings.default_lock_on_start
 
-    message = SettingsMessages.DEFAULT_MEETING_OPTIONS_MESSAGE.get(lang=lang)
+    message = SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION.get(lang=lang)
     waiting_list_button = options_button(
         cb.SET_DEFAULT_WAITING_LIST, ButtonMessages.WAITING_LIST.get(lang=lang), waiting_list
     )

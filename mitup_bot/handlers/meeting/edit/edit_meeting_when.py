@@ -7,7 +7,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingEditWhenMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
@@ -49,7 +49,7 @@ async def callback_query_clear_times(session: Session, update: Update, context: 
 
     view = factory.confirmation_view(
         lang=user.lang,
-        message=MeetingMessages.CLEAR_TIMES_CONFIRMATION.get(lang=user.lang),
+        message=MeetingEditWhenMessages.CLEAR_CONFIRMATION.get(lang=user.lang),
         confirm_callback_data=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(callback_data.id),
         decline_callback_data=cb.DECLINE_DELETE_MEETING_TIMES.with_id(callback_data.id),
     )
@@ -78,7 +78,7 @@ async def callback_query_confirm_clear_times(session: Session, update: Update, c
     session.add(meeting)
     session.flush()
 
-    view = meeting.when_view.with_context(MeetingMessages.TIMES_CLEARED.get(lang=user.lang))
+    view = meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user.lang))
     await context.api.edit_message(update=update, view=view)
     await context.api.update_meeting_messages(
         session=session,
@@ -104,7 +104,7 @@ async def callback_query_decline_clear_times(session: Session, update: Update, c
     if meeting is None:
         return
 
-    view = meeting.when_view.with_context(MeetingMessages.CLEAR_TIMES_DECLINE.get(lang=user.lang))
+    view = meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user.lang))
     await context.api.edit_message(update=update, view=view)
 
 
@@ -127,7 +127,7 @@ async def callback_query_set_lock_on_start(session: Session, update: Update, con
     if meeting.end_datetime is None:
         await context.api.answer_callback_query(
             update,
-            text=MeetingMessages.LOCK_ON_START_STALE_ALERT.get_text(lang=meeting.user_language),
+            text=MeetingEditWhenMessages.LOCK_ON_START_ALERT.get_text(lang=meeting.user_language),
             show_alert=True,
         )
         return

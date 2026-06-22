@@ -11,7 +11,7 @@ from mitup_bot.db import with_async_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
@@ -75,7 +75,7 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
     context.store_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, callback_data.id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_MAX_PARTICIPANTS,
-        MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS_ON_EXIT.get(lang=user.lang),
+        MeetingEditParticipantsMessages.MAX_ON_EXIT.get(lang=user.lang),
         cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(callback_data.id),
     )
 
@@ -113,9 +113,9 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
     meeting.max_members = None
     session.flush()
 
-    no_limit_text = MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=user.lang)
+    no_limit_text = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user.lang)
     response_view = edit_participants_view(meeting).with_context(
-        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=no_limit_text)
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=no_limit_text)
     )
 
     await context.api.send_message(update=update, view=response_view)
@@ -163,7 +163,7 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
     session.flush()
 
     response_view = edit_participants_view(meeting).with_context(
-        MeetingMessages.MAX_PARTICIPANTS_SET_SUCCESS.get(max_participants=meeting.max_members)
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
     )
 
     await context.api.send_message(update=update, view=response_view)

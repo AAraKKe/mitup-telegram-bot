@@ -5,10 +5,19 @@ from typing import TYPE_CHECKING
 
 from mitup_bot.callback_data import CallbackData, DateCallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
-from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages, Messages
+from mitup_bot.utils import (
+    ButtonMessages,
+    Emojis,
+    Languages,
+    MainMenuMessages,
+    MeetingCreationMessages,
+    MeetingEditDateTimeMessages,
+    MeetingEditLanguageMessages,
+    MeetingLifecycleMessages,
+    SettingsMessages,
+)
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
-from mitup_bot.utils.messages import Languages, SettingsMessages
 from mitup_bot.views import ButtonConfig, CalendarKeyboard, GridMitupView, Keyboard, MitupView
 
 if TYPE_CHECKING:
@@ -27,7 +36,7 @@ LANGUAGE_BUTTONS = {
 
 def main_menu_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
     return MitupView(
-        message or Messages.DEFAULT_MAIN_MENU_DESCRIPTION.get(lang=lang),
+        message or MainMenuMessages.DESCRIPTION.get(lang=lang),
         keyboard=[
             [
                 ButtonConfig(text=ButtonMessages.NEW_MEETING.get(lang=lang), callback_data=cb.CREATE_MEETING),
@@ -58,7 +67,7 @@ def main_menu_view(*, lang: str, message: str | FormattedText | None = None) -> 
 
 def settings_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
     return MitupView(
-        message or Messages.DEFAULT_SETTINGS_DESCRIPTION.get(lang=lang),
+        message or SettingsMessages.DESCRIPTION.get(lang=lang),
         [
             [
                 ButtonConfig(text=ButtonMessages.LANGUAGE.get(lang=lang), callback_data=cb.EDIT_LANGUAGE),
@@ -89,7 +98,7 @@ def create_meeting_view(
         kwargs: dict[str, FormattedText] = {}
         if datetime_link is not None:
             kwargs["datetime_link"] = datetime_link
-        message = MeetingMessages.CREATE.get(lang=lang, **kwargs)
+        message = MeetingCreationMessages.PROMPT.get(lang=lang, **kwargs)
     return MitupView(
         message,
         [
@@ -130,7 +139,7 @@ def change_settings_element_view(
 
 def settings_set_language_view(*, lang: str, message: FormattedText | None = None) -> MitupView:
     language_text = LANGUAGE_BUTTONS[lang].get(lang=lang)
-    message = message or SettingsMessages.SELECT_LANGUAGE.get(lang=lang, language=language_text)
+    message = message or SettingsMessages.LANGUAGE_PROMPT.get(lang=lang, language=language_text)
     return set_language_view(lang, message, cb.SET_LANGUAGE).with_back_button(
         ButtonMessages.SETTINGS, lang, cb.SETTINGS
     )
@@ -138,7 +147,7 @@ def settings_set_language_view(*, lang: str, message: FormattedText | None = Non
 
 def meeting_set_language_view(*, meeting: Meetup) -> MitupView:
     language_text = LANGUAGE_BUTTONS[meeting.lang].get(lang=meeting.user_language)
-    message = MeetingMessages.EDIT_MEETING_LANGUAGE.get(lang=meeting.user_language, language=language_text)
+    message = MeetingEditLanguageMessages.DESCRIPTION.get(lang=meeting.user_language, language=language_text)
 
     return set_language_view(
         meeting.user_language, message, cb.SET_MEETING_LANGUAGE.with_ids(meeting.db_id, 0)
@@ -198,7 +207,11 @@ def edit_meeting_date_view(
     resolved_nav = nav_callback or cb.EDIT_MEETING_DATE
     resolved_back = back_callback or cb.EDIT_MEETING
 
-    message = MeetingMessages.ADD_DATE.get(lang=lang) if new else MeetingMessages.EDIT_DATE.get(lang=lang)
+    message = (
+        MeetingEditDateTimeMessages.DATE_ADD_PROMPT.get(lang=lang)
+        if new
+        else MeetingEditDateTimeMessages.DATE_EDIT_PROMPT.get(lang=lang)
+    )
     calendar_keyboard = CalendarKeyboard(
         anchor_date,
         current_date,
@@ -262,7 +275,7 @@ def reactivation_prompt_view(*, lang: str, meeting_id: int, back_rows: Keyboard 
         [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]
     ]
     return MitupView(
-        description=MeetingMessages.PAST_MEETING_DESCRIPTION.get(lang=lang),
+        description=MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=lang),
         keyboard=[
             [
                 ButtonConfig(

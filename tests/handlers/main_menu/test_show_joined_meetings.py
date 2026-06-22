@@ -9,9 +9,8 @@ from mitup_bot.handlers.main_menu.show_joined_meetings import callback_query_sho
 
 # Updated imports for handlers and enums:
 from mitup_bot.models import User
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import (
@@ -63,7 +62,7 @@ async def test_show_meetings_use_correct_view(
     ]
 
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.JOINED_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.JOINED_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=user_meetings_buttons,
         page_number=1,
         column_size=2,
@@ -102,7 +101,7 @@ async def test_show_meetings_filters_out_inactive_meetings(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = PaginatedMitupView(
-        description=MeetingMessages.JOINED_MEETINGS_PAGE.get(lang=user_with_settings.lang),
+        description=MeetingListMessages.JOINED_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=[
             ButtonConfig(
                 text=str(active_meetup.title),
@@ -145,7 +144,7 @@ async def test_show_meetings_shows_empty_state_when_all_joined_meetings_inactive
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.NO_JOINED_MEETINGS.get(lang=user_with_settings.lang),
+        message=MeetingListMessages.JOINED_EMPTY.get(lang=user_with_settings.lang),
     )
     context.api.assert_edit_message_called(update, expected_view)
 
@@ -163,7 +162,7 @@ async def test_show_meetings_without_meetings_to_show_works(
 
     expected_view = factory.main_menu_view(
         lang=user_with_settings.lang,
-        message=MeetingMessages.NO_JOINED_MEETINGS.get(lang=user_with_settings.lang),
+        message=MeetingListMessages.JOINED_EMPTY.get(lang=user_with_settings.lang),
     )
 
     context.api.assert_edit_message_called(update, expected_view)

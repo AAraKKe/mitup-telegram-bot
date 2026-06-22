@@ -35,7 +35,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import StubMitupContext, UpdateRequest, create_meetup, create_user
@@ -174,7 +174,7 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_exist(
         context.api.assert_edit_message_called(
             update,
             MitupView(
-                description=MeetingMessages.ACCESS_TO_DELETED_MEETING.get(lang=user_with_settings.lang),
+                description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user_with_settings.lang),
                 keyboard=keyboard(user_with_settings.lang)
                 or [
                     [
@@ -257,14 +257,14 @@ async def test_context_manager_for_registered_user(
     is_registered = user_id == 123
 
     with expectation:
-        user = await user_registered(update, mock_session, context, MeetingMessages.INVITE_USER_OPEN_CHAT)
+        user = await user_registered(update, mock_session, context, MeetingInviteMessages.OPEN_CHAT)
         if is_registered:
             assert user is not None
             assert user.tg_user_id == user_id
         else:
             context.api.assert_answer_callback_query_called(
                 update,
-                MeetingMessages.INVITE_USER_OPEN_CHAT.get(lang="en"),
+                MeetingInviteMessages.OPEN_CHAT.get(lang="en"),
                 show_alert=True,
             )
 

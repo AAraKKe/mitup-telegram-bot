@@ -13,7 +13,7 @@ from mitup_bot.handlers.registration_process.edit_registration_timezone import (
 from mitup_bot.handlers.registration_process.enums import ConversationRegistrationProcessState
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.utils import SettingsMessages
+from mitup_bot.utils import RegistrationMessages
 from mitup_bot.views import factory
 from tests.helpers import StubMitupContext, UpdateRequest, create_user
 from tests.helpers.stub_db import MockDbSession
@@ -52,7 +52,7 @@ async def test_registration_timezone_invalid_input_handler_sends_invalid_input_m
 
     context.api.assert_send_message_called(
         update,
-        SettingsMessages.REGISTRATION_TIMEZONE_INVALID_INPUT.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_INVALID_INPUT.get(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
@@ -71,7 +71,7 @@ async def test_registration_timezone_text_message_handler_sets_timezone_and_ends
     result = await registration_timezone_text_message_handler(update, context)
 
     view = factory.main_menu_view(lang=user_with_settings.lang).with_context(
-        SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone=update.effective_message.text)
+        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=update.effective_message.text)
     )
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == update.effective_message.text
@@ -93,7 +93,7 @@ async def test_registration_timezone_text_message_handler_stays_in_timezone_stat
 
     context.api.assert_send_message_called(
         update,
-        SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
@@ -112,7 +112,7 @@ async def test_registration_timezone_location_message_handler_sets_timezone_and_
     result = await registration_timezone_location_message_handler(update, context)
 
     view = factory.main_menu_view(lang=user_with_settings.lang).with_context(
-        SettingsMessages.REGISTRATION_TIMEZONE_SET_SUCCESS.get(timezone="Europe/Madrid")
+        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Madrid")
     )
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == "Europe/Madrid"
@@ -135,7 +135,7 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
 
     context.api.assert_send_message_called(
         update,
-        SettingsMessages.REGISTRATION_TIMEZONE_SET_FAIL.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 

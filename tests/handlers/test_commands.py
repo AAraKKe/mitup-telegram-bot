@@ -26,7 +26,7 @@ from mitup_bot.handlers.registration_process.enums import (
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
-from mitup_bot.utils import SettingsMessages
+from mitup_bot.utils import RegistrationMessages
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
     HandlerContext,
@@ -147,7 +147,7 @@ async def test_command_start_with_new_user(
     mock_session.assert_added()
     context.api.assert_send_message_called(
         update,
-        SettingsMessages.SET_REGISTRATION_TIMEZONE.get(first_name=update.effective_user.first_name),
+        RegistrationMessages.TIMEZONE_PROMPT.get(first_name=update.effective_user.first_name),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 

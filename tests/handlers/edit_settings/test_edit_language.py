@@ -30,7 +30,7 @@ async def test_edit_language(
     context, _ = await call_handler(EditSettingsHandlerId.LANGUAGE_CALLBACK, handler_context=handler_context)
 
     expected_view = GridMitupView(
-        description=SettingsMessages.SELECT_LANGUAGE.get(
+        description=SettingsMessages.LANGUAGE_PROMPT.get(
             lang=user_with_settings.lang,
             language=factory.LANGUAGE_BUTTONS[user_with_settings.lang].get(lang=user_with_settings.lang),
         ),
@@ -71,7 +71,7 @@ async def test_set_language(
 
     expected_view = (
         GridMitupView(
-            description=SettingsMessages.SELECT_LANGUAGE.get(
+            description=SettingsMessages.LANGUAGE_PROMPT.get(
                 lang=language,
                 language=factory.LANGUAGE_BUTTONS[language].get(lang=language),
             ),
@@ -88,7 +88,7 @@ async def test_set_language(
                 ]
             ]
         )
-        .with_context(SettingsMessages.LANGUAGE_SET_SUCCESS.get(lang=language))
+        .with_context(SettingsMessages.LANGUAGE_SUCCESS.get(lang=language))
     )
 
     assert user_with_settings.lang == language

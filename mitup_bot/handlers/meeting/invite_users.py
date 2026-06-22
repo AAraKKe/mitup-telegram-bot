@@ -9,7 +9,7 @@ from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingInviteMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views.factory import confirmation_view, main_menu_view
@@ -29,7 +29,7 @@ async def handle_invite_from_external_chat(
     """
     await send_request_for_invite_name(context, user, meeting_id)
     await context.api.answer_callback_query(
-        update, text=MeetingMessages.INVITE_USER_GO_PRIVATE.get(lang=user.lang), show_alert=True
+        update, text=MeetingInviteMessages.GO_PRIVATE.get(lang=user.lang), show_alert=True
     )
 
 
@@ -39,7 +39,7 @@ async def send_request_for_invite_name(context: TMitupContext, user: User, meeti
     """
     view = views.factory.request_information_with_cancel_view(
         lang=user.lang,
-        message=MeetingMessages.INVITE_USER_PROMPT.get(lang=user.lang),
+        message=MeetingInviteMessages.PROMPT.get(lang=user.lang),
         callback_data=cb.CANCEL_INVITE_USER.with_id(meeting_id),
     )
 
@@ -61,23 +61,20 @@ async def ensure_meeting_still_allows_invitations(
     update = context.get_update()
 
     if meeting is None:
-        if on_callback:
-            message = MeetingMessages.INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK
-        else:
-            message = MeetingMessages.INVITE_USERS_MEETING_NOT_FOUND
+        message = MeetingInviteMessages.MEETING_NOT_FOUND if on_callback else MeetingInviteMessages.MEETING_LOST_RETRY
 
         await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
     if not meeting.join_allowed():
-        message = MeetingMessages.INVITE_USER_MEETING_FULL
+        message = MeetingInviteMessages.MEETING_FULL
         await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
     if not meeting.allow_invitation:
-        message = MeetingMessages.INVITE_USER_INVITES_DISABLED
+        message = MeetingInviteMessages.INVITES_DISABLED
         await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
@@ -96,7 +93,7 @@ async def callback_query_invite_users(
     callback_data = guards.valid_callback_data(cb.INVITE.parse(context.match), MeetingHandlerId.INVITE_USERS_CALLBACK)
     meeting_id = callback_data.id
 
-    user = await guards.user_registered(update, session, context, MeetingMessages.INVITE_USER_OPEN_CHAT)
+    user = await guards.user_registered(update, session, context, MeetingInviteMessages.OPEN_CHAT)
     if user is None:
         return ConversationHandler.END
 
@@ -114,7 +111,7 @@ async def callback_query_invite_users(
     context.store_meeting_id(ContextId.INVITE_USERS, meeting_id)
     context.store_on_exit(
         ContextId.INVITE_USERS,
-        MeetingMessages.INVITE_USER_ON_EXIT.get(lang=user.lang),
+        MeetingInviteMessages.ON_EXIT.get(lang=user.lang),
         cb.CANCEL_INVITE_USER.with_id(meeting_id),
     )
 
@@ -129,7 +126,7 @@ async def callback_query_cancel_invite_user(session: Session, update: Update, co
     # Clear the stored meeting ID, send the user to the main menu and end the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
     user = guards.current_user(update, session)
-    mesage = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user.lang)
+    mesage = MeetingInviteMessages.CANCELED.get(lang=user.lang)
 
     await context.api.edit_message(
         update=update,
@@ -167,7 +164,7 @@ async def invite_users_name_message_handler(
             return ConversationHandler.END
 
         context.store_text(ContextId.INVITE_USERS, invited_user_name)
-        message = MeetingMessages.INVITE_USER_CONFIRMATION.get(
+        message = MeetingInviteMessages.CONFIRMATION.get(
             lang=user.lang, name=invited_user_name, meeting_title=meeting.title
         )
 
@@ -211,14 +208,14 @@ async def callback_query_confirm_user_invitation(session: Session, update: Updat
             # This is unexpected since we have already validated this before but there might be a race condition
             # Lets emit a fault metric and inform the user
             context.emit_metric(MetricKey.FAULT.with_prefix("InviteUserMeetingFullOnConfirm"))
-            message = MeetingMessages.INVITE_USER_MEETING_FULL.get(
+            message = MeetingInviteMessages.MEETING_FULL.get(
                 lang=user.lang, name=invited_user_name, meeting_title=meeting.title
             )
         else:
             session.add(joined_link)
             session.add(invited_user)
 
-            message = MeetingMessages.INVITE_USER_SUCCESS.get(
+            message = MeetingInviteMessages.SUCCESS.get(
                 lang=user.lang, name=invited_user_name, meeting_title=meeting.title
             )
 
@@ -243,7 +240,7 @@ async def callback_query_decline_user_invitation(session: Session, update: Updat
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
 
-    message = MeetingMessages.INVITE_USERS_CANCELED.get(lang=user.lang)
+    message = MeetingInviteMessages.CANCELED.get(lang=user.lang)
 
     # If the user owns the meeting, go back to the meeting, if they do not
     # send to main menu
@@ -274,7 +271,7 @@ async def callback_query_fallback_invite_user(session: Session, update: Update, 
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
 
-    message = MeetingMessages.INVITE_USERS_UNEXPECTED_UPDATES.get(lang=user.lang)
+    message = MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user.lang)
     view = main_menu_view(lang=user.lang, message=message)
 
     await context.api.send_message_to_user(user, view)

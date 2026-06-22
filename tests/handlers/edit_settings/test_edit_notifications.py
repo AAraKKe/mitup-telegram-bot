@@ -5,7 +5,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
     HandlerContext,
@@ -19,7 +19,7 @@ from tests.helpers import (
 
 def expected_view(user: User, notifications_enabled: bool, notifications_time: int) -> MitupView:
     return MitupView(
-        description=SettingsMessages.NOTIFICATIONS_SETTINGS.get(
+        description=SettingsMessages.NOTIFICATIONS_DESCRIPTION.get(
             lang=user.lang,
             notifications_status=SettingsMessages.ENABLED.get(lang=user.lang)
             if notifications_enabled
@@ -106,7 +106,7 @@ async def test_callback_query_set_notification_time(
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.NOTIFICATION_SET_TIME.get(lang=user_with_settings.lang),
+        message=SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user_with_settings.lang),
         callback_data=cb.EDIT_NOTIFICATIONS,
     )
 
@@ -126,9 +126,7 @@ async def test_settings_notification_time_text_message_handler(
 
     expected_success_view = expected_view(
         user_with_settings, user_with_settings.settings.notification, 10
-    ).with_context(
-        SettingsMessages.NOTIFICATION_TIME_SET_SUCCESS.get(lang=user_with_settings.lang, notifications_time=10)
-    )
+    ).with_context(SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.get(lang=user_with_settings.lang, notifications_time=10))
 
     mock_session.assert_flushed()
     assert user_with_settings.settings.notification_time == 10
@@ -178,7 +176,7 @@ async def test_settings_notification_time_invalid_input_handler(
     # Check we have sent the proper message
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user_with_settings.lang),
+        message=CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user_with_settings.lang),
         callback_data=cb.EDIT_NOTIFICATIONS,
     )
     context.api.assert_send_message_called(update, expected_view)

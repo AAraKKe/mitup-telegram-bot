@@ -5,7 +5,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import SettingsMessages
+from mitup_bot.utils.messages import CommonMessages, SettingsMessages
 from mitup_bot.views import factory
 from tests.helpers import (
     HandlerContext,
@@ -27,7 +27,7 @@ async def test_callback_query_timeout(
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.SET_TIMEOUT_SETTINGS.get(
+        message=SettingsMessages.TIMEOUT_PROMPT.get(
             lang=user_with_settings.lang, timeout=user_with_settings.settings.timeout
         ),
     )
@@ -48,7 +48,7 @@ async def test_settings_timeout_text_message_handler(
 
     expected_view = factory.settings_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.TIMEOUT_SET_SUCCESS.get(lang=user_with_settings.lang, timeout=10),
+        message=SettingsMessages.TIMEOUT_SUCCESS.get(lang=user_with_settings.lang, timeout=10),
     )
 
     mock_session.assert_flushed()
@@ -98,7 +98,7 @@ async def test_settings_timeout_invalid_input_handler(
 
     expected_view = factory.change_settings_element_view(
         lang=user_with_settings.lang,
-        message=SettingsMessages.INVALID_POSITIVE_INTEGER.get(lang=user_with_settings.lang),
+        message=CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user_with_settings.lang),
     )
 
     # Tow messages are sent, one to request the timeout and another one to inform the user that the input was invalid

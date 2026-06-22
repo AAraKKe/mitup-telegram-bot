@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlmodel import Field, Relationship, SQLModel
 
 from mitup_bot.utils.entities import FormattedText, render
-from mitup_bot.utils.messages import MeetingMessages
+from mitup_bot.utils.messages import MeetingDisplayMessages
 
 from .base_model import BaseModel
 
@@ -41,6 +41,6 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
         name = self.user.inline_name
         if self.invited_by is not None:
             language = self.meetup.lang
-            invited_by_text = MeetingMessages.INVITED_BY_USER.get(lang=language, user=self.invited_by.inline_name)
+            invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=language, user=self.invited_by.inline_name)
             return render(t"{name} ({invited_by_text})")
         return FormattedText(name)

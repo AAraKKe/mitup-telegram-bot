@@ -10,7 +10,7 @@ from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, Edit
 from mitup_bot.models import Settings
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import (
     HandlerContext,
@@ -115,7 +115,7 @@ async def test_set_end_time_without_start_shows_alert(
     assert state == ConversationHandler.END
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=MeetingMessages.SET_END_TIME_STALE_ALERT.get_text(lang=user.lang),
+        text=MeetingEditDurationMessages.END_STALE_ALERT.get_text(lang=user.lang),
         show_alert=True,
     )
     # No message edit should have occurred
@@ -300,7 +300,7 @@ async def test_set_end_date_before_start_shows_alert(
     assert state == ConversationMeetingState.EDIT_END_DATE
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=MeetingMessages.END_DATETIME_BEFORE_START.get_text(lang=user.lang),
+        text=MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=user.lang),
         show_alert=True,
     )
 
@@ -362,7 +362,7 @@ async def test_update_existing_end_date_before_start_shows_alert(
     assert state == ConversationMeetingState.EDIT_END_DATE
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=MeetingMessages.END_DATETIME_BEFORE_START.get_text(lang=user.lang),
+        text=MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=user.lang),
         show_alert=True,
     )
 
@@ -698,7 +698,7 @@ async def test_duration_end_time_callback_shows_time_prompt(
 
     assert state == ConversationMeetingState.EDIT_END_TIME
     expected_view = MitupView(
-        description=MeetingMessages.EDIT_TIME.get(lang=user.lang),
+        description=CommonMessages.TIME_PROMPT.get(lang=user.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -765,7 +765,7 @@ async def test_duration_end_set_time_invalid_time_shows_error(
     )
 
     assert state == ConversationMeetingState.EDIT_END_TIME
-    context.api.assert_send_message_called(update, MeetingMessages.INVALID_TIME.get(lang=user.lang))
+    context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang))
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("InvalidTime"), value=1)
 
 
@@ -798,5 +798,5 @@ async def test_duration_end_time_wrong_input_shows_error_and_stays_in_state(
     )
 
     assert state == ConversationMeetingState.EDIT_END_TIME
-    context.api.assert_send_message_called(update, MeetingMessages.WRONG_TIME_FORMAT.get(lang=user.lang))
+    context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang))
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)

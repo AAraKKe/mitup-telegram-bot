@@ -10,7 +10,7 @@ from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils import MeetingMessages
+from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
@@ -68,7 +68,7 @@ async def test_meeting_creation_successful(
     assert new_meeting.datetime is None  # plain-text title carries no date entity
 
     title_step = result.get_step(1)
-    message = MeetingMessages.CREATED_SUCCESS.get(title=new_meeting.title, lang=user_with_settings.lang)
+    message = MeetingCreationMessages.SUCCESS.get(title=new_meeting.title, lang=user_with_settings.lang)
     view = new_meeting.edit_view.with_context(message)
     title_step.context.api.assert_send_message_called(title_step.context.get_update(), view)
 
@@ -110,7 +110,7 @@ async def test_callback_query_create_meeting_stores_on_exit(
     assert context.user_data is not None
     on_exit = context.user_data.registry[ContextId.CREATE_MEETING].on_exit
     assert on_exit is not None
-    assert on_exit.message == MeetingMessages.CREATE_MEETING_ON_EXIT.get(lang=user_with_settings.lang)
+    assert on_exit.message == MeetingCreationMessages.ON_EXIT.get(lang=user_with_settings.lang)
     assert on_exit.cancel_callback == cb.CANCEL_CREATE_MEETING
 
 
@@ -291,7 +291,7 @@ async def test_invalid_title_fires_fallback_handler(
     # Handler returns TITLE to signal the conversation should remain in TITLE state
     assert state == ConversationMeetingState.TITLE
     # Error view sent to the user
-    error_msg = MeetingMessages.TITLE_WITH_UNSUPPORTED_ENTITY.get(lang=user_with_settings.lang)
+    error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user_with_settings.lang)
     error_view = views_factory.create_meeting_view(lang=user_with_settings.lang, message=error_msg)
     context.api.assert_send_message_called(bad_update, error_view)
 

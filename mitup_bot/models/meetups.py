@@ -10,7 +10,15 @@ from telegram import Update
 
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.models import Message
-from mitup_bot.utils import ButtonMessages, Emojis, MeetingMessages
+from mitup_bot.utils import (
+    ButtonMessages,
+    Emojis,
+    MeetingAttachMessages,
+    MeetingDisplayMessages,
+    MeetingEditParticipantsMessages,
+    MeetingEditSettingsMessages,
+    MeetingEditWhenMessages,
+)
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import Bold, EntityDateTime, FormattedText, render
 from mitup_bot.views import MitupInlineView, MitupView
@@ -44,7 +52,7 @@ class MeetupLocation(MutableModel):
     def description(self, lang: str) -> FormattedText:
         match self.coerced_name, self.coordinates:
             case (None, None):
-                return MeetingMessages.LOCATION_NOT_SET.get(lang=lang)
+                return MeetingDisplayMessages.LOCATION_NOT_SET.get(lang=lang)
             case _:
                 name_section = f"{self.coerced_name}" if self.coerced_name else ""
                 coordinates_section = f"[{Emojis.PIN}]" if self.coordinates else ""
@@ -250,14 +258,14 @@ class Meetup(BaseModel, SQLModel, table=True):
         """UTC-formatted plain datetime string used in inline query previews."""
         if self.datetime:
             return f"{self.datetime:%Y-%m-%d %H:%M}"
-        return MeetingMessages.DATE_NOT_SET.get_text(lang=self.lang)
+        return MeetingDisplayMessages.DATE_NOT_SET.get_text(lang=self.lang)
 
     @property
     def participants_badge(self) -> Template:
         """Plain-text badge shown in inline query result descriptions."""
-        empty = MeetingMessages.EMPTY.get(lang=self.lang)
+        empty = MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=self.lang)
         joined_count = len(self.joined_links)
-        no_limit = t"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.user_language)})"
+        no_limit = t"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=self.user_language)})"
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
 
@@ -265,9 +273,8 @@ class Meetup(BaseModel, SQLModel, table=True):
             result_badged = empty if joined_count == 0 else t"{len(self.joined_links)} {no_limit}"
             return t"{incognito_prefix}{result_badged}"
 
-        empty_with_max = (
-            t"{empty} {MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)}"
-        )
+        max_label = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=self.lang, max_participants=self.max_members)
+        empty_with_max = t"{empty} {max_label}"
         result_badged = empty_with_max if joined_count == 0 else t"({joined_count}/{self.max_members})"
         return t"{incognito_prefix}{result_badged}"
 
@@ -317,17 +324,19 @@ class Meetup(BaseModel, SQLModel, table=True):
         It includes things like the number of participants, the maximum number of participants, etc.
         """
         if len(self.joined_links) == 0:
-            total_participants: FormattedText | Template = MeetingMessages.EMPTY.get(lang=self.lang)
+            total_participants: FormattedText | Template = MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(
+                lang=self.lang
+            )
         elif len(self.joined_links) == 1:
-            total_participants = t"1 {MeetingMessages.PARTICIPANT.get(lang=self.lang)}"
+            total_participants = t"1 {MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=self.lang)}"
         else:
             n = len(self.joined_links)
-            total_participants = t"{n} {MeetingMessages.PARTICIPANTS.get(lang=self.lang)}"
+            total_participants = t"{n} {MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=self.lang)}"
 
         max_participants: FormattedText | Template = (
-            MeetingMessages.MAX_PARTICIPANTS.get(lang=self.lang, max_participants=self.max_members)
+            MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=self.lang, max_participants=self.max_members)
             if self.max_members
-            else t"({MeetingMessages.NO_LIMIT_PARTICIPANTS.get(lang=self.lang)})"
+            else t"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=self.lang)})"
         )
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
@@ -348,23 +357,23 @@ class Meetup(BaseModel, SQLModel, table=True):
         Otherwise shows a single clock line with the datetime or a not-set placeholder.
         """
         if self.datetime is None:
-            datetime_display = MeetingMessages.DATE_NOT_SET.get(lang=self.lang)
+            datetime_display = MeetingDisplayMessages.DATE_NOT_SET.get(lang=self.lang)
             return t"--- {Emojis.CLOCK} {datetime_display}\n"
 
-        start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.datetime, "DT")
+        start_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), self.datetime, "DT")
 
         if self.end_datetime is None:
             return t"--- {Emojis.CLOCK} {start_entity}\n"
 
-        stop_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.end_datetime, "DT")
-        start_label = MeetingMessages.MEETING_START_TIME.get(lang=self.lang)
-        stop_label = MeetingMessages.MEETING_STOP_TIME.get(lang=self.lang)
+        stop_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), self.end_datetime, "DT")
+        start_label = MeetingDisplayMessages.START_LABEL.get(lang=self.lang)
+        stop_label = MeetingDisplayMessages.END_LABEL.get(lang=self.lang)
         return t"--- {Emojis.START} {start_label}: {start_entity}\n--- {Emojis.STOP} {stop_label}: {stop_entity}\n"
 
     @property
     def message(self) -> FormattedText:
-        description = self.description or MeetingMessages.DESCRIPTION_NOT_SET.get(lang=self.lang)
-        created_by = MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
+        description = self.description or MeetingDisplayMessages.DESCRIPTION_NOT_SET.get(lang=self.lang)
+        created_by = MeetingDisplayMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
         location = self.location.description(lang=self.lang)
         datetime_section = self._datetime_section
         participants_text_with_list = self.participants_text_with_list
@@ -382,7 +391,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         Similar to message but used when the meeting is shared inline.
         Properties that are not set are omitted.
         """
-        created_by = MeetingMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
+        created_by = MeetingDisplayMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
         description_section: Template | str = (
             t"\n--- {Emojis.DESCRIPTION} {self.description}" if self.description else ""
         )
@@ -455,7 +464,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         )
         view = MitupView(self.message, keyboard)
         if self.is_in_progress:
-            view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=self.user_language))
+            view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.user_language))
         return view
 
     @property
@@ -474,7 +483,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         )
         view = MitupView(self.inline_message, keyboard)
         if self.is_in_progress:
-            view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=self.user_language))
+            view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.user_language))
         return view
 
     def view_for(self, user: User) -> MitupView:
@@ -569,12 +578,14 @@ class Meetup(BaseModel, SQLModel, table=True):
         ]
 
         return MitupView(
-            MeetingMessages.EDIT_SETTINGS_MESSAGE.get(lang=self.owner.lang),
+            MeetingEditSettingsMessages.DESCRIPTION.get(lang=self.owner.lang),
             keyboard=keyboard,
         ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(self.db_id))
 
     def _when_view_with_start(self) -> tuple[str | FormattedText, Keyboard]:
-        start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), cast(dt.datetime, self.datetime), "DT")
+        start_entity = EntityDateTime(
+            MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), cast(dt.datetime, self.datetime), "DT"
+        )
         set_start_button = ButtonConfig(
             text=ButtonMessages.SET_START_TIME.get(lang=self.user_language),
             callback_data=cb.SET_MEETING_START_TIME.with_id(self.db_id),
@@ -594,14 +605,16 @@ class Meetup(BaseModel, SQLModel, table=True):
         )
 
         if self.end_datetime is not None:
-            end_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), self.end_datetime, "DT")
-            description: str | FormattedText = MeetingMessages.WHEN_VIEW_BOTH.get(
+            end_entity = EntityDateTime(
+                MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), self.end_datetime, "DT"
+            )
+            description: str | FormattedText = MeetingEditWhenMessages.DESCRIPTION_BOTH.get(
                 lang=self.user_language,
                 start_datetime=render(t"{start_entity}"),
                 end_datetime=render(t"{end_entity}"),
             )
         else:
-            description = MeetingMessages.WHEN_VIEW_START_ONLY.get(
+            description = MeetingEditWhenMessages.DESCRIPTION_START_ONLY.get(
                 lang=self.user_language,
                 start_datetime=render(t"{start_entity}"),
             )
@@ -616,7 +629,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def when_view(self) -> MitupView:
         if self.datetime is None:
-            description: str | FormattedText = MeetingMessages.WHEN_VIEW_NO_TIMES.get(lang=self.user_language)
+            description: str | FormattedText = MeetingEditWhenMessages.DESCRIPTION_NO_TIMES.get(lang=self.user_language)
             keyboard: Keyboard = [
                 [
                     ButtonConfig(
@@ -654,9 +667,9 @@ class Meetup(BaseModel, SQLModel, table=True):
     def inline_view(self, *, chat_instance: str | None = None) -> MitupInlineView:
         is_searchable = chat_instance is not None
         footnote = (
-            MeetingMessages.SEARCHABLE_FOOTNOTE.get(lang=self.lang)
+            MeetingAttachMessages.FOOTNOTE_ACTIVE.get(lang=self.lang)
             if is_searchable
-            else MeetingMessages.NOT_SEARCHABLE_FOOTNOTE.get(lang=self.lang)
+            else MeetingAttachMessages.FOOTNOTE_INACTIVE.get(lang=self.lang)
         )
         view = MitupInlineView(
             description=self.inline_message,
@@ -669,7 +682,7 @@ class Meetup(BaseModel, SQLModel, table=True):
             inline_description=self.inline_query_message,
         )
         if self.is_in_progress:
-            view.with_context(MeetingMessages.MEETING_IN_PROGRESS.get(lang=self.lang))
+            view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.lang))
         return view.with_footnote(footnote)
 
     def build_inline_keyboard(

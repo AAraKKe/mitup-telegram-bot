@@ -1,7 +1,7 @@
 from mitup_bot.callback_data import MeetingCallbackData
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingEditLocationMessages, MeetingEditParticipantsMessages
 from mitup_bot.views import ButtonConfig, MitupView, PaginatedMitupView, factory
 
 
@@ -21,7 +21,7 @@ def edit_location_view(meeting: Meetup) -> MitupView:
 
     return factory.edit_meeting_property_view(
         lang=meeting.lang,
-        message=MeetingMessages.EDIT_MEETING_LOCATION.get(lang=meeting.lang),
+        message=MeetingEditLocationMessages.DESCRIPTION.get(lang=meeting.lang),
         meeting_id=meeting.db_id,
         extra_buttons=extra_options,
     )
@@ -48,7 +48,7 @@ def edit_participants_view(meeting: Meetup) -> MitupView:
 
     return factory.edit_meeting_property_view(
         lang=meeting.lang,
-        message=MeetingMessages.EDIT_MEETING_PARTICIPANTS.get(lang=meeting.owner.lang),
+        message=MeetingEditParticipantsMessages.DESCRIPTION.get(lang=meeting.owner.lang),
         meeting_id=meeting.db_id,
         extra_buttons=[buttons],
     )
@@ -57,9 +57,9 @@ def edit_participants_view(meeting: Meetup) -> MitupView:
 def edit_max_participants_view(meeting: Meetup, fail: bool = False) -> MitupView:
     return MitupView(
         description=(
-            MeetingMessages.MAX_PARTICIPANTS_SET_FAIL.get(lang=meeting.lang)
+            MeetingEditParticipantsMessages.MAX_INVALID.get(lang=meeting.lang)
             if fail
-            else MeetingMessages.EDIT_MEETING_MAX_PARTICIPANTS.get(lang=meeting.lang)
+            else MeetingEditParticipantsMessages.MAX_PROMPT.get(lang=meeting.lang)
         ),
         keyboard=[
             [
@@ -85,7 +85,7 @@ def kick_out_users_view(
     Build the view that shows the list of users to kick out as a paginated view on the selected page.
     """
     return PaginatedMitupView(
-        description=MeetingMessages.EDIT_MEETING_KICK_OUT_PARTICIPANTS.get(lang=current_user.lang),
+        description=MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION.get(lang=current_user.lang),
         buttons=[
             factory.user_button(
                 participant.user, cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(meeting.db_id, participant.user.db_id)

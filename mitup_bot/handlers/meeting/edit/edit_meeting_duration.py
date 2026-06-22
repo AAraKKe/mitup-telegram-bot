@@ -15,7 +15,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, build_datetime_link, render
-from mitup_bot.utils.messages import ButtonMessages, MeetingMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDurationMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
@@ -71,7 +71,7 @@ async def callback_query_set_meeting_end_time(
     if meeting.datetime is None:
         await context.api.answer_callback_query(
             update,
-            text=MeetingMessages.SET_END_TIME_STALE_ALERT.get_text(lang=user.lang),
+            text=MeetingEditDurationMessages.END_STALE_ALERT.get_text(lang=user.lang),
             show_alert=True,
         )
         return ConversationHandler.END
@@ -79,7 +79,7 @@ async def callback_query_set_meeting_end_time(
     context.store_meeting_id(ContextId.EDIT_MEETING_DURATION, meeting_id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_DURATION,
-        MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT.get(lang=user.lang),
+        MeetingEditDurationMessages.ON_EXIT.get(lang=user.lang),
         cb.CANCEL_EDIT_MEETING_DURATION.with_id(meeting_id),
     )
 
@@ -125,24 +125,24 @@ async def show_end_datetime_entry(
 ) -> ConversationMeetingState:
     """Show the end datetime entry view. Transitions to EDIT_END_DATETIME state."""
     assert meeting.datetime is not None
-    start_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.datetime, "DT")
+    start_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.datetime, "DT")
     start_text = render(t"{start_entity}")
 
     datetime_link = build_datetime_link()
     if meeting.end_datetime is not None:
-        end_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.end_datetime, "DT")
-        description = MeetingMessages.EDIT_END_DATETIME_PROMPT.get(
+        end_entity = EntityDateTime(MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.end_datetime, "DT")
+        description = MeetingEditDurationMessages.END_EDIT_PROMPT.get(
             lang=lang, start_datetime=start_text, end_datetime=render(t"{end_entity}"), datetime_link=datetime_link
         )
     else:
-        description = MeetingMessages.SET_END_DATETIME_PROMPT.get(
+        description = MeetingEditDurationMessages.END_PROMPT.get(
             lang=lang, start_datetime=start_text, datetime_link=datetime_link
         )
 
     context.store_meeting_id(ContextId.EDIT_MEETING_END_DATETIME, meeting.db_id)
     context.store_on_exit(
         ContextId.EDIT_MEETING_END_DATETIME,
-        MeetingMessages.EDIT_MEETING_DURATION_ON_EXIT.get(lang=lang),
+        MeetingEditDurationMessages.ON_EXIT.get(lang=lang),
         cb.CANCEL_EDIT_MEETING_DURATION.with_id(meeting.db_id),
     )
 
@@ -193,7 +193,7 @@ def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> st
     """Return an error message string if end_dt is invalid, or None if valid."""
     assert meeting.datetime is not None
     if end_dt <= meeting.datetime:
-        return MeetingMessages.END_DATETIME_BEFORE_START.get_text(lang=lang)
+        return MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=lang)
     return None
 
 
@@ -263,7 +263,7 @@ async def duration_end_wrong_input_message_handler(
     datetime_link = build_datetime_link()
     await context.api.send_message(
         update=update,
-        view=MeetingMessages.WRONG_DATETIME_MESSAGE.get(lang=user.lang, datetime_link=datetime_link),
+        view=CommonMessages.DATETIME_INVALID.get(lang=user.lang, datetime_link=datetime_link),
     )
     context.emit_metric(MetricKey.ERROR.with_prefix("WrongEndDatetimeFormat"), 1)
     return ConversationMeetingState.EDIT_END_DATETIME
@@ -394,9 +394,13 @@ async def show_end_time_prompt(
 ) -> ConversationMeetingState:
     lang = meeting.lang
     assert meeting.end_datetime is not None
-    datetime_entity = EntityDateTime(MeetingMessages.MEETING_TIME.get_text(), meeting.end_datetime, "DT")
+    datetime_entity = EntityDateTime(
+        MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.end_datetime, "DT"
+    )
     view = MitupView(
-        description=MeetingMessages.NEW_END_DATE_SET_SUCCESS.get(lang=lang, datetime=render(t"{datetime_entity}")),
+        description=MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT.get(
+            lang=lang, datetime=render(t"{datetime_entity}")
+        ),
         keyboard=[
             [
                 ButtonConfig(
@@ -430,7 +434,7 @@ async def callback_query_duration_end_time(
         return ConversationHandler.END
 
     view = MitupView(
-        description=MeetingMessages.EDIT_TIME.get(lang=user.lang),
+        description=CommonMessages.TIME_PROMPT.get(lang=user.lang),
         keyboard=[
             [
                 ButtonConfig(
@@ -459,7 +463,7 @@ async def duration_end_set_time_handler(
 
     if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
         user = guards.current_user(update, session)
-        await context.api.send_message(update=update, view=MeetingMessages.INVALID_TIME.get(lang=user.lang))
+        await context.api.send_message(update=update, view=CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang))
         context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
         return ConversationMeetingState.EDIT_END_TIME
 
@@ -491,7 +495,7 @@ async def duration_end_time_wrong_input_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     user = guards.current_user(update, session)
-    await context.api.send_message(update=update, view=MeetingMessages.WRONG_TIME_FORMAT.get(lang=user.lang))
+    await context.api.send_message(update=update, view=CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang))
     context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
     return ConversationMeetingState.EDIT_END_TIME
 
