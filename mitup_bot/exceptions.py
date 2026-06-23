@@ -23,32 +23,40 @@ class HandlerNotRegistered(RuntimeError):
         super().__init__(f"The handler(s) {handler_list!r} has not been registered")
 
 
-class MalformedCallbackData(RuntimeError):
+class GuardError(RuntimeError):
+    """Base class for input-validation failures raised by ``guards.py``.
+
+    Subclasses ``RuntimeError`` so existing ``except RuntimeError`` / ``except Exception`` behaviour
+    is preserved, while letting the centralized error handler classify guard faults under a single base.
+    """
+
+
+class MalformedCallbackData(GuardError):
     def __init__(self, handler: HandlerId, callback_data: CallbackData) -> None:
         super().__init__(f"Callback data {callback_data!r} received in handler {handler!r} is malformed.")
 
 
-class EffectiveUserNotSet(RuntimeError):
+class EffectiveUserNotSet(GuardError):
     def __init__(self, update: Update):
         super().__init__(f"Expected user in Telegram Update not available: {update.to_json()}")
 
 
-class EffectiveChatNotSet(RuntimeError):
+class EffectiveChatNotSet(GuardError):
     def __init__(self, update: Update):
         super().__init__(f"Expected chat in Telegram Update not available: {update.to_json()}")
 
 
-class EffectiveMessageNotSet(RuntimeError):
+class EffectiveMessageNotSet(GuardError):
     def __init__(self, update: Update):
         super().__init__(f"Expected message in Telegram Update not available: {update.to_json()}")
 
 
-class UserNotFound(RuntimeError):
+class UserNotFound(GuardError):
     def __init__(self, tg_user_id: int):
         super().__init__(f"User with Telegram id {tg_user_id} not found in database")
 
 
-class CallbackQueryNotSet(RuntimeError):
+class CallbackQueryNotSet(GuardError):
     def __init__(self, update: Update):
         super().__init__(f"Expected callback data in Telegram Update not available: {update.to_json()}")
 
@@ -126,7 +134,9 @@ class MetricsNotSetError(ValueError):
     pass
 
 
-class InlineQueryNotSetError(ValueError):
+class InlineQueryNotSetError(GuardError, ValueError):
+    # Also subclasses ValueError to preserve its original public type: it was a ValueError
+    # before being reparented under GuardError, so any `except ValueError` still catches it.
     def __init__(self):
         super().__init__("InlineQueryId is not set but expected.")
 

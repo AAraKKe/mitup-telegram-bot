@@ -443,6 +443,9 @@ msgstr "L'incontro non sarà eliminato"
 msgid "CommonMessages.DELETED_MEETING_ALERT"
 msgstr "Questo incontro è stato eliminato"
 
+msgid "CommonMessages.UNEXPECTED_ERROR"
+msgstr "Oops! Qualcosa di inaspettato è accaduto. Ti ho riportato al menu principale. Per favore, riprova."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Scegli cosa vuoi impostare per il tuo incontro.\n\n<i>Suggerimento: puoi anche inviare un messaggio utilizzando ${datetime_link} per impostare la data e l'ora contemporaneamente.</i>"
 

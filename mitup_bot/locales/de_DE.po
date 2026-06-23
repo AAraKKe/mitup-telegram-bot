@@ -389,6 +389,9 @@ msgstr "Das Treffen wurde nicht gelöscht"
 msgid "CommonMessages.DELETED_MEETING_ALERT"
 msgstr "Dieses Treffen wurde gelöscht"
 
+msgid "CommonMessages.UNEXPECTED_ERROR"
+msgstr "Oops! Da ist etwas Unerwartetes passiert. Ich habe dich zum Hauptmenü zurückgebracht. Bitte versuche es erneut."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Wähle aus, was du für dein Treffen einstellen möchtest.\n\n<i>Tipp: du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal einzustellen.</i>"
 

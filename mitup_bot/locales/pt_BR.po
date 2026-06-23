@@ -479,6 +479,9 @@ msgstr "O evento não foi excluído"
 msgid "CommonMessages.DELETED_MEETING_ALERT"
 msgstr "Este evento foi excluído"
 
+msgid "CommonMessages.UNEXPECTED_ERROR"
+msgstr "Oops! Algo inesperado aconteceu. Levei você de volta ao menu principal. Por favor, tente novamente."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Escolha o que você deseja definir para seu evento.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e a hora de uma vez.</i>"
 

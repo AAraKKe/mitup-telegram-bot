@@ -736,6 +736,9 @@ msgstr "▶️ Esta quedada está en curso ▶️"
 msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "Xa respondaches a esta pregunta"
 
+msgid "CommonMessages.UNEXPECTED_ERROR"
+msgstr "Opa! Pasou algo inesperado. Traínte de volta ao menú principal. Por favor intenta de novo."
+
 msgid "NotificationMessages.STARTED"
 msgstr "A quedada <b>${meeting_title}</b> comezou!"
 

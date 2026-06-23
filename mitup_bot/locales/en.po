@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-06-22 09:01\n"
+"PO-Revision-Date: 2026-06-22 09:51\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -244,6 +244,9 @@ msgstr "Tap <b>Date</b> or <b>Time</b> to update them, or send a message with a 
 
 msgid "CommonMessages.DELETED_MEETING_ALERT"
 msgstr "This meeting has been deleted"
+
+msgid "CommonMessages.UNEXPECTED_ERROR"
+msgstr "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
 
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."

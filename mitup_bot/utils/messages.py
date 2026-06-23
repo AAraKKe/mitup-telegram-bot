@@ -176,6 +176,8 @@ class CommonMessages(MessageBase):
     )
     # Raised from guards.py across access paths
     DELETED_MEETING_ALERT = "This meeting has been deleted"
+    # Generic error when an internal guard check fails
+    UNEXPECTED_ERROR = "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
 
 
 # --- Registration and settings ---
