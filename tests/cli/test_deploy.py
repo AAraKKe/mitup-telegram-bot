@@ -600,19 +600,19 @@ def test_deployment_fails_when_missing_response_data(responses: list[dict[str, A
         # Invoke lambda fails
         [(None, click.Abort, [None, None], [None, None], [None, None]), (1, 1, 0, 0, 0), 1],
         # Register bot task fails
-        [(None, None, [click.Abort, None], [None, None], [None, None]), (1, 1, 1, 0, 0), 1],
+        [(None, None, [click.Abort, None], [None, None], [None, None]), (2, 1, 1, 0, 0), 1],
         # Update service fails
-        [(None, None, [None, None], [click.Abort, None], [None, None]), (1, 1, 1, 1, 0), 1],
+        [(None, None, [None, None], [click.Abort, None], [None, None]), (2, 1, 1, 1, 0), 1],
         # Waiting for deployment fails
-        [(None, None, [None, None], [None, None], [click.Abort, None]), (1, 1, 1, 1, 1), 1],
+        [(None, None, [None, None], [None, None], [click.Abort, None]), (2, 1, 1, 1, 1), 1],
         # Register recurrent events task fails
-        [(None, None, [None, click.Abort], [None, None], [None, None]), (1, 1, 2, 1, 1), 1],
+        [(None, None, [None, click.Abort], [None, None], [None, None]), (2, 1, 2, 1, 1), 1],
         # Update events service fails
-        [(None, None, [None, None], [None, click.Abort], [None, None]), (1, 1, 2, 2, 1), 1],
+        [(None, None, [None, None], [None, click.Abort], [None, None]), (2, 1, 2, 2, 1), 1],
         # Waiting for events deployment fails
-        [(None, None, [None, None], [None, None], [None, click.Abort]), (1, 1, 2, 2, 2), 1],
+        [(None, None, [None, None], [None, None], [None, click.Abort]), (2, 1, 2, 2, 2), 1],
         # All successfull
-        [(None, None, [None, None], [None, None], [None, None]), (1, 1, 2, 2, 2), 0],
+        [(None, None, [None, None], [None, None], [None, None]), (2, 1, 2, 2, 2), 0],
     ],
     ids=[
         "fail_on_update_migrations_lambda",
@@ -650,7 +650,15 @@ def test_command_chain_is_not_broken(
         with DeploymentContext().setup_mock() as (func, ecs, capture):
             runner = CliRunner()
             result = runner.invoke(
-                deploy.cli, ["--migrations-image", "migrations_image:latest", "--bot-image", "bot_image:latest"]
+                deploy.cli,
+                [
+                    "--migrations-image",
+                    "migrations_image:latest",
+                    "--bot-image",
+                    "bot_image:latest",
+                    "--alarm-action-image",
+                    "alarm_action_image:latest",
+                ],
             )
 
             assert result.exit_code == exit_code

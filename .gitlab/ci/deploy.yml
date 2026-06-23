@@ -13,6 +13,7 @@
     - hatch run dev:deploy
       --migrations-image $MIGRATIONS_IMAGE_TAG
       --bot-image $BOT_IMAGE_TAG
+      --alarm-action-image $ALARM_ACTION_IMAGE_TAG
 
 ## -------------- Deploy staging ---------------
 deploy-staging:

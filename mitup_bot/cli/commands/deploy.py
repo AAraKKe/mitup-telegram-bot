@@ -211,12 +211,14 @@ def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, servic
 @click.command()
 @click.option("--migrations-image", help="Uri of the migrations lambda image pushed to ECR")
 @click.option("--bot-image", help="Uri of the bot image pushed to ECR")
-def cli(migrations_image: str, bot_image: str):
+@click.option("--alarm-action-image", help="Uri of the alarm action lambda image pushed to ECR")
+def cli(migrations_image: str, bot_image: str, alarm_action_image: str):
     lambda_client = boto3.client("lambda", region_name="eu-west-1")
     ecs_client = boto3.client("ecs", region_name="eu-west-1")
 
     update_lambda_code(lambda_client, "MitupMigrationsLambda", migrations_image)
     invoke_lambda(lambda_client, "MitupMigrationsLambda")
+    update_lambda_code(lambda_client, "MitupAlarmActionLambda", alarm_action_image)
     task_definition_arn = register_task_definition(ecs_client, "mitup", bot_image)
     update_ecs_service(ecs_client, "mitup", "mitup", "mitup")
     waiting_for_deployment_to_finish(ecs_client, "mitup", "mitup", task_definition_arn)

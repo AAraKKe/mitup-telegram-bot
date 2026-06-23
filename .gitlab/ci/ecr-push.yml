@@ -86,6 +86,13 @@ push-migrate-rails-lambda-staging:
     DOCKERFILE: Dockerfile.migrate-rails
     PUSH_DESTINATION: $MIGRATE_RAILS_IMAGE_TAG
 
+push-alarm-action-lambda-staging:
+  extends: push-bot-tagged-staging
+  resource_group: alarm-action-tagged-staging
+  variables:
+    DOCKERFILE: Dockerfile.alarm-action
+    PUSH_DESTINATION: $ALARM_ACTION_IMAGE_TAG
+
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
   # We can reuse the one for staging and change the environment
@@ -116,3 +123,10 @@ push-migrate-rails-lambda-prod:
   variables:
     DOCKERFILE: Dockerfile.migrate-rails
     PUSH_DESTINATION: $MIGRATE_RAILS_IMAGE_TAG
+
+push-alarm-action-lambda-prod:
+  extends: push-bot-tagged-prod
+  resource_group: alarm-action-tagged-prod
+  variables:
+    DOCKERFILE: Dockerfile.alarm-action
+    PUSH_DESTINATION: $ALARM_ACTION_IMAGE_TAG
