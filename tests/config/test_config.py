@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import URL
 
-from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
+from mitup_bot.config import AppConfig, Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 
 TOML_CONTENT = """
 [db]
@@ -100,3 +100,39 @@ def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
     assert exc_info.value.errors()[3]["loc"] == ("metrics", "environment")
 
     assert exc_info.value.title == "Config"
+
+
+def test_app_config_log_level_defaults_to_info():
+    config = AppConfig(run_mode=RunModes.POLLING)
+
+    assert config.log_level == "INFO"
+
+
+def test_app_config_log_level_normalized_to_upper():
+    config = AppConfig(run_mode=RunModes.POLLING, log_level="debug")
+
+    assert config.log_level == "DEBUG"
+
+
+def test_app_config_invalid_log_level_raises():
+    with pytest.raises(ValidationError) as exc_info:
+        AppConfig(run_mode=RunModes.POLLING, log_level="bogus")
+
+    error = exc_info.value.errors()[0]
+    assert error["loc"] == ("log_level",)
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT, CONFIG_FROM_ENV],),
+    indirect=True,
+    ids=["working_config"],
+)
+def test_config_without_log_level_still_builds(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    # Backwards-compat: TOML_CONTENT does not set [app] log_level, so the default must apply.
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    assert config.app.log_level == "INFO"

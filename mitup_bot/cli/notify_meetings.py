@@ -1,8 +1,8 @@
-import logging
 from asyncio import gather
 from collections.abc import Sequence
 from contextlib import contextmanager
 
+import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, false, func, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
@@ -15,6 +15,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
+
+log = structlog.get_logger(__name__)
 
 USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
     select(JoinedUsers)
@@ -80,9 +82,10 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
     for joined_link, result in zip(joined_links, results, strict=False):
         if isinstance(result, Exception):
             failed += 1
-            logging.error(
-                f"Failed to send notification (user: {joined_link.user_id}, "
-                f"meeting: {joined_link.meetup_id}): {result}",
+            log.error(
+                "Failed to send notification",
+                user=joined_link.user_id,
+                meeting=joined_link.meetup_id,
                 exc_info=result,
             )
         else:

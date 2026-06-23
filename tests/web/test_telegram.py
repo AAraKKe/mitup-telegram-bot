@@ -156,3 +156,8 @@ async def test_process_update_exception_is_logged_and_returns_204(
     ptb_app.process_update.assert_awaited_once()
     error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
     assert error_records, "Expected an ERROR log when process_update raises"
+    # structlog log.exception(...) renders the event string as the LogRecord message and attaches
+    # the raised exception via exc_info.
+    record = error_records[0]
+    assert record.getMessage() == "Unhandled exception while processing Telegram update"
+    assert record.exc_info is not None and isinstance(record.exc_info[1], RuntimeError)

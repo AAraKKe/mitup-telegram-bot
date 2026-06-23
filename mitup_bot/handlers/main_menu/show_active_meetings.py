@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -19,8 +17,6 @@ from .enums import MainMenuHandlerId
 )
 @with_async_session
 async def callback_query_show_meetings(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_show_meetings")
-
     callback_data = guards.valid_callback_data(
         cb.SHOW_ACTIVE_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_MEETINGS_CALLBACK
     )

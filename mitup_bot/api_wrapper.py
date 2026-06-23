@@ -1,4 +1,3 @@
-import logging
 import re
 from asyncio import gather
 from collections.abc import Callable, Generator, Sequence
@@ -6,6 +5,7 @@ from contextlib import contextmanager
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol
 
+import structlog
 from sqlmodel import Session
 from telegram import (
     InlineQueryResultArticle,
@@ -40,6 +40,8 @@ MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Message to edit not found"),
 ]
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
+
+log = structlog.get_logger(__name__)
 
 
 if TYPE_CHECKING:
@@ -115,7 +117,7 @@ def handle_edit_errors(
         # If we get an error saying that the message is not found, we should delete the message
         if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
             if session and message:
-                logging.info(f"Message with ID {message.message_id} is invalid. Deleting it...")
+                log.info("Message is invalid, deleting it", message_id=message.message_id)
                 session.delete(message)
             adapter.emit_metric(MetricKey.MESSAGE_DELETED)
             return
@@ -221,11 +223,11 @@ class TelegramApi:
                     disable_web_page_preview=True,
                 )
             except Forbidden as e:
-                logging.warning(f"User {user.tg_user_id} has blocked the bot.")
+                log.warning("User has blocked the bot", tg_user_id=user.tg_user_id)
                 raise InactiveUserInteraction(user.tg_user_id, private=True) from e
             except BadRequest as e:
                 if "not found" in e.message:
-                    logging.warning(f"User {user.tg_user_id} is not in Telegram.")
+                    log.warning("User is not in Telegram", tg_user_id=user.tg_user_id)
                     raise InactiveUserInteraction(user.tg_user_id, private=True) from e
                 raise
 
@@ -261,13 +263,13 @@ class TelegramApi:
                 # Handle inactive user different for other errors
                 # we do not want to error out but mark the user as inactive
                 if user.mark_inactive():
-                    logging.info(f"Marking user {user.tg_user_id} as inactive")
+                    log.info("Marking user as inactive", tg_user_id=user.tg_user_id)
                     self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
                 continue
 
             # Handle Callbacks
             if on_error and isinstance(result, Exception):
-                logging.exception(f"Error sending message to user {user.id}: {result}")
+                log.exception("Error sending message to user", user_id=user.id, exc_info=result)
                 on_error[idx](user, result)
             elif on_success:
                 on_success[idx](user)

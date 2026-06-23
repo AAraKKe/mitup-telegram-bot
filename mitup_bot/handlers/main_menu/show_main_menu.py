@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -17,8 +15,6 @@ from .enums import MainMenuHandlerId
 )
 @with_async_session
 async def callback_query_main_menu(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_main_menu")
-
     context.clean_all_user_data()
 
     user = guards.current_user(update, session)

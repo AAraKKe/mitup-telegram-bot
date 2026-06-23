@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -23,8 +21,6 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
 )
 @with_async_session
 async def callback_query_edit_meeting_title(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_edit_title_meeting")
-
     meeting_id = guards.valid_callback_data(
         cb.EDIT_MEETING_TITLE.parse(context.match), EditMeetingHandlerId.TITLE_CALLBACK
     ).id
@@ -70,8 +66,6 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
 @HandlersRegistry.register_message(EditMeetingHandlerId.TITLE_MESSAGE, filters.TEXT, bindable=False)
 @with_async_session
 async def edit_title_meeting_message_handler(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into edit_title_meeting_message_handler")
-
     assert update.effective_message is not None and update.effective_message.text is not None
 
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:

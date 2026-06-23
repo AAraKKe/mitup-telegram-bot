@@ -1,8 +1,7 @@
 import datetime as dt
-import logging
-import traceback
 from typing import cast
 
+import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, delete, exists, func, literal, null, or_, select, true
 from sqlmodel.sql.expression import SelectOfScalar
@@ -12,6 +11,8 @@ from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+
+log = structlog.get_logger(__name__)
 
 # The amount of time a meeting stays active after it has been created when there is no datetime set
 INTERVAL_TO_DEACTIVATE = "1 year"
@@ -88,10 +89,9 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
             session.exec(delete(Message).where(Message.meetup_id == meeting.id))  # type: ignore
         except Exception as e:
             failed += 1
-            logging.exception(f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id})")
+            log.exception("Failed to deactivate meeting", meeting=meeting.id, owner=meeting.owner_id, exc_info=e)
             failed_details.append(
-                f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id}). Error: {e}.\n"
-                f"Stack trace: {traceback.format_exc()}"
+                f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id}). Error: {e}."
             )
 
     # Delete JOINED_ONLY users who have no remaining active-meeting links.

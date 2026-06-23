@@ -4,8 +4,10 @@ from enum import Enum
 from random import uniform
 from time import perf_counter
 from typing import assert_never
+from uuid import uuid4
 
 import click
+import structlog
 from telegram.ext import AIORateLimiter, ExtBot
 
 from mitup_bot import db
@@ -19,7 +21,10 @@ from mitup_bot.cli import (
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
+from mitup_bot.logging_config import configure_logging
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, configure_emf_backend
+
+log = structlog.get_logger(__name__)
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
 DEFAULT_GENERATE_STATS_INTERVAL = 3600
@@ -72,7 +77,7 @@ def build_bot(config: BotConfig) -> ExtBot:
     )
 
 
-async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
+async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
     match event_type:
         case EventType.USER_CLEANUP:
             user_cleanup.run(api, client)
@@ -88,6 +93,11 @@ async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: M
             await meetups_cleanup.run(api, client)
         case never:  # pragma: no cover
             assert_never(never)  # pragma: no cover
+
+
+async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
+    with structlog.contextvars.bound_contextvars(event_type=event_type.value, run_id=uuid4().hex):
+        await dispatch_event(event_type, api, client)
 
 
 async def handle_maintainance(event_type: EventType, bot: ExtBot, client: MetricsClient | None = None) -> None:
@@ -205,6 +215,7 @@ def cli(
     )
 
     db.configure_db(config.db)
+    configure_logging(env, config.app.log_level)
     configure_emf_backend(config.metrics)
 
     bot = build_bot(config.bot)

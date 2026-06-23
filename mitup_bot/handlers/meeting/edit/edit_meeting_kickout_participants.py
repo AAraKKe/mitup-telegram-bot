@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -29,8 +27,6 @@ async def edit_meeting_kickout_participants(session: Session, update: Update, co
     the next view shows a list of participants as buttons. The user selects the participant to be kicked out from
     the list and, after a confirmation message, the participant is removed from the meeting.
     """
-    logging.debug("Enter into edit_meeting_kickout_participants")
-
     callback_data = guards.valid_meeting_callback_data(
         cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK
     )
@@ -79,8 +75,6 @@ async def edit_meeting_kickout_participant(session: Session, update: Update, con
 
     Instead of immediately kicking out the participant, we show a confirmation message to the user.
     """
-    logging.debug("Enter into edit_meeting_kickout_participant")
-
     callback_data = guards.valid_meeting_callback_data(
         cb.EDIT_MEETING_KICK_OUT_ACTION.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK
     )
@@ -139,8 +133,6 @@ async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, cont
 )
 @with_async_session
 async def edit_meeting_kickout_participant_confirm(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into edit_meeting_kickout_participant_confirm")
-
     callback_data = guards.valid_meeting_callback_data(
         cb.CONFIRM_KICK_OUT.parse(context.match),
         EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,

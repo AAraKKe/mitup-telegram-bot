@@ -1,6 +1,6 @@
-import logging
 from enum import auto
 
+import structlog
 from sqlmodel import Session
 from telegram import Chat, Update
 from telegram.constants import ChatMemberStatus
@@ -13,7 +13,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 
 from .registry import HandlersRegistry
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 
 class ChatMemberHandlerId(HandlerId):
@@ -46,8 +46,6 @@ def is_block_transition(update: Update) -> bool:
 @HandlersRegistry.register_chat_member(handler_id=ChatMemberHandlerId.MY_CHAT_MEMBER)
 @with_async_session
 async def chat_member_block_handler(session: Session, update: Update, context: TMitupContext) -> None:
-    logger.debug("Enter into chat_member_block_handler")
-
     # Unblock (BANNED/LEFT → MEMBER) is intentionally NOT handled here. The end of the
     # registration conversation is the only legitimate transition back to MEMBER, and the
     # /start re-onboarding flow treats a LEFT user as a re-onboarding case. Restoring the
@@ -60,7 +58,7 @@ async def chat_member_block_handler(session: Session, update: Update, context: T
     # asserting: assertions are stripped under `python -O`, so a malformed update must not
     # cause an AttributeError in production.
     if update.effective_user is None:
-        logger.warning("Received a my_chat_member update without an effective_user: %s", update)
+        log.warning("Received a my_chat_member update without an effective_user", update=update)
         return
 
     if (user := User.by_tg_user_id(session, update.effective_user.id)) is None:

@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -54,7 +52,6 @@ async def _show_past_meetings(user: User, page_number: int, update: Update, cont
 )
 @with_async_session
 async def callback_query_show_past_meetings(session: Session, update: Update, context: TMitupContext) -> None:
-    logging.debug("Enter into callback_query_show_past_meetings")
     user = guards.current_user(update, session)
     await _show_past_meetings(user, 1, update, context)
 
@@ -64,7 +61,6 @@ async def callback_query_show_past_meetings(session: Session, update: Update, co
 )
 @with_async_session
 async def callback_query_show_past_meeting_page(session: Session, update: Update, context: TMitupContext) -> None:
-    logging.debug("Enter into callback_query_show_past_meeting_page")
     callback_data = guards.valid_callback_data(
         cb.SHOW_PAST_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK
     )

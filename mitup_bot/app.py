@@ -1,25 +1,22 @@
-import logging
 from typing import TYPE_CHECKING, assert_never
 
-import click
-import sqlalchemy
-import telegram
-import telegram.ext
+import structlog
 import uvicorn
-from rich.console import Console
-from rich.logging import RichHandler
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
 from mitup_bot import db, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.logging_config import configure_logging
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.web import create_app
 
 if TYPE_CHECKING:  # pragma: no cover
     from fastapi import FastAPI
+
+log = structlog.get_logger(__name__)
 
 
 class MitupRuntime:
@@ -32,41 +29,17 @@ class MitupRuntime:
 
     def __init__(self, env: Env):
         self.env = env
-        self.__configure_logging()
         HandlersRegistry.env = env
+        # Build config before configuring logging: the log level is sourced from config.
         self.config = Config.from_providers(
             EnvVariablesConfigProvider(),
             TomlConfigProvider(env=env),
         )
+        configure_logging(self.env, self.config.app.log_level)
         self.app = self.__build_application()
         self.__setup_db()
         self.__setup_timezone_api()
         self.__configure_metrics()
-
-    def __configure_logging(self):
-        # Configure logging with RichHandler for better output when debugging locally
-        handlers = (
-            [
-                RichHandler(
-                    level=logging.DEBUG,
-                    rich_tracebacks=True,
-                    tracebacks_suppress=[telegram.ext, telegram, sqlalchemy, click],
-                    console=Console(soft_wrap=True, force_terminal=True, width=250),
-                )
-            ]
-            if self.env is Env.DEV
-            else None
-        )
-
-        logging.basicConfig(
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO, handlers=handlers
-        )
-
-        # Remove https logs
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-
-        # Ensure debug logs from bot when working in dev environment
-        logging.getLogger("telegram.ext.ExtBot").setLevel(logging.DEBUG if self.env is Env.DEV else logging.WARNING)
 
     def __setup_db(self):
         db.configure_db(self.config.db)
@@ -76,7 +49,7 @@ class MitupRuntime:
 
     def __configure_metrics(self):
         configure_emf_backend(self.config.metrics)
-        logging.info(f"Metrics Configuration set: {self.config.metrics}")
+        log.info("Metrics configuration set", config=self.config.metrics)
 
     def __build_application(self) -> Application:
         builder = Application.builder()
@@ -124,7 +97,7 @@ class MitupRuntime:
         )
 
     def run(self):
-        logging.info(f"Running Mitup for environment: {self.env}")
+        log.info("Running Mitup", env=self.env)
 
         metrics_client = MetricsClient(EmfBackend())
 

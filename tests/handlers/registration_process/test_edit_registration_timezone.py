@@ -146,9 +146,9 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
     assert "123.6" not in caplog.text  # latitude
     assert "103.5" not in caplog.text  # longitude
     assert "tried to set a location" not in caplog.text  # old leaking phrase
-    assert (
-        f"The user {user_with_settings.db_id} sent a location that could not be resolved to a timezone" in caplog.text
-    )
+    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
+    assert "User provided an invalid location, retrying" in caplog.text
+    assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
 
 # ---------------------------------------------------------------------------

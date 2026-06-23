@@ -1,4 +1,3 @@
-import logging
 from enum import auto
 
 from sqlmodel import Session
@@ -12,8 +11,6 @@ from mitup_bot.utils.messages import CommonMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 
 from .registry import HandlersRegistry
-
-logger = logging.getLogger(__name__)
 
 # Matches every cancel-action callback regardless of entity, so stale cancel
 # buttons from any conversation (create, edit title, location, duration, etc.)
@@ -32,7 +29,6 @@ class StaleCancelHandlerId(HandlerId):
 )
 @with_async_session
 async def callback_query_stale_cancel(session: Session, update: Update, context: TMitupContext) -> None:
-    logger.debug("Enter into callback_query_stale_cancel")
     user = guards.current_user(update, session)
 
     alert_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user.lang)

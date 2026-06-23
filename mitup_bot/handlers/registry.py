@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -7,6 +6,7 @@ from enum import Enum
 from time import perf_counter
 from warnings import filterwarnings
 
+import structlog
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import (
@@ -42,6 +42,8 @@ from .error_handler import handler as error_handler
 # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Frequently-Asked-Questions#what-do-the-per_-settings-in-conversationhandler-do
 filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
+log = structlog.get_logger(__name__)
+
 
 def callback_with_metrics(
     handler_id: HandlerId, handler_type: str, callback: HandlerCallback, env: Env
@@ -55,33 +57,53 @@ def callback_with_metrics(
         # Keep the context for counter as Bot to differentiate this from the recurrent events
         db.set_connection_context("Bot")
 
-        start = perf_counter()
-        return_value = None
-        try:
-            return_value = await callback(update, context)
-        except Exception as e:
-            # Relying on error handlers by the application will result in the creation of a
-            # separate context. Lets handle errors here where we still have the context
-            # of the handler that was executed including metrics context.
-            await error_handler(context, e, env)
-        else:
-            # Emit FAULT=0 with handler dimensions and globally for aggregation
-            context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
-        finally:
-            latency = (perf_counter() - start) * 1000
-            # Emit latency with handler dimensions and globally for aggregation
-            context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS, emit_global=True)
+        # Bind request fields for the duration of this handler. bound_contextvars auto-clears on
+        # exit so fields never leak into the next update handled by PTB's reused worker task.
+        # merge_contextvars then injects them into every log line emitted downstream — including
+        # the metrics and error-handler logs below, which is why they run inside this block.
+        with structlog.contextvars.bound_contextvars(**handler_log_context(handler_id, handler_type, update)):
+            start = perf_counter()
+            return_value = None
+            try:
+                return_value = await callback(update, context)
+            except Exception as e:
+                # Relying on error handlers by the application will result in the creation of a
+                # separate context. Lets handle errors here where we still have the context
+                # of the handler that was executed including metrics context.
+                await error_handler(context, e, env)
+            else:
+                # Emit FAULT=0 with handler dimensions and globally for aggregation
+                context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
+            finally:
+                latency = (perf_counter() - start) * 1000
+                # Emit latency with handler dimensions and globally for aggregation
+                context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS, emit_global=True)
 
-            # Emit leaked database connections (should be 0 if all connections were properly closed)
-            context.emit_metric(
-                MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT, emit_global=True
-            )
+                # Emit leaked database connections (should be 0 if all connections were properly closed)
+                context.emit_metric(
+                    MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT, emit_global=True
+                )
 
-            # Make sure we flush the metrics after every callback to drain any buffered metrics
-            await context.flush_metrics()
-        return return_value
+                # Make sure we flush the metrics after every callback to drain any buffered metrics
+                await context.flush_metrics()
+            return return_value
 
     return inner_callback
+
+
+def handler_log_context(handler_id: HandlerId, handler_type: str, update: Update) -> dict[str, object]:
+    """Build the contextvar fields to bind for a handler call, omitting any the update lacks
+    (some updates carry no effective_user/chat)."""
+    fields: dict[str, object] = {
+        "handler": handler_id.dimension,
+        "handler_type": handler_type,
+        "update_id": update.update_id,
+    }
+    if update.effective_user is not None:
+        fields["user_id"] = update.effective_user.id
+    if update.effective_chat is not None:
+        fields["chat_id"] = update.effective_chat.id
+    return fields
 
 
 @dataclass
@@ -102,7 +124,6 @@ async def callback_query_fallback(update: Update, context: TMitupContext):
     # No need to create a message for this as there will be no transaltions. Before translations
     # are added all features should be finished.
     message = "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀"
-    logging.debug(update)
     with suppress(TelegramError):
         await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
 
@@ -261,7 +282,7 @@ class HandlersRegistry:
         sorted_items = sorted(cls.handlers.items(), key=lambda v: v[1].is_conversation(), reverse=True)
         for key, wrapper in sorted_items:
             if wrapper.bindable:
-                logging.info(f"Binding {key} handler to application")
+                log.info("Binding handler to application", handler=key)
                 app.add_handler(handler=wrapper.handler, group=wrapper.group)
         # Add a fallback handler for any update that is not handled by any of the registered handlers
         # the intention is that the user gets a message saying that it is not implemented yet instead of

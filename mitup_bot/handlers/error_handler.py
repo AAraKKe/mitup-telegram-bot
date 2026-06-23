@@ -1,5 +1,4 @@
-import logging
-
+import structlog
 from rich.console import Console
 from sqlmodel import Session, select
 from telegram.error import BadRequest
@@ -12,6 +11,8 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils.mitup_types import TMitupContext
 
 console = Console()
+
+log = structlog.get_logger(__name__)
 
 # Errors that can be suppressed and ignored
 SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
@@ -56,4 +57,4 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # If we are in development mode, lets print the exception when it happens
     if env is Env.DEV:  # pragma: no cover
         # Print exception with rich logger
-        logging.exception("An error occurred while handling the update.")
+        log.exception("An error occurred while handling the update")

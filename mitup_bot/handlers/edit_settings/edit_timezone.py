@@ -1,6 +1,6 @@
-import logging
 from typing import cast
 
+import structlog
 from sqlmodel import Session
 from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
@@ -17,14 +17,14 @@ from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId
 
+log = structlog.get_logger(__name__)
+
 
 @HandlersRegistry.register_callback_query(
     EditSettingsHandlerId.TIMEZONE_CALLBACK, callback_data=cb.EDIT_TIEMZONE, bindable=False
 )
 @with_async_session
 async def callback_query_timezone(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_settings_timezone")
-
     user = guards.current_user(update, session)
     message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
 
@@ -46,13 +46,11 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
 )
 @with_async_session
 async def settings_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into settings_timezone_text_message_handler")
-
     user = guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
-        logging.warning(f"The user {user.db_id} tried to set a timezone {address} that is not correct. Trying again")
+        log.warning("User provided an invalid timezone, retrying", user_id=user.db_id)
 
         view = MitupView(
             description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang),
@@ -86,13 +84,11 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
 )
 @with_async_session
 async def settings_timezone_location_message_handler(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into settings_timezone_location_message_handler")
-
     user = guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
-        logging.warning(f"The user {user.db_id} sent a location that could not be resolved to a timezone. Trying again")
+        log.warning("User provided an invalid location, retrying", user_id=user.db_id)
 
         view = MitupView(
             description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang),

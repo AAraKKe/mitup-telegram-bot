@@ -1,5 +1,4 @@
-import logging
-
+import structlog
 from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -19,14 +18,14 @@ from mitup_bot.views import ButtonConfig, MitupView, factory
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_location_view
 
+log = structlog.get_logger(__name__)
+
 
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.LOCATION_CALLBACK, callback_data=cb.EDIT_MEETING_LOCATION, bindable=True
 )
 @with_async_session
 async def callback_edit_meeting_location(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_edit_meeting_location")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_LOCATION.parse(context.match), EditMeetingHandlerId.LOCATION_CALLBACK
     )
@@ -103,8 +102,6 @@ async def callback_edit_meeting_location_name(session: Session, update: Update, 
 )
 @with_async_session
 async def callback_cancel_edit_meeting_location_property(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_cancel_edit_meeting_location_property")
-
     await callback_edit_meeting_location(update, context)
 
     return ConversationHandler.END
@@ -175,7 +172,7 @@ async def edit_meeting_location_name(session: Session, update: Update, context: 
             meeting = Meetup.by_id(session, meeting_id, must_exist=True)
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
-        logging.error(exc)
+        log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
@@ -208,7 +205,7 @@ async def edit_meeting_location_coordinates(session: Session, update: Update, co
                 return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
-        logging.error(exc)
+        log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
@@ -250,7 +247,7 @@ async def edit_coordinates_without_location(session: Session, update: Update, co
             )
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
-        logging.error(exc)
+        log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 

@@ -1,9 +1,16 @@
+import os
 from enum import StrEnum, auto
 from typing import Any
 
+import structlog
 from alembic import command
 from alembic.config import Config
 from pydantic import BaseModel
+
+from mitup_bot.config import Env
+from mitup_bot.logging_config import configure_logging
+
+log = structlog.get_logger(__name__)
 
 
 class AlembicActions(StrEnum):
@@ -17,35 +24,35 @@ class MigrationEvent(BaseModel):
 
 
 def run_migrations(event: dict[str, Any], context: Any) -> int:
-    """This a handler for the migrations lambda.
+    """Run Alembic upgrade or downgrade from a Lambda event.
 
-    With this lambda we run migrations through alembic as if we were executing the CLI but
-    programamtically. This can be adchieved through the command module of alembic.
-
-    The event sent to the lambda triggers what type of migration we want to achieve and run
-    it accordingly.
-
-    More information can be found here: https://alembic.sqlalchemy.org/en/latest/api/commands.html
-
-    Args:
-        event (dict[str, Any]): This is the event provided to the lambda as a JSON object.
-        context (lambda context): Context injected by the lambda runtime with information about the
-            lambda being executed.
-
-    Returns:
-        int: Return 0 on sucess and 1 on failure. When it fails the lambda execution will also
-            provide exception information if uncaught.
+    Invokes Alembic programmatically — equivalent to the CLI but usable from a Lambda handler.
+    See: https://alembic.sqlalchemy.org/en/latest/api/commands.html
     """
+    configure_logging(Env.PROD, os.environ.get("LOG_LEVEL", "INFO"))
 
     event_object = MigrationEvent.model_validate(event)
 
-    # File directly available in the lambda root directory
-    config = Config("alembic.ini")
+    ctx_fields: dict[str, object] = {
+        "lambda": "migrations",
+        "action": event_object.action,
+        "revision": event_object.revision,
+    }
+    if hasattr(context, "aws_request_id"):
+        ctx_fields["aws_request_id"] = context.aws_request_id
 
-    if event_object.action is AlembicActions.UPGRADE:
-        command.upgrade(config, event_object.revision)
+    with structlog.contextvars.bound_contextvars(**ctx_fields):
+        log.info("migration.start")
 
-    if event_object.action is AlembicActions.DOWNGRADE:
-        command.downgrade(config, event_object.revision)
+        # File directly available in the lambda root directory
+        config = Config("alembic.ini")
+
+        if event_object.action is AlembicActions.UPGRADE:
+            command.upgrade(config, event_object.revision)
+
+        if event_object.action is AlembicActions.DOWNGRADE:
+            command.downgrade(config, event_object.revision)
+
+        log.info("migration.done")
 
     return 0

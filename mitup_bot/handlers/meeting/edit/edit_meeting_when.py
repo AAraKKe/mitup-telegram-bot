@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -17,8 +15,6 @@ from .enums import EditMeetingHandlerId
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.WHEN_ENTRY_CALLBACK, callback_data=cb.EDIT_MEETING_WHEN)
 @with_async_session
 async def callback_query_when_entry(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_when_entry")
-
     meeting_id = guards.valid_callback_data(
         cb.EDIT_MEETING_WHEN.parse(context.match), EditMeetingHandlerId.WHEN_ENTRY_CALLBACK
     ).id
@@ -36,8 +32,6 @@ async def callback_query_when_entry(session: Session, update: Update, context: T
 )
 @with_async_session
 async def callback_query_clear_times(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_clear_times")
-
     callback_data = guards.valid_callback_data(
         cb.DELETE_MEETING_TIMES.parse(context.match), EditMeetingHandlerId.CLEAR_TIMES_CALLBACK
     )
@@ -61,8 +55,6 @@ async def callback_query_clear_times(session: Session, update: Update, context: 
 )
 @with_async_session
 async def callback_query_confirm_clear_times(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_confirm_clear_times")
-
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_DELETE_MEETING_TIMES.parse(context.match), EditMeetingHandlerId.CONFIRM_CLEAR_TIMES_CALLBACK
     )
@@ -93,8 +85,6 @@ async def callback_query_confirm_clear_times(session: Session, update: Update, c
 )
 @with_async_session
 async def callback_query_decline_clear_times(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_decline_clear_times")
-
     callback_data = guards.valid_callback_data(
         cb.DECLINE_DELETE_MEETING_TIMES.parse(context.match), EditMeetingHandlerId.DECLINE_CLEAR_TIMES_CALLBACK
     )
@@ -113,8 +103,6 @@ async def callback_query_decline_clear_times(session: Session, update: Update, c
 )
 @with_async_session
 async def callback_query_set_lock_on_start(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_set_lock_on_start")
-
     meeting_id = guards.valid_callback_data(
         cb.SET_MEETING_LOCK_ON_START.parse(context.match), EditMeetingHandlerId.LOCK_ON_START_CALLBACK
     ).id

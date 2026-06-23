@@ -1,10 +1,14 @@
+import contextlib
 import dataclasses
+import gc
 import logging
 from collections.abc import Generator
 from unittest import mock
 
 import pytest
+import structlog
 from pydantic import SecretStr
+from structlog._config import BoundLoggerLazyProxy
 
 from mitup_bot.app import MitupRuntime
 from mitup_bot.config import (
@@ -60,8 +64,22 @@ class RuntimeDeps:
 
 
 @pytest.fixture
-def _patch_runtime_deps() -> Generator[RuntimeDeps]:
-    """Patch all external dependencies that MitupRuntime.__init__ calls."""
+def _patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps]:
+    """Patch all external dependencies that MitupRuntime.__init__ calls.
+
+    By default this also stubs out the production `configure_logging`. The deterministic test
+    pipeline (installed by the autouse `deterministic_structlog` fixture) coerces non-primitive
+    bound values to strings so captured records stay serializable under xdist — but the production
+    `configure_logging` swaps in structlog's `ProcessorFormatter.wrap_for_formatter` pipeline, which
+    attaches live, non-serializable objects (`_logger`, `_record`) onto every record AND bypasses
+    that coercion. `MitupRuntime.__init__`/`run()` log while pytest is capturing, so letting the
+    real call run would ship those objects across execnet and crash the worker. Stubbing it keeps
+    the deterministic pipeline in force for runtime construction.
+
+    Tests that intentionally assert on what `configure_logging` installs opt out by requesting the
+    `_real_configure_logging` fixture.
+    """
+    stub_logging = "_real_configure_logging" not in request.fixturenames
     with (
         mock.patch("mitup_bot.app.Config.from_providers", return_value=_build_config()) as mock_config,
         mock.patch("mitup_bot.app.Application.builder") as mock_builder,
@@ -69,6 +87,7 @@ def _patch_runtime_deps() -> Generator[RuntimeDeps]:
         mock.patch("mitup_bot.app.timezone_api.configure") as mock_tz,
         mock.patch("mitup_bot.app.configure_emf_backend") as mock_metrics,
         mock.patch("mitup_bot.app.HandlersRegistry") as mock_registry,
+        mock.patch("mitup_bot.app.configure_logging") if stub_logging else contextlib.nullcontext(),
     ):
         builder_instance = mock.MagicMock()
         mock_builder.return_value = builder_instance
@@ -168,28 +187,75 @@ def test_bind_called_with_built_app(_patch_runtime_deps: RuntimeDeps):
 # --- Logging ---
 
 
+@pytest.fixture
+def _real_configure_logging() -> Generator[None]:
+    """Opt the requesting test out of `_patch_runtime_deps`'s `configure_logging` stub so it
+    exercises the production logging setup (it must also request `_restore_root_logging`).
+
+    Production `configure_logging` runs `structlog.configure(cache_logger_on_first_use=True)`, so
+    the first log emitted while building the runtime freezes each module-level
+    `structlog.get_logger(__name__)` proxy onto the production `wrap_for_formatter` pipeline by
+    caching its `bind`. That cache survives the deterministic reconfigure in `deterministic_structlog`,
+    so a later test reusing a frozen proxy would emit a record carrying a live
+    `_FixedFindCallerLogger` and crash xdist's report serialization. On teardown we drop every cached
+    `bind` so each proxy re-binds against whatever pipeline is configured next.
+    """
+    yield
+    for proxy in (obj for obj in gc.get_objects() if isinstance(obj, BoundLoggerLazyProxy)):
+        proxy.__dict__.pop("bind", None)
+
+
+@pytest.fixture
+def _restore_root_logging() -> Generator[None]:
+    """MitupRuntime configures real logging via configure_logging, which mutates the root logger's
+    handlers and level. Snapshot and restore them so these tests don't leak into the rest of the suite.
+    """
+    root = logging.getLogger()
+    saved_handlers = root.handlers[:]
+    saved_level = root.level
+    try:
+        yield
+    finally:
+        root.handlers[:] = saved_handlers
+        root.setLevel(saved_level)
+
+
 @pytest.mark.parametrize(
-    "env, expected_handler_name",
+    "env, expected_renderer",
     [
-        (Env.DEV, "RichHandler"),
-        (Env.PROD, None),
-        (Env.SAMPLE, None),
+        (Env.DEV, structlog.dev.ConsoleRenderer),
+        (Env.PROD, structlog.processors.JSONRenderer),
+        (Env.SAMPLE, structlog.processors.JSONRenderer),
     ],
     ids=["dev", "prod", "sample"],
 )
-def test_logging_handler_type_by_env(env: Env, expected_handler_name: str | None, _patch_runtime_deps: RuntimeDeps):
-    with mock.patch("mitup_bot.app.logging.basicConfig") as mock_basic_config:
-        MitupRuntime(env)
+def test_logging_installs_processor_formatter_handler_by_env(
+    env: Env,
+    expected_renderer: type[structlog.dev.ConsoleRenderer] | type[structlog.processors.JSONRenderer],
+    _real_configure_logging: None,
+    _patch_runtime_deps: RuntimeDeps,
+    _restore_root_logging: None,
+):
+    """MitupRuntime configures logging so the root carries exactly one StreamHandler whose
+    ProcessorFormatter renders through the env-selected final renderer (ConsoleRenderer in dev,
+    JSONRenderer otherwise). This replaces the old RichHandler-in-dev / handlers=None contract.
+    """
+    MitupRuntime(env)
 
-    handlers = mock_basic_config.call_args.kwargs.get("handlers")
-    if expected_handler_name is None:
-        assert handlers is None
-    else:
-        assert handlers is not None and len(handlers) == 1
-        assert type(handlers[0]).__name__ == expected_handler_name
+    handlers = logging.getLogger().handlers
+    assert len(handlers) == 1
+    handler = handlers[0]
+    assert type(handler) is logging.StreamHandler
+
+    formatter = handler.formatter
+    assert isinstance(formatter, structlog.stdlib.ProcessorFormatter)
+    # build_root_handler appends the final renderer last in the formatter's processors list.
+    assert isinstance(formatter.processors[-1], expected_renderer)
 
 
-def test_httpx_logger_set_to_warning(_patch_runtime_deps: RuntimeDeps, monkeypatch: pytest.MonkeyPatch):
+def test_httpx_logger_set_to_warning(
+    _real_configure_logging: None, _patch_runtime_deps: RuntimeDeps, monkeypatch: pytest.MonkeyPatch
+):
     logger = logging.getLogger("httpx")
     monkeypatch.setattr(logger, "level", logger.level)
 
@@ -208,7 +274,11 @@ def test_httpx_logger_set_to_warning(_patch_runtime_deps: RuntimeDeps, monkeypat
     ids=["dev", "prod", "sample"],
 )
 def test_ext_bot_logger_level_by_env(
-    env: Env, expected_level: int, _patch_runtime_deps: RuntimeDeps, monkeypatch: pytest.MonkeyPatch
+    env: Env,
+    expected_level: int,
+    _real_configure_logging: None,
+    _patch_runtime_deps: RuntimeDeps,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     logger = logging.getLogger("telegram.ext.ExtBot")
     monkeypatch.setattr(logger, "level", logger.level)

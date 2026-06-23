@@ -268,7 +268,29 @@ class MalformedCallbackData(RuntimeError):
 
 ## Logging
 
+<critical_rules>
+  <rule>Use `structlog.get_logger(__name__)` at module level. Never use bare `logging.debug(...)` / `logging.warning(...)` / `print()` calls. The structlog pipeline is the single renderer for all log output.</rule>
+  <rule>Log with an event string and structured keyword arguments. Do not interpolate values into the event string. `log.info("Meeting reminder sent", meeting_id=meeting.id)` keeps fields queryable; `log.info(f"Meeting {meeting.id} reminder sent")` buries them in the message text.</rule>
+  <rule>Never thread a logger through call signatures. Request context is bound once per entry point via `structlog.contextvars.bound_contextvars(...)` and injected automatically into every downstream log line by `merge_contextvars`. Adding a `logger` or `log` parameter to a function is wrong.</rule>
+  <rule>Every new process entry point (bot runtime, CLI task, Lambda handler) must call `configure_logging(env, level)` once before any logging, then bind its own invocation fields via `structlog.contextvars.bound_contextvars(...)`. See `handlers/registry.py`, `cli/commands/recurrent_events.py`, and `mitup_bot/lambdas/migrations.py` for the canonical pattern.</rule>
+</critical_rules>
+
 ```python
-logging.debug("Enter into <handler_name>")   # at handler entry points only
-logging.warning(message)                      # unexpected-but-recoverable situations
+import structlog
+
+log = structlog.get_logger(__name__)
+
+# Good: event string + structured kwargs
+log.info("Meeting reminder sent", meeting_id=meeting.id, user_id=user.id)
+
+# Bad: value interpolated into the event string
+log.info(f"Meeting {meeting.id} reminder sent to {user.id}")
+```
+
+Context binding at an entry point:
+
+```python
+with structlog.contextvars.bound_contextvars(handler=handler_id, update_id=update.update_id):
+    # every log.* call inside here carries those fields automatically
+    return_value = await callback(update, context)
 ```

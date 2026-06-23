@@ -5,6 +5,7 @@ from typing import cast
 from unittest import mock
 
 import pytest
+import structlog
 from click.testing import CliRunner, Result
 from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
@@ -48,6 +49,84 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         lang_opt: str = metafunc.config.getoption("--lang")
         langs = SUPPORTED_LANGUAGES if lang_opt == "all" else [lang_opt]
         metafunc.parametrize("lang", langs, ids=[f"lang_{lang}" for lang in langs])
+
+
+# execnet's serializer dispatches on the EXACT type, not via isinstance, so a `str`/`int`/`dict`
+# subclass (e.g. a `StrEnum` member such as `Env`, or an `IntEnum`) is NOT recognized and raises
+# `DumpError`. Only these exact scalar types pass through unchanged.
+_EXACT_SERIALIZABLE_SCALARS = (str, int, float, bool, type(None))
+
+
+def make_execnet_serializable(value: object) -> object:
+    """Recursively coerce *value* into something execnet can serialize, `repr`-ing anything else.
+
+    execnet only handles the exact built-in types (str/int/float/bool/None and dict/list/tuple of
+    the same), so any subclass instance (a `StrEnum` like `Env`) or custom object (a `MetricsConfig`
+    bound via `log.info(..., config=...)`) must be turned into a plain string.
+    """
+    if type(value) in _EXACT_SERIALIZABLE_SCALARS:
+        return value
+    if isinstance(value, list):
+        return [make_execnet_serializable(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(make_execnet_serializable(item) for item in value)
+    if isinstance(value, dict):
+        return {make_execnet_serializable(key): make_execnet_serializable(val) for key, val in value.items()}
+    return repr(value)
+
+
+def stringify_non_primitive_values(
+    _logger: object, _method_name: str, event_dict: structlog.typing.EventDict
+) -> structlog.typing.EventDict:
+    """Coerce every bound value that execnet can't serialize into a plain string.
+
+    `render_to_log_kwargs` turns each bound key/value into a raw `LogRecord` attribute, preserving
+    the original Python object. Under xdist, pytest ships each test's captured `LogRecord`s to the
+    controller through execnet's serializer; a non-serializable value (e.g. a `MetricsConfig`, an
+    `Env` member) raises `DumpError` and kills the worker. Coercing here mirrors what the production
+    renderers do before output, so captured records stay serializable regardless of what any log
+    call binds, now or in the future.
+    """
+    return {key: make_execnet_serializable(value) for key, value in event_dict.items()}
+
+
+@pytest.fixture(autouse=True)
+def deterministic_structlog() -> Generator[None]:
+    """Route structlog through the stdlib logging machinery so pytest's `caplog` deterministically
+    captures handler/model log output as clean LogRecords.
+
+    Why this is needed
+    ------------------
+    Production `configure_logging` reconfigures structlog globally to hand off to a
+    ProcessorFormatter (output goes to a stdout StreamHandler, and the LogRecord message becomes a
+    wrapped blob rather than the plain event string). structlog config is process-global and
+    `cache_logger_on_first_use=True`, so once any test calls `configure_logging` the new pipeline
+    leaks into every later test on the same xdist worker — making `caplog` see either a rendered
+    dict or nothing, depending on test order.
+
+    This autouse fixture re-establishes a deterministic, caplog-friendly pipeline before every test:
+    `render_to_log_kwargs` makes the event string the LogRecord message and turns bound key/values
+    (including merge_contextvars fields) into record attributes, with `exc_info` forwarded so
+    exception assertions via `caplog.text` keep working. `stringify_non_primitive_values` runs just
+    before it so no captured record carries a non-serializable object across xdist's execnet channel.
+    Being function-scoped and autouse, it runs after any per-test `configure_logging` call's
+    teardown, guaranteeing order-independence.
+    """
+    structlog.configure(
+        processors=[
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.add_logger_name,
+            stringify_non_primitive_values,
+            structlog.stdlib.render_to_log_kwargs,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        # Don't cache: each test rebinds the pipeline, and a cached logger would pin a stale one.
+        cache_logger_on_first_use=False,
+    )
+    yield
+    structlog.reset_defaults()
 
 
 @pytest.fixture

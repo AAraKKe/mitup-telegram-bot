@@ -2,7 +2,10 @@ from asyncio import CancelledError
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import structlog
 from click.testing import CliRunner
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from mitup_bot.cli.commands.recurrent_events import (
     EventType,
@@ -100,6 +103,66 @@ async def test_launch_event_sync(event_type: EventType, module_path: str):
     with patch(f"{module_path}.run") as mock_run:
         await launch_event(event_type, api, client)
         mock_run.assert_called_once_with(api, client)
+
+
+async def test_launch_event_binds_event_contextvars():
+    """A log emitted while an event runs carries event_type (the dispatched EventType.value) and a
+    run_id, bound by launch_event for the duration of the dispatched run()."""
+    api = MockApi()
+    client = make_test_metrics_client()
+
+    def run_emitting_log(_api: object, _client: object) -> None:
+        structlog.get_logger("mitup_bot").info("event running")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run", side_effect=run_emitting_log):
+            await launch_event(EventType.USER_CLEANUP, api, client)
+
+    event_logs = [log for log in logs if log["event"] == "event running"]
+    assert len(event_logs) == 1
+    entry = event_logs[0]
+    assert entry["event_type"] == EventType.USER_CLEANUP.value  # "UserCleanup"
+    # run_id is a uuid4().hex — present and a 32-char hex string, but its exact value is random.
+    run_id = entry["run_id"]
+    assert isinstance(run_id, str)
+    assert len(run_id) == 32  # uuid4().hex
+
+
+async def test_launch_event_clears_contextvars_between_events():
+    """bound_contextvars auto-clears on exit, so event_type/run_id must not leak from one event into
+    a log emitted after launch_event returns (events run back-to-back in run_periodic)."""
+    api = MockApi()
+    client = make_test_metrics_client()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run"):
+            await launch_event(EventType.USER_CLEANUP, api, client)
+        # Emitted after launch_event returned — must carry neither event field.
+        structlog.get_logger("mitup_bot").info("between events")
+
+    after_logs = [log for log in logs if log["event"] == "between events"]
+    assert len(after_logs) == 1
+    entry = after_logs[0]
+    assert "event_type" not in entry
+    assert "run_id" not in entry
+
+
+async def test_launch_event_uses_distinct_run_id_per_invocation():
+    """Each launch_event invocation generates a fresh run_id so back-to-back events are distinguishable."""
+    api = MockApi()
+    client = make_test_metrics_client()
+
+    def capture_run_id(_api: object, _client: object) -> None:
+        structlog.get_logger("mitup_bot").info("event running")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run", side_effect=capture_run_id):
+            await launch_event(EventType.USER_CLEANUP, api, client)
+            await launch_event(EventType.USER_CLEANUP, api, client)
+
+    run_ids = [log["run_id"] for log in logs if log["event"] == "event running"]
+    assert len(run_ids) == 2
+    assert run_ids[0] != run_ids[1]
 
 
 MAINTAINANCE_PARAMS = [

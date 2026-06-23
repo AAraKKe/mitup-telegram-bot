@@ -1,4 +1,3 @@
-import logging
 from typing import cast
 
 from sqlmodel import Session, delete
@@ -21,8 +20,6 @@ from .enums import MeetingHandlerId
 )
 @with_async_session
 async def callback_query_delete_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_delete_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.DELETE_MEETING.parse(context.match), MeetingHandlerId.DELETE_MEETING_CALLBACK
     )
@@ -49,8 +46,6 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
 )
 @with_async_session
 async def callback_query_confirm_delete_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_confirm_delete_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_DELETE_MEETING.parse(context.match),
         MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK,
@@ -88,8 +83,6 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
 )
 @with_async_session
 async def callback_query_decline_delete_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_decline_delete_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.DECLINE_DELETE_MEETING.parse(context.match),
         MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,

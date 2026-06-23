@@ -1,5 +1,4 @@
 import datetime as dt
-import logging
 from re import Match
 from typing import cast
 
@@ -57,8 +56,6 @@ from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor
 async def callback_query_set_meeting_end_time(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int | None:
-    logging.debug("Enter into callback_query_set_meeting_end_time")
-
     meeting_id = guards.valid_callback_data(
         cb.SET_MEETING_END_TIME.parse(context.match), EditMeetingHandlerId.DURATION_INPUT_CALLBACK
     ).id
@@ -94,8 +91,6 @@ async def callback_query_set_meeting_end_time(
 )
 @with_async_session
 async def callback_query_cancel_edit_duration(session: Session, update: Update, context: TMitupContext) -> int:
-    logging.debug("Enter into callback_query_cancel_edit_duration")
-
     context.clean_all_user_data()
 
     meeting_id = guards.valid_callback_data(
@@ -176,8 +171,6 @@ async def show_end_datetime_entry(
 async def callback_query_end_datetime_entry(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int | None:
-    logging.debug("Enter into callback_query_end_datetime_entry")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_END_DATE_TIME.parse(context.match), EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK
     )
@@ -234,8 +227,6 @@ async def save_end_datetime_and_finish(
 async def duration_end_datetime_entity_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into duration_end_datetime_entity_handler")
-
     message = guards.message(update)
     entities = message.entities or []
     date_entity = next(e for e in entities if e.type == MessageEntity.DATE_TIME)
@@ -286,8 +277,6 @@ async def duration_end_wrong_input_message_handler(
 async def callback_query_duration_end_date_nav(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | None:
-    logging.debug("Enter into callback_query_duration_end_date_nav")
-
     callback_data = guards.valid_date_callback_data(
         cb.EDIT_MEETING_END_DATE.parse(context.match), EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK
     )
@@ -326,8 +315,6 @@ async def callback_query_duration_end_date_nav(
 async def callback_query_back_to_end_datetime(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | None:
-    logging.debug("Enter into callback_query_back_to_end_datetime")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_END_DATE_TIME.parse(context.match),
         EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK,
@@ -347,8 +334,6 @@ async def callback_query_back_to_end_datetime(
 async def callback_query_duration_end_set_date(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into callback_query_duration_end_set_date")
-
     callback_data = guards.valid_date_callback_data(
         cb.SET_MEETING_END_DATE.parse(context.match), EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK
     )
@@ -428,8 +413,6 @@ async def show_end_time_prompt(
 async def callback_query_duration_end_time(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into callback_query_duration_end_time")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_END_TIME.parse(context.match), EditMeetingHandlerId.DURATION_END_TIME_CALLBACK
     )
@@ -464,8 +447,6 @@ async def callback_query_duration_end_time(
 async def duration_end_set_time_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into duration_end_set_time_handler")
-
     time_info = cast(Match, context.match).groupdict()
 
     if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:

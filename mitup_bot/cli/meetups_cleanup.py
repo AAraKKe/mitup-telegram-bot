@@ -1,8 +1,8 @@
-import logging
 from collections.abc import Callable
 from functools import partial
 from typing import cast
 
+import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Session, and_, delete, false, func, literal, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
@@ -14,6 +14,8 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import ButtonConfig, MitupView
+
+log = structlog.get_logger(__name__)
 
 """Meeting permanent expiration interval. After having expired, if the meeting is still inactive, it will be deleted."""
 PERMANENT_EXPIRATION_INTERVAL = "180 days"
@@ -47,9 +49,8 @@ async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiW
     callbacks: list[Callable[[User], None]] = []
 
     def on_success_callback(_: User, meetup_to_update: Meetup):
-        logging.debug(f"on_success_callback for meetup {meetup_to_update.id}")
+        log.debug("expiration notification sent", meetup=meetup_to_update.id)
         meetup_to_update.expiration_notification_sent = True
-        logging.debug(f"expiration_notification_sent set to True for meetup {meetup_to_update.id}")
 
     for meetup in meetups:
         users.append(meetup.owner)

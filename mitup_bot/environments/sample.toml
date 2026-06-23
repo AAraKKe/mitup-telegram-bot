@@ -32,6 +32,9 @@ url = "postgres"
 #               the supplied tocken belongs needs to have a webhook properly
 #               configured.
 run_mode = "polling"
+# Root log level. One of: CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET.
+# Optional; defaults to "INFO" when omitted.
+log_level = "INFO"
 
 [google_api]
 # Google API configuration

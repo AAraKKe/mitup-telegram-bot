@@ -10,12 +10,15 @@ from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Protocol
 
-from pydantic import BaseModel, SecretStr
+import structlog
+from pydantic import BaseModel, SecretStr, field_validator
 from sqlalchemy import URL
 
 from . import environments
 
 ConfigMap = dict[str, dict[str, str | int | bool | float]]
+
+log = structlog.get_logger(__name__)
 
 
 class Env(StrEnum):
@@ -69,7 +72,7 @@ class TomlConfigProvider:
         except Exception as exc:
             # If there is an error reading the config file we just log a warning and
             # return no content. Data validation by the Config will piont out the issue
-            logging.warning(f"Could not read configuration file {config_file}. Error: {exc}")
+            log.warning("Could not read configuration file", config_file=config_file, exc_info=exc)
             return {}
 
     def __process_config_file(self, config_path: Path) -> ConfigMap:
@@ -137,6 +140,15 @@ class DbConfig(BaseModel):
 
 class AppConfig(BaseModel):
     run_mode: RunModes
+    log_level: str = "INFO"
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, value: str) -> str:
+        normalized = value.upper()
+        if normalized not in logging.getLevelNamesMapping():
+            raise ValueError(f"Invalid log level: {value!r}")
+        return normalized
 
 
 class BotConfig(BaseModel):

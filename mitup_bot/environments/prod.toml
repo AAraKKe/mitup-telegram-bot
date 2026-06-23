@@ -2,4 +2,7 @@
 namespace = "MitupBot/Service"
 environment = "local"
 
+[app]
+log_level = "INFO"
+
 [bot]

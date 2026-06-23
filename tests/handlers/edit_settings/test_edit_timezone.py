@@ -121,10 +121,9 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
 
     result = await settings_timezone_text_message_handler(update, context)
 
-    assert (
-        f"The user {user_with_settings.id} tried to set a timezone some text that is not correct. Trying again"
-        in caplog.text
-    )
+    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
+    assert "User provided an invalid timezone, retrying" in caplog.text
+    assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     view = MitupView(
         description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
@@ -189,9 +188,9 @@ async def test_edit_timezone_location_log_excludes_coordinates(
     assert "123.6" not in caplog.text  # latitude
     assert "103.5" not in caplog.text  # longitude
     assert "tried to set a location" not in caplog.text  # old leaking phrase
-    assert (
-        f"The user {user_with_settings.db_id} sent a location that could not be resolved to a timezone" in caplog.text
-    )
+    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
+    assert "User provided an invalid location, retrying" in caplog.text
+    assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     view = MitupView(
         description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),

@@ -1,8 +1,8 @@
 import datetime as dt
-import logging
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import structlog
 from sqlalchemy import Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -16,6 +16,8 @@ from .base_model import BaseModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from .users import User
+
+log = structlog.get_logger(__name__)
 
 
 class Settings(BaseModel, SQLModel, table=True):
@@ -54,7 +56,7 @@ class Settings(BaseModel, SQLModel, table=True):
         except ZoneInfoNotFoundError:
             # While we implement proper timezone handling, users can set random timezones.
             # We should log this and use UTC instead.
-            logging.warning(f"Invalid timezone {self.timezone} by user {self.user_id}. Using UTC instead.")
+            log.warning("Invalid timezone, falling back to UTC", timezone=self.timezone, user_id=self.user_id)
             return ZoneInfo("UTC")
 
     def default_meeting_settings_view(self) -> MitupView:

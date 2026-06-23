@@ -32,6 +32,7 @@ nav = [
       { "Making Contributions" = "contribute/making_contributions.md" },
       { "Local Validation" = "contribute/local_validation.md" },
       { "Commit Message Format" = "contribute/commit_message_format.md" },
+      { "Logging" = "contribute/logging.md" },
     ] },
     { "Code of Conduct" = "collaborate/code_of_conduct.md" },
   ] },

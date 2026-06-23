@@ -1,6 +1,6 @@
-import logging
 from typing import cast
 
+import structlog
 from sqlmodel import Session
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 from telegram import User as TgUser
@@ -32,6 +32,8 @@ from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
+
+log = structlog.get_logger(__name__)
 
 
 def current_user(update: Update, session: Session) -> User:
@@ -144,7 +146,7 @@ async def user_owns_meeting(
             f"User tried {action!r} with a meeting that does not belong to them. "
             f"Meeting id: {meeting_id}, user id: {user.db_id}"
         )
-        logging.warning(message)
+        log.warning(message)
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
     return None
@@ -194,7 +196,7 @@ async def meeting_accessible(
     message = (
         f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.db_id}"
     )
-    logging.warning(message)
+    log.warning(message)
 
     await context.api.edit_message(
         update=update,

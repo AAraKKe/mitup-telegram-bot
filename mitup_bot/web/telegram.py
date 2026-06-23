@@ -1,8 +1,8 @@
 import json
-import logging
 import secrets
 from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from telegram import Update
 from telegram.ext import Application
@@ -10,7 +10,7 @@ from telegram.ext import Application
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 
@@ -44,7 +44,7 @@ def validate_secret(
     if expected_secret is None or received is None or not secrets.compare_digest(received, expected_secret):
         metrics_client.emit(MetricKey.WEBHOOK_FORBIDDEN)
         client_host = request.client.host if request.client is not None else "unknown"
-        logger.warning("Rejected webhook request from %s — invalid or missing secret header", client_host)
+        log.warning("Rejected webhook request, invalid or missing secret header", client_host=client_host)
         raise HTTPException(status_code=403)
 
 
@@ -58,7 +58,7 @@ def parse_update(payload: dict[str, Any], ptb_app: Application, metrics_client: 
         return Update.de_json(payload, bot=ptb_app.bot)
     except ValueError, KeyError, TypeError:
         metrics_client.emit(MetricKey.WEBHOOK_MALFORMED_UPDATE)
-        logger.exception("Failed to parse Telegram update")
+        log.exception("Failed to parse Telegram update")
         return None
 
 
@@ -79,7 +79,7 @@ async def telegram_webhook(
         payload = json.loads(body)
     except ValueError, TypeError:
         metrics_client.emit(MetricKey.WEBHOOK_MALFORMED_UPDATE)
-        logger.exception("Failed to decode webhook JSON body — bytes=%d", len(body))
+        log.exception("Failed to decode webhook JSON body", bytes=len(body))
         return
 
     update = parse_update(payload, ptb_app, metrics_client)
@@ -89,4 +89,4 @@ async def telegram_webhook(
     try:
         await ptb_app.process_update(update)
     except Exception:
-        logger.exception("Unhandled exception while processing Telegram update")
+        log.exception("Unhandled exception while processing Telegram update")

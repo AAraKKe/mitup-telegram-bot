@@ -1,7 +1,7 @@
-import logging
 from asyncio import gather
 from contextlib import contextmanager
 
+import structlog
 from sqlmodel import Session, and_, false, func, null, select, true
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.error import Forbidden
@@ -13,6 +13,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
+
+log = structlog.get_logger(__name__)
 
 MEETINGS_TO_NOTIFY_STARTED_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
     and_(
@@ -68,9 +70,10 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
             for joined_link, result in zip(participants, results, strict=False):
                 if isinstance(result, Exception):
                     failed += 1
-                    logging.error(
-                        f"Failed to send started notification (user: {joined_link.user_id}, "
-                        f"meeting: {meeting.id}): {result}",
+                    log.error(
+                        "Failed to send started notification",
+                        user=joined_link.user_id,
+                        meeting=meeting.id,
                         exc_info=result,
                     )
                 else:
@@ -81,9 +84,11 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
             meetings_processed += 1
         except Exception as error:
             failed += 1
-            logging.exception(
-                f"Failed to process started notification for meeting (meeting: {meeting.id}, "
-                f"owner: {meeting.owner_id}): {error}"
+            log.exception(
+                "Failed to process started notification for meeting",
+                meeting=meeting.id,
+                owner=meeting.owner_id,
+                exc_info=error,
             )
             failed_details.append(
                 f"Failed to process meeting (meeting: {meeting.id}, owner: {meeting.owner_id}): {error}"

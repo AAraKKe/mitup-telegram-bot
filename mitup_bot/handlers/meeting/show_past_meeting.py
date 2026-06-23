@@ -1,5 +1,3 @@
-import logging
-
 from sqlmodel import Session
 from telegram import Update
 
@@ -45,8 +43,6 @@ def _past_meeting_view(meeting: Meetup, user: User) -> MitupView:
 )
 @with_async_session
 async def callback_query_delete_past_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_delete_past_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.DELETE_PAST_MEETING.parse(context.match), MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK
     )
@@ -73,8 +69,6 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
 )
 @with_async_session
 async def callback_query_show_past_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_show_past_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.SHOW_PAST_MEETING.parse(context.match), MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK
     )
@@ -99,8 +93,6 @@ async def callback_query_show_past_meeting(session: Session, update: Update, con
 )
 @with_async_session
 async def callback_query_confirm_delete_past_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_confirm_delete_past_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_DELETE_PAST_MEETING.parse(context.match),
         MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK,
@@ -141,8 +133,6 @@ async def callback_query_confirm_delete_past_meeting(session: Session, update: U
 )
 @with_async_session
 async def callback_query_decline_delete_past_meeting(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_query_decline_delete_past_meeting")
-
     callback_data = guards.valid_callback_data(
         cb.DECLINE_DELETE_PAST_MEETING.parse(context.match),
         MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK,

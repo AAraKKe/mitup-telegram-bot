@@ -1,6 +1,6 @@
-import logging
 from typing import cast
 
+import structlog
 from sqlmodel import Session
 from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
@@ -18,6 +18,8 @@ from mitup_bot.views import factory
 from .enums import ConversationRegistrationProcessState, RegistrationProcessHandlerId
 from .utils import get_or_create_onboarding_user
 
+log = structlog.get_logger(__name__)
+
 
 @HandlersRegistry.register_command(
     RegistrationProcessHandlerId.TIMEZONE_COMMAND,
@@ -29,8 +31,6 @@ from .utils import get_or_create_onboarding_user
 async def command_start_with_new_user(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState:
-    logging.debug("Enter into command_start_with_new_user")
-
     user = get_or_create_onboarding_user(session, update)
     message = RegistrationMessages.TIMEZONE_PROMPT.get(first_name=user.first_name)
 
@@ -47,14 +47,13 @@ async def command_start_with_new_user(
 async def registration_timezone_text_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState | int:
-    logging.debug("Enter into registration_timezone_text_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
 
     user = guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
-        logging.warning(f"The user {user.db_id} tried to set a timezone {address} that is not correct. Trying again")
+        log.warning("User provided an invalid timezone, retrying", user_id=user.db_id)
 
         await context.api.send_message(update=update, view=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang))
 
@@ -87,14 +86,13 @@ async def registration_timezone_text_message_handler(
 async def registration_timezone_location_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState | int:
-    logging.debug("Enter into registration_timezone_location_message_handler")
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
 
     user = guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
-        logging.warning(f"The user {user.db_id} sent a location that could not be resolved to a timezone. Trying again")
+        log.warning("User provided an invalid location, retrying", user_id=user.db_id)
 
         await context.api.send_message(update=update, view=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang))
 

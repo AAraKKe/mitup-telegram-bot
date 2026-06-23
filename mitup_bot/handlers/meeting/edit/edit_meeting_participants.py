@@ -1,6 +1,6 @@
-import logging
 from typing import cast
 
+import structlog
 from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -19,14 +19,14 @@ from mitup_bot.views import factory
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_max_participants_view, edit_participants_view
 
+log = structlog.get_logger(__name__)
+
 
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.PARTICIPANTS_CALLBACK, callback_data=cb.EDIT_MEETING_PARTICIPANTS, bindable=True
 )
 @with_async_session
 async def callback_edit_meeting_participants(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_edit_meeting_participants")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_CALLBACK
     )
@@ -52,8 +52,6 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
 )
 @with_async_session
 async def callback_edit_meeting_max_participants(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_edit_meeting_max_participants")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_MAX_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK
     )
@@ -91,8 +89,6 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
 )
 @with_async_session
 async def callback_edit_meeting_no_limit_participants(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_edit_meeting_no_limit_participants")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK
     )
@@ -130,8 +126,6 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
 )
 @with_async_session
 async def callback_cancel_edit_meeting_participants(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into callback_cancel_edit_meeting_participants_property")
-
     context.clean_all_user_data()
 
     await callback_edit_meeting_participants(update, context)
@@ -144,8 +138,6 @@ async def callback_cancel_edit_meeting_participants(session: Session, update: Up
 )
 @with_async_session
 async def edit_meeting_max_participants(session: Session, update: Update, context: TMitupContext):
-    logging.debug("Enter into edit_meeting_max_participants")
-
     number = guards.message(update).text
     user = guards.current_user(update, session)
 
@@ -155,7 +147,7 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
             if meeting is None:
                 return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
-        logging.error(exc)
+        log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 
@@ -186,7 +178,7 @@ async def edit_meeting_wrong_max_participants(session: Session, update: Update, 
                 return ConversationHandler.END
             response_view = edit_max_participants_view(meeting, fail=True)
     except ContextPropertyNotSetError as exc:
-        logging.error(exc)
+        log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
 

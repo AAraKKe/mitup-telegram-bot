@@ -1,8 +1,8 @@
 import datetime as dt
-import logging
 from re import Match
 from typing import cast
 
+import structlog
 from sqlmodel import Session
 from telegram import MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
@@ -37,6 +37,8 @@ from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor
 #   EDIT_TIME -- HH:MM prompt
 #     * Valid HH:MM -> save + END (shows when_view)
 #     * [Cancel] fallback -> cleanup + END
+
+log = structlog.get_logger(__name__)
 
 
 # --- Shared helpers ---
@@ -91,8 +93,6 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
 async def callback_query_date_time_entry(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int | None:
-    logging.debug("Enter into callback_query_date_time_entry")
-
     callback_data = guards.valid_callback_data(
         cb.SET_MEETING_START_TIME.parse(context.match), EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK
     )
@@ -152,8 +152,6 @@ def build_edit_datetime_entry_view(meeting: Meetup, lang: str, today: dt.date) -
 )
 @with_async_session
 async def callback_query_cancel_start_time(session: Session, update: Update, context: TMitupContext) -> int:
-    logging.debug("Enter into callback_query_cancel_start_time")
-
     callback_data = guards.valid_callback_data(
         cb.CANCEL_EDIT_START_TIME.parse(context.match), EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK
     )
@@ -180,7 +178,6 @@ async def callback_query_cancel_start_time(session: Session, update: Update, con
 async def callback_query_edit_meeting_date(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int | None:
-    logging.debug("Enter into callback_query_edit_meeting_date")
     assert context.matches is not None
 
     callback_data = guards.valid_date_callback_data(
@@ -200,11 +197,13 @@ async def callback_query_edit_meeting_date(
     current_date = callback_data.date if today_in_user_timezone <= callback_data.date else today_in_user_timezone
 
     meeting_date_in_tz = meeting.owner.datetime_in_tz(meeting.datetime) if meeting.datetime else None
-    logging.debug(
-        "Calendar view: "
-        f"Anchor date: {anchor_date}, Current date: {current_date}, "
-        f"Meeting date: {meeting_date_in_tz}, Now tz: {now_in_user_timezone} "
-        f"Callback date: {callback_data.date}"
+    log.debug(
+        "Rendering calendar view",
+        anchor_date=anchor_date,
+        current_date=current_date,
+        meeting_date=meeting_date_in_tz,
+        now_in_user_timezone=now_in_user_timezone,
+        callback_date=callback_data.date,
     )
 
     await context.api.edit_message(
@@ -233,8 +232,6 @@ async def callback_query_edit_meeting_date(
 async def callback_query_back_to_edit_datetime(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | None:
-    logging.debug("Enter into callback_query_back_to_edit_datetime")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK
     )
@@ -361,8 +358,6 @@ async def handle_datetime_update(
 async def callback_query_set_meeting_date(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into callback_query_set_meeting_date")
-
     callback_data = guards.valid_date_callback_data(
         cb.SET_MEETING_DATE.parse(context.match), EditMeetingHandlerId.SET_DATE_CALLBACK
     )
@@ -388,8 +383,6 @@ async def callback_query_set_meeting_date(
 async def callback_query_set_meeting_time(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into callback_query_set_meeting_time")
-
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_TIME.parse(context.match), EditMeetingHandlerId.EDIT_TIME_CALLBACK
     )
@@ -419,8 +412,6 @@ async def callback_query_set_meeting_time(
 async def date_time_entity_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into date_time_entity_message_handler")
-
     message = guards.message(update)
     entities = message.entities or []
     date_entity = next(e for e in entities if e.type == MessageEntity.DATE_TIME)
@@ -472,8 +463,6 @@ async def date_time_entity_message_handler(
 async def set_time_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    logging.debug("Enter into set_time_message_handler")
-
     time_info = cast(Match, context.match).groupdict()
 
     if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
@@ -548,8 +537,6 @@ async def fallback_answer(session: Session, update: Update, context: TMitupConte
 async def wrong_message_sent_for_time(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    logging.debug("Enter into wrong_message_sent_for_time")
-
     return await fallback_answer(session, update, context)
 
 
@@ -562,8 +549,6 @@ async def wrong_message_sent_for_time(
 async def wrong_message_type_sent_for_time(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    logging.debug("Enter into wrong_message_type_sent_for_time")
-
     return await fallback_answer(session, update, context)
 
 
@@ -591,8 +576,6 @@ async def datetime_state_fallback_answer(
 async def datetime_wrong_text_message_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    logging.debug("Enter into datetime_wrong_text_message_handler")
-
     return await datetime_state_fallback_answer(session, update, context)
 
 
@@ -605,8 +588,6 @@ async def datetime_wrong_text_message_handler(
 async def datetime_wrong_message_type_handler(
     session: Session, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    logging.debug("Enter into datetime_wrong_message_type_handler")
-
     return await datetime_state_fallback_answer(session, update, context)
 
 

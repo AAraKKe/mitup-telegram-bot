@@ -1,5 +1,4 @@
-import logging
-
+import structlog
 from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -15,12 +14,12 @@ from mitup_bot.views import factory
 from .enums import EditMeetingHandlerId
 from .utils import cleanup_states
 
+log = structlog.get_logger(__name__)
+
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.EDIT, callback_data=cb.EDIT_MEETING, bindable=True)
 @with_async_session
 async def callback_query_edit_meeting(session: Session, update: Update, context: TMitupContext) -> None:
-    logging.debug("Enter into callback_query_edit_meeting")
-
     callback_data = guards.valid_callback_data(cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.EDIT)
 
     user = guards.current_user(update, session)
@@ -50,11 +49,9 @@ async def callback_query_cancel_edit_meeting(session: Session, update: Update, c
         # If we cannot get a meeting_id from callback something went wrong.
         # Cleanup, log error and end possible conversation
         cleanup_states(context)
-        logging.error(exc)
+        log.error("Malformed callback data while cancelling meeting edit", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
         return ConversationHandler.END
-
-    logging.debug(f"Enter into callback_query_cancel_edit_meeting. Meeting id: {meeting_id}")
 
     meetup = await guards.user_owns_meeting(user, meeting_id, "Cancel edit meeting", update, context)
     if meetup is None:

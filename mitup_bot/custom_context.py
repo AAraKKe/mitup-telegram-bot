@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -6,6 +5,7 @@ from enum import auto
 from time import perf_counter
 from typing import Any, Generic, TypeVar
 
+import structlog
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 
@@ -146,8 +146,20 @@ class MitupContext(
 
         super().__init__(application=application, chat_id=chat_id, user_id=user_id)
 
+        # Mirror update_id onto the metrics stream as a global property so a CloudWatch alarm on a
+        # metric can be cross-referenced to the matching log lines, which carry the same field.
+        if update and update.update_id is not None:
+            metrics.set_global_property("update_id", update.update_id)
+
         self.api = api
         api.adapter = self
+
+    @property
+    def log(self) -> structlog.stdlib.BoundLogger:
+        """Convenience accessor beside `context.metrics`. The request/invocation fields (user_id,
+        chat_id, update_id, ...) are injected from contextvars by the logging pipeline, not by this
+        accessor — it returns a plain module logger."""
+        return structlog.get_logger("mitup_bot")
 
     def get_update(self) -> Update:
         return self.__update
@@ -237,7 +249,7 @@ class MitupContext(
 
     def clean_user_data(self, contexts: list[ContextId]):
         if self.user_data is None:  # pragma: no cover
-            logging.warning("User data requested but not set when trying to clean user data. Not doing anything.")
+            self.log.warning("User data not set while cleaning user data, skipping")
             return
 
         for context in contexts:
@@ -246,7 +258,7 @@ class MitupContext(
 
     def clean_all_user_data(self):
         if self.user_data is None:  # pragma: no cover
-            logging.warning("User data requested but not set when trying to clean all user data. Not doing anything.")
+            self.log.warning("User data not set while cleaning all user data, skipping")
             return
 
         self.user_data.registry.clear()

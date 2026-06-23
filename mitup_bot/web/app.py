@@ -1,8 +1,8 @@
-import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import assert_never
 
+import structlog
 from fastapi import FastAPI
 from telegram.ext import Application
 
@@ -11,7 +11,7 @@ from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.web import telegram
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
@@ -22,7 +22,7 @@ async def run_shutdown_step(step: Callable[[], Awaitable[None]], metrics_client:
         await step()
     except Exception:
         metrics_client.emit(MetricKey.LIFESPAN_SHUTDOWN_FAILED)
-        logger.exception("Lifespan shutdown step failed: %s", label)
+        log.exception("Lifespan shutdown step failed", label=label)
 
 
 def build_webhook_lifespan(
@@ -44,7 +44,7 @@ def build_webhook_lifespan(
             )
         except Exception:
             metrics_client.emit(MetricKey.LIFESPAN_STARTUP_FAILED)
-            logger.exception("Lifespan startup failed in webhook mode")
+            log.exception("Lifespan startup failed in webhook mode")
             raise
 
         try:
@@ -69,7 +69,7 @@ def build_polling_lifespan(
             await ptb_app.start()
         except Exception:
             metrics_client.emit(MetricKey.LIFESPAN_STARTUP_FAILED)
-            logger.exception("Lifespan startup failed in polling mode")
+            log.exception("Lifespan startup failed in polling mode")
             raise
 
         try:
