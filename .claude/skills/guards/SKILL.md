@@ -52,9 +52,12 @@ Use `current_user` for all handlers that require an authenticated user. Use `use
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
 | `meeting_accessible` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
+| `meeting_viewable` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
 | `user_owns_meeting` | `(user, meeting_id, action, update, context, redirect=True)` | `Meetup \| None` | — (handles redirect internally) |
 
-Use `meeting_accessible` for all handlers that operate on a meeting from the bot chat (not inline). It handles three cases internally: meeting not found → "meeting deleted" message; meeting inactive + owner → reactivation prompt; non-owner → redirect to main menu. When `None` is returned, the handler must return immediately.
+Use `meeting_accessible` for all handlers that require **ownership** of a meeting from the bot chat (not inline). It handles three cases internally: meeting not found → "meeting deleted" message; meeting inactive + owner → reactivation prompt; non-owner → redirect to main menu. When `None` is returned, the handler must return immediately.
+
+Use `meeting_viewable` for handlers that only need to **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list. It behaves like `meeting_accessible` for the not-found and inactive-owner cases, but a non-owner who has *joined* an active meeting is allowed through so the caller can render `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Non-owners are still redirected to the main menu for meetings they neither own nor joined, and for inactive meetings (only the owner can reactivate).
 
 `user_owns_meeting` is a lower-level guard that skips the not-found and inactive checks. Use it only when those cases are handled separately.
 
@@ -75,5 +78,5 @@ async def show(session: Session, update: Update, context: TMitupContext) -> None
 ## Failure mode registration
 
 <critical_rules>
-  <rule>If a handler uses any of `current_user`, `meeting_accessible`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
+  <rule>If a handler uses any of `current_user`, `meeting_accessible`, `meeting_viewable`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
 </critical_rules>

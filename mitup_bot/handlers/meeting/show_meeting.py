@@ -21,7 +21,7 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
     )
 
     user = guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting_viewable(
         session,
         user,
         callback_data.id,
@@ -34,4 +34,4 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
         return
 
     back_button = meeting_detail_back_button(callback_data.source, callback_data.page, user.lang)
-    await context.api.edit_message(update=update, view=meeting.main_view(back_button=back_button))
+    await context.api.edit_message(update=update, view=meeting.view_for(user, back_button=back_button))

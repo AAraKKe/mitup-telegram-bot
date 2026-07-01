@@ -20,6 +20,8 @@ from tests.helpers import (
     call_handler,
     create_joined_link,
     create_meetup,
+    create_settings,
+    create_user,
 )
 from tests.helpers.stub_db import MockDbSession
 
@@ -133,6 +135,48 @@ async def test_show_meetings_clamps_out_of_range_page(
     item_buttons = joined_meeting_item_buttons(view)
     assert item_buttons
     assert all(str(button.callback_data).endswith(";page:1;src:j") for button in item_buttons)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
+)
+async def test_show_meetings_wires_non_owned_joined_meeting_to_show_meeting(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """A meeting the user joined but does not own is listed and wired to SHOW_MEETING (issue #166 entry point)."""
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    joined_meeting = create_meetup(id=7, owner=owner, title="Owner's Meeting")
+    user_with_settings.joined_links = [create_joined_link(user=user_with_settings, meetup=joined_meeting)]
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    expected_view = PaginatedMitupView(
+        description=MeetingListMessages.JOINED_DESCRIPTION.get(lang=user_with_settings.lang),
+        buttons=[
+            ButtonConfig(
+                text="Owner's Meeting",
+                callback_data=cb.SHOW_MEETING.with_id(7),
+            )
+        ],
+        page_number=1,
+        column_size=2,
+        row_size=2,
+        navigation_callback_data=cb.SHOW_JOINED_MEETINGS_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
+    )
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 @pytest.mark.parametrize(

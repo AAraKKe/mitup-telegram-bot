@@ -249,7 +249,7 @@ async def test_complete_user_invitation(
 
     # User has been sent confirmation of the invitation
     # With the proper view depending on who invited the user
-    expected_view = meeting.main_view() if owner_id == 123 else meeting.external_view
+    expected_view = meeting.main_view() if owner_id == 123 else meeting.external_view()
     expected_view = expected_view.with_context(
         MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )

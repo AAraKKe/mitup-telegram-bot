@@ -22,6 +22,7 @@ from mitup_bot.guards import (
     chat,
     current_user,
     meeting_accessible,
+    meeting_viewable,
     message,
     user_language,
     user_owns_meeting,
@@ -39,7 +40,14 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
-from tests.helpers import StubMitupContext, UpdateRequest, create_meetup, create_user
+from tests.helpers import (
+    StubMitupContext,
+    UpdateRequest,
+    create_joined_link,
+    create_meetup,
+    create_settings,
+    create_user,
+)
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -212,6 +220,190 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
 
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+
+
+async def test_meeting_viewable_returns_meeting_owned_by_user(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    with caplog.at_level(logging.WARNING):
+        result = await meeting_viewable(mock_session, user_with_settings, 1, "Show meeting", update, context)
+
+        assert result == user_with_settings.meetups[0]
+        assert caplog.text == ""
+
+    context.api.assert_edit_message_not_called()
+
+
+async def test_meeting_viewable_returns_joined_meeting_not_owned_by_user(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    caplog: pytest.LogCaptureFixture,
+):
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    joined_meeting = create_meetup(id=7, owner=owner, title="Owner's Meeting")
+    user_with_settings.joined_links = [create_joined_link(user=user_with_settings, meetup=joined_meeting)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(joined_meeting)
+
+    with caplog.at_level(logging.WARNING):
+        result = await meeting_viewable(mock_session, user_with_settings, 7, "Show meeting", update, context)
+
+        assert result == joined_meeting
+        assert caplog.text == ""
+
+    context.api.assert_edit_message_not_called()
+
+
+async def test_meeting_viewable_redirects_when_meeting_neither_owned_nor_joined(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+    caplog: pytest.LogCaptureFixture,
+):
+    meeting = create_meetup(999, "Meeting!", description="Description")
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    with caplog.at_level(logging.WARNING):
+        result = await meeting_viewable(mock_session, user_with_settings, 999, "Show meeting", update, context)
+        await context.flush_metrics()
+
+        assert result is None
+        assert "User tried 'Show meeting' with a meeting that does not belong to them. " in caplog.text
+        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+
+
+@pytest.mark.parametrize(
+    "keyboard",
+    [
+        lambda lang: None,
+        lambda lang: [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
+                ),
+            ]
+        ],
+    ],
+    ids=["without_custom_keyboard", "with_custom_keyboard"],
+)
+async def test_meeting_viewable_shows_reactivation_prompt_for_inactive_meeting_owned_by_user(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    keyboard: Callable[[str], Keyboard | None],
+):
+    inactive_meeting = create_meetup(id=5, owner=user_with_settings, active=False)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    result = await meeting_viewable(
+        mock_session,
+        user_with_settings,
+        5,
+        "Show meeting",
+        update,
+        context,
+        custom_keyboard=keyboard(user_with_settings.lang),
+    )
+
+    assert result is None
+    context.api.assert_edit_message_called(
+        update,
+        factory.reactivation_prompt_view(
+            lang=user_with_settings.lang, meeting_id=5, back_rows=keyboard(user_with_settings.lang)
+        ),
+    )
+
+
+async def test_meeting_viewable_redirects_non_owner_of_inactive_meeting(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    inactive_meeting = create_meetup(id=6, owner=owner, active=False)
+    user_with_settings.joined_links = [create_joined_link(user=user_with_settings, meetup=inactive_meeting)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    result = await meeting_viewable(mock_session, user_with_settings, 6, "Show meeting", update, context)
+    await context.flush_metrics()
+
+    assert result is None
+    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+
+
+@pytest.mark.parametrize(
+    "keyboard",
+    [
+        lambda lang: None,
+        lambda lang: [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
+                ),
+            ]
+        ],
+    ],
+    ids=["without_custom_keyboard", "with_custom_keyboard"],
+)
+async def test_meeting_viewable_shows_deleted_message_when_meeting_not_found(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    keyboard: Callable[[str], Keyboard | None],
+    caplog: pytest.LogCaptureFixture,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    with caplog.at_level(logging.WARNING):
+        result = await meeting_viewable(
+            mock_session,
+            user_with_settings,
+            999,
+            "Show meeting",
+            update,
+            context,
+            custom_keyboard=keyboard(user_with_settings.lang),
+        )
+
+        assert result is None
+        assert "User tried 'Show meeting' with a meeting that does not exist." in caplog.text
+        context.api.assert_edit_message_called(
+            update,
+            MitupView(
+                description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user_with_settings.lang),
+                keyboard=keyboard(user_with_settings.lang)
+                or [
+                    [
+                        ButtonConfig(
+                            text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                            callback_data=cb.MAIN_MENU,
+                        )
+                    ]
+                ],
+            ),
+        )
 
 
 @pytest.mark.parametrize(

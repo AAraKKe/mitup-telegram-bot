@@ -186,6 +186,55 @@ async def user_owns_meeting(
     return None
 
 
+async def show_reactivation_prompt(
+    user: User,
+    meeting_id: int,
+    update: Update,
+    context: TMitupContext,
+    custom_keyboard: Keyboard | None,
+):
+    """Edit the current message to show the reactivation prompt for an inactive meeting owned by the user."""
+    await context.api.edit_message(
+        update=update,
+        view=factory.reactivation_prompt_view(
+            lang=user.settings.language,
+            meeting_id=meeting_id,
+            back_rows=custom_keyboard,
+        ),
+    )
+
+
+async def notify_meeting_removed(
+    user: User,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    context: TMitupContext,
+    custom_keyboard: Keyboard | None,
+):
+    """Warn and edit the current message to inform the user the meeting no longer exists."""
+    message = (
+        f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.db_id}"
+    )
+    log.warning(message)
+
+    await context.api.edit_message(
+        update=update,
+        view=MitupView(
+            description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user.settings.language),
+            keyboard=custom_keyboard
+            or [
+                [
+                    ButtonConfig(
+                        text=f"{ButtonMessages.MAIN_MENU.back(lang=user.settings.language)}",
+                        callback_data=cb.MAIN_MENU,
+                    )
+                ]
+            ],
+        ),
+    )
+
+
 async def meeting_accessible(
     session: Session,
     user: User,
@@ -214,40 +263,49 @@ async def meeting_accessible(
 
     meeting = Meetup.by_id(session, meeting_id)
 
-    if meeting is not None:
-        if not meeting.active and user.own_meeting(meeting_id):
-            await context.api.edit_message(
-                update=update,
-                view=factory.reactivation_prompt_view(
-                    lang=user.settings.language,
-                    meeting_id=meeting_id,
-                    back_rows=custom_keyboard,
-                ),
-            )
+    if meeting is None:
+        await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
+        return None
+
+    if not meeting.active and user.own_meeting(meeting_id):
+        await show_reactivation_prompt(user, meeting_id, update, context, custom_keyboard)
+        return None
+
+    return await user_owns_meeting(user, meeting_id, action, update, context)
+
+
+async def meeting_viewable(
+    session: Session,
+    user: User,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    context: TMitupContext,
+    custom_keyboard: Keyboard | None = None,
+) -> Meetup | None:
+    """Check whether the user may *view* the meeting, whether they own it or have only joined it.
+
+    Unlike `meeting_accessible`, a non-owner who has joined an active meeting is allowed through so
+    the caller can render the non-owner view (`Meetup.external_view`) instead of being bounced to the
+    main menu. Can only be used when a meeting is accessed from the bot chat.
+    """
+
+    meeting = Meetup.by_id(session, meeting_id)
+
+    if meeting is None:
+        await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
+        return None
+
+    if not meeting.active:
+        if user.own_meeting(meeting_id):
+            await show_reactivation_prompt(user, meeting_id, update, context, custom_keyboard)
             return None
         return await user_owns_meeting(user, meeting_id, action, update, context)
 
-    message = (
-        f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.db_id}"
-    )
-    log.warning(message)
+    if user.own_meeting(meeting_id) or user.joined_meeting(meeting_id):
+        return meeting
 
-    await context.api.edit_message(
-        update=update,
-        view=MitupView(
-            description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user.settings.language),
-            keyboard=custom_keyboard
-            or [
-                [
-                    ButtonConfig(
-                        text=f"{ButtonMessages.MAIN_MENU.back(lang=user.settings.language)}",
-                        callback_data=cb.MAIN_MENU,
-                    )
-                ]
-            ],
-        ),
-    )
-    return None
+    return await user_owns_meeting(user, meeting_id, action, update, context)
 
 
 async def user_registered(

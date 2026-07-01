@@ -41,7 +41,7 @@ def test_external_view():
         ],
     )
 
-    assert expected_view == meeting.external_view
+    assert expected_view == meeting.external_view()
 
 
 def test_edit_view(user_with_settings: User):
@@ -225,7 +225,7 @@ def test_external_view_hides_join_leave_row_when_locked_and_in_progress(user_wit
 
     assert meeting.is_in_progress  # guard: the branch condition must be True
 
-    view = meeting.external_view
+    view = meeting.external_view()
 
     join_cb = cb.JOIN.with_id(meeting.db_id)
     join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
@@ -272,7 +272,7 @@ def make_not_in_progress_meeting(owner: User):
     "get_view",
     [
         lambda m: m.main_view(),
-        lambda m: m.external_view,
+        lambda m: m.external_view(),
     ],
     ids=["main_view", "external_view"],
 )
@@ -321,7 +321,7 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(use
     "get_view",
     [
         lambda m: m.main_view(),
-        lambda m: m.external_view,
+        lambda m: m.external_view(),
     ],
     ids=["main_view", "external_view"],
 )

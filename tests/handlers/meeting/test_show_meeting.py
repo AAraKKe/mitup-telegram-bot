@@ -8,7 +8,9 @@ from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.meeting.show_meeting import callback_query_show_meeting
+from mitup_bot.handlers.meeting.utils import meeting_detail_back_button
 from mitup_bot.models import User
+from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
@@ -18,8 +20,12 @@ from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
     call_handler,
+    create_joined_link,
     create_meetup,
+    create_settings,
+    create_user,
 )
+from tests.helpers.monitoring import MetricAssertions
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1))]), indirect=True)
@@ -97,6 +103,70 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
         "User tried 'Show meeting' with a meeting that does not belong to them. "
         f"Meeting id: 4, user id: {user_with_settings.id}"
     ) in caplog.text
+
+
+async def test_show_meeting_renders_external_view_for_joined_but_not_owned_meeting(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+    caplog: pytest.LogCaptureFixture,
+):
+    """Tapping a joined (non-owned) meeting shows the non-owner view instead of bouncing to the main menu."""
+    match = re.match(cb.SHOW_MEETING.pattern, "show;meeting:7")  # Meeting joined but not owned
+    assert match is not None
+    context.matches = [match]
+
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    joined_meeting = create_meetup(id=7, owner=owner, title="Owner's Meeting")
+    user_with_settings.joined_links = [create_joined_link(user=user_with_settings, meetup=joined_meeting)]
+
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(joined_meeting)
+
+    with caplog.at_level(logging.WARNING):
+        await callback_query_show_meeting(update, context)
+        await context.flush_metrics()
+
+        # The ownership bounce is fully gone: no warning log and no MeetingNotOwned error emitted.
+        assert caplog.text == ""
+        metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+
+    # The handler builds the back button in the viewer's language (no origin in the callback, so it
+    # targets the main menu), unlike external_view's owner-language default back button.
+    expected_view = joined_meeting.external_view(
+        back_button=meeting_detail_back_button(None, 1, user_with_settings.lang)
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+    context.api.assert_send_message_not_called()
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SHOW_MEETING.with_page(7, 2, MeetingListSource.JOINED))],
+    indirect=True,
+)
+async def test_show_meeting_external_view_back_button_targets_originating_list_page(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """A joined (non-owned) meeting opened from the joined list must render the non-owner view with
+    a back button returning to the originating joined-list page."""
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    joined_meeting = create_meetup(id=7, owner=owner, title="Owner's Meeting")
+    user_with_settings.joined_links = [create_joined_link(user=user_with_settings, meetup=joined_meeting)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(joined_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
+
+    expected_view = joined_meeting.external_view(
+        back_button=meeting_detail_back_button(MeetingListSource.JOINED, 2, user_with_settings.lang)
+    )
+    context.api.assert_edit_message_called(update, expected_view)
 
 
 async def test_show_meeting_fails_without_callback_query_data(

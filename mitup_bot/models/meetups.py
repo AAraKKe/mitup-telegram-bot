@@ -472,28 +472,27 @@ class Meetup(BaseModel, SQLModel, table=True):
             view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.user_language))
         return view
 
-    @property
-    def external_view(self) -> MitupView:
-        """This is the view shown to users that do not own the meeting when checking through meetings I have joined"""
+    def external_view(self, back_button: ButtonConfig | None = None) -> MitupView:
+        """This is the view shown to users that do not own the meeting when checking through meetings I have joined.
+
+        `back_button` lets the caller point the trailing back button at the list the user came
+        from; when omitted it defaults to the main menu.
+        """
         keyboard: Keyboard = []
         if not (self.lock_on_start and self.is_in_progress):
             keyboard.append(self._join_leave_row(self.user_language))
-        keyboard.append(
-            [
-                ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
-                    callback_data=cb.MAIN_MENU,
-                ),
-            ]
-        )
+        keyboard.append([back_button or self._main_menu_back_button()])
         view = MitupView(self.inline_message, keyboard)
         if self.is_in_progress:
             view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.user_language))
         return view
 
-    def view_for(self, user: User) -> MitupView:
-        """Get the appropriate view for the given user depending on whether they own the meeting or not."""
-        return self.main_view() if self.is_owned_by(user) else self.external_view
+    def view_for(self, user: User, back_button: ButtonConfig | None = None) -> MitupView:
+        """Get the appropriate view for the given user depending on whether they own the meeting or not.
+
+        `back_button` is forwarded to whichever view is rendered.
+        """
+        return self.main_view(back_button) if self.is_owned_by(user) else self.external_view(back_button)
 
     @property
     def edit_view(self) -> MitupView:

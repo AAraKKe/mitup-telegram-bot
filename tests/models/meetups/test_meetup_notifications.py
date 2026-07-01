@@ -30,7 +30,7 @@ def test_main_view_invite_button_visibility(allow_invitation: bool, user_with_se
 def test_external_view_invite_button_visibility(allow_invitation: bool, user_with_settings: User):
     meeting = create_meetup(id=11, owner=user_with_settings, invitation=allow_invitation)
 
-    view = meeting.external_view
+    view = meeting.external_view()
     found_invite_buttons = invite_buttons(view, meeting)
 
     if allow_invitation:
