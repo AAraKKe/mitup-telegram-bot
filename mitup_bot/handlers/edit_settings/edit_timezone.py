@@ -36,7 +36,7 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
 
-    await context.api.send_message(update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationSettingsState.TIMEZONE
 

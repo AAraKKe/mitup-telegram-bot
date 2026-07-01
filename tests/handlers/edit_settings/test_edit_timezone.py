@@ -49,7 +49,11 @@ async def test_callback_query_timezone_with_correct_view(
         ),
     )
 
-    context.api.assert_send_message_called(update, view)
+    # Issue #174: entering the timezone editor must replace the Settings menu in
+    # place, not append a new prompt below it, matching the Timeout and
+    # Notification-time editors.
+    context.api.assert_edit_message_called(update, view)
+    context.api.assert_send_message_not_called()
     assert result == ConversationSettingsState.TIMEZONE
 
 
