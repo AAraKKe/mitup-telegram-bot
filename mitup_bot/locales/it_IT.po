@@ -704,6 +704,15 @@ msgstr "Nessun incontro è stato condiviso in questa chat ancora"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Nessun incontro è stato ancora condiviso in questa chat.</i>"
 
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_TITLE"
+msgstr "❌ Incontro non più disponibile"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION"
+msgstr "Questo incontro è stato annullato o non è più accessibile"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE"
+msgstr "<i>Questo incontro non è più disponibile.</i>"
+
 msgid "NotificationMessages.DELETION_WARNING"
 msgstr "L'incontro <b>${meeting_title}</b> sarà eliminato permanentemente in <b>${days_until_deletion} giorni</b>.\n\nPer evitare che ciò accada, puoi riattivare l'incontro selezionando il pulsante <b>${reactivate_meeting_button}</b> di seguito.\n\nRicorda che puoi sempre riattivare qualsiasi incontro passato dal pulsante <b>${past_meetings_button}</b> nel menu principale.\n\nSe non desideri riattivare l'incontro, puoi ignorare questo messaggio."
 

@@ -595,6 +595,15 @@ msgstr "Nenhum evento foi compartilhado neste chat ainda"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Nenhum evento foi compartilhado neste chat ainda.</i>"
 
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_TITLE"
+msgstr "❌ Evento não está mais disponível"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION"
+msgstr "Este evento foi cancelado ou não está mais acessível"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE"
+msgstr "<i>Este evento não está mais disponível.</i>"
+
 msgid "NotificationMessages.DELETION_WARNING"
 msgstr "O evento <b>${meeting_title}</b> será permanentemente excluído em <b>${days_until_deletion} dias</b>.\n\nPara evitar que isso aconteça, você pode reativar o evento selecionando o botão <b>${reactivate_meeting_button}</b> abaixo.\n\nLembre-se de que você pode sempre reativar qualquer evento anterior do botão <b>${past_meetings_button}</b> no menu principal.\n\nSe você não deseja reativar o evento, pode ignorar esta mensagem."
 

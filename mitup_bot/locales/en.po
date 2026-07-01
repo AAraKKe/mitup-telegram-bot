@@ -644,6 +644,15 @@ msgstr "No meetings have been shared in this chat yet"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>No meetings have been shared in this chat yet.</i>"
 
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_TITLE"
+msgstr "❌ Meeting no longer available"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION"
+msgstr "This meeting has been cancelled or is no longer accessible"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE"
+msgstr "<i>This meeting is no longer available.</i>"
+
 msgid "NotificationMessages.DELETION_WARNING"
 msgstr "The meeting <b>${meeting_title}</b> will be permanently deleted in <b>${days_until_deletion} days</b>.\n\nTo prevent this from happening, you can reactivate the meeting by selecting the <b>${reactivate_meeting_button}</b> button below.\n\nRemember that you can always reactivate any past meeting from the <b>${past_meetings_button}</b> button in the main menu.\n\nIf you do not want to reactivate the meeting, you can ignore this message."
 

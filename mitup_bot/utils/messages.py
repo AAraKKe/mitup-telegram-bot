@@ -613,6 +613,9 @@ class InlineQueryMessages(MessageBase):
     NO_RESULTS_TITLE = "No meetings found"
     NO_RESULTS_DESCRIPTION = "No meetings have been shared in this chat yet"
     NO_RESULTS_MESSAGE = "<i>No meetings have been shared in this chat yet.</i>"
+    MEETING_UNAVAILABLE_TITLE = f"{Emojis.CANCEL} Meeting no longer available"
+    MEETING_UNAVAILABLE_DESCRIPTION = "This meeting has been cancelled or is no longer accessible"
+    MEETING_UNAVAILABLE_MESSAGE = "<i>This meeting is no longer available.</i>"
 
 
 # --- Notifications ---

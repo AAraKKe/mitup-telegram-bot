@@ -13,7 +13,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
 
 from .enums import InlineQueryId
-from .utils import sort_meetings
+from .utils import meeting_unavailable_view, sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW, pattern=r"^\s*$")
@@ -67,10 +67,12 @@ async def share_meeting(session: Session, update: Update, context: TMitupContext
     user = current_user(update, session)
     query = valid_inline_query(update).query
     meeting_id = int(query)
-    # Pass redirect false since an inline query does not have a message we can edit.
     meeting = Meetup.by_id(session, meeting_id)
 
     if meeting and meeting.active and (meeting.public or meeting.is_owned_by(user)):
-        view = meeting.inline_view()
-        await context.api.answer_inline_query(update=update, results=[view])
+        results = [meeting.inline_view()]
         context.put_feature_metric(Feature.SHARE_MEETING)
+    else:
+        results = [meeting_unavailable_view(user.lang)]
+
+    await context.api.answer_inline_query(update=update, results=results, cache_time=0)

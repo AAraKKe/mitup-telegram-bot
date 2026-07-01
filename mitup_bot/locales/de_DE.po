@@ -649,6 +649,15 @@ msgstr "In diesem Chat wurden noch keine Treffen geteilt"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>In diesem Chat wurden noch keine Treffen geteilt.</i>"
 
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_TITLE"
+msgstr "❌ Treffen nicht mehr verfügbar"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION"
+msgstr "Dieses Treffen wurde abgesagt oder ist nicht mehr zugänglich"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE"
+msgstr "<i>Dieses Treffen ist nicht mehr verfügbar.</i>"
+
 msgid "NotificationMessages.DELETION_WARNING"
 msgstr "Das Treffen <b>${meeting_title}</b> wird in <b>${days_until_deletion} Tagen</b> dauerhaft gelöscht.\n\nUm dies zu verhindern, kannst du das Treffen reaktivieren, indem du die Schaltfläche <b>${reactivate_meeting_button}</b> unten auswählst.\n\nDenke daran, dass du alle vergangenen Treffen jederzeit über die Schaltfläche <b>${past_meetings_button}</b> im Hauptmenü reaktivieren kannst.\n\nWenn du das Treffen nicht reaktivieren möchtest, kannst du diese Nachricht ignorieren."
 

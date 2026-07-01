@@ -595,6 +595,15 @@ msgstr "Ningunha quedada foi compartida neste chat aínda"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Ningunha quedada foi compartida neste chat aínda.</i>"
 
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_TITLE"
+msgstr "❌ A quedada xa non está dispoñible"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION"
+msgstr "Esta quedada cancelouse ou xa non é accesible"
+
+msgid "InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE"
+msgstr "<i>Esta quedada xa non está dispoñible.</i>"
+
 msgid "NotificationMessages.DELETION_WARNING"
 msgstr "A quedada <b>${meeting_title}</b> será permanentemente eliminada en <b>${days_until_deletion} días</b>.\n\nPara evitar isto, podes reactivar a quedada seleccionando o botón <b>${reactivate_meeting_button}</b> de abaixo.\n\nLembra que sempre podes reactivar calquera quedada pasada desde o botón <b>${past_meetings_button}</b> no menú principal.\n\nSe non queres reactivar a quedada, podes ignorar esta mensaxe."
 
