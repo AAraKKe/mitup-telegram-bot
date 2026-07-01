@@ -15,20 +15,27 @@ set -euo pipefail
 command="$1"
 MAX_LINES=120
 
-# Skip if background agents are still running. SubagentStart appends a line to
-# `in`, SubagentStop appends to `out`, and SessionStart resets both. While more
-# agents have started than have stopped (in > out), at least one is still
-# working — defer so we never lint/test/type-check half-written files.
+# Skip if background agents are still running, or if the counters are out of
+# sync and can't be trusted. SubagentStart appends a line to `in`, SubagentStop
+# appends to `out`, and SessionStart resets both. In the common case, more
+# starts than stops (in > out) means at least one agent is still working.
+# But some orchestration (observed with the Workflow tool) can emit an extra
+# SubagentStop with no matching SubagentStart, pushing out > in. Once that
+# happens, in > out never holds again for the rest of the session, silently
+# disabling this guard for every future turn. Treating any mismatch (not just
+# in > out) as "defer" fails safe in both directions: we might skip a check
+# that was actually safe to run, but we never lint/test/type-check a half-
+# written file because a desynced counter said nothing was running.
 # NB: the counters are deliberately NOT cleared anywhere in this script. Clearing
 # them mid-run orphaned the SubagentStop of still-in-flight agents and corrupted
-# the count (in < out forever); SessionStart is the only place that resets them.
+# the count; SessionStart is the only place that resets them.
 AGENTS_DIR=".claude/agents_running"
 if [ -d "$AGENTS_DIR" ]; then
     in_count=$(wc -l < "$AGENTS_DIR/in" 2>/dev/null || echo 0)
     out_count=$(wc -l < "$AGENTS_DIR/out" 2>/dev/null || echo 0)
-    if [ "$in_count" -gt "$out_count" ]; then
+    if [ "$in_count" -ne "$out_count" ]; then
         jq -n --arg cmd "$command" --argjson in "$in_count" --argjson out "$out_count" \
-            '{"decision":"approve","reason":"Skipped \($cmd): \($in - $out) background agent(s) still running."}'
+            '{"decision":"approve","reason":"Skipped \($cmd): agent counters not settled (started=\($in), stopped=\($out))."}'
         exit 0
     fi
 fi
