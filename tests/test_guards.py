@@ -7,7 +7,7 @@ import pytest
 from sqlmodel import Session
 from telegram import Chat, Message, Update
 
-from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_data import CallbackData, PaginatedCallbackData
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -29,6 +29,7 @@ from mitup_bot.guards import (
     valid_callback_data,
     valid_callback_query,
     valid_inline_query,
+    valid_paginated_callback_data,
 )
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
 from mitup_bot.models import User
@@ -219,6 +220,29 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
 def test_valid_callback_data_failed_states(match: re.Match | None):
     with pytest.raises(MalformedCallbackData):
         valid_callback_data(CallbackData.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+
+
+@pytest.mark.parametrize(
+    "match", [re.match(cb.SHOW_PAST_MEETING.pattern, "show;past_meeting:"), None], ids=["no_id", "none_match"]
+)
+def test_valid_paginated_callback_data_failed_states(match: re.Match | None):
+    with pytest.raises(MalformedCallbackData):
+        valid_paginated_callback_data(PaginatedCallbackData.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+
+
+@pytest.mark.parametrize(
+    "wire, expected_page",
+    [
+        ("show;past_meeting:42;page:3", 3),
+        ("show;past_meeting:42", 1),  # A missing page defaults to the first page.
+    ],
+    ids=["with_page", "page_defaults_to_one"],
+)
+def test_valid_paginated_callback_data_page(wire: str, expected_page: int):
+    match = re.match(cb.SHOW_PAST_MEETING.pattern, wire)
+    valid = valid_paginated_callback_data(cb.SHOW_PAST_MEETING.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+    assert valid.id == 42
+    assert valid.page == expected_page
 
 
 @pytest.mark.parametrize(

@@ -3,7 +3,12 @@ import re
 
 import pytest
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallbackData
+from mitup_bot.callback_data import (
+    CallbackData,
+    DateCallbackData,
+    MeetingCallbackData,
+    PaginatedCallbackData,
+)
 
 
 @pytest.mark.parametrize(
@@ -104,6 +109,49 @@ def test_meeting_callback_data_with_id():
     cb = MeetingCallbackData(entity="meeting", action="edit").with_ids(meeting_id=10, id=21)
     cb = cb.with_id(10)
     assert str(cb) == "edit;meeting:10:10"
+
+
+def test_paginated_callback_data_pattern():
+    cb = PaginatedCallbackData(entity="past_meeting", action="show")
+    assert cb.pattern == r"^(?P<action>show);(?P<entity>past_meeting):(?P<id>\d*)(?:;page:(?P<page>\d+))?$"
+
+
+@pytest.mark.parametrize(
+    "callback_data, expected",
+    [
+        (PaginatedCallbackData(entity="past_meeting", action="show").with_id(42), "show;past_meeting:42"),
+        (PaginatedCallbackData(entity="past_meeting", action="show").with_page(42, 3), "show;past_meeting:42;page:3"),
+        (PaginatedCallbackData(entity="past_meeting", action="show"), "show;past_meeting:"),
+    ],
+    ids=["with_id_omits_page", "with_page", "empty"],
+)
+def test_paginated_callback_data_str(callback_data: PaginatedCallbackData, expected: str):
+    assert str(callback_data) == expected
+
+
+@pytest.mark.parametrize(
+    "input_str, expected_id, expected_page",
+    [
+        ("show;past_meeting:42;page:3", 42, 3),
+        ("show;past_meeting:42", 42, None),
+        ("show;past_meeting:", None, None),
+    ],
+    ids=["id_and_page", "id_without_page", "empty"],
+)
+def test_paginated_callback_data_matches(input_str: str, expected_id: int | None, expected_page: int | None):
+    cb = PaginatedCallbackData(entity="past_meeting", action="show")
+    match = re.match(cb.pattern, input_str)
+    parsed = cb.parse(match)
+    assert parsed.id == expected_id
+    assert parsed.page == expected_page
+
+
+def test_paginated_callback_data_with_id_keeps_wire_format_of_plain_callback():
+    """A page-less paginated callback must be indistinguishable on the wire from a plain CallbackData,
+    so callbacks that never carried a page stay backward-compatible."""
+    paginated = PaginatedCallbackData(entity="meeting", action="show").with_id(7)
+    plain = CallbackData(entity="meeting", action="show").with_id(7)
+    assert str(paginated) == str(plain)
 
 
 @pytest.mark.parametrize(

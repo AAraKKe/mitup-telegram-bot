@@ -13,7 +13,7 @@ from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
 
 
-def _past_meeting_view(meeting: Meetup, user: User) -> MitupView:
+def _past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
     description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
     return MitupView(
         meeting.message,
@@ -25,13 +25,13 @@ def _past_meeting_view(meeting: Meetup, user: User) -> MitupView:
                 ),
                 ButtonConfig(
                     text=ButtonMessages.DELETE.get(lang=user.lang),
-                    callback_data=cb.DELETE_PAST_MEETING.with_id(meeting.db_id),
+                    callback_data=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page),
                 ),
             ],
             [
                 ButtonConfig(
                     text=ButtonMessages.PAST_MEETINGS.back(lang=user.lang),
-                    callback_data=cb.SHOW_PAST_MEETING_PAGE.with_id(1),
+                    callback_data=cb.SHOW_PAST_MEETING_PAGE.with_id(page),
                 ),
             ],
         ],
@@ -43,7 +43,7 @@ def _past_meeting_view(meeting: Meetup, user: User) -> MitupView:
 )
 @with_async_session
 async def callback_query_delete_past_meeting(session: Session, update: Update, context: TMitupContext):
-    callback_data = guards.valid_callback_data(
+    callback_data = guards.valid_paginated_callback_data(
         cb.DELETE_PAST_MEETING.parse(context.match), MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK
     )
 
@@ -58,8 +58,8 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
         view=factory.confirmation_view(
             lang=user.lang,
             message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
-            confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(callback_data.id),
-            decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(callback_data.id),
+            confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_page(callback_data.id, callback_data.page),
+            decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_page(callback_data.id, callback_data.page),
         ),
     )
 
@@ -69,7 +69,7 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
 )
 @with_async_session
 async def callback_query_show_past_meeting(session: Session, update: Update, context: TMitupContext):
-    callback_data = guards.valid_callback_data(
+    callback_data = guards.valid_paginated_callback_data(
         cb.SHOW_PAST_MEETING.parse(context.match), MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK
     )
 
@@ -83,7 +83,7 @@ async def callback_query_show_past_meeting(session: Session, update: Update, con
     if full_meeting is None:
         return
 
-    await context.api.edit_message(update=update, view=_past_meeting_view(full_meeting, user))
+    await context.api.edit_message(update=update, view=_past_meeting_view(full_meeting, user, callback_data.page))
 
 
 @HandlersRegistry.register_callback_query(
@@ -93,9 +93,8 @@ async def callback_query_show_past_meeting(session: Session, update: Update, con
 )
 @with_async_session
 async def callback_query_confirm_delete_past_meeting(session: Session, update: Update, context: TMitupContext):
-    callback_data = guards.valid_callback_data(
-        cb.CONFIRM_DELETE_PAST_MEETING.parse(context.match),
-        MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK,
+    callback_data = guards.valid_paginated_callback_data(
+        cb.CONFIRM_DELETE_PAST_MEETING.parse(context.match), MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK
     )
 
     user = guards.current_user(update, session)
@@ -118,7 +117,7 @@ async def callback_query_confirm_delete_past_meeting(session: Session, update: U
             [
                 ButtonConfig(
                     text=ButtonMessages.PAST_MEETINGS.back(lang=user.lang),
-                    callback_data=cb.SHOW_PAST_MEETING_PAGE.with_id(1),
+                    callback_data=cb.SHOW_PAST_MEETING_PAGE.with_id(callback_data.page),
                 )
             ]
         ],
@@ -133,9 +132,8 @@ async def callback_query_confirm_delete_past_meeting(session: Session, update: U
 )
 @with_async_session
 async def callback_query_decline_delete_past_meeting(session: Session, update: Update, context: TMitupContext):
-    callback_data = guards.valid_callback_data(
-        cb.DECLINE_DELETE_PAST_MEETING.parse(context.match),
-        MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK,
+    callback_data = guards.valid_paginated_callback_data(
+        cb.DECLINE_DELETE_PAST_MEETING.parse(context.match), MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK
     )
 
     user = guards.current_user(update, session)
@@ -148,4 +146,4 @@ async def callback_query_decline_delete_past_meeting(session: Session, update: U
     if full_meeting is None:
         return
 
-    await context.api.edit_message(update=update, view=_past_meeting_view(full_meeting, user))
+    await context.api.edit_message(update=update, view=_past_meeting_view(full_meeting, user, callback_data.page))

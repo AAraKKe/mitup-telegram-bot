@@ -108,3 +108,23 @@ async def test_show_meeting_fails_without_callback_query_data(
     context.matches = [match]
     with pytest.raises(MalformedCallbackData):
         await callback_query_show_meeting(update, context)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SHOW_MEETING.with_page(99, 3))], indirect=True)
+async def test_show_meeting_deleted_fallback_returns_to_originating_page(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """When a meeting opened from active-list page 3 no longer exists, the fallback back button
+    must return to page 3 rather than page 1."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    # Meeting 99 is never registered, so guards.meeting_accessible takes the "deleted" path
+    # and renders the custom back keyboard.
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    back_button = view.keyboard[-1][-1]
+    assert back_button.callback_data == cb.SHOW_ACTIVE_MEETING_PAGE.with_id(3)

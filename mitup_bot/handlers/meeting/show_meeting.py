@@ -17,17 +17,15 @@ from .enums import MeetingHandlerId
 )
 @with_async_session
 async def callback_query_show_meeting(session: Session, update: Update, context: TMitupContext):
-    callback_data = guards.valid_callback_data(
+    callback_data = guards.valid_paginated_callback_data(
         cb.SHOW_MEETING.parse(context.match), MeetingHandlerId.SHOW_MEETING_CALLBACK
     )
-
-    meeting_id = callback_data.id
 
     user = guards.current_user(update, session)
     meeting = await guards.meeting_accessible(
         session,
         user,
-        meeting_id,
+        callback_data.id,
         "Show meeting",
         update,
         context,
@@ -35,7 +33,7 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
             [
                 ButtonConfig(
                     text=ButtonMessages.ACTIVE_MEETINGS.get(lang=user.lang),
-                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(callback_data.page),
                 ),
             ]
         ],

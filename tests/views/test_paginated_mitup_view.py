@@ -139,6 +139,21 @@ def tests_paginated_mitup_view_with_incorrect_page(invalid_page: int):
         )
 
 
+@pytest.mark.parametrize(
+    "page_number, item_count, expected",
+    [
+        (1, 4, 1),  # in range, single page
+        (2, 8, 2),  # in range, last page
+        (9, 8, 2),  # stale page beyond the end clamps to the last page
+        (3, 0, 1),  # empty list clamps to the first page
+        (0, 8, 1),  # below range clamps to the first page
+    ],
+    ids=["in_range_single", "in_range_last", "beyond_end", "empty_list", "below_range"],
+)
+def test_clamp_page(page_number: int, item_count: int, expected: int):
+    assert PaginatedMitupView.clamp_page(page_number, item_count) == expected
+
+
 def test_paginated_view_fails_without_navigation_callback_and_multiple_pages():
     with pytest.raises(ValueError):
         PaginatedMitupView(

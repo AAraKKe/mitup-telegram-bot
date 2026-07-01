@@ -214,9 +214,24 @@ class PaginatedMitupView(MitupView):
         page_number (int): The current page number to display. Starts at 1.
         navigation_callback_data (CallbackData): The callback data to use for navigation buttons.
                                                  Mandatory if there are more than one page.
-        row_size (int, optional): The number of buttons per row. Defaults to 2.
-        column_size (int, optional): The number of buttons per column. Defaults to 2.
+        row_size (int, optional): The number of buttons per row. Defaults to DEFAULT_ROW_SIZE.
+        column_size (int, optional): The number of buttons per column. Defaults to DEFAULT_COLUMN_SIZE.
     """
+
+    DEFAULT_ROW_SIZE = 2
+    DEFAULT_COLUMN_SIZE = 2
+    DEFAULT_PAGE_SIZE = DEFAULT_ROW_SIZE * DEFAULT_COLUMN_SIZE
+
+    @classmethod
+    def clamp_page(cls, page_number: int, item_count: int, page_size: int = DEFAULT_PAGE_SIZE) -> int:
+        """Clamp a requested page into the valid range for `item_count` items.
+
+        Callback data can carry a stale page (e.g. the last item of the last page was deleted, or
+        the list shrank since the button was rendered), so handlers clamp the requested page
+        before building the view instead of failing on an out-of-range position.
+        """
+        total_pages = max(1, ceil(item_count / page_size))
+        return max(1, min(page_number, total_pages))
 
     def __init__(
         self,
@@ -225,8 +240,8 @@ class PaginatedMitupView(MitupView):
         buttons: list[ButtonConfig],
         page_number: int,
         navigation_callback_data: cb.CallbackData | None = None,
-        row_size: int = 2,
-        column_size: int = 2,
+        row_size: int = DEFAULT_ROW_SIZE,
+        column_size: int = DEFAULT_COLUMN_SIZE,
     ):
         self.row_size = row_size
         self.column_size = column_size

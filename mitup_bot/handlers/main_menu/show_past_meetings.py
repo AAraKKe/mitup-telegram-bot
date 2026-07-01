@@ -15,11 +15,12 @@ from .enums import MainMenuHandlerId
 
 async def _show_past_meetings(user: User, page_number: int, update: Update, context: TMitupContext) -> None:
     past_meetings = sorted([m for m in user.meetups if not m.active], key=lambda m: m.db_id)
+    page_number = PaginatedMitupView.clamp_page(page_number, len(past_meetings))
 
     if buttons := [
         ButtonConfig(
             text=str(meeting.title),
-            callback_data=cb.SHOW_PAST_MEETING.with_id(meeting.db_id),
+            callback_data=cb.SHOW_PAST_MEETING.with_page(meeting.db_id, page_number),
         )
         for meeting in past_meetings
     ]:

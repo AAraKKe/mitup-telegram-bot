@@ -3,7 +3,7 @@ While custom CallbackData classes can be crated, it is common to use the same se
 instances throughout the entire bot.
 """
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallbackData
+from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallbackData, PaginatedCallbackData
 
 # Empty callback data. Inline keyboards are forced to include some callback data but sometimes
 # we just need a button for display purposes (i.e. CalendarKeyboard)
@@ -13,10 +13,12 @@ EMPTY = CallbackData(action="empty", entity="empty", id=0)
 # Meeting callbacks
 # These are callbacks for the meeting and edit meeting views
 # ----------------------------------------
-SHOW_MEETING = CallbackData(action="show", entity="meeting")
+# SHOW_MEETING and SHOW_PAST_MEETING remember the list page they were opened from so the
+# detail view can send the user back to that exact page (see PaginatedCallbackData).
+SHOW_MEETING = PaginatedCallbackData(action="show", entity="meeting")
 SHOW_ACTIVE_MEETING_PAGE = CallbackData(action="show", entity="active_meeting_page")
 SHOW_JOINED_MEETINGS_PAGE = CallbackData(action="show", entity="joined_meetings")
-SHOW_PAST_MEETING = CallbackData(action="show", entity="past_meeting")
+SHOW_PAST_MEETING = PaginatedCallbackData(action="show", entity="past_meeting")
 SHOW_PAST_MEETING_PAGE = CallbackData(action="show", entity="past_meeting_page")
 EDIT_MEETING = CallbackData(action="edit", entity="meeting")
 CREATE_MEETING = CallbackData(action="create", entity="meeting")
@@ -32,9 +34,11 @@ SHARE = CallbackData(action="share", entity="meeting")
 ATTACH_TO_CHAT = CallbackData(action="attach", entity="meeting")
 LOAD_CHAT_MEETINGS = CallbackData(entity="chat_meet")
 REACTIVATE_MEETING = CallbackData(action="reac", entity="meeting")
-DELETE_PAST_MEETING = CallbackData(action="delete", entity="past_meeting")
-CONFIRM_DELETE_PAST_MEETING = CallbackData(action="confirm_delete", entity="past_meeting")
-DECLINE_DELETE_PAST_MEETING = CallbackData(action="decline_delete", entity="past_meeting")
+# The past-meeting delete flow threads the originating list page through every step so the
+# "Back" button (on both the detail view and the delete-success view) returns to that page.
+DELETE_PAST_MEETING = PaginatedCallbackData(action="delete", entity="past_meeting")
+CONFIRM_DELETE_PAST_MEETING = PaginatedCallbackData(action="confirm_delete", entity="past_meeting")
+DECLINE_DELETE_PAST_MEETING = PaginatedCallbackData(action="decline_delete", entity="past_meeting")
 CONFIRM_INVITE_USER = CallbackData(action="confirm", entity="invite")
 CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
 

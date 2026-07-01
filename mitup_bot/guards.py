@@ -9,9 +9,11 @@ from mitup_bot.callback_data import (
     CallbackData,
     DateCallbackData,
     MeetingCallbackData,
+    PaginatedCallbackData,
     ValidCallbackData,
     ValidDateCallbackData,
     ValidMeetingCallbackData,
+    ValidPaginatedCallbackData,
 )
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
@@ -88,6 +90,20 @@ def valid_callback_data(cb: CallbackData, handler_id: HandlerId) -> ValidCallbac
     if cb.id is None or cb.unknown():
         raise MalformedCallbackData(handler_id, cb)
     return ValidCallbackData(entity=cb.entity, action=cb.action, id=cb.id)
+
+
+def valid_paginated_callback_data(cb: PaginatedCallbackData, handler_id: HandlerId) -> ValidPaginatedCallbackData:
+    """
+    Validates the paginated callback `cb`. If an id cannot be set or the entity is unknown,
+    a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
+
+    A missing originating page defaults to the first page so handlers never re-derive it.
+
+    The output of the guard is a `ValidPaginatedCallbackData`.
+    """
+    if cb.id is None or cb.unknown():
+        raise MalformedCallbackData(handler_id, cb)
+    return ValidPaginatedCallbackData(entity=cb.entity, action=cb.action, id=cb.id, page=cb.page or 1)
 
 
 def valid_meeting_callback_data(cb: MeetingCallbackData, handler_id: HandlerId) -> ValidMeetingCallbackData:

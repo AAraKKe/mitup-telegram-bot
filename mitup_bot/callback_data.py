@@ -100,6 +100,57 @@ class DateCallbackData(CallbackData):
         return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)
 
 
+class ValidPaginatedCallbackData(ValidCallbackData):
+    """Validated PaginatedCallbackData with a concrete originating page.
+
+    The wire format leaves the page optional, but a validated callback always carries a page:
+    the guard defaults a missing page to the first page so handlers never re-derive it.
+    """
+
+    page: int
+
+
+class PaginatedCallbackData(CallbackData):
+    """CallbackData that remembers the list page a detail view was opened from.
+
+    A detail view reached from a paginated list must be able to return to the exact page
+    the user navigated from instead of defaulting to page 1. The originating page is encoded
+    after the id.
+
+    The page is optional: a plain `with_id(...)` callback keeps the same wire format as a
+    non-paginated `CallbackData` (no `;page:` suffix), so callbacks that have no originating
+    page stay backward-compatible.
+
+    Format string: {action};{entity}:{id}[;page:{page}]
+    Example: "show;past_meeting:42;page:3"
+    """
+
+    page: int | None = Field(default=None, ge=1)
+
+    def __str__(self) -> str:
+        return super().__str__() if self.page is None else f"{super().__str__()};page:{self.page}"
+
+    @property
+    def pattern(self) -> str:
+        # The page suffix is optional so callbacks built with `with_id` remain wire-compatible
+        # with a plain CallbackData.
+        return f"{super().pattern[:-1]}(?:;page:(?P<page>\\d+))?$"
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def validate_page(cls, value: str | int | None) -> str | int | None:
+        # A missing optional page group is parsed as None; let pydantic coerce the rest.
+        return value or None if isinstance(value, str) else value
+
+    def with_page(self, id: int, page: int) -> Self:
+        """Attach both the record id and the originating list page."""
+        return self.__class__(entity=self.entity, action=self.action, id=id, page=page)
+
+    @override
+    def with_id(self, id: int) -> Self:
+        return self.__class__(entity=self.entity, action=self.action, id=id, page=self.page)
+
+
 class ValidMeetingCallbackData(ValidCallbackData):
     """
     Callback data to be used when performing an action on a meeting
