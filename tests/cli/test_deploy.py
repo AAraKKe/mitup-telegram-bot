@@ -10,10 +10,9 @@ import click
 import pytest
 from click.testing import CliRunner
 from mypy_boto3_ecs import ECSClient
-from mypy_boto3_ecs.type_defs import DescribeServicesResponseTypeDef
+from mypy_boto3_ecs.type_defs import ServiceDeploymentTypeDef
 from mypy_boto3_lambda import LambdaClient
 from rich.console import Capture
-from rich.status import Status
 
 from mitup_bot.cli.commands import deploy
 from tests.helpers import console
@@ -30,7 +29,8 @@ class DeploymentContext:
     describe_task_responses: list[dict[str, Any]] = field(default_factory=lambda: [{}])
     register_task_responses: list[dict[str, Any]] = field(default_factory=lambda: [{}])
     update_ecs_responses: list[dict[str, Any]] = field(default_factory=lambda: [{}])
-    describe_services_responses: list[dict[str, Any]] = field(default_factory=lambda: [{}])
+    list_deployments_responses: list[dict[str, Any]] = field(default_factory=lambda: [{}])
+    describe_deployments_responses: list[dict[str, Any]] = field(default_factory=lambda: [{}])
 
     def __post_init__(self):
         # Add clients in post_init to avoid having a class variable set to a mock
@@ -66,9 +66,10 @@ class DeploymentContext:
 
     def setup_ecs_returns(self):
         self.ecs_client.describe_task_definition.side_effect = self.describe_task_responses
-        self.ecs_client.describe_services.side_effect = self.describe_services_responses
         self.ecs_client.update_service.side_effect = self.update_ecs_responses
         self.ecs_client.register_task_definition.side_effect = self.register_task_responses
+        self.ecs_client.list_service_deployments.side_effect = self.list_deployments_responses
+        self.ecs_client.describe_service_deployments.side_effect = self.describe_deployments_responses
 
     @contextmanager
     def setup_mock(
@@ -92,11 +93,21 @@ class DeploymentContext:
                 )
 
 
+def service_deployment(**fields: Any) -> ServiceDeploymentTypeDef:
+    return cast(ServiceDeploymentTypeDef, fields)
+
+
+def deployments_response(*deployments: ServiceDeploymentTypeDef) -> dict[str, Any]:
+    return {"serviceDeployments": list(deployments)}
+
+
 @pytest.fixture(autouse=True)
-def mock_sleep():
-    # Just make sure we do not sleep for tests
-    with mock.patch("mitup_bot.cli.commands.deploy.time"):
-        yield
+def mock_time() -> Generator[mock.MagicMock]:
+    # Just make sure we do not sleep for tests. Freeze monotonic so the heartbeat
+    # never fires unless a test drives it explicitly
+    with mock.patch("mitup_bot.cli.commands.deploy.time") as mocked_time:
+        mocked_time.monotonic.return_value = 0.0
+        yield mocked_time
 
 
 def test_update_lambda_code_succeeds_after_retry():
@@ -177,6 +188,11 @@ def test_update_lambda_code_fails_without_update_status(responses: list[dict[str
     with context.setup_mock() as (function, _, capture):
         with pytest.raises(click.Abort):
             deploy.update_lambda_code(function, "MyLambda", "MyImage")
+
+    assert (
+        console.text_with_ansi_codes("[bold red]✘ Failed to get the status of the lambda function 'MyLambda'[/]")
+        in capture.get()
+    )
 
 
 def test_invoke_lambda_succeeds():
@@ -453,56 +469,6 @@ def test_register_task_definition_fails_with_missing_response_data(responses: di
             deploy.register_task_definition(ecs, family, image)
 
 
-def create_service_description(
-    desired: int, running: int, pending: int, arn: str, n_tasks: int, state="IN_PROGRESS", reason="All Good"
-) -> dict[str, Any]:
-    return {
-        "services": [
-            {
-                "desiredCount": desired,
-                "runningCount": running,
-                "pendingCount": pending,
-                "deployments": [
-                    {"taskDefinition": arn, "rolloutState": state, "rolloutStateReason": reason} for _ in range(n_tasks)
-                ],
-            },
-        ]
-    }
-
-
-def service_from_state(state: str, reason: str) -> dict[str, Any]:
-    return create_service_description(1, 1, 0, "MyTask", 1, state, reason)
-
-
-@pytest.mark.parametrize(
-    "describe_service_response",
-    [
-        # No deployments
-        create_service_description(1, 1, 0, "myTask", 0),
-        # No valid task arn
-        create_service_description(1, 1, 0, "wrongTaskArn", 1),
-        # More than one task
-        create_service_description(1, 1, 0, "myTask", 2),
-    ],
-    ids=["missing_deployments", "invalid_task_definition", "multiple_deployments_per_task"],
-)
-def test_update_deployment_status_fails(describe_service_response: DescribeServicesResponseTypeDef):
-    with pytest.raises(click.Abort):
-        deploy.update_status_for_deployment(Status("Some message"), describe_service_response, "myTask")
-
-
-def test_update_deployment_status_succeeds():
-    status = Status("Some message")
-    service = cast(DescribeServicesResponseTypeDef, create_service_description(1, 1, 0, "myTask", 1))
-    result = deploy.update_status_for_deployment(status, service, "myTask")
-
-    assert result.get("rolloutState") == "IN_PROGRESS"
-    assert (
-        status.status
-        == "Deployment: IN_PROGRESS | Tasks: [ Desired: [bold]1[/], Running: [bold]1[/], Pending: [bold]0[/] ]"
-    )
-
-
 def test_update_ecs_service_succeeds():
     context = DeploymentContext(update_ecs_responses=[{"ResponseMetadata": {"HTTPStatusCode": 200}}])
 
@@ -527,69 +493,328 @@ def test_update_ecs_service_fails():
     )
 
 
-def test_deployment_fails_while_waiting():
+def test_find_service_deployment_arn_found_on_first_attempt(mock_time: mock.MagicMock):
     context = DeploymentContext(
-        describe_services_responses=[
-            service_from_state("IN_PROGRESS", "All good"),
-            service_from_state("FAILED", "This broke!"),
+        list_deployments_responses=[
+            deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn")),
         ]
     )
+
+    with context.setup_mock() as (function, ecs, capture):
+        result = deploy.find_service_deployment_arn(ecs, cluster="MyCluster", service="MyService")
+
+    assert result == "MyDeploymentArn"
+    context.assert_ecs_called(
+        "list_service_deployments", service="MyService", cluster="MyCluster", status=["PENDING", "IN_PROGRESS"]
+    )
+    mock_time.sleep.assert_not_called()
+
+
+def test_find_service_deployment_arn_found_after_retries(mock_time: mock.MagicMock):
+    context = DeploymentContext(
+        list_deployments_responses=[
+            # No active deployment yet
+            deployments_response(),
+            # A deployment without an ARN is not usable either
+            deployments_response(service_deployment()),
+            deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn")),
+        ]
+    )
+
+    with context.setup_mock() as (function, ecs, capture):
+        result = deploy.find_service_deployment_arn(ecs, cluster="MyCluster", service="MyService")
+
+    assert result == "MyDeploymentArn"
+    context.assert_ecs_called(
+        "list_service_deployments", n=3, service="MyService", cluster="MyCluster", status=["PENDING", "IN_PROGRESS"]
+    )
+    assert mock_time.sleep.call_count == 2
+    mock_time.sleep.assert_called_with(5)  # DEPLOYMENT_DISCOVERY_DELAY_SECONDS
+
+
+def test_find_service_deployment_arn_aborts_when_never_found(mock_time: mock.MagicMock):
+    context = DeploymentContext(list_deployments_responses=[deployments_response()] * 6)
 
     with context.setup_mock() as (function, ecs, capture):
         with pytest.raises(click.Abort):
-            deploy.waiting_for_deployment_to_finish(ecs, "MyCluster", "MyService", "MyTask")
+            deploy.find_service_deployment_arn(ecs, cluster="MyCluster", service="MyService")
 
-    context.assert_ecs_called("describe_services", services=["MyService"], cluster="MyCluster", n=2)
-    assert "Failed latest deployment: This broke!" in capture.get()
+    context.assert_ecs_called(
+        "list_service_deployments", n=6, service="MyService", cluster="MyCluster", status=["PENDING", "IN_PROGRESS"]
+    )
+    assert mock_time.sleep.call_count == 5  # DEPLOYMENT_DISCOVERY_ATTEMPTS - 1, no sleep before the first attempt
+    assert (
+        console.text_with_ansi_codes(
+            "[bold red]✘ No active deployment found for ECS service 'MyService' after updating it[/]"
+        )
+        in capture.get()
+    )
 
 
-def test_deployment_succeeds_after_waiting():
+def test_describe_service_deployment_returns_first_deployment():
     context = DeploymentContext(
-        describe_services_responses=[
-            service_from_state("IN_PROGRESS", "All good"),
-            service_from_state("IN_PROGRESS", "All good"),
-            service_from_state("COMPLETED", "All good"),
+        describe_deployments_responses=[
+            deployments_response(
+                service_deployment(status="IN_PROGRESS"),
+                service_deployment(status="SUCCESSFUL"),
+            )
         ]
     )
 
     with context.setup_mock() as (function, ecs, capture):
-        deploy.waiting_for_deployment_to_finish(ecs, "MyCluster", "MyService", "MyTask")
+        result = deploy.describe_service_deployment(ecs, "MyDeploymentArn")
 
-    context.assert_ecs_called("describe_services", services=["MyService"], cluster="MyCluster", n=3)
+    assert result == {"status": "IN_PROGRESS"}
+    context.assert_ecs_called("describe_service_deployments", serviceDeploymentArns=["MyDeploymentArn"])
+
+
+def test_describe_service_deployment_aborts_without_deployments():
+    context = DeploymentContext(describe_deployments_responses=[deployments_response()])
+
+    with context.setup_mock() as (function, ecs, capture):
+        with pytest.raises(click.Abort):
+            deploy.describe_service_deployment(ecs, "MyDeploymentArn")
+
     assert (
-        console.text_with_ansi_codes("[bold green]✔︎ ECS service 'MyService' successfuly deployed![/]") in capture.get()
+        console.text_with_ansi_codes("[bold red]✘ Failed to describe the service deployment 'MyDeploymentArn'[/]")
+        in capture.get()
     )
-
-
-def service_from_state_with_missing_data(rollout_state=True, rollout_state_reason=True) -> dict[str, Any]:
-    service = service_from_state("IN_PROGRESS", "All good")
-    if not rollout_state:
-        service["services"][0]["deployments"][0].pop("rolloutState")
-    if not rollout_state_reason:
-        service = service_from_state("FAILED", "Nah")
-        service["services"][0]["deployments"][0].pop("rolloutStateReason")
-
-    return service
 
 
 @pytest.mark.parametrize(
-    "responses",
+    "deployment,expected",
     [
-        # Missing rollout state in the first call
-        [service_from_state_with_missing_data(rollout_state=False)],
-        # Missing rollout state in the second call
-        [service_from_state("IN_PROGRESS", "All good"), service_from_state_with_missing_data(rollout_state=False)],
-        # Missing rollout state reason
-        [service_from_state_with_missing_data(rollout_state_reason=False)],
+        (
+            service_deployment(
+                targetServiceRevision={"runningTaskCount": 2, "pendingTaskCount": 1, "requestedTaskCount": 3}
+            ),
+            "tasks 2/3 running, 1 pending",
+        ),
+        (service_deployment(), None),
+        (service_deployment(targetServiceRevision={"pendingTaskCount": 1, "requestedTaskCount": 3}), None),
+        (service_deployment(targetServiceRevision={"runningTaskCount": 2, "requestedTaskCount": 3}), None),
+        (service_deployment(targetServiceRevision={"runningTaskCount": 2, "pendingTaskCount": 1}), None),
     ],
-    ids=["missing_rollout_state_first_call", "missing_rollout_state_second_call", "missing_failed_reason"],
+    ids=["all_counts", "missing_target_revision", "missing_running", "missing_pending", "missing_requested"],
 )
-def test_deployment_fails_when_missing_response_data(responses: list[dict[str, Any]]):
-    context = DeploymentContext(describe_services_responses=responses)
+def test_format_task_counts(deployment: ServiceDeploymentTypeDef, expected: str | None):
+    assert deploy.format_task_counts(deployment) == expected
+
+
+@pytest.mark.parametrize(
+    "deployment,expected",
+    [
+        (service_deployment(status="IN_PROGRESS"), "Deployment [bold]IN_PROGRESS[/]"),
+        (
+            service_deployment(status="IN_PROGRESS", lifecycleStage="DEPLOY_SERVICE"),
+            "Deployment [bold]IN_PROGRESS[/] · stage [bold]DEPLOY_SERVICE[/]",
+        ),
+        (
+            service_deployment(
+                status="IN_PROGRESS",
+                targetServiceRevision={"runningTaskCount": 2, "pendingTaskCount": 1, "requestedTaskCount": 3},
+            ),
+            "Deployment [bold]IN_PROGRESS[/] · tasks 2/3 running, 1 pending",
+        ),
+        (
+            service_deployment(
+                status="IN_PROGRESS",
+                lifecycleStage="BAKE_TIME",
+                targetServiceRevision={"runningTaskCount": 2, "pendingTaskCount": 1, "requestedTaskCount": 3},
+            ),
+            "Deployment [bold]IN_PROGRESS[/] · stage [bold]BAKE_TIME[/] · tasks 2/3 running, 1 pending",
+        ),
+        (service_deployment(), "Deployment [bold]UNKNOWN[/]"),
+    ],
+    ids=["status_only", "with_stage", "with_task_counts", "with_stage_and_counts", "missing_status"],
+)
+def test_format_deployment_progress(deployment: ServiceDeploymentTypeDef, expected: str):
+    assert deploy.format_deployment_progress(deployment) == expected
+
+
+def test_deployment_reached_terminal_state_reports_success():
+    with deploy.console().capture() as capture:
+        result = deploy.deployment_reached_terminal_state(service_deployment(status="SUCCESSFUL"), "MyService")
+
+    assert result is True
+    assert (
+        console.text_with_ansi_codes("[bold green]✔︎ ECS service 'MyService' successfully deployed![/]") in capture.get()
+    )
+
+
+@pytest.mark.parametrize(
+    "status", ["PENDING", "IN_PROGRESS", "STOP_REQUESTED", "ROLLBACK_REQUESTED", "ROLLBACK_IN_PROGRESS"]
+)
+def test_deployment_reached_terminal_state_keeps_polling_on_transient_status(status: str):
+    assert deploy.deployment_reached_terminal_state(service_deployment(status=status), "MyService") is False
+
+
+@pytest.mark.parametrize("reason", ["Circuit breaker", None], ids=["with_reason", "without_reason"])
+@pytest.mark.parametrize("status", ["ROLLBACK_SUCCESSFUL", "ROLLBACK_FAILED", "STOPPED"])
+def test_deployment_reached_terminal_state_aborts_on_failed_status(status: str, reason: str | None):
+    deployment = (
+        service_deployment(status=status) if reason is None else service_deployment(status=status, statusReason=reason)
+    )
+
+    with deploy.console().capture() as capture:
+        with pytest.raises(click.Abort):
+            deploy.deployment_reached_terminal_state(deployment, "MyService")
+
+    expected = f"Deployment of ECS service 'MyService' ended as {status}"
+    if reason is not None:
+        expected = f"{expected}: {reason}"
+    assert console.text_with_ansi_codes(f"[bold red]✘ {expected}[/]") in capture.get()
+
+
+def test_deployment_reached_terminal_state_aborts_without_status():
+    with deploy.console().capture() as capture:
+        with pytest.raises(click.Abort):
+            deploy.deployment_reached_terminal_state(service_deployment(), "MyService")
+
+    assert (
+        console.text_with_ansi_codes(
+            "[bold red]✘ Failed to get the status of the deployment for ECS service 'MyService'[/]"
+        )
+        in capture.get()
+    )
+
+
+def test_waiting_for_deployment_succeeds_and_suppresses_duplicate_progress(mock_time: mock.MagicMock):
+    context = DeploymentContext(
+        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
+        describe_deployments_responses=[
+            deployments_response(service_deployment(status="IN_PROGRESS")),
+            deployments_response(service_deployment(status="IN_PROGRESS")),
+            deployments_response(service_deployment(status="SUCCESSFUL")),
+        ],
+    )
+
+    with context.setup_mock() as (function, ecs, capture):
+        deploy.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+
+    context.assert_ecs_called("describe_service_deployments", n=3, serviceDeploymentArns=["MyDeploymentArn"])
+    captured = capture.get()
+    # The two identical IN_PROGRESS polls collapse into a single progress line
+    assert captured.count(console.text_with_ansi_codes("Deployment [bold]IN_PROGRESS[/]")) == 1
+    assert console.text_with_ansi_codes("[bold green]✔︎ ECS service 'MyService' successfully deployed![/]") in captured
+    assert mock_time.sleep.call_count == 2
+    mock_time.sleep.assert_called_with(10)  # DEPLOYMENT_POLL_INTERVAL_SECONDS
+
+
+def test_waiting_for_deployment_prints_progress_on_each_transition():
+    context = DeploymentContext(
+        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
+        describe_deployments_responses=[
+            deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="DEPLOY_SERVICE")),
+            deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="BAKE_TIME")),
+            deployments_response(service_deployment(status="SUCCESSFUL")),
+        ],
+    )
+
+    with context.setup_mock() as (function, ecs, capture):
+        deploy.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+
+    captured = capture.get()
+    assert console.text_with_ansi_codes("Deployment [bold]IN_PROGRESS[/] · stage [bold]DEPLOY_SERVICE[/]") in captured
+    assert console.text_with_ansi_codes("Deployment [bold]IN_PROGRESS[/] · stage [bold]BAKE_TIME[/]") in captured
+    assert console.text_with_ansi_codes("Deployment [bold]SUCCESSFUL[/]") in captured
+
+
+def test_waiting_for_deployment_prints_heartbeat_when_progress_is_unchanged(mock_time: mock.MagicMock):
+    context = DeploymentContext(
+        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
+        describe_deployments_responses=[
+            deployments_response(service_deployment(status="IN_PROGRESS")),
+            deployments_response(service_deployment(status="IN_PROGRESS")),
+            deployments_response(service_deployment(status="SUCCESSFUL")),
+        ],
+    )
+    # One monotonic call per poll: the first print stamps 0.0; the second poll sees
+    # 61.0, past the 60s heartbeat interval; the third poll is the terminal transition
+    mock_time.monotonic.side_effect = [0.0, 61.0, 61.0]
+
+    with context.setup_mock() as (function, ecs, capture):
+        deploy.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+
+    # The unchanged IN_PROGRESS line is re-printed as a heartbeat
+    assert capture.get().count(console.text_with_ansi_codes("Deployment [bold]IN_PROGRESS[/]")) == 2
+
+
+def test_waiting_for_deployment_polls_through_rollback_and_aborts_on_final_outcome():
+    context = DeploymentContext(
+        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
+        describe_deployments_responses=[
+            deployments_response(service_deployment(status="IN_PROGRESS")),
+            deployments_response(service_deployment(status="ROLLBACK_IN_PROGRESS")),
+            deployments_response(service_deployment(status="ROLLBACK_SUCCESSFUL", statusReason="Circuit breaker")),
+        ],
+    )
 
     with context.setup_mock() as (function, ecs, capture):
         with pytest.raises(click.Abort):
-            deploy.waiting_for_deployment_to_finish(ecs, "MyCluster", "MyService", "MyTask")
+            deploy.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+
+    context.assert_ecs_called("describe_service_deployments", n=3, serviceDeploymentArns=["MyDeploymentArn"])
+    captured = capture.get()
+    assert console.text_with_ansi_codes("Deployment [bold]ROLLBACK_IN_PROGRESS[/]") in captured
+    assert (
+        console.text_with_ansi_codes(
+            "[bold red]✘ Deployment of ECS service 'MyService' ended as ROLLBACK_SUCCESSFUL: Circuit breaker[/]"
+        )
+        in captured
+    )
+
+
+def test_cli_deploys_each_service_with_its_registered_task_definition():
+    with (
+        mock.patch("mitup_bot.cli.commands.deploy.update_lambda_code") as update_lambda_code,
+        mock.patch("mitup_bot.cli.commands.deploy.invoke_lambda") as invoke_lambda,
+        mock.patch("mitup_bot.cli.commands.deploy.register_task_definition") as register_task_definition,
+        mock.patch("mitup_bot.cli.commands.deploy.update_ecs_service") as update_ecs_service,
+        mock.patch(
+            "mitup_bot.cli.commands.deploy.waiting_for_deployment_to_finish"
+        ) as waiting_for_deployment_to_finish,
+    ):
+        register_task_definition.side_effect = ["MitupTaskArn", "RecurrentEventsTaskArn"]
+
+        # Attach every step to a manager so we can assert on the exact call order
+        manager = mock.MagicMock()
+        manager.attach_mock(update_lambda_code, "update_lambda_code")
+        manager.attach_mock(invoke_lambda, "invoke_lambda")
+        manager.attach_mock(register_task_definition, "register_task_definition")
+        manager.attach_mock(update_ecs_service, "update_ecs_service")
+        manager.attach_mock(waiting_for_deployment_to_finish, "waiting_for_deployment_to_finish")
+
+        with DeploymentContext().setup_mock() as (function, ecs, capture):
+            runner = CliRunner()
+            result = runner.invoke(
+                deploy.cli,
+                [
+                    "--migrations-image",
+                    "migrations_image:latest",
+                    "--bot-image",
+                    "bot_image:latest",
+                    "--alarm-action-image",
+                    "alarm_action_image:latest",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert manager.mock_calls == [
+            mock.call.update_lambda_code(function, "MitupMigrationsLambda", "migrations_image:latest"),
+            mock.call.invoke_lambda(function, "MitupMigrationsLambda"),
+            mock.call.update_lambda_code(function, "MitupAlarmActionLambda", "alarm_action_image:latest"),
+            mock.call.register_task_definition(ecs, "mitup", "bot_image:latest"),
+            mock.call.update_ecs_service(ecs, "MitupTaskArn", service="mitup", cluster="mitup"),
+            mock.call.waiting_for_deployment_to_finish(ecs, cluster="mitup", service="mitup"),
+            mock.call.register_task_definition(ecs, "mitup-recurrent-events", "bot_image:latest"),
+            mock.call.update_ecs_service(
+                ecs, "RecurrentEventsTaskArn", service="mitup-recurrent-events", cluster="mitup-recurrent-events"
+            ),
+            mock.call.waiting_for_deployment_to_finish(
+                ecs, cluster="mitup-recurrent-events", service="mitup-recurrent-events"
+            ),
+        ]
 
 
 @pytest.mark.parametrize(
@@ -661,7 +886,7 @@ def test_command_chain_is_not_broken(
                 ],
             )
 
-            assert result.exit_code == exit_code
+            assert result.exit_code == exit_code, result.output
             assert len(update_lambda_code.call_args_list) == number_of_calls[0]
             assert len(invoke_lambda.call_args_list) == number_of_calls[1]
             assert len(register_task_definition.call_args_list) == number_of_calls[2]

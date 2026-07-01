@@ -5,47 +5,53 @@ import time
 import boto3
 import click
 from mypy_boto3_ecs import ECSClient
-from mypy_boto3_ecs.type_defs import DeploymentTypeDef, DescribeServicesResponseTypeDef
+from mypy_boto3_ecs.type_defs import ServiceDeploymentTypeDef
 from mypy_boto3_lambda import LambdaClient
-from rich.status import Status
+from mypy_boto3_lambda.type_defs import FunctionConfigurationTypeDef
 
 from mitup_bot.cli.helpers import console, error, success
 
+LAMBDA_POLL_INTERVAL_SECONDS = 5
+DEPLOYMENT_POLL_INTERVAL_SECONDS = 10
+DEPLOYMENT_HEARTBEAT_SECONDS = 60
+DEPLOYMENT_DISCOVERY_ATTEMPTS = 6
+DEPLOYMENT_DISCOVERY_DELAY_SECONDS = 5
 
-def update_lambda_code(lambda_client: LambdaClient, name: str, image: str):
-    with console().status(f"Updating {name} lambda code..."):
-        lambda_client.update_function_code(FunctionName=name, ImageUri=image, Publish=True)
-        function = lambda_client.get_function(FunctionName=name)
 
-        if (status := function["Configuration"].get("LastUpdateStatus")) is None:
+def wait_for_lambda_update(lambda_client: LambdaClient, name: str) -> FunctionConfigurationTypeDef:
+    while True:
+        configuration = lambda_client.get_function(FunctionName=name)["Configuration"]
+        if (status := configuration.get("LastUpdateStatus")) is None:
             error(f"Failed to get the status of the lambda function {name!r}")
             raise click.Abort()
 
-        while status == "InProgress":
-            function = lambda_client.get_function(FunctionName=name)
-            if (status := function["Configuration"].get("LastUpdateStatus")) is None:
-                error(f"Failed to get the status of the lambda function {name!r}")
-                raise click.Abort()
+        if status != "InProgress":
+            return configuration
 
-            # Lets call every 5 seconds
-            time.sleep(5)
+        time.sleep(LAMBDA_POLL_INTERVAL_SECONDS)
 
-        if status == "Failed":
-            error(f"Failed updating code for lambda {name} for the following reason:")
-            console().print(function["Configuration"].get("LastUpdateStatusReason"))
-            raise click.Abort()
 
-        success(f"Lambda {name} function code updated")
+def update_lambda_code(lambda_client: LambdaClient, name: str, image: str):
+    console().print(f"Updating {name} lambda code...")
+    lambda_client.update_function_code(FunctionName=name, ImageUri=image, Publish=True)
+
+    configuration = wait_for_lambda_update(lambda_client, name)
+    if configuration.get("LastUpdateStatus") == "Failed":
+        error(f"Failed updating code for lambda {name} for the following reason:")
+        console().print(configuration.get("LastUpdateStatusReason"))
+        raise click.Abort()
+
+    success(f"Lambda {name} function code updated")
 
 
 def invoke_lambda(lambda_client: LambdaClient, name: str):
-    with console().status(f"Invoking lambda function {name}..."):
-        payload = {"action": "upgrade", "revision": "head"}
-        response = lambda_client.invoke(
-            FunctionName=name,
-            LogType="Tail",
-            Payload=json.dumps(payload),
-        )
+    console().print(f"Invoking lambda function {name}...")
+    payload = {"action": "upgrade", "revision": "head"}
+    response = lambda_client.invoke(
+        FunctionName=name,
+        LogType="Tail",
+        Payload=json.dumps(payload),
+    )
 
     console().rule("[bold]Log[/bold]")
     result = base64.b64decode(response["LogResult"]).decode().splitlines()
@@ -80,52 +86,52 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
 
 
 def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> str:
-    with console().status(f"Registering task definition {family!r}..."):
-        console().print(f"ECR image: {image}")
+    console().print(f"Registering task definition {family!r}...")
+    console().print(f"ECR image: {image}")
 
-        task_def = ecs_client.describe_task_definition(taskDefinition=family)
-        if (containers_definition := task_def["taskDefinition"].get("containerDefinitions")) is None:
-            error(f"Task definition {family!r} does not have any container definitions")
-            raise click.Abort()
+    task_def = ecs_client.describe_task_definition(taskDefinition=family)
+    if (containers_definition := task_def["taskDefinition"].get("containerDefinitions")) is None:
+        error(f"Task definition {family!r} does not have any container definitions")
+        raise click.Abort()
 
-        containers_definition[0]["image"] = image
-        if (execution_role := task_def["taskDefinition"].get("executionRoleArn")) is None:
-            error(f"Task definition {family!r} does not have an execution role")
-            raise click.Abort()
+    containers_definition[0]["image"] = image
+    if (execution_role := task_def["taskDefinition"].get("executionRoleArn")) is None:
+        error(f"Task definition {family!r} does not have an execution role")
+        raise click.Abort()
 
-        response = ecs_client.register_task_definition(
-            family=family,
-            containerDefinitions=containers_definition,
-            executionRoleArn=execution_role,
-        )
-        if (status_code := response["ResponseMetadata"].get("HTTPStatusCode")) is None:
-            error(f"Failed to get status code for registering task definition {family!r}")
-            raise click.Abort()
+    response = ecs_client.register_task_definition(
+        family=family,
+        containerDefinitions=containers_definition,
+        executionRoleArn=execution_role,
+    )
+    if (status_code := response["ResponseMetadata"].get("HTTPStatusCode")) is None:
+        error(f"Failed to get status code for registering task definition {family!r}")
+        raise click.Abort()
 
-        if status_code != 200:
-            error(f"Error registering task definition for {family!r}: [StatusCode: {status_code}]")
-            raise click.Abort()
+    if status_code != 200:
+        error(f"Error registering task definition for {family!r}: [StatusCode: {status_code}]")
+        raise click.Abort()
 
-        if (revision := response["taskDefinition"].get("revision")) is None:
-            error(f"Failed to get revision for task definition {family!r}")
-            raise click.Abort()
+    if (revision := response["taskDefinition"].get("revision")) is None:
+        error(f"Failed to get revision for task definition {family!r}")
+        raise click.Abort()
 
-        success(f"New task definition defined for family {family!r}, revision: {revision}")
+    success(f"New task definition defined for family {family!r}, revision: {revision}")
 
-        if (arn := response["taskDefinition"].get("taskDefinitionArn")) is None:
-            error(f"Failed to get task definition ARN for {family!r}")
-            raise click.Abort()
+    if (arn := response["taskDefinition"].get("taskDefinitionArn")) is None:
+        error(f"Failed to get task definition ARN for {family!r}")
+        raise click.Abort()
 
-        return arn
+    return arn
 
 
 def update_ecs_service(ecs_client: ECSClient, task_definition: str, service: str, cluster: str):
-    with console().status(f"Updating ECS service {service!r}"):
-        response = ecs_client.update_service(
-            cluster=cluster,
-            service=service,
-            taskDefinition=task_definition,
-        )
+    console().print(f"Updating ECS service {service!r}...")
+    response = ecs_client.update_service(
+        cluster=cluster,
+        service=service,
+        taskDefinition=task_definition,
+    )
 
     status_code = response["ResponseMetadata"]["HTTPStatusCode"]
     if status_code != 200:
@@ -134,78 +140,104 @@ def update_ecs_service(ecs_client: ECSClient, task_definition: str, service: str
     success(f"ECS service {service!r} has been updated")
 
 
-def update_status_for_deployment(
-    status: Status,
-    response: DescribeServicesResponseTypeDef,
-    task_definition_arn: str,
-) -> DeploymentTypeDef:
-    service = response["services"][0]
+def find_service_deployment_arn(ecs_client: ECSClient, cluster: str, service: str) -> str:
+    """Find the ARN of the deployment triggered by the last ``update_service`` call.
 
-    # Get the number of tasks in different stages
-    # We are using get with these properties because they are not ensured to exist
-    desired_count = service.get("desiredCount")
-    running_count = service.get("runningCount")
-    pending_count = service.get("pendingCount")
+    CI serializes deploys through the GitLab resource_group, so the newest active
+    deployment is always ours. It can take a moment to appear, hence the retries.
+    """
+    for attempt in range(DEPLOYMENT_DISCOVERY_ATTEMPTS):
+        if attempt:
+            time.sleep(DEPLOYMENT_DISCOVERY_DELAY_SECONDS)
 
-    deployments = service.get("deployments", [])
-
-    # Get the deployment state
-    task_deployments = [
-        deployment for deployment in deployments if deployment.get("taskDefinition", "") == task_definition_arn
-    ]
-
-    if not task_deployments:
-        error(
-            f"No deployment can be found for the task deifnition requested {task_definition_arn!r}. "
-            "Check wheather or not the deployments are triggered and further improve this deployment if needed."
+        response = ecs_client.list_service_deployments(
+            service=service, cluster=cluster, status=["PENDING", "IN_PROGRESS"]
         )
+        deployments = response["serviceDeployments"]
+        if deployments and (arn := deployments[0].get("serviceDeploymentArn")) is not None:
+            return arn
+
+    error(f"No active deployment found for ECS service {service!r} after updating it")
+    raise click.Abort()
+
+
+def describe_service_deployment(ecs_client: ECSClient, deployment_arn: str) -> ServiceDeploymentTypeDef:
+    response = ecs_client.describe_service_deployments(serviceDeploymentArns=[deployment_arn])
+    deployments = response["serviceDeployments"]
+    if not deployments:
+        error(f"Failed to describe the service deployment {deployment_arn!r}")
         raise click.Abort()
 
-    if len(task_deployments) > 1:
-        error(
-            f"More than one deployments have been found for the task deifnition requested {task_definition_arn!r}. "
-            "Check wheather or not the deployments are triggered and further improve this deployment if needed."
-        )
+    return deployments[0]
+
+
+def format_task_counts(deployment: ServiceDeploymentTypeDef) -> str | None:
+    if (target_revision := deployment.get("targetServiceRevision")) is None:
+        return None
+
+    running = target_revision.get("runningTaskCount")
+    pending = target_revision.get("pendingTaskCount")
+    requested = target_revision.get("requestedTaskCount")
+    if running is None or pending is None or requested is None:
+        return None
+
+    return f"tasks {running}/{requested} running, {pending} pending"
+
+
+def format_deployment_progress(deployment: ServiceDeploymentTypeDef) -> str:
+    parts = [f"Deployment [bold]{deployment.get('status', 'UNKNOWN')}[/]"]
+    if (stage := deployment.get("lifecycleStage")) is not None:
+        parts.append(f"stage [bold]{stage}[/]")
+    if (task_counts := format_task_counts(deployment)) is not None:
+        parts.append(task_counts)
+    return " · ".join(parts)
+
+
+def deployment_reached_terminal_state(deployment: ServiceDeploymentTypeDef, service: str) -> bool:
+    """Return True only for a successful deployment — failed terminal states never return.
+
+    Rollback and stop outcomes abort the whole command instead, so callers can treat
+    a False return as "still in progress" without inspecting the status themselves.
+    """
+    if (status := deployment.get("status")) is None:
+        error(f"Failed to get the status of the deployment for ECS service {service!r}")
         raise click.Abort()
 
-    deployment = task_deployments[0]
-    state = deployment.get("rolloutState")
+    if status == "SUCCESSFUL":
+        success(f"ECS service {service!r} successfully deployed!")
+        return True
 
-    desired_str = f"Desired: [bold]{desired_count}[/]"
-    running_str = f"Running: [bold]{running_count}[/]"
-    pending_str = f"Pending: [bold]{pending_count}[/]"
-    status.update(f"Deployment: {state} | Tasks: [ {desired_str}, {running_str}, {pending_str} ]")
-    return deployment
+    if status in {"ROLLBACK_SUCCESSFUL", "ROLLBACK_FAILED", "STOPPED"}:
+        message = f"Deployment of ECS service {service!r} ended as {status}"
+        if (reason := deployment.get("statusReason")) is not None:
+            message = f"{message}: {reason}"
+        error(message)
+        raise click.Abort()
+
+    return False
 
 
-def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, service: str, task_definition_arn: str):
-    with console().status(f"Waiting for ECS service {service!r} to deploy") as status:
-        response = ecs_client.describe_services(services=[service], cluster=cluster)
-        deployment = update_status_for_deployment(status, response, task_definition_arn=task_definition_arn)
+def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, service: str):
+    console().print(f"Waiting for ECS service {service!r} to deploy...")
+    deployment_arn = find_service_deployment_arn(ecs_client, cluster=cluster, service=service)
 
-        if (rollout_state := deployment.get("rolloutState")) is None:
-            error("Failed to get the rollout state for the deployment")
-            raise click.Abort()
+    last_progress: str | None = None
+    last_printed_at = 0.0
+    while True:
+        deployment = describe_service_deployment(ecs_client, deployment_arn)
 
-        while rollout_state == "IN_PROGRESS":
-            # This can take a bit of time, lets loop and give some information
-            time.sleep(5)
-            response = ecs_client.describe_services(services=[service], cluster=cluster)
-            deployment = update_status_for_deployment(status, response, task_definition_arn=task_definition_arn)
+        # Only log transitions, plus a heartbeat so a long bake doesn't look like a hung job
+        progress = format_deployment_progress(deployment)
+        now = time.monotonic()
+        if progress != last_progress or now - last_printed_at >= DEPLOYMENT_HEARTBEAT_SECONDS:
+            console().print(progress)
+            last_progress = progress
+            last_printed_at = now
 
-            if (rollout_state := deployment.get("rolloutState")) is None:
-                error("Failed to get the rollout state for the deployment")
-                raise click.Abort()
+        if deployment_reached_terminal_state(deployment, service):
+            return
 
-        if rollout_state == "FAILED":
-            if (reason := deployment.get("rolloutStateReason")) is None:
-                error("Failed to get the reason for the failed deployment")
-                raise click.Abort()
-
-            error(f"Failed latest deployment: {reason}")
-            raise click.Abort()
-
-        success(f"ECS service {service!r} successfuly deployed!")
+        time.sleep(DEPLOYMENT_POLL_INTERVAL_SECONDS)
 
 
 @click.command()
@@ -219,13 +251,9 @@ def cli(migrations_image: str, bot_image: str, alarm_action_image: str):
     update_lambda_code(lambda_client, "MitupMigrationsLambda", migrations_image)
     invoke_lambda(lambda_client, "MitupMigrationsLambda")
     update_lambda_code(lambda_client, "MitupAlarmActionLambda", alarm_action_image)
-    task_definition_arn = register_task_definition(ecs_client, "mitup", bot_image)
-    update_ecs_service(ecs_client, "mitup", "mitup", "mitup")
-    waiting_for_deployment_to_finish(ecs_client, "mitup", "mitup", task_definition_arn)
 
-    ## Recurrent events
-    task_definition_arn = register_task_definition(ecs_client, "mitup-recurrent-events", bot_image)
-    update_ecs_service(ecs_client, "mitup-recurrent-events", "mitup-recurrent-events", "mitup-recurrent-events")
-    waiting_for_deployment_to_finish(
-        ecs_client, "mitup-recurrent-events", "mitup-recurrent-events", task_definition_arn
-    )
+    # Both services run in a cluster named after themselves, off the same bot image
+    for service in ("mitup", "mitup-recurrent-events"):
+        task_definition_arn = register_task_definition(ecs_client, service, bot_image)
+        update_ecs_service(ecs_client, task_definition_arn, service=service, cluster=service)
+        waiting_for_deployment_to_finish(ecs_client, cluster=service, service=service)
