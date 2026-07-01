@@ -1,6 +1,7 @@
 import re
 
 from telegram import Update
+from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.edit_settings.entry import callback_query_cancel_settings, callback_query_settings
@@ -72,7 +73,30 @@ async def test_cancel_setting_calls_to_settings_view(
     mock_session.add_object(user_with_settings, "tg_user_id")
     await callback_query_cancel_settings(update, context)
 
-    context.api.assert_send_message_called(update, factory.settings_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.settings_view(lang=user_with_settings.lang))
+
+
+async def test_cancel_setting_edits_prompt_in_place_without_posting_new_message(
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
+):
+    # Regression for issue #175: cancelling a setting must replace the prompt in
+    # place. Posting a new message left the stale prompt (with its now-inert
+    # Cancel button) on screen and appended a duplicate "Settings" message below.
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    await callback_query_cancel_settings(update, context)
+
+    context.api.assert_send_message_not_called()
+
+
+async def test_cancel_setting_ends_conversation(
+    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    result = await callback_query_cancel_settings(update, context)
+
+    assert result == ConversationHandler.END
 
 
 async def test_create_meeting_calls_to_create_meeting_view(

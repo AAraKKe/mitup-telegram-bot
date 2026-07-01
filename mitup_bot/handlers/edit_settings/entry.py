@@ -28,6 +28,6 @@ async def callback_query_cancel_settings(session: Session, update: Update, conte
     user = guards.current_user(update, session)
     view = views.factory.settings_view(lang=user.lang)
 
-    await context.api.send_message(update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
     return ConversationHandler.END
