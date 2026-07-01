@@ -11,7 +11,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView
 
 from .enums import SEARCH_QUERY_PREFIX, InlineQueryId
-from .utils import sort_meetings
+from .utils import search_chat_meetings_button, sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, pattern=r"search:.+")
@@ -48,7 +48,7 @@ async def search_chat_meetings(session: Session, update: Update, context: TMitup
         results = [
             MitupInlineView(
                 description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
-                keyboard=[],
+                keyboard=[[search_chat_meetings_button(lang=lang, chat_instance=chat_instance)]],
                 id="no_meetings_found",
                 title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
                 inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),

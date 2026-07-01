@@ -2,6 +2,23 @@ import datetime as dt
 from typing import cast
 
 from mitup_bot.models import Meetup
+from mitup_bot.utils import ButtonMessages
+from mitup_bot.views import ButtonConfig
+
+from .enums import SEARCH_QUERY_PREFIX
+
+
+def search_chat_meetings_button(*, lang: str, chat_instance: str | None) -> ButtonConfig:
+    """Button that re-invokes the inline search for the current chat.
+
+    Shared by every step of the guided search flow so the user always has an
+    explicit way to (re)start the search without manually typing `@bot` — this
+    includes the zero-results message, which would otherwise be a dead end.
+    """
+    return ButtonConfig(
+        text=ButtonMessages.SEARCH_CHAT_MEETINGS.get(lang=lang),
+        switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}{chat_instance}",
+    )
 
 
 def sort_meetings(meetings: list[Meetup]) -> list[Meetup]:

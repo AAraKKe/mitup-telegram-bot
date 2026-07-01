@@ -8,8 +8,8 @@ from telegram import Update
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
-from mitup_bot.utils.messages import InlineQueryMessages
-from mitup_bot.views import MitupInlineView
+from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
+from mitup_bot.views import ButtonConfig, MitupInlineView
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -36,7 +36,14 @@ def make_message(*, id: int, meetup_id: int) -> Message:
 def no_meetings_found_view(lang: str) -> MitupInlineView:
     return MitupInlineView(
         description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
-        keyboard=[],
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.SEARCH_CHAT_MEETINGS.get(lang=lang),
+                    switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}",
+                )
+            ],
+        ],
         id="no_meetings_found",
         title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
         inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),
@@ -79,6 +86,26 @@ async def test_search_returns_no_meetings_found_when_empty(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
+    mock_session.add_user(user_with_settings)
+    register_messages_query(mock_session, [])
+
+    context, _ = await call_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, handler_context=handler_context)
+
+    context.api.assert_answer_inline_query_called(
+        update=update,
+        results=[no_meetings_found_view(user_with_settings.lang)],
+        cache_time=0,
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query=f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}")], indirect=True)
+async def test_no_results_message_offers_retry_button(
+    update: Update,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """Regression for #179: the zero-results result must carry a retry button, not a dead-end keyboard."""
     mock_session.add_user(user_with_settings)
     register_messages_query(mock_session, [])
 
