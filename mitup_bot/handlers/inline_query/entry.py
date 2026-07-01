@@ -2,7 +2,7 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot.db import with_async_session
-from mitup_bot.guards import current_user, valid_inline_query
+from mitup_bot.guards import current_user, shareable_meeting_id
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature
@@ -65,8 +65,10 @@ async def share_meeting(session: Session, update: Update, context: TMitupContext
     share a meeting as well when public meeting feature is implemented.
     """
     user = current_user(update, session)
-    query = valid_inline_query(update).query
-    meeting_id = int(query)
+    meeting_id = await shareable_meeting_id(update, context)
+    if meeting_id is None:
+        return
+
     meeting = Meetup.by_id(session, meeting_id)
 
     if meeting and meeting.active and (meeting.public or meeting.is_owned_by(user)):

@@ -87,3 +87,55 @@ async def test_share_meeting(
             update=update, results=[meeting_unavailable_view(user.lang)], cache_time=0
         )
         metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(inline_query="123abc"),
+        UpdateRequest(inline_query="12 34"),
+        UpdateRequest(inline_query="123①"),
+    ],
+    indirect=["update"],
+    ids=["digits_with_trailing_junk", "digits_with_inner_space", "digits_with_non_decimal_digit"],
+)
+async def test_share_meeting_malformed_query_answers_empty(
+    update: Update,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    # PTB matches the SHARE_MEETING pattern with re.match, not fullmatch, so a query with
+    # leading digits (e.g. "123abc") reaches the handler. int(query) would raise and leave the
+    # inline query silently unanswered (issue #178); the handler must answer with empty results.
+    mock_session.add_user(user_with_settings)
+    mock_session.commit()
+
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
+
+    context.api.assert_answer_inline_query_called(update, results=[], cache_time=0)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(inline_query="555 ")],
+    indirect=["update"],
+    ids=["trailing_space_valid_id"],
+)
+async def test_share_meeting_strips_surrounding_whitespace(
+    update: Update,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    # The SHARE_MEETING pattern (\d+, re.match) still matches a trailing-space query like "555 ",
+    # so it reaches the handler; .strip() must let it resolve to meeting 555 instead of answering empty.
+    user = user_with_settings
+    mock_session.add_user(user)
+    meetup = create_meetup(555, "Meeting Title", owner=user, active=True)
+    mock_session.add_object(meetup)
+    mock_session.commit()
+
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
+
+    context.api.assert_answer_inline_query_called(update, results=[meetup.inline_view()], cache_time=0)
