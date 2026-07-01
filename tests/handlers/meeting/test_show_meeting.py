@@ -4,10 +4,12 @@ import re
 import pytest
 from telegram import Update
 
+from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.meeting.show_meeting import callback_query_show_meeting
 from mitup_bot.models import User
+from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from tests.helpers import (
@@ -56,7 +58,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
-    expected_view = target_meeting.main_view
+    expected_view = target_meeting.main_view()
     context.api.assert_edit_message_called(update, expected_view)
 
 
@@ -128,3 +130,70 @@ async def test_show_meeting_deleted_fallback_returns_to_originating_page(
     view = context.api.call_args("edit_message").kwargs["view"]
     back_button = view.keyboard[-1][-1]
     assert back_button.callback_data == cb.SHOW_ACTIVE_MEETING_PAGE.with_id(3)
+
+
+@pytest.mark.parametrize(
+    "update, expected_text, expected_callback",
+    [
+        (
+            UpdateRequest(callback_query=cb.SHOW_MEETING.with_page(1, 2, MeetingListSource.ACTIVE)),
+            ButtonMessages.ACTIVE_MEETINGS,
+            cb.SHOW_ACTIVE_MEETING_PAGE.with_id(2),
+        ),
+        (
+            UpdateRequest(callback_query=cb.SHOW_MEETING.with_page(1, 2, MeetingListSource.JOINED)),
+            ButtonMessages.JOINED_MEETINGS,
+            cb.SHOW_JOINED_MEETINGS_PAGE.with_id(2),
+        ),
+        (
+            UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(1)),
+            ButtonMessages.MAIN_MENU,
+            cb.MAIN_MENU,
+        ),
+    ],
+    ids=["from_active_list", "from_joined_list", "no_origin"],
+    indirect=["update"],
+)
+async def test_show_meeting_back_button_targets_originating_list_page(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    expected_text,
+    expected_callback,
+):
+    """The detail back button must point at the list page encoded in the callback data, falling
+    back to the main menu when the callback carries no origin."""
+    meeting = create_meetup(id=1, title="Meeting 1", owner=user_with_settings)
+    user_with_settings.meetups = [meeting]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    back_button = view.keyboard[-1][-1]
+    assert back_button.text == expected_text.back(lang=user_with_settings.lang)
+    assert back_button.callback_data == expected_callback
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SHOW_MEETING.with_page(99, 3, MeetingListSource.JOINED))],
+    indirect=True,
+)
+async def test_show_meeting_deleted_fallback_targets_joined_list(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """When an inaccessible meeting was opened from the joined list, the fallback button must
+    offer the joined list at the originating page rather than the active list."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    back_button = view.keyboard[-1][-1]
+    assert back_button.callback_data == cb.SHOW_JOINED_MEETINGS_PAGE.with_id(3)

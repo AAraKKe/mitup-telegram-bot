@@ -95,5 +95,5 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
 
     await context.api.edit_message(
         update=update,
-        view=meeting.main_view.with_context(MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user.lang)),
+        view=meeting.main_view().with_context(MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user.lang)),
     )

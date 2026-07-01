@@ -2,6 +2,7 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards
+from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
@@ -32,7 +33,7 @@ async def callback_query_show_meetings(session: Session, update: Update, context
     if user_meetings_buttons := [
         ButtonConfig(
             text=str(meeting.title),
-            callback_data=cb.SHOW_MEETING.with_page(meeting.db_id, page_number),
+            callback_data=cb.SHOW_MEETING.with_page(meeting.db_id, page_number, MeetingListSource.ACTIVE),
         )
         for meeting in user_meetings
     ]:

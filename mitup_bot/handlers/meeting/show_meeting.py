@@ -3,13 +3,12 @@ from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.db import with_async_session
-from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
+from .utils import meeting_detail_back_button, meeting_list_button
 
 
 @HandlersRegistry.register_callback_query(
@@ -29,16 +28,10 @@ async def callback_query_show_meeting(session: Session, update: Update, context:
         "Show meeting",
         update,
         context,
-        custom_keyboard=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=user.lang),
-                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(callback_data.page),
-                ),
-            ]
-        ],
+        custom_keyboard=[[meeting_list_button(callback_data.source, callback_data.page, user.lang)]],
     )
     if meeting is None:
         return
 
-    await context.api.edit_message(update=update, view=meeting.main_view)
+    back_button = meeting_detail_back_button(callback_data.source, callback_data.page, user.lang)
+    await context.api.edit_message(update=update, view=meeting.main_view(back_button=back_button))

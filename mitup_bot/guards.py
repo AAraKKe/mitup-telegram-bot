@@ -97,13 +97,14 @@ def valid_paginated_callback_data(cb: PaginatedCallbackData, handler_id: Handler
     Validates the paginated callback `cb`. If an id cannot be set or the entity is unknown,
     a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
 
-    A missing originating page defaults to the first page so handlers never re-derive it.
+    A missing originating page defaults to the first page so handlers never re-derive it. The
+    originating list stays None when absent: it means the detail was not reached from a list.
 
     The output of the guard is a `ValidPaginatedCallbackData`.
     """
     if cb.id is None or cb.unknown():
         raise MalformedCallbackData(handler_id, cb)
-    return ValidPaginatedCallbackData(entity=cb.entity, action=cb.action, id=cb.id, page=cb.page or 1)
+    return ValidPaginatedCallbackData(entity=cb.entity, action=cb.action, id=cb.id, page=cb.page or 1, source=cb.source)
 
 
 def valid_meeting_callback_data(cb: MeetingCallbackData, handler_id: HandlerId) -> ValidMeetingCallbackData:

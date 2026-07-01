@@ -81,6 +81,60 @@ async def test_show_meetings_use_correct_view(
     context.api.assert_edit_message_called(update, expected_view)
 
 
+def joined_meeting_item_buttons(view: PaginatedMitupView) -> list[ButtonConfig]:
+    return [button for row in view.keyboard for button in row if str(button.callback_data).startswith("show;meeting:")]
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(2))], indirect=True
+)
+async def test_show_meetings_embeds_current_page_in_item_buttons(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """Each joined-list item must encode the page and list it was shown on so the detail view's
+    back button can return to that exact page instead of the main menu."""
+    meetups_to_join = [create_meetup(id=i, title=f"Meeting {i}") for i in range(10, 18)]
+    user_with_settings.joined_links = [
+        create_joined_link(user=user_with_settings, meetup=meetup) for meetup in meetups_to_join
+    ]
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    item_buttons = joined_meeting_item_buttons(view)
+    assert item_buttons
+    assert all(str(button.callback_data).endswith(";page:2;src:j") for button in item_buttons)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(9))], indirect=True
+)
+async def test_show_meetings_clamps_out_of_range_page(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """A stale page beyond the last one (e.g. from a detail back button after the list shrank)
+    clamps to the last page instead of raising."""
+    meetups_to_join = [create_meetup(id=i, title=f"Meeting {i}") for i in range(10, 14)]
+    user_with_settings.joined_links = [
+        create_joined_link(user=user_with_settings, meetup=meetup) for meetup in meetups_to_join
+    ]
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    item_buttons = joined_meeting_item_buttons(view)
+    assert item_buttons
+    assert all(str(button.callback_data).endswith(";page:1;src:j") for button in item_buttons)
+
+
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1))], indirect=True
 )

@@ -431,8 +431,18 @@ class Meetup(BaseModel, SQLModel, table=True):
         leave = ButtonConfig(text=ButtonMessages.LEAVE.get(lang=lang), callback_data=cb.LEAVE.with_id(self.db_id))
         return [join, invite, leave] if self.allow_invitation else [join, leave]
 
-    @property
-    def main_view(self) -> MitupView:
+    def _main_menu_back_button(self) -> ButtonConfig:
+        return ButtonConfig(
+            text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
+            callback_data=cb.MAIN_MENU,
+        )
+
+    def main_view(self, back_button: ButtonConfig | None = None) -> MitupView:
+        """Owner-facing detail view.
+
+        `back_button` lets the caller point the trailing back button at the list the user came
+        from; when omitted it defaults to the main menu.
+        """
         keyboard: Keyboard = []
         if not (self.lock_on_start and self.is_in_progress):
             keyboard.append(self._join_leave_row(self.user_language))
@@ -454,12 +464,7 @@ class Meetup(BaseModel, SQLModel, table=True):
                         text=ButtonMessages.SHARE.get(lang=self.user_language), switch_inline_query=str(self.db_id)
                     ),
                 ],
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
-                        callback_data=cb.MAIN_MENU,
-                    ),
-                ],
+                [back_button or self._main_menu_back_button()],
             ]
         )
         view = MitupView(self.message, keyboard)
@@ -488,7 +493,7 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     def view_for(self, user: User) -> MitupView:
         """Get the appropriate view for the given user depending on whether they own the meeting or not."""
-        return self.main_view if self.is_owned_by(user) else self.external_view
+        return self.main_view() if self.is_owned_by(user) else self.external_view
 
     @property
     def edit_view(self) -> MitupView:

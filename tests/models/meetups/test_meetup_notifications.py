@@ -17,7 +17,7 @@ def invite_buttons(view: MitupView, meeting: Meetup) -> list[ButtonConfig]:
 def test_main_view_invite_button_visibility(allow_invitation: bool, user_with_settings: User):
     meeting = create_meetup(id=10, owner=user_with_settings, invitation=allow_invitation)
 
-    view = meeting.main_view
+    view = meeting.main_view()
     found_invite_buttons = invite_buttons(view, meeting)
 
     if allow_invitation:

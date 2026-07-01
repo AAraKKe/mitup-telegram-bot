@@ -7,7 +7,7 @@ import pytest
 from sqlmodel import Session
 from telegram import Chat, Message, Update
 
-from mitup_bot.callback_data import CallbackData, PaginatedCallbackData
+from mitup_bot.callback_data import CallbackData, MeetingListSource, PaginatedCallbackData
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -231,18 +231,24 @@ def test_valid_paginated_callback_data_failed_states(match: re.Match | None):
 
 
 @pytest.mark.parametrize(
-    "wire, expected_page",
+    "wire, expected_page, expected_source",
     [
-        ("show;past_meeting:42;page:3", 3),
-        ("show;past_meeting:42", 1),  # A missing page defaults to the first page.
+        ("show;past_meeting:42;page:3", 3, None),
+        ("show;past_meeting:42;page:3;src:a", 3, MeetingListSource.ACTIVE),
+        ("show;past_meeting:42;page:3;src:j", 3, MeetingListSource.JOINED),
+        # A missing page defaults to the first page; a missing source stays None.
+        ("show;past_meeting:42", 1, None),
+        # A source without an explicit page still defaults the page to 1 and passes the source through.
+        ("show;past_meeting:42;src:a", 1, MeetingListSource.ACTIVE),
     ],
-    ids=["with_page", "page_defaults_to_one"],
+    ids=["with_page", "active_source", "joined_source", "page_defaults_to_one", "source_without_page"],
 )
-def test_valid_paginated_callback_data_page(wire: str, expected_page: int):
+def test_valid_paginated_callback_data_page(wire: str, expected_page: int, expected_source: MeetingListSource | None):
     match = re.match(cb.SHOW_PAST_MEETING.pattern, wire)
     valid = valid_paginated_callback_data(cb.SHOW_PAST_MEETING.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
     assert valid.id == 42
     assert valid.page == expected_page
+    assert valid.source == expected_source
 
 
 @pytest.mark.parametrize(

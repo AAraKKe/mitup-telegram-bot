@@ -52,7 +52,9 @@ class Message(BaseModel, SQLModel, table=True):
             message_id = update.effective_message.message_id
             # This is a message from the chat with the bot. Either by the user that owns it
             # or someone that has joined. Only shows the edit button if the user owns it
-            keyboard = meeting.main_view.keyboard if user.own_meeting(meeting.db_id) else meeting.external_view.keyboard
+            keyboard = (
+                meeting.main_view().keyboard if user.own_meeting(meeting.db_id) else meeting.external_view.keyboard
+            )
         if update.callback_query and update.callback_query.inline_message_id:
             inline_message_id = update.callback_query.inline_message_id
             chat_instance = update.callback_query.chat_instance

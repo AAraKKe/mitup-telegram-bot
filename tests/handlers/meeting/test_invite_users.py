@@ -236,7 +236,7 @@ async def test_complete_user_invitation(
 
     # User has been sent confirmation of the invitation
     # With the proper view depending on who invited the user
-    expected_view = meeting.main_view if owner_id == 123 else meeting.external_view
+    expected_view = meeting.main_view() if owner_id == 123 else meeting.external_view
     expected_view = expected_view.with_context(
         MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )
@@ -336,7 +336,7 @@ async def test_invite_user_adds_to_the_waiting_list(
     confirm_context = result.last_context
 
     # User has been sent confirmation of the invitation to the waiting list
-    expected_view = meeting.main_view.with_context(
+    expected_view = meeting.main_view().with_context(
         MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )
 

@@ -2,6 +2,7 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot import guards
+from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
@@ -26,18 +27,19 @@ async def callback_query_show_joined_meetings(session: Session, update: Update, 
         (link.meetup for link in user.joined_links if link.meetup.active),
         key=lambda meetup: meetup.db_id,
     )
+    page_number = PaginatedMitupView.clamp_page(callback_data.id, len(joined_meetings))
 
     if user_meetings_buttons := [
         ButtonConfig(
             text=str(meeting.title),
-            callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
+            callback_data=cb.SHOW_MEETING.with_page(meeting.db_id, page_number, MeetingListSource.JOINED),
         )
         for meeting in joined_meetings
     ]:
         view = PaginatedMitupView(
             description=MeetingListMessages.JOINED_DESCRIPTION.get(lang=user.lang),
             buttons=user_meetings_buttons,
-            page_number=callback_data.id,
+            page_number=page_number,
             navigation_callback_data=cb.SHOW_JOINED_MEETINGS_PAGE,
         ).with_context_menu(
             [

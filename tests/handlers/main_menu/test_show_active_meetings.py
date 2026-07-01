@@ -88,8 +88,8 @@ async def test_show_meetings_embeds_current_page_in_item_buttons(
     handler_context: HandlerContext,
     user_with_settings: User,
 ):
-    """Each active-list item must encode the page it was shown on so the detail view's fallback
-    back button can return to that page instead of page 1."""
+    """Each active-list item must encode the page and list it was shown on so the detail view's
+    back button can return to that exact page instead of the main menu."""
     user_with_settings.meetups = [create_meetup(id=i) for i in range(10, 18)]
     mock_session.add_object(user_with_settings, "tg_user_id")
 
@@ -98,7 +98,7 @@ async def test_show_meetings_embeds_current_page_in_item_buttons(
     view = context.api.call_args("edit_message").kwargs["view"]
     item_buttons = active_meeting_item_buttons(view)
     assert item_buttons
-    assert all(str(button.callback_data).endswith(";page:2") for button in item_buttons)
+    assert all(str(button.callback_data).endswith(";page:2;src:a") for button in item_buttons)
 
 
 @pytest.mark.parametrize(
@@ -120,7 +120,7 @@ async def test_show_meetings_clamps_out_of_range_page(
     view = context.api.call_args("edit_message").kwargs["view"]
     item_buttons = active_meeting_item_buttons(view)
     assert item_buttons
-    assert all(str(button.callback_data).endswith(";page:1") for button in item_buttons)
+    assert all(str(button.callback_data).endswith(";page:1;src:a") for button in item_buttons)
 
 
 @pytest.mark.parametrize(

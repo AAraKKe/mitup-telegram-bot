@@ -7,6 +7,7 @@ from mitup_bot.callback_data import (
     CallbackData,
     DateCallbackData,
     MeetingCallbackData,
+    MeetingListSource,
     PaginatedCallbackData,
 )
 
@@ -113,7 +114,10 @@ def test_meeting_callback_data_with_id():
 
 def test_paginated_callback_data_pattern():
     cb = PaginatedCallbackData(entity="past_meeting", action="show")
-    assert cb.pattern == r"^(?P<action>show);(?P<entity>past_meeting):(?P<id>\d*)(?:;page:(?P<page>\d+))?$"
+    assert cb.pattern == (
+        r"^(?P<action>show);(?P<entity>past_meeting):(?P<id>\d*)"
+        r"(?:;page:(?P<page>\d+))?(?:;src:(?P<source>[aj]))?$"
+    )
 
 
 @pytest.mark.parametrize(
@@ -121,29 +125,50 @@ def test_paginated_callback_data_pattern():
     [
         (PaginatedCallbackData(entity="past_meeting", action="show").with_id(42), "show;past_meeting:42"),
         (PaginatedCallbackData(entity="past_meeting", action="show").with_page(42, 3), "show;past_meeting:42;page:3"),
+        (
+            PaginatedCallbackData(entity="meeting", action="show").with_page(42, 3, MeetingListSource.JOINED),
+            "show;meeting:42;page:3;src:j",
+        ),
         (PaginatedCallbackData(entity="past_meeting", action="show"), "show;past_meeting:"),
     ],
-    ids=["with_id_omits_page", "with_page", "empty"],
+    ids=["with_id_omits_page", "with_page", "with_page_and_source", "empty"],
 )
 def test_paginated_callback_data_str(callback_data: PaginatedCallbackData, expected: str):
     assert str(callback_data) == expected
 
 
 @pytest.mark.parametrize(
-    "input_str, expected_id, expected_page",
+    "input_str, expected_id, expected_page, expected_source",
     [
-        ("show;past_meeting:42;page:3", 42, 3),
-        ("show;past_meeting:42", 42, None),
-        ("show;past_meeting:", None, None),
+        ("show;past_meeting:42;page:3", 42, 3, None),
+        ("show;past_meeting:42;page:3;src:a", 42, 3, MeetingListSource.ACTIVE),
+        ("show;past_meeting:42;page:3;src:j", 42, 3, MeetingListSource.JOINED),
+        ("show;past_meeting:42", 42, None, None),
+        ("show;past_meeting:", None, None, None),
     ],
-    ids=["id_and_page", "id_without_page", "empty"],
+    ids=["id_and_page", "active_source", "joined_source", "id_without_page", "empty"],
 )
-def test_paginated_callback_data_matches(input_str: str, expected_id: int | None, expected_page: int | None):
+def test_paginated_callback_data_matches(
+    input_str: str, expected_id: int | None, expected_page: int | None, expected_source: MeetingListSource | None
+):
     cb = PaginatedCallbackData(entity="past_meeting", action="show")
     match = re.match(cb.pattern, input_str)
     parsed = cb.parse(match)
     assert parsed.id == expected_id
     assert parsed.page == expected_page
+    assert parsed.source == expected_source
+
+
+def test_paginated_callback_data_rejects_unknown_source():
+    """A source outside the known list codes must not match the pattern at all."""
+    cb = PaginatedCallbackData(entity="past_meeting", action="show")
+    assert re.match(cb.pattern, "show;past_meeting:42;page:3;src:x") is None
+
+
+def test_paginated_callback_data_with_id_keeps_source():
+    """with_id must carry the source along, like it already does for the page."""
+    cb = PaginatedCallbackData(entity="meeting", action="show", page=2, source=MeetingListSource.ACTIVE)
+    assert str(cb.with_id(7)) == "show;meeting:7;page:2;src:a"
 
 
 def test_paginated_callback_data_with_id_keeps_wire_format_of_plain_callback():

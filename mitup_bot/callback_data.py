@@ -1,10 +1,23 @@
 import datetime as dt
 import re
+from enum import StrEnum
 from typing import Self, override
 
 from pydantic import BaseModel, Field, field_validator
 
 UNKNOWN_ENTITY = "unknown"
+
+
+class MeetingListSource(StrEnum):
+    """Identifies which meeting list a detail view was opened from.
+
+    Encoded in the callback data (see PaginatedCallbackData) so the detail view's back button
+    can target the originating list. Values are single characters to stay well within
+    Telegram's 64-byte callback data limit.
+    """
+
+    ACTIVE = "a"
+    JOINED = "j"
 
 
 class ValidCallbackData(BaseModel):
@@ -105,50 +118,57 @@ class ValidPaginatedCallbackData(ValidCallbackData):
 
     The wire format leaves the page optional, but a validated callback always carries a page:
     the guard defaults a missing page to the first page so handlers never re-derive it.
+    The originating list stays optional: None means the detail was not reached from a list.
     """
 
     page: int
+    source: MeetingListSource | None = None
 
 
 class PaginatedCallbackData(CallbackData):
-    """CallbackData that remembers the list page a detail view was opened from.
+    """CallbackData that remembers the list page (and list) a detail view was opened from.
 
     A detail view reached from a paginated list must be able to return to the exact page
     the user navigated from instead of defaulting to page 1. The originating page is encoded
-    after the id.
+    after the id, optionally followed by which list the user came from so views shared by
+    several lists (e.g. the meeting detail) can target the right one.
 
-    The page is optional: a plain `with_id(...)` callback keeps the same wire format as a
-    non-paginated `CallbackData` (no `;page:` suffix), so callbacks that have no originating
-    page stay backward-compatible.
+    Both suffixes are optional: a plain `with_id(...)` callback keeps the same wire format as
+    a non-paginated `CallbackData` (no `;page:`/`;src:` suffix), so callbacks that have no
+    originating page stay backward-compatible.
 
-    Format string: {action};{entity}:{id}[;page:{page}]
-    Example: "show;past_meeting:42;page:3"
+    Format string: {action};{entity}:{id}[;page:{page}][;src:{source}]
+    Example: "show;meeting:42;page:3;src:j"
     """
 
     page: int | None = Field(default=None, ge=1)
+    source: MeetingListSource | None = None
 
     def __str__(self) -> str:
-        return super().__str__() if self.page is None else f"{super().__str__()};page:{self.page}"
+        page_suffix = "" if self.page is None else f";page:{self.page}"
+        source_suffix = "" if self.source is None else f";src:{self.source}"
+        return f"{super().__str__()}{page_suffix}{source_suffix}"
 
     @property
     def pattern(self) -> str:
-        # The page suffix is optional so callbacks built with `with_id` remain wire-compatible
+        # Both suffixes are optional so callbacks built with `with_id` remain wire-compatible
         # with a plain CallbackData.
-        return f"{super().pattern[:-1]}(?:;page:(?P<page>\\d+))?$"
+        sources = "".join(source.value for source in MeetingListSource)
+        return f"{super().pattern[:-1]}(?:;page:(?P<page>\\d+))?(?:;src:(?P<source>[{sources}]))?$"
 
-    @field_validator("page", mode="before")
+    @field_validator("page", "source", mode="before")
     @classmethod
-    def validate_page(cls, value: str | int | None) -> str | int | None:
-        # A missing optional page group is parsed as None; let pydantic coerce the rest.
+    def validate_optional_suffixes(cls, value: str | int | None) -> str | int | None:
+        # A missing optional suffix group is parsed as None; let pydantic coerce the rest.
         return value or None if isinstance(value, str) else value
 
-    def with_page(self, id: int, page: int) -> Self:
-        """Attach both the record id and the originating list page."""
-        return self.__class__(entity=self.entity, action=self.action, id=id, page=page)
+    def with_page(self, id: int, page: int, source: MeetingListSource | None = None) -> Self:
+        """Attach the record id, the originating list page, and optionally which list it is."""
+        return self.__class__(entity=self.entity, action=self.action, id=id, page=page, source=source)
 
     @override
     def with_id(self, id: int) -> Self:
-        return self.__class__(entity=self.entity, action=self.action, id=id, page=self.page)
+        return self.__class__(entity=self.entity, action=self.action, id=id, page=self.page, source=self.source)
 
 
 class ValidMeetingCallbackData(ValidCallbackData):

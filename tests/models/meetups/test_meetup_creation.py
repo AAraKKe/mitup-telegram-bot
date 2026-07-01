@@ -565,7 +565,11 @@ def test_add_message_to_meeting_from_update(
 def test_add_message_does_nothing_if_message_exists():
     meeting = create_meetup(id=1, owner=User(first_name="John", tg_user_id=1, settings=Settings()))
     message = Message(
-        id=123, message_id=123, chat_id=123, buttons=MessageButtons(keyboard=meeting.main_view.keyboard), meetup=meeting
+        id=123,
+        message_id=123,
+        chat_id=123,
+        buttons=MessageButtons(keyboard=meeting.main_view().keyboard),
+        meetup=meeting,
     )
 
     assert message == meeting.add_message(

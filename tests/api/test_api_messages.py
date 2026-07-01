@@ -204,7 +204,7 @@ async def test_edit_meetup_messages(
 
     edit: mock.MagicMock = context.bot.edit_message_text
     inline_view = meeting.inline_view()
-    main_view = meeting.main_view
+    main_view = meeting.main_view()
     expected_call_params = {
         "text": inline_view.description.text,
         "entities": inline_view.description.entities or None,

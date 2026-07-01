@@ -13,8 +13,9 @@ EMPTY = CallbackData(action="empty", entity="empty", id=0)
 # Meeting callbacks
 # These are callbacks for the meeting and edit meeting views
 # ----------------------------------------
-# SHOW_MEETING and SHOW_PAST_MEETING remember the list page they were opened from so the
-# detail view can send the user back to that exact page (see PaginatedCallbackData).
+# SHOW_MEETING and SHOW_PAST_MEETING remember the list page (and, for SHOW_MEETING, which
+# list) they were opened from so the detail view can send the user back to that exact page
+# (see PaginatedCallbackData).
 SHOW_MEETING = PaginatedCallbackData(action="show", entity="meeting")
 SHOW_ACTIVE_MEETING_PAGE = CallbackData(action="show", entity="active_meeting_page")
 SHOW_JOINED_MEETINGS_PAGE = CallbackData(action="show", entity="joined_meetings")
