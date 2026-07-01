@@ -78,13 +78,8 @@ async def test_delete_meeting_works(
             MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK,
             "Confirm delete meeting",
         ),
-        (
-            (UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(999))),
-            MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
-            "Decline delete meeting",
-        ),
     ],
-    ids=["delete_meeting", "confirm_delete_meeting", "decline_delete_meeting"],
+    ids=["delete_meeting", "confirm_delete_meeting"],
     indirect=["update"],
 )
 async def test_delete_meeting_buttons_fails_without_existing_meeting(

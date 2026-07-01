@@ -89,7 +89,9 @@ async def callback_query_decline_delete_meeting(session: Session, update: Update
     )
     user = guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Decline delete meeting", update, context)
+    meeting = await guards.meeting_accessible(
+        session, user, callback_data.id, "Decline delete meeting", update, context
+    )
     if meeting is None:
         return
 

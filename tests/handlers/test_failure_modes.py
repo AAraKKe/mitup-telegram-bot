@@ -442,6 +442,18 @@ CONTEXTS = [
         ],
     ),
     Context(
+        handler_id=MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_delete_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_delete_inactive_meeting",
+    ),
+    Context(
         handler_id=EditMeetingHandlerId.EDIT,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
