@@ -1,14 +1,14 @@
-# This job will configure the aws credentials and the ECR URIs
+# This job resolves the ECR URIs shared with the push/deploy/docs jobs via the dotenv report.
+# AWS credentials are NOT part of the artifacts: every job authenticates itself with its own
+# job-scoped OIDC token (see .aws-prep in base.yml), so a job that queues for a long time
+# behind a deploy bake never inherits an expired token from this job.
 .aws-config: &aws-env-config
   stage: prepare-deployment
   id_tokens:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service
   script:
-    - mkdir -p ~/.aws
-    - mkdir -p /tmp
-    - echo "${OIDC_TOKEN}" > ${CI_PROJECT_DIR}/web_identity_token
-    - echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=${CI_PROJECT_DIR}/web_identity_token" > ~/.aws/config
+    - !reference [.aws-prep]
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
     - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
     - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
@@ -18,14 +18,10 @@
     - echo "MIGRATIONS_IMAGE_TAG=${ECR_MIGRATIONS_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
     - echo "MIGRATE_RAILS_IMAGE_TAG=${ECR_MIGRATE_RAILS_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
     - echo "ALARM_ACTION_IMAGE_TAG=${ECR_ALARM_ACTION_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
-    - cp ~/.aws/config ${CI_PROJECT_DIR}/aws-config
 
   artifacts:
     reports:
       dotenv: dotenv
-    paths:
-      - web_identity_token
-      - aws-config
     when: on_success
     expire_in: 2 hours
     access: none

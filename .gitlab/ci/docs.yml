@@ -22,8 +22,9 @@ build-docs:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service
   script:
-    - mkdir -p ~/.aws
-    - cp ${CI_PROJECT_DIR}/aws-config ~/.aws/config
+    # Authenticate with this job's own OIDC token: docs publish runs after the deploy, so it
+    # must not reuse credentials issued to an earlier job.
+    - !reference [.aws-prep]
     - hatch run dev:push-docs
 
 push-docs-staging:
@@ -61,9 +62,7 @@ publish_docs_manual:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service
   before_script:
-    - mkdir -p ~/.aws
-    - echo "${OIDC_TOKEN}" > ${CI_PROJECT_DIR}/web_identity_token
-    - echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=${CI_PROJECT_DIR}/web_identity_token" > ~/.aws/config
+    - !reference [.aws-prep]
   script:
     - echo "Building documentation before manual publish..."
     - hatch run dev:build-docs # Run build step first

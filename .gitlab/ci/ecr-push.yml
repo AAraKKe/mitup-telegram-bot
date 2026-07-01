@@ -15,9 +15,9 @@
     # Connect to docker:dind service
     DOCKER_HOST: tcp://docker:2375
   before_script:
-    # Setup AWS credentials using OIDC
-    - mkdir -p ~/.aws
-    - cp ${CI_PROJECT_DIR}/aws-config ~/.aws/config
+    # Authenticate with this job's own OIDC token: the job may queue for a long time behind a
+    # deploy bake, so it must not reuse credentials issued to an earlier job.
+    - !reference [.aws-prep]
     # Login to AWS ECR
     - ECR_REGISTRY=$(echo "$PUSH_DESTINATION" | cut -d'/' -f1)
     - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin "$ECR_REGISTRY"
