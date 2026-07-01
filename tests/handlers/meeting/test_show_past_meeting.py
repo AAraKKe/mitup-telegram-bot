@@ -64,7 +64,7 @@ async def test_delete_past_meeting_shows_confirmation(
     context, _ = await call_handler(MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context)
 
     mock_session.assert_not_deleted()
-    context.api.assert_send_message_called(
+    context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
@@ -73,6 +73,9 @@ async def test_delete_past_meeting_shows_confirmation(
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID),
         ),
     )
+    # Regression (issue #170): the confirmation must edit the detail view in place, never post a
+    # new message that would leave the original message with live "Reactivate"/"Delete" buttons.
+    context.api.assert_send_message_not_called()
 
 
 @pytest.mark.parametrize(
@@ -135,7 +138,7 @@ async def test_delete_past_meeting_threads_page_into_confirmation(
 
     context, _ = await call_handler(MeetingHandlerId.DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_send_message_called(
+    context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
@@ -145,9 +148,9 @@ async def test_delete_past_meeting_threads_page_into_confirmation(
         ),
     )
     # CallbackData.__eq__ ignores the page field, so assert it explicitly on both buttons.
-    sent_view = context.api.call_args("send_message").kwargs["view"]
-    confirm_button = sent_view.keyboard[0][0]
-    decline_button = sent_view.keyboard[-1][-1]
+    edited_view = context.api.call_args("edit_message").kwargs["view"]
+    confirm_button = edited_view.keyboard[0][0]
+    decline_button = edited_view.keyboard[-1][-1]
     assert str(confirm_button.callback_data).endswith(";page:3")
     assert str(decline_button.callback_data).endswith(";page:3")
 
@@ -170,7 +173,7 @@ async def test_confirm_delete_past_meeting_back_button_returns_to_originating_pa
         MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context
     )
 
-    context.api.assert_send_message_called(
+    context.api.assert_edit_message_called(
         update,
         MitupView(
             description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
@@ -232,7 +235,7 @@ async def test_confirm_delete_past_meeting_deletes_and_redirects_to_past_meeting
 
     mock_session.assert_deleted(inactive_meeting)
     context.api.assert_update_meeting_messages_called(session=mock_session, meeting=inactive_meeting, was_deleted=True)
-    context.api.assert_send_message_called(
+    context.api.assert_edit_message_called(
         update,
         MitupView(
             description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
@@ -246,6 +249,9 @@ async def test_confirm_delete_past_meeting_deletes_and_redirects_to_past_meeting
             ],
         ),
     )
+    # Regression (issue #170): the success view must replace the detail message in place, never post
+    # a new message that would leave stale buttons bound to the now-deleted meeting id in the chat.
+    context.api.assert_send_message_not_called()
 
 
 @pytest.mark.parametrize(
@@ -307,6 +313,7 @@ async def test_confirm_delete_past_meeting_silent_when_full_meeting_not_found(
     )
 
     mock_session.assert_not_deleted()
+    context.api.assert_method_just_called("edit_message", times=0)
     context.api.assert_method_just_called("send_message", times=0)
 
 

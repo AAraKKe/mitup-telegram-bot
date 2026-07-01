@@ -53,7 +53,7 @@ async def callback_query_delete_past_meeting(session: Session, update: Update, c
     if meeting is None:
         return
 
-    await context.api.send_message(
+    await context.api.edit_message(
         update=update,
         view=factory.confirmation_view(
             lang=user.lang,
@@ -122,7 +122,7 @@ async def callback_query_confirm_delete_past_meeting(session: Session, update: U
             ]
         ],
     )
-    await context.api.send_message(update=update, view=view)
+    await context.api.edit_message(update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
