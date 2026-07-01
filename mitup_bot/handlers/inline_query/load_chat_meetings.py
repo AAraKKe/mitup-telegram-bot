@@ -2,7 +2,7 @@ from sqlmodel import Session
 from telegram import Update
 
 from mitup_bot.db import with_async_session
-from mitup_bot.guards import user_language
+from mitup_bot.guards import callback_query, user_language
 from mitup_bot.utils import InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -25,7 +25,7 @@ async def load_chat_meetings(session: Session, update: Update, context: TMitupCo
     for meetings attached to this chat.
     """
     lang = user_language(update, session)
-    chat_instance = update.callback_query.chat_instance if update.callback_query else None
+    chat_instance = callback_query(update).chat_instance
 
     view = MitupView(
         description=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),

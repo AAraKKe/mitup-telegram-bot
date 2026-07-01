@@ -6,10 +6,12 @@ from sqlmodel import select
 from telegram import Update
 
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
+from mitup_bot.handlers.inline_query.utils import search_chat_meetings_button
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
-from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
-from mitup_bot.views import ButtonConfig, MitupInlineView
+from mitup_bot.translations import TranslationEngine
+from mitup_bot.utils.messages import InlineQueryMessages
+from mitup_bot.views import MitupInlineView
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -36,18 +38,23 @@ def make_message(*, id: int, meetup_id: int) -> Message:
 def no_meetings_found_view(lang: str) -> MitupInlineView:
     return MitupInlineView(
         description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
-        keyboard=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.SEARCH_CHAT_MEETINGS.get(lang=lang),
-                    switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}",
-                )
-            ],
-        ],
+        keyboard=[[search_chat_meetings_button(lang=lang, chat_instance=CHAT_INSTANCE)]],
         id="no_meetings_found",
         title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
         inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),
     )
+
+
+def test_search_chat_meetings_button_embeds_real_chat_instance():
+    """Regression for #181: the shared retry button must embed the real chat_instance, never a stringified None.
+
+    The helper now requires a non-optional ``chat_instance``; the type checker prevents a ``None`` from ever
+    being interpolated into a ``search:None`` query, and this locks the runtime construction contract.
+    """
+    button = search_chat_meetings_button(lang=TranslationEngine.FALLBACK_LANG, chat_instance=CHAT_INSTANCE)
+
+    assert button.switch_inline_query_current_chat == f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}"
+    assert "None" not in (button.switch_inline_query_current_chat or "")
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}")], indirect=True)

@@ -23,7 +23,7 @@ def meeting_unavailable_view(lang: str) -> MitupInlineView:
     )
 
 
-def search_chat_meetings_button(*, lang: str, chat_instance: str | None) -> ButtonConfig:
+def search_chat_meetings_button(*, lang: str, chat_instance: str) -> ButtonConfig:
     """Button that re-invokes the inline search for the current chat.
 
     Shared by every step of the guided search flow so the user always has an
