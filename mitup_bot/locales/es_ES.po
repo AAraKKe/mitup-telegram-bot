@@ -104,6 +104,9 @@ msgstr "🗓️ Fecha"
 msgid "ButtonMessages.DATE_TIME"
 msgstr "🗓️ Fecha y Hora"
 
+msgid "ButtonMessages.END_DATE_TIME"
+msgstr "🗓️ Fecha y Hora de finalización"
+
 msgid "ButtonMessages.TIME"
 msgstr "🕒 Hora"
 

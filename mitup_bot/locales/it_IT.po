@@ -164,6 +164,9 @@ msgstr "🗑️ Elimina durata"
 msgid "ButtonMessages.DATE_TIME"
 msgstr "🗓️ Data e Ora"
 
+msgid "ButtonMessages.END_DATE_TIME"
+msgstr "🗓️ Data e Ora di fine"
+
 msgid "ButtonMessages.DURATION"
 msgstr "⌛ Durata"
 

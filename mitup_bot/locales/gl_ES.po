@@ -718,6 +718,9 @@ msgstr "🇮🇹 Italiano"
 msgid "ButtonMessages.DATE_TIME"
 msgstr "🗓️ Data e Hora"
 
+msgid "ButtonMessages.END_DATE_TIME"
+msgstr "🗓️ Data e Hora de remate"
+
 msgid "MeetingEditDurationMessages.ON_EXIT"
 msgstr "Desculpa, estaba esperando a duración en minutos. Te gustaría enviarla? Se non, toca Cancelar para saír."
 

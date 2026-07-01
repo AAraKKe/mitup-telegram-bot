@@ -8,11 +8,12 @@ from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.utils import safe_anchor_date
 from mitup_bot.models import Settings
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -613,7 +614,29 @@ async def test_duration_end_date_nav_shows_calendar(
     )
 
     assert state == ConversationMeetingState.EDIT_END_DATE
-    context.api.assert_method_just_called("edit_message", times=1)
+
+    # Use meeting.owner.now_in_tz().date() to get the same "today" the handler used; the callback
+    # date (2024-06-15) is always in the past, so current_date resolves to today.
+    now_in_owner_tz = meeting.owner.now_in_tz()
+    today = now_in_owner_tz.date()
+    anchor_date = safe_anchor_date(meeting.end_datetime, now_in_owner_tz)
+
+    # Issue #173: this calendar's back button routes to the End Date & Time sub-hub, so it must
+    # be labeled END_DATE_TIME — not the old hardcoded "≪ ✏️ Edit".
+    context.api.assert_edit_message_called(
+        update,
+        factory.edit_meeting_date_view(
+            lang=meeting.lang,
+            meeting_id=1,
+            anchor_date=anchor_date,
+            current_date=today,
+            new=meeting.end_datetime is None,
+            set_date_callback=cb.SET_MEETING_END_DATE,
+            nav_callback=cb.EDIT_MEETING_END_DATE,
+            back_callback=cb.EDIT_MEETING_END_DATE_TIME,
+            back_button_text=ButtonMessages.END_DATE_TIME,
+        ),
+    )
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-06-22 09:51\n"
+"PO-Revision-Date: 2026-07-01 19:53\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -106,6 +106,9 @@ msgstr "🗓️ Date"
 
 msgid "ButtonMessages.DATE_TIME"
 msgstr "🗓️ Date & Time"
+
+msgid "ButtonMessages.END_DATE_TIME"
+msgstr "🗓️ End Date & Time"
 
 msgid "ButtonMessages.TIME"
 msgstr "🕒 Time"

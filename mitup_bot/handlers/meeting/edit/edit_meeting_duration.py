@@ -301,6 +301,7 @@ async def callback_query_duration_end_date_nav(
             set_date_callback=cb.SET_MEETING_END_DATE,
             nav_callback=cb.EDIT_MEETING_END_DATE,
             back_callback=cb.EDIT_MEETING_END_DATE_TIME,
+            back_button_text=ButtonMessages.END_DATE_TIME,
         ),
     )
     return ConversationMeetingState.EDIT_END_DATE

@@ -197,15 +197,19 @@ def edit_meeting_date_view(
     set_date_callback: DateCallbackData | None = None,
     nav_callback: DateCallbackData | None = None,
     back_callback: CallbackData | None = None,
+    back_button_text: ButtonMessages | None = None,
 ) -> MitupView:
     """Build a calendar view for date selection, parameterized by callback data.
 
     When no callback overrides are provided, defaults to the start-datetime callbacks
-    used by the edit_meeting_datetime conversation.
+    used by the edit_meeting_datetime conversation. ``back_button_text`` must name the
+    screen ``back_callback`` actually resolves to — callers overriding ``back_callback``
+    should also override ``back_button_text`` to match.
     """
     resolved_set = set_date_callback or cb.SET_MEETING_DATE
     resolved_nav = nav_callback or cb.EDIT_MEETING_DATE
     resolved_back = back_callback or cb.EDIT_MEETING
+    resolved_back_text = back_button_text or ButtonMessages.DATE_TIME
 
     message = (
         MeetingEditDateTimeMessages.DATE_ADD_PROMPT.get(lang=lang)
@@ -220,7 +224,7 @@ def edit_meeting_date_view(
     ).keyboard
 
     calendar_keyboard.append(
-        [ButtonConfig(text=ButtonMessages.EDIT.back(lang=lang), callback_data=resolved_back.with_id(meeting_id))]
+        [ButtonConfig(text=resolved_back_text.back(lang=lang), callback_data=resolved_back.with_id(meeting_id))]
     )
 
     return MitupView(description=message, keyboard=calendar_keyboard)

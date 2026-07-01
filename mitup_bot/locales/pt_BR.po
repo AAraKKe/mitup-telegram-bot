@@ -718,6 +718,9 @@ msgstr "🇮🇹 Italiano"
 msgid "ButtonMessages.DATE_TIME"
 msgstr "🗓️ Data e Hora"
 
+msgid "ButtonMessages.END_DATE_TIME"
+msgstr "🗓️ Data e Hora de término"
+
 msgid "MeetingDisplayMessages.IN_PROGRESS_BANNER"
 msgstr "▶️ Este evento está em andamento ▶️"
 
