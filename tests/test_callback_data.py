@@ -60,6 +60,24 @@ def test_callback_data_match():
     assert callback_data.match().groupdict() == {"action": "edit", "entity": "meeting", "id": "21"}
 
 
+@pytest.mark.parametrize(
+    "callback_data",
+    [
+        CallbackData(entity="meeting", action="edit"),
+        DateCallbackData(entity="meeting", action="edit"),
+        MeetingCallbackData(entity="meeting", action="edit"),
+        PaginatedCallbackData(entity="meeting", action="show"),
+    ],
+    ids=lambda cb: type(cb).__name__,
+)
+def test_pattern_is_anchored_pattern_body(callback_data: CallbackData):
+    """Every subclass composes its wire format through `pattern_body`; `pattern` adds the
+    anchors exactly once, so no subclass can end up double-anchored or unanchored."""
+    assert callback_data.pattern == f"^{callback_data.pattern_body}$"
+    assert "^" not in callback_data.pattern_body
+    assert "$" not in callback_data.pattern_body
+
+
 def test_date_callback_data_pattern():
     cb = DateCallbackData(entity="meeting", action="edit", id=21)
     assert cb.pattern == r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*);date:(?P<date>\d{4}-\d{2}-\d{2})$"

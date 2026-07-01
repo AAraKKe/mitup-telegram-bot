@@ -61,8 +61,17 @@ class CallbackData(BaseModel):
         return value or None if isinstance(value, str) else value
 
     @property
+    def pattern_body(self) -> str:
+        """Unanchored regex for this callback's wire format.
+
+        Subclasses extend the wire format by appending their own suffix to
+        `super().pattern_body`; `pattern` anchors the composed body exactly once.
+        """
+        return f"(?P<action>{self.action});(?P<entity>{self.entity}):(?P<id>\\d*)"
+
+    @property
     def pattern(self) -> str:
-        return f"^(?P<action>{self.action});(?P<entity>{self.entity}):(?P<id>\\d*)$"
+        return f"^{self.pattern_body}$"
 
     def with_id(self, id: int) -> Self:
         """Creates a CallbackData with the same information but different ID"""
@@ -105,9 +114,8 @@ class DateCallbackData(CallbackData):
         return f"{super().__str__()};date:{self.date:%Y-%m-%d}"
 
     @property
-    def pattern(self) -> str:
-        own_pattern = r";date:(?P<date>\d{4}-\d{2}-\d{2})$"
-        return f"{super().pattern[:-1]}{own_pattern}"
+    def pattern_body(self) -> str:
+        return rf"{super().pattern_body};date:(?P<date>\d{{4}}-\d{{2}}-\d{{2}})"
 
     def with_date(self, date: dt.date) -> Self:
         return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)
@@ -150,11 +158,11 @@ class PaginatedCallbackData(CallbackData):
         return f"{super().__str__()}{page_suffix}{source_suffix}"
 
     @property
-    def pattern(self) -> str:
+    def pattern_body(self) -> str:
         # Both suffixes are optional so callbacks built with `with_id` remain wire-compatible
         # with a plain CallbackData.
         sources = "".join(source.value for source in MeetingListSource)
-        return f"{super().pattern[:-1]}(?:;page:(?P<page>\\d+))?(?:;src:(?P<source>[{sources}]))?$"
+        return f"{super().pattern_body}(?:;page:(?P<page>\\d+))?(?:;src:(?P<source>[{sources}]))?"
 
     @field_validator("page", "source", mode="before")
     @classmethod
@@ -201,8 +209,8 @@ class MeetingCallbackData(CallbackData):
         return f"{self.action};{self.entity}:{'' if self.id is None else self.id}:{self.meeting_id or ''}"
 
     @property
-    def pattern(self) -> str:
-        return f"^(?P<action>{self.action});(?P<entity>{self.entity}):(?P<id>\\d*):(?P<meeting_id>\\d*)$"
+    def pattern_body(self) -> str:
+        return f"{super().pattern_body}:(?P<meeting_id>\\d*)"
 
     @field_validator("meeting_id", mode="before")
     @classmethod
