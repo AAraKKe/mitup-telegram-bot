@@ -54,6 +54,9 @@ def test_kickout_participants_view_pagination(num_participants: int, expected_pa
     assert len(back_button_row) == 1
     back_button = back_button_row[0]
     assert back_button.text == f"{ButtonMessages.EDIT.back(lang=current_user.lang)}"
+    # Back must return to the Edit Participants screen, not the top-level Edit menu (issue #168).
+    # The buggy value was cb.EDIT_MEETING (top-level Edit menu).
+    assert back_button.callback_data == cb.EDIT_MEETING_PARTICIPANTS.with_id(meetup.db_id)
 
 
 def prepare_meeting(mock_session: MockDbSession, user_with_settings: User):
@@ -114,6 +117,11 @@ async def test_edit_meeting_kickout_participants_sends_list_of_participants(
     # Validate that the button contains the correct callback data
     all_buttons_callback_data = {str(button.callback_data) for row in actual_view.keyboard for button in row}
     assert f"kickout;user:{expected_user_id}:1" in all_buttons_callback_data
+
+    # The kick-out list's back button must return to the Edit Participants screen, one level up,
+    # not to the top-level Edit menu (issue #168). The buggy value was cb.EDIT_MEETING.
+    back_button = actual_view.keyboard[-1][0]
+    assert back_button.callback_data == cb.EDIT_MEETING_PARTICIPANTS.with_id(user_with_settings.meetups[0].db_id)
 
 
 @pytest.mark.parametrize(
@@ -251,6 +259,11 @@ async def test_edit_meeting_kickout_participant_confirm(
     # Ensure the list of buttons does not include the participant that has been kicked out
     all_buttons_text = {button.text for row in expected_view.keyboard for button in row}
     assert "joined_user_10" not in all_buttons_text
+
+    # The success view is still the kick-out list, so its back button must also return to the
+    # Edit Participants screen, not the top-level Edit menu (issue #168, buggy value cb.EDIT_MEETING).
+    back_button = expected_view.keyboard[-1][0]
+    assert back_button.callback_data == cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id)
 
     # Kickout should trigger meeting messages update
     context.api.assert_update_meeting_messages_called(

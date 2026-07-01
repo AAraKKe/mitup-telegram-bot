@@ -103,7 +103,7 @@ def kick_out_users_view(
             [
                 ButtonConfig(
                     text=f"{ButtonMessages.EDIT.back(lang=current_user.lang)}",
-                    callback_data=cb.EDIT_MEETING.with_id(meeting.db_id),
+                    callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id),
                 )
             ]
         ]
