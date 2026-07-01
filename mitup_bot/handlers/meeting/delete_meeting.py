@@ -69,8 +69,8 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=user.lang),
-                    callback_data=cb.MAIN_MENU,
+                    text=ButtonMessages.ACTIVE_MEETINGS.back(lang=user.lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 )
             ]
         ],

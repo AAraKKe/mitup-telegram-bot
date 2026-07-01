@@ -168,13 +168,15 @@ async def test_confirm_delete_meeting_works(
 
     mock_session.assert_deleted(meeting_deleted)
 
+    # Regression for issue #171: the success view must route back to the Active
+    # meetings list the user came from, not the Main Menu.
     expected_view = MitupView(
         description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
-                    callback_data=cb.MAIN_MENU,
+                    text=ButtonMessages.ACTIVE_MEETINGS.back(lang=user_with_settings.lang),
+                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 )
             ]
         ],
