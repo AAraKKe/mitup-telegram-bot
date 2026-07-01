@@ -164,13 +164,24 @@ async def test_invite_users_ask_for_name(
         assert text == "Bruce Wayne"
 
 
+@pytest.mark.parametrize(
+    "owner_id",
+    [123, 456],
+    ids=["by_owner", "by_other_user"],
+)
 async def test_cancel_name_request(
     mock_session: MockDbSession,
     user_with_settings: User,
     conversation: ConversationTester,
+    owner_id: int,
     meeting: Meetup,
 ):
-    setup_db(mock_session, user_with_settings, meeting)
+    if owner_id == 123:
+        owner = user_with_settings
+    else:
+        owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
+        mock_session.add_user(user_with_settings)
+    setup_db(mock_session, owner, meeting)
 
     # These are the steps for the conversation when cancelling the name request
     steps = [
@@ -189,11 +200,13 @@ async def test_cancel_name_request(
     assert callback_step.state is ConversationInviteState.NAME
     assert cancel_step.state is None  # Conversation has ended
 
-    # User has been sent back to the main menu
-    expected_view = views.factory.main_menu_view(
-        lang=user_with_settings.lang,
-        message=MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang),
-    )
+    message = MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang)
+
+    # Owners are returned to their meeting; everyone else lands on the main menu
+    if owner_id == 123:
+        expected_view = meeting.view_for(user_with_settings).with_context(message)
+    else:
+        expected_view = views.factory.main_menu_view(lang=user_with_settings.lang, message=message)
 
     cancel_step.context.api.assert_edit_message_called(
         update=cancel_step.context.get_update(),
@@ -513,15 +526,44 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
     [UpdateRequest(callback_query=cb.CANCEL_INVITE_USER.with_id(MEETING_ID))],
     indirect=True,
 )
-async def test_decline_user_invitation_when_meeting_no_longer_allows_invitations(
+@pytest.mark.parametrize(
+    "owner_id",
+    [123, 456],
+    ids=["by_owner", "by_other_user"],
+)
+@pytest.mark.parametrize(
+    "handler_id",
+    [
+        MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK,
+        MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK,
+    ],
+    ids=["cancel", "decline"],
+)
+async def test_abort_invitation_when_meeting_no_longer_allows_invitations(
     handler_context: HandlerContext,
     user_with_settings: User,
     mock_session: MockDbSession,
     meeting: Meetup,
+    handler_id: MeetingHandlerId,
+    owner_id: int,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """When ensure_meeting_still_allows_invitations returns None, handler edits to main_menu_view and returns END."""
-    setup_db(mock_session, user_with_settings, meeting)
+    """When the meeting can no longer be invited into, even an owner lands on the main menu.
+
+    Both the NAME-step Cancel and the CONFIRMATION-step Decline share ``abort_invitation``,
+    so both entry points must fall back to the main menu when the meeting is gone — even for the
+    acting user who owns the meeting, which is what makes the ``by_owner`` case load-bearing.
+    """
+    if owner_id == 123:
+        owner = user_with_settings
+    else:
+        owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
+        mock_session.add_user(user_with_settings)
+    setup_db(mock_session, owner, meeting)
+
+    # Make the "even an owner" claim explicit rather than incidental: the by_owner case must
+    # genuinely own the meeting, and the by_other_user case must not.
+    assert (user_with_settings.own_meeting(MEETING_ID) is not None) is (owner_id == 123)
 
     async def _always_none(*args, **kwargs):
         return None
@@ -531,7 +573,7 @@ async def test_decline_user_invitation_when_meeting_no_longer_allows_invitations
         _always_none,
     )
 
-    context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, handler_context=handler_context)
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
 
     expected_view = views_factory.main_menu_view(
         lang=user_with_settings.lang,

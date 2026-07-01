@@ -3,6 +3,7 @@ from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_async_session
 from mitup_bot.handlers import HandlersRegistry
@@ -118,22 +119,48 @@ async def callback_query_invite_users(
     return ConversationInviteState.NAME
 
 
+async def abort_invitation(
+    session: Session,
+    update: Update,
+    context: TMitupContext,
+    handler_id: MeetingHandlerId,
+    callback_data: CallbackData,
+) -> int:
+    """Abort the invite flow, returning meeting owners to their meeting and everyone else to the main menu.
+
+    Owners are only returned to their meeting while it still allows invitations; when it is gone,
+    full, or no longer accepting invitations they fall back to the main menu like everyone else.
+
+    ``callback_data`` is the callback-data class each registration is bound to, so parsing stays in
+    sync with the registration even if a call site switches to a different class.
+    """
+    user = guards.current_user(update, session)
+
+    # Clean the stored data related to the conversation
+    context.clean_user_data([ContextId.INVITE_USERS])
+
+    message = MeetingInviteMessages.CANCELED.get(lang=user.lang)
+
+    meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
+    meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
+
+    if meeting is not None and user.own_meeting(meeting_id):
+        view = meeting.view_for(user).with_context(message=message)
+    else:
+        view = main_menu_view(lang=user.lang, message=message)
+
+    await context.api.edit_message(update, view)
+    return ConversationHandler.END
+
+
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK, callback_data=cb.CANCEL_INVITE_USER, bindable=False
 )
 @with_async_session
 async def callback_query_cancel_invite_user(session: Session, update: Update, context: TMitupContext) -> int:
-    # Clear the stored meeting ID, send the user to the main menu and end the conversation
-    context.clean_user_data([ContextId.INVITE_USERS])
-    user = guards.current_user(update, session)
-    mesage = MeetingInviteMessages.CANCELED.get(lang=user.lang)
-
-    await context.api.edit_message(
-        update=update,
-        view=main_menu_view(lang=user.lang, message=mesage),
+    return await abort_invitation(
+        session, update, context, MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK, cb.CANCEL_INVITE_USER
     )
-
-    return ConversationHandler.END
 
 
 @HandlersRegistry.register_message(
@@ -235,32 +262,9 @@ async def callback_query_confirm_user_invitation(session: Session, update: Updat
 )
 @with_async_session
 async def callback_query_decline_user_invitation(session: Session, update: Update, context: TMitupContext) -> int:
-    user = guards.current_user(update, session)
-
-    # Clean the stored data related to the conversation
-    context.clean_user_data([ContextId.INVITE_USERS])
-
-    message = MeetingInviteMessages.CANCELED.get(lang=user.lang)
-
-    # If the user owns the meeting, go back to the meeting, if they do not
-    # send to main menu
-    meeting_id = guards.valid_callback_data(
-        cb.CANCEL_INVITE_USER.parse(context.match), MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK
-    ).id
-    meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
-    if meeting is None:
-        # Edit message to send to the main menu
-        view = main_menu_view(lang=user.lang, message=message)
-        await context.api.edit_message(update, view)
-        return ConversationHandler.END
-
-    if user.own_meeting(meeting_id):
-        view = meeting.view_for(user).with_context(message=message)
-    else:
-        view = main_menu_view(lang=user.lang, message=message)
-
-    await context.api.edit_message(update, view)
-    return ConversationHandler.END
+    return await abort_invitation(
+        session, update, context, MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, cb.CANCEL_INVITE_USER
+    )
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.INVITE_USERS_FALLBACK, bindable=False)
