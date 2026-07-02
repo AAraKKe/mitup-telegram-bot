@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -29,7 +30,7 @@ def web_app(ptb_app: MagicMock, metrics_client: MetricsClient) -> FastAPI:
     )
 
 
-async def test_valid_secret_and_payload_returns_204_and_processes_update(
+async def test_valid_secret_and_payload_returns_204_and_enqueues_update(
     web_app: FastAPI, ptb_app: MagicMock, metrics: MetricAssertions
 ):
     async with build_web_client(web_app) as client:
@@ -40,10 +41,63 @@ async def test_valid_secret_and_payload_returns_204_and_processes_update(
         )
 
     assert response.status_code == 204
-    ptb_app.process_update.assert_awaited_once()
-    forwarded = ptb_app.process_update.await_args.args[0]
+    ptb_app.update_queue.put.assert_awaited_once()
+    forwarded = ptb_app.update_queue.put.await_args.args[0]
     assert isinstance(forwarded, Update)
     assert forwarded.update_id == 1
+    metrics.assert_not_emitted(name=MetricKey.WEBHOOK_FORBIDDEN)
+    metrics.assert_not_emitted(name=MetricKey.WEBHOOK_MALFORMED_UPDATE)
+
+
+async def test_valid_update_returns_204_without_processing_running(
+    web_app: FastAPI, ptb_app: MagicMock, metrics: MetricAssertions
+):
+    # Swap the queue stub for a real asyncio.Queue that nothing drains. If the
+    # response still comes back 204 while the update sits unconsumed in the queue,
+    # the endpoint provably does not await handler processing before responding —
+    # updates are handed off to PTB's out-of-band fetcher, not processed in-request.
+    queue: asyncio.Queue[Update] = asyncio.Queue()
+    ptb_app.update_queue = queue
+
+    async with build_web_client(web_app) as client:
+        response = await client.post(
+            "/telegram",
+            json=VALID_UPDATE_PAYLOAD,
+            headers={TELEGRAM_SECRET_HEADER: SECRET},
+        )
+
+    assert response.status_code == 204
+    # The update was enqueued but never consumed — the 204 did not wait on it.
+    assert queue.qsize() == 1
+    enqueued = queue.get_nowait()
+    assert isinstance(enqueued, Update)
+    assert enqueued.update_id == 1
+    # No direct, in-request processing path (the removed process_update call).
+    ptb_app.process_update.assert_not_called()
+    metrics.assert_not_emitted(name=MetricKey.WEBHOOK_FORBIDDEN)
+    metrics.assert_not_emitted(name=MetricKey.WEBHOOK_MALFORMED_UPDATE)
+
+
+async def test_enqueue_failure_still_returns_204_and_logs(
+    web_app: FastAPI, ptb_app: MagicMock, metrics: MetricAssertions, caplog: pytest.LogCaptureFixture
+):
+    # The endpoint guards update_queue.put: if enqueuing raises (broken event loop,
+    # bad app state), it must still return 204 so Telegram doesn't retry the update
+    # in a tight loop. The failure is logged, not surfaced as an error metric.
+    ptb_app.update_queue.put.side_effect = RuntimeError("event loop is broken")
+
+    with caplog.at_level(logging.ERROR, logger="mitup_bot.web.telegram"):
+        async with build_web_client(web_app) as client:
+            response = await client.post(
+                "/telegram",
+                json=VALID_UPDATE_PAYLOAD,
+                headers={TELEGRAM_SECRET_HEADER: SECRET},
+            )
+
+    assert response.status_code == 204
+    ptb_app.update_queue.put.assert_awaited_once()
+    assert "Failed to enqueue Telegram update" in caplog.text
+    # An enqueue failure is neither a forbidden nor a malformed-payload condition.
     metrics.assert_not_emitted(name=MetricKey.WEBHOOK_FORBIDDEN)
     metrics.assert_not_emitted(name=MetricKey.WEBHOOK_MALFORMED_UPDATE)
 
@@ -55,7 +109,7 @@ async def test_missing_secret_header_returns_403_and_emits_forbidden_metric(
         response = await client.post("/telegram", json=VALID_UPDATE_PAYLOAD)
 
     assert response.status_code == 403
-    ptb_app.process_update.assert_not_called()
+    ptb_app.update_queue.put.assert_not_called()
     metrics.assert_emitted(name=MetricKey.WEBHOOK_FORBIDDEN, value=1)
 
 
@@ -74,7 +128,7 @@ async def test_wrong_secret_same_length_returns_403_and_emits_forbidden_metric(
         )
 
     assert response.status_code == 403
-    ptb_app.process_update.assert_not_called()
+    ptb_app.update_queue.put.assert_not_called()
     metrics.assert_emitted(name=MetricKey.WEBHOOK_FORBIDDEN, value=1)
 
 
@@ -89,7 +143,7 @@ async def test_wrong_secret_different_length_returns_403_and_emits_forbidden_met
         )
 
     assert response.status_code == 403
-    ptb_app.process_update.assert_not_called()
+    ptb_app.update_queue.put.assert_not_called()
     metrics.assert_emitted(name=MetricKey.WEBHOOK_FORBIDDEN, value=1)
 
 
@@ -108,7 +162,7 @@ async def test_malformed_json_body_returns_204_and_emits_malformed_metric(
 
     # Telegram retries on non-2xx — always ack to drop poison pills.
     assert response.status_code == 204
-    ptb_app.process_update.assert_not_called()
+    ptb_app.update_queue.put.assert_not_called()
     metrics.assert_emitted(name=MetricKey.WEBHOOK_MALFORMED_UPDATE, value=1)
 
 
@@ -134,30 +188,5 @@ async def test_valid_json_but_invalid_update_returns_204_and_emits_malformed_met
 
     # Telegram retries on non-2xx — ack even when Update.de_json rejects the payload.
     assert response.status_code == 204
-    ptb_app.process_update.assert_not_called()
+    ptb_app.update_queue.put.assert_not_called()
     metrics.assert_emitted(name=MetricKey.WEBHOOK_MALFORMED_UPDATE, value=1)
-
-
-async def test_process_update_exception_is_logged_and_returns_204(
-    web_app: FastAPI, ptb_app: MagicMock, caplog: pytest.LogCaptureFixture
-):
-    ptb_app.process_update = AsyncMock(side_effect=RuntimeError("handler boom"))
-
-    with caplog.at_level(logging.ERROR, logger="mitup_bot.web.telegram"):
-        async with build_web_client(web_app) as client:
-            response = await client.post(
-                "/telegram",
-                json=VALID_UPDATE_PAYLOAD,
-                headers={TELEGRAM_SECRET_HEADER: SECRET},
-            )
-
-    # Returning 2xx prevents Telegram from retrying a buggy handler in a tight loop.
-    assert response.status_code == 204
-    ptb_app.process_update.assert_awaited_once()
-    error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
-    assert error_records, "Expected an ERROR log when process_update raises"
-    # structlog log.exception(...) renders the event string as the LogRecord message and attaches
-    # the raised exception via exc_info.
-    record = error_records[0]
-    assert record.getMessage() == "Unhandled exception while processing Telegram update"
-    assert record.exc_info is not None and isinstance(record.exc_info[1], RuntimeError)

@@ -14,17 +14,18 @@ from mitup_bot.web import create_app
 def build_ptb_app_mock() -> MagicMock:
     """Build a MagicMock standing in for telegram.ext.Application.
 
-    All lifecycle and dispatch methods used by the web layer are configured as
-    AsyncMock so they can be awaited and inspected. The mock's `bot` attribute
-    also exposes async stubs for the Telegram API calls performed during
-    lifespan setup (currently only `set_webhook`).
+    Lifecycle methods and `update_queue.put` (used by the webhook endpoint to
+    enqueue parsed updates) are configured as AsyncMock so they can be awaited
+    and inspected. The mock's `bot` attribute also exposes async stubs for the
+    Telegram API calls performed during lifespan setup (currently only
+    `set_webhook`).
     """
     ptb_app = MagicMock()
     ptb_app.initialize = AsyncMock()
     ptb_app.start = AsyncMock()
     ptb_app.stop = AsyncMock()
     ptb_app.shutdown = AsyncMock()
-    ptb_app.process_update = AsyncMock()
+    ptb_app.update_queue.put = AsyncMock()
 
     bot = MagicMock()
     bot.set_webhook = AsyncMock()

@@ -70,8 +70,9 @@ async def telegram_webhook(
     metrics_client: Annotated[MetricsClient, Depends(get_metrics_client)],
 ) -> None:
     # Telegram only reads the HTTP status code; it ignores the response body.
-    # We always return 204 (even on parse failures or handler exceptions) so
-    # Telegram doesn't retry poison-pill updates.
+    # We always return 204 (even on parse failures) so Telegram doesn't retry
+    # poison-pill updates. Well-formed updates are handed to PTB's update queue
+    # and processed out of band, so the request returns before processing runs.
     validate_secret(request, secret_token, metrics_client)
 
     body = await request.body()
@@ -86,7 +87,16 @@ async def telegram_webhook(
     if update is None:
         return
 
+    # Enqueue for PTB's update processor rather than calling process_update()
+    # directly. The fetcher task started by Application.start() drains this queue
+    # and applies the concurrent_updates semaphore; a direct call bypasses that
+    # (unbounded concurrency) and holds the request open for the full processing
+    # time, risking Telegram timeout re-delivery. The queue is unbounded, so this
+    # returns immediately; processing failures surface via PTB's error handler.
     try:
-        await ptb_app.process_update(update)
+        await ptb_app.update_queue.put(update)
     except Exception:
-        log.exception("Unhandled exception while processing Telegram update")
+        # Enqueuing an unbounded queue shouldn't raise, but a broken event loop or
+        # app state could. Swallow it so we still return 204 — a non-2xx would make
+        # Telegram retry the update in a tight loop.
+        log.exception("Failed to enqueue Telegram update")
