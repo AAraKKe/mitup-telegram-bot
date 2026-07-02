@@ -10,7 +10,12 @@ from pydantic import ValidationError
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
-from mitup_bot.lambdas.alarm_action import _GITLAB_POST_TIMEOUT_S, GitLabAlertCredentials, handler
+from mitup_bot.lambdas.alarm_action import (
+    _GITLAB_POST_TIMEOUT_S,
+    GitLabAlertCredentials,
+    build_alarm_console_url,
+    handler,
+)
 
 _CREDENTIALS = GitLabAlertCredentials(webhook_url="https://gitlab.example.com/alert", authorization_key="secret-token")
 
@@ -367,5 +372,53 @@ def test_missing_reason_and_timestamp_fall_back(
     handler(event, None)
 
     payload = mock_post.call_args.kwargs["json"]
-    assert payload["description"] == "CloudWatch alarm state changed"  # build_gitlab_payload fallback
+    assert payload["description"].startswith("CloudWatch alarm state changed")  # build_gitlab_payload fallback
+    # The console link is present even on the fallback path.
+    assert payload["alarm_url"] == build_alarm_console_url("eu-west-1", "bot-errors")
+    assert payload["description"].endswith(f"Alarm: {payload['alarm_url']}")
     assert payload["start_time"] is None
+
+
+def test_payload_includes_alarm_console_url(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """The payload carries a CloudWatch console deep link both as alarm_url and inside the
+    description, so the link survives into GitLab's downstream notification fanout."""
+    handler(_metric_alarm_event(), None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    # Derived via build_alarm_console_url so the URL format lives in one place; the format
+    # itself is pinned by test_build_alarm_console_url_encodes_name_and_region below.
+    expected_url = build_alarm_console_url("eu-west-1", "bot-errors")
+    assert payload["alarm_url"] == expected_url
+    assert payload["description"].endswith(f"Alarm: {expected_url}")
+    # The original CloudWatch reason still leads the description.
+    assert payload["description"].startswith("Threshold crossed: 1 datapoint greater than the threshold.")
+
+
+@pytest.mark.parametrize(
+    ("region", "alarm_name", "expected_url"),
+    [
+        (
+            "eu-west-1",
+            "bot-errors",
+            "https://eu-west-1.console.aws.amazon.com/cloudwatch/home?region=eu-west-1#alarmsV2:alarm/bot-errors",
+        ),
+        (
+            "eu-west-1",
+            "My alarm / with spaces",
+            "https://eu-west-1.console.aws.amazon.com/cloudwatch/home"
+            "?region=eu-west-1#alarmsV2:alarm/My%20alarm%20%2F%20with%20spaces",
+        ),
+        (
+            "us-east-1",
+            "error%rate?",
+            "https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#alarmsV2:alarm/error%25rate%3F",
+        ),
+    ],
+)
+def test_build_alarm_console_url_encodes_name_and_region(region: str, alarm_name: str, expected_url: str):
+    """build_alarm_console_url URL-encodes the alarm name (spaces, slashes, percent, query chars)
+    and interpolates the region in both the console hostname and the region query parameter."""
+    assert build_alarm_console_url(region, alarm_name) == expected_url

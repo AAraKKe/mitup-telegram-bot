@@ -23,6 +23,7 @@ LOG_LEVEL : str (optional, default "INFO")
 import json
 import os
 from typing import Any
+from urllib.parse import quote
 
 import boto3
 import httpx
@@ -145,6 +146,14 @@ def extract_metric_namespace(alarm_data: AlarmData) -> str | None:
     return None
 
 
+def build_alarm_console_url(region: str, alarm_name: str) -> str:
+    """Deep link to the alarm's detail page in the CloudWatch console."""
+    return (
+        f"https://{region}.console.aws.amazon.com/cloudwatch/home"
+        f"?region={region}#alarmsV2:alarm/{quote(alarm_name, safe='')}"
+    )
+
+
 def build_gitlab_payload(alarm: AlarmEvent) -> dict[str, Any]:
     """Build a generic GitLab alert payload from the alarm event.
 
@@ -160,7 +169,12 @@ def build_gitlab_payload(alarm: AlarmEvent) -> dict[str, Any]:
     previous_state_value = alarm.alarm_data.previous_state.value if alarm.alarm_data.previous_state else None
 
     severity = "critical" if state.value == "ALARM" else "info"
-    description = state.reason or "CloudWatch alarm state changed"
+    # The console URL goes in two places: alarm_url (clickable in GitLab's alert-details view)
+    # and the description — the only field that reliably survives into GitLab's downstream
+    # Telegram/email notification fanout.
+    alarm_url = build_alarm_console_url(alarm.region, alarm.alarm_data.alarm_name)
+    reason = state.reason or "CloudWatch alarm state changed"
+    description = f"{reason}\n\nAlarm: {alarm_url}"
 
     # Setting end_time on a payload whose fingerprint matches an open GitLab alert
     # triggers GitLab's automatic recovery flow, closing the incident.
@@ -182,6 +196,7 @@ def build_gitlab_payload(alarm: AlarmEvent) -> dict[str, Any]:
         # fingerprint deduplicates re-firings of the same alarm in GitLab.
         "fingerprint": alarm.alarm_arn,
         # Full alarm context so every alert is self-contained and queryable.
+        "alarm_url": alarm_url,
         "alarm_arn": alarm.alarm_arn,
         "region": alarm.region,
         "account_id": alarm.account_id,
