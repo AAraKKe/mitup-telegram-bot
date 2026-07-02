@@ -23,6 +23,7 @@ from mitup_bot.config import (
     RunModes,
     TomlConfigProvider,
 )
+from mitup_bot.update_processor import PerUserUpdateProcessor
 
 
 def _build_config(
@@ -176,6 +177,15 @@ def test_builder_sets_rate_limiter(_patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 
     _patch_runtime_deps.builder_instance.rate_limiter.assert_called_once()
+
+
+def test_builder_sets_per_user_update_processor(_patch_runtime_deps: RuntimeDeps):
+    MitupRuntime(Env.DEV)
+
+    _patch_runtime_deps.builder_instance.concurrent_updates.assert_called_once()
+    (processor,) = _patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
+    assert isinstance(processor, PerUserUpdateProcessor)
+    assert processor.max_concurrent_updates == 1  # MAX_CONCURRENT_UPDATES stays at 1 until #190
 
 
 def test_bind_called_with_built_app(_patch_runtime_deps: RuntimeDeps):

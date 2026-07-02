@@ -11,12 +11,18 @@ from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.logging_config import configure_logging
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.update_processor import PerUserUpdateProcessor
 from mitup_bot.web import create_app
 
 if TYPE_CHECKING:  # pragma: no cover
     from fastapi import FastAPI
 
 log = structlog.get_logger(__name__)
+
+# A cap of 1 keeps update processing observably sequential, exactly as before the custom
+# processor. #190 will replace this constant with a config-driven cap once handlers are
+# safe to overlap across different (user, chat) pairs.
+MAX_CONCURRENT_UPDATES = 1
 
 
 class MitupRuntime:
@@ -60,6 +66,10 @@ class MitupRuntime:
 
         # Set rate limiter
         builder.rate_limiter(AIORateLimiter(max_retries=self.config.bot.retries_on_throttle))
+
+        # Updates sharing a (user, chat) key are serialized by construction; distinct keys may
+        # overlap once the cap rises above 1.
+        builder.concurrent_updates(PerUserUpdateProcessor(MAX_CONCURRENT_UPDATES))
 
         # In webhook mode, FastAPI feeds updates directly into Application.process_update so
         # the built-in Updater is unused. Polling mode keeps the default Updater (we drive it
