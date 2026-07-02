@@ -7,12 +7,21 @@ from mitup_bot import views
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
-from mitup_bot.monitoring import MetricsClient, MetricUnit
+from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
+from mitup_bot.monitoring import Feature, MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.utils import MeetingInviteMessages
+from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
-from tests.helpers import AnyFloat, MockDbSession, UpdateRequest, call_handler, create_meetup, create_user
+from tests.helpers import (
+    AnyFloat,
+    MockDbSession,
+    UpdateRequest,
+    call_handler,
+    create_meetup,
+    create_user,
+    integrity_error,
+)
 from tests.helpers.conversation import ConversationStep, ConversationTester
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions
@@ -262,6 +271,54 @@ async def test_complete_user_invitation(
     assert invited_link.user.first_name == "Bruce Wayne"
     assert invited_link.invited_by is not None
     assert invited_link.invited_by.id == user_with_settings.id
+
+
+async def test_concurrent_duplicate_invitation_is_idempotent_noop(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    conversation: ConversationTester,
+    meeting: Meetup,
+):
+    """When confirming an invitation collides with the (user_id, meetup_id) unique constraint, the
+    handler reports "already joined" and ends the conversation instead of emitting a fault."""
+    setup_db(mock_session, user_with_settings, meeting)
+
+    def _arm_clash():
+        # The confirm step adds the membership row and flushes it inside flush_new_participant's
+        # savepoint; make that flush raise the uniqueness violation as if a concurrent update already
+        # registered the participant.
+        mock_session.flush.side_effect = [integrity_error(JOINED_USERS_UNIQUE_CONSTRAINT), None]
+
+    steps = [
+        ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
+        ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.CONFIRMATION, after=_arm_clash),
+        ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID)),
+    ]
+
+    result = await conversation.run(
+        handler_id=MeetingHandlerId.INVITE_USERS_CONVERSATION,
+        steps=steps,
+    )
+
+    confirm_context = result.last_context
+
+    # The inviter is told the user is already joined, and the conversation ends.
+    confirm_context.api.assert_answer_callback_query_called(
+        update=confirm_context.get_update(),
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user_with_settings.lang),
+        show_alert=True,
+    )
+    assert result.last_state is None
+
+    # The clash is a handled no-op: no success message is edited in, and the conversation data is cleared.
+    confirm_context.api.assert_method_just_called("edit_message", times=0)
+    assert confirm_context.user_data is not None
+    assert len(confirm_context.user_data.registry) == 0
+
+    # No fault emitted (the MEETING_FULL fault branch was not taken) and no membership metric counted.
+    confirm_metrics = MetricAssertions(confirm_context.metrics)
+    confirm_metrics.assert_not_emitted(name=MetricKey.FAULT, value=1.0)
+    confirm_metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
 
 @pytest.mark.parametrize(

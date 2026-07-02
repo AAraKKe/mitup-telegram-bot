@@ -77,11 +77,20 @@ class MockDbSession(mock.MagicMock):
         """
         self.flush.assert_not_called()
 
-    def assert_flushed(self):
+    def assert_flushed(self, times: int | None = None):
         """
-        Asserts that the `flush` method has been called exactly once.
+        Asserts that the `flush` method has been called.
+
+        With no argument, asserts a single flush — the common case. The join path flushes the new
+        membership row inside a savepoint (to catch the joined_users uniqueness clash) before the
+        shared flush that persists the rest of the operation, so those tests assert ``times=2``.
         """
-        self.flush.assert_called_once()
+        if times is None:
+            self.flush.assert_called_once()
+        else:
+            assert self.flush.call_count == times, (
+                f"Expected flush to be called {times} times, called {self.flush.call_count}"
+            )
 
     def assert_refresh(self, *objs: SQLModel):
         """

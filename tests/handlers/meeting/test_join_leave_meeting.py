@@ -4,6 +4,7 @@ from telegram import Update
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Settings, User, utils
+from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingJoinMessages
@@ -16,6 +17,7 @@ from tests.helpers import (
     call_handler,
     create_meetup,
     create_message,
+    integrity_error,
 )
 from tests.helpers.monitoring import MetricAssertions
 
@@ -42,7 +44,8 @@ async def test_existing_user_joins_own_meeting(
     assert len(meeting.joined_links) == 1
     assert meeting.joined_links[0].user == user_with_settings
     assert len(meeting.messages) == 1
-    mock_session.assert_flushed()
+    # Savepoint flush for the new membership row + the shared post-operation flush.
+    mock_session.assert_flushed(times=2)
 
     # We have emited a feature metric for user joined
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
@@ -97,6 +100,56 @@ async def test_user_already_join_does_not_join(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
+async def test_concurrent_duplicate_join_is_idempotent_noop(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A join that slips past the Python fast path but collides with the (user_id, meetup_id) unique
+    constraint is reported as "already joined" — no fault, no double feature metric, and the surrounding
+    work (the Message row) still persists via the shared flush."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+
+    # The user is NOT recorded as joined in the loaded Python state, so the fast path lets the join
+    # through; the clash only surfaces when the savepoint flush hits the DB constraint. The first flush
+    # (inside flush_new_participant's savepoint) raises the uniqueness IntegrityError; the shared
+    # post-op flush succeeds.
+    mock_session.flush.side_effect = [integrity_error(JOINED_USERS_UNIQUE_CONSTRAINT), None]
+
+    assert len(meeting.messages) == 0
+
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
+
+    # The Message row created before the operation is still there — the savepoint rolled back only the
+    # duplicate insert, leaving the outer transaction consistent.
+    assert len(meeting.messages) == 1
+    # Savepoint flush (raised) + shared post-operation flush.
+    mock_session.assert_flushed(times=2)
+
+    # No feature metric for a membership that was not actually inserted, and no fault raised — the
+    # clash is an expected, handled outcome.
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1.0)
+
+    # The user is told they are already joined.
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user_with_settings.lang),
+        show_alert=False,
+    )
+
+    # The surrounding message-update work still runs.
+    context.api.assert_update_meeting_messages_called(
+        session=mock_session,
+        meeting=meeting,
+        current_message=meeting.message_from_update(handler_context.update),
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
 async def test_join_with_existing_message_does_not_create_new_one(
     user_with_settings: User,
     mock_session: MockDbSession,
@@ -125,7 +178,8 @@ async def test_join_with_existing_message_does_not_create_new_one(
 
     # No new message was created — the existing one is reused
     assert len(meeting.messages) == 1
-    mock_session.assert_flushed()
+    # Savepoint flush for the new membership row + the shared post-operation flush.
+    mock_session.assert_flushed(times=2)
 
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 

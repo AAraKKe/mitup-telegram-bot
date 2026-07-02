@@ -10,12 +10,13 @@ from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.utils import MeetingInviteMessages
+from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views.factory import confirmation_view, main_menu_view
 
 from .enums import ConversationInviteState, MeetingHandlerId
+from .utils import flush_new_participant
 
 
 async def handle_invite_from_external_chat(
@@ -238,18 +239,24 @@ async def callback_query_confirm_user_invitation(session: Session, update: Updat
             message = MeetingInviteMessages.MEETING_FULL.get(
                 lang=user.lang, name=invited_user_name, meeting_title=meeting.title
             )
-        else:
-            session.add(joined_link)
-            session.add(invited_user)
+            await context.api.edit_message(update=update, view=meeting.view_for(user).with_context(message=message))
+            context.clean_user_data([ContextId.INVITE_USERS])
+            return ConversationHandler.END
 
-            message = MeetingInviteMessages.SUCCESS.get(
-                lang=user.lang, name=invited_user_name, meeting_title=meeting.title
+        if not flush_new_participant(session, meeting, joined_link, invited_user):
+            # A concurrent update already registered this participant; the joined_users unique
+            # constraint rejected our duplicate. No-op: report the existing membership instead of
+            # emitting a fault, leaving the transaction consistent.
+            await context.api.answer_callback_query(
+                update,
+                text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user.lang),
+                show_alert=True,
             )
+            context.clean_user_data([ContextId.INVITE_USERS])
+            return ConversationHandler.END
 
-        await context.api.edit_message(
-            update=update,
-            view=meeting.view_for(user).with_context(message=message),
-        )
+        message = MeetingInviteMessages.SUCCESS.get(lang=user.lang, name=invited_user_name, meeting_title=meeting.title)
+        await context.api.edit_message(update=update, view=meeting.view_for(user).with_context(message=message))
 
         # Clean the stored data related to the conversation
         context.clean_user_data([ContextId.INVITE_USERS])

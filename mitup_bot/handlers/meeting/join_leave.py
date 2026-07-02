@@ -16,6 +16,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
 
 from .enums import MeetingHandlerId
+from .utils import flush_new_participant
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
@@ -42,19 +43,23 @@ async def user_joins_meeting(
     """
 
     async def join_operation(meeting: Meetup, user: User) -> MeetingJoinMessages:
-        if not user.joined_meeting(meeting.db_id):
-            if (joined_link := meeting.add_participant(user)) is not None:
-                session.add(joined_link)
-                context.put_feature_metric(Feature.JOIN_MEETING)
-                return (
-                    MeetingJoinMessages.JOIN_FULL_WAITING_LIST
-                    if joined_link.is_waiting_list
-                    else MeetingJoinMessages.JOIN_SUCCESS
-                )
-            else:
-                return MeetingJoinMessages.JOIN_FULL
+        if user.joined_meeting(meeting.db_id):
+            return MeetingJoinMessages.JOIN_ALREADY_JOINED
 
-        return MeetingJoinMessages.JOIN_ALREADY_JOINED
+        if (joined_link := meeting.add_participant(user)) is None:
+            return MeetingJoinMessages.JOIN_FULL
+
+        if not flush_new_participant(session, meeting, joined_link):
+            # A concurrent join already created the membership row; the unique constraint on
+            # joined_users rejected our duplicate. Treat it as an idempotent no-op.
+            return MeetingJoinMessages.JOIN_ALREADY_JOINED
+
+        context.put_feature_metric(Feature.JOIN_MEETING)
+        return (
+            MeetingJoinMessages.JOIN_FULL_WAITING_LIST
+            if joined_link.is_waiting_list
+            else MeetingJoinMessages.JOIN_SUCCESS
+        )
 
     await handle_join_leave_operation(session, update, context, user, join_operation, with_notification)
 

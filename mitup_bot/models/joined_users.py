@@ -1,6 +1,7 @@
 import datetime as dt
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from mitup_bot.utils.entities import FormattedText, render
@@ -11,9 +12,14 @@ from .base_model import BaseModel
 if TYPE_CHECKING:  # pragma: no cover
     from . import Meetup, User
 
+# Name of the DB-level uniqueness guard on (user_id, meetup_id). Shared with the handler layer so the
+# IntegrityError raised on a duplicate join can be told apart from any other constraint violation.
+JOINED_USERS_UNIQUE_CONSTRAINT = "uq_joined_users_user_id_meetup_id"
+
 
 class JoinedUsers(BaseModel, SQLModel, table=True):
     __tablename__ = "joined_users"
+    __table_args__ = (UniqueConstraint("user_id", "meetup_id", name=JOINED_USERS_UNIQUE_CONSTRAINT),)
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")

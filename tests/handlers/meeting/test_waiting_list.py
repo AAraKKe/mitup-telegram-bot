@@ -54,7 +54,8 @@ async def test_user_joins_waiting_list_with_full_meeting(
     assert full_meeting.n_participants == (1 if is_full else 2)
     assert full_meeting.n_waiting == (1 if is_full else 0)
 
-    mock_session.assert_flushed()
+    # Savepoint flush for the new membership row + the shared post-operation flush.
+    mock_session.assert_flushed(times=2)
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
