@@ -21,6 +21,10 @@ class AuditStore:
 
     The table is intentionally narrow so we never need to evolve it during cutover; it stores
     the mapping from a Rails primary key to the new-schema primary key plus a status string.
+
+    Statements run on the session's transaction connection (same transaction scope): SQLModel
+    deprecates `Session.execute` in favor of `exec()`, which is typed only for SQLModel selects,
+    not the raw `text()` SQL used here.
     """
 
     def __init__(self, session: Session):
@@ -32,7 +36,7 @@ class AuditStore:
         Only rows with status='inserted' and a non-null new_id participate. Failed and
         skipped rows are deliberately not in the returned mapping so a re-run can retry them.
         """
-        result = self._session.execute(
+        result = self._session.connection().execute(
             text(
                 f"SELECT old_id, new_id FROM {_AUDIT_TABLE} "  # noqa: S608 — table name constant
                 "WHERE table_name = :table AND status = :status AND new_id IS NOT NULL"
@@ -47,14 +51,14 @@ class AuditStore:
         Used to skip rows that we have already considered (whether inserted, skipped, or
         failed) so a re-run only retries previously-failed rows when explicitly asked.
         """
-        result = self._session.execute(
+        result = self._session.connection().execute(
             text(f"SELECT old_id FROM {_AUDIT_TABLE} WHERE table_name = :table"),  # noqa: S608 — constant
             {"table": table},
         )
         return {int(row[0]) for row in result.all()}
 
     def record(self, table: str, old_id: int, *, new_id: int | None, status: AuditStatus, note: str | None = None):
-        self._session.execute(
+        self._session.connection().execute(
             text(
                 f"INSERT INTO {_AUDIT_TABLE} (table_name, old_id, new_id, status, note) "  # noqa: S608 — constant
                 "VALUES (:table, :old_id, :new_id, :status, :note) "
@@ -80,5 +84,5 @@ class AuditStore:
                 "WHERE table_name = :table AND status = :status"
             )
             params = {"table": table, "status": status.value}
-        result = self._session.execute(text(sql), params)
+        result = self._session.connection().execute(text(sql), params)
         return int(result.scalar() or 0)

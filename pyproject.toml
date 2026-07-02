@@ -16,20 +16,20 @@ classifiers = [
 ]
 dependencies = [
     "python-telegram-bot[ext]==22.8",
-    "click==8.4.1",
+    "click==8.4.2",
     "python-dateutil==2.9.0.post0",
     "sqlalchemy==2.0.51",
     "psycopg2==2.9.12",
-    "sqlmodel==0.0.38",
+    "sqlmodel==0.0.39",
     "pydantic==2.13.4",
-    "alembic==1.18.4",
+    "alembic==1.18.5",
     "rich==15.0.0",
     "structlog==26.1.0",
     "tzdata==2026.2",
     "googlemaps==4.10.0",
     "aws-embedded-metrics==3.5.0",
     "pyyaml==6.0.3",
-    "fastapi==0.138.0",
+    "fastapi==0.138.2",
     "uvicorn[standard]==0.49.0",
 ]
 
@@ -191,7 +191,7 @@ dependencies = [
     "pytest-xdist~=3.8.0",
     "pytest-dotenv~=0.5.2",
     "pytest-json-report~=1.5.0",
-    "ty==0.0.51",
+    "ty==0.0.55",
     "freezegun~=1.5.5",
     "ruff==0.15.0",
     "boto3~=1.34",
