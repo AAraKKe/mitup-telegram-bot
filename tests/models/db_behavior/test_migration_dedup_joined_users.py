@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import text
-from sqlmodel import Session, col, select
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 import mitup_bot
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
@@ -38,7 +39,7 @@ DEDUP_SQL = _load_dedup_sql()
 _BASE_TIME = dt.datetime(2020, 1, 1, tzinfo=dt.UTC)
 
 
-def _make_group(db_session: Session, rows: list[tuple[bool, int]]) -> tuple[User, Meetup, list[JoinedUsers]]:
+async def _make_group(db_session: AsyncSession, rows: list[tuple[bool, int]]) -> tuple[User, Meetup, list[JoinedUsers]]:
     """Create a throwaway user + meetup and a set of colliding memberships.
 
     ``rows`` is a list of (is_waiting_list, created_time_offset_hours). Each row is flushed in order so
@@ -55,7 +56,7 @@ def _make_group(db_session: Session, rows: list[tuple[bool, int]]) -> tuple[User
     )
     db_session.add(user)
     db_session.add(meetup)
-    db_session.flush()
+    await db_session.flush()
 
     links: list[JoinedUsers] = []
     for is_waiting_list, offset_hours in rows:
@@ -66,7 +67,7 @@ def _make_group(db_session: Session, rows: list[tuple[bool, int]]) -> tuple[User
             created_time=_BASE_TIME + dt.timedelta(hours=offset_hours),
         )
         db_session.add(link)
-        db_session.flush()
+        await db_session.flush()
         links.append(link)
     return user, meetup, links
 
@@ -83,56 +84,62 @@ def _make_group(db_session: Session, rows: list[tuple[bool, int]]) -> tuple[User
     ],
     ids=["mixed_keeps_oldest_non_waiting", "all_waiting_keeps_oldest", "id_tiebreak_keeps_lowest_id"],
 )
-def test_dedup_keeps_expected_survivor(db_session: Session, rows: list[tuple[bool, int]], survivor_index: int):
+async def test_dedup_keeps_expected_survivor(
+    db_session: AsyncSession, rows: list[tuple[bool, int]], survivor_index: int
+):
     """The migration dedup keeps exactly one row per (user_id, meetup_id), following the
     is_waiting_list ASC, created_time ASC, id ASC ordering."""
-    savepoint = db_session.begin_nested()
+    savepoint = await db_session.begin_nested()
     try:
         # Drop the constraint so duplicates can be inserted, reproducing the pre-migration state.
-        db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(f"ALTER TABLE joined_users DROP CONSTRAINT {JOINED_USERS_UNIQUE_CONSTRAINT}")
         )
-        user, meetup, links = _make_group(db_session, rows)
+        user, meetup, links = await _make_group(db_session, rows)
         expected_survivor_id = links[survivor_index].id
 
-        db_session.exec(text(DEDUP_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
-        db_session.flush()
+        await db_session.exec(text(DEDUP_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.flush()
 
-        remaining = db_session.exec(
-            select(JoinedUsers).where(
-                JoinedUsers.user_id == user.id,
-                JoinedUsers.meetup_id == meetup.id,
+        remaining = (
+            await db_session.exec(
+                select(JoinedUsers).where(
+                    JoinedUsers.user_id == user.id,
+                    JoinedUsers.meetup_id == meetup.id,
+                )
             )
         ).all()
         assert len(remaining) == 1
         assert remaining[0].id == expected_survivor_id
     finally:
-        savepoint.rollback()
+        await savepoint.rollback()
 
 
-def test_dedup_leaves_null_key_rows_untouched(db_session: Session, seed_meetup: Meetup):
+async def test_dedup_leaves_null_key_rows_untouched(db_session: AsyncSession, seed_meetup: Meetup):
     """Rows with a NULL user_id or meetup_id are excluded from the dedup and never deleted, even when
     they look like duplicates of each other."""
-    savepoint = db_session.begin_nested()
+    savepoint = await db_session.begin_nested()
     try:
-        db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(f"ALTER TABLE joined_users DROP CONSTRAINT {JOINED_USERS_UNIQUE_CONSTRAINT}")
         )
         # Two rows sharing (NULL, seed_meetup.id) — indistinguishable to the constraint but NULL-keyed.
         null_links = [JoinedUsers(user_id=None, meetup_id=seed_meetup.id) for _ in range(2)]
         for link in null_links:
             db_session.add(link)
-        db_session.flush()
+        await db_session.flush()
 
-        db_session.exec(text(DEDUP_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
-        db_session.flush()
+        await db_session.exec(text(DEDUP_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.flush()
 
-        remaining = db_session.exec(
-            select(JoinedUsers).where(
-                col(JoinedUsers.user_id).is_(None),
-                JoinedUsers.meetup_id == seed_meetup.id,
+        remaining = (
+            await db_session.exec(
+                select(JoinedUsers).where(
+                    col(JoinedUsers.user_id).is_(None),
+                    JoinedUsers.meetup_id == seed_meetup.id,
+                )
             )
         ).all()
         assert len(remaining) == 2
     finally:
-        savepoint.rollback()
+        await savepoint.rollback()

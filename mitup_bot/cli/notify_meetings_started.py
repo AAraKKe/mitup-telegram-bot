@@ -2,7 +2,8 @@ from asyncio import gather
 from contextlib import contextmanager
 
 import structlog
-from sqlmodel import Session, and_, false, func, null, select, true
+from sqlmodel import and_, false, func, null, select, true
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.error import Forbidden
 
@@ -46,10 +47,10 @@ async def send_started_notification(joined_link: JoinedUsers, api: TelegramApiWr
         await api.send_message_to_user(joined_link.user, view)
 
 
-@db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+@db.with_session
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Send a notification to all participants when a meeting's scheduled time has arrived."""
-    meetings = session.exec(MEETINGS_TO_NOTIFY_STARTED_STATEMENT).all()
+    meetings = (await session.exec(MEETINGS_TO_NOTIFY_STARTED_STATEMENT)).all()
     meetings_processed = 0
     sent = 0
     failed = 0

@@ -41,6 +41,8 @@ class Settings(BaseModel, SQLModel, table=True):
     default_incognito: bool = False
     default_lock_on_start: bool = False
 
+    # Deliberately lazy: no code path traverses `settings.user` (settings are always reached
+    # through the user), so it never triggers a load under the async engine.
     user: User = Relationship(back_populates="settings")
 
     def __hash__(self) -> int:

@@ -4,13 +4,11 @@ icon: material/wrench-outline
 
 # Setup
 
-This guide walks you through setting up your local development environment.
-
 ## Contributor requirements
 
 Mitup is built in Python, deployed in containers on AWS and managed using [Hatch](https://hatch.pypa.io) environments. Contributors must have:
 
-*   A Docker installation (install it from [here](https://www.docker.com/products/docker-desktop/) if you don't have it)
+*   A Docker installation ([Docker Desktop](https://www.docker.com/products/docker-desktop/) works well if you don't have one)
 *   Knowledge of modern Python, including type annotations
 *   A GitLab account
 
@@ -34,37 +32,13 @@ We use [pre-commit](https://pre-commit.com/) to handle validations for each comm
 pipx install pre-commit
 ```
 
-### Gettext and libpq
+### Gettext
 
-While most of the dependencies are handled by Hatch, there are two libraries that need to be installed on your system before you can run Mitup:
+While most of the dependencies are handled by Hatch, [gettext](https://www.gnu.org/software/gettext/) needs to be installed on your system before you can run Mitup. It handles the translation files. Follow the instructions on their site to install it.
 
-*   [gettext](https://www.gnu.org/software/gettext/) is used to handle translation files. Follow the instructions on their site to install it.
-*   [psycopg2](https://www.psycopg.org/docs/install.html#install-from-source) is a Python library that handles PostgreSQL communication and is built as a wrapper around [libpq](https://www.postgresql.org/docs/current/libpq.html), the PostgreSQL client library. It requires building parts of the library from source, which necessitates a C compiler and several additional libraries.
+!!! note "No PostgreSQL client libraries needed"
 
-??? info "Installing Required Libraries"
-    === "MacOS"
-        Simply install `postgresql` from Homebrew. It comes bundled with `libpq`. Installing PostgreSQL doesn't require running a server, but having it available can be useful during the development process in case you need it.
-
-        ```bash
-        brew install postgresql
-        ```
-
-        If you do not want to install PostgreSQL, you can just install the `libpq` client which comes with the necessary headers included.
-
-        ```bash
-        brew install libpq
-        ```
-
-    === "Linux"
-        The `libpq` client library is supported in many Linux distributions. For a Debian-based system, you can run the following commands. You can find instructions online to install this library for any distribution.
-
-        ```bash
-        apt update
-        apt install libpq-dev
-        ```
-
-    === "Windows"
-        We currently do not develop on Windows and lack instructions about how to install the required libraries. We cannot validate any found information as we lack a Windows system for testing. We welcome contributions with instructions for Windows users.
+    Mitup talks to PostgreSQL through [psycopg](https://www.psycopg.org/psycopg3/docs/), pinned with the `binary` extra in [`pyproject.toml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/pyproject.toml). The binary wheels bundle `libpq`, so you don't need a C compiler or a separate PostgreSQL installation.
 
 ### Set up local repository
 

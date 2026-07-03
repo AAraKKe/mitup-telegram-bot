@@ -1,11 +1,11 @@
 from enum import auto
 
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Chat, Update
 from telegram.constants import ChatMemberStatus
 
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
@@ -44,8 +44,8 @@ def is_block_transition(update: Update) -> bool:
 
 
 @HandlersRegistry.register_chat_member(handler_id=ChatMemberHandlerId.MY_CHAT_MEMBER)
-@with_async_session
-async def chat_member_block_handler(session: Session, update: Update, context: TMitupContext) -> None:
+@with_session
+async def chat_member_block_handler(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     # Unblock (BANNED/LEFT → MEMBER) is intentionally NOT handled here. The end of the
     # registration conversation is the only legitimate transition back to MEMBER, and the
     # /start re-onboarding flow treats a LEFT user as a re-onboarding case. Restoring the
@@ -61,7 +61,7 @@ async def chat_member_block_handler(session: Session, update: Update, context: T
         log.warning("Received a my_chat_member update without an effective_user", update=update)
         return
 
-    if (user := User.by_tg_user_id(session, update.effective_user.id)) is None:
+    if (user := await User.by_tg_user_id(session, update.effective_user.id)) is None:
         return
 
     if user.mark_inactive():

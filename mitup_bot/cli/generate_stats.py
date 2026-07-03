@@ -1,4 +1,5 @@
-from sqlmodel import Integer, Session, and_, cast, distinct, func, null, select
+from sqlmodel import Integer, and_, cast, distinct, func, null, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.db import with_session
@@ -10,15 +11,17 @@ EMPTY_USERS_TABLE_ERROR = "EmptyUsersTable"
 EMPTY_MEETINGS_TABLE_ERROR = "EmptyMeetingsTable"
 
 
-def users_stats(session: Session, metrics: MetricsClient):
+async def users_stats(session: AsyncSession, metrics: MetricsClient):
     member_users = func.sum(cast(User.status == UserStatus.MEMBER, Integer))
     left_users = func.sum(cast(User.status == UserStatus.LEFT, Integer))
     joined_only_users = func.sum(cast(and_(User.status == UserStatus.JOINED_ONLY, User.tg_user_id != -1), Integer))
     total_users = func.count()
     invited_users = func.sum(cast(User.tg_user_id == -1, Integer))
-    result = session.exec(
-        select(  # type: ignore no overload for "exec" matches argument types
-            member_users, left_users, joined_only_users, total_users, invited_users
+    result = (
+        await session.exec(
+            select(  # type: ignore no overload for "exec" matches argument types
+                member_users, left_users, joined_only_users, total_users, invited_users
+            )
         )
     ).first()
 
@@ -33,13 +36,13 @@ def users_stats(session: Session, metrics: MetricsClient):
     metrics.emit(MetricKey.FAULT.with_prefix(EMPTY_USERS_TABLE_ERROR), 0, MetricUnit.COUNT)
 
     # Get user language stats
-    user_languages = session.exec(select(Settings.language, func.count()).group_by(Settings.language)).all()
+    user_languages = (await session.exec(select(Settings.language, func.count()).group_by(Settings.language))).all()
 
     for language, count in user_languages:
         metrics.emit(MetricKey.ACTIVE_USERS.with_prefix(language), count, MetricUnit.COUNT)
 
 
-def meetings_stats(session: Session, metrics: MetricsClient):
+async def meetings_stats(session: AsyncSession, metrics: MetricsClient):
     active_meetings = func.sum(cast(Meetup.active, Integer))
     total_meetings = func.count()
     incognito_meetings = func.sum(cast(Meetup.incognito, Integer))
@@ -47,14 +50,16 @@ def meetings_stats(session: Session, metrics: MetricsClient):
     meetings_with_invitation = func.sum(cast(Meetup.allow_invitation, Integer))
     meetings_with_datetime = func.sum(cast(Meetup.datetime != null(), Integer))
 
-    result: tuple[int, int, int, int, int, int] = session.exec(
-        select(  # type: ignore no overload for "exec" matches argument types
-            active_meetings,
-            total_meetings,
-            incognito_meetings,
-            public_meetings,
-            meetings_with_invitation,
-            meetings_with_datetime,
+    result: tuple[int, int, int, int, int, int] = (
+        await session.exec(
+            select(  # type: ignore no overload for "exec" matches argument types
+                active_meetings,
+                total_meetings,
+                incognito_meetings,
+                public_meetings,
+                meetings_with_invitation,
+                meetings_with_datetime,
+            )
         )
     ).first()
 
@@ -74,7 +79,7 @@ def meetings_stats(session: Session, metrics: MetricsClient):
 
     # Get number of shared meetings through inline messages
     shared_meetings = func.count(distinct(Message.meetup_id))
-    count_result = session.exec(select(shared_meetings).where(Message.inline_message_id != null())).first()
+    count_result = (await session.exec(select(shared_meetings).where(Message.inline_message_id != null()))).first()
 
     if count_result is None:
         # It can happen that there are no meetings shared
@@ -84,6 +89,6 @@ def meetings_stats(session: Session, metrics: MetricsClient):
 
 
 @with_session
-def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient):
-    users_stats(session, metrics)
-    meetings_stats(session, metrics)
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
+    await users_stats(session, metrics)
+    await meetings_stats(session, metrics)

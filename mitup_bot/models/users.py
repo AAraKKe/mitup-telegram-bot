@@ -1,9 +1,11 @@
 import datetime as dt
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, Self, overload
+from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 from sqlalchemy import Column, DateTime, FetchedValue, String
-from sqlmodel import Field, Relationship, Session, SQLModel, select
+from sqlalchemy.orm import QueryableAttribute, selectinload
+from sqlmodel import Field, Relationship, SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import ExtBot
 
 from mitup_bot.exceptions import UserNotFound
@@ -47,16 +49,29 @@ class User(BaseModel, SQLModel, table=True):
     )
     last_name: str | None = None
     username: str | None = None
+    # lazy="selectin": `user.lang` is read for virtually every loaded user (including meeting
+    # participants), and implicit lazy loads raise MissingGreenlet under the async engine.
     settings: Settings = Relationship(
         back_populates="user",
         cascade_delete=True,
-        sa_relationship_kwargs={"uselist": False},
+        sa_relationship_kwargs={"uselist": False, "lazy": "selectin"},
     )
-    meetups: list[Meetup] = Relationship(back_populates="owner", cascade_delete=True)
+    # meetups and joined_links deliberately don't eager-load: doing so on every User would
+    # recurse through Meetup.joined_links -> JoinedUsers.user -> User.meetups across the whole
+    # social graph. They are only traversed on the *current* user, so `by_tg_user_id` loads them
+    # explicitly via selectinload options instead (freshly flushed users use session.refresh).
+    # lazy="raise": an unsanctioned unloaded access would otherwise emit a lazy SELECT, which
+    # the async engine turns into a MissingGreenlet in production only. Raising a clear
+    # InvalidRequestError instead makes the bad access deterministic and unit-test-visible.
+    meetups: list[Meetup] = Relationship(
+        back_populates="owner",
+        cascade_delete=True,
+        sa_relationship_kwargs={"lazy": "raise"},
+    )
     joined_links: list[JoinedUsers] = Relationship(
         back_populates="user",
         cascade_delete=True,
-        sa_relationship_kwargs={"foreign_keys": "JoinedUsers.user_id"},
+        sa_relationship_kwargs={"foreign_keys": "JoinedUsers.user_id", "lazy": "raise"},
     )
 
     def __hash__(self) -> int:
@@ -67,16 +82,28 @@ class User(BaseModel, SQLModel, table=True):
 
     @overload
     @classmethod
-    def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: Literal[True]) -> Self: ...
+    async def by_tg_user_id(cls, session: AsyncSession, tg_user_id: int, must_exist: Literal[True]) -> Self: ...
 
     @overload
     @classmethod
-    def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: bool = ...) -> Self | None: ...
+    async def by_tg_user_id(cls, session: AsyncSession, tg_user_id: int, must_exist: bool = ...) -> Self | None: ...
 
     @classmethod
-    def by_tg_user_id(cls, session: Session, tg_user_id: int, must_exist: bool = False) -> Self | None:
-        statement = select(cls).where(cls.tg_user_id == tg_user_id)
-        if (found_user := session.exec(statement).first()) is not None:
+    async def by_tg_user_id(cls, session: AsyncSession, tg_user_id: int, must_exist: bool = False) -> Self | None:
+        # Eagerly load the user's own meetings and memberships: handlers traverse them through
+        # `own_meeting`/`joined_meeting` and the list views, and the async engine cannot lazy-load
+        # on attribute access. Relationship-level selectin loading takes over from there.
+        statement = (
+            select(cls)
+            .where(cls.tg_user_id == tg_user_id)
+            # cast: SQLModel types relationship class attributes as their instance values,
+            # not as the InstrumentedAttribute SQLAlchemy actually puts on the class.
+            .options(
+                selectinload(cast("QueryableAttribute[Any]", cls.meetups)),
+                selectinload(cast("QueryableAttribute[Any]", cls.joined_links)),
+            )
+        )
+        if (found_user := (await session.exec(statement)).first()) is not None:
             return found_user
 
         if must_exist:

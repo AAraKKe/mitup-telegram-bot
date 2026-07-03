@@ -1,12 +1,12 @@
 import datetime as dt
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Message, MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.models import Meetup
@@ -39,11 +39,11 @@ class ValidTitleFilter(filters.MessageFilter):
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CREATE_MEETING_CALLBACK, callback_data=cb.CREATE_MEETING, bindable=False
 )
-@with_async_session
+@with_session
 async def callback_query_create_meeting(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     view = views.factory.create_meeting_view(lang=user.lang, datetime_link=build_datetime_link())
 
     context.store_on_exit(
@@ -62,9 +62,9 @@ async def callback_query_create_meeting(
     ValidTitleFilter(),
     bindable=False,
 )
-@with_async_session
-async def create_meeting_message_handler(session: Session, update: Update, context: TMitupContext) -> int:
-    user = guards.current_user(update, session)
+@with_session
+async def create_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext) -> int:
+    user = await guards.current_user(update, session)
     message = guards.message(update)
     title = message.text
     assert title is not None, "TEXT filter ensures this is set"
@@ -89,7 +89,10 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
         lock_on_start=user.settings.default_lock_on_start,
     )
     session.add(meetup)
-    session.flush()
+    await session.flush()
+    # A freshly flushed instance has never loaded its joined_links collection, and the async
+    # engine cannot lazy-load it when the view renders below — load it explicitly.
+    await session.refresh(meetup, ["joined_links"])
 
     success_message = MeetingCreationMessages.SUCCESS.get(title=meetup.title, lang=user.lang)
     view = meetup.edit_view.with_context(success_message)
@@ -103,11 +106,11 @@ async def create_meeting_message_handler(session: Session, update: Update, conte
     filters.TEXT & ~filters.COMMAND,
     bindable=False,
 )
-@with_async_session
+@with_session
 async def create_meeting_invalid_title_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user.lang)
     view = views.factory.create_meeting_view(lang=user.lang, message=error_msg)
     await context.api.send_message(update=update, view=view)

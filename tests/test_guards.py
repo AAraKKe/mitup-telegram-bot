@@ -4,7 +4,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
 import pytest
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Chat, Message, Update
 
 from mitup_bot.callback_data import CallbackData, MeetingListSource, PaginatedCallbackData
@@ -53,35 +53,35 @@ from tests.helpers.stub_db import MockDbSession
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
-def test_current_user_fails_without_effective_user(mock_session: Session, update: Update):
+async def test_current_user_fails_without_effective_user(mock_session: AsyncSession, update: Update):
     with pytest.raises(EffectiveUserNotSet):
-        current_user(update, mock_session)
+        await current_user(update, mock_session)
 
 
-def test_current_user_fails_if_user_not_in_db(mock_session: MockDbSession, update: Update):
+async def test_current_user_fails_if_user_not_in_db(mock_session: MockDbSession, update: Update):
     with pytest.raises(UserNotFound):
-        current_user(update, mock_session)
+        await current_user(update, mock_session)
 
 
-def test_current_user_succeeds(mock_session: MockDbSession, update: Update, user_with_settings: User):
+async def test_current_user_succeeds(mock_session: MockDbSession, update: Update, user_with_settings: User):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    assert user_with_settings == current_user(update, mock_session)
+    assert user_with_settings == await current_user(update, mock_session)
 
 
-def test_user_language_returns_user_lang(mock_session: MockDbSession, update: Update, user_with_settings: User):
+async def test_user_language_returns_user_lang(mock_session: MockDbSession, update: Update, user_with_settings: User):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    assert user_language(update, mock_session) == user_with_settings.lang
+    assert await user_language(update, mock_session) == user_with_settings.lang
 
 
-def test_user_language_falls_back_for_unknown_user(mock_session: MockDbSession, update: Update):
-    assert user_language(update, mock_session) == TranslationEngine.FALLBACK_LANG
+async def test_user_language_falls_back_for_unknown_user(mock_session: MockDbSession, update: Update):
+    assert await user_language(update, mock_session) == TranslationEngine.FALLBACK_LANG
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
-def test_user_language_falls_back_without_effective_user(mock_session: MockDbSession, update: Update):
-    assert user_language(update, mock_session) == TranslationEngine.FALLBACK_LANG
+async def test_user_language_falls_back_without_effective_user(mock_session: MockDbSession, update: Update):
+    assert await user_language(update, mock_session) == TranslationEngine.FALLBACK_LANG
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(chat=False)], indirect=True)

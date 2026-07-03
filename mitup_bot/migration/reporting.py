@@ -10,7 +10,6 @@ of buffered until the end — every emitted EMF line gets its own timestamp, whi
 what makes progress visible on a dashboard.
 """
 
-import asyncio
 import logging
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -35,17 +34,17 @@ class MetricsFlusher:
         self._flush_every = max(flush_every, 1)
         self._pending = 0
 
-    def tick(self):
+    async def tick(self):
         self._pending += 1
         if self._pending >= self._flush_every:
-            self._flush_now()
+            await self._flush_now()
 
-    def final(self):
+    async def final(self):
         if self._pending > 0:
-            self._flush_now()
+            await self._flush_now()
 
-    def _flush_now(self):
-        asyncio.run(self._metrics.flush())
+    async def _flush_now(self):
+        await self._metrics.flush()
         self._pending = 0
 
 
@@ -65,7 +64,7 @@ class MigrationReporter:
         self._console = console
         self._flusher = flusher
 
-    def phase_start(self, phase: str, table: str):
+    async def phase_start(self, phase: str, table: str):
         label = f"{phase} → {table}" if phase != table else phase
         if self._mode is OutputMode.CONSOLE:
             self._require_console().rule(f"[bold cyan]Phase: {label}[/]")
@@ -73,21 +72,21 @@ class MigrationReporter:
             _LOG.info("=== Phase: %s ===", label)
         # Phase boundary: flush whatever has accumulated so the new phase's metrics start
         # on a fresh timeline point.
-        self._final_flush()
+        await self._final_flush()
 
-    def row_inserted(self, table: str, old_id: int, new_id: int):
+    async def row_inserted(self, table: str, old_id: int, new_id: int):
         self._emit_row("✔", "green", table, old_id, f"inserted → new_id={new_id}")
-        self._tick()
+        await self._tick()
 
-    def row_skipped(self, table: str, old_id: int, reason: str):
+    async def row_skipped(self, table: str, old_id: int, reason: str):
         self._emit_row("✘", "yellow", table, old_id, f"skipped: {reason}")
-        self._tick()
+        await self._tick()
 
-    def row_failed(self, table: str, old_id: int, error: str):
+    async def row_failed(self, table: str, old_id: int, error: str):
         self._emit_row("✘", "red", table, old_id, f"failed: {error}")
-        self._tick()
+        await self._tick()
 
-    def phase_end(self, summary: PhaseSummary):
+    async def phase_end(self, summary: PhaseSummary):
         text = (
             f"{summary.table}: read={summary.read} inserted={summary.inserted} "
             f"skipped={summary.skipped} failed={summary.failed} duration_ms={summary.duration_ms}"
@@ -96,17 +95,17 @@ class MigrationReporter:
             self._require_console().print(f"[bold]{text}[/]")
         else:
             _LOG.info(text)
-        self._final_flush()
+        await self._final_flush()
 
-    def archive_table(self, table: str, rows: int, bytes_written: int):
+    async def archive_table(self, table: str, rows: int, bytes_written: int):
         text = f"archive:{table} rows={rows} bytes={bytes_written}"
         if self._mode is OutputMode.CONSOLE:
             self._require_console().print(f"[green]✔[/] {text}")
         else:
             _LOG.info("✔ %s", text)
-        self._tick()
+        await self._tick()
 
-    def verification(self, deltas: dict[str, int]):
+    async def verification(self, deltas: dict[str, int]):
         if self._mode is OutputMode.CONSOLE:
             console = self._require_console()
             console.rule("[bold cyan]Phase: verify[/]")
@@ -118,15 +117,15 @@ class MigrationReporter:
             for table, delta in deltas.items():
                 mark = "✔" if delta == 0 else "✘"
                 _LOG.info("%s %s: delta=%d", mark, table, delta)
-        self._final_flush()
+        await self._final_flush()
 
-    def _tick(self):
+    async def _tick(self):
         if self._flusher is not None:
-            self._flusher.tick()
+            await self._flusher.tick()
 
-    def _final_flush(self):
+    async def _final_flush(self):
         if self._flusher is not None:
-            self._flusher.final()
+            await self._flusher.final()
 
     def _emit_row(self, symbol: str, colour: str, table: str, old_id: int, message: str):
         if self._mode is OutputMode.CONSOLE:

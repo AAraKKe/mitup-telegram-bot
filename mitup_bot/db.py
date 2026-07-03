@@ -1,17 +1,18 @@
+import functools
 from collections import Counter
-from collections.abc import Callable, Coroutine, Generator
-from contextlib import contextmanager, suppress
+from collections.abc import AsyncGenerator, Callable, Coroutine
+from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
-from typing import Any, Concatenate, Protocol
+from typing import Any, Concatenate
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import sessionmaker
-from sqlmodel import Session, create_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.config import DbConfig
 from mitup_bot.models import MeetupLocation, MessageButtons
 
-__sessionmaker: sessionmaker[Session] | None = None
+__sessionmaker: async_sessionmaker[AsyncSession] | None = None
 __connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")
 __active_connections: Counter[str] = Counter()
 
@@ -24,10 +25,6 @@ class DbNotInitializedError(RuntimeError):
 class DbAlreadyInitializedError(RuntimeError):
     def __init__(self):
         super().__init__("Database has already been configured.")
-
-
-class SessionDecorableCallback(Protocol):
-    def __call__(self, *args: Any | None, db_session: Session, **kwargs: Any | None) -> Any: ...
 
 
 def serialize_pydantic_model(model: BaseModel) -> str:
@@ -62,25 +59,32 @@ def configure_db(db_config: DbConfig, skip_if_initialized: bool = False) -> None
     if __sessionmaker is not None and not skip_if_initialized:
         raise DbAlreadyInitializedError()
 
-    engine = create_engine(
+    engine = create_async_engine(
         db_config.full_url,
         echo=db_config.engine_echo,
         json_serializer=serialize_pydantic_model,
         json_deserializer=deserialize_pydantic_model,
+        pool_size=db_config.pool_size,
+        max_overflow=db_config.max_overflow,
+        pool_timeout=db_config.pool_timeout,
     )
-    __sessionmaker = sessionmaker(bind=engine, class_=Session)
+    # expire_on_commit=False: nothing reads ORM objects after the transaction commits, and
+    # expired attributes would otherwise trigger implicit (greenlet-unsafe) loads on access.
+    __sessionmaker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 
-@contextmanager
-def begin() -> Generator[Session]:
+@asynccontextmanager
+async def begin() -> AsyncGenerator[AsyncSession]:
     if __sessionmaker is None:
         raise DbNotInitializedError()
 
-    with __sessionmaker() as session:
+    async with __sessionmaker() as session:
         context = __connection_context.get()
+        # Single-threaded event loop and no await between read and write, so the
+        # increment/decrement pairs cannot interleave.
         __active_connections[context] += 1
         try:
-            with session.begin():
+            async with session.begin():
                 # Anything in here is considered to be in a transaction
                 # Any fault raised when this context is handled will trigger a rollback
                 # in the ongoing transaction
@@ -89,53 +93,19 @@ def begin() -> Generator[Session]:
             __active_connections[context] -= 1
 
 
-def with_session[**P, R](func: Callable[Concatenate[Session, P], R]) -> Callable[P, R]:
-    """
-    Decorator that wraps a method in a database transaction. The decorated function must define
-    as its first argument a `session: Session` parameter where the open session will be injected.
-
-    Args:
-        func: The method to be wrapped.
-
-    Returns:
-        The wrapped method.
-
-    Examples:
-        >>> @with_transaction
-        ... def wrapper(session: Session, *args, **kwargs):
-        ...     # Perform actions within a database transaction
-        ...     pass
-    """
-
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        with begin() as session:
-            return func(session, *args, **kwargs)
-
-    return wrapper
-
-
-def with_async_session[**P, R](
-    func: Callable[Concatenate[Session, P], Coroutine[Any, Any, R]],
+def with_session[**P, R](
+    func: Callable[Concatenate[AsyncSession, P], Coroutine[Any, Any, R]],
 ) -> Callable[P, Coroutine[Any, Any, R]]:
-    """
-    Decorator that wraps an async method in a database transaction. The decorated function must define
-    as its first argument a `session: Session` parameter where the open session will be injected.
+    """Wrap an async function in a database transaction, injecting the open `AsyncSession`
+    as its first positional argument. Commits on clean return, rolls back on exception.
 
-    Args:
-        func: The async method to be wrapped.
-
-    Returns:
-        The wrapped async method.
-
-    Examples:
-        >>> @with_async_session
-        ... async def wrapper(session: Session, *args, **kwargs):
-        ...     # Perform actions within a database transaction
-        ...     pass
+    >>> @with_session
+    ... async def handler(session: AsyncSession, *args, **kwargs): ...
     """
 
+    @functools.wraps(func)
     async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        with begin() as session:
+        async with begin() as session:
             return await func(session, *args, **kwargs)
 
     return async_wrapper

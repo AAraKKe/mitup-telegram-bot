@@ -1,8 +1,8 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 
@@ -14,13 +14,13 @@ from .utils import meeting_detail_back_button, meeting_list_button
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.SHOW_MEETING_CALLBACK, callback_data=cb.SHOW_MEETING, bindable=True
 )
-@with_async_session
-async def callback_query_show_meeting(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_query_show_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_paginated_callback_data(
         cb.SHOW_MEETING.parse(context.match), MeetingHandlerId.SHOW_MEETING_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     meeting = await guards.meeting_viewable(
         session,
         user,

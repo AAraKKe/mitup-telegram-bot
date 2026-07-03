@@ -1,10 +1,10 @@
 from collections.abc import Awaitable, Callable
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, Message, User, utils
@@ -20,8 +20,8 @@ from .utils import flush_new_participant
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
-@with_async_session
-async def join_meetup(session: Session, update: Update, context: TMitupContext) -> None:
+@with_session
+async def join_meetup(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     """
     Handle the join action when clicked on a meeting. This action can be clicked by any user
     to whom the meeting has been shared to.
@@ -29,14 +29,14 @@ async def join_meetup(session: Session, update: Update, context: TMitupContext) 
     If the user is not registered we should ask the user to register by opening a chat with the bot first.
     """
     try:
-        user = guards.current_user(update, session)
+        user = await guards.current_user(update, session)
         await user_joins_meeting(session, update, context, user)
     except UserNotFound:
         await handle_non_existing_user_join(session, update, context)
 
 
 async def user_joins_meeting(
-    session: Session, update: Update, context: TMitupContext, user: User, with_notification: bool = True
+    session: AsyncSession, update: Update, context: TMitupContext, user: User, with_notification: bool = True
 ):
     """
     The provided user joins the meeting.
@@ -49,7 +49,7 @@ async def user_joins_meeting(
         if (joined_link := meeting.add_participant(user)) is None:
             return MeetingJoinMessages.JOIN_FULL
 
-        if not flush_new_participant(session, meeting, joined_link):
+        if not await flush_new_participant(session, meeting, joined_link):
             # A concurrent join already created the membership row; the unique constraint on
             # joined_users rejected our duplicate. Treat it as an idempotent no-op.
             return MeetingJoinMessages.JOIN_ALREADY_JOINED
@@ -64,7 +64,7 @@ async def user_joins_meeting(
     await handle_join_leave_operation(session, update, context, user, join_operation, with_notification)
 
 
-def register_default_user(session: Session, update: Update) -> User:
+async def register_default_user(session: AsyncSession, update: Update) -> User:
     """
     Register the user with default values.
     """
@@ -73,17 +73,21 @@ def register_default_user(session: Session, update: Update) -> User:
 
     new_user = utils.user_from_update(update, status=UserStatus.JOINED_ONLY)
     session.add(new_user)
-    session.flush()
+    await session.flush()
+    # The join/leave paths read the new user's collections right away (joined_meeting, and
+    # own_meeting via Message.from_update); a freshly flushed instance has never loaded them
+    # and User marks both lazy="raise", so load them explicitly.
+    await session.refresh(new_user, ["joined_links", "meetups"])
 
     return new_user
 
 
-async def handle_non_existing_user_join(session: Session, update: Update, context: TMitupContext):
+async def handle_non_existing_user_join(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the case when a user tries to join a meeting but is not registered with the bot.
     We should ask the user to open a chat with the bot first to register.
     """
-    user = register_default_user(session, update)
+    user = await register_default_user(session, update)
     await user_joins_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
@@ -93,22 +97,22 @@ async def handle_non_existing_user_join(session: Session, update: Update, contex
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
-@with_async_session
-async def leave_meetup(session: Session, update: Update, context: TMitupContext) -> None:
+@with_session
+async def leave_meetup(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     """
     Handle the leave action when clicked on a meeting. This action can be clicked by any user
     who has already joined the meeting. If the user is not registered we should ask the user
     to register by opening a chat with the bot first.
     """
     try:
-        user = guards.current_user(update, session)
+        user = await guards.current_user(update, session)
         await user_leaves_meeting(session, update, context, user)
     except UserNotFound:
         await handle_non_existing_user_leave(session, update, context)
 
 
 async def user_leaves_meeting(
-    session: Session, update: Update, context: TMitupContext, user: User, with_notification: bool = True
+    session: AsyncSession, update: Update, context: TMitupContext, user: User, with_notification: bool = True
 ):
     async def leave_operation(meeting: Meetup, user: User) -> MeetingJoinMessages:
         if joined_link := meeting.participant(user.db_id):
@@ -127,12 +131,12 @@ async def user_leaves_meeting(
     await handle_join_leave_operation(session, update, context, user, leave_operation, with_notification)
 
 
-async def handle_non_existing_user_leave(session: Session, update: Update, context: TMitupContext):
+async def handle_non_existing_user_leave(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the case when a user tries to leave a meeting but is not registered with the bot.
     We should ask the user to open a chat with the bot first to register.
     """
-    user = register_default_user(session, update)
+    user = await register_default_user(session, update)
     await user_leaves_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
@@ -142,7 +146,7 @@ async def handle_non_existing_user_leave(session: Session, update: Update, conte
 
 
 async def handle_join_leave_operation(
-    session: Session,
+    session: AsyncSession,
     update: Update,
     context: TMitupContext,
     user: User,
@@ -151,7 +155,7 @@ async def handle_join_leave_operation(
 ):
     """Handle common infrastructure for meeting operations (join/leave)."""
     data = guards.valid_callback_data(cb.JOIN.parse(context.match), MeetingHandlerId.JOIN)
-    if meeting := Meetup.by_id(session, data.id):
+    if meeting := await Meetup.by_id(session, data.id):
         if not meeting.active:
             await context.api.edit_message(
                 update=update,
@@ -185,7 +189,7 @@ async def handle_join_leave_operation(
                 show_alert=False,
             )
 
-        session.flush()
+        await session.flush()
 
         await context.api.update_meeting_messages(session=session, meeting=meeting, current_message=current_message)
     else:

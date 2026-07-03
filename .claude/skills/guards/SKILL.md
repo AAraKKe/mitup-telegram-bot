@@ -19,10 +19,13 @@ Guards live in `mitup_bot/guards.py`. They validate handler inputs and raise dom
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
 | `current_user` | `(update, session)` | `User` | `UserNotFound` (caught by global error handler) |
+| `member_user` | `(update, session)` | `User \| None` (only when status is MEMBER) | — |
 | `user_language` | `(update, session)` | `str` (lang code or fallback) | — |
 | `user_registered` | `(update, session, context, alert_message)` | `User \| None` | — (answers callback query with alert) |
 
-Use `current_user` for all handlers that require an authenticated user. Use `user_registered` only when an unauthenticated user is a valid, non-fatal case (e.g. inline query handlers).
+Use `current_user` for all handlers that require an authenticated user. Use `user_registered` only when an unauthenticated user is a valid, non-fatal case (e.g. inline query handlers). `member_user` gates `/start` routing between the member flow and re-onboarding.
+
+All guards that take a `session` are async — `await` them.
 
 ### Message and query access
 
@@ -65,10 +68,10 @@ Use `meeting_viewable` for handlers that only need to **display** a meeting the 
 
 ```python
 @HandlersRegistry.register_callback_query(MyHandlerId.SHOW, callback_data=cb.MY_CALLBACK)
-@with_async_session
-async def show(session: Session, update: Update, context: TMitupContext) -> None:
+@with_session
+async def show(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     meeting_id = guards.valid_callback_data(cb.MY_CALLBACK.parse(context.match), MyHandlerId.SHOW).id
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     meeting = await guards.meeting_accessible(session, user, meeting_id, "show meeting", update, context)
     if meeting is None:
         return

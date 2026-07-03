@@ -1,11 +1,11 @@
 from enum import auto
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
@@ -19,9 +19,9 @@ class MessagesId(HandlerId):
 
 
 @HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT | filters.COMMAND, bindable=False)
-@with_async_session
-async def filter_messages_without_text(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def filter_messages_without_text(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
 
     if on_exit := context.get_active_on_exit():
         view = factory.conversation_interrupted_view(

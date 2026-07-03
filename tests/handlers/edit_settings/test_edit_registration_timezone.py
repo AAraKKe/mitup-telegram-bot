@@ -17,7 +17,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import RegistrationMessages
 from mitup_bot.views import factory
-from tests.helpers import StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import StubMitupContext, UpdateRequest, call_handler, claimed_state
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -102,7 +102,7 @@ async def test_registration_timezone_with_location_update_correctly(
     assert update.effective_message is not None
     assert user_with_settings.settings.timezone != "Europe/Dublin"
 
-    result = await registration_timezone_location_message_handler(update, context)
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Dublin")
     view = factory.main_menu_view(lang=user_with_settings.lang).with_context(message)
@@ -129,7 +129,7 @@ async def test_registration_timezone_message_handler_log_excludes_coordinates(
 
     assert update.effective_message is not None
 
-    result = await registration_timezone_location_message_handler(update, context)
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     # Issue #161: the warning must not leak the user's GPS coordinates.
     assert "123.6" not in caplog.text  # latitude

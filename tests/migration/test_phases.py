@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -52,7 +52,7 @@ def _make_metrics() -> tuple[MetricsClient, MetricAssertions]:
 
 
 def _make_session_with_zero_counts() -> MagicMock:
-    """Return a Session-shaped mock whose `exec().first()` always returns 0.
+    """Return a session-shaped mock whose `(await exec()).first()` always returns 0.
 
     `verify` runs `SELECT COUNT(*)` queries against the new DB; tests don't care about
     actual rows, only that the delta metric is emitted.
@@ -61,11 +61,11 @@ def _make_session_with_zero_counts() -> MagicMock:
     exec_result = MagicMock()
     exec_result.first.return_value = 0
     exec_result.all.return_value = []
-    session.exec.return_value = exec_result
+    session.exec = AsyncMock(return_value=exec_result)
     return session
 
 
-def test_run_migration_verify_phase_only_calls_verify():
+async def test_run_migration_verify_phase_only_calls_verify():
     session = _make_session_with_zero_counts()
     reader = _StubRailsReader(
         counts={"users": 3, "meetups": 1, "messages": 0, "user_join_meetups": 2, "user_waiting_lists": 0}
@@ -73,7 +73,7 @@ def test_run_migration_verify_phase_only_calls_verify():
     writer = ArchiveWriter(s3_uri=None, dry_run=True, s3_client=MagicMock())
     metrics, assertions = _make_metrics()
 
-    report = run_migration(
+    report = await run_migration(
         session=session,
         reader=cast(RailsReader, reader),
         archive_writer=writer,
@@ -88,7 +88,7 @@ def test_run_migration_verify_phase_only_calls_verify():
     assert report["archive"] == {}
     assert report["verification"] == {"users": 3, "meetups": 1, "messages": 0, "joined_users": 2}
 
-    # Verification delta metric emitted once per Rails table tracked by verify().
+    # Verification delta metric emitted once per Rails table tracked by (await verify()).
     for table, delta in (("users", 3), ("meetups", 1), ("messages", 0), ("joined_users", 2)):
         assertions.assert_emitted(
             name=MetricKey.MIGRATION_VERIFICATION_DELTA,
@@ -102,7 +102,7 @@ def test_run_migration_verify_phase_only_calls_verify():
     assertions.assert_not_emitted(name=MetricKey.MIGRATION_ARCHIVE_ROWS)
 
 
-def test_run_migration_archive_phase_only_calls_archive():
+async def test_run_migration_archive_phase_only_calls_archive():
     session = _make_session_with_zero_counts()
     # Archive iterates ARCHIVED_TABLES = ("support_messages", "payments", "shared_meetups", "chats").
     reader = _StubRailsReader(
@@ -116,7 +116,7 @@ def test_run_migration_archive_phase_only_calls_archive():
     writer = ArchiveWriter(s3_uri="s3://bucket/prefix/", dry_run=True, s3_client=MagicMock())
     metrics, assertions = _make_metrics()
 
-    report = run_migration(
+    report = await run_migration(
         session=session,
         reader=cast(RailsReader, reader),
         archive_writer=writer,
@@ -142,7 +142,7 @@ def test_run_migration_archive_phase_only_calls_archive():
             dimensions={"mode": str(MigrationMode.DRY_RUN), "table": table},
         )
 
-    # verify() is not invoked → no verification-delta metric.
+    # await verify() is not invoked → no verification-delta metric.
     assertions.assert_not_emitted(name=MetricKey.MIGRATION_VERIFICATION_DELTA)
     # No row-read metric for the user phase (only archive ran).
     assertions.assert_not_emitted(
@@ -151,14 +151,14 @@ def test_run_migration_archive_phase_only_calls_archive():
     )
 
 
-def test_run_migration_unknown_phase_raises_value_error():
+async def test_run_migration_unknown_phase_raises_value_error():
     session = _make_session_with_zero_counts()
     reader = _StubRailsReader()
     writer = ArchiveWriter(s3_uri=None, dry_run=True, s3_client=MagicMock())
     metrics = make_test_metrics_client()
 
     with pytest.raises(ValueError, match="Unknown phase"):
-        run_migration(
+        await run_migration(
             session=session,
             reader=cast(RailsReader, reader),
             archive_writer=writer,

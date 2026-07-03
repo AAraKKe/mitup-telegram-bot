@@ -25,7 +25,7 @@ async def test_no_inactive_users(mock_session: MockDbSession, metrics_client: Me
     api = MagicMock()
 
     # No users registered — select returns empty result (default behavior)
-    user_cleanup.run(api, metrics_client)
+    await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
     # Delete statement still executes but with empty set
@@ -48,7 +48,7 @@ async def test_inactive_users_deleted(
     # Register select result — returns user IDs
     mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive_1.id, inactive_2.id))  # ty: ignore[invalid-argument-type]  # https://github.com/astral-sh/ty/issues/2839
 
-    user_cleanup.run(api, metrics_client)
+    await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
     # Two exec calls: select + delete
@@ -60,7 +60,7 @@ async def test_inactive_users_deleted(
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=2, unit=MetricUnit.COUNT)
 
 
-def test_select_query_filters_correctly(mock_session: MockDbSession):
+async def test_select_query_filters_correctly(mock_session: MockDbSession):
     """Verify the SQL query selects LEFT users excluding invited ones (tg_user_id != -1).
 
     JOINED_ONLY users are intentionally NOT in this query — they are cleaned up by
@@ -69,7 +69,7 @@ def test_select_query_filters_correctly(mock_session: MockDbSession):
     api = MagicMock()
     client = make_test_metrics_client()
 
-    user_cleanup.run(api, client)
+    await user_cleanup.run(api, client)
 
     expected_query = mock_session.normalize_query(
         str(
@@ -97,7 +97,7 @@ async def test_joined_only_users_not_targeted(
     # JOINED_ONLY row existed, the select would not return it.
     mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, ())
 
-    user_cleanup.run(api, metrics_client)
+    await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
     # Empty IDs → empty IN clause; the JOINED_ONLY user is never targeted.

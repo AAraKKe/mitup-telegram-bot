@@ -1,9 +1,10 @@
+from contextlib import suppress
 from enum import Enum, auto
 from unittest import mock
 
 import pytest
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler
+from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
@@ -216,7 +217,10 @@ async def test_all_handlers_emit_global_metrics(app: StubMitupApp, update: Updat
         valid_handlers += 1
 
         handler_context = build_context(update, app, metrics=shared_client)
-        await wrapper.handler.handle_update(update, app, check_state, handler_context)
+        # Handlers that claim their update raise ApplicationHandlerStop after emitting
+        # the same TIME/FAULT metrics, so absorbing it keeps the counts intact.
+        with suppress(ApplicationHandlerStop):
+            await wrapper.handler.handle_update(update, app, check_state, handler_context)
 
     # All handlers have emitted the global TIME and FAULT metrics.
     # emit_global=True means 2 records per handler per metric (with + without handler dims).

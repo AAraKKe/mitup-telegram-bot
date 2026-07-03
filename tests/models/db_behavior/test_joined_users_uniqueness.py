@@ -1,45 +1,46 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, col, select
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 
 pytestmark = pytest.mark.db_test
 
 
-def test_duplicate_membership_is_rejected(
-    db_session: Session, seed_joined_link: JoinedUsers, seed_second_user: User, seed_meetup: Meetup
+async def test_duplicate_membership_is_rejected(
+    db_session: AsyncSession, seed_joined_link: JoinedUsers, seed_second_user: User, seed_meetup: Meetup
 ):
     """A second row with the same (user_id, meetup_id) as an existing membership violates
     the uq_joined_users_user_id_meetup_id constraint."""
-    savepoint = db_session.begin_nested()
+    savepoint = await db_session.begin_nested()
     try:
         with pytest.raises(IntegrityError):
             db_session.add(JoinedUsers(user_id=seed_second_user.id, meetup_id=seed_meetup.id))
-            db_session.flush()
+            await db_session.flush()
     finally:
-        savepoint.rollback()
+        await savepoint.rollback()
 
 
-def test_distinct_user_same_meetup_is_allowed(
-    db_session: Session, seed_joined_link: JoinedUsers, seed_user: User, seed_meetup: Meetup
+async def test_distinct_user_same_meetup_is_allowed(
+    db_session: AsyncSession, seed_joined_link: JoinedUsers, seed_user: User, seed_meetup: Meetup
 ):
     """A different user joining the same meetup does not collide — the constraint is on the pair."""
-    savepoint = db_session.begin_nested()
+    savepoint = await db_session.begin_nested()
     try:
         link = JoinedUsers(user_id=seed_user.id, meetup_id=seed_meetup.id)
         db_session.add(link)
-        db_session.flush()
+        await db_session.flush()
         assert link.id is not None
     finally:
-        savepoint.rollback()
+        await savepoint.rollback()
 
 
-def test_same_user_distinct_meetup_is_allowed(
-    db_session: Session, seed_joined_link: JoinedUsers, seed_second_user: User, seed_user: User
+async def test_same_user_distinct_meetup_is_allowed(
+    db_session: AsyncSession, seed_joined_link: JoinedUsers, seed_second_user: User, seed_user: User
 ):
     """The same user joining a different meetup does not collide."""
-    savepoint = db_session.begin_nested()
+    savepoint = await db_session.begin_nested()
     try:
         other_meetup = Meetup(
             title="Uniqueness Other Meetup",
@@ -50,26 +51,26 @@ def test_same_user_distinct_meetup_is_allowed(
             owner=seed_user,
         )
         db_session.add(other_meetup)
-        db_session.flush()
+        await db_session.flush()
 
         link = JoinedUsers(user_id=seed_second_user.id, meetup_id=other_meetup.id)
         db_session.add(link)
-        db_session.flush()
+        await db_session.flush()
         assert link.id is not None
     finally:
-        savepoint.rollback()
+        await savepoint.rollback()
 
 
 @pytest.mark.parametrize("null_column", ["user_id", "meetup_id"], ids=["null_user_id", "null_meetup_id"])
-def test_null_key_rows_coexist(db_session: Session, seed_meetup: Meetup, null_column: str):
+async def test_null_key_rows_coexist(db_session: AsyncSession, seed_meetup: Meetup, null_column: str):
     """Postgres treats NULLs as distinct, so rows with a NULL user_id or meetup_id never collide,
     even when the other key is identical."""
     # Throwaway user in the 998 range to avoid colliding with session-scoped seed data.
     throwaway_user = User(first_name="Null Key Probe", tg_user_id=998_010, settings=Settings())
     db_session.add(throwaway_user)
-    db_session.flush()
+    await db_session.flush()
 
-    savepoint = db_session.begin_nested()
+    savepoint = await db_session.begin_nested()
     try:
         # Filter on the exact probe pair so the count is insensitive to any pre-existing NULL-key rows.
         if null_column == "user_id":
@@ -79,14 +80,14 @@ def test_null_key_rows_coexist(db_session: Session, seed_meetup: Meetup, null_co
             probe_filter = (col(JoinedUsers.meetup_id).is_(None), JoinedUsers.user_id == throwaway_user.id)
             new_rows = [JoinedUsers(user_id=throwaway_user.id, meetup_id=None) for _ in range(2)]
 
-        before = len(db_session.exec(select(JoinedUsers).where(*probe_filter)).all())
+        before = len((await db_session.exec(select(JoinedUsers).where(*probe_filter))).all())
         for row in new_rows:
             db_session.add(row)
-        db_session.flush()
+        await db_session.flush()
 
-        after = len(db_session.exec(select(JoinedUsers).where(*probe_filter)).all())
+        after = len((await db_session.exec(select(JoinedUsers).where(*probe_filter))).all())
         assert after == before + 2
     finally:
-        savepoint.rollback()
-        db_session.delete(throwaway_user)
-        db_session.flush()
+        await savepoint.rollback()
+        await db_session.delete(throwaway_user)
+        await db_session.flush()

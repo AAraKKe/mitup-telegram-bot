@@ -1,12 +1,12 @@
 import re
 from asyncio import gather
 from collections.abc import Callable, Generator, Sequence
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol
 
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import (
     InlineQueryResultArticle,
     InlineQueryResultsButton,
@@ -102,9 +102,9 @@ def build_api(adapter_or_bot: ContextOrBotAdapter | ExtBot) -> TelegramApiWrappe
     return api
 
 
-@contextmanager
-def handle_edit_errors(
-    adapter: ContextOrBotAdapter, message: MessageModel | None = None, session: Session | None = None
+@asynccontextmanager
+async def handle_edit_errors(
+    adapter: ContextOrBotAdapter, message: MessageModel | None = None, session: AsyncSession | None = None
 ):
     try:
         yield
@@ -118,7 +118,7 @@ def handle_edit_errors(
         if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
             if session and message:
                 log.info("Message is invalid, deleting it", message_id=message.message_id)
-                session.delete(message)
+                await session.delete(message)
             adapter.emit_metric(MetricKey.MESSAGE_DELETED)
             return
         raise
@@ -158,7 +158,7 @@ class TelegramApiWrapper(Protocol):
     async def update_single_meeting_message(
         self,
         message: MessageModel,
-        session: Session,
+        session: AsyncSession,
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
@@ -166,7 +166,7 @@ class TelegramApiWrapper(Protocol):
     async def update_meeting_messages(
         self,
         *,
-        session: Session,
+        session: AsyncSession,
         meeting: Meetup,
         current_message: MessageModel | None = None,
         skip_current: bool = False,
@@ -305,7 +305,7 @@ class TelegramApi:
             raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            with handle_edit_errors(adapter=self.adapter):
+            async with handle_edit_errors(adapter=self.adapter):
                 return await self.adapter.bot.edit_message_text(
                     text=resolved.description.text,
                     entities=resolved.description.entities or None,
@@ -330,7 +330,7 @@ class TelegramApi:
             raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            with handle_edit_errors(adapter=self.adapter):
+            async with handle_edit_errors(adapter=self.adapter):
                 await self.adapter.bot.edit_message_reply_markup(
                     chat_id=chat_id,
                     message_id=message_id,
@@ -386,7 +386,7 @@ class TelegramApi:
     async def update_single_meeting_message(
         self,
         message: MessageModel,
-        session: Session,
+        session: AsyncSession,
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
@@ -435,24 +435,22 @@ class TelegramApi:
             entities = view.description.entities or None
             reply_markup = view.markup
 
-        with (
-            self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX),
-            handle_edit_errors(adapter=self.adapter, message=message, session=session),
-        ):
-            await self.adapter.bot.edit_message_text(
-                text=text,
-                entities=entities,
-                chat_id=message.chat_id,
-                message_id=message.message_id,
-                inline_message_id=message.inline_message_id,
-                reply_markup=reply_markup,
-                disable_web_page_preview=True,
-            )
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            async with handle_edit_errors(adapter=self.adapter, message=message, session=session):
+                await self.adapter.bot.edit_message_text(
+                    text=text,
+                    entities=entities,
+                    chat_id=message.chat_id,
+                    message_id=message.message_id,
+                    inline_message_id=message.inline_message_id,
+                    reply_markup=reply_markup,
+                    disable_web_page_preview=True,
+                )
 
     async def update_meeting_messages(
         self,
         *,
-        session: Session,
+        session: AsyncSession,
         meeting: Meetup,
         current_message: MessageModel | None = None,
         skip_current: bool = False,

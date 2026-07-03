@@ -22,20 +22,19 @@ Every registration method requires a `handler_id` argument — a `HandlerId` enu
 
 ## Database session
 
-Decorate the handler with `@with_async_session` from `mitup_bot.db`. This injects a `Session` as the **first positional argument**:
+Decorate the handler with `@with_session` from `mitup_bot.db`. This injects an `AsyncSession` as the **first positional argument**; all session I/O and the DB-touching guards are awaited:
 
 ```python
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 @HandlersRegistry.register_callback_query(handler_id=MyHandlerId.SHOW)
-@with_async_session
-async def show(session: Session, update: Update, context: MitupContext) -> None:
-    user = guards.current_user(update, session)
+@with_session
+async def show(session: AsyncSession, update: Update, context: MitupContext) -> None:
+    user = await guards.current_user(update, session)
     ...
 ```
-
-> **Type checker note:** Call sites trigger a false-positive `missing-argument` from `ty`. Suppress with `# ty: ignore[missing-argument]` and the tracking issue URL. See the `type-checking` skill.
 
 ## Conversation handlers
 
@@ -61,7 +60,15 @@ async def show(session: Session, update: Update, context: MitupContext) -> None:
 
 ## Filters
 
-Handlers accept PTB `BaseFilter` instances to narrow which updates they process. Custom filters are in `personal_filters.py` (e.g., `UserExistFilter`, `PositiveNumberFilter`).
+Handlers accept PTB `BaseFilter` instances to narrow which updates they process. Custom filters are in `personal_filters.py` (e.g., `PositiveNumberFilter`).
+
+<critical_rules>
+  <rule>Filters run synchronously during handler matching and MUST NOT touch the database — the async engine cannot be driven from sync code. Any DB-dependent routing belongs in the handler layer.</rule>
+</critical_rules>
+
+### DB-dependent routing (`/start`)
+
+`/start` routing is the reference pattern: the re-onboarding conversation binds in `REGISTRATION_HANDLERS_GROUP` (-1, processed before group 0). Its entry checks `guards.member_user` — members fall through silently (plain `return ConversationHandler.END`) to the group-0 `/start` handler, while onboarding handlers claim their updates by raising `ApplicationHandlerStop(next_state)` (via the `claim_update` decorator in `registration_process/utils.py`, applied OUTSIDE `with_session` so the transaction commits before the raise). `callback_with_metrics` re-raises `ApplicationHandlerStop` so PTB stops the remaining groups and applies the carried state.
 
 ## Handler structure
 
@@ -144,7 +151,7 @@ Name handler functions after their registration type and action:
 
 1. Define a `HandlerId` member in the appropriate `enums.py` (or create a new submodule).
 2. Write the handler function with the `@HandlersRegistry.register_*` decorator. Follow the naming convention above.
-3. Add `@with_async_session` if database access is needed.
+3. Add `@with_session` if database access is needed.
 4. Register the handler in `tests/test_failure_modes.py` if it calls any `guards.*` function (e.g. `guards.current_user`, `guards.meeting_accessible`, `guards.meeting_viewable`, `guards.valid_callback_data`, `guards.valid_meeting_callback_data`).
 5. Create a dedicated test file at `tests/handlers/<package>/test_<module>.py`.
 6. Import the handler module in `mitup_bot/handlers/__init__.py`.

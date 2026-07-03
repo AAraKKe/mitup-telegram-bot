@@ -287,7 +287,7 @@ async def test_show_past_meeting_silent_when_full_meeting_not_found(
 ):
     """When the user owns the meeting but Meetup.by_id returns None the handler returns silently."""
     # Register the user so guards.current_user succeeds, but do NOT register inactive_meeting
-    # so that Meetup.by_id(session, id, include_inactive=True) returns None.
+    # so that await Meetup.by_id(session, id, include_inactive=True) returns None.
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, handler_context=handler_context)

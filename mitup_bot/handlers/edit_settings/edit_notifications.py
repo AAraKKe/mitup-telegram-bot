@@ -1,11 +1,11 @@
 from typing import cast
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
@@ -47,9 +47,9 @@ def edit_notification_view(user: User) -> MitupView:
     EditSettingsHandlerId.NOTIFICATIONS_CALLBACK,
     callback_data=cb.EDIT_NOTIFICATIONS,
 )
-@with_async_session
-async def callback_query_notifications(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_notifications(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
 
     await context.api.edit_message(update=update, view=edit_notification_view(user))
 
@@ -58,12 +58,12 @@ async def callback_query_notifications(session: Session, update: Update, context
     EditSettingsHandlerId.TOGGLE_NOTIFICATIONS,
     callback_data=cb.TOGGLE_NOTIFICATIONS,
 )
-@with_async_session
-async def callback_query_toggle_notifications(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_toggle_notifications(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
 
     user.settings.notification = not user.settings.notification
-    session.flush()
+    await session.flush()
 
     await context.api.edit_message(update=update, view=edit_notification_view(user))
 
@@ -71,9 +71,9 @@ async def callback_query_toggle_notifications(session: Session, update: Update, 
 @HandlersRegistry.register_callback_query(
     EditSettingsHandlerId.SET_NOTIFICATION_TIME, callback_data=cb.SET_NOTIFICATION_TIME, bindable=False
 )
-@with_async_session
-async def callback_query_set_notification_time(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_set_notification_time(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(
@@ -88,15 +88,17 @@ async def callback_query_set_notification_time(session: Session, update: Update,
 @HandlersRegistry.register_message(
     EditSettingsHandlerId.NOTIFICATION_TIME_MESSAGE_WITH_TEXT, PositiveNumberFilter(), bindable=False
 )
-@with_async_session
-async def settings_notification_time_text_message_handler(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def settings_notification_time_text_message_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+):
+    user = await guards.current_user(update, session)
     notification_time_str = cast(str, guards.message(update).text)
 
     notification_time = int(notification_time_str)
 
     user.settings.notification_time = notification_time
-    session.flush()
+    await session.flush()
 
     message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.get(
         lang=user.lang, notifications_time=user.settings.notification_time
@@ -111,9 +113,11 @@ async def settings_notification_time_text_message_handler(session: Session, upda
 @HandlersRegistry.register_message(
     EditSettingsHandlerId.NOTIFICATION_TIME_INVALID_INPUT, filters=filters.ALL, bindable=False
 )
-@with_async_session
-async def settings_notification_time_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def settings_notification_time_invalid_input_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+):
+    user = await guards.current_user(update, session)
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(

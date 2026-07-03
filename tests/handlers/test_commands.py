@@ -173,6 +173,13 @@ async def test_commands_to_show_main_menu(
     mock_session: MockDbSession,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    # command_start_with_existing_user gates on the member_user guard, which issues a
+    # distinct lookup (tg_user_id AND status == MEMBER); register it too.
+    member_lookup = select(User).where(
+        User.tg_user_id == user_with_settings.tg_user_id,
+        User.status == UserStatus.MEMBER,
+    )
+    mock_session.add_objects_with_statement(member_lookup, (user_with_settings,))
 
     result = await command(update, context)
 

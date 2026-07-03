@@ -4,7 +4,7 @@ from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Message, Update
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import ExtBot
@@ -124,8 +124,8 @@ async def test_send_message_with_mitup_view(telegram_api: TelegramApi, bot: Asyn
 # ---------------------------------------------------------------------------
 
 
-def test_handle_edit_errors_ignores_message_not_modified(adapter: BotAdapter):
-    with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
+async def test_handle_edit_errors_ignores_message_not_modified(adapter: BotAdapter):
+    async with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
         raise BadRequest("Message is not modified: specified new message content and reply markup are exactly the same")
 
 
@@ -137,23 +137,23 @@ def test_handle_edit_errors_ignores_message_not_modified(adapter: BotAdapter):
     ],
     ids=["message_id_invalid", "message_to_edit_not_found"],
 )
-def test_handle_edit_errors_deletes_message_on_not_found(adapter: BotAdapter, error_message: str):
-    session = MagicMock(spec=Session)
+async def test_handle_edit_errors_deletes_message_on_not_found(adapter: BotAdapter, error_message: str):
+    session = AsyncMock(spec=AsyncSession)
     message = create_message(id=5, inline_message_id="msg_5")
-    with handle_edit_errors(cast(ContextOrBotAdapter, adapter), message=message, session=session):
+    async with handle_edit_errors(cast(ContextOrBotAdapter, adapter), message=message, session=session):
         raise BadRequest(error_message)
-    session.delete.assert_called_once_with(message)
+    session.delete.assert_awaited_once_with(message)
 
 
-def test_handle_edit_errors_no_delete_when_session_or_message_missing(adapter: BotAdapter):
+async def test_handle_edit_errors_no_delete_when_session_or_message_missing(adapter: BotAdapter):
     # No session or message — should still not raise, just emit metric
-    with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
+    async with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
         raise BadRequest("Message_id_invalid")
 
 
-def test_handle_edit_errors_reraises_other_bad_request(adapter: BotAdapter):
+async def test_handle_edit_errors_reraises_other_bad_request(adapter: BotAdapter):
     with pytest.raises(BadRequest, match="Something else"):
-        with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
+        async with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
             raise BadRequest("Something else went wrong")
 
 
@@ -360,7 +360,7 @@ def make_inline_meeting() -> tuple[Meetup, MessageModel]:
 
 async def test_update_single_meeting_message_bot_chat(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_single_meeting_message(msg, session, meeting)
 
@@ -374,7 +374,7 @@ async def test_update_single_meeting_message_bot_chat(telegram_api: TelegramApi,
 
 async def test_update_single_meeting_message_inline(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_inline_meeting()
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_single_meeting_message(msg, session, meeting)
 
@@ -400,7 +400,7 @@ async def test_update_single_meeting_message_state_flags(
     expected_text_fragment: str,
 ):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_single_meeting_message(
         msg, session, meeting, was_deleted=was_deleted, has_finished=has_finished
@@ -416,7 +416,7 @@ async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
 ):
     meeting_bot, msg_bot = make_bot_chat_meeting()
     meeting_inline, msg_inline = make_inline_meeting()
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_single_meeting_message(msg_bot, session, meeting_bot)
     bot_chat_text = bot.edit_message_text.call_args.kwargs["text"]
@@ -432,7 +432,7 @@ async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
 
 async def test_update_single_meeting_message_not_modified_is_swallowed(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
     bot.edit_message_text.side_effect = BadRequest("Message is not modified: ...")
 
     # Verifies the wiring: update_single_meeting_message routes errors through handle_edit_errors
@@ -441,7 +441,7 @@ async def test_update_single_meeting_message_not_modified_is_swallowed(telegram_
 
 async def test_update_single_meeting_message_not_found_deletes_message(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
     bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
 
     await telegram_api.update_single_meeting_message(msg, session, meeting)
@@ -462,7 +462,7 @@ async def test_update_meeting_messages_current_updated_first_then_others(telegra
         id=2, inline_message_id="inline_other", chat_instance="ci", chat_id=None, message_id=None, meetup_id=10
     )
     meeting.messages = [other_msg]
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
         session=session,
@@ -481,7 +481,7 @@ async def test_update_meeting_messages_skip_current(telegram_api: TelegramApi, b
         id=2, inline_message_id="inline_other", chat_instance="ci", chat_id=None, message_id=None, meetup_id=10
     )
     meeting.messages = [current_msg, other_msg]
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
         session=session,
@@ -503,7 +503,7 @@ async def test_update_meeting_messages_no_current_message(telegram_api: Telegram
         id=2, inline_message_id="inline_2", chat_instance="ci2", chat_id=None, message_id=None, meetup_id=10
     )
     meeting.messages = [msg1, msg2]
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
         session=session,
@@ -532,7 +532,7 @@ async def test_update_meeting_messages_state_flag_propagated(
     create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(id=1, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
     meeting.messages = [msg]
-    session = MagicMock(spec=Session)
+    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
         session=session,

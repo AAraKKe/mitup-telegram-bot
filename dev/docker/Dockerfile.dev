@@ -1,6 +1,6 @@
 FROM python:3.14.0-slim-bookworm
 
-# Install libraries needed to run psycopg2 and build packages
+# Install libraries needed to run psycopg and build packages
 # Keep build dependencies in dev image for faster iteration
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

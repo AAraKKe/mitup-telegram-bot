@@ -1,6 +1,7 @@
 import structlog
 from rich.console import Console
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.error import BadRequest
 
@@ -27,9 +28,9 @@ SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
 }
 
 
-@db.with_async_session
-async def handle_inactive_user(session: Session, context: TMitupContext, user_id: int):
-    if (user := session.exec(select(User).where(User.id == user_id)).first()) and user.mark_inactive():
+@db.with_session
+async def handle_inactive_user(session: AsyncSession, context: TMitupContext, user_id: int):
+    if (user := (await session.exec(select(User).where(User.id == user_id))).first()) and user.mark_inactive():
         context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_dimensions=False)
 
 
@@ -40,13 +41,17 @@ def should_ignore_error(error: Exception) -> bool:
     return str(error) in SUPPRESSED_EXCEPTIONS[type(error)]
 
 
-@db.with_async_session
-async def resolve_lang(session: Session, update: Update | None) -> str:
+@db.with_session
+async def resolve_lang(session: AsyncSession, update: Update | None) -> str:
     """Best-effort lookup of the effective user's language.
 
     Falls back to the project default language when the update, user, or DB record is missing.
     """
-    if update is not None and update.effective_user and (user := User.by_tg_user_id(session, update.effective_user.id)):
+    if (
+        update is not None
+        and update.effective_user
+        and (user := await User.by_tg_user_id(session, update.effective_user.id))
+    ):
         return user.lang
     return TranslationEngine.FALLBACK_LANG
 

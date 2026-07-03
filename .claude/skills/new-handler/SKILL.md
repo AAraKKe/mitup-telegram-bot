@@ -17,7 +17,7 @@ Then scaffold:
 1. Create `mitup_bot/handlers/<feature>/` with:
    - `__init__.py` (empty)
    - `enums.py` with a `HandlerId` subclass for this feature
-   - `entry.py` with the entry-point handler function(s), `@with_async_session`, and guards
+   - `entry.py` with the entry-point handler function(s), `@with_session`, and guards
 2. Register the handler in `mitup_bot/app.py` using the correct `register_*` method.
 3. Create `tests/handlers/test_<feature>.py` mirroring the test structure.
 4. Remind the user to add the handler context to `CONTEXTS` in `tests/test_failure_modes.py`.

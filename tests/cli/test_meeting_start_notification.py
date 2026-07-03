@@ -21,7 +21,7 @@ def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
 
 
-def test_query_for_users_to_notify_about_meeting_start(mock_session: MockDbSession):
+async def test_query_for_users_to_notify_about_meeting_start(mock_session: MockDbSession):
     # The query must select all joined_users that:
     # - Are not in the waiting list
     # - The meeting has a datetime set
@@ -49,7 +49,7 @@ WHERE meetups.datetime IS NOT NULL
         meetups.datetime - CAST(concat(settings.notification_time, ' minutes') AS INTERVAL)
         AND meetups.datetime"""
 
-    notify_meetings.joined_links_to_notify(mock_session)
+    await notify_meetings.joined_links_to_notify(mock_session)
     assert mock_session.normalize_query(expected_query) == mock_session.queries_executed[0]
 
 

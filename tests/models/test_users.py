@@ -10,22 +10,22 @@ from mitup_bot.views import MitupView
 from tests.helpers import MockDbSession, create_meetup, create_user
 
 
-def test_user_does_not_exist(mock_session: MockDbSession):
-    user = User.by_tg_user_id(mock_session, 1)
+async def test_user_does_not_exist(mock_session: MockDbSession):
+    user = await User.by_tg_user_id(mock_session, 1)
 
     assert user is None
 
 
-def test_user_exist(mock_session: MockDbSession, user_with_settings: User):
+async def test_user_exist(mock_session: MockDbSession, user_with_settings: User):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    result = User.by_tg_user_id(mock_session, user_with_settings.tg_user_id)
+    result = await User.by_tg_user_id(mock_session, user_with_settings.tg_user_id)
     assert result == user_with_settings
 
 
-def test_by_tg_user_id_must_exist_raises_when_not_found(mock_session: MockDbSession):
+async def test_by_tg_user_id_must_exist_raises_when_not_found(mock_session: MockDbSession):
     with pytest.raises(UserNotFound):
-        User.by_tg_user_id(mock_session, tg_user_id=999, must_exist=True)
+        await User.by_tg_user_id(mock_session, tg_user_id=999, must_exist=True)
 
 
 async def test_send_message_calls_bot_with_correct_args():

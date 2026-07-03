@@ -11,6 +11,7 @@ from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import (
     Application,
+    ApplicationHandlerStop,
     BaseHandler,
     CallbackQueryHandler,
     ChatMemberHandler,
@@ -66,6 +67,11 @@ def callback_with_metrics(
             return_value = None
             try:
                 return_value = await callback(update, context)
+            except ApplicationHandlerStop:
+                # Not a fault: the handler is claiming the update (it carries the next
+                # conversation state). Re-raise so PTB stops the remaining handler groups.
+                context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
+                raise
             except Exception as e:
                 # Relying on error handlers by the application will result in the creation of a
                 # separate context. Lets handle errors here where we still have the context

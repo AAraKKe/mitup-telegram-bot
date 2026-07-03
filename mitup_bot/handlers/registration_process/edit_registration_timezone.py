@@ -1,13 +1,12 @@
 from typing import cast
 
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Location, Update
-from telegram.ext import ConversationHandler, filters
+from telegram.ext import ApplicationHandlerStop, ConversationHandler, filters
 
 from mitup_bot import guards, timezone_api
-from mitup_bot.db import with_async_session
-from mitup_bot.handlers.personal_filters import MemberUserFilter
+from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
@@ -15,8 +14,8 @@ from mitup_bot.utils import RegistrationMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
-from .enums import ConversationRegistrationProcessState, RegistrationProcessHandlerId
-from .utils import get_or_create_onboarding_user
+from .enums import REGISTRATION_HANDLERS_GROUP, ConversationRegistrationProcessState, RegistrationProcessHandlerId
+from .utils import claim_update, get_or_create_onboarding_user
 
 log = structlog.get_logger(__name__)
 
@@ -24,14 +23,30 @@ log = structlog.get_logger(__name__)
 @HandlersRegistry.register_command(
     RegistrationProcessHandlerId.TIMEZONE_COMMAND,
     command="start",
-    filters=~MemberUserFilter(),
     bindable=False,
 )
-@with_async_session
 async def command_start_with_new_user(
-    session: Session, update: Update, context: TMitupContext
-) -> ConversationRegistrationProcessState:
-    user = get_or_create_onboarding_user(session, update)
+    update: Update, context: TMitupContext
+) -> ConversationRegistrationProcessState | int:
+    state = await start_onboarding(update, context)
+    if state is None:
+        # Already a MEMBER: their /start belongs to the group-0 handlers (main menu /
+        # create-meeting deep link), so stay silent and let the update fall through.
+        return ConversationHandler.END
+    # Claim the update so the group-0 /start handler never sees it. Raised outside
+    # start_onboarding so the session commits before the exception unwinds.
+    raise ApplicationHandlerStop(state)
+
+
+@with_session
+async def start_onboarding(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationRegistrationProcessState | None:
+    """Prompt for a timezone and enter the conversation, or None when the user is a MEMBER."""
+    if await guards.member_user(update, session) is not None:
+        return None
+
+    user = await get_or_create_onboarding_user(session, update)
     message = RegistrationMessages.TIMEZONE_PROMPT.get(first_name=user.first_name)
 
     await context.api.send_message(update=update, view=message)
@@ -43,13 +58,14 @@ async def command_start_with_new_user(
 @HandlersRegistry.register_message(
     RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT & ~filters.COMMAND, bindable=False
 )
-@with_async_session
+@claim_update
+@with_session
 async def registration_timezone_text_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState | int:
     context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
@@ -63,7 +79,7 @@ async def registration_timezone_text_message_handler(
     user.settings.timezone = new_timezone
 
     session.add(user)
-    session.flush()
+    await session.flush()
     # The end of the conversation is the only legitimate JOINED_ONLY/LEFT → MEMBER
     # transition site. Brand-new users are already MEMBER (model default), so this
     # is a no-op for them.
@@ -82,13 +98,14 @@ async def registration_timezone_text_message_handler(
 @HandlersRegistry.register_message(
     RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION, filters.LOCATION, bindable=False
 )
-@with_async_session
+@claim_update
+@with_session
 async def registration_timezone_location_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState | int:
     context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
@@ -102,7 +119,7 @@ async def registration_timezone_location_message_handler(
     user.settings.timezone = new_timezone
 
     session.add(user)
-    session.flush()
+    await session.flush()
     # The end of the conversation is the only legitimate JOINED_ONLY/LEFT → MEMBER
     # transition site. Brand-new users are already MEMBER (model default), so this
     # is a no-op for them.
@@ -123,11 +140,12 @@ async def registration_timezone_location_message_handler(
     ~filters.TEXT | filters.COMMAND,
     bindable=False,
 )
-@with_async_session
+@claim_update
+@with_session
 async def registration_timezone_invalid_input_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState:
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     await context.api.send_message(
         update=update,
         view=RegistrationMessages.TIMEZONE_INVALID_INPUT.get(lang=user.lang),
@@ -145,4 +163,5 @@ HandlersRegistry.register_conversation_handler(
         ],
     },
     fallbacks=[RegistrationProcessHandlerId.TIMEZONE_INVALID_INPUT],
+    group=REGISTRATION_HANDLERS_GROUP,
 )

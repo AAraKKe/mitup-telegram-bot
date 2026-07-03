@@ -2,7 +2,7 @@ import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 pytestmark = pytest.mark.db_test
 
@@ -15,20 +15,17 @@ def _alembic_head() -> str:
     return head
 
 
-def test_no_pending_migrations(db_session: Session) -> None:
+async def test_no_pending_migrations(db_session: AsyncSession) -> None:
     """Verify the DB is at the current Alembic head revision.
 
     If this test fails, the DB has not had all migrations applied.
     Run `alembic upgrade head` to bring it up to date.
     """
     expected = _alembic_head()
-    rows = (
-        db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
-            text("SELECT version_num FROM alembic_version")
-        )
-        .scalars()
-        .all()
+    result = await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        text("SELECT version_num FROM alembic_version")
     )
+    rows = result.scalars().all()
     assert len(rows) == 1, f"Expected 1 alembic_version row, got {len(rows)}"
     actual = rows[0]
     assert actual == expected, (

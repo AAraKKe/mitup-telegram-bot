@@ -4,7 +4,8 @@ from contextlib import contextmanager
 
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import Session, and_, false, func, null, select, true
+from sqlmodel import and_, false, func, null, select, true
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 from telegram.error import Forbidden
 
@@ -39,8 +40,8 @@ USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
 )
 
 
-def joined_links_to_notify(session: Session) -> Sequence[JoinedUsers]:
-    return session.exec(USERS_TO_NOTIFY_STATEMENT).all()
+async def joined_links_to_notify(session: AsyncSession) -> Sequence[JoinedUsers]:
+    return (await session.exec(USERS_TO_NOTIFY_STATEMENT)).all()
 
 
 @contextmanager
@@ -66,10 +67,10 @@ async def send_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
     joined_link.notification_sent = True
 
 
-@db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+@db.with_session
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Send a notification to all users that have joined a meeting that is about to start"""
-    joined_links = joined_links_to_notify(session)
+    joined_links = await joined_links_to_notify(session)
     failed = 0
     sent = 0
 

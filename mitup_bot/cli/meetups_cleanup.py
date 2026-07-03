@@ -4,7 +4,8 @@ from typing import cast
 
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import Session, and_, delete, false, func, literal, null, select, true
+from sqlmodel import and_, delete, false, func, literal, null, select, true
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
@@ -41,8 +42,8 @@ MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
 )
 
 
-async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiWrapper, metrics: MetricsClient):
-    meetups = session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT).all()
+async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
+    meetups = (await session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT)).all()
 
     views: list[MitupView] = []
     users: list[User] = []
@@ -84,8 +85,8 @@ async def notify_meetups_about_to_be_deleted(session: Session, api: TelegramApiW
     metrics.emit(MetricKey.MEETUPS_ABOUT_TO_BE_DELETED, len(meetups), MetricUnit.COUNT)
 
 
-async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: MetricsClient):
-    meetups = session.exec(MEETUPS_TO_DELETE_STATEMENT).all()
+async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
+    meetups = (await session.exec(MEETUPS_TO_DELETE_STATEMENT)).all()
 
     views: list[MitupView] = []
     meeting_ids: list[int] = []
@@ -114,8 +115,8 @@ async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: Met
     if views:
         await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
 
-    session.exec(delete(Meetup).where(Meetup.id.in_(meeting_ids)))  # type: ignore
-    session.exec(delete(User).where(User.id.in_(outside_user_ids)))  # type: ignore
+    await session.exec(delete(Meetup).where(Meetup.id.in_(meeting_ids)))  # type: ignore
+    await session.exec(delete(User).where(User.id.in_(outside_user_ids)))  # type: ignore
 
     deleted_count = len(meeting_ids)
     failed_count = len(meetups) - deleted_count
@@ -124,7 +125,7 @@ async def delete_meetups(session: Session, api: TelegramApiWrapper, metrics: Met
     metrics.emit(MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED), failed_count, MetricUnit.COUNT)
 
 
-@db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+@db.with_session
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     await notify_meetups_about_to_be_deleted(session, api, metrics)
     await delete_meetups(session, api, metrics)

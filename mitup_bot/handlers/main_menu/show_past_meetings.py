@@ -1,8 +1,8 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
@@ -51,19 +51,19 @@ async def _show_past_meetings(user: User, page_number: int, update: Update, cont
 @HandlersRegistry.register_callback_query(
     MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, callback_data=cb.PAST_MEETINGS, bindable=True
 )
-@with_async_session
-async def callback_query_show_past_meetings(session: Session, update: Update, context: TMitupContext) -> None:
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_show_past_meetings(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+    user = await guards.current_user(update, session)
     await _show_past_meetings(user, 1, update, context)
 
 
 @HandlersRegistry.register_callback_query(
     MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK, callback_data=cb.SHOW_PAST_MEETING_PAGE, bindable=True
 )
-@with_async_session
-async def callback_query_show_past_meeting_page(session: Session, update: Update, context: TMitupContext) -> None:
+@with_session
+async def callback_query_show_past_meeting_page(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     callback_data = guards.valid_callback_data(
         cb.SHOW_PAST_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK
     )
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     await _show_past_meetings(user, callback_data.id, update, context)

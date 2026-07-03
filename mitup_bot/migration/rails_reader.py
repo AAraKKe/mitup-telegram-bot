@@ -1,10 +1,9 @@
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
-from typing import Any
+from typing import Any, LiteralString, cast
 
-import psycopg2
-import psycopg2.extensions
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 
 
 class RailsReader(AbstractContextManager["RailsReader"]):
@@ -17,11 +16,11 @@ class RailsReader(AbstractContextManager["RailsReader"]):
     def __init__(self, dsn: str, batch_size: int = 1000):
         self._dsn = dsn
         self._batch_size = batch_size
-        self._conn: psycopg2.extensions.connection | None = None
+        self._conn: psycopg.Connection | None = None
 
     def __enter__(self) -> RailsReader:
-        self._conn = psycopg2.connect(self._dsn)
-        self._conn.set_session(readonly=True, autocommit=False)
+        self._conn = psycopg.connect(self._dsn, autocommit=False)
+        self._conn.read_only = True
         return self
 
     def __exit__(self, *_: object):
@@ -30,21 +29,26 @@ class RailsReader(AbstractContextManager["RailsReader"]):
             self._conn = None
 
     @property
-    def connection(self) -> psycopg2.extensions.connection:
+    def connection(self) -> psycopg.Connection:
         if self._conn is None:
             raise RuntimeError("RailsReader used outside its context manager")
         return self._conn
 
     def count(self, table: str) -> int:
+        # psycopg types queries as LiteralString to discourage injection; every caller passes
+        # constant table names / queries (see the S608 suppressions), so the casts are safe.
+        query = cast("LiteralString", f'SELECT COUNT(*) FROM "{table}"')  # noqa: S608 — table name is a constant
         with self.connection.cursor() as cur:
-            cur.execute(f'SELECT COUNT(*) FROM "{table}"')  # noqa: S608 — table name is a constant
-            (n,) = cur.fetchone()
+            cur.execute(query)
+            row = cur.fetchone()
+            assert row is not None, "COUNT(*) always returns a row"
+            (n,) = row
             return int(n)
 
     def stream(self, query: str, params: tuple[object, ...] | None = None) -> Iterator[dict[str, Any]]:
         cursor_name = f"mitup_migrate_{id(self):x}"
-        with self.connection.cursor(name=cursor_name, cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        with self.connection.cursor(name=cursor_name, row_factory=dict_row) as cur:
             cur.itersize = self._batch_size
-            cur.execute(query, params or ())
+            cur.execute(cast("LiteralString", query), params or ())
             for row in cur:
                 yield dict(row)

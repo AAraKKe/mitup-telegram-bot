@@ -1,11 +1,11 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
@@ -49,7 +49,7 @@ async def send_request_for_invite_name(context: TMitupContext, user: User, meeti
 
 
 async def ensure_meeting_still_allows_invitations(
-    session: Session,
+    session: AsyncSession,
     context: TMitupContext,
     user: User,
     meeting_id: int,
@@ -59,7 +59,7 @@ async def ensure_meeting_still_allows_invitations(
     Ensure that the meeting still allows invitations.
     If not, send a message to the user and return False.
     """
-    meeting = Meetup.by_id(session, meeting_id, include_inactive=False)
+    meeting = await Meetup.by_id(session, meeting_id, include_inactive=False)
     update = context.get_update()
 
     if meeting is None:
@@ -87,9 +87,9 @@ async def ensure_meeting_still_allows_invitations(
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.INVITE_USERS_CALLBACK, callback_data=cb.INVITE, bindable=False
 )
-@with_async_session
+@with_session
 async def callback_query_invite_users(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationInviteState | int:
     # This action can be called by unsubscribed users
     callback_data = guards.valid_callback_data(cb.INVITE.parse(context.match), MeetingHandlerId.INVITE_USERS_CALLBACK)
@@ -121,7 +121,7 @@ async def callback_query_invite_users(
 
 
 async def abort_invitation(
-    session: Session,
+    session: AsyncSession,
     update: Update,
     context: TMitupContext,
     handler_id: MeetingHandlerId,
@@ -135,7 +135,7 @@ async def abort_invitation(
     ``callback_data`` is the callback-data class each registration is bound to, so parsing stays in
     sync with the registration even if a call site switches to a different class.
     """
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
@@ -157,8 +157,8 @@ async def abort_invitation(
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK, callback_data=cb.CANCEL_INVITE_USER, bindable=False
 )
-@with_async_session
-async def callback_query_cancel_invite_user(session: Session, update: Update, context: TMitupContext) -> int:
+@with_session
+async def callback_query_cancel_invite_user(session: AsyncSession, update: Update, context: TMitupContext) -> int:
     return await abort_invitation(
         session, update, context, MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK, cb.CANCEL_INVITE_USER
     )
@@ -169,11 +169,11 @@ async def callback_query_cancel_invite_user(session: Session, update: Update, co
     filters=filters.TEXT & ~filters.COMMAND,
     bindable=False,
 )
-@with_async_session
+@with_session
 async def invite_users_name_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationInviteState | int:
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     invited_user_name = guards.message(update).text
     if invited_user_name is None:  # pragma: no cover
@@ -210,9 +210,9 @@ async def invite_users_name_message_handler(
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.INVITE_USERS_CONFIRM_CALLBACK, bindable=False, callback_data=cb.CONFIRM_INVITE_USER
 )
-@with_async_session
-async def callback_query_confirm_user_invitation(session: Session, update: Update, context: TMitupContext) -> int:
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_confirm_user_invitation(session: AsyncSession, update: Update, context: TMitupContext) -> int:
+    user = await guards.current_user(update, session)
 
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_INVITE_USER.parse(context.match), MeetingHandlerId.INVITE_USERS_CONFIRM_CALLBACK
@@ -243,7 +243,7 @@ async def callback_query_confirm_user_invitation(session: Session, update: Updat
             context.clean_user_data([ContextId.INVITE_USERS])
             return ConversationHandler.END
 
-        if not flush_new_participant(session, meeting, joined_link, invited_user):
+        if not await flush_new_participant(session, meeting, joined_link, invited_user):
             # A concurrent update already registered this participant; the joined_users unique
             # constraint rejected our duplicate. No-op: report the existing membership instead of
             # emitting a fault, leaving the transaction consistent.
@@ -267,17 +267,17 @@ async def callback_query_confirm_user_invitation(session: Session, update: Updat
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, bindable=False, callback_data=cb.CANCEL_INVITE_USER
 )
-@with_async_session
-async def callback_query_decline_user_invitation(session: Session, update: Update, context: TMitupContext) -> int:
+@with_session
+async def callback_query_decline_user_invitation(session: AsyncSession, update: Update, context: TMitupContext) -> int:
     return await abort_invitation(
         session, update, context, MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK, cb.CANCEL_INVITE_USER
     )
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.INVITE_USERS_FALLBACK, bindable=False)
-@with_async_session
-async def callback_query_fallback_invite_user(session: Session, update: Update, context: TMitupContext) -> int:
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_fallback_invite_user(session: AsyncSession, update: Update, context: TMitupContext) -> int:
+    user = await guards.current_user(update, session)
 
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])

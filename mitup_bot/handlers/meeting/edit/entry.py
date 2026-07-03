@@ -1,10 +1,10 @@
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import callbacks as cb
@@ -18,11 +18,11 @@ log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.EDIT, callback_data=cb.EDIT_MEETING, bindable=True)
-@with_async_session
-async def callback_query_edit_meeting(session: Session, update: Update, context: TMitupContext) -> None:
+@with_session
+async def callback_query_edit_meeting(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     callback_data = guards.valid_callback_data(cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.EDIT)
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(session, user, callback_data.id, "Edit meeting", update, context)
 
@@ -36,10 +36,10 @@ async def callback_query_edit_meeting(session: Session, update: Update, context:
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.CANCEL, callback_data=cb.EDIT_MEETING_CANCEL, bindable=False
 )
-@with_async_session
-async def callback_query_cancel_edit_meeting(session: Session, update: Update, context: TMitupContext) -> int:
+@with_session
+async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Update, context: TMitupContext) -> int:
     """If at any point the user clicks on Cancel we should get back to the Edit meeting view"""
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     try:
         meeting_id = guards.valid_callback_data(

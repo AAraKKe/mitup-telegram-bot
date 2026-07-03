@@ -3,7 +3,8 @@ from typing import cast
 
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import Session, and_, delete, exists, func, literal, null, or_, select, true
+from sqlmodel import and_, delete, exists, func, literal, null, or_, select, true
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
@@ -50,10 +51,10 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
 )
 
 
-@db.with_async_session
-async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+@db.with_session
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
     """Mark meetings as inactive when they've been finished for longer than the configured timeout"""
-    meetings = session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT).all()
+    meetings = (await session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT)).all()
     deactivated = 0
     failed = 0
     invited_users_ids: list[int] = []
@@ -82,11 +83,11 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
 
             # Delete all users that were added to the meeting that were invited.
             # These users exist only in the context of the current meeting.
-            session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
+            await session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
 
             # Same with messages, any messagea attached to this meeting is left untracked as the
             # meeting is now considered over
-            session.exec(delete(Message).where(Message.meetup_id == meeting.id))  # type: ignore
+            await session.exec(delete(Message).where(Message.meetup_id == meeting.id))  # type: ignore
         except Exception as e:
             failed += 1
             log.exception("Failed to deactivate meeting", meeting=meeting.id, owner=meeting.owner_id, exc_info=e)
@@ -109,7 +110,7 @@ async def run(session: Session, api: TelegramApiWrapper, metrics: MetricsClient)
             ),
         )
     )
-    result = session.exec(stmt)
+    result = await session.exec(stmt)
     joined_only_deleted = result.rowcount or 0
 
     metrics.emit(MetricKey.MEETINGS_DEACTIVATED, deactivated, MetricUnit.COUNT)

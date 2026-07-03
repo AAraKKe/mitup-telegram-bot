@@ -1,13 +1,13 @@
 from typing import cast
 
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import guards
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -25,13 +25,13 @@ log = structlog.get_logger(__name__)
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.PARTICIPANTS_CALLBACK, callback_data=cb.EDIT_MEETING_PARTICIPANTS, bindable=True
 )
-@with_async_session
-async def callback_edit_meeting_participants(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_edit_meeting_participants(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session,
@@ -50,13 +50,13 @@ async def callback_edit_meeting_participants(session: Session, update: Update, c
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, callback_data=cb.EDIT_MEETING_MAX_PARTICIPANTS, bindable=False
 )
-@with_async_session
-async def callback_edit_meeting_max_participants(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_edit_meeting_max_participants(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_MAX_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session,
@@ -87,12 +87,12 @@ async def callback_edit_meeting_max_participants(session: Session, update: Updat
     callback_data=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS,
     bindable=False,
 )
-@with_async_session
-async def callback_edit_meeting_no_limit_participants(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_edit_meeting_no_limit_participants(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK
     )
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session,
@@ -107,7 +107,7 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
         return ConversationHandler.END
 
     meeting.max_members = None
-    session.flush()
+    await session.flush()
 
     no_limit_text = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user.lang)
     response_view = edit_participants_view(meeting).with_context(
@@ -124,8 +124,8 @@ async def callback_edit_meeting_no_limit_participants(session: Session, update: 
     callback_data=cb.CANCEL_EDIT_MEETING_PARTICIPANS,
     bindable=False,
 )
-@with_async_session
-async def callback_cancel_edit_meeting_participants(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_cancel_edit_meeting_participants(session: AsyncSession, update: Update, context: TMitupContext):
     context.clean_all_user_data()
 
     await callback_edit_meeting_participants(update, context)
@@ -136,10 +136,10 @@ async def callback_cancel_edit_meeting_participants(session: Session, update: Up
 @HandlersRegistry.register_message(
     EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE, filters=PositiveNumberFilter(), bindable=False
 )
-@with_async_session
-async def edit_meeting_max_participants(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def edit_meeting_max_participants(session: AsyncSession, update: Update, context: TMitupContext):
     number = guards.message(update).text
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS) as meeting_id:
@@ -152,7 +152,7 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
         return ConversationHandler.END
 
     meeting.max_members = int(cast(str, number))
-    session.flush()
+    await session.flush()
 
     response_view = edit_participants_view(meeting).with_context(
         MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
@@ -167,9 +167,9 @@ async def edit_meeting_max_participants(session: Session, update: Update, contex
 @HandlersRegistry.register_message(
     EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE, filters=~PositiveNumberFilter(), bindable=False
 )
-@with_async_session
-async def edit_meeting_wrong_max_participants(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
 
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, ensure_clean=False) as meeting_id:

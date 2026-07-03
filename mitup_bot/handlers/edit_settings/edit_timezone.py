@@ -1,13 +1,13 @@
 from typing import cast
 
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Location, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, timezone_api, views
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
@@ -23,9 +23,9 @@ log = structlog.get_logger(__name__)
 @HandlersRegistry.register_callback_query(
     EditSettingsHandlerId.TIMEZONE_CALLBACK, callback_data=cb.EDIT_TIEMZONE, bindable=False
 )
-@with_async_session
-async def callback_query_timezone(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_timezone(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
 
     context.store_on_exit(
@@ -44,9 +44,9 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
 @HandlersRegistry.register_message(
     EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, filters.TEXT & ~filters.COMMAND, bindable=False
 )
-@with_async_session
-async def settings_timezone_text_message_handler(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def settings_timezone_text_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
@@ -69,7 +69,7 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
 
     user.settings.timezone = new_timezone
 
-    session.flush()
+    await session.flush()
 
     message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)
@@ -82,9 +82,9 @@ async def settings_timezone_text_message_handler(session: Session, update: Updat
 @HandlersRegistry.register_message(
     EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION, filters.LOCATION, bindable=False
 )
-@with_async_session
-async def settings_timezone_location_message_handler(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def settings_timezone_location_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
@@ -107,7 +107,7 @@ async def settings_timezone_location_message_handler(session: Session, update: U
 
     user.settings.timezone = new_timezone
 
-    session.flush()
+    await session.flush()
 
     message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
     view = factory.settings_view(lang=user.lang, message=message)

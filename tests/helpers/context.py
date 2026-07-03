@@ -1,8 +1,9 @@
+from collections.abc import Coroutine
 from enum import Enum
-from typing import cast
+from typing import Any, cast
 
 from telegram import Update
-from telegram.ext import ConversationHandler
+from telegram.ext import ApplicationHandlerStop, ConversationHandler
 
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handler_id import HandlerId
@@ -13,6 +14,19 @@ from tests.helpers.monitoring import make_test_metrics_client
 
 from .api import MockApi
 from .types import StubMitupApp, StubMitupContext
+
+
+async def claimed_state(coro: Coroutine[Any, Any, object]) -> object:
+    """Await a handler that claims its update via ApplicationHandlerStop and return the carried state.
+
+    Use for direct calls to handlers wrapped in `claim_update` (the registration conversation);
+    calling them through the registry goes via `call_handler`, which absorbs the stop itself.
+    """
+    try:
+        await coro
+    except ApplicationHandlerStop as stop:
+        return stop.state
+    raise AssertionError("Handler did not raise ApplicationHandlerStop")
 
 
 def build_context(
@@ -66,7 +80,14 @@ async def call_handler(
 
     # Force cast becuase PTB forces a return type when declaring handlers and set `object` as return type
     # of ConversationHandlers which prevents us from using specific types as the return type is invariant
-    handler_result = cast(Enum | None, await handler.handle_update(update, app, check_result, context))
+    try:
+        handler_result = cast(Enum | None, await handler.handle_update(update, app, check_result, context))
+    except ApplicationHandlerStop as stop:
+        # Handlers that claim their update (see the registration conversation) raise
+        # ApplicationHandlerStop carrying the next state; treat it as the handler result.
+        # ConversationHandlers re-raise a bare stop after applying the state internally,
+        # which the conversation-state lookup below picks up.
+        handler_result = cast(Enum | None, stop.state)
 
     # For conversation handlers, retrieve the current state so callers can assert on it.
     #

@@ -3,7 +3,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.migration.archive import ArchiveWriter
 from mitup_bot.migration.audit import AuditStatus, AuditStore
@@ -43,7 +44,7 @@ def phase_dims(mode: MigrationMode, table: str) -> dict[str, str]:
     return {"mode": str(mode), "table": table}
 
 
-def record_row_inserted(
+async def record_row_inserted(
     metrics: MetricsClient,
     mode: MigrationMode,
     table: str,
@@ -52,12 +53,12 @@ def record_row_inserted(
     old_id: int,
     new_id: int,
 ):
-    audit.record(table, old_id, new_id=new_id, status=AuditStatus.INSERTED)
+    await audit.record(table, old_id, new_id=new_id, status=AuditStatus.INSERTED)
     emit_count(metrics, MetricKey.MIGRATION_ROWS_INSERTED, 1, dims=phase_dims(mode, table))
-    reporter.row_inserted(table, old_id, new_id)
+    await reporter.row_inserted(table, old_id, new_id)
 
 
-def record_row_skipped(
+async def record_row_skipped(
     metrics: MetricsClient,
     mode: MigrationMode,
     table: str,
@@ -66,12 +67,12 @@ def record_row_skipped(
     old_id: int,
     reason: str,
 ):
-    audit.record(table, old_id, new_id=None, status=AuditStatus.SKIPPED, note=reason)
+    await audit.record(table, old_id, new_id=None, status=AuditStatus.SKIPPED, note=reason)
     emit_count(metrics, MetricKey.MIGRATION_ROWS_SKIPPED, 1, dims={**phase_dims(mode, table), "reason": reason})
-    reporter.row_skipped(table, old_id, reason)
+    await reporter.row_skipped(table, old_id, reason)
 
 
-def record_row_failed(
+async def record_row_failed(
     metrics: MetricsClient,
     mode: MigrationMode,
     table: str,
@@ -80,9 +81,9 @@ def record_row_failed(
     old_id: int,
     error: str,
 ):
-    audit.record(table, old_id, new_id=None, status=AuditStatus.FAILED, note=error)
+    await audit.record(table, old_id, new_id=None, status=AuditStatus.FAILED, note=error)
     emit_count(metrics, MetricKey.MIGRATION_ROWS_FAILED, 1, dims=phase_dims(mode, table))
-    reporter.row_failed(table, old_id, error)
+    await reporter.row_failed(table, old_id, error)
 
 
 def emit_phase_duration(metrics: MetricsClient, mode: MigrationMode, phase: str, duration_ms: int):
@@ -94,9 +95,9 @@ def emit_phase_duration(metrics: MetricsClient, mode: MigrationMode, phase: str,
     )
 
 
-def migrate_users(
+async def migrate_users(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     audit: AuditStore,
     metrics: MetricsClient,
@@ -105,8 +106,8 @@ def migrate_users(
 ) -> PhaseSummary:
     summary = PhaseSummary(table="users")
     start = time.perf_counter()
-    reporter.phase_start("users", "users")
-    already = audit.processed_old_ids("users")
+    await reporter.phase_start("users", "users")
+    already = await audit.processed_old_ids("users")
 
     for row in reader.stream("SELECT * FROM users ORDER BY id"):
         summary.read += 1
@@ -119,31 +120,31 @@ def migrate_users(
             user_kwargs, settings_kwargs = map_user_and_settings(row)
         except RowMappingError as exc:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "users", audit, reporter, old_id, str(exc))
+            await record_row_skipped(metrics, mode, "users", audit, reporter, old_id, str(exc))
             continue
         user = User(**user_kwargs)
         try:
-            with session.begin_nested():
+            async with session.begin_nested():
                 session.add(user)
-                session.flush()
+                await session.flush()
                 settings = Settings(user_id=user.id, **settings_kwargs)
                 session.add(settings)
         except Exception as exc:  # noqa: BLE001 — record & continue
             summary.failed += 1
-            record_row_failed(metrics, mode, "users", audit, reporter, old_id, repr(exc))
+            await record_row_failed(metrics, mode, "users", audit, reporter, old_id, repr(exc))
             continue
         summary.inserted += 1
-        record_row_inserted(metrics, mode, "users", audit, reporter, old_id, int(user.id or 0))
+        await record_row_inserted(metrics, mode, "users", audit, reporter, old_id, int(user.id or 0))
 
     summary.duration_ms = int((time.perf_counter() - start) * 1000)
     emit_phase_duration(metrics, mode, "users", summary.duration_ms)
-    reporter.phase_end(summary)
+    await reporter.phase_end(summary)
     return summary
 
 
-def migrate_meetups(
+async def migrate_meetups(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     audit: AuditStore,
     metrics: MetricsClient,
@@ -152,9 +153,9 @@ def migrate_meetups(
 ) -> PhaseSummary:
     summary = PhaseSummary(table="meetups")
     start = time.perf_counter()
-    reporter.phase_start("meetups", "meetups")
-    user_map = audit.existing_mapping("users")
-    already = audit.processed_old_ids("meetups")
+    await reporter.phase_start("meetups", "meetups")
+    user_map = await audit.existing_mapping("users")
+    already = await audit.processed_old_ids("meetups")
 
     for row in reader.stream("SELECT * FROM meetups ORDER BY id"):
         summary.read += 1
@@ -167,28 +168,28 @@ def migrate_meetups(
         owner_new_id = user_map.get(int(owner_old_id)) if owner_old_id is not None else None
         if owner_new_id is None:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "meetups", audit, reporter, old_id, "owner-not-migrated")
+            await record_row_skipped(metrics, mode, "meetups", audit, reporter, old_id, "owner-not-migrated")
             continue
         try:
             meetup_kwargs = map_meetup(row, owner_new_id=owner_new_id)
         except RowMappingError as exc:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "meetups", audit, reporter, old_id, str(exc))
+            await record_row_skipped(metrics, mode, "meetups", audit, reporter, old_id, str(exc))
             continue
         meetup = Meetup(**meetup_kwargs)
         try:
-            with session.begin_nested():
+            async with session.begin_nested():
                 session.add(meetup)
         except Exception as exc:  # noqa: BLE001
             summary.failed += 1
-            record_row_failed(metrics, mode, "meetups", audit, reporter, old_id, repr(exc))
+            await record_row_failed(metrics, mode, "meetups", audit, reporter, old_id, repr(exc))
             continue
         summary.inserted += 1
-        record_row_inserted(metrics, mode, "meetups", audit, reporter, old_id, int(meetup.id or 0))
+        await record_row_inserted(metrics, mode, "meetups", audit, reporter, old_id, int(meetup.id or 0))
 
     summary.duration_ms = int((time.perf_counter() - start) * 1000)
     emit_phase_duration(metrics, mode, "meetups", summary.duration_ms)
-    reporter.phase_end(summary)
+    await reporter.phase_end(summary)
     return summary
 
 
@@ -202,9 +203,9 @@ def pending_notifications(reader: RailsReader) -> set[tuple[int, int]]:
     return pending
 
 
-def migrate_joins(
+async def migrate_joins(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     audit: AuditStore,
     metrics: MetricsClient,
@@ -213,9 +214,9 @@ def migrate_joins(
 ) -> PhaseSummary:
     summary = PhaseSummary(table="joined_users")
     start = time.perf_counter()
-    reporter.phase_start("joins", "joined_users")
-    user_map = audit.existing_mapping("users")
-    meetup_map = audit.existing_mapping("meetups")
+    await reporter.phase_start("joins", "joined_users")
+    user_map = await audit.existing_mapping("users")
+    meetup_map = await audit.existing_mapping("meetups")
     pending = pending_notifications(reader)
     seen_pairs: set[tuple[int, int]] = set()
 
@@ -226,7 +227,7 @@ def migrate_joins(
     )
 
     for source_table, is_waiting_list in sources:
-        already = audit.processed_old_ids(source_table)
+        already = await audit.processed_old_ids(source_table)
         for row in reader.stream(f"SELECT * FROM {source_table} ORDER BY id"):  # noqa: S608 — constant
             summary.read += 1
             emit_count(metrics, MetricKey.MIGRATION_ROWS_READ, 1, dims=phase_dims(mode, source_table))
@@ -238,18 +239,18 @@ def migrate_joins(
             user_old, meetup_old = row.get("user_id"), row.get("meetup_id")
             if user_old is None or meetup_old is None:
                 summary.skipped += 1
-                record_row_skipped(metrics, mode, source_table, audit, reporter, old_id, "null-fk")
+                await record_row_skipped(metrics, mode, source_table, audit, reporter, old_id, "null-fk")
                 continue
             user_new = user_map.get(int(user_old))
             meetup_new = meetup_map.get(int(meetup_old))
             if user_new is None or meetup_new is None:
                 summary.skipped += 1
-                record_row_skipped(metrics, mode, source_table, audit, reporter, old_id, "fk-not-migrated")
+                await record_row_skipped(metrics, mode, source_table, audit, reporter, old_id, "fk-not-migrated")
                 continue
             pair = (user_new, meetup_new)
             if pair in seen_pairs:
                 summary.skipped += 1
-                record_row_skipped(metrics, mode, source_table, audit, reporter, old_id, "duplicate-pair")
+                await record_row_skipped(metrics, mode, source_table, audit, reporter, old_id, "duplicate-pair")
                 continue
 
             join_kwargs = map_join(
@@ -261,25 +262,25 @@ def migrate_joins(
             )
             join = JoinedUsers(**join_kwargs)
             try:
-                with session.begin_nested():
+                async with session.begin_nested():
                     session.add(join)
             except Exception as exc:  # noqa: BLE001
                 summary.failed += 1
-                record_row_failed(metrics, mode, source_table, audit, reporter, old_id, repr(exc))
+                await record_row_failed(metrics, mode, source_table, audit, reporter, old_id, repr(exc))
                 continue
             seen_pairs.add(pair)
             summary.inserted += 1
-            record_row_inserted(metrics, mode, source_table, audit, reporter, old_id, int(join.id or 0))
+            await record_row_inserted(metrics, mode, source_table, audit, reporter, old_id, int(join.id or 0))
 
     summary.duration_ms = int((time.perf_counter() - start) * 1000)
     emit_phase_duration(metrics, mode, "joined_users", summary.duration_ms)
-    reporter.phase_end(summary)
+    await reporter.phase_end(summary)
     return summary
 
 
-def migrate_invitations(
+async def migrate_invitations(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     audit: AuditStore,
     metrics: MetricsClient,
@@ -288,10 +289,10 @@ def migrate_invitations(
 ) -> PhaseSummary:
     summary = PhaseSummary(table="invitations")
     start = time.perf_counter()
-    reporter.phase_start("invitations", "invitations")
-    user_map = audit.existing_mapping("users")
-    meetup_map = audit.existing_mapping("meetups")
-    already = audit.processed_old_ids("invitations")
+    await reporter.phase_start("invitations", "invitations")
+    user_map = await audit.existing_mapping("users")
+    meetup_map = await audit.existing_mapping("meetups")
+    already = await audit.processed_old_ids("invitations")
 
     for row in reader.stream("SELECT * FROM invitations ORDER BY id"):
         summary.read += 1
@@ -304,45 +305,47 @@ def migrate_invitations(
         friend_old, host_old, meetup_old = row.get("friend_id"), row.get("host_id"), row.get("meetup_id")
         if friend_old is None or host_old is None or meetup_old is None:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "null-fk")
+            await record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "null-fk")
             continue
         friend_new = user_map.get(int(friend_old))
         host_new = user_map.get(int(host_old))
         meetup_new = meetup_map.get(int(meetup_old))
         if friend_new is None or host_new is None or meetup_new is None:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "phantom-or-not-migrated")
+            await record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "phantom-or-not-migrated")
             continue
 
-        join = session.exec(
-            select(JoinedUsers).where((JoinedUsers.user_id == friend_new) & (JoinedUsers.meetup_id == meetup_new))
+        join = (
+            await session.exec(
+                select(JoinedUsers).where((JoinedUsers.user_id == friend_new) & (JoinedUsers.meetup_id == meetup_new))
+            )
         ).first()
         if join is None:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "no-joined-link")
+            await record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "no-joined-link")
             continue
 
         try:
-            with session.begin_nested():
+            async with session.begin_nested():
                 for key, value in map_invitation(host_new).items():
                     setattr(join, key, value)
                 session.add(join)
         except Exception as exc:  # noqa: BLE001
             summary.failed += 1
-            record_row_failed(metrics, mode, "invitations", audit, reporter, old_id, repr(exc))
+            await record_row_failed(metrics, mode, "invitations", audit, reporter, old_id, repr(exc))
             continue
         summary.inserted += 1
-        record_row_inserted(metrics, mode, "invitations", audit, reporter, old_id, int(join.id or 0))
+        await record_row_inserted(metrics, mode, "invitations", audit, reporter, old_id, int(join.id or 0))
 
     summary.duration_ms = int((time.perf_counter() - start) * 1000)
     emit_phase_duration(metrics, mode, "invitations", summary.duration_ms)
-    reporter.phase_end(summary)
+    await reporter.phase_end(summary)
     return summary
 
 
-def migrate_messages(
+async def migrate_messages(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     audit: AuditStore,
     metrics: MetricsClient,
@@ -351,9 +354,9 @@ def migrate_messages(
 ) -> PhaseSummary:
     summary = PhaseSummary(table="messages")
     start = time.perf_counter()
-    reporter.phase_start("messages", "messages")
-    meetup_map = audit.existing_mapping("meetups")
-    already = audit.processed_old_ids("messages")
+    await reporter.phase_start("messages", "messages")
+    meetup_map = await audit.existing_mapping("meetups")
+    already = await audit.processed_old_ids("messages")
 
     for row in reader.stream("SELECT * FROM messages ORDER BY id"):
         summary.read += 1
@@ -366,32 +369,32 @@ def migrate_messages(
         meetup_new = meetup_map.get(int(meetup_old)) if meetup_old is not None else None
         if meetup_new is None:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "messages", audit, reporter, old_id, "meetup-not-migrated")
+            await record_row_skipped(metrics, mode, "messages", audit, reporter, old_id, "meetup-not-migrated")
             continue
         try:
             message_kwargs = map_message(row, meetup_new_id=meetup_new)
         except RowMappingError as exc:
             summary.skipped += 1
-            record_row_skipped(metrics, mode, "messages", audit, reporter, old_id, str(exc))
+            await record_row_skipped(metrics, mode, "messages", audit, reporter, old_id, str(exc))
             continue
         message = Message(**message_kwargs)
         try:
-            with session.begin_nested():
+            async with session.begin_nested():
                 session.add(message)
         except Exception as exc:  # noqa: BLE001
             summary.failed += 1
-            record_row_failed(metrics, mode, "messages", audit, reporter, old_id, repr(exc))
+            await record_row_failed(metrics, mode, "messages", audit, reporter, old_id, repr(exc))
             continue
         summary.inserted += 1
-        record_row_inserted(metrics, mode, "messages", audit, reporter, old_id, int(message.id or 0))
+        await record_row_inserted(metrics, mode, "messages", audit, reporter, old_id, int(message.id or 0))
 
     summary.duration_ms = int((time.perf_counter() - start) * 1000)
     emit_phase_duration(metrics, mode, "messages", summary.duration_ms)
-    reporter.phase_end(summary)
+    await reporter.phase_end(summary)
     return summary
 
 
-def archive_dropped_tables(
+async def archive_dropped_tables(
     *,
     reader: RailsReader,
     writer: ArchiveWriter,
@@ -400,7 +403,7 @@ def archive_dropped_tables(
     reporter: MigrationReporter,
 ) -> dict[str, PhaseSummary]:
     summaries: dict[str, PhaseSummary] = {}
-    reporter.phase_start("archive", "dropped tables")
+    await reporter.phase_start("archive", "dropped tables")
     for table in ARCHIVED_TABLES:
         start = time.perf_counter()
         summary = PhaseSummary(table=table)
@@ -419,14 +422,14 @@ def archive_dropped_tables(
             dimensions=phase_dims(mode, table),
         )
         emit_phase_duration(metrics, mode, f"archive:{table}", summary.duration_ms)
-        reporter.archive_table(table, row_count, byte_count)
+        await reporter.archive_table(table, row_count, byte_count)
         summaries[table] = summary
     return summaries
 
 
-def verify(
+async def verify(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     metrics: MetricsClient,
     mode: MigrationMode,
@@ -440,7 +443,7 @@ def verify(
     )
     for rails_table, model in pairs:
         rails_count = reader.count(rails_table)
-        new_count = session.exec(select(func.count()).select_from(model)).first() or 0
+        new_count = (await session.exec(select(func.count()).select_from(model))).first() or 0
         delta = rails_count - int(new_count)
         deltas[rails_table] = delta
         metrics.emit(
@@ -451,7 +454,7 @@ def verify(
         )
     # joined_users delta uses the sum of both Rails join tables.
     rails_joins = reader.count("user_join_meetups") + reader.count("user_waiting_lists")
-    new_joins = session.exec(select(func.count()).select_from(JoinedUsers)).first() or 0
+    new_joins = (await session.exec(select(func.count()).select_from(JoinedUsers))).first() or 0
     deltas["joined_users"] = rails_joins - int(new_joins)
     metrics.emit(
         MetricKey.MIGRATION_VERIFICATION_DELTA,
@@ -462,9 +465,9 @@ def verify(
     return deltas
 
 
-def run_migration(
+async def run_migration(
     *,
-    session: Session,
+    session: AsyncSession,
     reader: RailsReader,
     archive_writer: ArchiveWriter,
     metrics: MetricsClient,
@@ -482,6 +485,7 @@ def run_migration(
     audit = AuditStore(session)
     report: dict[str, Any] = {"mode": str(mode), "phases": {}, "verification": {}, "archive": {}}
 
+    # The lambdas build coroutines; the dispatch loop awaits them.
     dispatch = {
         "users": lambda: migrate_users(
             session=session, reader=reader, audit=audit, metrics=metrics, mode=mode, reporter=reporter
@@ -503,16 +507,16 @@ def run_migration(
     for phase in phases:
         match phase:
             case "users" | "meetups" | "joins" | "invitations" | "messages":
-                summary = dispatch[phase]()
+                summary = await dispatch[phase]()
                 report["phases"][phase] = summary_dict(summary)
             case "archive":
-                archived = archive_dropped_tables(
+                archived = await archive_dropped_tables(
                     reader=reader, writer=archive_writer, metrics=metrics, mode=mode, reporter=reporter
                 )
                 report["archive"] = {name: summary_dict(s) for name, s in archived.items()}
             case "verify":
-                deltas = verify(session=session, reader=reader, metrics=metrics, mode=mode)
-                reporter.verification(deltas)
+                deltas = await verify(session=session, reader=reader, metrics=metrics, mode=mode)
+                await reporter.verification(deltas)
                 report["verification"] = deltas
             case _:
                 raise ValueError(f"Unknown phase: {phase!r}")

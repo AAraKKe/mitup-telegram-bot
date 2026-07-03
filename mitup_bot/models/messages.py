@@ -34,7 +34,9 @@ class Message(BaseModel, SQLModel, table=True):
         sa_column=Column(type_=MessageButtons.as_mutable(JSON(none_as_null=True)), nullable=True),
     )
 
-    meetup: Meetup = Relationship(back_populates="messages")
+    # lazy="selectin": the inline search handler reads `message.meetup` in plain Python, and
+    # implicit lazy loads raise MissingGreenlet under the async engine.
+    meetup: Meetup = Relationship(back_populates="messages", sa_relationship_kwargs={"lazy": "selectin"})
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"id"}))

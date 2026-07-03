@@ -1,10 +1,11 @@
 from typing import cast
 
-from sqlmodel import Session, delete
+from sqlmodel import delete
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
@@ -18,13 +19,13 @@ from .enums import MeetingHandlerId
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.DELETE_MEETING_CALLBACK, callback_data=cb.DELETE_MEETING, bindable=True
 )
-@with_async_session
-async def callback_query_delete_meeting(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_query_delete_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.DELETE_MEETING.parse(context.match), MeetingHandlerId.DELETE_MEETING_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.user_owns_meeting(user, callback_data.id, "Delete meeting", update, context)
     if meeting is None:
@@ -44,14 +45,14 @@ async def callback_query_delete_meeting(session: Session, update: Update, contex
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, callback_data=cb.CONFIRM_DELETE_MEETING, bindable=True
 )
-@with_async_session
-async def callback_query_confirm_delete_meeting(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_query_confirm_delete_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_DELETE_MEETING.parse(context.match),
         MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK,
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.user_owns_meeting(user, callback_data.id, "Confirm delete meeting", update, context)
     if meeting is None:
@@ -61,8 +62,8 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
 
     # Keep all invited users ides to also delete them
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
-    session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
-    session.delete(meeting)
+    await session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
+    await session.delete(meeting)
 
     view = MitupView(
         description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user.lang),
@@ -81,13 +82,13 @@ async def callback_query_confirm_delete_meeting(session: Session, update: Update
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK, callback_data=cb.DECLINE_DELETE_MEETING, bindable=True
 )
-@with_async_session
-async def callback_query_decline_delete_meeting(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_query_decline_delete_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.DECLINE_DELETE_MEETING.parse(context.match),
         MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
     )
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session, user, callback_data.id, "Decline delete meeting", update, context

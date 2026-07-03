@@ -1,11 +1,11 @@
 from enum import auto
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.utils.messages import CommonMessages
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -27,9 +27,9 @@ class StaleCancelHandlerId(HandlerId):
     callback_data=STALE_CANCEL,
     auto_answer=False,
 )
-@with_async_session
-async def callback_query_stale_cancel(session: Session, update: Update, context: TMitupContext) -> None:
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_stale_cancel(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+    user = await guards.current_user(update, session)
 
     alert_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user.lang)
     await context.api.answer_callback_query(update, text=alert_text, show_alert=True)

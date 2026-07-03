@@ -1,8 +1,8 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards, views
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import SUPPORTED_LANGUAGES
@@ -16,13 +16,13 @@ from .enums import EditMeetingHandlerId
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.LANGUAGE_CALLBACK, callback_data=cb.EDIT_MEETING_LANGUAGE
 )
-@with_async_session
-async def callback_edit_meeting_language(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_edit_meeting_language(session: AsyncSession, update: Update, context: TMitupContext):
     valid_data = guards.valid_callback_data(
         cb.EDIT_MEETING_LANGUAGE.parse(context.match), EditMeetingHandlerId.LANGUAGE_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     meeting = await guards.meeting_accessible(session, user, valid_data.id, "Edit meeting language", update, context)
 
     if meeting is None:
@@ -37,13 +37,13 @@ async def callback_edit_meeting_language(session: Session, update: Update, conte
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_MEETING_LANGUAGE
 )
-@with_async_session
-async def callback_set_meeting_language(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_set_meeting_language(session: AsyncSession, update: Update, context: TMitupContext):
     valid_data = guards.valid_meeting_callback_data(
         cb.SET_MEETING_LANGUAGE.parse(context.match), EditMeetingHandlerId.SET_LANGUAGE_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     meeting = await guards.meeting_accessible(
         session, user, valid_data.meeting_id, "Set meeting language", update, context
     )
@@ -57,7 +57,7 @@ async def callback_set_meeting_language(session: Session, update: Update, contex
     meeting.language = SUPPORTED_LANGUAGES[valid_data.id]
     for message in meeting.messages:
         message.buttons.keyboard = meeting.build_inline_keyboard(is_searchable=message.chat_instance is not None)
-    session.flush()
+    await session.flush()
 
     await context.api.edit_message(
         update=update,

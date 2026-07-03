@@ -152,9 +152,9 @@ def expected_inline_message(
 
 
 @pytest.mark.parametrize("mock_meeting", [EXAMPLE_MEETING, None], ids=["meeting_exist", "meeting_does_not_exist"])
-def test_meeting_does_not_exist(mock_session: MockDbSession, mock_meeting: mock.MagicMock):
+async def test_meeting_does_not_exist(mock_session: MockDbSession, mock_meeting: mock.MagicMock):
     mock_session.add_object(mock_meeting)
-    meeting = Meetup.by_id(mock_session, 123, must_exist=False)
+    meeting = await Meetup.by_id(mock_session, 123, must_exist=False)
 
     expected_query = mock_session.queries_executed[0]
 
@@ -163,9 +163,9 @@ def test_meeting_does_not_exist(mock_session: MockDbSession, mock_meeting: mock.
     assert meeting == mock_meeting
 
 
-def test_meeting_does_not_exist_fail_when_must_exist(mock_session: MockDbSession):
+async def test_meeting_does_not_exist_fail_when_must_exist(mock_session: MockDbSession):
     with pytest.raises(MeetupNotFound):
-        Meetup.by_id(mock_session, 1, must_exist=True)
+        await Meetup.by_id(mock_session, 1, must_exist=True)
 
 
 @pytest.mark.parametrize(

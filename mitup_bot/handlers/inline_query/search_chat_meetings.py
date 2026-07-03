@@ -1,7 +1,8 @@
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.guards import user_language, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, Message
@@ -15,20 +16,20 @@ from .utils import search_chat_meetings_button, sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, pattern=r"search:.+")
-@with_async_session
-async def search_chat_meetings(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def search_chat_meetings(session: AsyncSession, update: Update, context: TMitupContext):
     """Search for meetings attached to a specific chat via `chat_instance`.
 
     The inline query has the form `search:<chat_instance>`.  The handler looks up
     all messages stored with that `chat_instance`, collects the unique active
     meetings, sorts them by relevance, and returns them as inline results.
     """
-    lang = user_language(update, session)
+    lang = await user_language(update, session)
     query = valid_inline_query(update).query
     chat_instance = query.removeprefix(SEARCH_QUERY_PREFIX)
 
     statement = select(Message).where(Message.chat_instance == chat_instance)
-    messages = session.exec(statement).all()
+    messages = (await session.exec(statement)).all()
 
     # Collect unique active meetings via the already-loaded relationship
     seen: set[int] = set()

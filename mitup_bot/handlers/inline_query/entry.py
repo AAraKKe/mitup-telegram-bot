@@ -1,7 +1,7 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.guards import current_user, shareable_meeting_id
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, User
@@ -17,14 +17,14 @@ from .utils import meeting_unavailable_view, sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW, pattern=r"^\s*$")
-@with_async_session
-async def inline_view(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def inline_view(session: AsyncSession, update: Update, context: TMitupContext):
     """Show the default inline view when a user invokes the bot in any chat without a specific query.
 
     This handler can be triggered by any Telegram user, whether or not they have a mitup profile.
     If the user is registered, their preferred language is used; otherwise the fallback language is applied.
     """
-    user = User.by_tg_user_id(session, update.effective_user.id) if update.effective_user else None
+    user = await User.by_tg_user_id(session, update.effective_user.id) if update.effective_user else None
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
 
     button_text = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON
@@ -57,19 +57,19 @@ async def inline_view(session: Session, update: Update, context: TMitupContext):
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SHARE_MEETING, pattern=r"\d+")
-@with_async_session
-async def share_meeting(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def share_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle an inline query to share a meeting.
     TODO: Right now we are only allowing existing users to share a meeting. We should allow non-existing users to
     share a meeting as well when public meeting feature is implemented.
     """
-    user = current_user(update, session)
+    user = await current_user(update, session)
     meeting_id = await shareable_meeting_id(update, context)
     if meeting_id is None:
         return
 
-    meeting = Meetup.by_id(session, meeting_id)
+    meeting = await Meetup.by_id(session, meeting_id)
 
     if meeting and meeting.active and (meeting.public or meeting.is_owned_by(user)):
         results = [meeting.inline_view()]

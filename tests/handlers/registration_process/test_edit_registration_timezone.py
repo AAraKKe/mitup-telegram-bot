@@ -16,7 +16,7 @@ from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import RegistrationMessages
 from mitup_bot.views import factory
-from tests.helpers import StubMitupContext, UpdateRequest, create_user
+from tests.helpers import StubMitupContext, UpdateRequest, claimed_state, create_user
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -49,7 +49,7 @@ async def test_registration_timezone_invalid_input_handler_sends_invalid_input_m
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    result = await registration_timezone_invalid_input_handler(update, context)
+    result = await claimed_state(registration_timezone_invalid_input_handler(update, context))
 
     context.api.assert_send_message_called(
         update,
@@ -69,7 +69,7 @@ async def test_registration_timezone_text_message_handler_sets_timezone_and_ends
     assert update.effective_message is not None
     get_timezone_from_api.return_value = update.effective_message.text
 
-    result = await registration_timezone_text_message_handler(update, context)
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     view = factory.main_menu_view(lang=user_with_settings.lang).with_context(
         RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=update.effective_message.text)
@@ -90,7 +90,7 @@ async def test_registration_timezone_text_message_handler_stays_in_timezone_stat
     mock_session.add_object(user_with_settings, "tg_user_id")
     get_timezone_from_api.return_value = None
 
-    result = await registration_timezone_text_message_handler(update, context)
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     context.api.assert_send_message_called(
         update,
@@ -110,7 +110,7 @@ async def test_registration_timezone_location_message_handler_sets_timezone_and_
     mock_session.add_object(user_with_settings, "tg_user_id")
     get_location_from_api.return_value = "Europe/Madrid"
 
-    result = await registration_timezone_location_message_handler(update, context)
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     view = factory.main_menu_view(lang=user_with_settings.lang).with_context(
         RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Madrid")
@@ -134,7 +134,7 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
     mock_session.add_object(user_with_settings, "tg_user_id")
     get_location_from_api.return_value = None
 
-    result = await registration_timezone_location_message_handler(update, context)
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     context.api.assert_send_message_called(
         update,
@@ -174,7 +174,7 @@ async def test_joined_only_user_promoted_to_member_on_text_success(
     assert update.effective_message is not None
     get_timezone_from_api.return_value = update.effective_message.text
 
-    result = await registration_timezone_text_message_handler(update, context)
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     assert joined_only_user.status is UserStatus.MEMBER
     assert result == ConversationHandler.END
@@ -197,7 +197,7 @@ async def test_joined_only_user_stays_joined_only_when_address_not_recognized(
     mock_session.add_object(joined_only_user, "tg_user_id")
     get_timezone_from_api.return_value = None
 
-    result = await registration_timezone_text_message_handler(update, context)
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     assert joined_only_user.status is UserStatus.JOINED_ONLY
     assert result == ConversationRegistrationProcessState.TIMEZONE
@@ -221,7 +221,7 @@ async def test_left_user_completes_conversation_and_is_promoted_to_member(
     assert update.effective_message is not None
     get_timezone_from_api.return_value = update.effective_message.text
 
-    result = await registration_timezone_text_message_handler(update, context)
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     assert left_user.status is UserStatus.MEMBER
     assert result == ConversationHandler.END
@@ -241,7 +241,7 @@ async def test_joined_only_user_promoted_to_member_on_location_success(
     mock_session.add_object(joined_only_user, "tg_user_id")
     get_location_from_api.return_value = "Europe/Madrid"
 
-    result = await registration_timezone_location_message_handler(update, context)
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     assert joined_only_user.status is UserStatus.MEMBER
     assert result == ConversationHandler.END
@@ -260,7 +260,7 @@ async def test_joined_only_user_stays_joined_only_when_location_not_recognized(
     mock_session.add_object(joined_only_user, "tg_user_id")
     get_location_from_api.return_value = None
 
-    result = await registration_timezone_location_message_handler(update, context)
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     assert joined_only_user.status is UserStatus.JOINED_ONLY
     assert result == ConversationRegistrationProcessState.TIMEZONE
@@ -287,7 +287,7 @@ async def test_brand_new_user_starts_with_member_status(
     `status` column defaults to MEMBER from the model — there is no JOINED_ONLY
     intermediate state here.
     """
-    await command_start_with_new_user(update, context)
+    await claimed_state(command_start_with_new_user(update, context))
 
     # Exactly one User object was added to the session — and its status is MEMBER (the model default).
     added_users = [obj for obj in mock_session.objects_added if isinstance(obj, User)]
@@ -316,7 +316,7 @@ async def test_brand_new_user_completes_conversation_with_member_status(
     assert update.effective_message is not None
     get_timezone_from_api.return_value = update.effective_message.text
 
-    result = await registration_timezone_text_message_handler(update, context)
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     assert brand_new_user.status is UserStatus.MEMBER
     assert result == ConversationHandler.END

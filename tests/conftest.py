@@ -148,14 +148,14 @@ def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
     Since we are centralizing db interaction through the base model we can easily
     patch Session there without having to worry it being instantiated anywhere else
     """
-    with mock.patch("mitup_bot.db.sessionmaker") as maker_patch:
+    with mock.patch("mitup_bot.db.async_sessionmaker") as maker_patch:
         mocked_session = MockDbSession()
-        # Setup a factory that returns our mocked_session
-        maker_factory = mock.MagicMock(return_value=mocked_session)
-        maker_patch.return_value.return_value.__enter__ = maker_factory
+        # Calling the factory returns an async context manager yielding our mocked_session
+        maker_patch.return_value.return_value.__aenter__ = mock.AsyncMock(return_value=mocked_session)
+        maker_patch.return_value.return_value.__aexit__ = mock.AsyncMock(return_value=False)
 
-        with mock.patch("mitup_bot.db.create_engine"):
-            # Patch create_engine to and make sure we are not creating an engine while
+        with mock.patch("mitup_bot.db.create_async_engine"):
+            # Patch create_async_engine to make sure we are not creating an engine while
             # testing
             db.configure_db(db_config, skip_if_initialized=True)
             yield mocked_session

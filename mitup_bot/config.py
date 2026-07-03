@@ -122,8 +122,15 @@ class DbConfig(BaseModel):
     url: str
     database: str
     port: int = 5432
-    url_schema: str = "postgresql"
+    # psycopg (v3) drives both the async bot engine and Alembic's sync migration engine.
+    url_schema: str = "postgresql+psycopg"
     engine_echo: bool = False
+    # Connection pool sizing for the bot engine. Defaults mirror SQLAlchemy's own
+    # (5 persistent + 10 overflow), which is the capacity the bot ran with before
+    # the pool was made explicit.
+    pool_size: int = 5
+    max_overflow: int = 10
+    pool_timeout: int = 30
 
     @property
     def full_url(self) -> URL:

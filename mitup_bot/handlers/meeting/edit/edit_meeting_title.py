@@ -1,10 +1,10 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
@@ -19,13 +19,13 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.TITLE_CALLBACK, callback_data=cb.EDIT_MEETING_TITLE, bindable=False
 )
-@with_async_session
-async def callback_query_edit_meeting_title(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def callback_query_edit_meeting_title(session: AsyncSession, update: Update, context: TMitupContext):
     meeting_id = guards.valid_callback_data(
         cb.EDIT_MEETING_TITLE.parse(context.match), EditMeetingHandlerId.TITLE_CALLBACK
     ).id
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     meeting = await guards.meeting_accessible(
         session,
         user,
@@ -64,16 +64,16 @@ async def callback_query_edit_meeting_title(session: Session, update: Update, co
 
 
 @HandlersRegistry.register_message(EditMeetingHandlerId.TITLE_MESSAGE, filters.TEXT, bindable=False)
-@with_async_session
-async def edit_title_meeting_message_handler(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def edit_title_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
     assert update.effective_message is not None and update.effective_message.text is not None
 
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:
-        meeting = Meetup.by_id(session, meeting_id, must_exist=True)
+        meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
         meeting.title = update.effective_message.text
 
         session.add(meeting)
-        session.flush()
+        await session.flush()
 
         view = meeting.edit_view.with_context(MeetingEditContentMessages.TITLE_SUCCESS.get(title=meeting.title))
         await context.api.send_message(update=update, view=view)

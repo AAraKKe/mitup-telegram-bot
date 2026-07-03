@@ -1,6 +1,6 @@
 ---
 name: database
-description: Database layer conventions. Auto-load when writing or modifying models, sessions, migrations, or @with_session/@with_async_session decorators.
+description: Database layer conventions. Auto-load when writing or modifying models, sessions, migrations, or the @with_session decorator.
 user-invocable: false
 ---
 
@@ -8,35 +8,35 @@ user-invocable: false
 
 ## Engine and sessions
 
-The database layer lives in `mitup_bot/db.py`. It uses SQLAlchemy with SQLModel and manages sessions through a `sessionmaker` configured at startup via `configure_db()`.
+The database layer lives in `mitup_bot/db.py`. It uses SQLAlchemy's **async engine** (psycopg 3 driver) with SQLModel's `AsyncSession`, managed through an `async_sessionmaker` configured at startup via `configure_db()`. Pool sizing comes from `DbConfig` (`pool_size` / `max_overflow` / `pool_timeout`).
 
-**Never create sessions manually.** Use the session-injecting decorators instead.
+**Never create sessions manually.** Use the session-injecting decorator instead.
 
-## Session decorators
+## Session decorator
 
-Two decorators inject a `Session` as the first positional argument and wrap the call in a transaction (commit on success, rollback on exception):
-
-| Decorator | Use case |
-|-----------|----------|
-| `with_session` | Synchronous functions |
-| `with_async_session` | Async functions (handlers, CLI commands) |
+`with_session` injects an `AsyncSession` as the first positional argument and wraps the call in a transaction (commit on success, rollback on exception). The decorated function must be async; every session I/O method (`exec`, `flush`, `refresh`, `delete`, `get`, `commit`, `rollback`, `begin_nested`) must be awaited (`begin_nested` is used with `async with`).
 
 ```python
-from mitup_bot.db import with_async_session
-from sqlmodel import Session
+from mitup_bot.db import with_session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-@with_async_session
-async def my_handler(session: Session, update: Update, context: MitupContext) -> int:
-    user = session.get(User, user_id)
+@with_session
+async def my_handler(session: AsyncSession, update: Update, context: MitupContext) -> int:
+    user = (await session.exec(select(User).where(User.id == user_id))).first()
     ...
 
 # Call without the session argument — the decorator supplies it:
 await my_handler(update, context)
 ```
 
-<note>
-`ty` does not yet support `Concatenate` / `ParamSpec`, so call sites produce a false-positive `missing-argument` error. Suppress with `# ty: ignore[missing-argument]` and include the tracking issue URL. See the `type-checking` skill for the full convention.
-</note>
+## Lazy loading is forbidden at runtime
+
+The async engine cannot run implicit lazy loads: touching an unloaded relationship or expired attribute raises `MissingGreenlet`. The strategy:
+
+- Relationships traversed in plain Python by model properties are `lazy="selectin"` (via `sa_relationship_kwargs`): `User.settings`, `Meetup.owner/messages/joined_links`, `JoinedUsers.user/invited_by/meetup`, `Message.meetup`.
+- `User.meetups` and `User.joined_links` are `lazy="raise"` (eager both ways would recurse across the whole social graph): any unloaded access raises `InvalidRequestError` immediately instead of a prod-only `MissingGreenlet`. Load them through the sanctioned routes only — `User.by_tg_user_id` applies explicit `selectinload` options (covers every current-user path), and freshly flushed users get `await session.refresh(user, ["joined_links", "meetups"])` (see `register_default_user`).
+- After flushing a **new** instance, its never-touched collections are still unloaded — `await session.refresh(obj, ["<relationship>"])` before rendering anything that traverses them (see the create-meeting handler).
+- The session factory sets `expire_on_commit=False`, so post-commit attribute access never triggers a load.
 
 ## Models
 

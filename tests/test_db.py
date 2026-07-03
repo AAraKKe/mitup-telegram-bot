@@ -1,10 +1,9 @@
-import asyncio
 import inspect
 from unittest import mock
 
 import pytest
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
 from mitup_bot.config import DbConfig
@@ -34,8 +33,8 @@ def serializable_model(request: pytest.FixtureRequest):
 
 def test_db_initilization(db_config: DbConfig):
     with (
-        mock.patch("mitup_bot.db.sessionmaker") as mock_maker,
-        mock.patch("mitup_bot.db.create_engine") as mock_engine,
+        mock.patch("mitup_bot.db.async_sessionmaker") as mock_maker,
+        mock.patch("mitup_bot.db.create_async_engine") as mock_engine,
     ):
         db.configure_db(db_config)
 
@@ -45,13 +44,16 @@ def test_db_initilization(db_config: DbConfig):
         echo=db_config.engine_echo,
         json_serializer=db.serialize_pydantic_model,
         json_deserializer=db.deserialize_pydantic_model,
+        pool_size=db_config.pool_size,
+        max_overflow=db_config.max_overflow,
+        pool_timeout=db_config.pool_timeout,
     )
 
 
 def test_db_cannot_be_configured_twice(db_config: DbConfig):
     with (
-        mock.patch("mitup_bot.db.sessionmaker") as mock_maker,
-        mock.patch("mitup_bot.db.create_engine") as mock_engine,
+        mock.patch("mitup_bot.db.async_sessionmaker") as mock_maker,
+        mock.patch("mitup_bot.db.create_async_engine") as mock_engine,
     ):
         db.configure_db(db_config)
 
@@ -64,35 +66,27 @@ def test_db_cannot_be_configured_twice(db_config: DbConfig):
         echo=db_config.engine_echo,
         json_serializer=db.serialize_pydantic_model,
         json_deserializer=db.deserialize_pydantic_model,
+        pool_size=db_config.pool_size,
+        max_overflow=db_config.max_overflow,
+        pool_timeout=db_config.pool_timeout,
     )
 
 
-def test_cannot_get_transaction_without_configuring_db():
+async def test_cannot_get_transaction_without_configuring_db():
     with pytest.raises(db.DbNotInitializedError):
-        with db.begin():
+        async with db.begin():
             pass
 
 
-def test_decorator_with_async(mock_session: MockDbSession):
-    async def f(s: Session) -> int:
-        return 1
-
-    wrapped = db.with_async_session(f)()
-
-    assert inspect.iscoroutine(wrapped)
-
-    assert asyncio.run(wrapped) == 1
-
-
-def test_decorator_with_method(mock_session: MockDbSession):
-    def f(s: Session) -> int:
+async def test_session_decorator(mock_session: MockDbSession):
+    async def f(s: AsyncSession) -> int:
         return 1
 
     wrapped = db.with_session(f)()
 
-    assert not inspect.iscoroutine(wrapped)
+    assert inspect.iscoroutine(wrapped)
 
-    assert wrapped == 1
+    assert await wrapped == 1
 
 
 def test_engine_json_serializer(meeting: Meetup):

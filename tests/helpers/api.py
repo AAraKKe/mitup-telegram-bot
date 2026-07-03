@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 from unittest import mock
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot.api_wrapper import TelegramApi
@@ -37,7 +37,7 @@ class MockApi(TelegramApi):
     def update_meeting_messages(
         self,
         *,
-        session: Session,
+        session: AsyncSession,
         meeting: Meetup,
         current_message: Message | None = DEFAULT_NONE,  # type: ignore
         skip_current: bool = DEFAULT_FALSE,  # type: ignore

@@ -1,11 +1,11 @@
 from typing import cast
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards, views
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CommonMessages, SettingsMessages
@@ -17,9 +17,9 @@ from .enums import ConversationSettingsState, EditSettingsHandlerId
 @HandlersRegistry.register_callback_query(
     EditSettingsHandlerId.TIMEOUT_CALLBACK, callback_data=cb.EDIT_TIMEOUT, bindable=False
 )
-@with_async_session
-async def callback_query_timeout(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_timeout(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     message = SettingsMessages.TIMEOUT_PROMPT.get(lang=user.lang, timeout=user.settings.timeout)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
@@ -32,15 +32,15 @@ async def callback_query_timeout(session: Session, update: Update, context: TMit
 @HandlersRegistry.register_message(
     EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT, PositiveNumberFilter(), bindable=False
 )
-@with_async_session
-async def settings_timeout_text_message_handler(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def settings_timeout_text_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     timeout_str = cast(str, guards.message(update).text)
 
     timeout = int(timeout_str)
 
     user.settings.timeout = timeout
-    session.flush()
+    await session.flush()
 
     message = SettingsMessages.TIMEOUT_SUCCESS.get(lang=user.lang, timeout=user.settings.timeout)
     view = views.factory.settings_view(lang=user.lang, message=message)
@@ -51,9 +51,9 @@ async def settings_timeout_text_message_handler(session: Session, update: Update
 
 
 @HandlersRegistry.register_message(EditSettingsHandlerId.TIMEOUT_INVALID_INPUT, filters=filters.ALL, bindable=False)
-@with_async_session
-async def settings_timeout_invalid_input_handler(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def settings_timeout_invalid_input_handler(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)

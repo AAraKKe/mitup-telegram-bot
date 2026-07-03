@@ -70,27 +70,6 @@ future.sort(key=lambda m: cast(dt.datetime, m.datetime))
 
 This section documents active `ty` bugs that require suppressions in the codebase. When a suppression is removed (because the upstream issue closed), remove the corresponding subsection here. The `check-ty-ignores` CI job signals when an issue has closed.
 
-### `Concatenate` / `ParamSpec` (ty#2759)
-
-`ty` lacks support for `typing.Concatenate`, causing false positives on functions decorated with `with_session` or `with_async_session` from `mitup_bot.db`. These decorators use `Callable[Concatenate[Session, P], R]` to strip the leading `Session` parameter, but `ty` does not understand this and reports `missing-argument` at call sites and `invalid-return-type` on the decorator return statements.
-
-Tracked in: https://github.com/astral-sh/ty/issues/2759
-
-Affected patterns:
-
-```python
-# Decorator definitions in mitup_bot/db.py — ty: ignore[invalid-return-type]
-def with_session[**P, R](func: Callable[Concatenate[Session, P], R]) -> Callable[P, R]:
-    ...
-
-# Call sites — ty: ignore[missing-argument]
-@with_async_session
-async def my_handler(session: Session, update: Update, context: MitupContext) -> int:
-    ...
-
-await my_handler(update, context)  # ty: ignore[missing-argument]  https://github.com/astral-sh/ty/issues/2759
-```
-
 ## CI enforcement
 
 The `check-ty-ignores` job (defined in `.gitlab/ci/test.yml`) runs `bin/check_ty_ignores.py` on merge requests. It scans `mitup_bot/`, `tests/`, and `bin/` and:

@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
 from sqlalchemy import JSON, Column, DateTime, FetchedValue
-from sqlmodel import Field, Relationship, Session, SQLModel, select
+from sqlmodel import Field, Relationship, SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot.exceptions import MeetupNotFound
@@ -92,9 +93,17 @@ class Meetup(BaseModel, SQLModel, table=True):
     )
     active: bool = True
 
-    owner: User = Relationship(back_populates="meetups")
-    messages: list[Message] = Relationship(back_populates="meetup")
-    joined_links: list[JoinedUsers] = Relationship(back_populates="meetup", cascade_delete=True)
+    # lazy="selectin" on all three: model properties traverse them in plain Python
+    # (`lang`/`timezone` via owner, `message_from_update` via messages, participant counts and
+    # lists via joined_links), and implicit lazy loads raise MissingGreenlet under the async
+    # engine. This also removes the old per-meeting N+1 on list views.
+    owner: User = Relationship(back_populates="meetups", sa_relationship_kwargs={"lazy": "selectin"})
+    messages: list[Message] = Relationship(back_populates="meetup", sa_relationship_kwargs={"lazy": "selectin"})
+    joined_links: list[JoinedUsers] = Relationship(
+        back_populates="meetup",
+        cascade_delete=True,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
@@ -718,26 +727,27 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @overload
     @classmethod
-    def by_id(
-        cls, session: Session, meetup_id: int, must_exist: Literal[True], include_inactive: bool = False
+    async def by_id(
+        cls, session: AsyncSession, meetup_id: int, must_exist: Literal[True], include_inactive: bool = False
     ) -> Self: ...  # pragma: no cover
 
     @overload
     @classmethod
-    def by_id(
-        cls, session: Session, meetup_id: int, must_exist: bool = ..., include_inactive: bool = False
+    async def by_id(
+        cls, session: AsyncSession, meetup_id: int, must_exist: bool = ..., include_inactive: bool = False
     ) -> Self | None: ...  # pragma: no cover
 
     @classmethod
-    def by_id(
+    async def by_id(
         cls,
-        session: Session,
+        session: AsyncSession,
         meetup_id: int,
         must_exist: bool = False,
         include_inactive: bool = True,
     ) -> Self | None:
         statement = select(cls).where(cls.id == meetup_id)
-        if (found_meetup := session.exec(statement).first()) is not None and (found_meetup.active or include_inactive):
+        found_meetup = (await session.exec(statement)).first()
+        if found_meetup is not None and (found_meetup.active or include_inactive):
             return found_meetup
 
         if must_exist:

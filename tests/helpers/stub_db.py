@@ -5,7 +5,8 @@ from unittest import mock
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import SelectBase
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot.models import User
@@ -34,14 +35,15 @@ class MockDbSession(mock.MagicMock):
     """
 
     def __init__(self, *args, **kwargs):
-        # Ensure the mock is created with Sesison as the spec
-        super().__init__(*args, spec=Session, **kwargs)
+        # Ensure the mock is created with AsyncSession as the spec
+        super().__init__(*args, spec=AsyncSession, **kwargs)
         self.add = mock.MagicMock(side_effect=self.__add_side_effect)
-        self.flush = mock.MagicMock()
-        self.refresh = mock.MagicMock()
+        # I/O methods are coroutines on AsyncSession, so they mock as AsyncMock
+        self.flush = mock.AsyncMock()
+        self.refresh = mock.AsyncMock()
         self.exec_return = mock.MagicMock()
-        self.exec = mock.MagicMock(side_effect=self.__exec_side_effect)
-        self.delete = mock.MagicMock()
+        self.exec = mock.AsyncMock(side_effect=self.__exec_side_effect)
+        self.delete = mock.AsyncMock()
         self.statements_registry: dict[str, Result] = {}
         self.objects_added: list[SQLModel] = []
         self.__last_id = 0

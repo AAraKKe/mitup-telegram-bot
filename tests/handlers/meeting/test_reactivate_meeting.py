@@ -63,7 +63,7 @@ async def test_reactivate_meeting_returns_silently_when_full_meeting_not_found(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """When Meetup.by_id(include_inactive=True) returns None, the handler returns silently
+    """When await Meetup.by_id(include_inactive=True) returns None, the handler returns silently
     without editing any message."""
     mock_session.add_object(user_with_settings, "tg_user_id")
     # Add the meeting so user_owns_meeting succeeds, but patch by_id to return None

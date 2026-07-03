@@ -2,7 +2,8 @@ import pytest
 from sqlmodel import select
 from telegram import Update
 
-from mitup_bot.handlers import MemberUserFilter, PositiveNumberFilter
+from mitup_bot import guards
+from mitup_bot.handlers import PositiveNumberFilter
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from tests.helpers import UpdateRequest, create_user
@@ -10,50 +11,50 @@ from tests.helpers.stub_db import MockDbSession
 
 
 def _register_member_lookup(mock_session: MockDbSession, user: User) -> None:
-    """Register the select statement used by MemberUserFilter so the mock returns `user`."""
+    """Register the select statement used by guards.member_user so the mock returns `user`."""
     statement = select(User).where(User.tg_user_id == user.tg_user_id, User.status == UserStatus.MEMBER)
     mock_session.add_objects_with_statement(statement, (user,))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
-def test_member_user_filter_without_effective_user(mock_session: MockDbSession, update: Update):
-    assert MemberUserFilter().filter(update) is False
+async def test_member_user_guard_without_effective_user(mock_session: MockDbSession, update: Update):
+    assert await guards.member_user(update, mock_session) is None
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=True)], indirect=True)
-def test_member_user_filter_with_member_user(mock_session: MockDbSession, update: Update):
-    """A MEMBER user matches — the filter is the gate for the existing-member /start flow."""
+async def test_member_user_guard_with_member_user(mock_session: MockDbSession, update: Update):
+    """A MEMBER user matches — the guard is the gate for the existing-member /start flow."""
     assert update.effective_user is not None
     member = create_user(id=1, tg_user_id=update.effective_user.id, status=UserStatus.MEMBER)
     _register_member_lookup(mock_session, member)
 
-    assert MemberUserFilter().filter(update) is True
+    assert await guards.member_user(update, mock_session) is member
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=True)], indirect=True)
-def test_member_user_filter_with_joined_only_user_is_false(mock_session: MockDbSession, update: Update):
-    """A JOINED_ONLY user must NOT pass the filter.
+async def test_member_user_guard_with_joined_only_user_is_none(mock_session: MockDbSession, update: Update):
+    """A JOINED_ONLY user must NOT pass the guard.
 
-    The filter's WHERE clause includes `status == MEMBER`, so a JOINED_ONLY row never matches
+    The guard's WHERE clause includes `status == MEMBER`, so a JOINED_ONLY row never matches
     even if the same tg_user_id exists. MockDbSession returns empty by default for
     unregistered statements, which is exactly what real SQL would return here.
     """
     assert update.effective_user is not None
-    assert MemberUserFilter().filter(update) is False
+    assert await guards.member_user(update, mock_session) is None
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=True)], indirect=True)
-def test_member_user_filter_with_left_user_is_false(mock_session: MockDbSession, update: Update):
-    """A LEFT user must NOT pass the filter — they re-enter via the new-user /start handler."""
+async def test_member_user_guard_with_left_user_is_none(mock_session: MockDbSession, update: Update):
+    """A LEFT user must NOT pass the guard — they re-enter via the re-onboarding /start handler."""
     assert update.effective_user is not None
-    assert MemberUserFilter().filter(update) is False
+    assert await guards.member_user(update, mock_session) is None
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=True)], indirect=True)
-def test_member_user_filter_with_effective_user_not_found(mock_session: MockDbSession, update: Update):
+async def test_member_user_guard_with_effective_user_not_found(mock_session: MockDbSession, update: Update):
     # While the update has an user, the user is not in the database
     assert update.effective_user is not None
-    assert MemberUserFilter().filter(update) is False
+    assert await guards.member_user(update, mock_session) is None
 
 
 @pytest.mark.parametrize(

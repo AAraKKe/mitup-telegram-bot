@@ -1,13 +1,15 @@
+import inspect
 import os
 import re
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 
 import docker
 import pytest
+import pytest_asyncio
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from pydantic import SecretStr
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from testcontainers.postgres import PostgresContainer
 
 from mitup_bot import db
@@ -43,6 +45,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         except Exception as exc:
             pytest.fail(f"Docker is unavailable but --db-tests was requested: {exc}")
 
+    # The db_session fixture (and its seeds) are session-scoped async fixtures living on the
+    # session event loop, so every async db test must run on that same loop.
+    for item in items:
+        if item.get_closest_marker("db_test") and inspect.iscoroutinefunction(getattr(item, "function", None)):
+            item.add_marker(pytest.mark.asyncio(loop_scope="session"), append=False)
+
 
 @pytest.fixture(scope="session")
 def pg_container() -> Generator[PostgresContainer]:
@@ -73,6 +81,7 @@ def live_db_config(pg_container: PostgresContainer) -> DbConfig:
 
 @pytest.fixture(scope="session")
 def migrated_db(live_db_config: DbConfig) -> Generator[DbConfig]:
+    # Alembic keeps its own synchronous engine, so the migration run stays sync.
     saved: dict[str, str | None] = {}
     env_vars = {
         "MITUPBOT__DB__USERNAME": live_db_config.username,
@@ -96,33 +105,33 @@ def migrated_db(live_db_config: DbConfig) -> Generator[DbConfig]:
                 os.environ[key] = original_value
 
 
-@pytest.fixture(scope="session")
-def db_session(migrated_db: DbConfig) -> Generator[Session]:
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def db_session(migrated_db: DbConfig) -> AsyncGenerator[AsyncSession]:
     db.configure_db(migrated_db, skip_if_initialized=True)
-    with db.begin() as session:
+    async with db.begin() as session:
         yield session
 
 
-@pytest.fixture(scope="session")
-def seed_user(db_session: Session) -> User:
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def seed_user(db_session: AsyncSession) -> User:
     user = User(first_name="Seed User One", tg_user_id=999_001)
     user.settings = Settings()
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
     return user
 
 
-@pytest.fixture(scope="session")
-def seed_second_user(db_session: Session) -> User:
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def seed_second_user(db_session: AsyncSession) -> User:
     user = User(first_name="Seed User Two", tg_user_id=999_002)
     user.settings = Settings()
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
     return user
 
 
-@pytest.fixture(scope="session")
-def seed_meetup(db_session: Session, seed_user: User) -> Meetup:
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def seed_meetup(db_session: AsyncSession, seed_user: User) -> Meetup:
     meetup = Meetup(
         title="Seed Meetup",
         waiting_list=False,
@@ -132,16 +141,16 @@ def seed_meetup(db_session: Session, seed_user: User) -> Meetup:
         owner=seed_user,
     )
     db_session.add(meetup)
-    db_session.flush()
+    await db_session.flush()
     return meetup
 
 
-@pytest.fixture(scope="session")
-def seed_joined_link(db_session: Session, seed_second_user: User, seed_meetup: Meetup) -> JoinedUsers:
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def seed_joined_link(db_session: AsyncSession, seed_second_user: User, seed_meetup: Meetup) -> JoinedUsers:
     joined = JoinedUsers(
         user=seed_second_user,
         meetup=seed_meetup,
     )
     db_session.add(joined)
-    db_session.flush()
+    await db_session.flush()
     return joined

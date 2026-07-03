@@ -4,7 +4,6 @@ __all__ = (
     "commands",
     "HandlersRegistry",
     "messages",
-    "MemberUserFilter",
     "PositiveNumberFilter",
     "inline_query",
     "edit_settings",
@@ -20,7 +19,7 @@ from .registry import HandlersRegistry
 
 # Then all other utils
 from . import commands, messages
-from .personal_filters import MemberUserFilter, PositiveNumberFilter
+from .personal_filters import PositiveNumberFilter
 
 # Then subpackages with different handlers registered
 from . import registration_process, edit_settings, inline_query, meeting, main_menu

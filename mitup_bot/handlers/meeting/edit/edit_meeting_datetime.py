@@ -3,13 +3,13 @@ from re import Match
 from typing import cast
 
 import structlog
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
@@ -89,15 +89,15 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
     callback_data=cb.SET_MEETING_START_TIME,
     bindable=False,
 )
-@with_async_session
+@with_session
 async def callback_query_date_time_entry(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int | None:
     callback_data = guards.valid_callback_data(
         cb.SET_MEETING_START_TIME.parse(context.match), EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     if (
         meeting := await guards.meeting_accessible(
             session, user, callback_data.id, "Edit date and time", update, context
@@ -150,13 +150,13 @@ def build_edit_datetime_entry_view(meeting: Meetup, lang: str, today: dt.date) -
     callback_data=cb.CANCEL_EDIT_START_TIME,
     bindable=False,
 )
-@with_async_session
-async def callback_query_cancel_start_time(session: Session, update: Update, context: TMitupContext) -> int:
+@with_session
+async def callback_query_cancel_start_time(session: AsyncSession, update: Update, context: TMitupContext) -> int:
     callback_data = guards.valid_callback_data(
         cb.CANCEL_EDIT_START_TIME.parse(context.match), EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     if (
         meeting := await guards.meeting_accessible(
             session, user, callback_data.id, "Cancel start time edit", update, context
@@ -174,9 +174,9 @@ async def callback_query_cancel_start_time(session: Session, update: Update, con
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.DATE_CALLBACK, callback_data=cb.EDIT_MEETING_DATE)
-@with_async_session
+@with_session
 async def callback_query_edit_meeting_date(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int | None:
     assert context.matches is not None
 
@@ -184,7 +184,7 @@ async def callback_query_edit_meeting_date(
         cb.EDIT_MEETING_DATE.parse(context.match), EditMeetingHandlerId.DATE_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     if (
         meeting := await guards.meeting_accessible(session, user, callback_data.id, "Edit date", update, context)
     ) is None:
@@ -228,15 +228,15 @@ async def callback_query_edit_meeting_date(
     callback_data=cb.EDIT_MEETING,
     bindable=False,
 )
-@with_async_session
+@with_session
 async def callback_query_back_to_edit_datetime(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | None:
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     if (
         meeting := await guards.meeting_accessible(
             session, user, callback_data.id, "Back to edit datetime", update, context
@@ -253,7 +253,7 @@ async def callback_query_back_to_edit_datetime(
 
 
 async def handle_first_datetime_set(
-    session: Session, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
+    session: AsyncSession, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
     proposed_start = dt.datetime.combine(cb_date, dt.time(0, 0, tzinfo=meeting.timezone)).astimezone(dt.UTC)
     if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
@@ -263,7 +263,7 @@ async def handle_first_datetime_set(
     meeting.datetime = proposed_start
     end_cleared = meeting.enforce_datetime_ordering()
     session.add(meeting)
-    session.flush()
+    await session.flush()
 
     lang = meeting.lang
 
@@ -308,7 +308,7 @@ async def handle_first_datetime_set(
 
 
 async def handle_datetime_update(
-    session: Session, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
+    session: AsyncSession, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
     proposed_start = dt.datetime.combine(
         dt.date(cb_date.year, cb_date.month, cb_date.day),
@@ -322,7 +322,7 @@ async def handle_datetime_update(
     meeting.datetime = proposed_start
     end_cleared = meeting.enforce_datetime_ordering()
     session.add(meeting)
-    session.flush()
+    await session.flush()
 
     if end_cleared:
         await context.api.answer_callback_query(
@@ -354,15 +354,15 @@ async def handle_datetime_update(
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.SET_DATE_CALLBACK, callback_data=cb.SET_MEETING_DATE)
-@with_async_session
+@with_session
 async def callback_query_set_meeting_date(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
     callback_data = guards.valid_date_callback_data(
         cb.SET_MEETING_DATE.parse(context.match), EditMeetingHandlerId.SET_DATE_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     if (
         meeting := await guards.meeting_accessible(session, user, callback_data.id, "Edit date", update, context)
     ) is None:
@@ -379,15 +379,15 @@ async def callback_query_set_meeting_date(
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.EDIT_TIME_CALLBACK, callback_data=cb.EDIT_MEETING_TIME, bindable=False
 )
-@with_async_session
+@with_session
 async def callback_query_set_meeting_time(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
     callback_data = guards.valid_callback_data(
         cb.EDIT_MEETING_TIME.parse(context.match), EditMeetingHandlerId.EDIT_TIME_CALLBACK
     )
 
-    user = guards.current_user(update, session)
+    user = await guards.current_user(update, session)
     meeting = await guards.meeting_accessible(
         session,
         user,
@@ -408,9 +408,9 @@ async def callback_query_set_meeting_time(
     DateTimeEntityFilter(),
     bindable=False,
 )
-@with_async_session
+@with_session
 async def date_time_entity_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
     message = guards.message(update)
     entities = message.entities or []
@@ -419,7 +419,7 @@ async def date_time_entity_message_handler(
     assert unix_time is not None, "date_time entity must carry unix_time"
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME) as meeting_id:
-        current_user = guards.current_user(update, session)
+        current_user = await guards.current_user(update, session)
         meeting = await guards.meeting_accessible(
             session, current_user, meeting_id, "Set datetime from entity", update, context
         )
@@ -434,7 +434,7 @@ async def date_time_entity_message_handler(
         meeting.datetime = unix_time
         end_cleared = meeting.enforce_datetime_ordering()
         session.add(meeting)
-        session.flush()
+        await session.flush()
 
         assert meeting.datetime is not None
         datetime_entity = EntityDateTime(
@@ -459,14 +459,14 @@ async def date_time_entity_message_handler(
     bindable=False,
     filters=filters.Regex(r"^(?P<hour>\d{2}):(?P<minutes>\d{2})$"),
 )
-@with_async_session
+@with_session
 async def set_time_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
     time_info = cast(Match, context.match).groupdict()
 
     if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
-        current_user = guards.current_user(update, session)
+        current_user = await guards.current_user(update, session)
         await context.api.send_message(
             update=update,
             view=CommonMessages.TIME_INVALID_VALUE.get(lang=current_user.lang),
@@ -475,7 +475,7 @@ async def set_time_message_handler(
         return ConversationMeetingState.EDIT_TIME
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME) as meeting_id:
-        current_user = guards.current_user(update, session)
+        current_user = await guards.current_user(update, session)
 
         user_time = dt.time(int(time_info["hour"]), int(time_info["minutes"]), tzinfo=current_user.settings.tz)
 
@@ -495,7 +495,7 @@ async def set_time_message_handler(
         end_cleared = meeting.enforce_datetime_ordering()
 
         session.add(meeting)
-        session.flush()
+        await session.flush()
 
         assert meeting.datetime is not None
         datetime_entity = EntityDateTime(
@@ -515,8 +515,8 @@ async def set_time_message_handler(
         return ConversationHandler.END
 
 
-async def fallback_answer(session: Session, update: Update, context: TMitupContext) -> ConversationMeetingState:
-    current_user = guards.current_user(update, session)
+async def fallback_answer(session: AsyncSession, update: Update, context: TMitupContext) -> ConversationMeetingState:
+    current_user = await guards.current_user(update, session)
 
     await context.api.send_message(
         update=update,
@@ -533,9 +533,9 @@ async def fallback_answer(session: Session, update: Update, context: TMitupConte
     bindable=False,
     filters=filters.TEXT & ~filters.COMMAND,
 )
-@with_async_session
+@with_session
 async def wrong_message_sent_for_time(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     return await fallback_answer(session, update, context)
 
@@ -545,17 +545,17 @@ async def wrong_message_sent_for_time(
     bindable=False,
     filters=~filters.TEXT,
 )
-@with_async_session
+@with_session
 async def wrong_message_type_sent_for_time(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     return await fallback_answer(session, update, context)
 
 
 async def datetime_state_fallback_answer(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    current_user = guards.current_user(update, session)
+    current_user = await guards.current_user(update, session)
 
     await context.api.send_message(
         update=update,
@@ -572,9 +572,9 @@ async def datetime_state_fallback_answer(
     bindable=False,
     filters=filters.TEXT & ~filters.COMMAND,
 )
-@with_async_session
+@with_session
 async def datetime_wrong_text_message_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     return await datetime_state_fallback_answer(session, update, context)
 
@@ -584,9 +584,9 @@ async def datetime_wrong_text_message_handler(
     bindable=False,
     filters=~filters.TEXT,
 )
-@with_async_session
+@with_session
 async def datetime_wrong_message_type_handler(
-    session: Session, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     return await datetime_state_fallback_answer(session, update, context)
 

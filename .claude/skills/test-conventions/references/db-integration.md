@@ -2,7 +2,7 @@
 
 ## Overview
 
-DB integration tests run against a real Postgres container via `testcontainers`. They live in `tests/db/` and require Docker to be running.
+DB integration tests run against a real Postgres container via `testcontainers`. They live in `tests/models/db_behavior/` and require Docker to be running.
 
 ## Running
 
@@ -20,7 +20,7 @@ DB tests are skipped during normal `hatch run dev:test` runs via the `--db-tests
 
 ### `db_session` (session-scoped)
 
-Yields a live `Session` via `db.begin()`. Use this **instead of** `mock_session`. All queries hit the real database.
+Yields a live `AsyncSession` via `async with db.begin()`, on the session-scoped event loop. Use this **instead of** `mock_session`. All queries hit the real database and every session I/O call is awaited.
 
 ### Seed data (session-scoped, auto-flushed)
 
@@ -45,13 +45,13 @@ throwaway_user = User(tg_user_id=999_001, ...)
 
 ## Raw SQL rules
 
-- Use `session.exec(text(...))` — never `session.execute()` (triggers SQLModel deprecation warnings).
+- Use `await session.exec(text(...))` — never `session.execute()` (triggers SQLModel deprecation warnings).
 - Bind parameters with `.bindparams()`:
 
 ```python
 from sqlalchemy import text
 
-result = session.exec(
+result = await session.exec(
     text("SELECT * FROM users WHERE tg_user_id = :uid").bindparams(uid=999_001)
 )
 ```

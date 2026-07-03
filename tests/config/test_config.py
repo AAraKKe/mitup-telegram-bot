@@ -72,7 +72,12 @@ def test_config_properly_setup(
 
     # Password from environment variable takes precedence as it is defined before Toml
     expected_url = URL.create(
-        drivername="postgresql", username="username", password="1234abc", host="some.url.com", port=12, database="mydb"
+        drivername="postgresql+psycopg",
+        username="username",
+        password="1234abc",
+        host="some.url.com",
+        port=12,
+        database="mydb",
     )
     assert config.db.full_url == expected_url
     assert config.bot.token.get_secret_value() == "abcd12345"

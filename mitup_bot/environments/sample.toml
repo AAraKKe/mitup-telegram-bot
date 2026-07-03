@@ -22,6 +22,12 @@ database = "mitup"
 password = "12345pass"
 port = "5432"
 url = "postgres"
+# Connection pool sizing for the bot engine.
+# Optional; the values below are the defaults when omitted.
+pool_size = 5
+max_overflow = 10
+# Seconds to wait for a pooled connection before failing.
+pool_timeout = 30
 
 [app]
 # MitupBot App configuration.

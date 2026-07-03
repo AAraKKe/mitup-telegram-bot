@@ -24,6 +24,6 @@ Rather than maintaining a list here (which goes stale as lambdas are added or re
 1. Create a new file in `mitup_bot/lambdas/`.
 2. Define a handler function following the AWS Lambda signature: `def handler(event: dict[str, Any], context: Any) -> ...`
 3. Use Pydantic models to validate the incoming `event` (see the existing lambda files for the pattern).
-4. For database access, call `configure_db()` from `mitup_bot.db` during initialization and decorate with `@with_session` / `@with_async_session` — see the `database` skill for the full convention.
+4. For database access, call `configure_db()` from `mitup_bot.db` during initialization and decorate with the async `@with_session` — see the `database` skill for the full convention.
 5. For Telegram API access, wrap the `ExtBot` with `BotAdapter` / `build_api()` — see the `api-wrapper` skill.
 6. Update the AWS infrastructure configuration in the separate infrastructure repository to deploy the new lambda.

@@ -1,8 +1,8 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.monitoring import Feature
@@ -20,8 +20,8 @@ from .views import edit_participants_view, kick_out_users_view
     callback_data=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS,
     bindable=True,
 )
-@with_async_session
-async def edit_meeting_kickout_participants(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def edit_meeting_kickout_participants(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the kick out of a participant from a meeting. Once the user clicks in the kick out button,
     the next view shows a list of participants as buttons. The user selects the participant to be kicked out from
@@ -31,7 +31,7 @@ async def edit_meeting_kickout_participants(session: Session, update: Update, co
         cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK
     )
 
-    current_user = guards.current_user(update, session)
+    current_user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session,
@@ -67,8 +67,8 @@ async def edit_meeting_kickout_participants(session: Session, update: Update, co
     callback_data=cb.EDIT_MEETING_KICK_OUT_ACTION,
     bindable=True,
 )
-@with_async_session
-async def edit_meeting_kickout_participant(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def edit_meeting_kickout_participant(session: AsyncSession, update: Update, context: TMitupContext):
     """
     This handler handles the action of kicking out a participant from a meeting after the user has selected
     the participant to be kicked out from the list of participants.
@@ -79,7 +79,7 @@ async def edit_meeting_kickout_participant(session: Session, update: Update, con
         cb.EDIT_MEETING_KICK_OUT_ACTION.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK
     )
 
-    current_user = guards.current_user(update, session)
+    current_user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session,
@@ -131,14 +131,14 @@ async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, cont
     callback_data=cb.CONFIRM_KICK_OUT,
     bindable=True,
 )
-@with_async_session
-async def edit_meeting_kickout_participant_confirm(session: Session, update: Update, context: TMitupContext):
+@with_session
+async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_meeting_callback_data(
         cb.CONFIRM_KICK_OUT.parse(context.match),
         EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
     )
 
-    current_user = guards.current_user(update, session)
+    current_user = await guards.current_user(update, session)
 
     meeting = await guards.meeting_accessible(
         session,
@@ -161,8 +161,8 @@ async def edit_meeting_kickout_participant_confirm(session: Session, update: Upd
     promoted_participants = meeting.remove_participant(participant)
     # If the participant is invited, remove it too
     if participant.invited_by is not None:
-        session.delete(participant.user)
-    session.flush()
+        await session.delete(participant.user)
+    await session.flush()
 
     # We need to decide whetehr we go back to the edit participatns view or the list of participants to kick out
     # If there are no more participants to kick out, we go back to the edit participants view

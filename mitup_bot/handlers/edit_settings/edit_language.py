@@ -1,8 +1,8 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards, views
-from mitup_bot.db import with_async_session
+from mitup_bot.db import with_session
 from mitup_bot.exceptions import InvalidLanguageError
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.translations import SUPPORTED_LANGUAGES
@@ -14,9 +14,9 @@ from .enums import EditSettingsHandlerId
 
 
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.LANGUAGE_CALLBACK, callback_data=cb.EDIT_LANGUAGE)
-@with_async_session
-async def callback_query_timezone(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_timezone(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
 
     view = views.factory.settings_set_language_view(lang=user.lang)
 
@@ -24,9 +24,9 @@ async def callback_query_timezone(session: Session, update: Update, context: TMi
 
 
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_LANGUAGE)
-@with_async_session
-async def callback_query_set_timezone(session: Session, update: Update, context: TMitupContext):
-    user = guards.current_user(update, session)
+@with_session
+async def callback_query_set_timezone(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
 
     language_id = guards.valid_callback_data(
         cb.SET_LANGUAGE.parse(context.match), EditSettingsHandlerId.SET_LANGUAGE_CALLBACK
@@ -37,7 +37,7 @@ async def callback_query_set_timezone(session: Session, update: Update, context:
 
     new_language = SUPPORTED_LANGUAGES[language_id]
     user.settings.language = new_language
-    session.flush()
+    await session.flush()
 
     view = views.factory.settings_set_language_view(lang=new_language).with_context(
         SettingsMessages.LANGUAGE_SUCCESS.get(lang=new_language)

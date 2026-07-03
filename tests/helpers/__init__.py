@@ -8,6 +8,7 @@ __all__ = [
     "make_test_metrics_client",
     "build_context",
     "call_handler",
+    "claimed_state",
     "MockApi",
     "UpdateRequest",
     "create_meetup",
@@ -35,7 +36,7 @@ __all__ = [
 from .constants import DEFAULT_CURRENT_MESSAGE
 from .types import AnyFloat, StubMitupApp, StubMitupContext, CliRunner
 from .monitoring import MetricAssertions, make_test_metrics_client
-from .context import build_context, call_handler
+from .context import build_context, call_handler, claimed_state
 from .api import MockApi
 from .fixtures import (
     UpdateRequest,

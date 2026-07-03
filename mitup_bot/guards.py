@@ -1,7 +1,8 @@
 from typing import cast
 
 import structlog
-from sqlmodel import Session
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 from telegram import User as TgUser
 
@@ -26,6 +27,7 @@ from mitup_bot.exceptions import (
 )
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
@@ -38,20 +40,37 @@ from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 log = structlog.get_logger(__name__)
 
 
-def current_user(update: Update, session: Session) -> User:
+async def member_user(update: Update, session: AsyncSession) -> User | None:
+    """Return the effective user's `User` row only when their status is MEMBER, else None.
+
+    Gates `/start` between the existing-member flow and the new/joined-only re-onboarding
+    flow. JOINED_ONLY and LEFT users intentionally get None so they fall through to the
+    re-onboarding conversation.
+    """
+    if update.effective_user is None:
+        return None
+
+    statement = select(User).where(
+        User.tg_user_id == update.effective_user.id,
+        User.status == UserStatus.MEMBER,
+    )
+    return (await session.exec(statement)).first()
+
+
+async def current_user(update: Update, session: AsyncSession) -> User:
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
 
     # If we have an effective user, get the user from DB
-    if user := User.by_tg_user_id(session, update.effective_user.id):
+    if user := await User.by_tg_user_id(session, update.effective_user.id):
         return user
     else:
         raise UserNotFound(update.effective_user.id)
 
 
-def user_language(update: Update, session: Session) -> str:
+async def user_language(update: Update, session: AsyncSession) -> str:
     """Return the preferred language for the effective user, or the fallback language if unregistered."""
-    if (tg_user := update.effective_user) and (user := User.by_tg_user_id(session, tg_user.id)):
+    if (tg_user := update.effective_user) and (user := await User.by_tg_user_id(session, tg_user.id)):
         return user.lang
     return TranslationEngine.FALLBACK_LANG
 
@@ -236,7 +255,7 @@ async def notify_meeting_removed(
 
 
 async def meeting_accessible(
-    session: Session,
+    session: AsyncSession,
     user: User,
     meeting_id: int,
     action: str,
@@ -261,7 +280,7 @@ async def meeting_accessible(
     **Note**: this method can only be used when a meeting is being accessed from the bot chat.
     """
 
-    meeting = Meetup.by_id(session, meeting_id)
+    meeting = await Meetup.by_id(session, meeting_id)
 
     if meeting is None:
         await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
@@ -275,7 +294,7 @@ async def meeting_accessible(
 
 
 async def meeting_viewable(
-    session: Session,
+    session: AsyncSession,
     user: User,
     meeting_id: int,
     action: str,
@@ -290,7 +309,7 @@ async def meeting_viewable(
     main menu. Can only be used when a meeting is accessed from the bot chat.
     """
 
-    meeting = Meetup.by_id(session, meeting_id)
+    meeting = await Meetup.by_id(session, meeting_id)
 
     if meeting is None:
         await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
@@ -309,14 +328,14 @@ async def meeting_viewable(
 
 
 async def user_registered(
-    update: Update, session: Session, context: TMitupContext, alert_message: MessageBase
+    update: Update, session: AsyncSession, context: TMitupContext, alert_message: MessageBase
 ) -> User | None:
     """
     Context manager that yields the current user if they are subscribed to the bot.
     If the user is not subscribed, the callback query is answered with an allert showing the `alert_message`.
     """
     try:
-        return current_user(update, session)
+        return await current_user(update, session)
     except UserNotFound as e:
         user = cast(TgUser, update.effective_user)  # We know the user exists here
         if update.callback_query is None:

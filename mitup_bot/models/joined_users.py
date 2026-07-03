@@ -29,12 +29,17 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
     is_waiting_list: bool = False
     notification_sent: bool = False
 
-    meetup: Meetup = Relationship(back_populates="joined_links")
+    # lazy="selectin" on all three: `participant_name` traverses user, invited_by and meetup in
+    # plain Python, and implicit lazy loads raise MissingGreenlet under the async engine.
+    meetup: Meetup = Relationship(back_populates="joined_links", sa_relationship_kwargs={"lazy": "selectin"})
     user: User = Relationship(
-        back_populates="joined_links", sa_relationship_kwargs={"foreign_keys": "JoinedUsers.user_id"}
+        back_populates="joined_links",
+        sa_relationship_kwargs={"foreign_keys": "JoinedUsers.user_id", "lazy": "selectin"},
     )
     # Need to use the older Optional syntax
-    invited_by: Optional[User] = Relationship(sa_relationship_kwargs={"foreign_keys": "JoinedUsers.invited_by_id"})  # noqa: UP045
+    invited_by: Optional[User] = Relationship(  # noqa: UP045
+        sa_relationship_kwargs={"foreign_keys": "JoinedUsers.invited_by_id", "lazy": "selectin"}
+    )
 
     def __hash__(self) -> int:
         return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
