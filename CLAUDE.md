@@ -12,7 +12,7 @@ For complex tasks that span multiple areas (handler + migration + tests + transl
 /em Add recurring meetings — needs a handler, DB migration, tests, and EN/ES translations.
 ```
 
-For single-domain tasks or targeted fixes, **always delegate to the appropriate specialist agent** — do not implement it directly. Specialists carry their area's conventions and stay in sync with the skills they own; the orchestrator session does not. Check the table below to find the right agent:
+For single-domain tasks or targeted fixes, **delegate to the appropriate specialist agent by default** — specialists carry their area's conventions and stay in sync with the skills they own; the orchestrator session does not. Check the table below to find the right agent:
 
 | Work involves | Delegate to |
 |---|---|
@@ -24,6 +24,8 @@ For single-domain tasks or targeted fixes, **always delegate to the appropriate 
 | User-facing message text / button labels | `bot-copywriter` |
 | Translation `.po`/`.pot` files | `translator` |
 | Documentation in `docs/` | `docs-writer` |
+
+**Exception — trivial mechanical fixes.** A change that is a few lines, convention-unambiguous, and involves no design decision (a typo, a one-line annotation or suppression, a stale doc sentence, an obvious assertion tweak) may be fixed directly instead of spawning a specialist — the agent round-trip costs more than it protects. Two conditions: **first load the skill(s) that govern the touched area** (the specialist's knowledge lives in `.claude/skills/`, not in the agent definition — fixing without the skill loaded is how convention violations slip in), and if the fix grows beyond a few lines or surfaces a judgment call mid-edit, stop and delegate with the partial diff.
 
 **After any specialist agent finishes**, run the `convention-reviewer` agent on the files it touched before considering the task done. If the reviewer reports violations, **resume the specialist agent that made the changes** and pass it the full violation report — the specialist already has the full context of every change it made, while you would be reconstructing it from a diff.
 
@@ -40,7 +42,7 @@ The canonical reference for available agents is `.claude/agents/` (one file per 
 
 ## When hooks fail
 
-If a hook fails, don't try to fix it yourself — the failure usually involves area-specific conventions a specialist already knows.
+If a hook fails, don't try to fix it yourself by default — the failure usually involves area-specific conventions a specialist already knows. The trivial-fix exception above applies here too, including on specialist-authored work: a mechanical failure with an obvious few-line fix (formatting, a missing annotation, a rename fallout) may be fixed directly **after loading the governing skill named in the table below**. When directly fixing a specialist's output, mention the fix in any later message that resumes that specialist, so its session model of the code stays accurate. Anything beyond trivial, delegate:
 
 **If the work was done by a specialist agent:** resume that agent's session with the error output. The resumed agent retains full context of every change it made.
 
@@ -49,7 +51,7 @@ If a hook fails, don't try to fix it yourself — the failure usually involves a
 | Failing hook | Delegate to |
 |--------------|-------------|
 | Type checker (`ty`) | the specialist that owns the failing file (see the table above), with an explicit instruction to load the `type-checking` skill |
-| Tests (`pytest`) | `test-expert` |
+| Tests (`pytest`) | `test-expert` (governing skill: `test-conventions`) |
 | Linter (`ruff`) | the specialist that owns the failing file (see the table above), with an explicit instruction to load the `coding-standards` skill |
 
 ## Maintaining these instructions
