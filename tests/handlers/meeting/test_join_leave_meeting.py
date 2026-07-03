@@ -14,6 +14,7 @@ from tests.helpers import (
     HandlerContext,
     MockDbSession,
     UpdateRequest,
+    assert_locked_meetup_select,
     call_handler,
     create_meetup,
     create_message,
@@ -147,6 +148,24 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
+async def test_join_loads_meeting_with_row_lock(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """Wiring guard for the per-meeting mutex (#187): the join/leave path must load the meeting
+    with by_id(for_update=True). The actual serialization behavior is covered on real Postgres in
+    tests/models/db_behavior/test_meeting_row_locks.py; this only pins the call site so a refactor
+    cannot silently drop the lock."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
+
+    assert_locked_meetup_select(mock_session)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)

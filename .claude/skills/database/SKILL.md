@@ -38,6 +38,17 @@ The async engine cannot run implicit lazy loads: touching an unloaded relationsh
 - After flushing a **new** instance, its never-touched collections are still unloaded — `await session.refresh(obj, ["<relationship>"])` before rendering anything that traverses them (see the create-meeting handler).
 - The session factory sets `expire_on_commit=False`, so post-commit attribute access never triggers a load.
 
+## Per-meeting row locks
+
+Meeting capacity and waiting-list logic is computed in Python over the loaded `joined_links` collection, so cross-user races (two joins on the last slot, leave-with-promotion vs join) must serialize on the database. The `meetups` row is the per-meeting mutex:
+
+- **Every participant- or capacity-mutating path** loads the meeting via `Meetup.by_id(session, id, for_update=True)` (directly or through `guards.meeting_accessible(..., for_update=True)`) **before** reading any capacity/waiting-list state. This issues `SELECT … FOR UPDATE` on the meetups row plus `populate_existing`, so the post-lock read overwrites any stale identity-mapped state pulled in by the current-user eager loads.
+- **Read-only paths** (show views, lists, inline queries, confirmation prompts) must NOT take the lock.
+- **Lock ordering:** meeting row first, then anything else. Never lock two meetings in one transaction — every handler operates on a single meeting, which keeps the deadlock surface at zero.
+- `FOR UPDATE` applies only to the meetups row; the `selectin` follow-up loads run unlocked. That's correct: the row lock is what serializes writers, the link rows don't need locking.
+- Unconditional writes that make no participant-dependent decision (e.g. reactivation setting `active = True`) don't need the explicit lock — the flush-time UPDATE acquires it.
+- **Interim caveat:** until #188 restructures handlers to commit before Telegram fan-outs, the lock is held across the fan-out. Acceptable short-lived state, by design.
+
 ## Models
 
 All SQLModel table models live in `mitup_bot/models/` and use SQLModel. Inspect `mitup_bot/models/__init__.py` for the current list of exported models.

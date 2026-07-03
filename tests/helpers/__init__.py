@@ -31,6 +31,7 @@ __all__ = [
     "build_web_client",
     "lifespan_runner",
     "integrity_error",
+    "assert_locked_meetup_select",
 ]
 
 from .constants import DEFAULT_CURRENT_MESSAGE
@@ -49,6 +50,7 @@ from .fixtures import (
     owner_with_meeting,
 )
 from .stub_db import MockDbSession, Result
+from .locking import assert_locked_meetup_select
 from .db_errors import integrity_error
 from .filesystem import MITUP_DIR
 from . import console, calendar_july_2024

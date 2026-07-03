@@ -155,7 +155,9 @@ async def handle_join_leave_operation(
 ):
     """Handle common infrastructure for meeting operations (join/leave)."""
     data = guards.valid_callback_data(cb.JOIN.parse(context.match), MeetingHandlerId.JOIN)
-    if meeting := await Meetup.by_id(session, data.id):
+    # for_update: both operations read capacity/waiting-list state and mutate participants, so
+    # the meetup row must be locked before the first read to serialize cross-user races.
+    if meeting := await Meetup.by_id(session, data.id, for_update=True):
         if not meeting.active:
             await context.api.edit_message(
                 update=update,

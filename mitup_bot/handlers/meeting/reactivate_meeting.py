@@ -27,6 +27,9 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     if meeting is None:
         return
 
+    # No for_update here: reactivation writes `active` unconditionally without reading any
+    # participant or capacity state, and the flush-time UPDATE takes the row lock on its own.
+    # A join that grabs the per-meeting lock first sees the committed `active` value either way.
     full_meeting = await Meetup.by_id(session, callback_data.id, include_inactive=True)
     if full_meeting is None:
         return

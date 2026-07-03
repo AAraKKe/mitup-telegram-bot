@@ -17,6 +17,7 @@ from tests.helpers import (
     AnyFloat,
     MockDbSession,
     UpdateRequest,
+    assert_locked_meetup_select,
     call_handler,
     create_meetup,
     create_user,
@@ -271,6 +272,36 @@ async def test_complete_user_invitation(
     assert invited_link.user.first_name == "Bruce Wayne"
     assert invited_link.invited_by is not None
     assert invited_link.invited_by.id == user_with_settings.id
+
+
+async def test_invite_confirm_loads_meeting_with_row_lock(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    conversation: ConversationTester,
+    meeting: Meetup,
+):
+    """Wiring guard for the per-meeting mutex (#187): only the confirm step must lock the meeting —
+    the earlier steps pre-validate unlocked so the lock is never held across the user's typing. The
+    serialization behavior is covered on real Postgres in
+    tests/models/db_behavior/test_meeting_row_locks.py; this only pins the call site."""
+    setup_db(mock_session, user_with_settings, meeting)
+
+    def _isolate_confirm_queries():
+        # The earlier steps read the meeting unlocked by design; drop their statements so the
+        # assertion below only sees the confirm step's queries.
+        mock_session.exec.reset_mock()
+
+    steps = [
+        ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
+        ConversationStep.message(
+            "Bruce Wayne", expected_state=ConversationInviteState.CONFIRMATION, after=_isolate_confirm_queries
+        ),
+        ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID)),
+    ]
+
+    await conversation.run(handler_id=MeetingHandlerId.INVITE_USERS_CONVERSATION, steps=steps)
+
+    assert_locked_meetup_select(mock_session)
 
 
 async def test_concurrent_duplicate_invitation_is_idempotent_noop(

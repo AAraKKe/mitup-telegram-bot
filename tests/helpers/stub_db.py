@@ -4,7 +4,7 @@ from typing import overload
 from unittest import mock
 
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.sql.expression import SelectBase
+from sqlalchemy.sql.expression import GenerativeSelect, SelectBase
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
@@ -69,6 +69,16 @@ class MockDbSession(mock.MagicMock):
             obj.id = self.__last_id
 
     def __exec_side_effect(self, statement: SelectBase) -> Result | None:
+        # Participant-mutating paths load the meeting with by_id(for_update=True), while the
+        # registry is keyed on the plain SELECT registered by add_object — so key the lookup on
+        # a copy of the statement with its FOR UPDATE clause cleared. SQLAlchemy exposes no
+        # public API to remove an applied with_for_update (the method only ever sets it), hence
+        # the private _for_update_arg, declared on GenerativeSelect. The original statement is
+        # not mutated, so queries_executed still exposes the locked SQL for tests that assert
+        # on it.
+        if isinstance(statement, GenerativeSelect) and statement._for_update_arg is not None:
+            statement = statement._clone()
+            statement._for_update_arg = None
         statement_str = str(statement.compile(compile_kwargs={"literal_binds": True}))
         # If we have not registered the object, return an empty result mimicking the behavior of the real session
         return self.statements_registry.get(statement_str, Result())

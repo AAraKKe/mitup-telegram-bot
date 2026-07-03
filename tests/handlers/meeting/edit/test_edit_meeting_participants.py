@@ -18,6 +18,7 @@ from tests.helpers import (
     AnyFloat,
     HandlerContext,
     UpdateRequest,
+    assert_locked_meetup_select,
     call_handler,
     create_meetup,
     create_user,
@@ -243,6 +244,48 @@ async def test_edit_meeting_no_limit_participants_works(
     )
     context.api.assert_send_message_called(update, response_view)
     assert result is ConversationHandler.END
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1))], indirect=True
+)
+async def test_no_limit_participants_loads_meeting_with_row_lock(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Wiring guard for the per-meeting mutex (#187): lifting the participant cap races concurrent
+    joins reading `full`, so the callback must load the meeting with for_update=True. The
+    serialization behavior is covered on real Postgres in
+    tests/models/db_behavior/test_meeting_row_locks.py; this only pins the call site."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    await call_handler(EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, handler_context=handler_context)
+
+    assert_locked_meetup_select(mock_session)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="4")], indirect=True)
+async def test_max_participants_message_loads_meeting_with_row_lock(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Wiring guard for the per-meeting mutex (#187): the max-participants number message mutates
+    capacity, so the handler must re-load the meeting with for_update=True before writing. The
+    serialization behavior is covered on real Postgres in
+    tests/models/db_behavior/test_meeting_row_locks.py; this only pins the call site."""
+    mock_session.add_object(user_with_settings.meetups[0])
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
+    )
+
+    assert_locked_meetup_select(mock_session)
 
 
 @pytest.mark.parametrize(

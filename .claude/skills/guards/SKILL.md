@@ -54,15 +54,19 @@ All guards that take a `session` are async — `await` them.
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `meeting_accessible` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
+| `meeting_accessible` | `(session, user, meeting_id, action, update, context, custom_keyboard=None, for_update=False)` | `Meetup \| None` | — (handles redirect internally) |
 | `meeting_viewable` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
 | `user_owns_meeting` | `(user, meeting_id, action, update, context, redirect=True)` | `Meetup \| None` | — (handles redirect internally) |
 
 Use `meeting_accessible` for all handlers that require **ownership** of a meeting from the bot chat (not inline). It handles three cases internally: meeting not found → "meeting deleted" message; meeting inactive + owner → reactivation prompt; non-owner → redirect to main menu. When `None` is returned, the handler must return immediately.
 
+Pass `for_update=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. See the `database` skill's "Per-meeting row locks" section for the full convention.
+
 Use `meeting_viewable` for handlers that only need to **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list. It behaves like `meeting_accessible` for the not-found and inactive-owner cases, but a non-owner who has *joined* an active meeting is allowed through so the caller can render `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Non-owners are still redirected to the main menu for meetings they neither own nor joined, and for inactive meetings (only the owner can reactivate).
 
 `user_owns_meeting` is a lower-level guard that skips the not-found and inactive checks. Use it only when those cases are handled separately.
+
+For both `meeting_accessible` and `meeting_viewable`, `custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from.
 
 ## Usage pattern
 

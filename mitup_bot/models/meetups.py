@@ -728,13 +728,25 @@ class Meetup(BaseModel, SQLModel, table=True):
     @overload
     @classmethod
     async def by_id(
-        cls, session: AsyncSession, meetup_id: int, must_exist: Literal[True], include_inactive: bool = False
+        cls,
+        session: AsyncSession,
+        meetup_id: int,
+        must_exist: Literal[True],
+        include_inactive: bool = False,
+        *,
+        for_update: bool = False,
     ) -> Self: ...  # pragma: no cover
 
     @overload
     @classmethod
     async def by_id(
-        cls, session: AsyncSession, meetup_id: int, must_exist: bool = ..., include_inactive: bool = False
+        cls,
+        session: AsyncSession,
+        meetup_id: int,
+        must_exist: bool = ...,
+        include_inactive: bool = False,
+        *,
+        for_update: bool = False,
     ) -> Self | None: ...  # pragma: no cover
 
     @classmethod
@@ -744,8 +756,21 @@ class Meetup(BaseModel, SQLModel, table=True):
         meetup_id: int,
         must_exist: bool = False,
         include_inactive: bool = True,
+        *,
+        for_update: bool = False,
     ) -> Self | None:
         statement = select(cls).where(cls.id == meetup_id)
+        if for_update:
+            # The meetups row is the per-meeting mutex: every participant-mutating path locks it
+            # here before reading capacity or waiting-list state, so cross-user races (double join
+            # on the last slot, leave-with-promotion vs join) serialize on this row. Lock ordering:
+            # meeting row first, then anything else; never lock two meetings in one transaction.
+            # populate_existing is load-bearing: the current-user eager loads usually pulled this
+            # meetup and its joined_links into the identity map already, and without it the locked
+            # SELECT would return the stale pre-lock state instead of re-reading it. FOR UPDATE
+            # applies only to the meetups row — the selectin follow-ups run unlocked, which is
+            # fine because the row lock itself is what serializes writers.
+            statement = statement.with_for_update().execution_options(populate_existing=True)
         found_meetup = (await session.exec(statement)).first()
         if found_meetup is not None and (found_meetup.active or include_inactive):
             return found_meetup

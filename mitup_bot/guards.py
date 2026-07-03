@@ -262,25 +262,19 @@ async def meeting_accessible(
     update: Update,
     context: TMitupContext,
     custom_keyboard: Keyboard | None = None,
+    for_update: bool = False,
 ) -> Meetup | None:
     """
-    Check if the user has access to the meeting.
-    If the user does, the meeting is returned.
-    If not, warn and send the user to the main menu and None is returned.
+    Return the meeting when the user may act on it as its owner (bot-chat access only); otherwise
+    inform the user of the failing case (removed, inactive-but-owned → reactivation prompt, not
+    owned → main-menu redirect) and return None, on which callers must bail immediately.
 
-    If the meeting does not exist, the user is warned that the meeting has been removed.
-
-    If the meeting exists but is inactive, the owner is shown a reactivation prompt instead of
-    the normal view. Non-owners fall through to the ownership check.
-
-    If `custom_keyboard` is provided, it is used as the back-navigation row(s) in both the
-    "meeting deleted" message and the reactivation prompt. Otherwise, a back button to the
-    main menu is shown.
-
-    **Note**: this method can only be used when a meeting is being accessed from the bot chat.
+    Participant- or capacity-mutating callers must pass `for_update=True` so the meetup row (the
+    per-meeting mutex) is locked before any capacity/waiting-list read. Parameter mechanics such
+    as `custom_keyboard` are documented in the guards skill.
     """
 
-    meeting = await Meetup.by_id(session, meeting_id)
+    meeting = await Meetup.by_id(session, meeting_id, for_update=for_update)
 
     if meeting is None:
         await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)

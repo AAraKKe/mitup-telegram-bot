@@ -54,12 +54,17 @@ async def ensure_meeting_still_allows_invitations(
     user: User,
     meeting_id: int,
     on_callback: bool = True,
+    for_update: bool = False,
 ) -> Meetup | None:
     """
     Ensure that the meeting still allows invitations.
-    If not, send a message to the user and return False.
+    If not, alert the user and return None.
+
+    The confirm step passes `for_update=True` so the fullness check and the membership insert
+    happen under the per-meeting row lock; the earlier conversation steps only pre-validate and
+    must not hold the lock across the user's typing.
     """
-    meeting = await Meetup.by_id(session, meeting_id, include_inactive=False)
+    meeting = await Meetup.by_id(session, meeting_id, include_inactive=False, for_update=for_update)
     update = context.get_update()
 
     if meeting is None:
@@ -220,7 +225,9 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
     meeting_id = callback_data.id
 
     with context.text(ContextId.INVITE_USERS, ensure_clean=True) as invited_user_name:
-        meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id, on_callback=False)
+        meeting = await ensure_meeting_still_allows_invitations(
+            session, context, user, meeting_id, on_callback=False, for_update=True
+        )
         if meeting is None:
             # If the user cannot continue mid conversation, go back to the main menu
             await context.api.edit_message(

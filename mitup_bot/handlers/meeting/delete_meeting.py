@@ -6,7 +6,7 @@ from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.db import with_session
-from mitup_bot.models import User
+from mitup_bot.models import Meetup, User
 from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -55,6 +55,15 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
     user = await guards.current_user(update, session)
 
     meeting = await guards.user_owns_meeting(user, callback_data.id, "Confirm delete meeting", update, context)
+    if meeting is None:
+        return
+
+    # for_update: the invited-user cleanup below reads joined_links and the DELETE races with
+    # concurrent joins (a link inserted between the read and the delete would leak its invited
+    # user). The ownership guard reads the relationship without touching the DB, so take the
+    # per-meeting row lock explicitly and re-read before acting. None means the row vanished
+    # under us — someone else already deleted it, so there is nothing left to do.
+    meeting = await Meetup.by_id(session, callback_data.id, for_update=True)
     if meeting is None:
         return
 

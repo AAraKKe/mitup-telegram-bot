@@ -11,7 +11,14 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
-from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import (
+    AnyFloat,
+    HandlerContext,
+    UpdateRequest,
+    assert_locked_meetup_select,
+    call_handler,
+    create_meetup,
+)
 from tests.helpers.fixtures import create_joined_link, create_user
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -179,6 +186,24 @@ async def test_confirm_delete_meeting_works(
 
     context.api.assert_edit_message_called(update, expected_view)
     context.api.assert_method_just_called("send_message", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
+async def test_confirm_delete_loads_meeting_with_row_lock(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Wiring guard for the per-meeting mutex (#187): delete confirm must re-load the meeting with
+    for_update=True before reading joined_links for the invited-user cleanup. The serialization
+    behavior is covered on real Postgres in tests/models/db_behavior/test_meeting_row_locks.py;
+    this only pins the call site so a refactor cannot silently drop the lock."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
+
+    assert_locked_meetup_select(mock_session)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING.with_id(1))], indirect=True)

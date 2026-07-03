@@ -11,6 +11,7 @@ from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.models import Meetup
 from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -94,6 +95,8 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
     )
     user = await guards.current_user(update, session)
 
+    # for_update: capacity changes race with concurrent joins reading `full`, so the write
+    # happens under the per-meeting row lock.
     meeting = await guards.meeting_accessible(
         session,
         user,
@@ -101,6 +104,7 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
         "Edit no limit participants",
         update,
         context,
+        for_update=True,
     )
 
     if meeting is None:
@@ -149,6 +153,13 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        return ConversationHandler.END
+
+    # for_update: capacity changes race with concurrent joins reading `full`, so the write happens
+    # under the per-meeting row lock. The ownership guard reads the relationship without touching
+    # the DB; None means the meeting vanished since — end the conversation quietly.
+    meeting = await Meetup.by_id(session, meeting.db_id, for_update=True)
+    if meeting is None:
         return ConversationHandler.END
 
     meeting.max_members = int(cast(str, number))

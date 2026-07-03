@@ -43,6 +43,8 @@ throwaway_user = User(tg_user_id=998_001, ...)
 throwaway_user = User(tg_user_id=999_001, ...)
 ```
 
+Multi-session concurrency tests use the `997_0xx` range for **committed** per-test data: the `999_00x` seeds live in the session fixture's open transaction (invisible to other sessions) and `998_xxx` throwaways stay inside a single rolled-back session, so races across concurrent `db.begin()` transactions need data that is actually committed. Because that data outlives its transaction, each test must claim its own sub-range and delete everything it committed in a `finally`-guarded committed transaction (see `tests/models/db_behavior/test_meeting_row_locks.py`).
+
 ## Raw SQL rules
 
 - Use `await session.exec(text(...))` — never `session.execute()` (triggers SQLModel deprecation warnings).
