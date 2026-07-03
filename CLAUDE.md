@@ -35,20 +35,20 @@ The canonical reference for available agents is `.claude/agents/` (one file per 
 
 ## Important rules
 
-- **Hooks own validation.** Tests, linters, formatters, and the type checker run automatically via hooks — once after each modification (lint/format/type-check) and once when work is complete (tests). Running them manually duplicates work and floods the conversation with output you don't need. If you want feedback mid-work on a specific test, run it directly: `hatch run dev -- <pytest args>`. Avoid full runs.
+- **Validation is explicit — run it when it earns its cost.** There are no automatic validation hooks. During work, use targeted runs: `hatch run dev:test-hook <paths or pytest args>` for the tests you're touching (fast, no coverage; script definitions live in `pyproject.toml` under `[tool.hatch.envs.dev.scripts]`), `hatch run dev:fix` after finishing a coherent batch of edits (not after every file). Before declaring a task done or opening/updating an MR, run the full gate: `hatch run dev:validate` (format + lint + type-check + tests). Never hand work back as finished without that full run having passed — CI is the backstop, not the first line.
 - **Never run `python` directly.** The system Python has no project dependencies. Use `hatch run dev:python python <args>` to execute Python in the project's managed environment.
 - **Prefer scripts for bulk edits.** When the same change needs to land across many files, write a small script rather than editing each one by hand — it's faster and saves the conversation context for actual reasoning.
 - **Run `convention-reviewer` before opening any MR.** Review the full branch diff against the repo's default branch (`git diff "$(git symbolic-ref --short refs/remotes/origin/HEAD)"...HEAD`, typically `origin/main`) regardless of who wrote the code — manual edits skip the per-specialist post-task review and routinely slip past project conventions.
 
-## When hooks fail
+## When validation fails
 
-If a hook fails, don't try to fix it yourself by default — the failure usually involves area-specific conventions a specialist already knows. The trivial-fix exception above applies here too, including on specialist-authored work: a mechanical failure with an obvious few-line fix (formatting, a missing annotation, a rename fallout) may be fixed directly **after loading the governing skill named in the table below**. When directly fixing a specialist's output, mention the fix in any later message that resumes that specialist, so its session model of the code stays accurate. Anything beyond trivial, delegate:
+When `hatch run dev:validate` (or CI) fails on work you didn't author the fix for, don't fix it yourself by default — the failure usually involves area-specific conventions a specialist already knows. The trivial-fix exception above applies here too, including on specialist-authored work: a mechanical failure with an obvious few-line fix (formatting, a missing annotation, a rename fallout) may be fixed directly **after loading the governing skill named in the table below**. When directly fixing a specialist's output, mention the fix in any later message that resumes that specialist, so its session model of the code stays accurate. Anything beyond trivial, delegate:
 
 **If the work was done by a specialist agent:** resume that agent's session with the error output. The resumed agent retains full context of every change it made.
 
 **If the work was done directly:** delegate to the appropriate specialist and pass it the full `git diff` of the changes alongside the error output — not a prose summary. The diff is the only way the specialist sees the exact state of the code.
 
-| Failing hook | Delegate to |
+| Failing check | Delegate to |
 |--------------|-------------|
 | Type checker (`ty`) | the specialist that owns the failing file (see the table above), with an explicit instruction to load the `type-checking` skill |
 | Tests (`pytest`) | `test-expert` (governing skill: `test-conventions`) |

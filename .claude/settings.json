@@ -32,24 +32,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bin/claude_stop_hook.sh dev:test-hook"
-          },
-          {
-            "type": "command",
-            "command": "bin/claude_stop_hook.sh dev:type-check"
-          },
-          {
-            "type": "command",
-            "command": "bin/claude_stop_hook.sh dev:fix"
-          }
-        ]
-      }
     ]
   }
 }
