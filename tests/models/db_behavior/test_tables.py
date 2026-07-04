@@ -6,7 +6,7 @@ pytestmark = pytest.mark.db_test
 
 
 @pytest.mark.parametrize("table_name", ["users", "settings", "meetups", "joined_users", "messages"])
-async def test_table_exists(db_session: AsyncSession, table_name: str) -> None:
+async def test_table_exists(db_session: AsyncSession, table_name: str):
     result = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(

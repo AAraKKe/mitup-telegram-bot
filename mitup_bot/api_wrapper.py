@@ -198,7 +198,7 @@ class TelegramApiWrapper(Protocol):
         views: Sequence[MitupView | FormattedText | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
-    ) -> None: ...
+    ): ...
     async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool: ...
     async def answer_inline_query(
         self,
@@ -206,8 +206,8 @@ class TelegramApiWrapper(Protocol):
         results: list[MitupInlineView],
         button: InlineResultsButton | None = None,
         cache_time: int = 60,
-    ) -> None: ...
-    async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool) -> None: ...
+    ): ...
+    async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool): ...
     async def update_single_meeting_message(
         self,
         message: MessageModel,
@@ -215,7 +215,7 @@ class TelegramApiWrapper(Protocol):
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
-    ) -> None: ...
+    ): ...
     async def update_meeting_messages(
         self,
         *,
@@ -225,13 +225,13 @@ class TelegramApiWrapper(Protocol):
         skip_current: bool = False,
         was_deleted: bool = False,
         has_finished: bool = False,
-    ) -> None: ...
+    ): ...
     async def notify_users_promoted_from_waiting_list(
         self,
         joined_users: Sequence[JoinedUsers],
         meeting: Meetup,
-    ) -> None: ...
-    async def clear_reply_markup(self, update: Update) -> None: ...
+    ): ...
+    async def clear_reply_markup(self, update: Update): ...
 
 
 class _ImmediateApi:
@@ -294,10 +294,10 @@ class TelegramApi:
         self._outbox = ApiOutbox()
         return self._outbox
 
-    def end_capture(self) -> None:
+    def end_capture(self):
         self._outbox = None
 
-    async def execute_queued(self, outbox: ApiOutbox) -> None:
+    async def execute_queued(self, outbox: ApiOutbox):
         """Execute the queued calls in order, after the handler's transaction committed.
 
         Failures here are partial rendering problems — the DB is already right — so calls are
@@ -321,7 +321,7 @@ class TelegramApi:
             except Exception as exc:
                 self._record_queued_failure(queued, exc)
 
-    def _record_queued_failure(self, queued: QueuedApiCall, exc: Exception) -> None:
+    def _record_queued_failure(self, queued: QueuedApiCall, exc: Exception):
         log.exception("Queued Telegram call failed after commit", queued_call=queued.name, exc_info=exc)
         # Mirror the error handler's fault shape: a per-error-type fault plus the aggregate.
         self.adapter.emit_metric(
@@ -329,7 +329,7 @@ class TelegramApi:
         )
         self.adapter.emit_metric(MetricKey.FAULT, properties={"QueuedApiCall": queued.name})
 
-    def _enqueue(self, name: str, invoke: Callable[[], Coroutine[Any, Any, object]]) -> None:
+    def _enqueue(self, name: str, invoke: Callable[[], Coroutine[Any, Any, object]]):
         assert self._outbox is not None
         self._outbox.calls.append(QueuedApiCall(name, invoke))
 
@@ -485,11 +485,11 @@ class TelegramApi:
                 )
         return False
 
-    async def clear_reply_markup(self, update: Update) -> None:
+    async def clear_reply_markup(self, update: Update):
         target = _edit_target(update)
         await self._call_or_enqueue("clear_reply_markup", partial(self._clear_reply_markup_now, target), None)
 
-    async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]) -> None:
+    async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]):
         chat_id, message_id, inline_message_id = target
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             async with handle_edit_errors(adapter=self.adapter):
@@ -539,7 +539,7 @@ class TelegramApi:
         inline_results: list[InlineQueryResultArticle],
         tg_button: InlineQueryResultsButton | None,
         cache_time: int,
-    ) -> None:
+    ):
         if await self.adapter.bot.answer_inline_query(
             query_id, results=inline_results, button=tg_button, cache_time=cache_time
         ):
@@ -561,7 +561,7 @@ class TelegramApi:
             "answer_callback_query", partial(self._answer_callback_query_now, query.id, _text, show_alert), None
         )
 
-    async def _answer_callback_query_now(self, query_id: str, text: str, show_alert: bool) -> None:
+    async def _answer_callback_query_now(self, query_id: str, text: str, show_alert: bool):
         await self.adapter.bot.answer_callback_query(query_id, text=text, show_alert=show_alert)
 
     def _render_meeting_message_edit(
@@ -651,7 +651,7 @@ class TelegramApi:
                 raise
         return False
 
-    async def _queued_meeting_message_edit(self, edit: MeetingMessageEdit, outbox: ApiOutbox) -> None:
+    async def _queued_meeting_message_edit(self, edit: MeetingMessageEdit, outbox: ApiOutbox):
         if await self._edit_meeting_message_now(edit) and edit.message_db_id is not None:
             outbox.dead_message_ids.append(edit.message_db_id)
 

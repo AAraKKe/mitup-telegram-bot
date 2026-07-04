@@ -91,7 +91,7 @@ class MitupUserData:
     def has_meeting_id(self, context: ContextId) -> bool:
         return context in self.registry and self.registry[context].meeting_id is not None
 
-    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData) -> None:
+    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData):
         fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
         entry = self.registry.setdefault(context, ContextData())
         entry.on_exit = OnExit(message=fmessage, cancel_callback=cancel_callback)
@@ -237,7 +237,7 @@ class MitupContext(
             properties={"ContextId": context.value, "StoredText": ftext.text},
         )
 
-    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData) -> None:
+    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData):
         fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
         if self.user_data is None:  # pragma: no cover
             raise InvalidUserData("User data requested but not set")

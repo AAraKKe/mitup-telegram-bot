@@ -10,7 +10,7 @@ from tests.helpers import UpdateRequest, create_user
 from tests.helpers.stub_db import MockDbSession
 
 
-def _register_member_lookup(mock_session: MockDbSession, user: User) -> None:
+def _register_member_lookup(mock_session: MockDbSession, user: User):
     """Register the select statement used by guards.member_user so the mock returns `user`."""
     statement = select(User).where(User.tg_user_id == user.tg_user_id, User.status == UserStatus.MEMBER)
     mock_session.add_objects_with_statement(statement, (user,))

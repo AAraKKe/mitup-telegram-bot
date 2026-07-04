@@ -68,7 +68,7 @@ async def send_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
 
 
 @db.with_session
-async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
     """Send a notification to all users that have joined a meeting that is about to start"""
     joined_links = await joined_links_to_notify(session)
     failed = 0

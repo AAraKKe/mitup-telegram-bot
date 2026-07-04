@@ -18,11 +18,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.drop_column("settings", "meeting_duration_enabled")
 
 
-def downgrade() -> None:
+def downgrade():
     op.add_column(
         "settings",
         sa.Column("meeting_duration_enabled", sa.Boolean(), nullable=False, server_default=sa.false()),

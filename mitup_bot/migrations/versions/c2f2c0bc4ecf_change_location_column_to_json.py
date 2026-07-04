@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.alter_column("meetups", "location", existing_type=sa.String, type_=sa.JSON, postgresql_using="location::jsonb")
 
     # Update existing rows with empty location to be a JSON object
@@ -26,5 +26,5 @@ def upgrade() -> None:
     op.execute(meetup.update().where(meetup.c.location == sa.null()).values(location="{}"))
 
 
-def downgrade() -> None:
+def downgrade():
     op.alter_column("meetups", "location", existing_type=sa.JSON, type_=sa.String)

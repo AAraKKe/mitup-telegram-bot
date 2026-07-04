@@ -21,12 +21,12 @@ depends_on: str | Sequence[str] | None = None
 _TABLES = ("users", "settings", "meetups")
 
 
-def upgrade() -> None:
+def upgrade():
     for table in _TABLES:
         helpers.add_updated_time_trigger(table)
 
 
-def downgrade() -> None:
+def downgrade():
     for table in _TABLES:
         helpers.remove_updated_time_trigger(table)
         op.execute(

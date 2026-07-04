@@ -127,7 +127,7 @@ async def _delete_meeting(session: AsyncSession, meetup_id: int) -> bool:
     return True
 
 
-async def _set_max_members(session: AsyncSession, meetup_id: int, max_members: int | None) -> None:
+async def _set_max_members(session: AsyncSession, meetup_id: int, max_members: int | None):
     """The capacity-edit critical section as edit_meeting_max_participants runs it: locked
     re-load, mutate max_members, flush."""
     meeting = await Meetup.by_id(session, meetup_id, for_update=True)

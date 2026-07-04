@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     # Create table 'users'
     op.create_table(
         "users",
@@ -32,5 +32,5 @@ def upgrade() -> None:
     )
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_table("users")

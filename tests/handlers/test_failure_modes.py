@@ -1108,7 +1108,7 @@ def _assert_handler_metrics(
     *,
     fault_value: int,
     extra_metrics: list[tuple[str, int]] | None = None,
-) -> None:
+):
     """Assert the standard handler metrics emitted by callback_with_metrics."""
     # FAULT: emit_global=True means 2 records (with handler dims + without)
     metrics.assert_emitted(name=MetricKey.FAULT, value=fault_value, times=2)

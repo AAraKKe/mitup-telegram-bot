@@ -18,11 +18,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.alter_column("users", "id", existing_type=sa.Integer, type_=sa.BigInteger)
     op.alter_column("settings", "id", existing_type=sa.Integer, type_=sa.BigInteger)
 
 
-def downgrade() -> None:
+def downgrade():
     op.alter_column("users", "id", existing_type=sa.BigInteger, type_=sa.Integer)
     op.alter_column("settings", "id", existing_type=sa.BigInteger, type_=sa.Integer)

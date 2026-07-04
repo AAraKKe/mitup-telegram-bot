@@ -18,11 +18,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.add_column("joined_users", sa.Column("invited_by_id", sa.Integer(), nullable=True))
     op.create_foreign_key("fk_joined_users_invited_by_id", "joined_users", "users", ["invited_by_id"], ["id"])
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_constraint("fk_joined_users_invited_by_id", "joined_users", type_="foreignkey")
     op.drop_column("joined_users", "invited_by_id")

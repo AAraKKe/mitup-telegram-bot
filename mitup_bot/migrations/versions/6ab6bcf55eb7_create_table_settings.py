@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.create_table(
         "settings",
         sa.Column("id", sa.Integer, nullable=False, primary_key=True),
@@ -42,5 +42,5 @@ def upgrade() -> None:
     )
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_table("settings")

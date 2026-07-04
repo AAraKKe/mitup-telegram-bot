@@ -79,7 +79,7 @@ Keyboard = list[ButtonRow]
 
 
 class MitupView:
-    def __init__(self, description: str | FormattedText, keyboard: Keyboard) -> None:
+    def __init__(self, description: str | FormattedText, keyboard: Keyboard):
         self.description: FormattedText = (
             description if isinstance(description, FormattedText) else FormattedText(description)
         )
@@ -140,7 +140,7 @@ class MitupInlineView(MitupView):
         title: str | FormattedText,
         inline_description: str | FormattedText,
         id: str,
-    ) -> None:
+    ):
         super().__init__(description, keyboard)
         self.title = title if isinstance(title, str) else title.text
         self.inline_description = inline_description if isinstance(inline_description, str) else inline_description.text

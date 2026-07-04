@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.add_column("meetups", sa.Column("end_datetime", sa.DateTime(), nullable=True))
 
     # Convert existing duration_minutes data into end_datetime
@@ -33,7 +33,7 @@ def upgrade() -> None:
     op.drop_column("meetups", "duration_minutes")
 
 
-def downgrade() -> None:
+def downgrade():
     op.add_column("meetups", sa.Column("duration_minutes", sa.Integer(), nullable=True))
 
     # Convert end_datetime back to duration_minutes (in whole minutes)

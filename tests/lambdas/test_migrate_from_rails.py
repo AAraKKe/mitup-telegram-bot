@@ -39,7 +39,7 @@ def mock_rails_work() -> Generator[tuple[mock.MagicMock, mock.MagicMock]]:
 def _emit_inside(message: str):
     """Return a side_effect that emits a log from inside the handler's bound block."""
 
-    def side_effect(*_args: object, **_kwargs: object) -> None:
+    def side_effect(*_args: object, **_kwargs: object):
         structlog.get_logger("mitup_bot").info(message)
 
     return side_effect

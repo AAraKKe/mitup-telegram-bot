@@ -18,13 +18,13 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.drop_column("meetups", "date")
     op.drop_column("meetups", "time")
     op.add_column("meetups", sa.Column("datetime", sa.DateTime(timezone=True), nullable=True))
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_column("meetups", "datetime")
     op.add_column("meetups", sa.Column("time", sa.Time(), nullable=True))
     op.add_column("meetups", sa.Column("date", sa.Date(), nullable=True))

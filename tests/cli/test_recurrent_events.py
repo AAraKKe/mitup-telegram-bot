@@ -111,7 +111,7 @@ async def test_launch_event_binds_event_contextvars():
     api = MockApi()
     client = make_test_metrics_client()
 
-    def run_emitting_log(_api: object, _client: object) -> None:
+    def run_emitting_log(_api: object, _client: object):
         structlog.get_logger("mitup_bot").info("event running")
 
     with capture_logs(processors=[merge_contextvars]) as logs:
@@ -152,7 +152,7 @@ async def test_launch_event_uses_distinct_run_id_per_invocation():
     api = MockApi()
     client = make_test_metrics_client()
 
-    def capture_run_id(_api: object, _client: object) -> None:
+    def capture_run_id(_api: object, _client: object):
         structlog.get_logger("mitup_bot").info("event running")
 
     with capture_logs(processors=[merge_contextvars]) as logs:

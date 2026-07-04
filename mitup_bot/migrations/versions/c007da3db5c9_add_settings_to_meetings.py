@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.add_column("meetups", sa.Column("waiting_list", sa.Boolean, nullable=False, server_default=sa.false()))
     op.add_column("meetups", sa.Column("public", sa.Boolean, nullable=False, server_default=sa.false()))
     op.add_column("meetups", sa.Column("allow_invitation", sa.Boolean, nullable=False, server_default=sa.false()))
@@ -26,7 +26,7 @@ def upgrade() -> None:
     op.add_column("meetups", sa.Column("show_timezone", sa.Boolean, nullable=False, server_default=sa.true()))
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_column("meetups", "waiting_list")
     op.drop_column("meetups", "public")
     op.drop_column("meetups", "allow_invitation")

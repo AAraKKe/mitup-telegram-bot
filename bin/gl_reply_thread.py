@@ -62,7 +62,7 @@ def glab_api(path: str, *, method: str = "GET", fields: dict[str, str] | None = 
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def cmd_list(mr_iid: str) -> None:
+def cmd_list(mr_iid: str):
     discussions = glab_api(f"projects/:fullpath/merge_requests/{mr_iid}/discussions")
     assert isinstance(discussions, list)
     for d in discussions:
@@ -79,7 +79,7 @@ def cmd_list(mr_iid: str) -> None:
         print()
 
 
-def cmd_get(mr_iid: str, discussion_id: str) -> None:
+def cmd_get(mr_iid: str, discussion_id: str):
     discussion = glab_api(f"projects/:fullpath/merge_requests/{mr_iid}/discussions/{discussion_id}")
     assert isinstance(discussion, dict)
     for note in discussion["notes"]:
@@ -87,7 +87,7 @@ def cmd_get(mr_iid: str, discussion_id: str) -> None:
         print("---")
 
 
-def cmd_resolve(mr_iid: str, discussion_id: str) -> None:
+def cmd_resolve(mr_iid: str, discussion_id: str):
     glab_api(
         f"projects/:fullpath/merge_requests/{mr_iid}/discussions/{discussion_id}",
         method="PUT",
@@ -96,7 +96,7 @@ def cmd_resolve(mr_iid: str, discussion_id: str) -> None:
     print(f"Thread {discussion_id} marked as resolved.")
 
 
-def cmd_reply(mr_iid: str, discussion_id: str, body: str) -> None:
+def cmd_reply(mr_iid: str, discussion_id: str, body: str):
     glab_api(
         f"projects/:fullpath/merge_requests/{mr_iid}/discussions/{discussion_id}/notes",
         method="POST",
@@ -105,7 +105,7 @@ def cmd_reply(mr_iid: str, discussion_id: str, body: str) -> None:
     print(f"Reply posted to discussion {discussion_id} on MR !{mr_iid}.")
 
 
-def cmd_reply_batch(mr_iid: str, json_source: str) -> None:
+def cmd_reply_batch(mr_iid: str, json_source: str):
     if json_source == "-":
         raw = sys.stdin.read()
     else:

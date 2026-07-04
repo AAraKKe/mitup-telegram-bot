@@ -13,7 +13,7 @@ from mitup_bot.views import ButtonConfig, PaginatedMitupView, factory
 from .enums import MainMenuHandlerId
 
 
-async def _show_past_meetings(user: User, page_number: int, update: Update, context: TMitupContext) -> None:
+async def _show_past_meetings(user: User, page_number: int, update: Update, context: TMitupContext):
     past_meetings = sorted([m for m in user.meetups if not m.active], key=lambda m: m.db_id)
     page_number = PaginatedMitupView.clamp_page(page_number, len(past_meetings))
 
@@ -52,7 +52,7 @@ async def _show_past_meetings(user: User, page_number: int, update: Update, cont
     MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, callback_data=cb.PAST_MEETINGS, bindable=True
 )
 @with_session
-async def callback_query_show_past_meetings(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def callback_query_show_past_meetings(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
     await _show_past_meetings(user, 1, update, context)
 
@@ -61,7 +61,7 @@ async def callback_query_show_past_meetings(session: AsyncSession, update: Updat
     MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK, callback_data=cb.SHOW_PAST_MEETING_PAGE, bindable=True
 )
 @with_session
-async def callback_query_show_past_meeting_page(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def callback_query_show_past_meeting_page(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.SHOW_PAST_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK
     )

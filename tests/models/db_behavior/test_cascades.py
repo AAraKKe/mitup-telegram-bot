@@ -7,7 +7,7 @@ from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 pytestmark = pytest.mark.db_test
 
 
-async def test_deleting_user_cascades_to_settings(db_session: AsyncSession) -> None:
+async def test_deleting_user_cascades_to_settings(db_session: AsyncSession):
     user = User(first_name="Cascade Test Settings", tg_user_id=998_001, settings=Settings())
     db_session.add(user)
     await db_session.flush()
@@ -20,7 +20,7 @@ async def test_deleting_user_cascades_to_settings(db_session: AsyncSession) -> N
     assert (await db_session.exec(select(Settings).where(Settings.user_id == user_id))).all() == []
 
 
-async def test_deleting_user_cascades_to_meetups(db_session: AsyncSession) -> None:
+async def test_deleting_user_cascades_to_meetups(db_session: AsyncSession):
     user = User(first_name="Cascade Test Meetups", tg_user_id=998_002)
     user.settings = Settings()
     meetup = Meetup(
@@ -42,7 +42,7 @@ async def test_deleting_user_cascades_to_meetups(db_session: AsyncSession) -> No
     assert (await db_session.exec(select(Meetup).where(Meetup.owner_id == user_id))).all() == []
 
 
-async def test_deleting_meetup_cascades_to_joined_users(db_session: AsyncSession) -> None:
+async def test_deleting_meetup_cascades_to_joined_users(db_session: AsyncSession):
     owner = User(first_name="Cascade Meetup Owner", tg_user_id=998_003)
     owner.settings = Settings()
     joiner = User(first_name="Cascade Meetup Joiner", tg_user_id=998_004)

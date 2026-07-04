@@ -41,7 +41,7 @@ def safe_anchor_date(reference_datetime: dt.datetime | None, user_now: dt.dateti
     return user_now.date()
 
 
-def cleanup_states(context: TMitupContext) -> None:
+def cleanup_states(context: TMitupContext):
     context.clean_user_data(
         [
             ContextId.EDIT_MEETING_TITLE,

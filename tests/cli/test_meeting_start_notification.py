@@ -55,7 +55,7 @@ WHERE meetups.datetime IS NOT NULL
 
 async def test_meeting_start(
     mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
-) -> None:
+):
     meeting = create_meetup(id=1, title="Test meetup")
     joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
     joined_2 = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))

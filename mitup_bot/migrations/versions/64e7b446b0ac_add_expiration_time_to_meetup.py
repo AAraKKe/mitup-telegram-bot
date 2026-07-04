@@ -18,9 +18,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.add_column("meetups", sa.Column("expiration_time", sa.DateTime(), nullable=True))
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_column("meetups", "expiration_time")

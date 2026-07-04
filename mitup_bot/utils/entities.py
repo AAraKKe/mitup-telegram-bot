@@ -21,7 +21,7 @@ class FormattedText:
 
     __slots__ = ("_entities", "_text")
 
-    def __init__(self, text: str, entities: list[MessageEntity] | None = None) -> None:
+    def __init__(self, text: str, entities: list[MessageEntity] | None = None):
         self._text = text
         self._entities: list[MessageEntity] = list(entities) if entities else []
 
@@ -276,7 +276,7 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
     active: dict[str, int] = {}  # style → UTF-16 offset where the opening tag appeared
     cursor = 0
 
-    def flush(s: str) -> None:
+    def flush(s: str):
         nonlocal plain, utf16_offset
         plain += s
         utf16_offset += utf16_len(s)

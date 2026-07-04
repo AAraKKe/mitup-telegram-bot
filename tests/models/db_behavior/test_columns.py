@@ -78,7 +78,7 @@ async def test_users_status_rejects_invalid_value(db_session: AsyncSession):
         await savepoint.rollback()
 
 
-async def test_joined_users_has_invited_by_id(db_session: AsyncSession) -> None:
+async def test_joined_users_has_invited_by_id(db_session: AsyncSession):
     result = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(
@@ -90,7 +90,7 @@ async def test_joined_users_has_invited_by_id(db_session: AsyncSession) -> None:
     assert result == "invited_by_id"
 
 
-async def test_messages_has_chat_instance(db_session: AsyncSession) -> None:
+async def test_messages_has_chat_instance(db_session: AsyncSession):
     result = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(
@@ -103,7 +103,7 @@ async def test_messages_has_chat_instance(db_session: AsyncSession) -> None:
 
 
 @pytest.mark.parametrize("table_name, column_name", [("meetups", "location"), ("messages", "buttons")])
-async def test_column_is_json(db_session: AsyncSession, table_name: str, column_name: str) -> None:
+async def test_column_is_json(db_session: AsyncSession, table_name: str, column_name: str):
     data_type = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(

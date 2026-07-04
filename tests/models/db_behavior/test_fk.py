@@ -9,12 +9,12 @@ from mitup_bot.models import JoinedUsers, Meetup, User
 pytestmark = pytest.mark.db_test
 
 
-async def test_invited_by_id_is_nullable(db_session: AsyncSession, seed_joined_link: JoinedUsers) -> None:
+async def test_invited_by_id_is_nullable(db_session: AsyncSession, seed_joined_link: JoinedUsers):
     loaded = (await db_session.exec(select(JoinedUsers).where(JoinedUsers.id == seed_joined_link.id))).one()
     assert loaded.invited_by_id is None
 
 
-async def test_invited_by_fk_references_users(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> None:
+async def test_invited_by_fk_references_users(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup):
     with pytest.raises(IntegrityError):
         async with db_session.begin_nested():
             await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657

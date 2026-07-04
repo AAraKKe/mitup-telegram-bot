@@ -17,11 +17,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     helpers.add_created_time_trigger("settings")
     helpers.add_updated_time_trigger("settings")
 
 
-def downgrade() -> None:
+def downgrade():
     helpers.remove_created_time_trigger("settings")
     helpers.remove_updated_time_trigger("settings")

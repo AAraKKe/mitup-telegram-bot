@@ -28,7 +28,7 @@ class StaleCancelHandlerId(HandlerId):
     auto_answer=False,
 )
 @with_session
-async def callback_query_stale_cancel(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def callback_query_stale_cancel(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
 
     alert_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user.lang)

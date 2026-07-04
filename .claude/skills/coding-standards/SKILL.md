@@ -260,7 +260,7 @@ object.__setattr__(self, "unix_time", unix_time)
 
 ```python
 class MalformedCallbackData(RuntimeError):
-    def __init__(self, handler: HandlerId, callback_data: CallbackData) -> None:
+    def __init__(self, handler: HandlerId, callback_data: CallbackData):
         super().__init__(
             f"Callback data {callback_data!r} received in handler {handler!r} is malformed."
         )

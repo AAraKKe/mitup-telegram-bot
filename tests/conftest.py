@@ -35,7 +35,7 @@ from tests.helpers.types import CliRunner as TypeRunner
 from tests.helpers.types import StubMitupContext
 
 
-def pytest_addoption(parser: pytest.Parser) -> None:
+def pytest_addoption(parser: pytest.Parser):
     parser.addoption(
         "--lang",
         default="en",
@@ -44,7 +44,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+def pytest_generate_tests(metafunc: pytest.Metafunc):
     if "lang" in metafunc.fixturenames:
         lang_opt: str = metafunc.config.getoption("--lang")
         langs = SUPPORTED_LANGUAGES if lang_opt == "all" else [lang_opt]

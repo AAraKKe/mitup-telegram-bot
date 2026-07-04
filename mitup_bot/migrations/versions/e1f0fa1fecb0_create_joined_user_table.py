@@ -20,7 +20,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.create_table(
         "joined_users",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
@@ -42,6 +42,6 @@ def upgrade() -> None:
     add_created_time_trigger("joined_users")
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_table("joined_users")
     remove_created_time_trigger("joined_users")

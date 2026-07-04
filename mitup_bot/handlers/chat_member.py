@@ -45,7 +45,7 @@ def is_block_transition(update: Update) -> bool:
 
 @HandlersRegistry.register_chat_member(handler_id=ChatMemberHandlerId.MY_CHAT_MEMBER)
 @with_session
-async def chat_member_block_handler(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def chat_member_block_handler(session: AsyncSession, update: Update, context: TMitupContext):
     # Unblock (BANNED/LEFT → MEMBER) is intentionally NOT handled here. The end of the
     # registration conversation is the only legitimate transition back to MEMBER, and the
     # /start re-onboarding flow treats a LEFT user as a re-onboarding case. Restoring the

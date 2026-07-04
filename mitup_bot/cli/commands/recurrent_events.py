@@ -77,7 +77,7 @@ def build_bot(config: BotConfig) -> ExtBot:
     )
 
 
-async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
+async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient):
     match event_type:
         case EventType.USER_CLEANUP:
             await user_cleanup.run(api, client)
@@ -95,12 +95,12 @@ async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client:
             assert_never(never)  # pragma: no cover
 
 
-async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient) -> None:
+async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient):
     with structlog.contextvars.bound_contextvars(event_type=event_type.value, run_id=uuid4().hex):
         await dispatch_event(event_type, api, client)
 
 
-async def handle_maintainance(event_type: EventType, bot: ExtBot, client: MetricsClient | None = None) -> None:
+async def handle_maintainance(event_type: EventType, bot: ExtBot, client: MetricsClient | None = None):
     client = client or MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})
     api = build_api(BotAdapter(bot, client))
 

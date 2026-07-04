@@ -17,7 +17,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.alter_column(
         table_name="settings",
         column_name="default_show_members",
@@ -25,7 +25,7 @@ def upgrade() -> None:
     )
 
 
-def downgrade() -> None:
+def downgrade():
     op.alter_column(
         table_name="settings",
         column_name="default_incognito",

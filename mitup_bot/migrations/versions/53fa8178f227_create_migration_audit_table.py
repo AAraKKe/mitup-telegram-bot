@@ -18,7 +18,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.create_table(
         "migration_audit",
         sa.Column("table_name", sa.String, primary_key=True, nullable=False),
@@ -31,6 +31,6 @@ def upgrade() -> None:
     op.create_index("ix_migration_audit_status", "migration_audit", ["status"])
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_index("ix_migration_audit_status", table_name="migration_audit")
     op.drop_table("migration_audit")

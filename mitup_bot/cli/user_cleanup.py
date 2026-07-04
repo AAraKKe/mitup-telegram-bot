@@ -1,4 +1,4 @@
-from sqlmodel import and_, delete, select
+from sqlmodel import and_, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -20,8 +20,8 @@ Invited users (tg_user_id == -1) are handled by `inactive_meetings` too.
 
 
 @db.with_session
-async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
     user_ids = set((await session.exec(INACTIVE_USERS_SELECT_STATEMENT)).all())
 
-    await session.exec(delete(User).where(User.id.in_(user_ids)))  # ty: ignore[unresolved-attribute]  # https://github.com/astral-sh/ty/issues/2839
+    await session.exec(delete(User).where(col(User.id).in_(user_ids)))
     metrics.emit(MetricKey.INACTIVE_USERS_DELETED, len(user_ids), MetricUnit.COUNT)

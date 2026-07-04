@@ -4,7 +4,7 @@ from typing import cast
 
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import and_, delete, false, func, literal, null, select, true
+from sqlmodel import and_, col, delete, false, func, literal, null, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -115,8 +115,8 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
     if views:
         await api.send_messages_to_users(users=users, views=views, on_success=callbacks)
 
-    await session.exec(delete(Meetup).where(Meetup.id.in_(meeting_ids)))  # type: ignore
-    await session.exec(delete(User).where(User.id.in_(outside_user_ids)))  # type: ignore
+    await session.exec(delete(Meetup).where(col(Meetup.id).in_(meeting_ids)))
+    await session.exec(delete(User).where(col(User.id).in_(outside_user_ids)))
 
     deleted_count = len(meeting_ids)
     failed_count = len(meetups) - deleted_count
@@ -126,6 +126,6 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
 
 
 @db.with_session
-async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
     await notify_meetups_about_to_be_deleted(session, api, metrics)
     await delete_meetups(session, api, metrics)

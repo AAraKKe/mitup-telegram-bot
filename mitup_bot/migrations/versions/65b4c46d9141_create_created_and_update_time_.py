@@ -17,7 +17,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.execute(
         """
         CREATE OR REPLACE FUNCTION set_created_time()
@@ -42,6 +42,6 @@ def upgrade() -> None:
     )
 
 
-def downgrade() -> None:
+def downgrade():
     op.execute("DROP FUNCTION IF EXISTS set_created_time()")
     op.execute("DROP FUNCTION IF EXISTS set_updated_time()")

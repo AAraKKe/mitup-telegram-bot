@@ -73,7 +73,7 @@ For both `meeting_accessible` and `meeting_viewable`, `custom_keyboard` replaces
 ```python
 @HandlersRegistry.register_callback_query(MyHandlerId.SHOW, callback_data=cb.MY_CALLBACK)
 @with_session
-async def show(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def show(session: AsyncSession, update: Update, context: TMitupContext):
     meeting_id = guards.valid_callback_data(cb.MY_CALLBACK.parse(context.match), MyHandlerId.SHOW).id
     user = await guards.current_user(update, session)
     meeting = await guards.meeting_accessible(session, user, meeting_id, "show meeting", update, context)

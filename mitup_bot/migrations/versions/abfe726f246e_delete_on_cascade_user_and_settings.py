@@ -17,11 +17,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.drop_constraint("settings_user_id_fkey", "settings", type_="foreignkey")
     op.create_foreign_key("settings_user_id_fkey", "settings", "users", ["user_id"], ["id"], ondelete="CASCADE")
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_constraint("settings_user_id_fkey", "settings", type_="foreignkey")
     op.create_foreign_key("settings_user_id_fkey", "settings", "users", ["user_id"], ["id"])

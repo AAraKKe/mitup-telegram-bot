@@ -24,7 +24,7 @@ def test_setattr_propagates_change_tracking():
     call_count = 0
 
     class _TrackingModel(SampleModel):
-        def changed(self) -> None:
+        def changed(self):
             nonlocal call_count
             call_count += 1
 

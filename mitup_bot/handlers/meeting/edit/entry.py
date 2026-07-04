@@ -19,7 +19,7 @@ log = structlog.get_logger(__name__)
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.EDIT, callback_data=cb.EDIT_MEETING, bindable=True)
 @with_session
-async def callback_query_edit_meeting(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def callback_query_edit_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(cb.EDIT_MEETING.parse(context.match), EditMeetingHandlerId.EDIT)
 
     user = await guards.current_user(update, session)

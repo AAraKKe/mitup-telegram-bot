@@ -18,11 +18,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     # Add chat_instance column to messages table
     op.add_column("messages", sa.Column("chat_instance", sa.String(), nullable=True))
 
 
-def downgrade() -> None:
+def downgrade():
     # Remove chat_instance column from messages table
     op.drop_column("messages", "chat_instance")

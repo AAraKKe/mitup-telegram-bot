@@ -5,7 +5,7 @@ from sqlalchemy.ext.mutable import Mutable
 
 
 class MutableModel(BaseModel, Mutable):
-    def __setattr__(self, name: str, value: Any) -> None:
+    def __setattr__(self, name: str, value: Any):
         """Allows SQLAlchmey Session to track mutable behavior when updating any field"""
         self.changed()
         return super().__setattr__(name, value)

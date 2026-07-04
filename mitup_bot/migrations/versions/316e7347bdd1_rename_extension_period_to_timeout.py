@@ -17,9 +17,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.alter_column("settings", "default_extension_period", new_column_name="timeout")
 
 
-def downgrade() -> None:
+def downgrade():
     op.alter_column("settings", "timeout", new_column_name="default_extension_period")

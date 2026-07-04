@@ -19,7 +19,7 @@ from mitup_bot.monitoring import MetricsClient
 from tests.helpers import make_test_metrics_client
 
 USERNAME = "mitupbot"
-PAST_MEETINGS = "12345pass"
+PASSWORD = "12345pass"
 
 
 def _read_postgres_image() -> str:
@@ -31,11 +31,11 @@ def _read_postgres_image() -> str:
     return match.group(1)
 
 
-def pytest_addoption(parser: pytest.Parser) -> None:
+def pytest_addoption(parser: pytest.Parser):
     parser.addoption("--db-tests", action="store_true", default=False, help="Run DB integration tests")
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]):
     if not config.getoption("--db-tests"):
         skip = pytest.mark.skip(reason="Pass --db-tests to run database integration tests")
         for item in items:
@@ -60,7 +60,7 @@ def pg_container() -> Generator[PostgresContainer]:
     container = PostgresContainer(
         image=image,
         username=USERNAME,
-        password=PAST_MEETINGS,
+        password=PASSWORD,
         dbname="mitup",
     )
     container.start()
@@ -74,7 +74,7 @@ def pg_container() -> Generator[PostgresContainer]:
 def live_db_config(pg_container: PostgresContainer) -> DbConfig:
     return DbConfig(
         username=USERNAME,
-        password=SecretStr(PAST_MEETINGS),
+        password=SecretStr(PASSWORD),
         url=pg_container.get_container_host_ip(),
         database="mitup",
         port=int(pg_container.get_exposed_port(5432)),

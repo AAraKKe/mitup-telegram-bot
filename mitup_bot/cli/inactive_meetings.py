@@ -3,7 +3,7 @@ from typing import cast
 
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import and_, delete, exists, func, literal, null, or_, select, true
+from sqlmodel import and_, col, delete, exists, func, literal, null, or_, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -91,11 +91,11 @@ async def _deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api:
     # These users exist only in the context of the current meeting.
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
     if invited_users_ids:
-        await session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
+        await session.exec(delete(User).where(col(User.id).in_(invited_users_ids)))
 
     # Same with messages, any message attached to this meeting is left untracked as the
     # meeting is now considered over
-    await session.exec(delete(Message).where(Message.meetup_id == meetup_id))  # type: ignore
+    await session.exec(delete(Message).where(col(Message.meetup_id) == meetup_id))
     return True
 
 

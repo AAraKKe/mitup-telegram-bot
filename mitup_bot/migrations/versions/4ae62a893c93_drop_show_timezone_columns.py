@@ -18,11 +18,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.drop_column("meetups", "show_timezone")
     op.drop_column("settings", "default_show_timezone")
 
 
-def downgrade() -> None:
+def downgrade():
     op.add_column("meetups", sa.Column("show_timezone", sa.Boolean, nullable=False, server_default=sa.false()))
     op.add_column("settings", sa.Column("default_show_timezone", sa.Boolean, nullable=False, server_default=sa.false()))

@@ -21,7 +21,7 @@ from .enums import MeetingHandlerId
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
 @with_session(write=True)
-async def join_meetup(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def join_meetup(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the join action when clicked on a meeting. This action can be clicked by any user
     to whom the meeting has been shared to.
@@ -103,7 +103,7 @@ async def handle_non_existing_user_join(session: AsyncSession, update: Update, c
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
 @with_session(write=True)
-async def leave_meetup(session: AsyncSession, update: Update, context: TMitupContext) -> None:
+async def leave_meetup(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the leave action when clicked on a meeting. This action can be clicked by any user
     who has already joined the meeting. If the user is not registered we should ask the user

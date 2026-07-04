@@ -52,10 +52,10 @@ DEDUPLICATE_JOINED_USERS_SQL = """
 """
 
 
-def upgrade() -> None:
+def upgrade():
     op.execute(DEDUPLICATE_JOINED_USERS_SQL)
     op.create_unique_constraint(CONSTRAINT_NAME, "joined_users", ["user_id", "meetup_id"])
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_constraint(CONSTRAINT_NAME, "joined_users", type_="unique")

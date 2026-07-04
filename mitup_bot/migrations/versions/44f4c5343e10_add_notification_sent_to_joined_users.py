@@ -18,11 +18,11 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.add_column(
         "joined_users", sa.Column("notification_sent", sa.Boolean(), nullable=False, server_default=sa.false())
     )
 
 
-def downgrade() -> None:
+def downgrade():
     pass

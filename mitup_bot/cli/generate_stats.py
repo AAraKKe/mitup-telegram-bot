@@ -19,7 +19,7 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
     invited_users = func.sum(cast(User.tg_user_id == -1, Integer))
     result = (
         await session.exec(
-            select(  # type: ignore no overload for "exec" matches argument types
+            select(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1333
                 member_users, left_users, joined_only_users, total_users, invited_users
             )
         )
@@ -52,7 +52,7 @@ async def meetings_stats(session: AsyncSession, metrics: MetricsClient):
 
     result: tuple[int, int, int, int, int, int] = (
         await session.exec(
-            select(  # type: ignore no overload for "exec" matches argument types
+            select(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1333
                 active_meetings,
                 total_meetings,
                 incognito_meetings,

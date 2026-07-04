@@ -15,7 +15,7 @@ def _alembic_head() -> str:
     return head
 
 
-async def test_no_pending_migrations(db_session: AsyncSession) -> None:
+async def test_no_pending_migrations(db_session: AsyncSession):
     """Verify the DB is at the current Alembic head revision.
 
     If this test fails, the DB has not had all migrations applied.

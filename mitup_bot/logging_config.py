@@ -44,7 +44,7 @@ def build_root_handler(env: Env) -> logging.Handler:
     return handler
 
 
-def configure_library_levels(env: Env) -> None:
+def configure_library_levels(env: Env):
     """Tune noisy third-party loggers."""
     # httpx logs every request at INFO, which floods our logs with HTTP noise.
     logging.getLogger("httpx").setLevel(logging.WARNING)

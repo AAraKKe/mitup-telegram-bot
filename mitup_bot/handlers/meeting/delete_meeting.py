@@ -1,6 +1,6 @@
 from typing import cast
 
-from sqlmodel import delete
+from sqlmodel import col, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -73,7 +73,7 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
 
     # Keep all invited users ides to also delete them
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
-    await session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
+    await session.exec(delete(User).where(col(User.id).in_(invited_users_ids)))
     await session.delete(meeting)
 
     view = MitupView(

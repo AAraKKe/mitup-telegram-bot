@@ -6,7 +6,7 @@ from mitup_bot.models.base_model import BaseModel
 class _ModelWithId(BaseModel):
     """Minimal concrete subclass with an explicit id attribute."""
 
-    def __init__(self, id: int | None = None) -> None:
+    def __init__(self, id: int | None = None):
         self.id = id
 
 

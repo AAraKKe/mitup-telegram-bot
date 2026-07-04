@@ -60,7 +60,7 @@ def _conversation(handler_id: HandlerId) -> ConversationHandler:
     return cast(ConversationHandler, HandlersRegistry.get_handler(handler_id))
 
 
-def _clear_conversation_state() -> None:
+def _clear_conversation_state():
     # The conversation handlers are registry singletons shared with every other test in the
     # process; drop any state keyed under the default (chat, user) so tests stay independent.
     _conversation(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)._conversations.clear()
@@ -101,7 +101,7 @@ async def _process(app: Application, update: Update) -> MockApi:
     return cast(MockApi, RecordingContext.created[-1].api)
 
 
-def _register_member(mock_session: MockDbSession, user: User) -> None:
+def _register_member(mock_session: MockDbSession, user: User):
     """Seed both lookups a MEMBER /start triggers: guards.member_user and User.by_tg_user_id."""
     mock_session.add_user(user)
     member_lookup = select(User).where(

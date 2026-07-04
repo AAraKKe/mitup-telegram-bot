@@ -36,7 +36,7 @@ def handle_forbidden(joined_link: JoinedUsers):
         joined_link.notification_sent = True
 
 
-async def send_started_notification(joined_link: JoinedUsers, api: TelegramApiWrapper) -> None:
+async def send_started_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
     view = MitupView(
         description=NotificationMessages.STARTED.get(
             lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
@@ -48,7 +48,7 @@ async def send_started_notification(joined_link: JoinedUsers, api: TelegramApiWr
 
 
 @db.with_session
-async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
+async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
     """Send a notification to all participants when a meeting's scheduled time has arrived."""
     meetings = (await session.exec(MEETINGS_TO_NOTIFY_STARTED_STATEMENT)).all()
     meetings_processed = 0

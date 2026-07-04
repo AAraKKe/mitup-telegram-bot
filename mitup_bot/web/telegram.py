@@ -68,7 +68,7 @@ async def telegram_webhook(
     ptb_app: Annotated[Application, Depends(get_ptb_application)],
     secret_token: Annotated[str | None, Depends(get_webhook_secret)],
     metrics_client: Annotated[MetricsClient, Depends(get_metrics_client)],
-) -> None:
+):
     # Telegram only reads the HTTP status code; it ignores the response body.
     # We always return 204 (even on parse failures) so Telegram doesn't retry
     # poison-pill updates. Well-formed updates are handed to PTB's update queue

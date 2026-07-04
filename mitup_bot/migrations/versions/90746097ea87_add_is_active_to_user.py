@@ -18,9 +18,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.add_column("users", sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.true()))
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_column("users", "is_active")

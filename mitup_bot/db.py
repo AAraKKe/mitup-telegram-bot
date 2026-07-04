@@ -57,7 +57,7 @@ def deserialize_pydantic_model(data: str) -> BaseModel | None:
     return None
 
 
-def set_connection_context(context: str) -> None:
+def set_connection_context(context: str):
     __connection_context.set(context)
 
 
@@ -66,9 +66,7 @@ def get_open_connections(context: str) -> int:
     return __active_connections[context]
 
 
-def configure_db(
-    db_config: DbConfig, skip_if_initialized: bool = False, metrics_client: MetricsClient | None = None
-) -> None:
+def configure_db(db_config: DbConfig, skip_if_initialized: bool = False, metrics_client: MetricsClient | None = None):
     """Configure the db module by creating the engine and the session factory.
 
     Passing a `metrics_client` enables connection-pool observability: pool-event gauges plus
@@ -252,7 +250,7 @@ def _capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> Telegr
     )
 
 
-async def _apply_reconcile(api: TelegramApi, outbox: ApiOutbox) -> None:
+async def _apply_reconcile(api: TelegramApi, outbox: ApiOutbox):
     """Apply the DB fix-ups discovered while draining the outbox, in one short transaction:
     drop Message rows Telegram reported gone and mark unreachable users inactive."""
     if not outbox.dead_message_ids and not outbox.inactive_tg_user_ids:

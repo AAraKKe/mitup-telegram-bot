@@ -37,7 +37,7 @@ class ProbeBot:
         self.order: list[str] = []
         self.participants_seen_under_lock: int | None = None
 
-    async def send_message(self, **kwargs: object) -> None:
+    async def send_message(self, **kwargs: object):
         self.order.append("fanout-started")
         # Take the same row lock the handler held. This blocks (and times the test out)
         # if the handler's transaction were still open around the fan-out.
@@ -75,7 +75,7 @@ async def test_row_lock_released_at_commit_before_queued_fanout(db_session: Asyn
     context = SimpleNamespace(api=api)
 
     @db.with_session(write=True)
-    async def join_handler(session: AsyncSession, context: SimpleNamespace) -> None:
+    async def join_handler(session: AsyncSession, context: SimpleNamespace):
         user = (await session.exec(select(User).where(User.tg_user_id == 997_101))).one()
         await session.refresh(user, ["joined_links"])
         meeting = await Meetup.by_id(session, meetup_id, for_update=True)

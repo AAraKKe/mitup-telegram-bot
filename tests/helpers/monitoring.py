@@ -104,7 +104,7 @@ class MetricAssertions:
         properties_exact: bool = False,
         exception: type[Exception] | str | None = None,
         times: int = 1,
-    ) -> None:
+    ):
         found = sum(
             self._matches(
                 record,
@@ -151,7 +151,7 @@ class MetricAssertions:
         properties: dict[str, Any] | None = None,
         properties_exact: bool = False,
         exception: type[Exception] | str | None = None,
-    ) -> None:
+    ):
         self.assert_emitted(
             name=name,
             value=value,

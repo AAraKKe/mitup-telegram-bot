@@ -20,7 +20,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
+def upgrade():
     op.create_table(
         "meetups",
         sa.Column("id", sa.BigInteger, nullable=False, primary_key=True),
@@ -41,5 +41,5 @@ def upgrade() -> None:
     helpers.add_updated_time_trigger("meetups")
 
 
-def downgrade() -> None:
+def downgrade():
     op.drop_table("meetups")

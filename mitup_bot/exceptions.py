@@ -32,7 +32,7 @@ class GuardError(RuntimeError):
 
 
 class MalformedCallbackData(GuardError):
-    def __init__(self, handler: HandlerId, callback_data: CallbackData) -> None:
+    def __init__(self, handler: HandlerId, callback_data: CallbackData):
         super().__init__(f"Callback data {callback_data!r} received in handler {handler!r} is malformed.")
 
 
