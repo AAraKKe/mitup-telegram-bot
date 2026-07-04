@@ -53,9 +53,9 @@ async def test_errors_ignored(error: type, message: str, context: StubMitupConte
 async def test_handle_inactive_user_not_found(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """When user_id does not exist in the session, handle_inactive_user returns silently without emitting metrics."""
+    """When no user with that tg_user_id exists, handle_inactive_user returns silently without emitting metrics."""
     # Do not add any user to the session so the lookup returns None
-    await error_handler.handle_inactive_user(context, user_id=999)
+    await error_handler.handle_inactive_user(context, tg_user_id=999)
     await context.metrics.flush()
 
     metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
@@ -67,9 +67,9 @@ async def test_handle_inactive_user_error(
     """MEMBER → LEFT transition: the metric MUST fire."""
     assert user.status is UserStatus.MEMBER
 
-    mock_session.add_object(user)
+    mock_session.add_object(user, query_field="tg_user_id")
 
-    await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
+    await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert user.status is UserStatus.LEFT
@@ -86,9 +86,9 @@ async def test_handle_inactive_user_joined_only_is_noop(
     eventually delete them via user_cleanup, defeating the entire purpose of the new enum.
     """
     user = create_user(id=10, tg_user_id=500, status=UserStatus.JOINED_ONLY)
-    mock_session.add_object(user)
+    mock_session.add_object(user, query_field="tg_user_id")
 
-    await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
+    await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert user.status is UserStatus.JOINED_ONLY
@@ -101,9 +101,9 @@ async def test_handle_inactive_user_left_is_noop(
 ):
     """Re-hitting an already-LEFT user must not double-emit the INACTIVE_USER_SET metric."""
     user = create_user(id=11, tg_user_id=501, status=UserStatus.LEFT)
-    mock_session.add_object(user)
+    mock_session.add_object(user, query_field="tg_user_id")
 
-    await error_handler.handler(context, InactiveUserInteraction(user.db_id, private=True), Env.DEV)
+    await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert user.status is UserStatus.LEFT

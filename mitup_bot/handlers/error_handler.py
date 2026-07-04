@@ -29,8 +29,12 @@ SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
 
 
 @db.with_session
-async def handle_inactive_user(session: AsyncSession, context: TMitupContext, user_id: int):
-    if (user := (await session.exec(select(User).where(User.id == user_id))).first()) and user.mark_inactive():
+async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg_user_id: int):
+    # InactiveUserInteraction carries the TELEGRAM user id (see the api_wrapper raise sites);
+    # filtering on the internal primary key silently matched nothing — or the wrong user.
+    if (
+        user := (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
+    ) and user.mark_inactive():
         context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_dimensions=False)
 
 
@@ -89,7 +93,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
         return
 
     if isinstance(error, InactiveUserInteraction) and error.private:
-        await handle_inactive_user(context, error.user_id)
+        await handle_inactive_user(context, error.tg_user_id)
         return
 
     # Emit an error metric for the current update both including the error type and a general

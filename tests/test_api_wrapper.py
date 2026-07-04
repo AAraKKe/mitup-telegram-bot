@@ -221,7 +221,7 @@ async def test_send_message_to_user_raises_inactive_user(
     with pytest.raises(InactiveUserInteraction) as exc_info:
         await telegram_api.send_message_to_user(user, "test")
 
-    assert exc_info.value.user_id == tg_user_id
+    assert exc_info.value.tg_user_id == tg_user_id
 
 
 async def test_send_message_to_user_other_bad_request_reraised(telegram_api: TelegramApi, bot: AsyncMock):

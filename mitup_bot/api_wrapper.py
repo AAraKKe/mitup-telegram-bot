@@ -310,8 +310,8 @@ class TelegramApi:
                 await queued.invoke()
             except InactiveUserInteraction as exc:
                 # The reconcile transaction run by the decorator marks the user inactive.
-                outbox.inactive_tg_user_ids.append(exc.user_id)
-                log.info("User unreachable during post-commit fan-out", tg_user_id=exc.user_id)
+                outbox.inactive_tg_user_ids.append(exc.tg_user_id)
+                log.info("User unreachable during post-commit fan-out", tg_user_id=exc.tg_user_id)
             except BadRequest as exc:
                 if any(pattern.findall(exc.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
                     continue

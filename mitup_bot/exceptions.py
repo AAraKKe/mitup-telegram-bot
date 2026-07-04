@@ -156,10 +156,12 @@ class InvalidLanguageError(ValueError):
 
 
 class InactiveUserInteraction(RuntimeError):
-    def __init__(self, user_id: int, private: bool):
-        self.user_id = user_id
+    # Carries the TELEGRAM user id (raise sites pass user.tg_user_id) — named explicitly
+    # after the id-space bug fixed in #196.
+    def __init__(self, tg_user_id: int, private: bool):
+        self.tg_user_id = tg_user_id
         self.private = private
-        super().__init__(f"The user {user_id} is inactive and interacted with the bot")
+        super().__init__(f"The user {tg_user_id} is inactive and interacted with the bot")
 
 
 class CallbackQueryTextTooLong(ValueError):
