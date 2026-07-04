@@ -42,7 +42,7 @@ def test_query_for_users_to_notify_about_meeting_start(mock_session: MockDbSessi
     # - Are not in the waiting list
     # - The meeting has a datetime set
     # - The notification has not yet been sent
-    # - The meeting start time is between now and now + notification_time on the user settings
+    # - The meeting start time is between now and now + notification_time on the PARTICIPANT's settings
 
     expected_query = """SELECT
     joined_users.id,
@@ -53,9 +53,9 @@ def test_query_for_users_to_notify_about_meeting_start(mock_session: MockDbSessi
     joined_users.is_waiting_list,
     joined_users.notification_sent
 FROM joined_users
-    JOIN meetups ON meetups.id = joined_users.meetup_id
-    JOIN users ON users.id = meetups.owner_id
-    JOIN settings ON users.id = settings.user_id
+    JOIN meetups ON joined_users.meetup_id = meetups.id
+    JOIN users ON joined_users.user_id = users.id
+    JOIN settings ON settings.user_id = users.id
 WHERE meetups.datetime IS NOT NULL
     AND users.status = 'member'
     AND settings.notification = true
@@ -67,6 +67,17 @@ WHERE meetups.datetime IS NOT NULL
 
     mock_session.exec(notify_meetings.USERS_TO_NOTIFY_STATEMENT)
     assert mock_session.normalize_query(expected_query) == mock_session.queries_executed[0]
+
+
+def test_users_and_settings_join_through_the_participant_not_the_owner():
+    """Regression for #201: FK inference used to route the users join through
+    meetups.owner_id, so status, notification toggle, and lead-time window were all
+    evaluated against the meeting owner instead of the participant being notified."""
+    compiled = MockDbSession.normalize_query(str(notify_meetings.USERS_TO_NOTIFY_STATEMENT))
+
+    assert "JOIN users ON joined_users.user_id = users.id" in compiled
+    assert "JOIN settings ON settings.user_id = users.id" in compiled
+    assert "meetups.owner_id" not in compiled
 
 
 async def test_meeting_start(

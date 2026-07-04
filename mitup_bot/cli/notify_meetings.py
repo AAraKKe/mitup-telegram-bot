@@ -1,6 +1,6 @@
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import and_, false, func, null, select, true
+from sqlmodel import and_, col, false, func, null, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -14,11 +14,14 @@ from mitup_bot.views import MitupView
 
 log = structlog.get_logger(__name__)
 
+# The ON clauses are explicit because FK inference picks the users join through
+# meetups.owner_id, silently evaluating every per-user condition (status, notification
+# toggle, lead-time window) against the meeting OWNER instead of the participant (#201).
 USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
     select(JoinedUsers)
-    .join(Meetup)
-    .join(User)
-    .join(Settings)
+    .join(Meetup, col(JoinedUsers.meetup_id) == col(Meetup.id))
+    .join(User, col(JoinedUsers.user_id) == col(User.id))
+    .join(Settings, col(Settings.user_id) == col(User.id))
     .where(
         and_(
             Meetup.datetime != null(),
