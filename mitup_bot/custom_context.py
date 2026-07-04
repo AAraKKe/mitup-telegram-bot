@@ -138,7 +138,7 @@ class MitupContext(
     ):
         self.metrics = metrics
         self.telegram_update = update
-        self._handler_dimensions: dict[str, str] = {}
+        self._handler_properties: dict[str, str] = {}
         self.__update = update
 
         chat_id = update.effective_chat.id if update and update.effective_chat else None
@@ -266,12 +266,14 @@ class MitupContext(
 
     def prepare_handler_metrics(
         self,
-        handler_dimensions: dict[str, str] | None = None,
+        handler_properties: dict[str, str] | None = None,
     ):
-        if not handler_dimensions:
+        """Register the handler identity (`Handler`/`HandlerType`) attached to every metric emitted
+        during this invocation. These ride as EMF *properties*, not dimensions — see `emit_metric`."""
+        if not handler_properties:
             return
 
-        self._handler_dimensions = handler_dimensions
+        self._handler_properties = handler_properties
 
     def emit_metric(
         self,
@@ -281,34 +283,32 @@ class MitupContext(
         *,
         # Dimension control
         dimensions: dict[str, str] | None = None,
-        include_handler_dimensions: bool = True,
+        include_handler_properties: bool = True,
         # Property control
         properties: dict[str, Any] | None = None,
         include_update_properties: bool = True,
-        # Special flag for global aggregation
-        emit_global: bool = False,
     ):
         """Emit a metric with flexible dimension and property configuration.
+
+        Handler identity (`Handler`/`HandlerType`) is attached as EMF *properties*, never as
+        dimensions: each distinct dimension set is a separately billed CloudWatch series, so
+        dimensioning by handler would mint one series per handler per metric. Properties ride
+        the EMF log line at zero metric cost and stay queryable in CloudWatch Logs Insights
+        (`filter Fault = 1 | stats sum(Fault) by Handler`). Only the dimensionless series is
+        emitted per metric name. See https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/205.
 
         Metrics with identical dimensions are batched into a single EMF log line — a CloudWatch
         cost optimization since charges are per log line, not per metric within a line.
         """
         dims = dict(dimensions or {})
-        if include_handler_dimensions:
-            dims |= self._handler_dimensions
 
         props = dict(properties or {})
+        if include_handler_properties:
+            props |= self._handler_properties
         if include_update_properties:
             props |= properties_from_update(self.telegram_update)
 
         self.metrics.emit(name, value, unit, dimensions=dims, properties=props)
-
-        if emit_global:
-            global_dims = dict(dimensions or {})
-            global_props = dict(properties or {})
-            if include_update_properties:
-                global_props |= properties_from_update(self.telegram_update)
-            self.metrics.emit(name, value, unit, dimensions=global_dims, properties=global_props)
 
     def put_feature_metric(
         self,
@@ -318,7 +318,7 @@ class MitupContext(
         unit: MetricUnit = MetricUnit.COUNT,
         dimensions: dict[str, str] | None = None,
         properties: dict[str, Any] | None = None,
-        with_handler_dimensions: bool = False,
+        with_handler_properties: bool = False,
         with_update_properties: bool = True,
     ):
         """Convenience wrapper around emit_metric that adds a Feature dimension automatically."""
@@ -329,7 +329,7 @@ class MitupContext(
             unit,
             dimensions=feature_dimensions,
             properties=properties,
-            include_handler_dimensions=with_handler_dimensions,
+            include_handler_properties=with_handler_properties,
             include_update_properties=with_update_properties,
         )
 
@@ -344,7 +344,7 @@ class MitupContext(
             MetricKey.TIME.with_prefix(prefix, separator=""),
             elapsed_time,
             MetricUnit.MILLISECONDS,
-            include_handler_dimensions=handler_metrics,
+            include_handler_properties=handler_metrics,
         )
 
     async def flush_metrics(self):

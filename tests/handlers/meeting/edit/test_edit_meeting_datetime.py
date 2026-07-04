@@ -310,9 +310,9 @@ async def test_edit_meeting_time_callback(
         metrics.assert_emitted(
             name="StoredMeetingId", value=1, properties={"ContextId": ContextId.EDIT_MEETING_TIME.value}
         )
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -365,11 +365,11 @@ async def test_set_time_message_with_valid_time(
     # Meeting id has been removed from context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name="CleanUserData", value=1)
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
     context.api.assert_send_message_called(
         update,
@@ -419,9 +419,9 @@ async def test_set_time_message_with_invalid_time(
     context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_VALUE.get(lang=user_with_settings.lang))
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("InvalidTime"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 def entry_point_update(update: Update):
@@ -481,9 +481,9 @@ async def test_conversation_fallback_with_wrong_message_format(
     )
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -696,9 +696,9 @@ async def test_datetime_state_fallbacks(
         CommonMessages.DATETIME_INVALID.get(lang=user_with_settings.lang, datetime_link=build_datetime_link()),
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST], indirect=True)
@@ -718,11 +718,11 @@ async def test_date_time_entity_message_user_not_found(
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 99},
     )
 
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
     metrics.assert_emitted(name="CleanUserData", value=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST], indirect=True)

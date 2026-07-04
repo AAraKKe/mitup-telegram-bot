@@ -244,9 +244,9 @@ async def test_user_join_for_non_existing_meeting(
 
     # No feature metric has been emitted
     metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
     # The user has been notified
     context.api.assert_edit_message_called(
@@ -349,9 +349,9 @@ async def test_user_leave_for_non_existing_meeting(
 
     # No feature metric has been emitted
     metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
     # The user has been notified
     context.api.assert_edit_message_called(

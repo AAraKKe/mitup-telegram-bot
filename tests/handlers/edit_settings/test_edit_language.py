@@ -109,6 +109,6 @@ async def test_set_language_fails_if_id_invalid(
     context, _ = await call_handler(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("InvalidLanguageError"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)

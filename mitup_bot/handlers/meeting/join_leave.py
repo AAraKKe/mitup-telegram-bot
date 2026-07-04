@@ -201,4 +201,4 @@ async def handle_join_leave_operation(
         # The meeting was not found, update the message to inform the user
         # This should never happen because when the meeting is deleted all messages are updated
         await context.api.edit_message(update=update, view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang))
-        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_dimensions=False)
+        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_properties=False)

@@ -42,9 +42,9 @@ def failure_cases(callback_data: CallbackData):
 def assert_metrics_for_failure(error_count: int, error_type: type[Exception], metrics_client: MetricsClient):
     metrics = MetricAssertions(metrics_client)
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix(error_type.__name__), value=error_count)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(1))], indirect=True)

@@ -50,9 +50,9 @@ def callback_with_metrics(
     handler_id: HandlerId, handler_type: str, callback: HandlerCallback, env: Env
 ) -> HandlerCallback:
     async def inner_callback(update: Update, context: TMitupContext):
-        # Set Handler as dimensions for every metric emission from within a callback
-        # Setting them as default dimensions so any flush does not remove them and we also
-        # override aws default dimensions we are not interested in.
+        # Attach the handler identity to every metric emitted from within this callback as EMF
+        # properties (not dimensions): per-handler drill-down stays available in Logs Insights
+        # without minting a billed CloudWatch series per handler. See issue #205.
         context.prepare_handler_metrics({"Handler": handler_id.dimension, "HandlerType": handler_type})
 
         # Keep the context for counter as Bot to differentiate this from the recurrent events
@@ -70,7 +70,7 @@ def callback_with_metrics(
             except ApplicationHandlerStop:
                 # Not a fault: the handler is claiming the update (it carries the next
                 # conversation state). Re-raise so PTB stops the remaining handler groups.
-                context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
+                context.emit_metric(MetricKey.FAULT, 0)
                 raise
             except Exception as e:
                 # Relying on error handlers by the application will result in the creation of a
@@ -78,17 +78,15 @@ def callback_with_metrics(
                 # of the handler that was executed including metrics context.
                 await error_handler(context, e, env)
             else:
-                # Emit FAULT=0 with handler dimensions and globally for aggregation
-                context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
+                # Dimensionless FAULT=0; the handler identity rides as an EMF property, not a dimension.
+                context.emit_metric(MetricKey.FAULT, 0)
             finally:
                 latency = (perf_counter() - start) * 1000
-                # Emit latency with handler dimensions and globally for aggregation
-                context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS, emit_global=True)
+                # Dimensionless latency; the handler identity rides as an EMF property, not a dimension.
+                context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS)
 
                 # Emit leaked database connections (should be 0 if all connections were properly closed)
-                context.emit_metric(
-                    MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT, emit_global=True
-                )
+                context.emit_metric(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT)
 
                 # Make sure we flush the metrics after every callback to drain any buffered metrics
                 await context.flush_metrics()

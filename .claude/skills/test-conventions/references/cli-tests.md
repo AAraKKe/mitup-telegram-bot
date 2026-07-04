@@ -82,4 +82,4 @@ stub.assert_metrics_emited(
 )
 ```
 
-Note: `StubMetrics.assert_metrics_emited` requires explicit `dimensions` since there are no handler dimensions to add automatically.
+Note: `StubMetrics.assert_metrics_emited` requires explicit `dimensions` since no handler identity is attached automatically outside a `MitupContext` (and handler identity rides as EMF properties, never as dimensions — issue #205).

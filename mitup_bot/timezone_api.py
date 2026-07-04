@@ -105,7 +105,7 @@ def get_timezone_by_location(latitude: float, longitude: float, context: TMitupC
 
     if timezone is None:
         context.emit_metric(
-            MetricKey.ERROR.with_prefix("InvalidGoogleTimezoneResponse"), include_handler_dimensions=False
+            MetricKey.ERROR.with_prefix("InvalidGoogleTimezoneResponse"), include_handler_properties=False
         )
         raise IncorrectCoordinatesError()
 
@@ -132,7 +132,7 @@ def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation:
         raise IncorrectGeocodeKeyError() from e
     except (IndexError, ValidationError) as e:
         context.emit_metric(
-            MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), include_handler_dimensions=False
+            MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), include_handler_properties=False
         )
         raise IncorrectCoordinatesError() from e
 

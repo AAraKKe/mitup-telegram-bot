@@ -65,4 +65,4 @@ async def chat_member_block_handler(session: AsyncSession, update: Update, conte
         return
 
     if user.mark_inactive():
-        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_dimensions=False)
+        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)

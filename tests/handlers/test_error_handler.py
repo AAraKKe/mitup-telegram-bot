@@ -112,7 +112,7 @@ async def test_handle_inactive_user_left_is_noop(
 
 
 async def test_handle_error_for_uncaght_exception(context: StubMitupContext, metrics: MetricAssertions):
-    context.prepare_handler_metrics({"SomeDimension": "SomeValue", "SomeOtherDimension": "SomeOtherValue"})
+    context.prepare_handler_metrics({"Handler": "SomeHandler", "HandlerType": "Callback"})
 
     try:
         # We need to raise the exception to have exec_info available when the error is handled
@@ -121,13 +121,15 @@ async def test_handle_error_for_uncaght_exception(context: StubMitupContext, met
         await error_handler.handler(context, RuntimeError(), Env.DEV)
         await context.metrics.flush()
 
-    # emit_global=True emits Fault twice: once with handler dims, once without (for global aggregation)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
-    # The prefixed fault is emitted once, with handler dimensions
+    # The dimensionless aggregate FAULT is emitted exactly once (the infra alarms read it).
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    # The prefixed fault is emitted once, carrying the handler identity as EMF properties.
     metrics.assert_emitted(
         name=MetricKey.FAULT.with_prefix("RuntimeError"),
         value=1,
-        dimensions={"SomeDimension": "SomeValue", "SomeOtherDimension": "SomeOtherValue"},
+        dimensions={},
+        dimensions_exact=True,
+        properties={"Handler": "SomeHandler", "HandlerType": "Callback"},
     )
 
 
@@ -174,7 +176,7 @@ async def test_guard_error_emits_fault_metrics_and_notifies_user(
     await context.metrics.flush()
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("EffectiveMessageNotSet"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(lang=fallback, message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback))
@@ -204,7 +206,7 @@ async def test_non_guard_error_emits_fault_but_does_not_notify(
     await context.metrics.flush()
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ValueError"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
     context.api.assert_send_message_not_called()
     context.api.assert_method_just_called("answer_callback_query", times=0)
 
@@ -333,8 +335,8 @@ async def test_successful_callback_emits_fault_zero_without_notification(
     await wrapped(context.telegram_update, context)
 
     assert handler_was_called
-    # callback_with_metrics emits FAULT=0 with handler dims + globally on the success path.
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
+    # callback_with_metrics emits a single dimensionless FAULT=0 on the success path.
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
     # The guard-error branch is never reached, so no notification is sent.
     context.api.assert_send_message_not_called()

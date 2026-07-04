@@ -199,7 +199,7 @@ def test_cannot_register_same_inline_handler_twice():
     ClearableRegistry.clear()
 
 
-async def test_all_handlers_emit_global_metrics(app: StubMitupApp, update: Update, mock_session: MockDbSession):
+async def test_all_handlers_emit_handler_metrics(app: StubMitupApp, update: Update, mock_session: MockDbSession):
     await app.initialize()
 
     # Define check_stat that is valid for conversation handlers
@@ -222,13 +222,11 @@ async def test_all_handlers_emit_global_metrics(app: StubMitupApp, update: Updat
         with suppress(ApplicationHandlerStop):
             await wrapper.handler.handle_update(update, app, check_state, handler_context)
 
-    # All handlers have emitted the global TIME and FAULT metrics.
-    # emit_global=True means 2 records per handler per metric (with + without handler dims).
+    # Every handler emits exactly one dimensionless TIME and FAULT record (handler identity rides
+    # as an EMF property, so there is no separate per-handler-dimensioned copy — issue #205).
     metrics = MetricAssertions(shared_client)
-    metrics.assert_emitted(
-        name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=valid_handlers * 2
-    )
-    metrics.assert_emitted(name=MetricKey.FAULT, value=AnyFloat(), times=valid_handlers * 2)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=valid_handlers)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=AnyFloat(), times=valid_handlers)
 
 
 # ---------------------------------------------------------------------------

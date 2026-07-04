@@ -1110,12 +1110,11 @@ def assert_handler_metrics(
     extra_metrics: list[tuple[str, int]] | None = None,
 ):
     """Assert the standard handler metrics emitted by callback_with_metrics."""
-    # FAULT: emit_global=True means 2 records (with handler dims + without)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=fault_value, times=2)
-    # TIME: emit_global=True means 2 records
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    # DB_CONNECTIONS_LEAKED: emit_global=True means 2 records
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    # Each is a single dimensionless record — handler identity rides as an EMF property, so there
+    # is no separate per-handler-dimensioned copy (issue #205).
+    metrics.assert_emitted(name=MetricKey.FAULT, value=fault_value, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
     # Extra metrics this handler emits
     for metric_name, times in extra_metrics or []:
         metrics.assert_emitted(name=metric_name, times=times)
@@ -1217,11 +1216,11 @@ async def test_callback_fails_with_malformed_callback_data(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    # emit_global=True for FAULT means 2 records (FAULT=1 for handler dims + global)
+    # Dimensionless handler metrics — a single record each (issue #205).
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("MalformedCallbackData"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -1242,9 +1241,9 @@ async def test_callback_fails_when_user_is_not_found(
     )
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -1272,9 +1271,9 @@ async def test_callback_fails_when_missing_necessary_user_data(
     )
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(

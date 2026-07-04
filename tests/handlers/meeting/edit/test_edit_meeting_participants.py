@@ -48,9 +48,9 @@ def failure_cases(callback_data: CallbackData):
 def assert_metrics_for_failure(error_count: int, error_type: type[Exception], metrics_client: MetricsClient):
     metrics = MetricAssertions(metrics_client)
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix(error_type.__name__), value=error_count)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -92,9 +92,9 @@ async def test_edit_meeting_participants_meeting_not_owned(
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -208,9 +208,9 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
         assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -349,9 +349,9 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
         context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=2)
-    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
 @pytest.mark.parametrize(

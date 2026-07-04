@@ -135,14 +135,19 @@ metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MI
 metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
 ```
 
-For handlers that raise exceptions:
+For handlers that raise exceptions. Each of the three handler metrics is a single dimensionless
+emission — the handler identity rides as EMF properties, not dimensions (issue #205), so assert
+`times=1` (the default), never a duplicate "global" copy:
 
 ```python
-metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=2)  # handler dims + global
+metrics.assert_emitted(name=MetricKey.FAULT, value=1)
 metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
-metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2)
-metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=2)
+metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
+metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
 ```
+
+To pin the no-dimension invariant on a handler metric, assert `dimensions={}, dimensions_exact=True`
+and put the handler identity under `properties={"Handler": ..., "HandlerType": ...}`.
 
 ## Feature metrics
 

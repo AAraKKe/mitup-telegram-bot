@@ -61,4 +61,4 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
             update=update,
             view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang),
         )
-        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_dimensions=False)
+        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_properties=False)

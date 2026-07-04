@@ -126,7 +126,7 @@ def test_context_has_meeting_id(context: StubMitupContext):
     "with_update_properties", [True, False], ids=["with_context_properties", "without_context_properties"]
 )
 @pytest.mark.parametrize(
-    "with_handler_dimensions", [True, False], ids=["with_handler_dimensions", "without_handler_dimensions"]
+    "with_handler_properties", [True, False], ids=["with_handler_properties", "without_handler_properties"]
 )
 async def test_metrics_emitted(
     context: StubMitupContext,
@@ -134,14 +134,14 @@ async def test_metrics_emitted(
     dimensions: None | dict[str, str],
     properties: None | dict[str, Any],
     with_update_properties: bool,
-    with_handler_dimensions: bool,
+    with_handler_properties: bool,
 ):
     context.emit_metric(
         "test_metric",
         value=123,
         dimensions=dimensions,
         properties=properties,
-        include_handler_dimensions=with_handler_dimensions,
+        include_handler_properties=with_handler_properties,
         include_update_properties=with_update_properties,
     )
 
@@ -189,50 +189,56 @@ async def test_timing_metrics(context: StubMitupContext, metrics: MetricAssertio
     )
 
 
-async def test_timing_metrics_with_handler_dimensions(context: StubMitupContext, metrics: MetricAssertions):
-    context.prepare_handler_metrics({"HandlerDim": "HandlerValue"})
+async def test_timing_metrics_with_handler_properties(context: StubMitupContext, metrics: MetricAssertions):
+    context.prepare_handler_metrics({"HandlerProp": "HandlerValue"})
 
     with context.with_time_metric("MyMetric", handler_metrics=True):
         pass
 
     await context.flush_metrics()
 
+    # Handler identity rides as an EMF property, never as a dimension.
     metrics.assert_emitted(
         name="MyMetricTime",
         value=AnyFloat(),
         unit=MetricUnit.MILLISECONDS,
-        dimensions={"HandlerDim": "HandlerValue"},
+        dimensions={},
+        dimensions_exact=True,
+        properties={"HandlerProp": "HandlerValue"},
     )
 
 
 def test_prepare_handler_metrics_empty_dict_is_noop(context: StubMitupContext):
-    # Passing an empty dict must not alter _handler_dimensions
+    # Passing an empty dict must not alter _handler_properties
     context.prepare_handler_metrics({})
 
-    # The handler dimensions must remain empty
-    assert context._handler_dimensions == {}
+    # The handler properties must remain empty
+    assert context._handler_properties == {}
 
 
-async def test_emit_metric_global_also_emits_under_null_dimensionality(
+async def test_emit_metric_attaches_handler_identity_as_properties_not_dimensions(
     context: StubMitupContext, metrics: MetricAssertions
 ):
-    # emit_global=True emits the metric twice: once with the primary dimensions and once as
-    # a global copy. Both have the same explicit dimensions but the global copy omits handler dims.
+    # Handler identity must ride as EMF properties and never inflate the dimension set — each
+    # distinct dimension set is a separately billed CloudWatch series (issue #205).
+    context.prepare_handler_metrics({"Handler": "SomeHandler", "HandlerType": "Callback"})
+
     context.emit_metric(
-        "global_metric",
+        "handler_metric",
         value=5.0,
-        dimensions={"MyDim": "MyVal"},
-        emit_global=True,
-        include_handler_dimensions=False,
         include_update_properties=False,
     )
 
     await context.flush_metrics()
 
-    # Two records emitted — the primary and the global copy
+    # Exactly one dimensionless record carrying the handler identity as properties.
     metrics.assert_emitted(
-        name="global_metric",
+        name="handler_metric",
         value=5.0,
-        dimensions={"MyDim": "MyVal"},
-        times=2,
+        dimensions={},
+        dimensions_exact=True,
+        properties={"Handler": "SomeHandler", "HandlerType": "Callback"},
+        times=1,
     )
+    # And no record ever carries the handler identity as a dimension.
+    metrics.assert_not_emitted(name="handler_metric", dimensions={"Handler": "SomeHandler"})

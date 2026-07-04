@@ -47,6 +47,18 @@ Custom `MetricUnit` enum (in `monitoring/units.py`) replaces the old `aws_embedd
 Always import `MetricUnit` from `mitup_bot.monitoring`, never from `aws_embedded_metrics`.
 </critical_rules>
 
+## Dimensions vs. properties
+
+This is the rule that governs every emission path in this codebase — handler metrics, feature metrics, and outside-handler client metrics alike.
+
+CloudWatch **dimensions** are reserved for **bounded, intentional facets** — ones where every value is a deliberately created, separately-billed metric series (`Feature`, `EventType`). Each distinct dimension-value combination is one CloudWatch series (billed per series-month), so the dimension key set is a cost commitment, not a place to stash context.
+
+**Identity-like or high-cardinality facets** — `Handler`, `HandlerType`, user IDs, callback data, meeting IDs — must ride as EMF **properties** instead. Properties travel inside the EMF log line in the `MitupEcsService` log group: zero metric cost, and still fully queryable per-record via CloudWatch Logs Insights (e.g. `filter Fault = 1 | stats sum(Fault) by Handler`).
+
+<critical_rules>
+When adding a new metric, **default to properties**. Promoting a facet to a dimension is a deliberate cost decision that you must justify by its bounded cardinality — never a convenience for getting a value onto a graph. Dropping an unbounded base dimension and re-attaching it as a property (as handler identity does here, and as an outside-handler client's global copy does when it strips its base dimensions) is this same rule applied, not a special case.
+</critical_rules>
+
 ## Emitting metrics from handlers
 
 <critical_rules>
@@ -55,23 +67,23 @@ All handler metrics go through `MitupContext` methods. Never instantiate clients
 
 ### `context.emit_metric()`
 
-The primary method. Handles dimensions, properties, and optional global aggregation:
+The primary method. Handles dimensions and properties:
 
 ```python
-# Most common: emit a metric with handler dimensions (auto-included)
+# Most common: emit a metric carrying the handler identity as EMF properties (auto-included)
 context.emit_metric(MetricKey.ERROR, 1)
 
-# Custom dimensions, no handler context
-context.emit_metric("ApiCallCount", 1, dimensions={"Service": "Google"}, include_handler_dimensions=False)
-
-# Emit with handler dims AND a dimensionless copy for cross-handler aggregation
-context.emit_metric(MetricKey.FAULT, 0, emit_global=True)
+# Custom dimensions, no handler identity attached
+context.emit_metric("ApiCallCount", 1, dimensions={"Service": "Google"}, include_handler_properties=False)
 ```
 
 Key parameters:
-- `include_handler_dimensions` (default `True`) — adds `Handler` and `HandlerType` dimensions automatically.
+- `include_handler_properties` (default `True`) — attaches `Handler` and `HandlerType` as EMF **properties** (not dimensions).
 - `include_update_properties` (default `True`) — attaches Telegram update metadata (user ID, callback data, message text) as EMF properties (searchable but not dimensioned).
-- `emit_global` — additionally emits a dimensionless copy of the metric (no handler or custom dimensions) for cross-handler aggregate dashboards.
+
+<critical_rules>
+The canonical application of the [Dimensions vs. properties](#dimensions-vs-properties) rule above: handler identity (`Handler`/`HandlerType`) rides as EMF **properties**, never as dimensions, so only the dimensionless series is emitted per metric name. Do **not** reintroduce a `Handler`/`HandlerType` dimension or a duplicate "global" emission of a handler metric. See [issue #205](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/205).
+</critical_rules>
 
 ### `context.put_feature_metric()`
 
@@ -99,11 +111,11 @@ All Telegram API calls in `TelegramApi` already use this — do not add redundan
 
 | Metric | Description |
 |--------|-------------|
-| `Time` | Handler latency in milliseconds (with handler dims + global) |
-| `Fault` | `1` on exception, `0` on success (with handler dims + global) |
+| `Time` | Handler latency in milliseconds (dimensionless) |
+| `Fault` | `1` on exception, `0` on success (dimensionless) |
 | `DbConnectionsLeaked` | Count of unreturned DB connections (should always be 0) |
 
-Handler dimensions (`Handler`, `HandlerType`) are set automatically via `context.prepare_handler_metrics()`.
+Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension. The dimensionless `Fault` series is what the infra CloudWatch fault alarms and the ECS deploy gate read, and it is emitted exactly once per invocation — never emit a duplicate copy.
 
 ## Adding a new `MetricKey`
 

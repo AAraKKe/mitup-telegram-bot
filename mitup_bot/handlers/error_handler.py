@@ -35,7 +35,7 @@ async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg
     if (
         user := (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
     ) and user.mark_inactive():
-        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_dimensions=False)
+        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)
 
 
 def should_ignore_error(error: Exception) -> bool:
@@ -96,11 +96,12 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
         await handle_inactive_user(context, error.tg_user_id)
         return
 
-    # Emit an error metric for the current update both including the error type and a general
-    # error metric to aggregate all error types
+    # Emit an error-class-specific fault metric plus the general aggregate FAULT. Both are
+    # dimensionless — the handler identity rides as an EMF property (see issue #205) — so the
+    # dimensionless FAULT the infra alarms read is emitted exactly once per fault.
     error_class = error.__class__.__name__
     context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1)
-    context.emit_metric(MetricKey.FAULT, 1, emit_global=True)
+    context.emit_metric(MetricKey.FAULT, 1)
 
     context.metrics.add_stack_trace()
 
