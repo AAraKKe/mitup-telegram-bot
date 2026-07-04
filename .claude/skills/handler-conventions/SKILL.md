@@ -36,7 +36,7 @@ async def show(session: AsyncSession, update: Update, context: MitupContext) -> 
     ...
 ```
 
-Handlers that **take the per-meeting row lock** (`for_update=True` — participant, capacity, or meeting-existence mutations) MUST use `@with_session(write=True)`; other DB-mutating broadcast handlers currently stay on plain `@with_session` in immediate mode, though write mode is preferred for new handlers of that shape. Under write mode: the decorator commits the transaction — releasing the per-meeting row lock — before executing the handler's `context.api` calls, which are queued as plain-data snapshots. Any handler that loads the meeting `for_update=True` MUST use write mode. Under write mode, don't pass `session=` to `update_meeting_messages`, don't add defensive pre-send flushes, and reach for `context.api.immediate.X(...)` only when a call genuinely must run before commit. See the `database` and `api-wrapper` skills for the full lifecycle and error semantics.
+**Broadcast ⇒ write mode:** any handler that mutates state and then fans out over Telegram — it takes the per-meeting row lock (`for_update=True`), calls `update_meeting_messages`, or notifies users — MUST use `@with_session(write=True)`. Under write mode: the decorator commits the transaction — releasing the per-meeting row lock — before executing the handler's `context.api` calls, which are queued as plain-data snapshots. Never pass `session=` to `update_meeting_messages` (the parameter exists only for the immediate-mode CLI callers), don't add defensive pre-send flushes, and reach for `context.api.immediate.X(...)` only when a call genuinely must run before commit. See the `database` and `api-wrapper` skills for the full lifecycle and error semantics.
 
 ## Conversation handlers
 

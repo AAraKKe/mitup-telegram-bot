@@ -161,7 +161,7 @@ async def callback_edit_meeting_location_coordinates(session: AsyncSession, upda
 @HandlersRegistry.register_message(
     EditMeetingHandlerId.LOCATION_NAME_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
 )
-@with_session
+@with_session(write=True)
 async def edit_meeting_location_name(session: AsyncSession, update: Update, context: TMitupContext):
     assert update.effective_message is not None
 
@@ -177,20 +177,18 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
         return ConversationHandler.END
 
     meeting.location.name = update.effective_message.text
-    session.add(meeting)
-    await session.flush()
 
     response_view = edit_location_view(meeting).with_context(
         MeetingEditLocationMessages.NAME_SUCCESS.get(name=meeting.location.name)
     )
     await context.api.send_message(update=update, view=response_view)
-    await context.api.update_meeting_messages(session=session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     return ConversationHandler.END
 
 
 @HandlersRegistry.register_message(EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE, filters.LOCATION, bindable=False)
-@with_session
+@with_session(write=True)
 async def edit_meeting_location_coordinates(session: AsyncSession, update: Update, context: TMitupContext):
     assert update.effective_message is not None
 
@@ -213,14 +211,12 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
     assert tg_location is not None
 
     meeting.location.coordinates = (tg_location.longitude, tg_location.latitude)
-    session.add(meeting)
-    await session.flush()
 
     response_view = edit_location_view(meeting).with_context(
         MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user.lang)
     )
     await context.api.send_message(update=update, view=response_view)
-    await context.api.update_meeting_messages(session=session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     return ConversationHandler.END
 

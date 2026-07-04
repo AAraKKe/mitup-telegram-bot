@@ -37,7 +37,7 @@ async def callback_edit_meeting_language(session: AsyncSession, update: Update, 
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_MEETING_LANGUAGE
 )
-@with_session
+@with_session(write=True)
 async def callback_set_meeting_language(session: AsyncSession, update: Update, context: TMitupContext):
     valid_data = guards.valid_meeting_callback_data(
         cb.SET_MEETING_LANGUAGE.parse(context.match), EditMeetingHandlerId.SET_LANGUAGE_CALLBACK
@@ -57,7 +57,6 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     meeting.language = SUPPORTED_LANGUAGES[valid_data.id]
     for message in meeting.messages:
         message.buttons.keyboard = meeting.build_inline_keyboard(is_searchable=message.chat_instance is not None)
-    await session.flush()
 
     await context.api.edit_message(
         update=update,
@@ -67,6 +66,6 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     )
 
     # Since the language has changed, we need to update the messages of the meeting
-    await context.api.update_meeting_messages(session=session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     context.put_feature_metric(Feature.MEETING_LANGUAGE_SET)

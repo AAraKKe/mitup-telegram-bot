@@ -21,7 +21,7 @@ def _is_already_attached(meeting: Meetup, chat_instance: str | None) -> bool:
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.ATTACH_TO_CHAT, callback_data=cb.ATTACH_TO_CHAT)
-@with_session
+@with_session(write=True)
 async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the 'Make it searchable' button click on a shared meeting.
@@ -42,6 +42,9 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
         elif current_message.chat_instance is None and chat_instance:
             current_message.chat_instance = chat_instance
 
+        # Not defensive: the broadcast payload snapshots message.id at enqueue time, and a
+        # freshly appended Message only gets one from this flush (needed for the dead-message
+        # reconcile if Telegram reports the message gone during the fan-out).
         await session.flush()
 
         alert = MeetingAttachMessages.ALREADY_ENABLED_ALERT if already_attached else MeetingAttachMessages.ENABLED_ALERT
@@ -51,7 +54,7 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
             show_alert=True,
         )
 
-        await context.api.update_meeting_messages(session=session, meeting=meeting, current_message=current_message)
+        await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
         context.put_feature_metric(Feature.ATTACH_TO_CHAT)
     else:
         await context.api.edit_message(

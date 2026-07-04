@@ -253,7 +253,7 @@ async def callback_query_back_to_edit_datetime(
 
 
 async def handle_first_datetime_set(
-    session: AsyncSession, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
+    context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
     proposed_start = dt.datetime.combine(cb_date, dt.time(0, 0, tzinfo=meeting.timezone)).astimezone(dt.UTC)
     if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
@@ -262,8 +262,6 @@ async def handle_first_datetime_set(
 
     meeting.datetime = proposed_start
     end_cleared = meeting.enforce_datetime_ordering()
-    session.add(meeting)
-    await session.flush()
 
     lang = meeting.lang
 
@@ -299,7 +297,6 @@ async def handle_first_datetime_set(
     )
     await context.api.edit_message(update=update, view=view)
     await context.api.update_meeting_messages(
-        session=session,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -308,7 +305,7 @@ async def handle_first_datetime_set(
 
 
 async def handle_datetime_update(
-    session: AsyncSession, context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
+    context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
     proposed_start = dt.datetime.combine(
         dt.date(cb_date.year, cb_date.month, cb_date.day),
@@ -321,8 +318,6 @@ async def handle_datetime_update(
 
     meeting.datetime = proposed_start
     end_cleared = meeting.enforce_datetime_ordering()
-    session.add(meeting)
-    await session.flush()
 
     if end_cleared:
         await context.api.answer_callback_query(
@@ -345,7 +340,6 @@ async def handle_datetime_update(
         view=build_edit_datetime_entry_view(meeting, meeting.lang, today).with_context(context_message),
     )
     await context.api.update_meeting_messages(
-        session=session,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -354,7 +348,7 @@ async def handle_datetime_update(
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.SET_DATE_CALLBACK, callback_data=cb.SET_MEETING_DATE)
-@with_session
+@with_session(write=True)
 async def callback_query_set_meeting_date(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
@@ -369,8 +363,8 @@ async def callback_query_set_meeting_date(
         return ConversationHandler.END
 
     if meeting.datetime is None:
-        return await handle_first_datetime_set(session, context, update, meeting, callback_data.date)
-    return await handle_datetime_update(session, context, update, meeting, callback_data.date)
+        return await handle_first_datetime_set(context, update, meeting, callback_data.date)
+    return await handle_datetime_update(context, update, meeting, callback_data.date)
 
 
 # --- Time editing ---
@@ -408,7 +402,7 @@ async def callback_query_set_meeting_time(
     DateTimeEntityFilter(),
     bindable=False,
 )
-@with_session
+@with_session(write=True)
 async def date_time_entity_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
@@ -433,8 +427,6 @@ async def date_time_entity_message_handler(
 
         meeting.datetime = unix_time
         end_cleared = meeting.enforce_datetime_ordering()
-        session.add(meeting)
-        await session.flush()
 
         assert meeting.datetime is not None
         datetime_entity = EntityDateTime(
@@ -449,7 +441,7 @@ async def date_time_entity_message_handler(
         view = meeting.when_view.with_context(context_message)
 
         await context.api.send_message(update=update, view=view)
-        await context.api.update_meeting_messages(session=session, meeting=meeting)
+        await context.api.update_meeting_messages(meeting=meeting)
 
         return ConversationHandler.END
 
@@ -459,7 +451,7 @@ async def date_time_entity_message_handler(
     bindable=False,
     filters=filters.Regex(r"^(?P<hour>\d{2}):(?P<minutes>\d{2})$"),
 )
-@with_session
+@with_session(write=True)
 async def set_time_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
@@ -494,9 +486,6 @@ async def set_time_message_handler(
         meeting.datetime = proposed_start
         end_cleared = meeting.enforce_datetime_ordering()
 
-        session.add(meeting)
-        await session.flush()
-
         assert meeting.datetime is not None
         datetime_entity = EntityDateTime(
             MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), meeting.datetime, "DT"
@@ -510,7 +499,7 @@ async def set_time_message_handler(
         view = meeting.when_view.with_context(context_message)
 
         await context.api.send_message(update=update, view=view)
-        await context.api.update_meeting_messages(session=session, meeting=meeting)
+        await context.api.update_meeting_messages(meeting=meeting)
 
         return ConversationHandler.END
 

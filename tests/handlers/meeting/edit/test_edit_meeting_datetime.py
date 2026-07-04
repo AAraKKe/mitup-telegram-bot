@@ -176,8 +176,6 @@ async def test_set_meeting_date_callback(
     )
 
     assert meeting.datetime == expected_datetime
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
     if new:
         # First time setting the date: show a "done" prompt and advance to EDIT_TIME.
@@ -189,7 +187,7 @@ async def test_set_meeting_date_callback(
             datetime_entity(int(expected_datetime.timestamp())),
         )
         context.api.assert_edit_message_called(update, expected_view)
-        context.api.assert_update_meeting_messages_called(mock_session, meeting, None, True)
+        context.api.assert_update_meeting_messages_called(None, meeting, None, True)
     else:
         # Updating an existing datetime: re-show entry view with success context, return EDIT_DATETIME.
         # The handler uses meeting.lang (the meeting's own language, "en" from create_meetup), not the
@@ -205,7 +203,7 @@ async def test_set_meeting_date_callback(
             )
         )
         context.api.assert_edit_message_called(update, expected_view)
-        context.api.assert_update_meeting_messages_called(mock_session, meeting, None, True)
+        context.api.assert_update_meeting_messages_called(None, meeting, None, True)
 
 
 # ---------------------------------------------------------------------------
@@ -363,8 +361,6 @@ async def test_set_time_message_with_valid_time(
     assert response == ConversationHandler.END
     # Since the user provides 20:20 in Europ/Madrid, the UTC time stored in the meeting is one hour earlier
     assert meeting.datetime == expected_meeting_time
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
     # Meeting id has been removed from context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
@@ -384,7 +380,7 @@ async def test_set_time_message_with_valid_time(
             )
         ),
     )
-    context.api.assert_update_meeting_messages_called(mock_session, meeting)
+    context.api.assert_update_meeting_messages_called(None, meeting)
 
 
 @pytest.mark.parametrize(
@@ -650,8 +646,6 @@ async def test_date_time_entity_message(
     assert response == ConversationHandler.END
     expected_datetime = dt.datetime.fromtimestamp(DATE_TIME_ENTITY_UNIX_TIME, tz=dt.UTC)
     assert meeting.datetime == expected_datetime
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
     context.api.assert_send_message_called(
         update,
@@ -662,7 +656,7 @@ async def test_date_time_entity_message(
             )
         ),
     )
-    context.api.assert_update_meeting_messages_called(mock_session, meeting)
+    context.api.assert_update_meeting_messages_called(None, meeting)
 
 
 @pytest.mark.parametrize(
@@ -858,8 +852,6 @@ async def test_set_time_past_end_datetime_clears_end(
     # 2025-01-15 19:20 UTC > 2024-12-21 18:00 UTC end, so end_datetime is cleared.
     assert meeting.end_datetime is None
     assert meeting.lock_on_start is False
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
     # The context message should include END_DATETIME_CLEARED_BY_START prepended
     assert meeting.datetime is not None
@@ -1014,8 +1006,6 @@ async def test_datetime_entity_past_end_datetime_clears_end(
     assert meeting.datetime == expected_datetime
     assert meeting.end_datetime is None
     assert meeting.lock_on_start is False
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
     expected_context_message = (
         MeetingEditDateTimeMessages.END_CLEARED_BY_START.get(lang=user_with_settings.lang)
@@ -1031,7 +1021,7 @@ async def test_datetime_entity_past_end_datetime_clears_end(
         update,
         meeting.when_view.with_context(expected_context_message),
     )
-    context.api.assert_update_meeting_messages_called(mock_session, meeting)
+    context.api.assert_update_meeting_messages_called(None, meeting)
 
 
 # ---------------------------------------------------------------------------

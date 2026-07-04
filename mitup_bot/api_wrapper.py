@@ -666,10 +666,9 @@ class TelegramApi:
         """
         Updates a single meeting message with the current meeting view.
 
-        The view content is rendered immediately; under capture mode the resulting plain
-        payload is queued for post-commit execution and a message deleted by the user is
-        recorded on the outbox for the reconcile transaction. In immediate mode a deleted
-        message's DB record is removed via ``session`` when one is provided.
+        The view renders at call time; under capture the plain payload is queued and a
+        user-deleted message is recorded for the reconcile transaction. ``session`` exists
+        only for immediate mode's inline dead-row cleanup — CLI callers only, handlers omit it.
         """
         edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
         if self._outbox is not None:
@@ -690,12 +689,10 @@ class TelegramApi:
         has_finished: bool = False,
     ):
         """
-        Updates all tracked messages for a meeting. Edits `current_message` first for
-        immediate feedback, then updates the rest. Use `skip_current` when the caller is
-        already handling the current message separately.
-
-        ``session`` only matters in immediate mode (see ``update_single_meeting_message``);
-        capture-mode callers omit it — queued payloads never carry a live session.
+        Updates all tracked messages for a meeting, `current_message` first for immediate
+        feedback (`skip_current` when the caller already handles it separately). ``session``
+        is CLI-only (immediate mode, see ``update_single_meeting_message``); handlers run
+        under write mode and omit it.
         """
         # First lets update the current message for a better user experience
         if current_message and not skip_current:

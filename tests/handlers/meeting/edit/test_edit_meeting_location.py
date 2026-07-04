@@ -358,7 +358,6 @@ async def test_edit_location_name_message_works(
     )
 
     assert meeting.location.name == "My Location"
-    mock_session.assert_flushed()
     context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
     # Meeting id has been cleaned from the context
@@ -410,7 +409,6 @@ async def test_edit_location_coordinates_message_works(
     )
 
     assert meeting.location.coordinates == (123.4, 567.8)
-    mock_session.assert_flushed()
     context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
     # Meeting id has been cleaned from the context

@@ -69,7 +69,7 @@ async def callback_query_edit_meeting_description(session: AsyncSession, update:
 
 
 @HandlersRegistry.register_message(EditMeetingHandlerId.DESCRIPTION_MESSAGE, filters.TEXT, bindable=False)
-@with_session
+@with_session(write=True)
 async def edit_description_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
     assert update.effective_message is not None
 
@@ -77,14 +77,11 @@ async def edit_description_meeting_message_handler(session: AsyncSession, update
         meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
         meeting.description = update.effective_message.text
 
-        session.add(meeting)
-        await session.flush()
-
         view = meeting.edit_view.with_context(
             MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=meeting.description)
         )
         await context.api.send_message(update=update, view=view)
-        await context.api.update_meeting_messages(session=session, meeting=meeting)
+        await context.api.update_meeting_messages(meeting=meeting)
 
         return ConversationHandler.END
 

@@ -91,7 +91,7 @@ async def callback_query_show_past_meeting(session: AsyncSession, update: Update
     callback_data=cb.CONFIRM_DELETE_PAST_MEETING,
     bindable=True,
 )
-@with_session
+@with_session(write=True)
 async def callback_query_confirm_delete_past_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_paginated_callback_data(
         cb.CONFIRM_DELETE_PAST_MEETING.parse(context.match), MeetingHandlerId.CONFIRM_DELETE_PAST_MEETING_CALLBACK
@@ -107,7 +107,9 @@ async def callback_query_confirm_delete_past_meeting(session: AsyncSession, upda
     if full_meeting is None:
         return
 
-    await context.api.update_meeting_messages(session=session, meeting=full_meeting, was_deleted=True)
+    # Rendered (and queued) before the row is deleted below; the edits themselves run after
+    # the deletion commits.
+    await context.api.update_meeting_messages(meeting=full_meeting, was_deleted=True)
 
     await session.delete(full_meeting)
 

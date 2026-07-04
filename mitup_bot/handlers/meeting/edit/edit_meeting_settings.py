@@ -63,13 +63,11 @@ async def toggle_meeting_setting(
         )
     ) is not None:
         yield meeting
-        await session.flush()
 
         await context.api.edit_message(update=update, view=return_view(meeting))
         # Update all messages to ensure any visible message contains the new changes but skip current one
         # to stay in the current sub-screen view.
         await context.api.update_meeting_messages(
-            session=session,
             meeting=meeting,
             current_message=meeting.message_from_update(update),
             skip_current=True,
@@ -85,7 +83,7 @@ def create_meeting_settings_toggle_handler(
     return_view: Callable[[Meetup], MitupView] = lambda meeting: meeting.settings_view,
 ):
     @HandlersRegistry.register_callback_query(handler_id, callback_data=callback_data)
-    @with_session
+    @with_session(write=True)
     async def handler(session: AsyncSession, update: Update, context: TMitupContext):
         async with toggle_meeting_setting(
             session=session,

@@ -61,7 +61,7 @@ By the time the drain runs, the DB state is committed and correct — a failing 
 
 ### The reconcile transaction
 
-Fan-out execution can discover DB fix-ups: messages deleted by users (`dead_message_ids`) and unreachable users (`inactive_tg_user_ids`). The write-mode decorator applies both in one short follow-up transaction after the drain — never interleave ad-hoc API-then-DB writes in a handler; record onto the outbox instead. In immediate mode, `update_single_meeting_message`/`update_meeting_messages` still delete dead `Message` rows inline when a `session` is passed; the parameter is `None`-able and exists only for immediate-mode callers (plain handlers, CLI) — write-mode call sites must omit it.
+Fan-out execution can discover DB fix-ups: messages deleted by users (`dead_message_ids`) and unreachable users (`inactive_tg_user_ids`). The write-mode decorator applies both in one short follow-up transaction after the drain — never interleave ad-hoc API-then-DB writes in a handler; record onto the outbox instead. In immediate mode, `update_single_meeting_message`/`update_meeting_messages` still delete dead `Message` rows inline when a `session` is passed; the parameter is `None`-able and exists only for the immediate-mode CLI callers — handler broadcasts always run write mode and must omit it.
 
 ## Usage outside handlers (lambdas, CLI)
 

@@ -55,7 +55,7 @@ async def test_attach_to_chat_new_message(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=meeting,
         current_message=meeting.messages[0],
     )

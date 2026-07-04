@@ -234,7 +234,7 @@ async def test_confirm_delete_past_meeting_deletes_and_redirects_to_past_meeting
     )
 
     mock_session.assert_deleted(inactive_meeting)
-    context.api.assert_update_meeting_messages_called(session=mock_session, meeting=inactive_meeting, was_deleted=True)
+    context.api.assert_update_meeting_messages_called(session=None, meeting=inactive_meeting, was_deleted=True)
     context.api.assert_edit_message_called(
         update,
         MitupView(

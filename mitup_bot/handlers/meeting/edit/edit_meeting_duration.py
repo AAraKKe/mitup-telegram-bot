@@ -198,21 +198,18 @@ def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> st
 
 
 async def save_end_datetime_and_finish(
-    session: AsyncSession,
     context: TMitupContext,
     update: Update,
     meeting: Meetup,
     end_dt: dt.datetime,
 ) -> int:
-    """Persist end_datetime, broadcast updates, and return ConversationHandler.END."""
+    """Shared tail of both end-datetime flows; broadcast runs post-commit via write mode."""
     meeting.end_datetime = end_dt
-    session.add(meeting)
-    await session.flush()
 
     response_view = meeting.when_view
 
     await context.api.send_message(update=update, view=response_view)
-    await context.api.update_meeting_messages(session=session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     cleanup_states(context)
     return ConversationHandler.END
@@ -223,7 +220,7 @@ async def save_end_datetime_and_finish(
     DateTimeEntityFilter(),
     bindable=False,
 )
-@with_session
+@with_session(write=True)
 async def duration_end_datetime_entity_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
@@ -245,7 +242,7 @@ async def duration_end_datetime_entity_handler(
             await context.api.send_message(update=update, view=error)
             return ConversationMeetingState.EDIT_END_DATETIME
 
-        return await save_end_datetime_and_finish(session, context, update, meeting, unix_time)
+        return await save_end_datetime_and_finish(context, update, meeting, unix_time)
 
 
 @HandlersRegistry.register_message(
@@ -356,6 +353,8 @@ async def callback_query_duration_end_set_date(
 
         meeting.end_datetime = proposed_end
         session.add(meeting)
+        # Mid-conversation step with no broadcast: flush so a constraint error surfaces
+        # here, before the next prompt renders (plain mode, not write mode).
         await session.flush()
 
         return await show_end_time_prompt(context, update, meeting)
@@ -372,6 +371,7 @@ async def callback_query_duration_end_set_date(
 
     meeting.end_datetime = proposed_end
     session.add(meeting)
+    # Same rationale as above: fail before rendering the next prompt (plain mode).
     await session.flush()
 
     return await show_end_datetime_entry(context, update, meeting, user.lang)
@@ -444,7 +444,7 @@ async def callback_query_duration_end_time(
     bindable=False,
     filters=filters.Regex(r"^(?P<hour>\d{2}):(?P<minutes>\d{2})$"),
 )
-@with_session
+@with_session(write=True)
 async def duration_end_set_time_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
@@ -471,7 +471,7 @@ async def duration_end_set_time_handler(
             await context.api.send_message(update=update, view=error)
             return ConversationMeetingState.EDIT_END_TIME
 
-        return await save_end_datetime_and_finish(session, context, update, meeting, proposed_end)
+        return await save_end_datetime_and_finish(context, update, meeting, proposed_end)
 
 
 @HandlersRegistry.register_message(

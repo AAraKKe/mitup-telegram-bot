@@ -43,8 +43,7 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
 
     assert ContextId.EDIT_MEETING_TITLE not in context.user_data.registry
 
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
+    assert meeting.title == update.effective_message.text
 
     view = meeting.edit_view.with_context(
         MeetingEditContentMessages.TITLE_SUCCESS.get(title=update.effective_message.text)
@@ -69,8 +68,7 @@ async def test_edit_description_message_handler_update_the_description_and_send_
 
     assert ContextId.EDIT_MEETING_DESCRIPTION not in context.user_data.registry
 
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
+    assert meeting.description == update.effective_message.text
 
     view = meeting.edit_view.with_context(
         MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=update.effective_message.text)

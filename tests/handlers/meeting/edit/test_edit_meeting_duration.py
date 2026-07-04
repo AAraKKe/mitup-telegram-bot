@@ -247,7 +247,7 @@ async def test_valid_end_time_saves_end_datetime_and_exits_conversation(
 
     # Success response sent and meeting messages updated
     context.api.assert_method_just_called("send_message", times=1)
-    context.api.assert_update_meeting_messages_called(session=mock_session, meeting=meeting)
+    context.api.assert_update_meeting_messages_called(session=None, meeting=meeting)
 
     assert state == ConversationHandler.END
 
@@ -507,12 +507,10 @@ async def test_end_datetime_entity_valid_saves_and_sends(
 
     # end_datetime saved
     assert meeting.end_datetime == after_start
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
     # send_message was used (use_send=True path)
     context.api.assert_method_just_called("send_message", times=1)
-    context.api.assert_update_meeting_messages_called(session=mock_session, meeting=meeting)
+    context.api.assert_update_meeting_messages_called(session=None, meeting=meeting)
 
     assert state == ConversationHandler.END
 

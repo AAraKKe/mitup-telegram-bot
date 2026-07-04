@@ -39,8 +39,8 @@ Handlers that **mutate state and then fan out over Telegram** (edit meeting mess
 
 Handler bodies keep their linear style — only the execution time of the api calls moves. Rules of thumb:
 
-- Use write mode for any handler that takes the per-meeting row lock (participant, capacity, or meeting-existence mutations) — locking paths MUST commit before their fan-out. Non-locking DB-mutating handlers that broadcast (the field editors, attach_to_chat, show_past_meeting) currently remain on plain `@with_session` in immediate mode; prefer write mode for NEW handlers of that shape, and migrating the existing ones is safe follow-up. Plain `@with_session` stays for read-only handlers.
-- Under write mode, don't pass `session=` to `update_meeting_messages` — payloads are snapshotted at enqueue time and no live session may cross into the fan-out.
+- **Broadcast ⇒ write mode.** Every handler that mutates state and then fans out over Telegram — whether it takes the per-meeting row lock (participant, capacity, or meeting-existence mutations) or just calls `update_meeting_messages` / notifies users — uses write mode; locking paths MUST commit before their fan-out. Plain `@with_session` stays for read-only handlers.
+- Never pass `session=` to `update_meeting_messages` from a handler — payloads are snapshotted at enqueue time and no live session may cross into the fan-out. The parameter exists solely for the immediate-mode CLI callers (see the `api-wrapper` skill).
 - Drop defensive "flush before send" calls: commit-before-drain provides fail-early ordering structurally.
 - `context.api.immediate.X(...)` is the escape hatch for a call that must run pre-commit (its failure aborts the transaction). Keep usages rare and greppable.
 - If the handler raises, the queue is discarded with the rolled-back transaction — nothing about aborted state is rendered.
