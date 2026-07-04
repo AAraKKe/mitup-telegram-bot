@@ -16,10 +16,13 @@ from telegram import Location, MessageEntity, Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.handlers.command_enums import CommandsId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
+from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.registration_process.enums import RegistrationProcessHandlerId
 from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricUnit
@@ -258,31 +261,31 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_settings",
     ),
     Context(
         handler_id=EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_WAITING_LIST.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_waiting_list",
     ),
     Context(
         handler_id=EditMeetingHandlerId.SET_MEETING_PUBLIC_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_PUBLIC.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_public",
     ),
     Context(
         handler_id=EditMeetingHandlerId.SET_MEETING_INCOGNITO_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_INCOGNITO.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_incognito",
     ),
     Context(
         handler_id=EditMeetingHandlerId.SET_MEETING_ALLOW_INVITATIONS_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SET_MEETING_ALLOW_INVITATIONS.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_allow_invitations",
     ),
     Context(
@@ -761,6 +764,314 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CANCEL_CREATE_MEETING),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="stale_cancel",
+    ),
+    # --- Documented exclusions ---
+    #
+    # Handlers whose "user not found" path is intentionally not a guard fault, so no ErrorMode
+    # applies to them:
+    #   - CommandsId.START_WITH_EXISTING_USER: gates on guards.member_user, which returns None
+    #     instead of raising — an unknown user gets a silent END with no fault
+    #     (guards.current_user only runs after the MEMBER check succeeded, so its UserNotFound
+    #     path is unreachable). The group -1 / group 0 routing is covered end-to-end in
+    #     test_start_routing.py.
+    #   - RegistrationProcessHandlerId.TIMEZONE_COMMAND: gates on guards.member_user; an unknown
+    #     user is the normal onboarding case — the handler creates the row and claims the update
+    #     via ApplicationHandlerStop rather than failing. Covered in test_start_routing.py and
+    #     test_commands.py.
+    #   - MeetingHandlerId.JOIN / MeetingHandlerId.LEAVE: catch UserNotFound themselves and
+    #     register a default JOINED_ONLY user instead — an unregistered user pressing the button
+    #     is a valid case, covered in tests/handlers/meeting/test_join_leave_meeting.py.
+    #   - MeetingHandlerId.INVITE_USERS_CALLBACK: uses guards.user_registered, which answers the
+    #     callback query with an alert instead of raising when the user is unregistered.
+    #
+    # --- /start and registration-process handlers ---
+    Context(
+        handler_id=CommandsId.MAIN_MENU,
+        update_request=UpdateRequest(command="main_menu"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="command_main_menu",
+    ),
+    # The conversation-state handlers below reach guards.current_user before their claim_update
+    # wrapper can raise ApplicationHandlerStop, so the standard UserNotFound fault applies.
+    Context(
+        handler_id=RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT,
+        update_request=UpdateRequest(message_text="Madrid"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="registration_timezone_text",
+    ),
+    Context(
+        handler_id=RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="registration_timezone_location",
+    ),
+    Context(
+        handler_id=RegistrationProcessHandlerId.TIMEZONE_INVALID_INPUT,
+        update_request=UpdateRequest(command="start"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="registration_timezone_invalid_input",
+    ),
+    # --- Global message fallback ---
+    Context(
+        handler_id=MessagesId.MESSAGE_WITHOUT_TEXT,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="message_without_text",
+    ),
+    # --- Main menu handlers ---
+    Context(
+        handler_id=MainMenuHandlerId.MAIN_MENU_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.MAIN_MENU),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="main_menu",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.SHOW_MEETINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="show_active_meetings",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="show_joined_meetings",
+    ),
+    # --- Settings handlers ---
+    Context(
+        handler_id=EditSettingsHandlerId.EDIT,
+        update_request=UpdateRequest(callback_query=cb.SETTINGS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_entry",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.CANCEL,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_SETTINGS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_cancel",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.NOTIFICATIONS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_NOTIFICATIONS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_notifications",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TOGGLE_NOTIFICATIONS,
+        update_request=UpdateRequest(callback_query=cb.TOGGLE_NOTIFICATIONS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_toggle_notifications",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.SET_NOTIFICATION_TIME,
+        update_request=UpdateRequest(callback_query=cb.SET_NOTIFICATION_TIME),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_set_notification_time",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.NOTIFICATION_TIME_MESSAGE_WITH_TEXT,
+        update_request=UpdateRequest(message_text="30"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_notification_time_text",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.NOTIFICATION_TIME_INVALID_INPUT,
+        update_request=UpdateRequest(message_text="not a number"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_notification_time_invalid",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEZONE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_TIEMZONE),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timezone_entry",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_TEXT,
+        update_request=UpdateRequest(message_text="Madrid"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timezone_text",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEZONE_MESSAGE_WITH_LOCATION,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timezone_location",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEOUT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_TIMEOUT),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timeout_entry",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT,
+        update_request=UpdateRequest(message_text="30"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timeout_text",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEOUT_INVALID_INPUT,
+        update_request=UpdateRequest(message_text="not a number"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timeout_invalid",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.SET_LANGUAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_LANGUAGE.with_id(0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_set_language",
+    ),
+    # --- Meeting lifecycle handlers ---
+    Context(
+        handler_id=MeetingHandlerId.CREATE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CREATE_MEETING),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="create_meeting_entry",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.DELETE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="delete_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="confirm_delete_meeting",
+    ),
+    # --- Invite flow handlers ---
+    Context(
+        handler_id=MeetingHandlerId.INVITE_USERS_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_INVITE_USER.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="invite_users_cancel",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.INVITE_USERS_DECLINE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_INVITE_USER.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="invite_users_decline",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.INVITE_USERS_NAME_MESSAGE,
+        update_request=UpdateRequest(message_text="John Doe"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="invite_users_name_message",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.INVITE_USERS_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_INVITE_USER.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="invite_users_confirm",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.INVITE_USERS_FALLBACK,
+        update_request=UpdateRequest(callback_query=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="invite_users_fallback",
+    ),
+    # --- Edit meeting handlers ---
+    Context(
+        handler_id=EditMeetingHandlerId.CANCEL,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_cancel",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_description",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.WRONG_TIME_MESSAGE,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="wrong_time_message",
+    ),
+    # --- Edit meeting location flow ---
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION_NAME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location_name",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location_cancel",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location_coordinates",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
+        update_request=UpdateRequest(message_text="Some place"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location_name_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location_coordinates_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE,
+        update_request=UpdateRequest(message_text="not a location"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_location_coordinates_wrong_message",
+    ),
+    # --- Edit meeting participants flow ---
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_PARTICIPANTS.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_participants",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_max_participants",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_no_limit_participants",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_participants_cancel",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        update_request=UpdateRequest(message_text="5"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_max_participants_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
+        update_request=UpdateRequest(message_text="not a number"),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_meeting_max_participants_wrong_message",
     ),
 ]
 

@@ -44,9 +44,9 @@ Context(
 | `fault_count` | `int` | No | Expected fault metric value (default: `0`) |
 | `custom_keyboard` | `Keyboard \| None` | No | Custom keyboard for "meeting not found" response |
 | `meeting_id` | `dict[ContextId, int] \| None` | No | Pre-populate context meeting IDs |
-| `metrics_emitted` | `MetricsProperties` | No | Additional metrics the handler emits beyond standard ones |
-| `metrics_properties` | `dict[str, str] \| None` | No | Properties for metric assertions |
-| `metrics_properties_not_found` | `dict[str, str] \| None` | No | Override properties for "not found" case |
+| `extra_metrics` | `list[tuple[str, int]]` | No | Additional metrics the handler emits beyond the standard ones, as `(name, times)` pairs |
+| `extra_metrics_not_found` | `list[tuple[str, int]] \| None` | No | Override of `extra_metrics` for the "meeting not found" case; defaults to `extra_metrics`, `[]` asserts none |
+| `extra_metrics_non_owner_inactive` | `list[tuple[str, int]] \| None` | No | Override of `extra_metrics` for the non-owner inactive meeting test |
 | `shows_deleted_message_when_not_found` | `bool` | No | `False` for handlers using `user_owns_meeting` directly |
 | `reactivation_back_keyboard_factory` | `Callable[[str], Keyboard] \| None` | No | For inactive meeting reactivation prompt |
 
@@ -60,18 +60,14 @@ MEETING_ID_NOT_FOUND = 9999  # Does not exist in DB
 MEETING_ID_INACTIVE = 88     # Exists but inactive
 ```
 
-### MetricsProperties
+### Extra metrics
 
-When a handler emits additional metrics beyond the standard ones (FAULT, TIME, DB_CONNECTIONS_LEAKED), specify them:
+When a handler emits additional metrics beyond the standard ones (FAULT, TIME, DB_CONNECTIONS_LEAKED), specify them as `(name, times)` pairs:
 
 ```python
 Context(
     ...,
-    metrics_emitted=MetricsProperties(
-        metrics=["CleanUserData"],
-        values=[[1, 1, 1, 1, 1, 1]],
-        units=[Unit.COUNT],
-    ),
+    extra_metrics=[("CleanUserData", 7)],
 )
 ```
 
