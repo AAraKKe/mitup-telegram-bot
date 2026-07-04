@@ -33,6 +33,7 @@ def build_config(
     domain: str | None = None,
     secret_token: SecretStr | None = None,
     concurrent_updates: int = 1,
+    pool_metrics_enabled: bool = False,
 ) -> Config:
     return Config(
         db=DbConfig(
@@ -40,6 +41,7 @@ def build_config(
             password=SecretStr("password"),
             url="testhost",
             database="db",
+            pool_metrics_enabled=pool_metrics_enabled,
         ),
         bot=BotConfig(
             token=SecretStr("fake-bot-token"),
@@ -143,13 +145,24 @@ def test_init_calls_config_from_providers_with_toml_provider(env: Env, patch_run
     assert toml_providers[0].env == env
 
 
-def test_init_configures_db(patch_runtime_deps: RuntimeDeps):
+def test_init_configures_db_without_metrics_when_pool_metrics_disabled(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
     patch_runtime_deps.db.assert_called_once()
     configure_call = patch_runtime_deps.db.call_args
     assert configure_call.args == (runtime.config.db,)
-    # The runtime must hand the db layer a metrics client so the pool gets instrumented.
+    # Flag defaults off, so the pool stays uninstrumented — no metrics client is handed to the db.
+    assert configure_call.kwargs["metrics_client"] is None
+
+
+def test_init_configures_db_with_metrics_when_pool_metrics_enabled(patch_runtime_deps: RuntimeDeps):
+    config = build_config(pool_metrics_enabled=True)
+
+    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+        MitupRuntime(Env.DEV)
+
+    configure_call = patch_runtime_deps.db.call_args
+    # Flag on: the runtime instruments the pool by handing the db layer a metrics client.
     assert isinstance(configure_call.kwargs["metrics_client"], MetricsClient)
 
 

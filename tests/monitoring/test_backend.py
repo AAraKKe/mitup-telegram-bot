@@ -1,8 +1,14 @@
 """Tests for the EmfBackend, MitupMetricsLogger, RichConsoleSink, and configure_emf_backend."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from aws_embedded_metrics.environment import Environment
+from aws_embedded_metrics.environment.local_environment import LocalEnvironment
+from aws_embedded_metrics.logger.metrics_context import MetricsContext
 from aws_embedded_metrics.logger.metrics_logger import MetricsLogger
+from aws_embedded_metrics.serializers.log_serializer import LogSerializer
+from aws_embedded_metrics.sinks import Sink
 
 from mitup_bot.config import MetricsConfig, MetricsEnv
 from mitup_bot.monitoring.backend import (
@@ -39,6 +45,57 @@ async def test_mitup_metrics_logger_flush_calls_super_and_stdout():
         await logger.flush()
         mock_super_flush.assert_awaited_once()
         mock_sys.stdout.flush.assert_called_once()
+
+
+class CapturingSink(Sink):
+    """Sink that records every EMF line the logger serializes, for dimension assertions."""
+
+    def __init__(self):
+        self.serializer = LogSerializer()
+        self.serialized: list[str] = []
+
+    def accept(self, context: MetricsContext):
+        self.serialized.extend(self.serializer.serialize(context))
+
+    @staticmethod
+    def name() -> str:
+        return "CapturingSink"
+
+
+class CapturingEnvironment(LocalEnvironment):
+    """LocalEnvironment (LogGroup/ServiceName/ServiceType default to Unknown) with a capturing sink."""
+
+    def __init__(self, sink: CapturingSink):
+        self.sink = sink
+
+
+async def test_consecutive_flushes_never_leak_default_dimensions():
+    """Regression for issue #202: a long-lived logger flushed once per transaction must never
+    emit the LogGroup/ServiceName/ServiceType EMF defaults. `MetricsLogger.flush()` re-enables
+    them on the copied context, so without the re-assertion in `MitupMetricsLogger.flush()` the
+    second flush leaks them as a duplicate metric series."""
+    sink = CapturingSink()
+    environment = CapturingEnvironment(sink)
+
+    async def resolver() -> Environment:
+        return environment
+
+    logger = MitupMetricsLogger(resolver)
+    # Mirror EmfBackend._prepare_logger: custom dimensions survive across per-transaction flushes.
+    logger.flush_preserve_dimensions = True
+    logger.put_dimensions({"Feature": "DbPool"})
+
+    logger.put_metric("DbPoolConnectionsInUse", 1)
+    await logger.flush()
+    logger.put_metric("DbPoolConnectionsInUse", 2)
+    await logger.flush()
+
+    assert len(sink.serialized) == 2
+    default_dimension_keys = {"LogGroup", "ServiceName", "ServiceType"}
+    for line in sink.serialized:
+        payload = json.loads(line)
+        leaked = default_dimension_keys & payload.keys()
+        assert not leaked, f"default dimensions leaked into EMF payload: {sorted(leaked)}"
 
 
 # --- Dimensionality.__add__ ---

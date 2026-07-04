@@ -347,16 +347,42 @@ def test_cli_invokes_with_defaults():
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
     ):
         mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = False
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
         assert result.exit_code == 0, result.output
         mock_config_cls.assert_called_once()
-        mock_db.configure_db.assert_called_once_with(mock_config.db)
+        # Flag off: the events pool stays uninstrumented — no metrics client passed to the db.
+        mock_db.configure_db.assert_called_once_with(mock_config.db, metrics_client=None)
         mock_configure_emf.assert_called_once_with(mock_config.metrics)
         mock_build_bot.assert_called_once_with(mock_config.bot)
         mock_async_run.assert_called_once()
+
+
+def test_cli_instruments_pool_when_pool_metrics_enabled():
+    runner = CliRunner()
+
+    with (
+        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
+        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
+        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
+    ):
+        mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = True
+        mock_config_cls.return_value = mock_config
+
+        result = runner.invoke(cli, [])
+
+        assert result.exit_code == 0, result.output
+        # Flag on: the events pool is instrumented with a metrics client.
+        configure_call = mock_db.configure_db.call_args
+        assert configure_call.args == (mock_config.db,)
+        assert isinstance(configure_call.kwargs["metrics_client"], MetricsClient)
 
 
 def test_cli_passes_custom_intervals():

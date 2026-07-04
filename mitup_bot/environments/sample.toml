@@ -33,6 +33,10 @@ pool_size = 5
 max_overflow = 10
 # Seconds to wait for a pooled connection before failing.
 pool_timeout = 30
+# Emit connection-pool metrics (in-use gauge, checkout wait time, pool-timeout counter).
+# Optional; defaults to false. Enabled in deployed services via
+# MITUPBOT__DB__POOL_METRICS_ENABLED=true so a revert stays config-only.
+pool_metrics_enabled = false
 
 [app]
 # MitupBot App configuration.

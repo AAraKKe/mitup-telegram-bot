@@ -131,6 +131,10 @@ class DbConfig(BaseModel):
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
+    # Emit connection-pool metrics (in-use gauge, checkout wait time, pool-timeout counter) from
+    # the process that owns this engine. Off by default so CLI tools and tests keep an
+    # uninstrumented pool; the bot and events services enable it via env-var override.
+    pool_metrics_enabled: bool = False
 
     @property
     def full_url(self) -> URL:

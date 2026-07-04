@@ -28,6 +28,14 @@ class MitupMetricsLogger(MetricsLogger):
 
     async def flush(self):
         await super().flush()
+        # super().flush() swaps in a freshly-copied context whose __init__ re-enables default
+        # dimensions and which inherits the LogGroup/ServiceName/ServiceType defaults that the
+        # flush assigns just before serializing. Re-assert the invariants on that fresh context
+        # so every subsequent flush stays dimensionless — otherwise only the first flush is clean
+        # and later ones leak the EMF defaults as a duplicate metric series.
+        # See https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/202.
+        self.context.should_use_default_dimensions = False
+        self.context.set_default_dimensions({})
         # Force stdout flush to ensure the logs are emitted
         sys.stdout.flush()
 

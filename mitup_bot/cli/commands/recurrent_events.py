@@ -214,7 +214,8 @@ def cli(
         TomlConfigProvider(env=env),
     )
 
-    db.configure_db(config.db)
+    pool_metrics_client = MetricsClient(EmfBackend()) if config.db.pool_metrics_enabled else None
+    db.configure_db(config.db, metrics_client=pool_metrics_client)
     configure_logging(env, config.app.log_level)
     configure_emf_backend(config.metrics)
 

@@ -45,7 +45,8 @@ class MitupRuntime:
         self.__setup_timezone_api()
 
     def __setup_db(self):
-        db.configure_db(self.config.db, metrics_client=MetricsClient(EmfBackend()))
+        metrics_client = MetricsClient(EmfBackend()) if self.config.db.pool_metrics_enabled else None
+        db.configure_db(self.config.db, metrics_client=metrics_client)
 
     def __setup_timezone_api(self):
         timezone_api.configure(self.config.google_api)
