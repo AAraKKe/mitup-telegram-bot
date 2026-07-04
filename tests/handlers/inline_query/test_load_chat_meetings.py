@@ -9,7 +9,7 @@ from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
-def _expected_view(lang: str) -> MitupView:
+def expected_view(lang: str) -> MitupView:
     return MitupView(
         description=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),
         keyboard=[
@@ -40,7 +40,7 @@ async def test_load_chat_meetings_edits_with_switch_button(
 
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=_expected_view(user_with_settings.lang),
+        view=expected_view(user_with_settings.lang),
     )
 
 
@@ -58,5 +58,5 @@ async def test_load_chat_meetings_uses_fallback_language_for_unknown_user(
 
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=_expected_view(TranslationEngine.FALLBACK_LANG),
+        view=expected_view(TranslationEngine.FALLBACK_LANG),
     )

@@ -24,12 +24,12 @@ from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 pytestmark = pytest.mark.db_test
 
 
-def _async_engine(db_session: AsyncSession) -> AsyncEngine:
+def async_engine(db_session: AsyncSession) -> AsyncEngine:
     """Re-wrap the session's sync-facade engine (its dialect is already async-capable)."""
     return AsyncEngine(cast(Engine, db_session.get_bind()))
 
 
-async def _make_meeting(session: AsyncSession, tg_user_id: int) -> tuple[User, Meetup]:
+async def make_meeting(session: AsyncSession, tg_user_id: int) -> tuple[User, Meetup]:
     user = User(first_name="RF Probe", tg_user_id=tg_user_id, settings=Settings())
     meetup = Meetup(
         title="RF Meeting",
@@ -57,8 +57,8 @@ async def test_racy_flush_recovers_session_on_clash(db_session: AsyncSession):
     ``racy_flush`` opens the top-level savepoint, exactly as in production. ``db_session`` is
     depended on only to guarantee the schema is migrated.
     """
-    async with AsyncSession(_async_engine(db_session)) as session:
-        user, meeting = await _make_meeting(session, tg_user_id=998_500)
+    async with AsyncSession(async_engine(db_session)) as session:
+        user, meeting = await make_meeting(session, tg_user_id=998_500)
         # The membership that the concurrent writer already persisted (flushed within this transaction
         # is enough for the constraint to reject a duplicate).
         session.add(JoinedUsers(user=user, meetup=meeting))
@@ -103,8 +103,8 @@ async def test_racy_flush_recovers_session_on_clash(db_session: AsyncSession):
 async def test_racy_flush_persists_first_join(db_session: AsyncSession):
     """The success path inserts the row: the helper returns the built link and the membership is
     present in both the DB and the in-memory collection."""
-    async with AsyncSession(_async_engine(db_session)) as session:
-        user, meeting = await _make_meeting(session, tg_user_id=998_502)
+    async with AsyncSession(async_engine(db_session)) as session:
+        user, meeting = await make_meeting(session, tg_user_id=998_502)
 
         joined_link = await db.racy_flush(
             session, lambda: meeting.add_participant(user), constraint=JOINED_USERS_UNIQUE_CONSTRAINT
@@ -125,8 +125,8 @@ async def test_racy_flush_inserts_backref_only_association(db_session: AsyncSess
     """A row wired to its parents only through backref events is NOT cascaded into the session by
     SQLAlchemy 2.0 (it warns and skips the INSERT) — ``racy_flush``'s explicit ``session.add`` of
     the built row is what makes the flush land, warning-free."""
-    async with AsyncSession(_async_engine(db_session)) as session:
-        user, meeting = await _make_meeting(session, tg_user_id=998_503)
+    async with AsyncSession(async_engine(db_session)) as session:
+        user, meeting = await make_meeting(session, tg_user_id=998_503)
 
         with warnings.catch_warnings():
             warnings.simplefilter("error", SAWarning)

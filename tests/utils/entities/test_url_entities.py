@@ -83,7 +83,7 @@ def test_formatted_text_prepend_formatted_text_with_emoji_shifts_correctly():
 
 
 def test_formatted_text_prepend_preserves_url_on_link_entity():
-    # Exercises the `if entity.url` branch in _shift_entity.
+    # Exercises the `if entity.url` branch in shift_entity.
     e = MessageEntity(type="text_link", offset=0, length=5, url="https://example.com")
     ft = FormattedText("Mitup", [e])
     result = ft.prepend("prefix ")

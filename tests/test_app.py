@@ -27,7 +27,7 @@ from mitup_bot.monitoring import MetricsClient
 from mitup_bot.update_processor import PerUserUpdateProcessor
 
 
-def _build_config(
+def build_config(
     *,
     run_mode: RunModes = RunModes.POLLING,
     domain: str | None = None,
@@ -68,7 +68,7 @@ class RuntimeDeps:
 
 
 @pytest.fixture
-def _patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps]:
+def patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps]:
     """Patch all external dependencies that MitupRuntime.__init__ calls.
 
     By default this also stubs out the production `configure_logging`. The deterministic test
@@ -81,11 +81,11 @@ def _patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps
     the deterministic pipeline in force for runtime construction.
 
     Tests that intentionally assert on what `configure_logging` installs opt out by requesting the
-    `_real_configure_logging` fixture.
+    `real_configure_logging` fixture.
     """
-    stub_logging = "_real_configure_logging" not in request.fixturenames
+    stub_logging = "real_configure_logging" not in request.fixturenames
     with (
-        mock.patch("mitup_bot.app.Config.from_providers", return_value=_build_config()) as mock_config,
+        mock.patch("mitup_bot.app.Config.from_providers", return_value=build_config()) as mock_config,
         mock.patch("mitup_bot.app.Application.builder") as mock_builder,
         mock.patch("mitup_bot.app.db.configure_db") as mock_db,
         mock.patch("mitup_bot.app.timezone_api.configure") as mock_tz,
@@ -113,112 +113,112 @@ def _patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps
 
 
 @pytest.fixture
-def runtime(_patch_runtime_deps: RuntimeDeps) -> MitupRuntime:
+def runtime(patch_runtime_deps: RuntimeDeps) -> MitupRuntime:
     return MitupRuntime(Env.DEV)
 
 
 # --- Init ---
 
 
-def test_init_sets_env(_patch_runtime_deps: RuntimeDeps):
+def test_init_sets_env(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
     assert runtime.env is Env.DEV
 
 
-def test_init_sets_registry_env(_patch_runtime_deps: RuntimeDeps):
+def test_init_sets_registry_env(patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.PROD)
 
-    assert _patch_runtime_deps.registry.env is Env.PROD
+    assert patch_runtime_deps.registry.env is Env.PROD
 
 
 @pytest.mark.parametrize("env", [Env.DEV, Env.PROD, Env.SAMPLE], ids=["dev", "prod", "sample"])
-def test_init_calls_config_from_providers_with_toml_provider(env: Env, _patch_runtime_deps: RuntimeDeps):
+def test_init_calls_config_from_providers_with_toml_provider(env: Env, patch_runtime_deps: RuntimeDeps):
     MitupRuntime(env)
 
-    call_args = _patch_runtime_deps.config.call_args
+    call_args = patch_runtime_deps.config.call_args
     providers = call_args.args
     toml_providers = [p for p in providers if isinstance(p, TomlConfigProvider)]
     assert len(toml_providers) == 1
     assert toml_providers[0].env == env
 
 
-def test_init_configures_db(_patch_runtime_deps: RuntimeDeps):
+def test_init_configures_db(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.db.assert_called_once()
-    configure_call = _patch_runtime_deps.db.call_args
+    patch_runtime_deps.db.assert_called_once()
+    configure_call = patch_runtime_deps.db.call_args
     assert configure_call.args == (runtime.config.db,)
     # The runtime must hand the db layer a metrics client so the pool gets instrumented.
     assert isinstance(configure_call.kwargs["metrics_client"], MetricsClient)
 
 
-def test_init_configures_timezone_api(_patch_runtime_deps: RuntimeDeps):
+def test_init_configures_timezone_api(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.tz.assert_called_once_with(runtime.config.google_api)
+    patch_runtime_deps.tz.assert_called_once_with(runtime.config.google_api)
 
 
-def test_init_configures_metrics(_patch_runtime_deps: RuntimeDeps):
+def test_init_configures_metrics(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.metrics.assert_called_once_with(runtime.config.metrics)
+    patch_runtime_deps.metrics.assert_called_once_with(runtime.config.metrics)
 
 
 # --- Build application ---
 
 
-def test_builder_called_with_token(_patch_runtime_deps: RuntimeDeps):
+def test_builder_called_with_token(patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.builder_instance.token.assert_called_once_with("fake-bot-token")
+    patch_runtime_deps.builder_instance.token.assert_called_once_with("fake-bot-token")
 
 
-def test_builder_sets_context_types(_patch_runtime_deps: RuntimeDeps):
+def test_builder_sets_context_types(patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.builder_instance.context_types.assert_called_once()
+    patch_runtime_deps.builder_instance.context_types.assert_called_once()
 
 
-def test_builder_sets_rate_limiter(_patch_runtime_deps: RuntimeDeps):
+def test_builder_sets_rate_limiter(patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.builder_instance.rate_limiter.assert_called_once()
+    patch_runtime_deps.builder_instance.rate_limiter.assert_called_once()
 
 
-def test_builder_sets_per_user_update_processor(_patch_runtime_deps: RuntimeDeps):
+def test_builder_sets_per_user_update_processor(patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.builder_instance.concurrent_updates.assert_called_once()
-    (processor,) = _patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
+    patch_runtime_deps.builder_instance.concurrent_updates.assert_called_once()
+    (processor,) = patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
     assert isinstance(processor, PerUserUpdateProcessor)
     assert processor.max_concurrent_updates == 1  # the config default keeps processing sequential
 
 
-def test_concurrency_cap_flows_from_config_into_processor(_patch_runtime_deps: RuntimeDeps):
-    config = _build_config(concurrent_updates=4)
+def test_concurrency_cap_flows_from_config_into_processor(patch_runtime_deps: RuntimeDeps):
+    config = build_config(concurrent_updates=4)
 
     with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
         MitupRuntime(Env.DEV)
 
-    (processor,) = _patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
+    (processor,) = patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
     assert isinstance(processor, PerUserUpdateProcessor)
     assert processor.max_concurrent_updates == 4
 
 
-def test_bind_called_with_built_app(_patch_runtime_deps: RuntimeDeps):
+def test_bind_called_with_built_app(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.registry.bind.assert_called_once_with(runtime.app)
+    patch_runtime_deps.registry.bind.assert_called_once_with(runtime.app)
 
 
 # --- Logging ---
 
 
 @pytest.fixture
-def _real_configure_logging() -> Generator[None]:
-    """Opt the requesting test out of `_patch_runtime_deps`'s `configure_logging` stub so it
-    exercises the production logging setup (it must also request `_restore_root_logging`).
+def real_configure_logging() -> Generator[None]:
+    """Opt the requesting test out of `patch_runtime_deps`'s `configure_logging` stub so it
+    exercises the production logging setup (it must also request `restore_root_logging`).
 
     Production `configure_logging` runs `structlog.configure(cache_logger_on_first_use=True)`, so
     the first log emitted while building the runtime freezes each module-level
@@ -234,7 +234,7 @@ def _real_configure_logging() -> Generator[None]:
 
 
 @pytest.fixture
-def _restore_root_logging() -> Generator[None]:
+def restore_root_logging() -> Generator[None]:
     """MitupRuntime configures real logging via configure_logging, which mutates the root logger's
     handlers and level. Snapshot and restore them so these tests don't leak into the rest of the suite.
     """
@@ -260,9 +260,9 @@ def _restore_root_logging() -> Generator[None]:
 def test_logging_installs_processor_formatter_handler_by_env(
     env: Env,
     expected_renderer: type[structlog.dev.ConsoleRenderer] | type[structlog.processors.JSONRenderer],
-    _real_configure_logging: None,
-    _patch_runtime_deps: RuntimeDeps,
-    _restore_root_logging: None,
+    real_configure_logging: None,
+    patch_runtime_deps: RuntimeDeps,
+    restore_root_logging: None,
 ):
     """MitupRuntime configures logging so the root carries exactly one StreamHandler whose
     ProcessorFormatter renders through the env-selected final renderer (ConsoleRenderer in dev,
@@ -282,7 +282,7 @@ def test_logging_installs_processor_formatter_handler_by_env(
 
 
 def test_httpx_logger_set_to_warning(
-    _real_configure_logging: None, _patch_runtime_deps: RuntimeDeps, monkeypatch: pytest.MonkeyPatch
+    real_configure_logging: None, patch_runtime_deps: RuntimeDeps, monkeypatch: pytest.MonkeyPatch
 ):
     logger = logging.getLogger("httpx")
     monkeypatch.setattr(logger, "level", logger.level)
@@ -304,8 +304,8 @@ def test_httpx_logger_set_to_warning(
 def test_ext_bot_logger_level_by_env(
     env: Env,
     expected_level: int,
-    _real_configure_logging: None,
-    _patch_runtime_deps: RuntimeDeps,
+    real_configure_logging: None,
+    patch_runtime_deps: RuntimeDeps,
     monkeypatch: pytest.MonkeyPatch,
 ):
     logger = logging.getLogger("telegram.ext.ExtBot")
@@ -319,11 +319,11 @@ def test_ext_bot_logger_level_by_env(
 # --- Run ---
 
 
-def test_webhook_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: RuntimeDeps):
+def test_webhook_mode_builds_fastapi_and_runs_uvicorn(patch_runtime_deps: RuntimeDeps):
     """Webhook mode disables PTB's internal updater, builds the FastAPI app via
     create_app with RunModes.WEBHOOK and a /telegram URL, and starts uvicorn with
     the configured host/port/workers/log_config. PTB's run_webhook must NOT run."""
-    config = _build_config(
+    config = build_config(
         run_mode=RunModes.WEBHOOK,
         domain="example.com",
         secret_token=SecretStr("my-secret"),
@@ -341,7 +341,7 @@ def test_webhook_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: Runti
         runtime.run()
 
     # Webhook mode must disable PTB's Updater so FastAPI feeds updates directly.
-    _patch_runtime_deps.builder_instance.updater.assert_called_once_with(None)
+    patch_runtime_deps.builder_instance.updater.assert_called_once_with(None)
 
     mock_create_app.assert_called_once()
     create_call = mock_create_app.call_args
@@ -370,10 +370,10 @@ def test_webhook_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: Runti
     runtime.app.run_webhook.assert_not_called()
 
 
-def test_polling_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: RuntimeDeps):
+def test_polling_mode_builds_fastapi_and_runs_uvicorn(patch_runtime_deps: RuntimeDeps):
     """Polling mode keeps PTB's default Updater, builds FastAPI with RunModes.POLLING
     and no webhook URL, and runs uvicorn. PTB's run_polling must NOT run."""
-    config = _build_config(run_mode=RunModes.POLLING)
+    config = build_config(run_mode=RunModes.POLLING)
 
     with (
         mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
@@ -387,7 +387,7 @@ def test_polling_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: Runti
         runtime.run()
 
     # Polling mode must NOT disable PTB's Updater — it drives polling.
-    _patch_runtime_deps.builder_instance.updater.assert_not_called()
+    patch_runtime_deps.builder_instance.updater.assert_not_called()
 
     mock_create_app.assert_called_once()
     create_call = mock_create_app.call_args
@@ -412,7 +412,7 @@ def test_polling_mode_builds_fastapi_and_runs_uvicorn(_patch_runtime_deps: Runti
 
 
 def test_webhook_mode_missing_domain_raises(runtime: MitupRuntime):
-    runtime.config = _build_config(
+    runtime.config = build_config(
         run_mode=RunModes.WEBHOOK,
         secret_token=SecretStr("my-secret"),
     )
@@ -422,7 +422,7 @@ def test_webhook_mode_missing_domain_raises(runtime: MitupRuntime):
 
 
 def test_webhook_mode_missing_secret_token_raises(runtime: MitupRuntime):
-    runtime.config = _build_config(
+    runtime.config = build_config(
         run_mode=RunModes.WEBHOOK,
         domain="example.com",
     )

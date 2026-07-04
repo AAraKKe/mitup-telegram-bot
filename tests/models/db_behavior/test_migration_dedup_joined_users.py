@@ -13,7 +13,7 @@ from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 
 pytestmark = pytest.mark.db_test
 
-_MIGRATION_PATH = (
+MIGRATION_PATH = (
     Path(mitup_bot.__file__).parent
     / "migrations"
     / "versions"
@@ -21,25 +21,25 @@ _MIGRATION_PATH = (
 )
 
 
-def _load_dedup_sql() -> str:
+def load_dedup_sql() -> str:
     """Load the exact DELETE the migration runs, so this test breaks if that statement changes.
 
     The revision module can't be imported by dotted path (its name starts with a digit), so load it
     from its file location and read the constant ``upgrade()`` itself executes.
     """
-    spec = importlib.util.spec_from_file_location("_migration_02557bf55f98", _MIGRATION_PATH)
+    spec = importlib.util.spec_from_file_location("_migration_02557bf55f98", MIGRATION_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.DEDUPLICATE_JOINED_USERS_SQL
 
 
-DEDUP_SQL = _load_dedup_sql()
+DEDUP_SQL = load_dedup_sql()
 
-_BASE_TIME = dt.datetime(2020, 1, 1, tzinfo=dt.UTC)
+BASE_TIME = dt.datetime(2020, 1, 1, tzinfo=dt.UTC)
 
 
-async def _make_group(db_session: AsyncSession, rows: list[tuple[bool, int]]) -> tuple[User, Meetup, list[JoinedUsers]]:
+async def make_group(db_session: AsyncSession, rows: list[tuple[bool, int]]) -> tuple[User, Meetup, list[JoinedUsers]]:
     """Create a throwaway user + meetup and a set of colliding memberships.
 
     ``rows`` is a list of (is_waiting_list, created_time_offset_hours). Each row is flushed in order so
@@ -64,7 +64,7 @@ async def _make_group(db_session: AsyncSession, rows: list[tuple[bool, int]]) ->
             user_id=user.id,
             meetup_id=meetup.id,
             is_waiting_list=is_waiting_list,
-            created_time=_BASE_TIME + dt.timedelta(hours=offset_hours),
+            created_time=BASE_TIME + dt.timedelta(hours=offset_hours),
         )
         db_session.add(link)
         await db_session.flush()
@@ -95,7 +95,7 @@ async def test_dedup_keeps_expected_survivor(
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(f"ALTER TABLE joined_users DROP CONSTRAINT {JOINED_USERS_UNIQUE_CONSTRAINT}")
         )
-        user, meetup, links = await _make_group(db_session, rows)
+        user, meetup, links = await make_group(db_session, rows)
         expected_survivor_id = links[survivor_index].id
 
         await db_session.exec(text(DEDUP_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657

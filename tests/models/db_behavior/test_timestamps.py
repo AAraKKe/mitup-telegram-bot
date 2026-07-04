@@ -14,7 +14,7 @@ pytestmark = pytest.mark.db_test
 # --- INSERT path helpers ---
 
 
-async def _user_timestamps(
+async def user_timestamps(
     db_session: AsyncSession, seed_user: User, seed_meetup: Meetup
 ) -> tuple[dt.datetime | None, dt.datetime | None]:
     loaded = (await db_session.exec(select(User).where(User.id == seed_user.id))).one()
@@ -22,7 +22,7 @@ async def _user_timestamps(
     return loaded.created_time, loaded.updated_time
 
 
-async def _settings_timestamps(
+async def settings_timestamps(
     db_session: AsyncSession, seed_user: User, seed_meetup: Meetup
 ) -> tuple[dt.datetime | None, dt.datetime | None]:
     loaded = (await db_session.exec(select(Settings).where(Settings.user_id == seed_user.id))).one()
@@ -30,7 +30,7 @@ async def _settings_timestamps(
     return loaded.created_time, loaded.updated_time
 
 
-async def _meetup_timestamps(
+async def meetup_timestamps(
     db_session: AsyncSession, seed_user: User, seed_meetup: Meetup
 ) -> tuple[dt.datetime | None, dt.datetime | None]:
     # Earlier tests' savepoint rollbacks may have expired the shared seed instance, and even
@@ -43,7 +43,7 @@ async def _meetup_timestamps(
 
 @pytest.mark.parametrize(
     "get_timestamps",
-    [_user_timestamps, _settings_timestamps, _meetup_timestamps],
+    [user_timestamps, settings_timestamps, meetup_timestamps],
     ids=["users", "settings", "meetups"],
 )
 async def test_timestamps_are_set_on_insert(
@@ -62,7 +62,7 @@ async def test_timestamps_are_set_on_insert(
 # --- UPDATE path helpers ---
 
 
-async def _update_user(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> dt.datetime | None:
+async def update_user(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> dt.datetime | None:
     loaded = (await db_session.exec(select(User).where(User.id == seed_user.id))).one()
     loaded.last_name = "trigger-check"
     await db_session.flush()
@@ -70,7 +70,7 @@ async def _update_user(db_session: AsyncSession, seed_user: User, seed_meetup: M
     return loaded.updated_time
 
 
-async def _update_settings(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> dt.datetime | None:
+async def update_settings(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> dt.datetime | None:
     loaded = (await db_session.exec(select(Settings).where(Settings.user_id == seed_user.id))).one()
     loaded.timezone = "Europe/Madrid"
     await db_session.flush()
@@ -78,8 +78,8 @@ async def _update_settings(db_session: AsyncSession, seed_user: User, seed_meetu
     return loaded.updated_time
 
 
-async def _update_meetup(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> dt.datetime | None:
-    # See _meetup_timestamps: the shared seed may be expired by earlier savepoint rollbacks.
+async def update_meetup(db_session: AsyncSession, seed_user: User, seed_meetup: Meetup) -> dt.datetime | None:
+    # See meetup_timestamps: the shared seed may be expired by earlier savepoint rollbacks.
     await db_session.refresh(seed_meetup)
     loaded = (await db_session.exec(select(Meetup).where(Meetup.id == seed_meetup.id))).one()
     loaded.description = "trigger-check"
@@ -90,7 +90,7 @@ async def _update_meetup(db_session: AsyncSession, seed_user: User, seed_meetup:
 
 @pytest.mark.parametrize(
     "do_update",
-    [_update_user, _update_settings, _update_meetup],
+    [update_user, update_settings, update_meetup],
     ids=["users", "settings", "meetups"],
 )
 async def test_updated_time_is_set_after_update(

@@ -16,7 +16,7 @@ from tests.helpers.fixtures import UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
 
-def _chat_card(lang: str) -> MitupInlineView:
+def chat_card(lang: str) -> MitupInlineView:
     return MitupInlineView(
         description=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.get(lang=lang),
         keyboard=[
@@ -33,14 +33,14 @@ def _chat_card(lang: str) -> MitupInlineView:
     )
 
 
-def _inline_button(lang: str) -> InlineResultsButton:
+def inline_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
         text=InlineQueryMessages.CREATE_MEETING_BUTTON.get_text(lang=lang),
         start_parameter="inline",
     )
 
 
-def _explore_button(lang: str) -> InlineResultsButton:
+def explore_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
         text=InlineQueryMessages.EXPLORE_BUTTON.get_text(lang=lang),
         start_parameter="inline",
@@ -113,8 +113,8 @@ async def test_inline_view_falls_back_to_default_language_for_unknown_user(
 
     context.api.assert_answer_inline_query_called(
         update=update,
-        results=[_chat_card(default_lang)],
-        button=_explore_button(default_lang),
+        results=[chat_card(default_lang)],
+        button=explore_button(default_lang),
         cache_time=0,
     )
 
@@ -124,12 +124,12 @@ async def test_inline_view_falls_back_to_default_language_for_unknown_user(
 DEFAULT_LANG = "en"
 
 
-def _no_meetings_scenario() -> tuple[User, list[MitupInlineView]]:
+def no_meetings_scenario() -> tuple[User, list[MitupInlineView]]:
     """User has no meetings — only the chat card should appear."""
     return create_user(id=1, tg_user_id=123, first_name="Test"), []
 
 
-def _active_meetings_scenario() -> tuple[User, list[MitupInlineView]]:
+def active_meetings_scenario() -> tuple[User, list[MitupInlineView]]:
     """User has active meetings — they should appear after the chat card."""
     m1 = create_meetup(10, "Meeting A")
     m2 = create_meetup(11, "Meeting B")
@@ -137,7 +137,7 @@ def _active_meetings_scenario() -> tuple[User, list[MitupInlineView]]:
     return user, [m1.inline_view(), m2.inline_view()]
 
 
-def _mixed_active_inactive_scenario() -> tuple[User, list[MitupInlineView]]:
+def mixed_active_inactive_scenario() -> tuple[User, list[MitupInlineView]]:
     """User has both active and inactive meetings — only active ones shown."""
     active = create_meetup(10, "Active")
     inactive = create_meetup(11, "Inactive", active=False)
@@ -148,9 +148,9 @@ def _mixed_active_inactive_scenario() -> tuple[User, list[MitupInlineView]]:
 @pytest.mark.parametrize(
     "update, build_scenario",
     [
-        (UpdateRequest(inline_query=" "), _no_meetings_scenario),
-        (UpdateRequest(inline_query=" "), _active_meetings_scenario),
-        (UpdateRequest(inline_query=" "), _mixed_active_inactive_scenario),
+        (UpdateRequest(inline_query=" "), no_meetings_scenario),
+        (UpdateRequest(inline_query=" "), active_meetings_scenario),
+        (UpdateRequest(inline_query=" "), mixed_active_inactive_scenario),
     ],
     indirect=["update"],
     ids=["no_meetings", "active_meetings", "mixed_active_inactive"],
@@ -168,8 +168,8 @@ async def test_inline_view_includes_user_meetings(
 
     context.api.assert_answer_inline_query_called(
         update=update,
-        results=[_chat_card(DEFAULT_LANG), *expected_meeting_views],
-        button=_inline_button(DEFAULT_LANG),
+        results=[chat_card(DEFAULT_LANG), *expected_meeting_views],
+        button=inline_button(DEFAULT_LANG),
         cache_time=0,
     )
 
@@ -195,12 +195,12 @@ async def test_inline_view_sorts_user_meetings_by_relevance(
     context.api.assert_answer_inline_query_called(
         update=update,
         results=[
-            _chat_card(DEFAULT_LANG),
+            chat_card(DEFAULT_LANG),
             future.inline_view(),
             no_date.inline_view(),
             past.inline_view(),
         ],
-        button=_inline_button(DEFAULT_LANG),
+        button=inline_button(DEFAULT_LANG),
         cache_time=0,
     )
 
@@ -226,11 +226,11 @@ async def test_inline_view_sorts_no_datetime_meetings_by_created_time(
     context.api.assert_answer_inline_query_called(
         update=update,
         results=[
-            _chat_card(DEFAULT_LANG),
+            chat_card(DEFAULT_LANG),
             early.inline_view(),
             middle.inline_view(),
             late.inline_view(),
         ],
-        button=_inline_button(DEFAULT_LANG),
+        button=inline_button(DEFAULT_LANG),
         cache_time=0,
     )

@@ -13,7 +13,7 @@ TEST_DATE = datetime.datetime(2024, 7, 1, tzinfo=datetime.UTC)
 DEADLOCK_TIMEOUT = 5
 
 
-def _message_update(update_id: int, user_id: int, chat_id: int) -> Update:
+def message_update(update_id: int, user_id: int, chat_id: int) -> Update:
     """An update carrying both an effective user and an effective chat."""
     return Update(
         update_id,
@@ -26,7 +26,7 @@ def _message_update(update_id: int, user_id: int, chat_id: int) -> Update:
     )
 
 
-def _inline_query_update(update_id: int, user_id: int) -> Update:
+def inline_query_update(update_id: int, user_id: int) -> Update:
     """An update with an effective user but no effective chat."""
     return Update(
         update_id,
@@ -39,7 +39,7 @@ def _inline_query_update(update_id: int, user_id: int) -> Update:
     )
 
 
-def _chat_only_update(update_id: int, chat_id: int) -> Update:
+def chat_only_update(update_id: int, chat_id: int) -> Update:
     """A synthetic update with an effective chat but no effective user.
 
     The bot does not receive such updates today; this only covers the defensive chat-only
@@ -62,9 +62,9 @@ def _chat_only_update(update_id: int, chat_id: int) -> Update:
 @pytest.mark.parametrize(
     "update, expected",
     [
-        (_message_update(1, user_id=1, chat_id=10), (1, 10)),
-        (_inline_query_update(1, user_id=1), (1, None)),
-        (_chat_only_update(1, chat_id=10), (None, 10)),
+        (message_update(1, user_id=1, chat_id=10), (1, 10)),
+        (inline_query_update(1, user_id=1), (1, None)),
+        (chat_only_update(1, chat_id=10), (None, 10)),
         (Update(1), None),
         (object(), None),
     ],
@@ -95,10 +95,10 @@ async def test_same_key_updates_never_interleave():
         log.append("second:start")
         log.append("second:end")
 
-    first_task = asyncio.create_task(processor.do_process_update(_message_update(1, user_id=1, chat_id=10), first()))
+    first_task = asyncio.create_task(processor.do_process_update(message_update(1, user_id=1, chat_id=10), first()))
     async with asyncio.timeout(DEADLOCK_TIMEOUT):
         await first_running.wait()
-    second_task = asyncio.create_task(processor.do_process_update(_message_update(2, user_id=1, chat_id=10), second()))
+    second_task = asyncio.create_task(processor.do_process_update(message_update(2, user_id=1, chat_id=10), second()))
     # Yield a few times: if the lock did not serialize, second() would run to completion here.
     for _ in range(5):
         await asyncio.sleep(0)
@@ -136,8 +136,8 @@ async def test_different_key_updates_overlap(key_a: tuple[int, int], key_b: tupl
 
     async with asyncio.timeout(DEADLOCK_TIMEOUT):
         await asyncio.gather(
-            processor.do_process_update(_message_update(1, user_id=key_a[0], chat_id=key_a[1]), first()),
-            processor.do_process_update(_message_update(2, user_id=key_b[0], chat_id=key_b[1]), second()),
+            processor.do_process_update(message_update(1, user_id=key_a[0], chat_id=key_a[1]), first()),
+            processor.do_process_update(message_update(2, user_id=key_b[0], chat_id=key_b[1]), second()),
         )
 
 
@@ -170,7 +170,7 @@ async def test_locks_drain_after_contended_same_key_batch():
     async def noop(): ...
 
     tasks = [
-        asyncio.create_task(processor.do_process_update(_message_update(i, user_id=1, chat_id=10), coroutine))
+        asyncio.create_task(processor.do_process_update(message_update(i, user_id=1, chat_id=10), coroutine))
         for i, coroutine in enumerate((holder(), noop(), noop()), start=1)
     ]
     async with asyncio.timeout(DEADLOCK_TIMEOUT):
@@ -202,11 +202,11 @@ async def test_exception_releases_lock_and_drains_map():
     async def follower():
         log.append("follower")
 
-    failing_task = asyncio.create_task(processor.do_process_update(_message_update(1, user_id=1, chat_id=10), boom()))
+    failing_task = asyncio.create_task(processor.do_process_update(message_update(1, user_id=1, chat_id=10), boom()))
     async with asyncio.timeout(DEADLOCK_TIMEOUT):
         await boom_running.wait()
     trailing_task = asyncio.create_task(
-        processor.do_process_update(_message_update(2, user_id=1, chat_id=10), follower())
+        processor.do_process_update(message_update(2, user_id=1, chat_id=10), follower())
     )
     for _ in range(5):
         await asyncio.sleep(0)

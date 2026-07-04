@@ -13,7 +13,7 @@ class AuditStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-_AUDIT_TABLE = "migration_audit"
+AUDIT_TABLE = "migration_audit"
 
 
 class AuditStore:
@@ -38,7 +38,7 @@ class AuditStore:
         """
         result = await (await self._session.connection()).execute(
             text(
-                f"SELECT old_id, new_id FROM {_AUDIT_TABLE} "  # noqa: S608 — table name constant
+                f"SELECT old_id, new_id FROM {AUDIT_TABLE} "  # noqa: S608 — table name constant
                 "WHERE table_name = :table AND status = :status AND new_id IS NOT NULL"
             ),
             {"table": table, "status": AuditStatus.INSERTED.value},
@@ -52,7 +52,7 @@ class AuditStore:
         failed) so a re-run only retries previously-failed rows when explicitly asked.
         """
         result = await (await self._session.connection()).execute(
-            text(f"SELECT old_id FROM {_AUDIT_TABLE} WHERE table_name = :table"),  # noqa: S608 — constant
+            text(f"SELECT old_id FROM {AUDIT_TABLE} WHERE table_name = :table"),  # noqa: S608 — constant
             {"table": table},
         )
         return {int(row[0]) for row in result.all()}
@@ -62,7 +62,7 @@ class AuditStore:
     ):
         await (await self._session.connection()).execute(
             text(
-                f"INSERT INTO {_AUDIT_TABLE} (table_name, old_id, new_id, status, note) "  # noqa: S608 — constant
+                f"INSERT INTO {AUDIT_TABLE} (table_name, old_id, new_id, status, note) "  # noqa: S608 — constant
                 "VALUES (:table, :old_id, :new_id, :status, :note) "
                 "ON CONFLICT (table_name, old_id) DO UPDATE SET "
                 "new_id = EXCLUDED.new_id, status = EXCLUDED.status, note = EXCLUDED.note"
@@ -78,11 +78,11 @@ class AuditStore:
 
     async def count(self, table: str, status: AuditStatus | None = None) -> int:
         if status is None:
-            sql = f"SELECT COUNT(*) FROM {_AUDIT_TABLE} WHERE table_name = :table"  # noqa: S608 — constant
+            sql = f"SELECT COUNT(*) FROM {AUDIT_TABLE} WHERE table_name = :table"  # noqa: S608 — constant
             params: dict[str, object] = {"table": table}
         else:
             sql = (
-                f"SELECT COUNT(*) FROM {_AUDIT_TABLE} "  # noqa: S608 — constant
+                f"SELECT COUNT(*) FROM {AUDIT_TABLE} "  # noqa: S608 — constant
                 "WHERE table_name = :table AND status = :status"
             )
             params = {"table": table, "status": status.value}

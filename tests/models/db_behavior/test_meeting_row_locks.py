@@ -23,7 +23,7 @@ pytestmark = pytest.mark.db_test
 
 
 @contextlib.asynccontextmanager
-async def _provisioned_meeting(
+async def provisioned_meeting(
     tg_base: int,
     *,
     max_members: int | None,
@@ -85,7 +85,7 @@ async def _provisioned_meeting(
             )
 
 
-async def _join(session: AsyncSession, meetup_id: int, tg_user_id: int) -> bool:
+async def join_meeting(session: AsyncSession, meetup_id: int, tg_user_id: int) -> bool:
     """The join critical section as handle_join_leave_operation runs it: lock the meetup row,
     read capacity, insert through the racy_flush savepoint. True when a membership row landed
     (participant or waiting), False when the join was rejected or the meeting vanished."""
@@ -104,7 +104,7 @@ async def _join(session: AsyncSession, meetup_id: int, tg_user_id: int) -> bool:
     return joined_link is not None
 
 
-async def _remove_participant(session: AsyncSession, meetup_id: int, tg_user_id: int) -> list[int]:
+async def remove_participant(session: AsyncSession, meetup_id: int, tg_user_id: int) -> list[int]:
     """The leave/kick-out critical section: lock, find the membership, remove it (which promotes
     from the waiting list) and flush. Returns the tg ids of the promoted users."""
     user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).one()
@@ -117,7 +117,7 @@ async def _remove_participant(session: AsyncSession, meetup_id: int, tg_user_id:
     return [link.user.tg_user_id for link in promoted]
 
 
-async def _delete_meeting(session: AsyncSession, meetup_id: int) -> bool:
+async def delete_meeting(session: AsyncSession, meetup_id: int) -> bool:
     """The delete-confirm critical section: locked re-load, then delete (memberships cascade).
     False when the row is already gone — the handler's nothing-left-to-do branch."""
     meeting = await Meetup.by_id(session, meetup_id, for_update=True)
@@ -127,7 +127,7 @@ async def _delete_meeting(session: AsyncSession, meetup_id: int) -> bool:
     return True
 
 
-async def _set_max_members(session: AsyncSession, meetup_id: int, max_members: int | None):
+async def set_max_members(session: AsyncSession, meetup_id: int, max_members: int | None):
     """The capacity-edit critical section as edit_meeting_max_participants runs it: locked
     re-load, mutate max_members, flush."""
     meeting = await Meetup.by_id(session, meetup_id, for_update=True)
@@ -136,7 +136,7 @@ async def _set_max_members(session: AsyncSession, meetup_id: int, max_members: i
     await session.flush()
 
 
-async def _committed_state(meetup_id: int) -> tuple[set[int], set[int]]:
+async def committed_state(meetup_id: int) -> tuple[set[int], set[int]]:
     """(participant tg ids, waiting tg ids) as visible to a fresh transaction after the race."""
     async with db.begin() as session:
         meeting = await Meetup.by_id(session, meetup_id)
@@ -152,10 +152,10 @@ async def test_double_join_on_last_slot_serializes(db_session: AsyncSession, wai
     exactly one becomes a participant and the loser overflows to the waiting list (when enabled)
     or is rejected. Without the lock both read "not full" and both become participants."""
     tg_base = 997_010 if waiting_list else 997_015
-    async with _provisioned_meeting(tg_base, max_members=1, waiting_list=waiting_list, users=2) as meetup_id:
+    async with provisioned_meeting(tg_base, max_members=1, waiting_list=waiting_list, users=2) as meetup_id:
         first_join, second_join = await race(
-            lambda session: _join(session, meetup_id, tg_base + 1),
-            lambda session: _join(session, meetup_id, tg_base + 2),
+            lambda session: join_meeting(session, meetup_id, tg_base + 1),
+            lambda session: join_meeting(session, meetup_id, tg_base + 2),
         )
 
         assert first_join is True
@@ -163,7 +163,7 @@ async def test_double_join_on_last_slot_serializes(db_session: AsyncSession, wai
         # None once the locked load showed the meeting full.
         assert second_join is waiting_list
 
-        participant_tgs, waiting_tgs = await _committed_state(meetup_id)
+        participant_tgs, waiting_tgs = await committed_state(meetup_id)
         assert participant_tgs == {tg_base + 1}
         assert waiting_tgs == ({tg_base + 2} if waiting_list else set())
 
@@ -173,18 +173,18 @@ async def test_leave_racing_join_promotes_exactly_once(db_session: AsyncSession)
     promotes the seeded waiter, and the join — serialized behind it — sees the meeting full again
     and lands in the waiting list. Exactly one promotion, no capacity overrun."""
     tg_base = 997_020
-    async with _provisioned_meeting(
+    async with provisioned_meeting(
         tg_base, max_members=1, waiting_list=True, users=3, participants=(1,), waiting=(2,)
     ) as meetup_id:
         promoted_tgs, join_result = await race(
-            lambda session: _remove_participant(session, meetup_id, tg_base + 1),
-            lambda session: _join(session, meetup_id, tg_base + 3),
+            lambda session: remove_participant(session, meetup_id, tg_base + 1),
+            lambda session: join_meeting(session, meetup_id, tg_base + 3),
         )
 
         assert promoted_tgs == [tg_base + 2]  # exactly one promotion: the seeded waiter
         assert join_result is True  # joined the (again full) meeting's waiting list
 
-        participant_tgs, waiting_tgs = await _committed_state(meetup_id)
+        participant_tgs, waiting_tgs = await committed_state(meetup_id)
         assert participant_tgs == {tg_base + 2}
         assert waiting_tgs == {tg_base + 3}
 
@@ -194,18 +194,18 @@ async def test_kickout_racing_join_stays_consistent(db_session: AsyncSession):
     waiting list behind the seeded waiter), then the kick-out removes the participant and must
     promote the oldest waiting entry — the seeded waiter, not the racer that just joined."""
     tg_base = 997_030
-    async with _provisioned_meeting(
+    async with provisioned_meeting(
         tg_base, max_members=1, waiting_list=True, users=3, participants=(1,), waiting=(2,)
     ) as meetup_id:
         join_result, promoted_tgs = await race(
-            lambda session: _join(session, meetup_id, tg_base + 3),
-            lambda session: _remove_participant(session, meetup_id, tg_base + 1),
+            lambda session: join_meeting(session, meetup_id, tg_base + 3),
+            lambda session: remove_participant(session, meetup_id, tg_base + 1),
         )
 
         assert join_result is True
         assert promoted_tgs == [tg_base + 2]  # promotion picked the oldest waiting entry
 
-        participant_tgs, waiting_tgs = await _committed_state(meetup_id)
+        participant_tgs, waiting_tgs = await committed_state(meetup_id)
         assert participant_tgs == {tg_base + 2}
         assert waiting_tgs == {tg_base + 3}
 
@@ -215,10 +215,10 @@ async def test_capacity_increase_racing_join_admits_under_new_cap(db_session: As
     behind the capacity edit, is admitted as a participant under the new cap. Neither write is
     lost — the committed row holds the new capacity and both participants."""
     tg_base = 997_060
-    async with _provisioned_meeting(tg_base, max_members=1, waiting_list=True, users=2, participants=(1,)) as meetup_id:
+    async with provisioned_meeting(tg_base, max_members=1, waiting_list=True, users=2, participants=(1,)) as meetup_id:
         _, join_result = await race(
-            lambda session: _set_max_members(session, meetup_id, 2),
-            lambda session: _join(session, meetup_id, tg_base + 2),
+            lambda session: set_max_members(session, meetup_id, 2),
+            lambda session: join_meeting(session, meetup_id, tg_base + 2),
         )
 
         assert join_result is True  # admitted under the raised cap, not waiting-listed
@@ -236,10 +236,10 @@ async def test_capacity_decrease_racing_join_overflows_to_waiting(db_session: As
     serialized behind the edit, finds the meeting already full under the new cap and overflows to
     the waiting list — the final state is never over capacity."""
     tg_base = 997_070
-    async with _provisioned_meeting(tg_base, max_members=2, waiting_list=True, users=2, participants=(1,)) as meetup_id:
+    async with provisioned_meeting(tg_base, max_members=2, waiting_list=True, users=2, participants=(1,)) as meetup_id:
         _, join_result = await race(
-            lambda session: _set_max_members(session, meetup_id, 1),
-            lambda session: _join(session, meetup_id, tg_base + 2),
+            lambda session: set_max_members(session, meetup_id, 1),
+            lambda session: join_meeting(session, meetup_id, tg_base + 2),
         )
 
         assert join_result is True  # landed in the waiting list under the lowered cap
@@ -258,18 +258,18 @@ async def test_delete_racing_join_leaves_no_orphans(db_session: AsyncSession, de
     the row gone, or the join lands first and the delete's re-load sees the fresh membership and
     removes it. Either way no membership row survives the meeting."""
     tg_base = 997_040 if delete_goes_first else 997_045
-    async with _provisioned_meeting(tg_base, max_members=None, waiting_list=False, users=1) as meetup_id:
+    async with provisioned_meeting(tg_base, max_members=None, waiting_list=False, users=1) as meetup_id:
         if delete_goes_first:
             delete_result, join_result = await race(
-                lambda session: _delete_meeting(session, meetup_id),
-                lambda session: _join(session, meetup_id, tg_base + 1),
+                lambda session: delete_meeting(session, meetup_id),
+                lambda session: join_meeting(session, meetup_id, tg_base + 1),
             )
             assert delete_result is True
             assert join_result is False  # the locked load found no row after the delete committed
         else:
             join_result, delete_result = await race(
-                lambda session: _join(session, meetup_id, tg_base + 1),
-                lambda session: _delete_meeting(session, meetup_id),
+                lambda session: join_meeting(session, meetup_id, tg_base + 1),
+                lambda session: delete_meeting(session, meetup_id),
             )
             assert join_result is True  # landed before the delete took the lock
             assert delete_result is True  # the locked re-load saw the fresh membership and removed it
@@ -301,14 +301,14 @@ async def test_locked_reload_refreshes_identity_mapped_meeting(db_session: Async
     membership committed by another session — on the SAME object after by_id(for_update=True).
     Without populate_existing the locked SELECT returns the stale pre-lock state."""
     tg_base = 997_050
-    async with _provisioned_meeting(tg_base, max_members=None, waiting_list=False, users=1) as meetup_id:
+    async with provisioned_meeting(tg_base, max_members=None, waiting_list=False, users=1) as meetup_id:
         async with asyncio.timeout(RACE_TIMEOUT), db.begin() as observer:
             stale = await Meetup.by_id(observer, meetup_id)
             assert stale is not None
             assert stale.n_participants == 0
 
             async with db.begin() as writer:
-                assert await _join(writer, meetup_id, tg_base + 1) is True
+                assert await join_meeting(writer, meetup_id, tg_base + 1) is True
 
             locked = await Meetup.by_id(observer, meetup_id, for_update=True)
             assert locked is stale  # identity map returns the same object, not a new instance

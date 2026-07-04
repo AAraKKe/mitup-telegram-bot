@@ -26,22 +26,22 @@ OWNER_TG_USER_ID = 998_610
 JOINER_TG_USER_ID = 998_611
 
 
-def _async_engine(db_session: AsyncSession) -> AsyncEngine:
+def async_engine(db_session: AsyncSession) -> AsyncEngine:
     """Re-wrap the session's sync-facade engine (its dialect is already async-capable)."""
     return AsyncEngine(cast(Engine, db_session.get_bind()))
 
 
-def _inline_update(meeting_id: int, joiner: TgUser) -> Update:
+def inline_update(meeting_id: int, joiner: TgUser) -> Update:
     """A join clicked on a shared (inline) meeting message — reads user.joined_links."""
     return create_update(UpdateRequest(callback_query=cb.JOIN.with_id(meeting_id), from_bot_chat=False), tg_user=joiner)
 
 
-def _bot_chat_update(meeting_id: int, joiner: TgUser) -> Update:
+def bot_chat_update(meeting_id: int, joiner: TgUser) -> Update:
     """A join clicked in the bot chat — Message.from_update additionally reads user.meetups."""
     return create_update(UpdateRequest(callback_query=cb.JOIN.with_id(meeting_id)), tg_user=joiner)
 
 
-@pytest.mark.parametrize("update_builder", [_inline_update, _bot_chat_update], ids=["inline", "bot_chat"])
+@pytest.mark.parametrize("update_builder", [inline_update, bot_chat_update], ids=["inline", "bot_chat"])
 async def test_unregistered_join_registers_user_and_creates_membership(
     db_session: AsyncSession,
     app: Application,
@@ -58,7 +58,7 @@ async def test_unregistered_join_registers_user_and_creates_membership(
     Runs on a dedicated session on the same engine (nothing committed; rolled back on close).
     `db_session` is depended on only to guarantee the schema is migrated.
     """
-    async with AsyncSession(_async_engine(db_session)) as session:
+    async with AsyncSession(async_engine(db_session)) as session:
         owner = User(first_name="RDU Owner", tg_user_id=OWNER_TG_USER_ID, settings=Settings())
         meeting = Meetup(
             title="RDU Meeting",

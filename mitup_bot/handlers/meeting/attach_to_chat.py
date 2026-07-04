@@ -13,7 +13,7 @@ from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
 
 
-def _is_already_attached(meeting: Meetup, chat_instance: str | None) -> bool:
+def is_already_attached(meeting: Meetup, chat_instance: str | None) -> bool:
     """Check if the meeting is already attached to this chat via another message."""
     if chat_instance is None:
         return False
@@ -34,7 +34,7 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
 
     if meeting := await Meetup.by_id(session, data.id):
         chat_instance = update.callback_query.chat_instance if update.callback_query else None
-        already_attached = _is_already_attached(meeting, chat_instance)
+        already_attached = is_already_attached(meeting, chat_instance)
 
         if (current_message := meeting.message_from_update(update)) is None:
             current_message = Message.from_update(update, meeting, user)

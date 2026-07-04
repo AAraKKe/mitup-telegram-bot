@@ -28,7 +28,7 @@ def restore_logging_state() -> Generator[None]:
         logging.getLogger("telegram.ext.ExtBot").setLevel(saved_extbot_level)
 
 
-def _final_renderer(handler: logging.Handler) -> structlog.typing.Processor:
+def final_renderer(handler: logging.Handler) -> structlog.typing.Processor:
     """Pull the env-selected final renderer out of an installed handler's ProcessorFormatter.
 
     build_root_handler wires the formatter's `processors` list as
@@ -86,7 +86,7 @@ def test_final_renderer_depends_on_env(
     """Dev gets the human-friendly ConsoleRenderer; every other env ships structured JSON."""
     configure_logging(env, "INFO")
 
-    renderer = _final_renderer(logging.getLogger().handlers[0])
+    renderer = final_renderer(logging.getLogger().handlers[0])
     assert isinstance(renderer, expected_renderer)
 
 

@@ -22,7 +22,7 @@ USERNAME = "mitupbot"
 PASSWORD = "12345pass"
 
 
-def _read_postgres_image() -> str:
+def read_postgres_image() -> str:
     with open("docker-compose.yaml") as f:
         content = f.read()
     match = re.search(r"image:\s*(postgres:\S+)", content)
@@ -56,7 +56,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 @pytest.fixture(scope="session")
 def pg_container() -> Generator[PostgresContainer]:
-    image = _read_postgres_image()
+    image = read_postgres_image()
     container = PostgresContainer(
         image=image,
         username=USERNAME,

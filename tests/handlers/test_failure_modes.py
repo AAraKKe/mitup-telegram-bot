@@ -42,7 +42,7 @@ class _Unset:
     """Sentinel type for dataclass fields that distinguish 'not set' from None."""
 
 
-_UNSET: Final = _Unset()
+UNSET: Final = _Unset()
 
 
 class ErrorMode(Enum):
@@ -75,7 +75,7 @@ class Context:
     meeting_id: dict[ContextId, int] | None = None  # Meeting id to store in the context data
     # Extra metric emissions for this handler (e.g. CleanUserData). Each is a (name, times) pair.
     extra_metrics: list[tuple[str, int]] = field(default_factory=list)
-    # Override extra_metrics when the meeting is not found. Uses _UNSET sentinel as default (falls back to
+    # Override extra_metrics when the meeting is not found. Uses UNSET sentinel as default (falls back to
     # extra_metrics). Set to [] to explicitly assert no extra metrics.
     extra_metrics_not_found: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
     # Override extra_metrics for the non-owner inactive meeting test.
@@ -1103,7 +1103,7 @@ def handler_shows_reactivation_prompt_for_inactive_meeting() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_INACTIVE_OWNER in context.error_modes]
 
 
-def _assert_handler_metrics(
+def assert_handler_metrics(
     metrics: MetricAssertions,
     *,
     fault_value: int,
@@ -1146,7 +1146,7 @@ async def test_callback_fails_when_meeting_not_accessible(
 
     # MeetingNotOwned error metric is emitted
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
-    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
+    assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
     context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
 
@@ -1179,7 +1179,7 @@ async def test_callback_fails_when_meeting_not_found(
         if not isinstance(test_context.extra_metrics_not_found, _Unset)
         else test_context.extra_metrics
     )
-    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
+    assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
 
     keyboard = test_context.custom_keyboard or [
         [
@@ -1302,7 +1302,7 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
+    assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
 
     back_rows = (
         test_context.reactivation_back_keyboard_factory(user_with_settings.lang)
@@ -1348,5 +1348,5 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
         else test_context.extra_metrics
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
-    _assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
+    assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
     context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))

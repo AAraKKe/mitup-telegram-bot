@@ -56,22 +56,22 @@ class RecordingContext(MitupContext):
         return context
 
 
-def _conversation(handler_id: HandlerId) -> ConversationHandler:
+def conversation_for(handler_id: HandlerId) -> ConversationHandler:
     return cast(ConversationHandler, HandlersRegistry.get_handler(handler_id))
 
 
-def _clear_conversation_state():
+def clear_conversation_state():
     # The conversation handlers are registry singletons shared with every other test in the
     # process; drop any state keyed under the default (chat, user) so tests stay independent.
-    _conversation(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)._conversations.clear()
-    _conversation(MeetingHandlerId.CREATE_MEETING_CONVERSATION)._conversations.clear()
+    conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)._conversations.clear()
+    conversation_for(MeetingHandlerId.CREATE_MEETING_CONVERSATION)._conversations.clear()
 
 
 @pytest.fixture
 async def routing_app() -> AsyncGenerator[Application]:
     """A real application with the full production registry bound, initialized for process_update."""
     RecordingContext.created.clear()
-    _clear_conversation_state()
+    clear_conversation_state()
 
     builder = ApplicationBuilder()
     # Same bot setup as create_test_app: a spec'd mock with no defaults so no scheduler config leaks.
@@ -87,10 +87,10 @@ async def routing_app() -> AsyncGenerator[Application]:
         yield app
     finally:
         await app.shutdown()
-        _clear_conversation_state()
+        clear_conversation_state()
 
 
-async def _process(app: Application, update: Update) -> MockApi:
+async def process_update(app: Application, update: Update) -> MockApi:
     """Feed the update through the full handler-group chain and return the recording api."""
     # CommandHandler.check_update resolves the command's @mention through message.get_bot(),
     # so the update must be bound to the application's bot (as PTB does when de-serializing).
@@ -101,7 +101,7 @@ async def _process(app: Application, update: Update) -> MockApi:
     return cast(MockApi, RecordingContext.created[-1].api)
 
 
-def _register_member(mock_session: MockDbSession, user: User):
+def register_member(mock_session: MockDbSession, user: User):
     """Seed both lookups a MEMBER /start triggers: guards.member_user and User.by_tg_user_id."""
     mock_session.add_user(user)
     member_lookup = select(User).where(
@@ -120,13 +120,13 @@ async def test_member_start_falls_through_to_main_menu(
 ):
     """A MEMBER's /start is released by the group -1 entry (silent END) and reaches group 0."""
     user_with_settings.status = UserStatus.MEMBER
-    _register_member(mock_session, user_with_settings)
+    register_member(mock_session, user_with_settings)
 
-    api = await _process(routing_app, update)
+    api = await process_update(routing_app, update)
 
     # times=1 asserts the main menu was the ONLY message: the re-onboarding prompt never fired.
     api.assert_send_message_called(update, main_menu_view(lang=user_with_settings.lang))
-    registration = _conversation(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
+    registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) is None
 
 
@@ -147,14 +147,14 @@ async def test_non_member_start_is_claimed_by_reonboarding(
     existing_user = create_user(id=1, tg_user_id=123, status=status)
     mock_session.add_object(existing_user, "tg_user_id")
 
-    api = await _process(routing_app, update)
+    api = await process_update(routing_app, update)
 
     # times=1: the prompt was the only message — no main menu means group 0 was stopped.
     api.assert_send_message_called(
         update,
         RegistrationMessages.TIMEZONE_PROMPT.get(first_name=existing_user.first_name),
     )
-    registration = _conversation(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
+    registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) == ConversationRegistrationProcessState.TIMEZONE
     # The existing row is reused; no new User row is created for re-onboarding.
     mock_session.assert_not_added()
@@ -167,13 +167,13 @@ async def test_brand_new_user_start_is_claimed_by_reonboarding(
     mock_session: MockDbSession,
 ):
     """A /start from a user with no row at all is claimed in group -1 with a freshly created row."""
-    api = await _process(routing_app, update)
+    api = await process_update(routing_app, update)
 
     api.assert_send_message_called(
         update,
         RegistrationMessages.TIMEZONE_PROMPT.get(first_name=DEFAULT_TG_USER_PARAMS["first_name"]),
     )
-    registration = _conversation(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
+    registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) == ConversationRegistrationProcessState.TIMEZONE
 
     added_users = [obj for obj in mock_session.objects_added if isinstance(obj, User)]
@@ -191,12 +191,12 @@ async def test_member_start_inline_deep_link_enters_create_meeting(
     """A MEMBER's "/start inline" deep link falls through group -1 and enters the group-0
     create-meeting conversation at TITLE."""
     user_with_settings.status = UserStatus.MEMBER
-    _register_member(mock_session, user_with_settings)
+    register_member(mock_session, user_with_settings)
 
-    api = await _process(routing_app, update)
+    api = await process_update(routing_app, update)
 
     api.assert_send_message_called(update, create_meeting_view(lang=user_with_settings.lang))
-    create_meeting = _conversation(MeetingHandlerId.CREATE_MEETING_CONVERSATION)
+    create_meeting = conversation_for(MeetingHandlerId.CREATE_MEETING_CONVERSATION)
     assert create_meeting._conversations.get(CONVERSATION_KEY) == ConversationMeetingState.TITLE
-    registration = _conversation(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
+    registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) is None

@@ -37,7 +37,7 @@ from mitup_bot.logging_config import configure_logging
 log = structlog.get_logger(__name__)
 
 # Timeout applied to the GitLab HTTP endpoint POST request.
-_GITLAB_POST_TIMEOUT_S = 10
+GITLAB_POST_TIMEOUT_S = 10
 
 
 # --- Pydantic models for the CloudWatch alarm event ---
@@ -251,7 +251,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                     "Authorization": f"Bearer {credentials.authorization_key}",
                     "Content-Type": "application/json",
                 },
-                timeout=_GITLAB_POST_TIMEOUT_S,
+                timeout=GITLAB_POST_TIMEOUT_S,
             )
         except httpx.RequestError:
             log.exception(

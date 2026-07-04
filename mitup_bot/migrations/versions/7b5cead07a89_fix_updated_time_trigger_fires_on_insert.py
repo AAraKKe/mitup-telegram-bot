@@ -18,16 +18,16 @@ down_revision: str | None = "965067fc3f1e"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_TABLES = ("users", "settings", "meetups")
+TABLES = ("users", "settings", "meetups")
 
 
 def upgrade():
-    for table in _TABLES:
+    for table in TABLES:
         helpers.add_updated_time_trigger(table)
 
 
 def downgrade():
-    for table in _TABLES:
+    for table in TABLES:
         helpers.remove_updated_time_trigger(table)
         op.execute(
             f"""

@@ -11,16 +11,16 @@ from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
 from mitup_bot.lambdas.alarm_action import (
-    _GITLAB_POST_TIMEOUT_S,
+    GITLAB_POST_TIMEOUT_S,
     GitLabAlertCredentials,
     build_alarm_console_url,
     handler,
 )
 
-_CREDENTIALS = GitLabAlertCredentials(webhook_url="https://gitlab.example.com/alert", authorization_key="secret-token")
+CREDENTIALS = GitLabAlertCredentials(webhook_url="https://gitlab.example.com/alert", authorization_key="secret-token")
 
 
-def _metric_alarm_event() -> dict[str, Any]:
+def metric_alarm_event() -> dict[str, Any]:
     """A realistic CloudWatch metric-alarm event (the shape CloudWatch sends to alarm-action lambdas)."""
     return {
         "source": "aws.cloudwatch",
@@ -59,7 +59,7 @@ def _metric_alarm_event() -> dict[str, Any]:
     }
 
 
-def _ok_response() -> mock.MagicMock:
+def ok_response() -> mock.MagicMock:
     response = mock.MagicMock(name="httpx.Response")
     response.is_success = True
     response.status_code = 200
@@ -86,14 +86,14 @@ def gitlab_ssm_param(monkeypatch: pytest.MonkeyPatch):
 def mock_fetch_credentials() -> Generator[mock.MagicMock]:
     with mock.patch(
         "mitup_bot.lambdas.alarm_action.fetch_gitlab_credentials",
-        return_value=_CREDENTIALS,
+        return_value=CREDENTIALS,
     ) as fetch:
         yield fetch
 
 
 @pytest.fixture
 def mock_post() -> Generator[mock.MagicMock]:
-    with mock.patch("mitup_bot.lambdas.alarm_action.httpx.post", return_value=_ok_response()) as post:
+    with mock.patch("mitup_bot.lambdas.alarm_action.httpx.post", return_value=ok_response()) as post:
         yield post
 
 
@@ -102,14 +102,14 @@ def test_happy_path_posts_critical_alert(
     mock_post: mock.MagicMock,
 ):
     """A metric-alarm event in ALARM state posts a critical GitLab alert with bearer auth."""
-    result = handler(_metric_alarm_event(), None)
+    result = handler(metric_alarm_event(), None)
 
     mock_post.assert_called_once()
     _args, kwargs = mock_post.call_args
-    assert mock_post.call_args.args[0] == _CREDENTIALS.webhook_url
+    assert mock_post.call_args.args[0] == CREDENTIALS.webhook_url
     assert kwargs["headers"]["Authorization"] == "Bearer secret-token"  # f"Bearer {authorization_key}"
     assert kwargs["headers"]["Content-Type"] == "application/json"
-    assert kwargs["timeout"] == _GITLAB_POST_TIMEOUT_S
+    assert kwargs["timeout"] == GITLAB_POST_TIMEOUT_S
 
     payload = kwargs["json"]
     assert payload["title"] == "bot-errors"  # alarmName
@@ -133,7 +133,7 @@ def test_non_alarm_state_defaults_severity_to_info(
     mock_post: mock.MagicMock,
 ):
     """Any state other than ALARM yields the generic "info" severity."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["state"]["value"] = "OK"
 
     handler(event, None)
@@ -151,7 +151,7 @@ def test_ok_state_sets_end_time_for_recovery(
 
     GitLab matches the open alert by fingerprint, so the fingerprint must still equal the alarm ARN.
     """
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["state"]["value"] = "OK"
 
     handler(event, None)
@@ -168,7 +168,7 @@ def test_insufficient_data_state_omits_end_time(
     mock_post: mock.MagicMock,
 ):
     """INSUFFICIENT_DATA is not a recovery, so end_time is absent from the payload."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["state"]["value"] = "INSUFFICIENT_DATA"
 
     handler(event, None)
@@ -192,7 +192,7 @@ def test_non_2xx_response_propagates(
 
     with mock.patch("mitup_bot.lambdas.alarm_action.httpx.post", return_value=failing_response):
         with pytest.raises(httpx.HTTPStatusError):
-            handler(_metric_alarm_event(), None)
+            handler(metric_alarm_event(), None)
 
 
 def test_request_error_propagates(
@@ -204,7 +204,7 @@ def test_request_error_propagates(
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with pytest.raises(httpx.RequestError):
-            handler(_metric_alarm_event(), None)
+            handler(metric_alarm_event(), None)
 
     request_error_logs = [log for log in logs if log["event"] == "alarm_action.request_error"]
     assert len(request_error_logs) == 1
@@ -217,7 +217,7 @@ def test_handler_raises_when_ssm_param_env_missing(
     monkeypatch.delenv("GITLAB_ALERT_SSM_PARAM", raising=False)
 
     with pytest.raises(KeyError):
-        handler(_metric_alarm_event(), None)
+        handler(metric_alarm_event(), None)
 
 
 def test_invalid_event_raises_and_logs(
@@ -225,7 +225,7 @@ def test_invalid_event_raises_and_logs(
     mock_post: mock.MagicMock,
 ):
     """An event missing the required alarmData fails validation, logs the invalid event, and raises."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     del event["alarmData"]
 
     with capture_logs(processors=[merge_contextvars]) as logs:
@@ -244,7 +244,7 @@ def test_binds_invocation_contextvars_during_handler_body(
     """The handler binds alarm metadata for the duration of the body, so logs emitted while posting
     carry the invocation context."""
     with capture_logs(processors=[merge_contextvars]) as logs:
-        handler(_metric_alarm_event(), None)
+        handler(metric_alarm_event(), None)
 
     posting = [log for log in logs if log["event"] == "alarm_action.posting"]
     assert len(posting) == 1
@@ -264,7 +264,7 @@ def test_includes_aws_request_id_when_context_has_it(
     context = SimpleNamespace(aws_request_id="req-abc")
 
     with capture_logs(processors=[merge_contextvars]) as logs:
-        handler(_metric_alarm_event(), context)
+        handler(metric_alarm_event(), context)
 
     entry = next(log for log in logs if log["event"] == "alarm_action.posting")
     assert entry["aws_request_id"] == "req-abc"
@@ -276,7 +276,7 @@ def test_omits_aws_request_id_when_context_lacks_it(
 ):
     """The hasattr guard omits aws_request_id when the context arg doesn't carry one (e.g. None)."""
     with capture_logs(processors=[merge_contextvars]) as logs:
-        handler(_metric_alarm_event(), None)
+        handler(metric_alarm_event(), None)
 
     entry = next(log for log in logs if log["event"] == "alarm_action.posting")
     assert "aws_request_id" not in entry
@@ -289,7 +289,7 @@ def test_clears_invocation_contextvars_after_return(
     """bound_contextvars auto-clears on exit, so a log emitted after the handler returns carries
     none of the invocation fields."""
     with capture_logs(processors=[merge_contextvars]) as logs:
-        handler(_metric_alarm_event(), None)
+        handler(metric_alarm_event(), None)
         structlog.get_logger("mitup_bot").info("after handler")
 
     entry = next(log for log in logs if log["event"] == "after handler")
@@ -303,7 +303,7 @@ def test_tolerant_payload_without_optional_blocks(
 ):
     """A composite/log-style event that omits configuration, previousState and reasonData still
     validates and posts (previous_state collapses to None)."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     del event["alarmData"]["previousState"]
     del event["alarmData"]["configuration"]
     del event["alarmData"]["state"]["reasonData"]
@@ -320,7 +320,7 @@ def test_reason_data_parsed_in_payload(
     mock_post: mock.MagicMock,
 ):
     """A JSON-string reasonData is parsed into a structured object in the posted payload."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["state"]["reasonData"] = '{"version":"1.0","threshold":5}'
 
     handler(event, None)
@@ -335,7 +335,7 @@ def test_reason_data_left_as_string_when_not_json(
     mock_post: mock.MagicMock,
 ):
     """maybe_parse_json never raises: a non-JSON reasonData is forwarded verbatim as the original string."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["state"]["reasonData"] = "not json"
 
     handler(event, None)
@@ -350,7 +350,7 @@ def test_service_omitted_when_no_metric_namespace(
 ):
     """A metric-math configuration (no metricStat namespace) yields no derivable service, so the key
     is omitted from the payload entirely."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["configuration"]["metrics"] = [{"id": "e1", "expression": "m1 + m2"}]
 
     handler(event, None)
@@ -365,7 +365,7 @@ def test_missing_reason_and_timestamp_fall_back(
 ):
     """When the alarm state omits reason and timestamp, build_gitlab_payload uses its generic fallback
     description and a None start_time."""
-    event = _metric_alarm_event()
+    event = metric_alarm_event()
     event["alarmData"]["state"].pop("reason", None)
     event["alarmData"]["state"].pop("timestamp", None)
 
@@ -385,7 +385,7 @@ def test_payload_includes_alarm_console_url(
 ):
     """The payload carries a CloudWatch console deep link both as alarm_url and inside the
     description, so the link survives into GitLab's downstream notification fanout."""
-    handler(_metric_alarm_event(), None)
+    handler(metric_alarm_event(), None)
 
     payload = mock_post.call_args.kwargs["json"]
     # Derived via build_alarm_console_url so the URL format lives in one place; the format

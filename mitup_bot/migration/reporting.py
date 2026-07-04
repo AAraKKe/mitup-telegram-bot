@@ -53,7 +53,7 @@ class OutputMode(StrEnum):
     LOG = "log"
 
 
-_LOG = logging.getLogger("mitup_bot.migration")
+log = logging.getLogger("mitup_bot.migration")
 
 
 class MigrationReporter:
@@ -69,7 +69,7 @@ class MigrationReporter:
         if self._mode is OutputMode.CONSOLE:
             self._require_console().rule(f"[bold cyan]Phase: {label}[/]")
         else:
-            _LOG.info("=== Phase: %s ===", label)
+            log.info("=== Phase: %s ===", label)
         # Phase boundary: flush whatever has accumulated so the new phase's metrics start
         # on a fresh timeline point.
         await self._final_flush()
@@ -94,7 +94,7 @@ class MigrationReporter:
         if self._mode is OutputMode.CONSOLE:
             self._require_console().print(f"[bold]{text}[/]")
         else:
-            _LOG.info(text)
+            log.info(text)
         await self._final_flush()
 
     async def archive_table(self, table: str, rows: int, bytes_written: int):
@@ -102,7 +102,7 @@ class MigrationReporter:
         if self._mode is OutputMode.CONSOLE:
             self._require_console().print(f"[green]✔[/] {text}")
         else:
-            _LOG.info("✔ %s", text)
+            log.info("✔ %s", text)
         await self._tick()
 
     async def verification(self, deltas: dict[str, int]):
@@ -113,10 +113,10 @@ class MigrationReporter:
                 symbol, colour = ("✔", "green") if delta == 0 else ("✘", "red")
                 console.print(f"[{colour}]{symbol}[/] {table}: delta={delta}")
         else:
-            _LOG.info("=== Phase: verify ===")
+            log.info("=== Phase: verify ===")
             for table, delta in deltas.items():
                 mark = "✔" if delta == 0 else "✘"
-                _LOG.info("%s %s: delta=%d", mark, table, delta)
+                log.info("%s %s: delta=%d", mark, table, delta)
         await self._final_flush()
 
     async def _tick(self):
@@ -131,7 +131,7 @@ class MigrationReporter:
         if self._mode is OutputMode.CONSOLE:
             self._require_console().print(f"[{colour}]{symbol}[/] {table}#{old_id} {message}")
         else:
-            _LOG.info("%s %s#%d %s", symbol, table, old_id, message)
+            log.info("%s %s#%d %s", symbol, table, old_id, message)
 
     def _require_console(self) -> Console:
         if self._console is None:

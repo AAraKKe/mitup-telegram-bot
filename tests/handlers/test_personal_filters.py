@@ -10,7 +10,7 @@ from tests.helpers import UpdateRequest, create_user
 from tests.helpers.stub_db import MockDbSession
 
 
-def _register_member_lookup(mock_session: MockDbSession, user: User):
+def register_member_lookup(mock_session: MockDbSession, user: User):
     """Register the select statement used by guards.member_user so the mock returns `user`."""
     statement = select(User).where(User.tg_user_id == user.tg_user_id, User.status == UserStatus.MEMBER)
     mock_session.add_objects_with_statement(statement, (user,))
@@ -26,7 +26,7 @@ async def test_member_user_guard_with_member_user(mock_session: MockDbSession, u
     """A MEMBER user matches — the guard is the gate for the existing-member /start flow."""
     assert update.effective_user is not None
     member = create_user(id=1, tg_user_id=update.effective_user.id, status=UserStatus.MEMBER)
-    _register_member_lookup(mock_session, member)
+    register_member_lookup(mock_session, member)
 
     assert await guards.member_user(update, mock_session) is member
 

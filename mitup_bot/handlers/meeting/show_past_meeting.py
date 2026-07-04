@@ -13,7 +13,7 @@ from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
 
 
-def _past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
+def past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
     description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
     return MitupView(
         meeting.message,
@@ -83,7 +83,7 @@ async def callback_query_show_past_meeting(session: AsyncSession, update: Update
     if full_meeting is None:
         return
 
-    await context.api.edit_message(update=update, view=_past_meeting_view(full_meeting, user, callback_data.page))
+    await context.api.edit_message(update=update, view=past_meeting_view(full_meeting, user, callback_data.page))
 
 
 @HandlersRegistry.register_callback_query(
@@ -148,4 +148,4 @@ async def callback_query_decline_delete_past_meeting(session: AsyncSession, upda
     if full_meeting is None:
         return
 
-    await context.api.edit_message(update=update, view=_past_meeting_view(full_meeting, user, callback_data.page))
+    await context.api.edit_message(update=update, view=past_meeting_view(full_meeting, user, callback_data.page))

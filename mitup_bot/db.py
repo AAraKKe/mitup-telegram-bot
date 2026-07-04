@@ -176,7 +176,7 @@ async def begin() -> AsyncGenerator[AsyncSession]:
                 await __pool_metrics.flush()
 
 
-def _loaded_attributes(obj: object) -> set[str]:
+def loaded_attributes(obj: object) -> set[str]:
     state = sa_inspect(obj)
     assert state is not None
     return set(state.dict)
@@ -198,7 +198,7 @@ async def racy_flush[T](session: AsyncSession, builder: Callable[[], T], *, cons
     # rollback resets whatever the builder dirtied (relationship collections appended to via
     # backrefs, mutated scalars) to the unloaded state, and the async engine cannot reload
     # them lazily on access — User's collections are lazy="raise" on top of that.
-    loaded_before = [(obj, _loaded_attributes(obj)) for obj in session.identity_map.values()]
+    loaded_before = [(obj, loaded_attributes(obj)) for obj in session.identity_map.values()]
     try:
         async with session.begin_nested():
             built = builder()
@@ -219,7 +219,7 @@ async def racy_flush[T](session: AsyncSession, builder: Callable[[], T], *, cons
         # loading route for lazy="raise" relationships): this drops the phantom rows from the
         # in-memory collections and picks up whatever the concurrent transaction committed.
         for obj, loaded in loaded_before:
-            unloaded_by_rollback = loaded - _loaded_attributes(obj)
+            unloaded_by_rollback = loaded - loaded_attributes(obj)
             if unloaded_by_rollback:
                 await session.refresh(obj, list(unloaded_by_rollback))
         return None
@@ -232,7 +232,7 @@ class _WriteHandlerDecorator(Protocol):
     ) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
-def _capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> TelegramApi:
+def capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> TelegramApi:
     """Take the api to capture on from the handler's context: handlers follow the
     ``(session, update, context)`` convention, so at the call site the context is the last
     positional argument (or an explicit ``context=`` keyword)."""
@@ -246,7 +246,7 @@ def _capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> Telegr
     )
 
 
-async def _apply_reconcile(api: TelegramApiWrapper, outbox: ApiOutbox):
+async def apply_reconcile(api: TelegramApiWrapper, outbox: ApiOutbox):
     """Apply the DB fix-ups discovered while draining the outbox, in one short transaction:
     drop Message rows Telegram reported gone and mark unreachable users inactive."""
     if not outbox.dead_message_ids and not outbox.inactive_tg_user_ids:
@@ -293,7 +293,7 @@ async def begin_write(api: TelegramApiWrapper) -> AsyncGenerator[AsyncSession]:
     try:
         await api.execute_queued(outbox)
     finally:
-        await _apply_reconcile(api, outbox)
+        await apply_reconcile(api, outbox)
 
 
 @overload
@@ -332,7 +332,7 @@ def with_session(func: Callable | None = None, /, *, write: bool = False) -> Cal
 
         @functools.wraps(func)
         async def write_wrapper(*args, **kwargs):
-            async with begin_write(_capture_api(args, kwargs)) as session:
+            async with begin_write(capture_api(args, kwargs)) as session:
                 return await func(session, *args, **kwargs)
 
         return write_wrapper

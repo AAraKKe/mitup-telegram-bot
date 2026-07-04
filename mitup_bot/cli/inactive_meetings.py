@@ -52,7 +52,7 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
 
 
 @db.with_session
-async def _due_meeting_ids(session: AsyncSession) -> list[int]:
+async def due_meeting_ids(session: AsyncSession) -> list[int]:
     """Collect the ids of the meetings currently due for deactivation.
 
     Ids only, in a short read-only transaction: every decision about a meeting is made later
@@ -61,7 +61,7 @@ async def _due_meeting_ids(session: AsyncSession) -> list[int]:
     return [meeting.db_id for meeting in (await session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT)).all()]
 
 
-async def _deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api: TelegramApiWrapper) -> bool:
+async def deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api: TelegramApiWrapper) -> bool:
     """Deactivate one meeting under its row lock; returns False when it is no longer due.
 
     The unlocked sweep only nominated this meeting: the eligibility decision and the
@@ -104,11 +104,11 @@ async def deactivate_meeting(meetup_id: int, api: TelegramApiWrapper) -> bool:
     lock) before the queued fan-out drains. The bare critical section stays importable for
     the row-lock race tests in tests/models/db_behavior/."""
     async with db.begin_write(api) as session:
-        return await _deactivate_meeting_locked(session, meetup_id, api)
+        return await deactivate_meeting_locked(session, meetup_id, api)
 
 
 @db.with_session
-async def _delete_joined_only_users(session: AsyncSession) -> int:
+async def delete_joined_only_users(session: AsyncSession) -> int:
     """Delete JOINED_ONLY users who have no remaining active-meeting links.
 
     These users were only ever reachable through the inline-join flow and have no further
@@ -136,7 +136,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     (never across the sweep or across Telegram I/O), and a crash mid-sweep keeps every
     deactivation already committed — the remaining meetings are still due on the next run.
     """
-    meeting_ids = await _due_meeting_ids()
+    meeting_ids = await due_meeting_ids()
     metrics.emit(MetricKey.MEETINGS_TO_DEACTIVATE, len(meeting_ids), MetricUnit.COUNT)
 
     deactivated = 0
@@ -152,7 +152,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
             log.exception("Failed to deactivate meeting", meeting=meetup_id, exc_info=e)
             failed_details.append(f"Failed to deactivate meeting (meeting: {meetup_id}). Error: {e}.")
 
-    joined_only_deleted = await _delete_joined_only_users()
+    joined_only_deleted = await delete_joined_only_users()
 
     metrics.emit(MetricKey.MEETINGS_DEACTIVATED, deactivated, MetricUnit.COUNT)
     metrics.emit(

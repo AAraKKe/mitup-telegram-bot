@@ -54,7 +54,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
 # execnet's serializer dispatches on the EXACT type, not via isinstance, so a `str`/`int`/`dict`
 # subclass (e.g. a `StrEnum` member such as `Env`, or an `IntEnum`) is NOT recognized and raises
 # `DumpError`. Only these exact scalar types pass through unchanged.
-_EXACT_SERIALIZABLE_SCALARS = (str, int, float, bool, type(None))
+EXACT_SERIALIZABLE_SCALARS = (str, int, float, bool, type(None))
 
 
 def make_execnet_serializable(value: object) -> object:
@@ -64,7 +64,7 @@ def make_execnet_serializable(value: object) -> object:
     the same), so any subclass instance (a `StrEnum` like `Env`) or custom object (a `MetricsConfig`
     bound via `log.info(..., config=...)`) must be turned into a plain string.
     """
-    if type(value) in _EXACT_SERIALIZABLE_SCALARS:
+    if type(value) in EXACT_SERIALIZABLE_SCALARS:
         return value
     if isinstance(value, list):
         return [make_execnet_serializable(item) for item in value]

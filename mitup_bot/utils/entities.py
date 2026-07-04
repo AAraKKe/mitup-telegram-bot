@@ -39,7 +39,7 @@ class FormattedText:
         prefix_text = prefix if isinstance(prefix, str) else prefix.text
         prefix_entities = [] if isinstance(prefix, str) else prefix.entities
         offset = utf16_len(prefix_text)
-        shifted = [_shift_entity(e, offset) for e in self._entities]
+        shifted = [shift_entity(e, offset) for e in self._entities]
         return FormattedText(prefix_text + self._text, list(prefix_entities) + shifted)
 
     def append(self, suffix: str | FormattedText) -> FormattedText:
@@ -47,7 +47,7 @@ class FormattedText:
         suffix_text = suffix if isinstance(suffix, str) else suffix.text
         suffix_entities = [] if isinstance(suffix, str) else suffix.entities
         offset = utf16_len(self._text)
-        shifted_suffix = [_shift_entity(e, offset) for e in suffix_entities]
+        shifted_suffix = [shift_entity(e, offset) for e in suffix_entities]
         return FormattedText(self._text + suffix_text, self._entities + shifted_suffix)
 
     @classmethod
@@ -108,7 +108,7 @@ class EntityDateTime:
     date_time_format: str | None = None
 
 
-def _shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
+def shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
     """Return a copy of *entity* with its offset shifted by *offset* UTF-16 code units."""
     # MessageEntity is frozen; construct a new instance with the adjusted offset.
     return MessageEntity(
@@ -150,17 +150,17 @@ def utf16_len(s: str) -> int:
 # --- render() ---
 
 
-def _render_bold(plain: str, value: Bold) -> list[MessageEntity]:
+def render_bold(plain: str, value: Bold) -> list[MessageEntity]:
     offset, length = utf16_len(plain), utf16_len(value.text)
     return [MessageEntity(type=MessageEntity.BOLD, offset=offset, length=length)]
 
 
-def _render_italic(plain: str, value: Italic) -> list[MessageEntity]:
+def render_italic(plain: str, value: Italic) -> list[MessageEntity]:
     offset, length = utf16_len(plain), utf16_len(value.text)
     return [MessageEntity(type=MessageEntity.ITALIC, offset=offset, length=length)]
 
 
-def _render_bold_italic(plain: str, value: BoldItalic) -> list[MessageEntity]:
+def render_bold_italic(plain: str, value: BoldItalic) -> list[MessageEntity]:
     offset, length = utf16_len(plain), utf16_len(value.text)
     return [
         MessageEntity(type=MessageEntity.BOLD, offset=offset, length=length),
@@ -168,12 +168,12 @@ def _render_bold_italic(plain: str, value: BoldItalic) -> list[MessageEntity]:
     ]
 
 
-def _render_link(plain: str, value: Link) -> list[MessageEntity]:
+def render_link(plain: str, value: Link) -> list[MessageEntity]:
     offset, length = utf16_len(plain), utf16_len(value.text)
     return [MessageEntity(type=MessageEntity.TEXT_LINK, offset=offset, length=length, url=value.url)]
 
 
-def _render_entity_datetime(plain: str, value: EntityDateTime) -> list[MessageEntity]:
+def render_entity_datetime(plain: str, value: EntityDateTime) -> list[MessageEntity]:
     offset, length = utf16_len(plain), utf16_len(value.text)
     return [
         MessageEntity(
@@ -203,28 +203,28 @@ def render(template: Template) -> FormattedText:
             case str():
                 plain += value
             case Bold():
-                entities.extend(_render_bold(plain, value))
+                entities.extend(render_bold(plain, value))
                 plain += value.text
             case Italic():
-                entities.extend(_render_italic(plain, value))
+                entities.extend(render_italic(plain, value))
                 plain += value.text
             case BoldItalic():
-                entities.extend(_render_bold_italic(plain, value))
+                entities.extend(render_bold_italic(plain, value))
                 plain += value.text
             case Link():
-                entities.extend(_render_link(plain, value))
+                entities.extend(render_link(plain, value))
                 plain += value.text
             case EntityDateTime():
-                entities.extend(_render_entity_datetime(plain, value))
+                entities.extend(render_entity_datetime(plain, value))
                 plain += value.text
             case FormattedText():
                 prefix_len = utf16_len(plain)
-                entities.extend(_shift_entity(e, prefix_len) for e in value.entities)
+                entities.extend(shift_entity(e, prefix_len) for e in value.entities)
                 plain += value.text
             case Template():
                 nested = render(value)
                 prefix_len = utf16_len(plain)
-                entities.extend(_shift_entity(e, prefix_len) for e in nested.entities)
+                entities.extend(shift_entity(e, prefix_len) for e in nested.entities)
                 plain += nested.text
             case _:
                 plain += str(value)
@@ -242,7 +242,7 @@ def build_datetime_link() -> FormattedText:
 
 # --- parse_format_tags() ---
 
-_TOKEN_RE = re.compile(r"<(/?[a-z]+)>|\$\{(\w+)\}")
+TOKEN_RE = re.compile(r"<(/?[a-z]+)>|\$\{(\w+)\}")
 
 STYLE_MAP: dict[str, str] = {
     "b": "bold",
@@ -281,7 +281,7 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         plain += s
         utf16_offset += utf16_len(s)
 
-    for m in _TOKEN_RE.finditer(text):
+    for m in TOKEN_RE.finditer(text):
         flush(text[cursor : m.start()])
         cursor = m.end()
 
@@ -291,7 +291,7 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
             value = substitutions.get(var, m.group(0))
             if isinstance(value, FormattedText):
                 for e in value.entities:
-                    entities.append(_shift_entity(e, utf16_offset))
+                    entities.append(shift_entity(e, utf16_offset))
                 flush(value.text)
             else:
                 flush(value)

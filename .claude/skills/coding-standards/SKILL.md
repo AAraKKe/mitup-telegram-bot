@@ -15,7 +15,7 @@ These are never acceptable. Check these first before writing or reviewing any co
 <critical_rules>
   <rule>No methods longer than ~30 lines (handlers) or ~20 lines (helpers). Split by responsibility.</rule>
   <rule>No nesting deeper than 2 levels — use early return or extract a helper.</rule>
-  <rule>No leading underscore on module-level functions. A module-level function is either public (no underscore) or a class member (underscore allowed). Never use `_` on a function defined at module level.</rule>
+  <rule>Leading underscores are allowed only on class-internal members — private pydantic fields, and internal methods or attributes of classes not intended for outside use — plus the `_unused` idiom for deliberately ignored parameters and the `_PascalCase` form for private inner dataclasses (see the naming table). Module-level functions, variables, and constants must never carry one — "internal to the module" is not a reason. When stripping an underscore would produce an awkward or colliding name, pick a better name instead (e.g. `_client` → `make_client`). See [Naming conventions](#naming-conventions).</rule>
   <rule>No single-letter or abbreviated variable names outside of loop indices and explicitly mathematical contexts — name variables after what they represent.</rule>
   <rule>`# ---` banners only in large files where sections are clearly distinct and hard to navigate without them (e.g. long test modules or large utility files).</rule>
   <rule>No module docstrings on handler, model, or view files.</rule>
@@ -53,7 +53,9 @@ await context.api.edit_message(update=update, view=meeting.main_view)
 | Message handlers | `<action>_message_handler` | `edit_title_meeting_message_handler` |
 | Command handlers | `<action>_command` | `start_command` |
 | Module-level helpers | `snake_case` (no leading underscore) | `make_message_update` |
-| Truly private class internals | `_snake_case` | `_freeze`, `_build_key` |
+| Module-level constants | `UPPER_SNAKE_CASE` (no leading underscore) | `TOKEN_RE`, `GITLAB_POST_TIMEOUT_S` |
+| Private pydantic fields | `_snake_case` | `_outbox` |
+| Internal instance methods (class not meant for outside use) | `_snake_case` | `_freeze`, `_build_key` |
 | Private inner dataclasses | `_PascalCase` | `_MarkerSpan` |
 | Type aliases | `PascalCase` | `Keyboard`, `TMitupContext` |
 | Section separators | `# ---` with a label | `# --- UTF-16 helper ---` |

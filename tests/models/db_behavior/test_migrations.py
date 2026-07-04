@@ -7,7 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 pytestmark = pytest.mark.db_test
 
 
-def _alembic_head() -> str:
+def alembic_head() -> str:
     cfg = Config("alembic.ini")
     head = ScriptDirectory.from_config(cfg).get_current_head()
     if head is None:
@@ -21,7 +21,7 @@ async def test_no_pending_migrations(db_session: AsyncSession):
     If this test fails, the DB has not had all migrations applied.
     Run `alembic upgrade head` to bring it up to date.
     """
-    expected = _alembic_head()
+    expected = alembic_head()
     result = await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
         text("SELECT version_num FROM alembic_version")
     )

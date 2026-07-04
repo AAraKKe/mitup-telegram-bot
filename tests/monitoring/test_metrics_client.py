@@ -4,12 +4,12 @@ from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, MetricUnit
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 
-def _client() -> MetricsClient:
+def make_client() -> MetricsClient:
     return make_test_metrics_client()
 
 
 def test_emit_records_a_metric():
-    client = _client()
+    client = make_client()
     client.emit("MyMetric", 42)
 
     assert len(client.records) == 1
@@ -18,14 +18,14 @@ def test_emit_records_a_metric():
 
 
 def test_emit_stores_unit():
-    client = _client()
+    client = make_client()
     client.emit("MyMetric", 1.5, MetricUnit.MILLISECONDS)
 
     assert client.records[0].unit == MetricUnit.MILLISECONDS
 
 
 def test_emit_stores_dimensions():
-    client = _client()
+    client = make_client()
     client.emit("MyMetric", 1, dimensions={"Env": "test", "Region": "us-east-1"})
 
     dims = client.records[0].dimensions_dict
@@ -50,14 +50,14 @@ def test_emit_base_dimensions_do_not_override_explicit():
 
 
 def test_emit_stores_properties():
-    client = _client()
+    client = make_client()
     client.emit("MyMetric", 1, properties={"UserId": 123})
 
     assert client.records[0].properties["UserId"] == 123
 
 
 def test_records_accumulate_across_multiple_emits():
-    client = _client()
+    client = make_client()
     client.emit("A", 1)
     client.emit("B", 2)
     client.emit("C", 3)
@@ -66,7 +66,7 @@ def test_records_accumulate_across_multiple_emits():
 
 
 def test_emit_feature_adds_feature_dimension():
-    client = _client()
+    client = make_client()
     client.emit_feature(Feature.JOIN_MEETING)
 
     dims = client.records[0].dimensions_dict
@@ -74,7 +74,7 @@ def test_emit_feature_adds_feature_dimension():
 
 
 def test_emit_feature_with_named_args():
-    client = _client()
+    client = make_client()
     # emit_feature forwards to emit; verify positional/keyword usage works
     client.emit_feature(Feature.JOIN_MEETING, value=2.0, name="Count", unit=MetricUnit.COUNT)
 
@@ -86,7 +86,7 @@ def test_emit_feature_with_named_args():
 
 async def test_flush_delegates_to_backend():
     """Flushing does not raise and does not clear records."""
-    client = _client()
+    client = make_client()
     client.emit("MyMetric", 1)
     await client.flush()
 
@@ -108,14 +108,14 @@ def test_set_global_property_delegates_to_backend():
 
 
 def test_metric_assertions_helper_works_with_client():
-    client = _client()
+    client = make_client()
     client.emit(MetricKey.FAULT, 0)
 
     MetricAssertions(client).assert_emitted(name=MetricKey.FAULT, value=0)
 
 
 def test_metric_assertions_assert_not_emitted():
-    client = _client()
+    client = make_client()
 
     MetricAssertions(client).assert_not_emitted(name=MetricKey.FAULT)
 

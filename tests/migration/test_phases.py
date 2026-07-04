@@ -13,7 +13,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from tests.helpers import MetricAssertions, make_test_metrics_client
 
 
-def _make_reporter() -> MigrationReporter:
+def make_reporter() -> MigrationReporter:
     return MigrationReporter(OutputMode.LOG)
 
 
@@ -46,12 +46,12 @@ class _StubRailsReader:
         return self._counts.get(table, 0)
 
 
-def _make_metrics() -> tuple[MetricsClient, MetricAssertions]:
+def make_metrics() -> tuple[MetricsClient, MetricAssertions]:
     client = make_test_metrics_client()
     return client, MetricAssertions(client)
 
 
-def _make_session_with_zero_counts() -> MagicMock:
+def make_session_with_zero_counts() -> MagicMock:
     """Return a session-shaped mock whose `(await exec()).first()` always returns 0.
 
     `verify` runs `SELECT COUNT(*)` queries against the new DB; tests don't care about
@@ -66,12 +66,12 @@ def _make_session_with_zero_counts() -> MagicMock:
 
 
 async def test_run_migration_verify_phase_only_calls_verify():
-    session = _make_session_with_zero_counts()
+    session = make_session_with_zero_counts()
     reader = _StubRailsReader(
         counts={"users": 3, "meetups": 1, "messages": 0, "user_join_meetups": 2, "user_waiting_lists": 0}
     )
     writer = ArchiveWriter(s3_uri=None, dry_run=True, s3_client=MagicMock())
-    metrics, assertions = _make_metrics()
+    metrics, assertions = make_metrics()
 
     report = await run_migration(
         session=session,
@@ -80,7 +80,7 @@ async def test_run_migration_verify_phase_only_calls_verify():
         metrics=metrics,
         mode=MigrationMode.DRY_RUN,
         phases=("verify",),
-        reporter=_make_reporter(),
+        reporter=make_reporter(),
     )
 
     # Only verify ran → no per-phase entries; verification populated.
@@ -103,7 +103,7 @@ async def test_run_migration_verify_phase_only_calls_verify():
 
 
 async def test_run_migration_archive_phase_only_calls_archive():
-    session = _make_session_with_zero_counts()
+    session = make_session_with_zero_counts()
     # Archive iterates ARCHIVED_TABLES = ("support_messages", "payments", "shared_meetups", "chats").
     reader = _StubRailsReader(
         rows_by_query={
@@ -114,7 +114,7 @@ async def test_run_migration_archive_phase_only_calls_archive():
         }
     )
     writer = ArchiveWriter(s3_uri="s3://bucket/prefix/", dry_run=True, s3_client=MagicMock())
-    metrics, assertions = _make_metrics()
+    metrics, assertions = make_metrics()
 
     report = await run_migration(
         session=session,
@@ -123,7 +123,7 @@ async def test_run_migration_archive_phase_only_calls_archive():
         metrics=metrics,
         mode=MigrationMode.DRY_RUN,
         phases=("archive",),
-        reporter=_make_reporter(),
+        reporter=make_reporter(),
     )
 
     assert report["phases"] == {}
@@ -152,7 +152,7 @@ async def test_run_migration_archive_phase_only_calls_archive():
 
 
 async def test_run_migration_unknown_phase_raises_value_error():
-    session = _make_session_with_zero_counts()
+    session = make_session_with_zero_counts()
     reader = _StubRailsReader()
     writer = ArchiveWriter(s3_uri=None, dry_run=True, s3_client=MagicMock())
     metrics = make_test_metrics_client()
@@ -165,7 +165,7 @@ async def test_run_migration_unknown_phase_raises_value_error():
             metrics=metrics,
             mode=MigrationMode.DRY_RUN,
             phases=("nonsense",),
-            reporter=_make_reporter(),
+            reporter=make_reporter(),
         )
 
 

@@ -28,8 +28,8 @@ from tests.helpers.monitoring import MetricAssertions
 
 # --- Update builders ---
 
-_DATE = dt.datetime(2023, 1, 1, 12, 0, tzinfo=dt.UTC)
-_UNTIL = dt.datetime(2024, 1, 1, 12, 0, tzinfo=dt.UTC)
+DATE = dt.datetime(2023, 1, 1, 12, 0, tzinfo=dt.UTC)
+UNTIL = dt.datetime(2024, 1, 1, 12, 0, tzinfo=dt.UTC)
 
 ChatMemberFactory = Callable[[TgUser], ChatMember]
 
@@ -49,7 +49,7 @@ def make_chat_member_update(
         my_chat_member=ChatMemberUpdated(
             chat=Chat(id=DEFAULT_CHAT_ID, type=chat_type),
             from_user=tg_user,
-            date=_DATE,
+            date=DATE,
             old_chat_member=old,
             new_chat_member=new,
         ),
@@ -60,7 +60,7 @@ def make_block_update(chat_type: str = Chat.PRIVATE) -> Update:
     tg_user = make_tg_user()
     return make_chat_member_update(
         old=ChatMemberMember(user=tg_user),
-        new=ChatMemberBanned(user=tg_user, until_date=_UNTIL),
+        new=ChatMemberBanned(user=tg_user, until_date=UNTIL),
         chat_type=chat_type,
     )
 
@@ -90,7 +90,7 @@ def test_is_block_transition_no_status_key():
     # Both members are MEMBER; only until_date changes, so difference() has no "status" key.
     update = make_chat_member_update(
         old=ChatMemberMember(user=tg_user),
-        new=ChatMemberMember(user=tg_user, until_date=_UNTIL),
+        new=ChatMemberMember(user=tg_user, until_date=UNTIL),
     )
     assert is_block_transition(update) is False
 
@@ -99,7 +99,7 @@ def test_is_block_transition_no_status_key():
     ("old_factory", "new_factory"),
     [
         # unblock: BANNED -> MEMBER
-        (lambda u: ChatMemberBanned(user=u, until_date=_UNTIL), lambda u: ChatMemberMember(user=u)),
+        (lambda u: ChatMemberBanned(user=u, until_date=UNTIL), lambda u: ChatMemberMember(user=u)),
         # rejoin: LEFT -> MEMBER
         (lambda u: ChatMemberLeft(user=u), lambda u: ChatMemberMember(user=u)),
         # member -> left (not a ban)
@@ -143,7 +143,7 @@ async def test_block_flips_member_to_left_and_emits_metric(
 @pytest.mark.parametrize(
     ("old_factory", "new_factory"),
     [
-        (lambda u: ChatMemberBanned(user=u, until_date=_UNTIL), lambda u: ChatMemberMember(user=u)),
+        (lambda u: ChatMemberBanned(user=u, until_date=UNTIL), lambda u: ChatMemberMember(user=u)),
         (lambda u: ChatMemberLeft(user=u), lambda u: ChatMemberMember(user=u)),
     ],
     ids=["banned_to_member", "left_to_member"],
@@ -204,7 +204,7 @@ async def test_irrelevant_status_change_is_noop(
     mock_session.add_user(user)
     update = make_chat_member_update(
         old=ChatMemberMember(user=make_tg_user()),
-        new=ChatMemberMember(user=make_tg_user(), until_date=_UNTIL),
+        new=ChatMemberMember(user=make_tg_user(), until_date=UNTIL),
     )
 
     context, _ = await call_handler(

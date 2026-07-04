@@ -165,7 +165,7 @@ async def handle_edit_errors(adapter: ContextOrBotAdapter):
         raise
 
 
-def _resolve_view(view: MitupView | FormattedText | str) -> MitupView:
+def resolve_view(view: MitupView | FormattedText | str) -> MitupView:
     if isinstance(view, MitupView):
         return view
     if isinstance(view, FormattedText):
@@ -173,7 +173,7 @@ def _resolve_view(view: MitupView | FormattedText | str) -> MitupView:
     return MitupView(view, keyboard=[])
 
 
-def _edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
+def edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
     """Extract (chat_id, message_id, inline_message_id) for an edit from the update."""
     if update.effective_message:
         return update.effective_message.chat.id, update.effective_message.id, None
@@ -352,7 +352,7 @@ class TelegramApi:
         from mitup_bot import guards
 
         chat_id = guards.chat(update).id
-        resolved = _resolve_view(view)
+        resolved = resolve_view(view)
         return await self._call_or_enqueue(
             "send_message", partial(self._send_chat_message_now, chat_id, resolved), None
         )
@@ -368,7 +368,7 @@ class TelegramApi:
             )
 
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
-        resolved = _resolve_view(view)
+        resolved = resolve_view(view)
         return await self._call_or_enqueue(
             "send_message_to_user", partial(self._send_user_message_now, user.tg_user_id, resolved), None
         )
@@ -418,7 +418,7 @@ class TelegramApi:
             for user, view in zip(users, views, strict=True):
                 self._enqueue(
                     "send_messages_to_users",
-                    partial(self._send_user_message_now, user.tg_user_id, _resolve_view(view)),
+                    partial(self._send_user_message_now, user.tg_user_id, resolve_view(view)),
                 )
             return
 
@@ -464,8 +464,8 @@ class TelegramApi:
         )
 
     async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool:
-        resolved = _resolve_view(view)
-        target = _edit_target(update)
+        resolved = resolve_view(view)
+        target = edit_target(update)
         return await self._call_or_enqueue(
             "edit_message", partial(self._edit_message_now, target, resolved), cast("Message | bool", False)
         )
@@ -488,7 +488,7 @@ class TelegramApi:
         return False
 
     async def clear_reply_markup(self, update: Update):
-        target = _edit_target(update)
+        target = edit_target(update)
         await self._call_or_enqueue("clear_reply_markup", partial(self._clear_reply_markup_now, target), None)
 
     async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]):

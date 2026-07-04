@@ -31,7 +31,7 @@ pytestmark = pytest.mark.db_test
 
 
 @contextlib.asynccontextmanager
-async def _provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> AsyncIterator[int]:
+async def provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> AsyncIterator[int]:
     """Provision a committed meeting that is due for deactivation and tear it down afterwards.
 
     Committed data is required here: the conftest seeds live in the session fixture's open
@@ -83,13 +83,13 @@ async def _provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> Async
             )
 
 
-async def _deactivate(session: AsyncSession, meetup_id: int) -> bool:
+async def deactivate(session: AsyncSession, meetup_id: int) -> bool:
     """The batch job's per-meeting critical section exactly as production runs it. MockApi keeps
     the enqueued fan-out away from Telegram — the DB effects are what these tests race."""
-    return await inactive_meetings._deactivate_meeting_locked(session, meetup_id, MockApi())
+    return await inactive_meetings.deactivate_meeting_locked(session, meetup_id, MockApi())
 
 
-async def _invite_outside_user(session: AsyncSession, meetup_id: int, inviter_tg: int) -> int | None:
+async def invite_outside_user(session: AsyncSession, meetup_id: int, inviter_tg: int) -> int | None:
     """The invite-confirm critical section as callback_query_confirm_user_invitation runs it:
     lock the meetup row, bail out when the meeting is gone or inactive, insert the invited-user
     row through the racy_flush savepoint. Returns the invited user's id, None when rejected."""
@@ -107,7 +107,7 @@ async def _invite_outside_user(session: AsyncSession, meetup_id: int, inviter_tg
     return invited_user.db_id
 
 
-async def _reschedule(session: AsyncSession, meetup_id: int, new_datetime: dt.datetime):
+async def reschedule(session: AsyncSession, meetup_id: int, new_datetime: dt.datetime):
     """An owner moving the meeting to a new date: locked re-load, mutate datetime, flush."""
     meeting = await Meetup.by_id(session, meetup_id, for_update=True)
     assert meeting is not None
@@ -115,7 +115,7 @@ async def _reschedule(session: AsyncSession, meetup_id: int, new_datetime: dt.da
     await session.flush()
 
 
-async def _committed_meeting_state(meetup_id: int) -> tuple[bool, dt.datetime | None, int]:
+async def committed_meeting_state(meetup_id: int) -> tuple[bool, dt.datetime | None, int]:
     """(active, expiration_time, membership row count) as visible to a fresh transaction."""
     async with db.begin() as session:
         meeting = await Meetup.by_id(session, meetup_id)
@@ -128,16 +128,16 @@ async def test_deactivation_racing_invite_rejects_the_invite(db_session: AsyncSe
     the deactivation commits, finds the meeting inactive and bails. Without the job's lock the
     invite lands inside the window and its invited-user row leaks past the cleanup forever."""
     tg_base = 997_300
-    async with _provisioned_expired_meeting(tg_base, users=1) as meetup_id:
+    async with provisioned_expired_meeting(tg_base, users=1) as meetup_id:
         deactivated, invited_id = await race(
-            lambda session: _deactivate(session, meetup_id),
-            lambda session: _invite_outside_user(session, meetup_id, tg_base + 1),
+            lambda session: deactivate(session, meetup_id),
+            lambda session: invite_outside_user(session, meetup_id, tg_base + 1),
         )
 
         assert deactivated is True
         assert invited_id is None  # the invite saw the committed active=False and rejected
 
-        active, expiration_time, memberships = await _committed_meeting_state(meetup_id)
+        active, expiration_time, memberships = await committed_meeting_state(meetup_id)
         assert active is False
         assert expiration_time is not None
         assert memberships == 0  # nothing joined the meeting after its deactivation
@@ -149,16 +149,16 @@ async def test_invite_racing_deactivation_leaks_no_invited_user(db_session: Asyn
     cleaned up with the meeting. Without the lock the job decides on stale joined_links and
     the invited-user row survives deactivation with no remaining path to ever delete it."""
     tg_base = 997_310
-    async with _provisioned_expired_meeting(tg_base, users=1) as meetup_id:
+    async with provisioned_expired_meeting(tg_base, users=1) as meetup_id:
         invited_id, deactivated = await race(
-            lambda session: _invite_outside_user(session, meetup_id, tg_base + 1),
-            lambda session: _deactivate(session, meetup_id),
+            lambda session: invite_outside_user(session, meetup_id, tg_base + 1),
+            lambda session: deactivate(session, meetup_id),
         )
 
         assert invited_id is not None  # landed before the job took the lock
         assert deactivated is True
 
-        active, _, memberships = await _committed_meeting_state(meetup_id)
+        active, _, memberships = await committed_meeting_state(meetup_id)
         assert active is False
         assert memberships == 0
         async with db.begin() as session:
@@ -176,14 +176,14 @@ async def test_reschedule_racing_deactivation_keeps_meeting_active(db_session: A
     the job decides on the stale timing and deactivates a meeting that was just moved."""
     tg_base = 997_320
     future = dt.datetime.now(dt.UTC).replace(tzinfo=None) + dt.timedelta(days=2)
-    async with _provisioned_expired_meeting(tg_base) as meetup_id:
+    async with provisioned_expired_meeting(tg_base) as meetup_id:
         _, deactivated = await race(
-            lambda session: _reschedule(session, meetup_id, future),
-            lambda session: _deactivate(session, meetup_id),
+            lambda session: reschedule(session, meetup_id, future),
+            lambda session: deactivate(session, meetup_id),
         )
 
         assert deactivated is False  # the under-lock re-check saw the new datetime
 
-        active, expiration_time, _ = await _committed_meeting_state(meetup_id)
+        active, expiration_time, _ = await committed_meeting_state(meetup_id)
         assert active is True
         assert expiration_time is None

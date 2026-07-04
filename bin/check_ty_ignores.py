@@ -214,7 +214,7 @@ def scan_ty_ignores(root: Path) -> tuple[list[IgnoreEntry], list[UntrackedIgnore
     return tracked, untracked
 
 
-async def _fetch_issue_state(issue: GitHubIssueRef) -> IssueCheckResult:
+async def fetch_issue_state(issue: GitHubIssueRef) -> IssueCheckResult:
     """Query the GitHub API for the state of a single issue."""
     request = urllib.request.Request(
         issue.api_url,
@@ -239,7 +239,7 @@ async def check_all_issues(unique_issues: dict[str, GitHubIssueRef]) -> dict[str
     results: dict[str, IssueCheckResult] = {}
 
     async with asyncio.TaskGroup() as tg:
-        tasks = {url: tg.create_task(_fetch_issue_state(issue)) for url, issue in unique_issues.items()}
+        tasks = {url: tg.create_task(fetch_issue_state(issue)) for url, issue in unique_issues.items()}
 
     for url, task in tasks.items():
         results[url] = task.result()
