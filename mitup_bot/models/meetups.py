@@ -212,7 +212,12 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     def waiting_links(self) -> list[JoinedUsers]:
         """Get the joined links that are in the waiting list sorted by the time they joined"""
-        return sorted((link for link in self.joined_links if link.is_waiting_list), key=lambda x: x.created_time)
+        # id breaks created_time ties in insert order: rows written before #191 share one
+        # process-start timestamp per deploy, so without it their promotion order is arbitrary.
+        return sorted(
+            (link for link in self.joined_links if link.is_waiting_list),
+            key=lambda x: (cast(dt.datetime, x.created_time), x.id or 0),
+        )
 
     def has_message(self, update: Update) -> bool:
         """Return True if the message where the update was sent from is linked to this meeting."""

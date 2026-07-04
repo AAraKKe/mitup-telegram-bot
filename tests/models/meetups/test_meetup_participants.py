@@ -1,3 +1,5 @@
+import datetime as dt
+
 import pytest
 
 from mitup_bot.models import JoinedUsers
@@ -418,3 +420,25 @@ def test_participants_list_text_without_waiting_list():
     expected = "\n  Bob\n  Alice"
 
     assert expected == meeting.participants_list_text.text
+
+
+def test_waiting_links_orders_by_created_time_then_id():
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner)
+    early = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    late = dt.datetime(2026, 1, 2, tzinfo=dt.UTC)
+
+    # Insertion order deliberately scrambled relative to the expected promotion order.
+    newest = meeting.create_joined_link(create_user(id=4, first_name="Dana"), is_waiting_list=True)
+    newest.created_time = late
+    newest.id = 30
+    legacy_second = meeting.create_joined_link(create_user(id=3, first_name="Bob"), is_waiting_list=True)
+    legacy_second.created_time = early
+    legacy_second.id = 20
+    legacy_first = meeting.create_joined_link(create_user(id=2, first_name="Alice"), is_waiting_list=True)
+    legacy_first.created_time = early
+    legacy_first.id = 10
+
+    # Pins #191's fairness contract: created_time first, then id — the tiebreaker that
+    # keeps pre-fix rows (which share one process-start timestamp) in true join order.
+    assert meeting.waiting_links() == [legacy_first, legacy_second, newest]
