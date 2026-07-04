@@ -10,6 +10,7 @@ from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
 
 from mitup_bot.api_wrapper import (
+    CALLBACK_QUERY_TEXT_LIMIT,
     TELEMGRAM_API_TIME_PREFIX,
     ApiOutbox,
     BotAdapter,
@@ -18,7 +19,12 @@ from mitup_bot.api_wrapper import (
     build_api,
     handle_edit_errors,
 )
-from mitup_bot.exceptions import AnswerInlineQueryError, InactiveUserInteraction, NoMessageAvailable
+from mitup_bot.exceptions import (
+    AnswerInlineQueryError,
+    CallbackQueryTextTooLong,
+    InactiveUserInteraction,
+    NoMessageAvailable,
+)
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
@@ -742,17 +748,31 @@ async def test_answer_inline_query_raises_on_api_failure(telegram_api: TelegramA
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "text",
-    ["short text", "x" * 201],
-    ids=["short_text", "long_text"],
-)
-async def test_answer_callback_query(telegram_api: TelegramApi, bot: AsyncMock, text: str):
+async def test_answer_callback_query(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
+    text = "short text"
 
     await telegram_api.answer_callback_query(update, text, show_alert=False)
 
     bot.answer_callback_query.assert_awaited_once_with(update.callback_query.id, text=text, show_alert=False)
+
+
+async def test_answer_callback_query_accepts_text_at_the_limit(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    text = "x" * CALLBACK_QUERY_TEXT_LIMIT
+
+    await telegram_api.answer_callback_query(update, text, show_alert=False)
+
+    bot.answer_callback_query.assert_awaited_once_with(update.callback_query.id, text=text, show_alert=False)
+
+
+async def test_answer_callback_query_rejects_text_over_telegram_limit(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+
+    with pytest.raises(CallbackQueryTextTooLong):
+        await telegram_api.answer_callback_query(update, "x" * (CALLBACK_QUERY_TEXT_LIMIT + 1), show_alert=False)
+
+    bot.answer_callback_query.assert_not_awaited()
 
 
 async def test_answer_callback_query_raises_when_formatted_text_has_entities(

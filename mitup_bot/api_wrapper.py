@@ -47,6 +47,9 @@ EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")
 
 log = structlog.get_logger(__name__)
 
+# Telegram Bot API hard limit for answerCallbackQuery text.
+CALLBACK_QUERY_TEXT_LIMIT = 200
+
 
 if TYPE_CHECKING:
     ...
@@ -551,8 +554,8 @@ class TelegramApi:
 
         _text = text.text if isinstance(text, FormattedText) else text
 
-        if len(_text) > 200:
-            CallbackQueryTextTooLong(_text)
+        if len(_text) > CALLBACK_QUERY_TEXT_LIMIT:
+            raise CallbackQueryTextTooLong(_text)
         query = guards.valid_callback_query(update)
         await self._call_or_enqueue(
             "answer_callback_query", partial(self._answer_callback_query_now, query.id, _text, show_alert), None
