@@ -28,7 +28,7 @@ icon: material/account-group-outline
 
 ## Our story
 
-[How the project started — the year, the problem you set out to solve]
+[How the project started: the year, the problem you set out to solve]
 
 [Why Telegram and not something else]
 
@@ -69,10 +69,10 @@ The Mitup project is maintained by a small group of people who care about keepin
 
 ## Get involved
 
-Mitup is a community-driven project. Whether you code, translate, report bugs, or just spread the word, you're helping.
+Mitup is a community-driven project. Whether you code, translate, report bugs, or spread the word, you're helping.
 
-[**Contribute code →**](code_contributor.md) Start with the contributor guide.
+[**Contribute code →**](../collaborate/code_contributor.md) Start with the contributor guide.
 
-[**Translate **→**](translator.md) Help bring Mitup to your language on Crowdin.
+[**Translate →**](../collaborate/translator.md) Help bring Mitup to your language on Crowdin.
 
-We also follow a [Code of Conduct](code_of_conduct.md) that all contributors agree to uphold.
+We also follow a [Code of Conduct](../collaborate/code_of_conduct.md) that all contributors agree to uphold.
