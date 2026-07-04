@@ -23,7 +23,7 @@ INTERVAL_TO_DEACTIVATE = "1 year"
 #   - The meeting has a datetime set
 #   - The current time is past meeting.datetime + timeout from the owner's settings
 #
-# If the meeting does not ahve a datetime set, the meeting is deactivated INTERVAL_TO_DEACTIVATE from the creation date.
+# If the meeting does not have a datetime set, the meeting is deactivated INTERVAL_TO_DEACTIVATE from the creation date.
 # When end_datetime is set, the meeting window extends to end_datetime + timeout.
 # When only datetime is set, the meeting is deactivated after datetime + timeout.
 # When no datetime is set, fall back to created_time + INTERVAL_TO_DEACTIVATE.
@@ -52,53 +52,66 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
 
 
 @db.with_session
-async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient) -> None:
-    """Mark meetings as inactive when they've been finished for longer than the configured timeout"""
-    meetings = (await session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT)).all()
-    deactivated = 0
-    failed = 0
-    invited_users_ids: list[int] = []
+async def _due_meeting_ids(session: AsyncSession) -> list[int]:
+    """Collect the ids of the meetings currently due for deactivation.
 
-    metrics.emit(MetricKey.MEETINGS_TO_DEACTIVATE, len(meetings), MetricUnit.COUNT)
-    failed_details: list[str] = []
+    Ids only, in a short read-only transaction: every decision about a meeting is made later
+    under that meeting's row lock, so nothing read here may feed a mutation.
+    """
+    return [meeting.db_id for meeting in (await session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT)).all()]
 
-    for meeting in meetings:
-        try:
-            # Update all messages using the existing API method
-            await api.update_meeting_messages(
-                session=session,
-                meeting=meeting,
-                has_finished=True,
-            )
 
-            meeting.active = False
-            meeting.expiration_time = dt.datetime.now(dt.UTC)
+async def _deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api: TelegramApiWrapper) -> bool:
+    """Deactivate one meeting under its row lock; returns False when it is no longer due.
 
-            # Keep track of all invited users of the deactivated meetings to be deleted at the end
-            invited_users_ids.extend(
-                [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
-            )
+    The unlocked sweep only nominated this meeting: the eligibility decision and the
+    invited-user cleanup must be re-derived from what the locked load returns, or the job
+    races the live bot — a concurrent invite leaks its invited-user row, and a concurrent
+    reschedule gets deactivated on stale timing.
+    """
+    meeting = await Meetup.by_id(session, meetup_id, for_update=True)
+    if meeting is None:
+        return False
 
-            deactivated += 1
+    # Re-check the deactivation predicate under the lock: the owner may have rescheduled the
+    # meeting between the sweep's read and here. We hold the row lock, so this read is final.
+    still_due = (await session.exec(MEETINGS_TO_DEACTIVATE_STATEMENT.where(Meetup.id == meetup_id))).first()
+    if still_due is None:
+        log.info("Meeting no longer due for deactivation, skipping", meeting=meetup_id)
+        return False
 
-            # Delete all users that were added to the meeting that were invited.
-            # These users exist only in the context of the current meeting.
-            await session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
+    # Enqueued under write mode: the payload is rendered now, inside the transaction, but the
+    # edits execute only after commit — the row lock is never held across Telegram I/O.
+    await api.update_meeting_messages(meeting=meeting, has_finished=True)
 
-            # Same with messages, any messagea attached to this meeting is left untracked as the
-            # meeting is now considered over
-            await session.exec(delete(Message).where(Message.meetup_id == meeting.id))  # type: ignore
-        except Exception as e:
-            failed += 1
-            log.exception("Failed to deactivate meeting", meeting=meeting.id, owner=meeting.owner_id, exc_info=e)
-            failed_details.append(
-                f"Failed to deactivate meeting (meeting: {meeting.id}, owner: {meeting.owner_id}). Error: {e}."
-            )
+    meeting.active = False
+    meeting.expiration_time = dt.datetime.now(dt.UTC)
 
-    # Delete JOINED_ONLY users who have no remaining active-meeting links.
-    # These users were only ever reachable through the inline-join flow and have
-    # no further meetings to attend, so retaining them wastes space and pollutes
-    # user-count metrics.
+    # Delete all users that were added to the meeting that were invited.
+    # These users exist only in the context of the current meeting.
+    invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
+    if invited_users_ids:
+        await session.exec(delete(User).where(User.id.in_(invited_users_ids)))  # type: ignore
+
+    # Same with messages, any message attached to this meeting is left untracked as the
+    # meeting is now considered over
+    await session.exec(delete(Message).where(Message.meetup_id == meetup_id))  # type: ignore
+    return True
+
+
+# Write mode with the api as the last argument: commit (releasing the row lock) before the
+# queued fan-out drains. The undecorated critical section stays importable for the row-lock
+# race tests in tests/models/db_behavior/.
+_deactivate_meeting = db.with_session(write=True)(_deactivate_meeting_locked)
+
+
+@db.with_session
+async def _delete_joined_only_users(session: AsyncSession) -> int:
+    """Delete JOINED_ONLY users who have no remaining active-meeting links.
+
+    These users were only ever reachable through the inline-join flow and have no further
+    meetings to attend, so retaining them wastes space and pollutes user-count metrics.
+    """
     stmt = delete(User).where(
         and_(
             User.status == UserStatus.JOINED_ONLY,
@@ -111,7 +124,33 @@ async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsCl
         )
     )
     result = await session.exec(stmt)
-    joined_only_deleted = result.rowcount or 0
+    return result.rowcount or 0
+
+
+async def run(api: TelegramApiWrapper, metrics: MetricsClient):
+    """Mark meetings as inactive when they've been finished for longer than the configured timeout.
+
+    Each meeting commits in its own transaction under its row lock: locks are held per meeting
+    (never across the sweep or across Telegram I/O), and a crash mid-sweep keeps every
+    deactivation already committed — the remaining meetings are still due on the next run.
+    """
+    meeting_ids = await _due_meeting_ids()
+    metrics.emit(MetricKey.MEETINGS_TO_DEACTIVATE, len(meeting_ids), MetricUnit.COUNT)
+
+    deactivated = 0
+    failed = 0
+    failed_details: list[str] = []
+
+    for meetup_id in meeting_ids:
+        try:
+            if await _deactivate_meeting(meetup_id, api):
+                deactivated += 1
+        except Exception as e:
+            failed += 1
+            log.exception("Failed to deactivate meeting", meeting=meetup_id, exc_info=e)
+            failed_details.append(f"Failed to deactivate meeting (meeting: {meetup_id}). Error: {e}.")
+
+    joined_only_deleted = await _delete_joined_only_users()
 
     metrics.emit(MetricKey.MEETINGS_DEACTIVATED, deactivated, MetricUnit.COUNT)
     metrics.emit(

@@ -44,6 +44,7 @@ Handler bodies keep their linear style — only the execution time of the api ca
 - Drop defensive "flush before send" calls: commit-before-drain provides fail-early ordering structurally.
 - `context.api.immediate.X(...)` is the escape hatch for a call that must run pre-commit (its failure aborts the transaction). Keep usages rare and greppable.
 - If the handler raises, the queue is discarded with the rolled-back transaction — nothing about aborted state is rendered.
+- Write mode is not handler-only: non-handler locking code (CLI batch jobs) uses it too, passing the `TelegramApi` itself as the function's last argument — there is no `MitupContext` outside the PTB app, so the decorator captures on the api directly (see `mitup_bot/cli/inactive_meetings.py`).
 
 ### `racy_flush` — the single racy-write primitive
 
@@ -76,6 +77,7 @@ Meeting capacity and waiting-list logic is computed in Python over the loaded `j
 - `FOR UPDATE` applies only to the meetups row; the `selectin` follow-up loads run unlocked. That's correct: the row lock is what serializes writers, the link rows don't need locking.
 - Unconditional writes that make no participant-dependent decision (e.g. reactivation setting `active = True`) don't need the explicit lock — the flush-time UPDATE acquires it.
 - **The lock is never held across Telegram I/O:** every locking path runs under `@with_session(write=True)`, which commits (releasing the lock) before the queued fan-out executes. A new locking handler must use write mode too; `tests/models/db_behavior/test_commit_before_fanout.py` pins the release-at-commit property on real Postgres.
+- **Batch jobs are writers too:** a scheduled job that mutates meetings (e.g. the expiration sweep in `mitup_bot/cli/inactive_meetings.py`) takes the same per-meeting lock, re-checks its decision under the lock (the unlocked candidate sweep only nominates), and commits one transaction per meeting so locks are held briefly and a crash keeps the deactivations already committed.
 
 ## Models
 

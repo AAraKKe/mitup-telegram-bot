@@ -42,7 +42,7 @@ Top-level scripts in `mitup_bot/cli/` are not auto-discovered — they are impor
 
 CLI commands run outside the PTB application lifecycle, so they use the non-handler variants of the shared infrastructure. The details live in the owning skills — this section is a pointer, not a second copy of the rules:
 
-- **Database:** sessions are injected by the async `@with_session` decorator from `mitup_bot.db`; sync Click entry points wrap the async pipeline in a single `asyncio.run(...)`. See the `database` skill for the full pattern.
+- **Database:** sessions are injected by the async `@with_session` decorator from `mitup_bot.db`; sync Click entry points wrap the async pipeline in a single `asyncio.run(...)`. Jobs that mutate meetings follow the same per-meeting row-lock + write-mode pattern as handlers, with the api passed as the function's last argument. See the `database` skill for the full pattern.
 - **Telegram API:** use `BotAdapter` wrapping an `ExtBot` — never `MitupContext`, which only exists inside the PTB app. See the `api-wrapper` skill for how to construct it and supply a `MetricsClient`.
 - **Configuration:** load via `Config.from_providers()` with the appropriate `Env` — see the `mitup-config` skill.
 

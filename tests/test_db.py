@@ -246,6 +246,26 @@ async def test_write_mode_requires_a_context_like_argument():
         await not_a_handler(object())
 
 
+async def test_write_mode_accepts_bare_api_as_last_argument(
+    mock_session: MockDbSession, write_context: SimpleNamespace, fanout_bot: mock.AsyncMock
+):
+    """Non-handler callers (CLI batch jobs) have no MitupContext: passing the TelegramApi
+    itself as the last positional argument gets the same commit-before-fanout lifecycle."""
+    events: list[str] = []
+    mock_session.begin.return_value.__aexit__.side_effect = lambda *exc_info: events.append("commit")
+    fanout_bot.send_message.side_effect = lambda **kwargs: events.append("bot-send")
+    user = create_user(id=1, tg_user_id=100)
+
+    @db.with_session(write=True)
+    async def batch_job(session: AsyncSession, api: TelegramApi):
+        await api.send_message_to_user(user, "swept")
+        events.append("job-returned")
+
+    await batch_job(write_context.api)
+
+    assert events == ["job-returned", "commit", "bot-send"]
+
+
 @pytest.mark.parametrize(
     "status, expected_status, metric_times",
     [

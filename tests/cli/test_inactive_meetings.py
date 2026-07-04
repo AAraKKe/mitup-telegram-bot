@@ -5,6 +5,7 @@ import pytest
 
 from mitup_bot.cli import inactive_meetings
 from mitup_bot.cli.commands.recurrent_events import EventType
+from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import (
     MockApi,
@@ -27,10 +28,23 @@ def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
 
 
+def register_due_meetings(mock_session: MockDbSession, *meetings: Meetup, still_due: bool = True):
+    """Register a meeting for every read the sweep performs: the unlocked candidate sweep,
+    the locked ``by_id`` re-load, and the under-lock eligibility re-check (empty when
+    ``still_due`` is False — the meeting was rescheduled between sweep and lock)."""
+    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, meetings)
+    for meeting in meetings:
+        mock_session.add_object(meeting)
+        mock_session.add_objects_with_statement(
+            inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT.where(Meetup.id == meeting.id),
+            (meeting,) if still_due else (),
+        )
+
+
 async def test_no_meetings_to_deactivate(
     mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
 ):
-    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, ())
+    register_due_meetings(mock_session)
     await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
@@ -58,7 +72,7 @@ async def test_single_meeting_deactivated(
     meeting = create_meetup(id=1, title="Test Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
-    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting,))
+    register_due_meetings(mock_session, meeting)
     await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
@@ -66,11 +80,12 @@ async def test_single_meeting_deactivated(
     assert meeting.expiration_time is not None
     assert isinstance(meeting.expiration_time, dt.datetime)
 
-    # Verify update_meeting_messages was called with has_finished=True for this meeting
+    # Verify update_meeting_messages was called with has_finished=True for this meeting.
+    # No session is passed: the call runs under write-mode capture and executes post-commit.
     call_kwargs = api.mock_method("update_meeting_messages").call_args.kwargs
     assert call_kwargs["has_finished"] is True
     assert call_kwargs["meeting"] is meeting
-    assert call_kwargs["session"] is mock_session
+    assert "session" not in call_kwargs
 
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_TO_DEACTIVATE,
@@ -80,6 +95,39 @@ async def test_single_meeting_deactivated(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
+        value=0,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+
+
+async def test_meeting_no_longer_due_is_skipped(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """The under-lock re-check found the meeting rescheduled: it is neither deactivated nor
+    counted as failed — the next sweep re-evaluates it from scratch."""
+    meeting = create_meetup(id=1, title="Rescheduled Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+
+    register_due_meetings(mock_session, meeting, still_due=False)
+    await inactive_meetings.run(api, metrics_client)
+    await metrics_client.flush()
+
+    assert meeting.active is True
+    assert meeting.expiration_time is None
+    api.assert_method_just_called("update_meeting_messages", times=0)
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_TO_DEACTIVATE,
+        value=1,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
     metrics.assert_emitted(
@@ -103,7 +151,7 @@ async def test_meeting_with_invited_users(
     invited_user = create_user(id=3, tg_user_id=-1, first_name="Outside User")
     create_joined_link(user=invited_user, meetup=meeting, id=2)
 
-    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting,))
+    register_due_meetings(mock_session, meeting)
     await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
@@ -139,9 +187,7 @@ async def test_api_failure_raises_runtime_error(
     meeting_fail = create_meetup(id=2, title="Fail Meeting")
     create_user(id=2, tg_user_id=20, owned_meetings=[meeting_fail], settings=create_settings(id=2))
 
-    mock_session.add_objects_with_statement(
-        inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting_ok, meeting_fail)
-    )
+    register_due_meetings(mock_session, meeting_ok, meeting_fail)
 
     # First call succeeds (returns None), second call raises
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("API timeout")]
@@ -151,7 +197,8 @@ async def test_api_failure_raises_runtime_error(
 
     await metrics_client.flush()
 
-    # First meeting should still be deactivated
+    # First meeting committed in its own transaction, so the second meeting's failure
+    # cannot roll it back
     assert meeting_ok.active is False
     assert meeting_ok.expiration_time is not None
 
@@ -185,7 +232,7 @@ async def test_multiple_meetings_deactivated(
     meeting_b = create_meetup(id=2, title="Meeting B")
     create_user(id=2, tg_user_id=20, owned_meetings=[meeting_b], settings=create_settings(id=2))
 
-    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, (meeting_a, meeting_b))
+    register_due_meetings(mock_session, meeting_a, meeting_b)
 
     await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
@@ -225,7 +272,7 @@ async def test_joined_only_users_deleted_metric_emitted_when_no_orphans(
     The metric is a counter, not a conditional emission — it gets the count of users
     deleted in this run, including zero. Operators rely on the gauge being present.
     """
-    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, ())
+    register_due_meetings(mock_session)
 
     await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
@@ -241,5 +288,7 @@ async def test_joined_only_users_deleted_metric_emitted_when_no_orphans(
 # JOINED_ONLY cleanup — DB integration tests live in
 # tests/models/db_behavior/test_joined_only_cleanup.py because the cleanup
 # query relies on `NOT EXISTS … active=true` semantics that the mock session
-# cannot replay. Keep this file mock-only.
+# cannot replay. The row-lock race tests for the per-meeting critical section
+# live in tests/models/db_behavior/test_inactive_meetings_row_locks.py.
+# Keep this file mock-only.
 # ---------------------------------------------------------------------------

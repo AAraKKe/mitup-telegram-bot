@@ -7,7 +7,7 @@ Each actor runs the same critical section the handlers run — lock the meetup r
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator
 
 import pytest
 from sqlalchemy import text
@@ -17,16 +17,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from mitup_bot import db
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
+from tests.helpers.locking import RACE_TIMEOUT, race
 
 pytestmark = pytest.mark.db_test
-
-# How long the lock holder keeps its transaction open for the contender to act. With the row lock
-# in place the contender blocks and the window always elapses in full; without it the contender
-# finishes inside the window against the holder's uncommitted state — the interleaving the lock
-# forbids — which is what makes these tests fail if for_update is ever dropped.
-CONTENDER_WINDOW = 0.5
-# Hard cap so a lock bug (e.g. a deadlock) fails the test quickly instead of hanging the suite.
-RACE_TIMEOUT = 20.0
 
 
 @contextlib.asynccontextmanager
@@ -90,42 +83,6 @@ async def _provisioned_meeting(
                     lo=tg_base, hi=tg_base + users
                 )
             )
-
-
-async def _race[H, C](
-    holder: Callable[[AsyncSession], Awaitable[H]],
-    contender: Callable[[AsyncSession], Awaitable[C]],
-) -> tuple[H, C]:
-    """Run two transactions with a deterministic interleaving and return their results.
-
-    The holder runs its critical section first (taking the row lock inside its own code), then
-    keeps its transaction open for up to CONTENDER_WINDOW while the contender runs. With the lock
-    in place the contender blocks inside its locked load until the holder commits, so it always
-    observes the holder's committed state; without the lock the contender completes inside the
-    window against uncommitted state, corrupting the final state these tests assert on.
-    """
-    holder_mutated = asyncio.Event()
-    contender_finished = asyncio.Event()
-
-    async def run_holder() -> H:
-        async with db.begin() as session:
-            result = await holder(session)
-            holder_mutated.set()
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(contender_finished.wait(), timeout=CONTENDER_WINDOW)
-        return result
-
-    async def run_contender() -> C:
-        await holder_mutated.wait()
-        try:
-            async with db.begin() as session:
-                return await contender(session)
-        finally:
-            contender_finished.set()
-
-    async with asyncio.timeout(RACE_TIMEOUT):
-        holder_result, contender_result = await asyncio.gather(run_holder(), run_contender())
-    return holder_result, contender_result
 
 
 async def _join(session: AsyncSession, meetup_id: int, tg_user_id: int) -> bool:
@@ -196,7 +153,7 @@ async def test_double_join_on_last_slot_serializes(db_session: AsyncSession, wai
     or is rejected. Without the lock both read "not full" and both become participants."""
     tg_base = 997_010 if waiting_list else 997_015
     async with _provisioned_meeting(tg_base, max_members=1, waiting_list=waiting_list, users=2) as meetup_id:
-        first_join, second_join = await _race(
+        first_join, second_join = await race(
             lambda session: _join(session, meetup_id, tg_base + 1),
             lambda session: _join(session, meetup_id, tg_base + 2),
         )
@@ -219,7 +176,7 @@ async def test_leave_racing_join_promotes_exactly_once(db_session: AsyncSession)
     async with _provisioned_meeting(
         tg_base, max_members=1, waiting_list=True, users=3, participants=(1,), waiting=(2,)
     ) as meetup_id:
-        promoted_tgs, join_result = await _race(
+        promoted_tgs, join_result = await race(
             lambda session: _remove_participant(session, meetup_id, tg_base + 1),
             lambda session: _join(session, meetup_id, tg_base + 3),
         )
@@ -240,7 +197,7 @@ async def test_kickout_racing_join_stays_consistent(db_session: AsyncSession):
     async with _provisioned_meeting(
         tg_base, max_members=1, waiting_list=True, users=3, participants=(1,), waiting=(2,)
     ) as meetup_id:
-        join_result, promoted_tgs = await _race(
+        join_result, promoted_tgs = await race(
             lambda session: _join(session, meetup_id, tg_base + 3),
             lambda session: _remove_participant(session, meetup_id, tg_base + 1),
         )
@@ -259,7 +216,7 @@ async def test_capacity_increase_racing_join_admits_under_new_cap(db_session: As
     lost — the committed row holds the new capacity and both participants."""
     tg_base = 997_060
     async with _provisioned_meeting(tg_base, max_members=1, waiting_list=True, users=2, participants=(1,)) as meetup_id:
-        _, join_result = await _race(
+        _, join_result = await race(
             lambda session: _set_max_members(session, meetup_id, 2),
             lambda session: _join(session, meetup_id, tg_base + 2),
         )
@@ -280,7 +237,7 @@ async def test_capacity_decrease_racing_join_overflows_to_waiting(db_session: As
     the waiting list — the final state is never over capacity."""
     tg_base = 997_070
     async with _provisioned_meeting(tg_base, max_members=2, waiting_list=True, users=2, participants=(1,)) as meetup_id:
-        _, join_result = await _race(
+        _, join_result = await race(
             lambda session: _set_max_members(session, meetup_id, 1),
             lambda session: _join(session, meetup_id, tg_base + 2),
         )
@@ -303,14 +260,14 @@ async def test_delete_racing_join_leaves_no_orphans(db_session: AsyncSession, de
     tg_base = 997_040 if delete_goes_first else 997_045
     async with _provisioned_meeting(tg_base, max_members=None, waiting_list=False, users=1) as meetup_id:
         if delete_goes_first:
-            delete_result, join_result = await _race(
+            delete_result, join_result = await race(
                 lambda session: _delete_meeting(session, meetup_id),
                 lambda session: _join(session, meetup_id, tg_base + 1),
             )
             assert delete_result is True
             assert join_result is False  # the locked load found no row after the delete committed
         else:
-            join_result, delete_result = await _race(
+            join_result, delete_result = await race(
                 lambda session: _join(session, meetup_id, tg_base + 1),
                 lambda session: _delete_meeting(session, meetup_id),
             )

@@ -158,16 +158,20 @@ class _WriteHandlerDecorator(Protocol):
 
 
 def _capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> TelegramApi:
-    """Take the api to capture on from the context argument: handlers follow the
+    """Take the api to capture on from the last argument: handlers follow the
     ``(session, update, context)`` convention, so at the call site the context is the last
-    positional argument (or an explicit ``context=`` keyword)."""
-    context = kwargs.get("context", args[-1] if args else None)
-    api = getattr(context, "api", None)
+    positional argument (or an explicit ``context=`` keyword). Non-handler callers (CLI
+    batch jobs) have no MitupContext — they pass the ``TelegramApi`` itself in that
+    position instead."""
+    candidate = kwargs.get("context", args[-1] if args else None)
+    if isinstance(candidate, TelegramApi):
+        return candidate
+    api = getattr(candidate, "api", None)
     if isinstance(api, TelegramApi):
         return api
     raise TypeError(
-        "with_session(write=True) requires the MitupContext (exposing `.api`) as the last positional "
-        "argument or the `context` keyword"
+        "with_session(write=True) requires the MitupContext (exposing `.api`) or the TelegramApi itself "
+        "as the last positional argument or the `context` keyword"
     )
 
 
