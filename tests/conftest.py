@@ -220,7 +220,9 @@ def meeting(user_with_settings: UserModel) -> Meetup:
         id=123,
         title="Test Meeting",
         description="Test Description",
-        datetime=dt.datetime(1987, 7, 16, 23, 59, tzinfo=dt.UTC),
+        # Far-future start so the generic fixture is never accidentally "in progress":
+        # with no end time, a past start would now open an open-ended in-progress window.
+        datetime=dt.datetime(2099, 7, 16, 23, 59, tzinfo=dt.UTC),
         location=MeetupLocation(name="Test Location", coordinates=(123.1, 321.1)),
         owner=user_with_settings,
         language="en",

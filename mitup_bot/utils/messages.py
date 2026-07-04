@@ -572,7 +572,6 @@ class MeetingEditWhenMessages(MessageBase):
     CLEAR_CONFIRMATION = "Are you sure you want to clear the start and end times?"
     CLEAR_DECLINED = "The times won't be cleared."
     CLEAR_SUCCESS = "Times removed."
-    LOCK_ON_START_ALERT = "You must set an end time before enabling this option."
 
 
 # --- Meeting edit: duration (end-time sub-screen) ---

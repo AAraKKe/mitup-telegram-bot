@@ -185,7 +185,8 @@ async def test_decline_clear_times(
 
 
 # ---------------------------------------------------------------------------
-# LOCK_ON_START_CALLBACK — toggle lock_on_start when end_datetime is set
+# LOCK_ON_START_CALLBACK — toggle lock_on_start with a start time set
+# (both a start+end window and a start-only, open-ended window)
 # ---------------------------------------------------------------------------
 
 
@@ -194,15 +195,17 @@ async def test_decline_clear_times(
     [UpdateRequest(callback_query=cb.SET_MEETING_LOCK_ON_START.with_id(1))],
     indirect=True,
 )
+@pytest.mark.parametrize("end_datetime", [END_DATETIME, None], ids=["with_end", "start_only"])
 @pytest.mark.parametrize("initial_lock", [True, False], ids=["lock_true", "lock_false"])
 async def test_lock_on_start_toggle(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
+    end_datetime: dt.datetime | None,
     initial_lock: bool,
 ):
     user, meeting = owner_with_meeting(
-        meeting_id=1, meeting_datetime=START_DATETIME, end_datetime=END_DATETIME, lock_on_start=initial_lock
+        meeting_id=1, meeting_datetime=START_DATETIME, end_datetime=end_datetime, lock_on_start=initial_lock
     )
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
@@ -217,39 +220,3 @@ async def test_lock_on_start_toggle(
         current_message=meeting.message_from_update(update),  # None -- no message registered
         skip_current=True,
     )
-
-
-# ---------------------------------------------------------------------------
-# LOCK_ON_START_CALLBACK — stale callback when end_datetime is None
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_LOCK_ON_START.with_id(1))],
-    indirect=True,
-)
-async def test_lock_on_start_stale_alert_when_no_end_datetime(
-    mock_session: MockDbSession,
-    update: Update,
-    handler_context: HandlerContext,
-):
-    user, meeting = owner_with_meeting(meeting_id=1, end_datetime=None)
-    mock_session.add_object(user, query_field="tg_user_id")
-    mock_session.add_object(meeting)
-
-    original_lock = meeting.lock_on_start
-
-    context, _ = await call_handler(EditMeetingHandlerId.LOCK_ON_START_CALLBACK, handler_context=handler_context)
-
-    # lock_on_start must not have been modified
-    assert meeting.lock_on_start == original_lock
-
-    context.api.assert_answer_callback_query_called(
-        update=update,
-        text=MeetingEditWhenMessages.LOCK_ON_START_ALERT.get_text(lang=meeting.user_language),
-        show_alert=True,
-    )
-
-    # No message edit should have occurred
-    context.api.assert_method_just_called("edit_message", times=0)

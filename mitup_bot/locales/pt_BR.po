@@ -520,9 +520,6 @@ msgstr "Meu relógio interno é antigo e não consegue entender essa hora de fic
 msgid "MeetingEditDurationMessages.ON_EXIT"
 msgstr "Desculpe, eu esperava a duração em minutos. Você gostaria de enviar? Caso contrário, toque em Cancelar para sair."
 
-msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
-msgstr "Você precisa definir uma duração antes de ativar essa opção."
-
 msgid "MeetingDisplayMessages.DELETED_BANNER"
 msgstr "🚫 Este evento foi excluído 🚫"
 

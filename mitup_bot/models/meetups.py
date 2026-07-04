@@ -130,13 +130,26 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def is_in_progress(self) -> bool:
-        """Return True only when an end time is set and the current UTC time falls within the meeting window."""
-        if self.end_datetime is None or self.datetime is None:
+        """Return True when the current UTC time falls within the meeting's in-progress window.
+
+        With a start and an end time the window is bounded to `[start, end)`; with a start time but
+        no end time it is open-ended, in progress from `start` onward. Without a start time, or once
+        the meeting is deactivated, there is no window at all.
+        """
+        # Business rule: an inactive meeting is never in progress. This intrinsically ends the
+        # open-ended window at deactivation, so callers need no separate activeness check.
+        if not self.active:
+            return False
+        if self.datetime is None:
             return False
         now = dt.datetime.now(dt.UTC)
-        end = self.end_datetime if self.end_datetime.tzinfo else self.end_datetime.replace(tzinfo=dt.UTC)
         start = self.datetime if self.datetime.tzinfo else self.datetime.replace(tzinfo=dt.UTC)
-        return start <= now < end
+        if now < start:
+            return False
+        if self.end_datetime is None:
+            return True
+        end = self.end_datetime if self.end_datetime.tzinfo else self.end_datetime.replace(tzinfo=dt.UTC)
+        return now < end
 
     @property
     def participants(self) -> list[JoinedUsers]:
@@ -647,19 +660,14 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def when_view(self) -> MitupView:
         if self.datetime is None:
+            # Lock-on-start is only offered once a start time exists: without a start there is no
+            # window to freeze on, so the toggle would be a no-op. Setting a start time reveals it.
             description: str | FormattedText = MeetingEditWhenMessages.DESCRIPTION_NO_TIMES.get(lang=self.user_language)
             keyboard: Keyboard = [
                 [
                     ButtonConfig(
                         text=ButtonMessages.SET_START_TIME.get(lang=self.user_language),
                         callback_data=cb.SET_MEETING_START_TIME.with_id(self.db_id),
-                    ),
-                ],
-                [
-                    options_button(
-                        cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
-                        ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
-                        self.lock_on_start,
                     ),
                 ],
             ]

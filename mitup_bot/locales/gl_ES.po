@@ -736,9 +736,6 @@ msgstr "Desculpa, estaba esperando a duración en minutos. Te gustaría enviarla
 msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "Esta quedada xa comezou e a súa lista de asistentes está bloqueada."
 
-msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
-msgstr "Debes establecer unha duración antes de activar esta opción."
-
 msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
 msgstr "✅ Esta quedada rematou ✅\n\n<b>Duración:</b> ${duration} minutos · <b>Asistentes:</b> ${attendee_count}"
 

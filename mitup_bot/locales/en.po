@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-01 19:53\n"
+"PO-Revision-Date: 2026-07-04 21:35\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -592,9 +592,6 @@ msgstr "The times won't be cleared."
 
 msgid "MeetingEditWhenMessages.CLEAR_SUCCESS"
 msgstr "Times removed."
-
-msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
-msgstr "You must set an end time before enabling this option."
 
 msgid "MeetingEditDurationMessages.END_PROMPT"
 msgstr "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"

@@ -574,9 +574,6 @@ msgstr "▶️ Esta quedada está en curso ▶️"
 msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
 msgstr "✅ Esta quedada ha finalizado ✅\n\n<b>Duración:</b> ${duration} minutos · <b>Asistentes:</b> ${attendee_count}"
 
-msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
-msgstr "Debes establecer una duración antes de habilitar esta opción."
-
 msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "Esta quedada ya ha comenzado y su lista de asistentes está bloqueada."
 

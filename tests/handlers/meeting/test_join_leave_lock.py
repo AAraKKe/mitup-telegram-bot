@@ -155,7 +155,7 @@ async def test_join_leave_allowed_when_lock_on_but_meeting_not_started(
 
 
 # ---------------------------------------------------------------------------
-# Lock does NOT block when end_datetime is None (is_in_progress is always False)
+# Lock blocks join and leave with an open-ended window (start set, no end time)
 # ---------------------------------------------------------------------------
 
 
@@ -168,18 +168,61 @@ async def test_join_leave_allowed_when_lock_on_but_meeting_not_started(
     ids=["join", "leave"],
     indirect=["update"],
 )
-async def test_join_leave_allowed_when_lock_on_but_no_duration(
+async def test_join_leave_blocked_when_lock_on_and_open_ended_window(
     update: Update,
     handler_id: MeetingHandlerId,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
-    # lock_on_start=True but end_datetime=None → is_in_progress is always False
+    # Start 5 min ago, no end time → open-ended window, is_in_progress from start onward
     user, meeting = user_with_meeting(
         meeting_id=1,
         end_datetime=None,
         lock_on_start=True,
         meeting_datetime=now_minus(5),
+    )
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
+
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
+        show_alert=True,
+    )
+
+    # No join/leave side-effects
+    context.api.assert_method_just_called("update_meeting_messages", times=0)
+    assert len(meeting.joined_links) == 0
+
+
+# ---------------------------------------------------------------------------
+# Lock does NOT block when there is no start time at all (is_in_progress is always False)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update, handler_id",
+    [
+        (UpdateRequest(callback_query=cb.JOIN.with_id(1)), MeetingHandlerId.JOIN),
+        (UpdateRequest(callback_query=cb.LEAVE.with_id(1)), MeetingHandlerId.LEAVE),
+    ],
+    ids=["join", "leave"],
+    indirect=["update"],
+)
+async def test_join_leave_allowed_when_lock_on_but_no_start_time(
+    update: Update,
+    handler_id: MeetingHandlerId,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    # lock_on_start=True but no start time at all → is_in_progress is always False
+    user, meeting = user_with_meeting(
+        meeting_id=1,
+        end_datetime=None,
+        lock_on_start=True,
+        meeting_datetime=None,
     )
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)

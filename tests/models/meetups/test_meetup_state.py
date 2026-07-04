@@ -396,3 +396,84 @@ def test_is_in_progress_with_naive_datetimes(user_with_settings: User):
     # Before the fix, comparing naive end_datetime with aware now() raised TypeError.
     # After the fix, naive datetimes are normalised to UTC before comparison.
     assert meeting.is_in_progress is True
+
+
+# ---------------------------------------------------------------------------
+# is_in_progress: window semantics (open-ended vs bounded vs no start)
+# ---------------------------------------------------------------------------
+
+
+def test_is_in_progress_false_without_start_time(user_with_settings: User):
+    """No start time at all → never in progress, even with lock intent."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = None
+    meeting.end_datetime = None
+
+    assert meeting.is_in_progress is False
+
+
+def test_is_in_progress_open_ended_false_before_start(user_with_settings: User):
+    """Start time set, no end time → not in progress while now < start."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = dt.datetime.now(dt.UTC) + timedelta(minutes=30)  # starts in the future
+    meeting.end_datetime = None
+
+    assert meeting.is_in_progress is False
+
+
+def test_is_in_progress_open_ended_true_after_start(user_with_settings: User):
+    """Start time in the past, no end time → in progress indefinitely (open-ended window)."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = dt.datetime.now(dt.UTC) - timedelta(minutes=5)  # started 5 min ago
+    meeting.end_datetime = None
+
+    assert meeting.is_in_progress is True
+
+
+def test_is_in_progress_open_ended_true_long_after_start(user_with_settings: User):
+    """Open-ended window has no upper bound: still in progress long after start."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = dt.datetime.now(dt.UTC) - timedelta(days=365)  # started a year ago
+    meeting.end_datetime = None
+
+    assert meeting.is_in_progress is True
+
+
+def test_is_in_progress_false_when_meeting_inactive(user_with_settings: User):
+    """A deactivated meeting is never in progress — deactivation ends the open-ended window."""
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = dt.datetime.now(dt.UTC) - timedelta(days=365)
+    meeting.end_datetime = None
+    meeting.active = False
+
+    assert meeting.is_in_progress is False
+
+
+def test_is_in_progress_bounded_true_within_window(user_with_settings: User):
+    """Both times set → in progress within [start, end)."""
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = now - timedelta(minutes=5)
+    meeting.end_datetime = now + timedelta(minutes=55)
+
+    assert meeting.is_in_progress is True
+
+
+def test_is_in_progress_bounded_false_after_end(user_with_settings: User):
+    """Both times set → not in progress once now >= end (bounded window closes)."""
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = now - timedelta(minutes=120)
+    meeting.end_datetime = now - timedelta(minutes=5)  # ended 5 min ago
+
+    assert meeting.is_in_progress is False
+
+
+def test_is_in_progress_bounded_false_before_start(user_with_settings: User):
+    """Both times set → not in progress before the start."""
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.datetime = now + timedelta(minutes=30)
+    meeting.end_datetime = now + timedelta(minutes=90)
+
+    assert meeting.is_in_progress is False

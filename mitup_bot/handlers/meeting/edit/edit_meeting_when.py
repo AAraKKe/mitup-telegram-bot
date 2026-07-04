@@ -109,14 +109,6 @@ async def callback_query_set_lock_on_start(session: AsyncSession, update: Update
     if meeting is None:
         return
 
-    if meeting.end_datetime is None:
-        await context.api.answer_callback_query(
-            update,
-            text=MeetingEditWhenMessages.LOCK_ON_START_ALERT.get_text(lang=meeting.user_language),
-            show_alert=True,
-        )
-        return
-
     meeting.lock_on_start = not meeting.lock_on_start
 
     await context.api.edit_message(update=update, view=meeting.when_view)

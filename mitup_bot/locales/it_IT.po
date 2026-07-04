@@ -500,9 +500,6 @@ msgstr "✅ Questo incontro è terminato ✅\n\n<b>Durata:</b> ${duration} minut
 msgid "MeetingEditDurationMessages.ON_EXIT"
 msgstr "Mi dispiace, mi aspettavo la durata in minuti. Vuoi inviarlo? In caso contrario, tocca Annulla per uscire."
 
-msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
-msgstr "Devi impostare una durata prima di abilitare questa opzione."
-
 msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "Questo incontro è già iniziato e la sua lista di partecipanti è bloccata."
 

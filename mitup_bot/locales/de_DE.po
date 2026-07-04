@@ -730,9 +730,6 @@ msgstr "<b>Liste aktualisiert</b>\n\nBenutzer <b>${name}</b> wurde zum Treffen <
 msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "Dieses Treffen hat bereits begonnen und seine Teilnehmerliste ist gesperrt."
 
-msgid "MeetingEditWhenMessages.LOCK_ON_START_ALERT"
-msgstr "Du musst eine Dauer festlegen, bevor du diese Option aktivierst."
-
 msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
 msgstr "✅ Dieses Treffen ist beendet ✅\n\n<b>Dauer:</b> ${duration} Minuten · <b>Teilnehmer:</b> ${attendee_count}"
 
