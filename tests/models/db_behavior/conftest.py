@@ -15,6 +15,8 @@ from testcontainers.postgres import PostgresContainer
 from mitup_bot import db
 from mitup_bot.config import DbConfig
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.monitoring import MetricsClient
+from tests.helpers import make_test_metrics_client
 
 USERNAME = "mitupbot"
 PAST_MEETINGS = "12345pass"
@@ -105,9 +107,16 @@ def migrated_db(live_db_config: DbConfig) -> Generator[DbConfig]:
                 os.environ[key] = original_value
 
 
+@pytest.fixture(scope="session")
+def pool_metrics_client() -> MetricsClient:
+    return make_test_metrics_client()
+
+
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
-async def db_session(migrated_db: DbConfig) -> AsyncGenerator[AsyncSession]:
-    db.configure_db(migrated_db, skip_if_initialized=True)
+async def db_session(migrated_db: DbConfig, pool_metrics_client: MetricsClient) -> AsyncGenerator[AsyncSession]:
+    # The recording client instruments the real pool so integration tests can assert the
+    # pool metrics emitted by actual checkouts (see test_pool_metrics.py).
+    db.configure_db(migrated_db, skip_if_initialized=True, metrics_client=pool_metrics_client)
     async with db.begin() as session:
         yield session
 

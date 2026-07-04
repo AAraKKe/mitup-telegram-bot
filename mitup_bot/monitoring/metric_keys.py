@@ -107,6 +107,14 @@ class MetricKey(CamelCaseStrEnum):
     JOINED_ONLY_USERS = auto()
     """Number of JOINED_ONLY users deleted after all their meetings were deactivated"""
     JOINED_ONLY_USERS_DELETED = auto()
+    """Gauge of pooled DB connections currently checked out (emitted on checkout and checkin)"""
+    DB_POOL_CONNECTIONS_IN_USE = auto()
+    """New physical DB connections opened by the pool (growth and overflow churn)"""
+    DB_POOL_CONNECTIONS_OPENED = auto()
+    """Milliseconds a transaction waited to check out a pooled DB connection"""
+    DB_POOL_CHECKOUT_WAIT_TIME = auto()
+    """Checkout attempts that gave up after waiting pool_timeout seconds for an exhausted pool"""
+    DB_POOL_TIMEOUT = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

@@ -19,11 +19,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 log = structlog.get_logger(__name__)
 
-# A cap of 1 keeps update processing observably sequential, exactly as before the custom
-# processor. #190 will replace this constant with a config-driven cap once handlers are
-# safe to overlap across different (user, chat) pairs.
-MAX_CONCURRENT_UPDATES = 1
-
 
 class MitupRuntime:
     """
@@ -43,12 +38,14 @@ class MitupRuntime:
         )
         configure_logging(self.env, self.config.app.log_level)
         self.app = self.__build_application()
+        # Metrics before db: the pool-metrics client emits through the process-global EMF
+        # configuration, which must be in place before the db layer starts using it.
+        self.__configure_metrics()
         self.__setup_db()
         self.__setup_timezone_api()
-        self.__configure_metrics()
 
     def __setup_db(self):
-        db.configure_db(self.config.db)
+        db.configure_db(self.config.db, metrics_client=MetricsClient(EmfBackend()))
 
     def __setup_timezone_api(self):
         timezone_api.configure(self.config.google_api)
@@ -68,8 +65,9 @@ class MitupRuntime:
         builder.rate_limiter(AIORateLimiter(max_retries=self.config.bot.retries_on_throttle))
 
         # Updates sharing a (user, chat) key are serialized by construction; distinct keys may
-        # overlap once the cap rises above 1.
-        builder.concurrent_updates(PerUserUpdateProcessor(MAX_CONCURRENT_UPDATES))
+        # overlap once the cap rises above 1. The default cap of 1 keeps processing observably
+        # sequential — raising it via config is the deliberate concurrency flip (#190).
+        builder.concurrent_updates(PerUserUpdateProcessor(self.config.bot.concurrent_updates))
 
         # In webhook mode, FastAPI feeds updates directly into Application.process_update so
         # the built-in Updater is unused. Polling mode keeps the default Updater (we drive it

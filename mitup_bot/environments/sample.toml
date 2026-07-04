@@ -14,6 +14,11 @@
 # of the bot related features of the telegram-bot package
 # Secret token. Get one through BothFather and add it here.
 token = "123123123987987987"
+# Cap on updates the bot processes concurrently. 1 keeps update handling strictly
+# sequential. Must fit the db pool: concurrent_updates <= pool_size + max_overflow - 2
+# (headroom for the job queue and reconcile transactions); startup fails otherwise.
+# Optional; defaults to 1 when omitted.
+concurrent_updates = 1
 
 [db]
 # Database connection configuration

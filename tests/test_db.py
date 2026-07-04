@@ -6,6 +6,7 @@ from unittest import mock
 import pytest
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.error import BadRequest, Forbidden, TimedOut
 from telegram.ext import ExtBot
@@ -16,7 +17,7 @@ from mitup_bot.config import DbConfig
 from mitup_bot.models import Meetup, MeetupLocation
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
 from tests.helpers import make_test_metrics_client
 from tests.helpers.db_errors import integrity_error
@@ -31,6 +32,7 @@ def reset_db():
     # validate its behavior
     yield
     db.__sessionmaker = None
+    db.__pool_metrics = None
 
 
 @pytest.fixture(
@@ -84,6 +86,65 @@ def test_db_cannot_be_configured_twice(db_config: DbConfig):
         max_overflow=db_config.max_overflow,
         pool_timeout=db_config.pool_timeout,
     )
+
+
+def test_configure_db_with_metrics_client_instruments_pool(db_config: DbConfig):
+    pool_metrics_client = make_test_metrics_client()
+
+    with (
+        mock.patch("mitup_bot.db.async_sessionmaker"),
+        mock.patch("mitup_bot.db.create_async_engine") as mock_engine,
+        mock.patch("mitup_bot.db.instrument_pool") as mock_instrument,
+    ):
+        db.configure_db(db_config, metrics_client=pool_metrics_client)
+
+    mock_instrument.assert_called_once_with(mock_engine.return_value, pool_metrics_client)
+
+
+def test_configure_db_without_metrics_client_skips_instrumentation(db_config: DbConfig):
+    with (
+        mock.patch("mitup_bot.db.async_sessionmaker"),
+        mock.patch("mitup_bot.db.create_async_engine"),
+        mock.patch("mitup_bot.db.instrument_pool") as mock_instrument,
+    ):
+        db.configure_db(db_config)
+
+    mock_instrument.assert_not_called()
+
+
+async def test_begin_emits_checkout_wait_time(mock_session: MockDbSession):
+    pool_metrics_client = make_test_metrics_client()
+    db.__pool_metrics = pool_metrics_client
+
+    async with db.begin():
+        ...
+
+    MetricAssertions(pool_metrics_client).assert_emitted(
+        name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME, value=None, unit=MetricUnit.MILLISECONDS, times=1
+    )
+
+
+async def test_begin_emits_pool_timeout_and_reraises(mock_session: MockDbSession):
+    pool_metrics_client = make_test_metrics_client()
+    db.__pool_metrics = pool_metrics_client
+    mock_session.connection = mock.AsyncMock(side_effect=PoolTimeoutError("QueuePool limit reached"))
+
+    with pytest.raises(PoolTimeoutError):
+        async with db.begin():
+            raise AssertionError("the transaction body must not run without a connection")
+
+    pool_assertions = MetricAssertions(pool_metrics_client)
+    pool_assertions.assert_emitted(name=MetricKey.DB_POOL_TIMEOUT, value=1, times=1)
+    # A timed-out checkout never acquired a connection, so no wait time is recorded for it.
+    pool_assertions.assert_not_emitted(name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME)
+
+
+async def test_begin_without_pool_metrics_stays_silent(mock_session: MockDbSession):
+    async with db.begin():
+        ...
+
+    # No metrics client was configured: the eager connection acquisition must not blow up.
+    mock_session.connection.assert_awaited_once()
 
 
 async def test_cannot_get_transaction_without_configuring_db():

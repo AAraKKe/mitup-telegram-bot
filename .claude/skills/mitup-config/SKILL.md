@@ -54,15 +54,19 @@ Values are auto-converted: `"true"`/`"false"` → `bool`, numeric strings → `i
 | Section | Class | Purpose |
 |---------|-------|---------|
 | `db` | `DbConfig` | Database connection (username, password, url, port, database) |
-| `bot` | `BotConfig` | Telegram bot token, webhook domain/port/secret, rate limits |
+| `bot` | `BotConfig` | Telegram bot token, webhook domain/port/secret, rate limits, update-concurrency cap |
 | `google_api` | `GoogleApiConfig` | Google Maps geocoding and timezone API keys |
 | `app` | `AppConfig` | Run mode (`POLLING` or `WEBHOOK`) |
 | `metrics` | `MetricsConfig` | CloudWatch namespace, metrics environment, flush behavior |
 
+## Cross-section invariants
+
+Invariants spanning multiple sections live as `model_validator`s on `Config` itself (per-field rules stay on the section model). Example: `bot.concurrent_updates` must fit the DB connection budget (`db.pool_size + db.max_overflow - POOL_CONNECTION_HEADROOM`) — a violation is a startup `ValidationError`, never a runtime surprise.
+
 ## Adding a new config field
 
 1. Add the field to the appropriate Pydantic model in `config.py` (e.g., `BotConfig`, `DbConfig`). Use `SecretStr` for tokens, passwords, and API keys.
-2. Add the value to **all** TOML files in `mitup_bot/environments/`. At minimum: `dev.toml`, `prod.toml`, `sample.toml`.
+2. Document the field in `sample.toml` (always, with its default noted). Fields with a safe default may be omitted from the other environment TOMLs — established practice for defaulted fields (`engine_echo`, the pool fields, `concurrent_updates`), and required when rollout happens via `MITUPBOT__` env-var overrides so revert stays config-only. Fields WITHOUT a safe default go in **all** TOMLs: `dev.toml`, `prod.toml`, `sample.toml`.
 3. Document the corresponding environment variable override if applicable.
 4. If adding an entirely new section, create a new Pydantic model and add it as a field on `Config`.
 

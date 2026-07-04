@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Protocol
 
 import structlog
-from pydantic import BaseModel, SecretStr, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from sqlalchemy import URL
 
 from . import environments
@@ -172,6 +172,10 @@ class BotConfig(BaseModel):
     secret_token: SecretStr | None = None
     max_connections: int = 100
     retries_on_throttle: int = 3
+    # Cap on updates the PTB application processes concurrently. 1 keeps update handling
+    # strictly sequential; raising it is the deliberate concurrency flip (#190), done via
+    # env var override at rollout time so the revert stays config-only.
+    concurrent_updates: int = Field(default=1, ge=1)
 
 
 class GoogleApiConfig(BaseModel):
@@ -185,6 +189,11 @@ class MetricsConfig(BaseModel):
     namespace: str
     environment: MetricsEnv
     flush_on_emission: bool = False
+
+
+# Connections kept free for work that runs outside update handlers: the job queue and the
+# post-fan-out reconcile transactions must never find the pool fully claimed by handlers.
+POOL_CONNECTION_HEADROOM = 2
 
 
 class Config(BaseModel):
@@ -209,6 +218,20 @@ class Config(BaseModel):
     google_api: GoogleApiConfig
     app: AppConfig
     metrics: MetricsConfig
+
+    @model_validator(mode="after")
+    def validate_concurrency_fits_pool(self) -> Config:
+        """Fail at boot when the update-concurrency cap could exhaust the connection pool —
+        a misconfigured cap must be a startup error, not a runtime pool-timeout mystery."""
+        connection_budget = self.db.pool_size + self.db.max_overflow - POOL_CONNECTION_HEADROOM
+        if self.bot.concurrent_updates > connection_budget:
+            raise ValueError(
+                f"bot.concurrent_updates ({self.bot.concurrent_updates}) exceeds the connection budget: "
+                f"db.pool_size ({self.db.pool_size}) + db.max_overflow ({self.db.max_overflow}) "
+                f"- {POOL_CONNECTION_HEADROOM} headroom for the job queue and reconcile transactions "
+                f"= {connection_budget}. Raise the pool sizing or lower the cap."
+            )
+        return self
 
     @staticmethod
     def from_providers(*providers: ConfigProvider) -> Config:

@@ -23,6 +23,7 @@ from mitup_bot.config import (
     RunModes,
     TomlConfigProvider,
 )
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.update_processor import PerUserUpdateProcessor
 
 
@@ -31,6 +32,7 @@ def _build_config(
     run_mode: RunModes = RunModes.POLLING,
     domain: str | None = None,
     secret_token: SecretStr | None = None,
+    concurrent_updates: int = 1,
 ) -> Config:
     return Config(
         db=DbConfig(
@@ -43,6 +45,7 @@ def _build_config(
             token=SecretStr("fake-bot-token"),
             domain=domain,
             secret_token=secret_token,
+            concurrent_updates=concurrent_updates,
         ),
         google_api=GoogleApiConfig(
             gmaps_geocode_key=SecretStr("geocode-key"),
@@ -143,7 +146,11 @@ def test_init_calls_config_from_providers_with_toml_provider(env: Env, _patch_ru
 def test_init_configures_db(_patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
-    _patch_runtime_deps.db.assert_called_once_with(runtime.config.db)
+    _patch_runtime_deps.db.assert_called_once()
+    configure_call = _patch_runtime_deps.db.call_args
+    assert configure_call.args == (runtime.config.db,)
+    # The runtime must hand the db layer a metrics client so the pool gets instrumented.
+    assert isinstance(configure_call.kwargs["metrics_client"], MetricsClient)
 
 
 def test_init_configures_timezone_api(_patch_runtime_deps: RuntimeDeps):
@@ -185,7 +192,18 @@ def test_builder_sets_per_user_update_processor(_patch_runtime_deps: RuntimeDeps
     _patch_runtime_deps.builder_instance.concurrent_updates.assert_called_once()
     (processor,) = _patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
     assert isinstance(processor, PerUserUpdateProcessor)
-    assert processor.max_concurrent_updates == 1  # MAX_CONCURRENT_UPDATES stays at 1 until #190
+    assert processor.max_concurrent_updates == 1  # the config default keeps processing sequential
+
+
+def test_concurrency_cap_flows_from_config_into_processor(_patch_runtime_deps: RuntimeDeps):
+    config = _build_config(concurrent_updates=4)
+
+    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+        MitupRuntime(Env.DEV)
+
+    (processor,) = _patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
+    assert isinstance(processor, PerUserUpdateProcessor)
+    assert processor.max_concurrent_updates == 4
 
 
 def test_bind_called_with_built_app(_patch_runtime_deps: RuntimeDeps):

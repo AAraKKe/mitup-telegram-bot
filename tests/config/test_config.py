@@ -1,10 +1,22 @@
 from unittest import mock
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 from sqlalchemy import URL
 
-from mitup_bot.config import AppConfig, Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
+from mitup_bot.config import (
+    AppConfig,
+    BotConfig,
+    Config,
+    DbConfig,
+    Env,
+    EnvVariablesConfigProvider,
+    GoogleApiConfig,
+    MetricsConfig,
+    MetricsEnv,
+    RunModes,
+    TomlConfigProvider,
+)
 
 TOML_CONTENT = """
 [db]
@@ -105,6 +117,51 @@ def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
     assert exc_info.value.errors()[3]["loc"] == ("metrics", "environment")
 
     assert exc_info.value.title == "Config"
+
+
+def build_config(*, concurrent_updates: int = 1, pool_size: int = 5, max_overflow: int = 10) -> Config:
+    return Config(
+        db=DbConfig(
+            username="user",
+            password=SecretStr("password"),
+            url="testhost",
+            database="db",
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+        ),
+        bot=BotConfig(token=SecretStr("fake-bot-token"), concurrent_updates=concurrent_updates),
+        google_api=GoogleApiConfig(
+            gmaps_geocode_key=SecretStr("geocode-key"),
+            gmaps_timezone_key=SecretStr("timezone-key"),
+        ),
+        app=AppConfig(run_mode=RunModes.POLLING),
+        metrics=MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT),
+    )
+
+
+def test_bot_config_concurrent_updates_defaults_to_sequential():
+    config = BotConfig(token=SecretStr("fake-bot-token"))
+
+    assert config.concurrent_updates == 1
+
+
+def test_bot_config_concurrent_updates_must_be_positive():
+    with pytest.raises(ValidationError) as exc_info:
+        BotConfig(token=SecretStr("fake-bot-token"), concurrent_updates=0)
+
+    assert exc_info.value.errors()[0]["loc"] == ("concurrent_updates",)
+
+
+def test_concurrency_cap_at_connection_budget_accepted():
+    # pool_size 10 + max_overflow 5 - 2 headroom = 13: the largest cap that boots.
+    config = build_config(concurrent_updates=13, pool_size=10, max_overflow=5)
+
+    assert config.bot.concurrent_updates == 13
+
+
+def test_concurrency_cap_exceeding_connection_budget_rejected():
+    with pytest.raises(ValidationError, match="exceeds the connection budget"):
+        build_config(concurrent_updates=14, pool_size=10, max_overflow=5)
 
 
 def test_app_config_log_level_defaults_to_info():

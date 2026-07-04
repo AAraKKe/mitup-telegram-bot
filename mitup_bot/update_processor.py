@@ -1,9 +1,10 @@
 """Update processor that serializes updates sharing the same (user, chat) key.
 
 At a concurrency cap of 1 PTB's own semaphore already processes every update sequentially, so
-the keyed locks are belt-and-braces today; they become load-bearing when #190 raises the cap
-and different (user, chat) pairs start overlapping. In-process locks are sufficient because
-the bot always runs a single uvicorn worker (see the comment in MitupRuntime.run).
+the keyed locks are belt-and-braces; they become load-bearing when the configured cap
+(`bot.concurrent_updates`, #190) rises above 1 and different (user, chat) pairs start
+overlapping. In-process locks are sufficient because the bot always runs a single uvicorn
+worker (see the comment in MitupRuntime.run).
 """
 
 import asyncio

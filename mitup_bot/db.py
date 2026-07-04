@@ -1,4 +1,5 @@
 import functools
+import time
 from collections import Counter
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
@@ -7,22 +8,27 @@ from typing import Any, Concatenate, Literal, Protocol, overload
 
 import structlog
 from pydantic import BaseModel, ValidationError
+from sqlalchemy import Engine, event
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import ConnectionPoolEntry, PoolProxiedConnection, QueuePool
 from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.api_wrapper import ApiOutbox, TelegramApi
 from mitup_bot.config import DbConfig
 from mitup_bot.models import MeetupLocation, Message, MessageButtons, User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 log = structlog.get_logger(__name__)
 
 __sessionmaker: async_sessionmaker[AsyncSession] | None = None
 __connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")
 __active_connections: Counter[str] = Counter()
+__pool_metrics: MetricsClient | None = None
 
 
 class DbNotInitializedError(RuntimeError):
@@ -60,9 +66,16 @@ def get_open_connections(context: str) -> int:
     return __active_connections[context]
 
 
-def configure_db(db_config: DbConfig, skip_if_initialized: bool = False) -> None:
-    """Configure the db module by creating the engine and the session factory"""
-    global __sessionmaker
+def configure_db(
+    db_config: DbConfig, skip_if_initialized: bool = False, metrics_client: MetricsClient | None = None
+) -> None:
+    """Configure the db module by creating the engine and the session factory.
+
+    Passing a `metrics_client` enables connection-pool observability: pool-event gauges plus
+    the checkout wait time and pool-timeout counters emitted by `begin()`. Callers without a
+    metrics pipeline (CLI commands, unit tests) omit it and get an uninstrumented pool.
+    """
+    global __sessionmaker, __pool_metrics
 
     if __sessionmaker is not None and not skip_if_initialized:
         raise DbAlreadyInitializedError()
@@ -76,9 +89,68 @@ def configure_db(db_config: DbConfig, skip_if_initialized: bool = False) -> None
         max_overflow=db_config.max_overflow,
         pool_timeout=db_config.pool_timeout,
     )
+    __pool_metrics = metrics_client
+    if metrics_client is not None:
+        instrument_pool(engine, metrics_client)
     # expire_on_commit=False: nothing reads ORM objects after the transaction commits, and
     # expired attributes would otherwise trigger implicit (greenlet-unsafe) loads on access.
     __sessionmaker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+
+def checked_out_connections(sync_engine: Engine) -> int:
+    pool = sync_engine.pool
+    # create_async_engine always builds an AsyncAdaptedQueuePool, a QueuePool subclass.
+    assert isinstance(pool, QueuePool)
+    return pool.checkedout()
+
+
+def instrument_pool(engine: AsyncEngine, metrics: MetricsClient):
+    """Attach pool-event listeners emitting the in-use gauge and connection-open counter.
+
+    The listeners are synchronous (SQLAlchemy pool events) so they only accumulate records;
+    `begin()` flushes the shared client once per transaction, after the checkin has fired.
+    """
+    sync_engine = engine.sync_engine
+
+    @event.listens_for(sync_engine, "connect")
+    def emit_connection_opened(dbapi_connection: DBAPIConnection, connection_record: ConnectionPoolEntry):
+        metrics.emit(MetricKey.DB_POOL_CONNECTIONS_OPENED)
+
+    @event.listens_for(sync_engine, "checkout")
+    def emit_checkout_gauge(
+        dbapi_connection: DBAPIConnection,
+        connection_record: ConnectionPoolEntry,
+        connection_proxy: PoolProxiedConnection,
+    ):
+        metrics.emit(MetricKey.DB_POOL_CONNECTIONS_IN_USE, checked_out_connections(sync_engine))
+
+    @event.listens_for(sync_engine, "checkin")
+    def emit_checkin_gauge(dbapi_connection: DBAPIConnection, connection_record: ConnectionPoolEntry):
+        # The checkin event fires before the pool's bookkeeping releases the connection, so
+        # subtract the one being returned to report the post-release level (reaching 0 idle).
+        metrics.emit(MetricKey.DB_POOL_CONNECTIONS_IN_USE, checked_out_connections(sync_engine) - 1)
+
+
+async def acquire_timed_connection(session: AsyncSession):
+    """Eagerly check out the transaction's connection, measuring the pool wait.
+
+    Without this the checkout happens lazily on the first statement, which would smear pool
+    waits (and pool-timeout errors) across arbitrary handler code instead of surfacing them
+    deterministically at transaction start.
+    """
+    checkout_started = time.perf_counter()
+    try:
+        await session.connection()
+    except PoolTimeoutError:
+        if __pool_metrics is not None:
+            __pool_metrics.emit(MetricKey.DB_POOL_TIMEOUT)
+        raise
+    if __pool_metrics is not None:
+        __pool_metrics.emit(
+            MetricKey.DB_POOL_CHECKOUT_WAIT_TIME,
+            (time.perf_counter() - checkout_started) * 1000,
+            MetricUnit.MILLISECONDS,
+        )
 
 
 @asynccontextmanager
@@ -93,12 +165,17 @@ async def begin() -> AsyncGenerator[AsyncSession]:
         __active_connections[context] += 1
         try:
             async with session.begin():
+                await acquire_timed_connection(session)
                 # Anything in here is considered to be in a transaction
                 # Any fault raised when this context is handled will trigger a rollback
                 # in the ongoing transaction
                 yield session
         finally:
             __active_connections[context] -= 1
+            if __pool_metrics is not None:
+                # The commit above released the connection, so this transaction's checkin
+                # gauge is already accumulated: one EMF line flushed per transaction.
+                await __pool_metrics.flush()
 
 
 def _loaded_attributes(obj: object) -> set[str]:
