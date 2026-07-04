@@ -307,24 +307,46 @@ async def test_write_mode_requires_a_context_like_argument():
         await not_a_handler(object())
 
 
-async def test_write_mode_accepts_bare_api_as_last_argument(
+# ---------------------------------------------------------------------------
+# begin_write: the lifecycle primitive, driven directly (the CLI batch-job form)
+# ---------------------------------------------------------------------------
+
+
+async def test_begin_write_commits_before_queued_calls_drain(
     mock_session: MockDbSession, write_context: SimpleNamespace, fanout_bot: mock.AsyncMock
 ):
-    """Non-handler callers (CLI batch jobs) have no MitupContext: passing the TelegramApi
-    itself as the last positional argument gets the same commit-before-fanout lifecycle."""
+    """Non-handler code (CLI batch jobs) has no MitupContext: it drives ``db.begin_write``
+    directly, one critical section per ``async with`` block, and gets the same
+    commit-before-fanout ordering the write-mode decorator provides."""
     events: list[str] = []
     mock_session.begin.return_value.__aexit__.side_effect = lambda *exc_info: events.append("commit")
     fanout_bot.send_message.side_effect = lambda **kwargs: events.append("bot-send")
     user = create_user(id=1, tg_user_id=100)
+    api: TelegramApi = write_context.api
 
-    @db.with_session(write=True)
-    async def batch_job(session: AsyncSession, api: TelegramApi):
+    async with db.begin_write(api):
         await api.send_message_to_user(user, "swept")
-        events.append("job-returned")
+        events.append("body-finished")
 
-    await batch_job(write_context.api)
+    assert events == ["body-finished", "commit", "bot-send"]
 
-    assert events == ["job-returned", "commit", "bot-send"]
+
+async def test_begin_write_body_exception_discards_queue(
+    mock_session: MockDbSession, write_context: SimpleNamespace, fanout_bot: mock.AsyncMock
+):
+    user = create_user(id=1, tg_user_id=100)
+    api: TelegramApi = write_context.api
+
+    with pytest.raises(RuntimeError, match="sweep blew up"):
+        async with db.begin_write(api):
+            await api.send_message_to_user(user, "never delivered")
+            raise RuntimeError("sweep blew up")
+
+    # Nothing about the rolled-back state was rendered to anyone...
+    fanout_bot.send_message.assert_not_called()
+    assert mock_session.begin.return_value.__aexit__.await_args.args[0] is RuntimeError
+    # ...and capture mode was torn down: the next critical section can start its own.
+    api.begin_capture()
 
 
 @pytest.mark.parametrize(

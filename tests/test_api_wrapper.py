@@ -4,7 +4,6 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Message, Update
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
@@ -367,26 +366,23 @@ def make_inline_meeting() -> tuple[Meetup, MessageModel]:
 
 async def test_update_single_meeting_message_bot_chat(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=AsyncSession)
 
-    await telegram_api.update_single_meeting_message(msg, session, meeting)
+    await telegram_api.update_single_meeting_message(msg, meeting)
 
     bot.edit_message_text.assert_awaited_once()
     call_kwargs = bot.edit_message_text.call_args.kwargs
     assert call_kwargs["chat_id"] == msg.chat_id
     assert call_kwargs["message_id"] == msg.message_id
     assert call_kwargs["reply_markup"] is not None
-    # The rendered keyboard is persisted onto the row via MutableModel change tracking; no
-    # explicit session.add is needed (the message is already persistent or cascade-pending).
+    # The rendered keyboard is persisted onto the row via MutableModel change tracking with
+    # the caller's surrounding transaction.
     assert msg.buttons.keyboard
-    session.add.assert_not_called()
 
 
 async def test_update_single_meeting_message_inline(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_inline_meeting()
-    session = MagicMock(spec=AsyncSession)
 
-    await telegram_api.update_single_meeting_message(msg, session, meeting)
+    await telegram_api.update_single_meeting_message(msg, meeting)
 
     bot.edit_message_text.assert_awaited_once()
     call_kwargs = bot.edit_message_text.call_args.kwargs
@@ -410,11 +406,8 @@ async def test_update_single_meeting_message_state_flags(
     expected_text_fragment: str,
 ):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=AsyncSession)
 
-    await telegram_api.update_single_meeting_message(
-        msg, session, meeting, was_deleted=was_deleted, has_finished=has_finished
-    )
+    await telegram_api.update_single_meeting_message(msg, meeting, was_deleted=was_deleted, has_finished=has_finished)
 
     call_kwargs = bot.edit_message_text.call_args.kwargs
     assert call_kwargs["reply_markup"] is None
@@ -426,14 +419,13 @@ async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
 ):
     meeting_bot, msg_bot = make_bot_chat_meeting()
     meeting_inline, msg_inline = make_inline_meeting()
-    session = MagicMock(spec=AsyncSession)
 
-    await telegram_api.update_single_meeting_message(msg_bot, session, meeting_bot)
+    await telegram_api.update_single_meeting_message(msg_bot, meeting_bot)
     bot_chat_text = bot.edit_message_text.call_args.kwargs["text"]
 
     bot.reset_mock()
 
-    await telegram_api.update_single_meeting_message(msg_inline, session, meeting_inline)
+    await telegram_api.update_single_meeting_message(msg_inline, meeting_inline)
     inline_text = bot.edit_message_text.call_args.kwargs["text"]
 
     assert isinstance(bot_chat_text, str)
@@ -442,21 +434,21 @@ async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
 
 async def test_update_single_meeting_message_not_modified_is_swallowed(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=AsyncSession)
     bot.edit_message_text.side_effect = BadRequest("Message is not modified: ...")
 
     # Verifies the wiring: update_single_meeting_message routes errors through handle_edit_errors
-    await telegram_api.update_single_meeting_message(msg, session, meeting)
+    await telegram_api.update_single_meeting_message(msg, meeting)
 
 
-async def test_update_single_meeting_message_not_found_deletes_message(telegram_api: TelegramApi, bot: AsyncMock):
+async def test_update_single_meeting_message_not_found_is_swallowed_in_immediate_mode(
+    telegram_api: TelegramApi, bot: AsyncMock
+):
     meeting, msg = make_bot_chat_meeting()
-    session = MagicMock(spec=AsyncSession)
     bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
 
-    await telegram_api.update_single_meeting_message(msg, session, meeting)
-
-    session.delete.assert_called_once_with(msg)
+    # No DB cleanup happens here: the dead row is recorded and deleted only by the write
+    # lifecycle's reconcile (see test_execute_queued_records_dead_message_for_reconcile).
+    await telegram_api.update_single_meeting_message(msg, meeting)
 
 
 # ---------------------------------------------------------------------------
@@ -472,10 +464,8 @@ async def test_update_meeting_messages_current_updated_first_then_others(telegra
         id=2, inline_message_id="inline_other", chat_instance="ci", chat_id=None, message_id=None, meetup_id=10
     )
     meeting.messages = [other_msg]
-    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
-        session=session,
         meeting=meeting,
         current_message=current_msg,
     )
@@ -491,10 +481,8 @@ async def test_update_meeting_messages_skip_current(telegram_api: TelegramApi, b
         id=2, inline_message_id="inline_other", chat_instance="ci", chat_id=None, message_id=None, meetup_id=10
     )
     meeting.messages = [current_msg, other_msg]
-    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
-        session=session,
         meeting=meeting,
         current_message=current_msg,
         skip_current=True,
@@ -513,10 +501,8 @@ async def test_update_meeting_messages_no_current_message(telegram_api: Telegram
         id=2, inline_message_id="inline_2", chat_instance="ci2", chat_id=None, message_id=None, meetup_id=10
     )
     meeting.messages = [msg1, msg2]
-    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
-        session=session,
         meeting=meeting,
     )
 
@@ -542,10 +528,8 @@ async def test_update_meeting_messages_state_flag_propagated(
     create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(id=1, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
     meeting.messages = [msg]
-    session = MagicMock(spec=AsyncSession)
 
     await telegram_api.update_meeting_messages(
-        session=session,
         meeting=meeting,
         current_message=msg,
         was_deleted=was_deleted,

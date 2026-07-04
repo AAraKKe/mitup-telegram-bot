@@ -35,9 +35,11 @@ class MetricKey(CamelCaseStrEnum):
     INACTIVE_USER_SET = auto()
     """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
     INACTIVE_USERS_DELETED = auto()
-    """Number of notifications failed to send"""
+    """Number of joined links whose starting-soon write lifecycle raised (rolled back
+    pre-commit, or aborted mid-drain by a systemic network error after the flag committed)"""
     NOTIFICATIONS_FAILED = auto()
-    """Number of notifications sent when a meeting is about to start"""
+    """Number of starting-soon notifications enqueued in committed per-link transactions
+    (post-commit delivery failures surface as Fault metrics, not here)"""
     NOTIFICATIONS_SENT = auto()
     """Show how many notifications should be sent when a meeting is about to start"""
     NOTIFICATIONS_TO_SEND = auto()
@@ -75,9 +77,11 @@ class MetricKey(CamelCaseStrEnum):
     DB_CONNECTIONS_LEAKED = auto()
     """Number of meetings processed by the notify-meeting-started task"""
     MEETINGS_STARTED_PROCESSED = auto()
-    """Number of started-meeting notifications successfully sent"""
+    """Number of started-meeting notifications enqueued in committed per-meeting transactions
+    (post-commit delivery failures surface as Fault metrics, not here)"""
     STARTED_NOTIFICATIONS_SENT = auto()
-    """Number of started-meeting notifications that failed to send"""
+    """Number of meetings whose started-notification write lifecycle raised (rolled back
+    pre-commit, or aborted mid-drain by a systemic network error after the commit)"""
     STARTED_NOTIFICATIONS_FAILED = auto()
     """Telegram rejected the webhook request with a 403 Forbidden response"""
     WEBHOOK_FORBIDDEN = auto()

@@ -139,7 +139,6 @@ async def test_confirm_clear_times(
         meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user_with_settings.lang)),
     )
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,
@@ -214,7 +213,6 @@ async def test_lock_on_start_toggle(
 
     context.api.assert_edit_message_called(update, meeting.when_view)
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(update),  # None -- no message registered
         skip_current=True,

@@ -60,7 +60,6 @@ async def test_existing_user_joins_own_meeting(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -143,7 +142,6 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
 
     # The surrounding message-update work still runs.
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -309,7 +307,6 @@ async def test_user_leaves_meeting(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -388,7 +385,6 @@ async def test_leave_creates_new_message_when_no_existing_message_found(
     mock_session.assert_not_flushed()
 
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=meeting,
         current_message=meeting.messages[0],
     )

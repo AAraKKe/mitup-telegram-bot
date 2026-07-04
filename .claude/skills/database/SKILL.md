@@ -31,22 +31,21 @@ async def my_handler(session: AsyncSession, update: Update, context: MitupContex
 await my_handler(update, context)
 ```
 
-### Write mode: `@with_session(write=True)`
+### Write mode: `begin_write` and `@with_session(write=True)`
 
-Handlers that **mutate state and then fan out over Telegram** (edit meeting messages, notify users) use write mode. The decorator owns the whole two-phase lifecycle — ordering is infrastructure, not author discipline:
+Code that **mutates state and then fans out over Telegram** (edit meeting messages, notify users) uses the write lifecycle. The `db.begin_write(api)` async context manager owns the whole two-phase lifecycle — ordering is infrastructure, not author discipline:
 
-1. `context.api` is switched into capture mode: every `context.api.*` call enqueues a plain-data snapshot instead of executing (see the `api-wrapper` skill).
-2. The handler runs and the transaction **commits**, releasing the pooled connection and any per-meeting row lock.
+1. The api is switched into capture mode: every `api.*` call enqueues a plain-data snapshot instead of executing (see the `api-wrapper` skill).
+2. The body runs and the transaction **commits**, releasing the pooled connection and any per-meeting row lock.
 3. The queued Telegram calls execute in order, and their DB fix-ups (dead message rows, unreachable users) are applied in one short reconcile transaction.
 
-Handler bodies keep their linear style — only the execution time of the api calls moves. Rules of thumb:
+Handlers use it through `@with_session(write=True)`, a thin wrapper that captures on `context.api`; non-handler code (CLI batch jobs) has no `MitupContext` and drives the context manager directly, one `async with db.begin_write(api)` block per critical section — per meeting or per joined link, whichever row carries the job's flag (see the broadcast jobs in `mitup_bot/cli/`, e.g. `inactive_meetings.py`). Bodies keep their linear style — only the execution time of the api calls moves. Rules of thumb:
 
 - **Broadcast ⇒ write mode.** Every handler that mutates state and then fans out over Telegram — whether it takes the per-meeting row lock (participant, capacity, or meeting-existence mutations) or just calls `update_meeting_messages` / notifies users — uses write mode; locking paths MUST commit before their fan-out. Plain `@with_session` stays for read-only handlers.
-- Never pass `session=` to `update_meeting_messages` from a handler — payloads are snapshotted at enqueue time and no live session may cross into the fan-out. The parameter exists solely for the immediate-mode CLI callers (see the `api-wrapper` skill).
+- No live session ever crosses into the fan-out: `update_meeting_messages` renders plain-data payloads at enqueue time and takes no session (the old `session` parameter is gone — the reconcile transaction owns dead-message cleanup for every caller).
 - Drop defensive "flush before send" calls: commit-before-drain provides fail-early ordering structurally.
 - `context.api.immediate.X(...)` is the escape hatch for a call that must run pre-commit (its failure aborts the transaction). Keep usages rare and greppable.
-- If the handler raises, the queue is discarded with the rolled-back transaction — nothing about aborted state is rendered.
-- Write mode is not handler-only: non-handler locking code (CLI batch jobs) uses it too, passing the `TelegramApi` itself as the function's last argument — there is no `MitupContext` outside the PTB app, so the decorator captures on the api directly (see `mitup_bot/cli/inactive_meetings.py`).
+- If the body raises, the queue is discarded with the rolled-back transaction — nothing about aborted state is rendered.
 
 ### `racy_flush` — the single racy-write primitive
 
@@ -78,8 +77,8 @@ Meeting capacity and waiting-list logic is computed in Python over the loaded `j
 - **Lock ordering:** meeting row first, then anything else. Never lock two meetings in one transaction — every handler operates on a single meeting, which keeps the deadlock surface at zero.
 - `FOR UPDATE` applies only to the meetups row; the `selectin` follow-up loads run unlocked. That's correct: the row lock is what serializes writers, the link rows don't need locking.
 - Unconditional writes that make no participant-dependent decision (e.g. reactivation setting `active = True`) don't need the explicit lock — the flush-time UPDATE acquires it.
-- **The lock is never held across Telegram I/O:** every locking path runs under `@with_session(write=True)`, which commits (releasing the lock) before the queued fan-out executes. A new locking handler must use write mode too; `tests/models/db_behavior/test_commit_before_fanout.py` pins the release-at-commit property on real Postgres.
-- **Batch jobs are writers too:** a scheduled job that mutates meetings (e.g. the expiration sweep in `mitup_bot/cli/inactive_meetings.py`) takes the same per-meeting lock, re-checks its decision under the lock (the unlocked candidate sweep only nominates), and commits one transaction per meeting so locks are held briefly and a crash keeps the deactivations already committed.
+- **The lock is never held across Telegram I/O:** every locking path runs under the write lifecycle (`@with_session(write=True)` in handlers, `db.begin_write` in batch jobs), which commits (releasing the lock) before the queued fan-out executes. A new locking path must use write mode too; `tests/models/db_behavior/test_commit_before_fanout.py` and `tests/models/db_behavior/test_cli_write_lifecycle.py` pin the release-at-commit property on real Postgres.
+- **Batch jobs are writers too:** a scheduled job that mutates meetings (e.g. the expiration sweep in `mitup_bot/cli/inactive_meetings.py`) takes the same per-meeting lock, re-checks its decision under the lock (the unlocked candidate sweep only nominates), and wraps each meeting in its own `db.begin_write` block so locks are held briefly and a crash keeps the deactivations already committed.
 
 ## Models
 

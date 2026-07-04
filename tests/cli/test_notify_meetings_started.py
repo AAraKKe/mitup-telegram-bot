@@ -1,10 +1,10 @@
 from unittest.mock import ANY
 
 import pytest
-from telegram.error import Forbidden
 
 from mitup_bot.cli import notify_meetings_started
 from mitup_bot.cli.commands.recurrent_events import EventType
+from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
@@ -19,6 +19,11 @@ from tests.helpers import (
 )
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
+# Inactive-user handling is not exercised here: under the write lifecycle an unreachable
+# participant surfaces at drain time and is marked inactive by the reconcile transaction —
+# see the reconcile tests in tests/test_db.py and the real-Postgres lifecycle tests in
+# tests/models/db_behavior/test_cli_write_lifecycle.py.
+
 
 @pytest.fixture
 def metrics_client() -> MetricsClient:
@@ -28,6 +33,18 @@ def metrics_client() -> MetricsClient:
 @pytest.fixture
 def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
+
+
+def register_due_meetings(mock_session: MockDbSession, *meetings: Meetup, still_due: bool = True):
+    """Register a meeting for both reads the job performs: the unlocked candidate sweep and
+    the per-meeting re-check inside the write lifecycle (empty when ``still_due`` is False —
+    the meeting was flagged or deactivated between sweep and processing)."""
+    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, meetings)
+    for meeting in meetings:
+        mock_session.add_objects_with_statement(
+            notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT.where(Meetup.id == meeting.id),
+            (meeting,) if still_due else (),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +79,7 @@ def test_meetings_to_notify_started_query(mock_session: MockDbSession):
 async def test_no_meetings_to_notify(
     mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
 ):
-    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, ())
+    register_due_meetings(mock_session)
 
     await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
@@ -99,7 +116,7 @@ async def test_started_notification_sent_to_participants(
     create_joined_link(user=participant_a, meetup=meeting, id=1, is_waiting_list=False)
     create_joined_link(user=participant_b, meetup=meeting, id=2, is_waiting_list=False)
 
-    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
+    register_due_meetings(mock_session, meeting)
 
     await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
@@ -144,6 +161,46 @@ async def test_started_notification_sent_to_participants(
 
 
 # ---------------------------------------------------------------------------
+# Meeting no longer due at the per-meeting re-check — skipped, not failed
+# ---------------------------------------------------------------------------
+
+
+async def test_meeting_no_longer_due_is_skipped(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+):
+    """The per-meeting re-check found the meeting already flagged or deactivated: nothing is
+    sent, nothing fails — the next sweep re-evaluates from scratch."""
+    meeting = create_meetup(id=1, title="Already flagged meetup")
+    participant = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
+    create_joined_link(user=participant, meetup=meeting, id=1, is_waiting_list=False)
+
+    register_due_meetings(mock_session, meeting, still_due=False)
+
+    await notify_meetings_started.run(api, metrics_client)
+    await metrics_client.flush()
+
+    assert meeting.started_notification_sent is False
+    api.assert_method_just_called("update_meeting_messages", times=0)
+    api.assert_method_just_called("send_message_to_user", times=0)
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_STARTED_PROCESSED,
+        value=1,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
+        value=0,
+        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Waiting-list participants do NOT receive the notification
 # ---------------------------------------------------------------------------
 
@@ -157,7 +214,7 @@ async def test_waiting_list_participants_not_notified(
     create_joined_link(user=regular, meetup=meeting, id=1, is_waiting_list=False)
     create_joined_link(user=waiting, meetup=meeting, id=2, is_waiting_list=True)
 
-    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
+    register_due_meetings(mock_session, meeting)
 
     await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
@@ -180,15 +237,10 @@ async def test_waiting_list_participants_not_notified(
     )
 
     # The waiting-list user's send_message_to_user was never called
-    MitupView(
-        description=NotificationMessages.STARTED.get(lang=waiting.lang, meeting_title=meeting.title),
-        keyboard=[],
-    )
-    # assert it was called 0 times for the waiting user — use the low-level mock
     send_mock = api.mock_mapping.get("send_message_to_user")
-    if send_mock is not None:
-        for call in send_mock.call_args_list:
-            assert call.kwargs.get("user") is not waiting
+    assert send_mock is not None
+    for call in send_mock.call_args_list:
+        assert call.kwargs.get("user") is not waiting
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +253,8 @@ async def test_joined_only_participants_not_notified(
 ):
     """JOINED_ONLY users cannot be DM-ed; they must be filtered before send_message_to_user.
 
-    Were they included, every send would raise Forbidden — the iteration-time filter avoids that.
+    Were they included, every send would fail during the drain — the iteration-time filter
+    avoids ever enqueueing them.
     """
     meeting = create_meetup(id=1, title="Demo meetup")
     member_participant = create_user(
@@ -213,7 +266,7 @@ async def test_joined_only_participants_not_notified(
     create_joined_link(user=member_participant, meetup=meeting, id=1, is_waiting_list=False)
     create_joined_link(user=joined_only_participant, meetup=meeting, id=2, is_waiting_list=False)
 
-    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
+    register_due_meetings(mock_session, meeting)
 
     await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
@@ -232,114 +285,16 @@ async def test_joined_only_participants_not_notified(
 
     # The JOINED_ONLY user was never targeted.
     send_mock = api.mock_mapping.get("send_message_to_user")
-    if send_mock is not None:
-        for call in send_mock.call_args_list:
-            assert call.kwargs.get("user") is not joined_only_participant
+    assert send_mock is not None
+    for call in send_mock.call_args_list:
+        assert call.kwargs.get("user") is not joined_only_participant
 
-    # The JOINED_ONLY user's status is unchanged — handle_forbidden never ran for them.
+    # The JOINED_ONLY user's status is unchanged.
     assert joined_only_participant.status is UserStatus.JOINED_ONLY
 
 
 # ---------------------------------------------------------------------------
-# Forbidden → user marked inactive, no re-raise
-# ---------------------------------------------------------------------------
-
-
-async def test_forbidden_marks_user_inactive_and_does_not_raise(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
-):
-    meeting = create_meetup(id=1, title="Demo meetup")
-    participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
-    participant_b = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
-    create_joined_link(user=participant_a, meetup=meeting, id=1, is_waiting_list=False)
-    create_joined_link(user=participant_b, meetup=meeting, id=2, is_waiting_list=False)
-
-    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
-
-    send_mock = api.mock_method("send_message_to_user")
-    # First participant raises Forbidden, second succeeds
-    send_mock.side_effect = [Forbidden("blocked"), None]
-
-    await notify_meetings_started.run(api, metrics_client)
-    await metrics_client.flush()
-
-    # User whose send raised Forbidden is marked inactive via handle_forbidden
-    assert participant_a.status is UserStatus.LEFT
-    # Second user should remain active
-    assert participant_b.status is UserStatus.MEMBER
-
-    # The meeting's started flag is still set
-    assert meeting.started_notification_sent is True
-
-    # Forbidden is caught by handle_forbidden so the coroutine returns normally;
-    # gather sees both results as successes → sent=2, failed=0.
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=2,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-
-
-# ---------------------------------------------------------------------------
-# Non-Forbidden participant exception → logged, counter incremented, loop continues
-# ---------------------------------------------------------------------------
-
-
-async def test_non_forbidden_participant_exception_is_logged_and_counted(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
-):
-    """A non-Forbidden exception from send_message_to_user for a participant is caught by
-    gather, logged, and increments the failed counter.  The meeting loop continues to the
-    next participant and ultimately raises RuntimeError because failed > 0.
-    """
-    meeting = create_meetup(id=1, title="Demo meetup")
-    participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
-    participant_b = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
-    create_joined_link(user=participant_a, meetup=meeting, id=1, is_waiting_list=False)
-    create_joined_link(user=participant_b, meetup=meeting, id=2, is_waiting_list=False)
-
-    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
-
-    send_mock = api.mock_method("send_message_to_user")
-    # First participant raises a generic exception; second succeeds.
-    send_mock.side_effect = [Exception("Network failure"), None]
-
-    with pytest.raises(RuntimeError, match="Failed to process started notifications"):
-        await notify_meetings_started.run(api, metrics_client)
-
-    await metrics_client.flush()
-
-    # The second participant's send still succeeded → sent=1.
-    # The failed exception from the first send → failed=1.
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-
-
-# ---------------------------------------------------------------------------
-# Failed meeting increments counter and raises RuntimeError at the end
+# Failed meeting increments counter, does not block others, raises at the end
 # ---------------------------------------------------------------------------
 
 
@@ -352,9 +307,7 @@ async def test_failed_meeting_increments_counter_and_raises(
     meeting_fail = create_meetup(id=2, title="Bad meeting")
     create_user(id=2, tg_user_id=2, owned_meetings=[meeting_fail], settings=create_settings(id=2, language=lang))
 
-    mock_session.add_objects_with_statement(
-        notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting_ok, meeting_fail)
-    )
+    register_due_meetings(mock_session, meeting_ok, meeting_fail)
 
     # Second call to update_meeting_messages raises
     api.mock_method("update_meeting_messages").side_effect = [None, RuntimeError("Boom")]
@@ -364,7 +317,8 @@ async def test_failed_meeting_increments_counter_and_raises(
 
     await metrics_client.flush()
 
-    # First meeting was processed successfully
+    # First meeting committed in its own write lifecycle, so the second meeting's failure
+    # cannot roll it back
     assert meeting_ok.started_notification_sent is True
 
     # Second meeting did not get flagged

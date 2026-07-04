@@ -1,7 +1,7 @@
 """Concurrency tests for the expiration batch job's per-meeting row lock (issue #195).
 
 The job racer runs the REAL per-meeting critical section (the undecorated inner of
-``inactive_meetings._deactivate_meeting``) — lock the meetup row via
+``inactive_meetings.deactivate_meeting``) — lock the meetup row via
 ``Meetup.by_id(for_update=True)``, re-check eligibility, read ``joined_links``, mutate — in
 its own ``db.begin()`` transaction against real Postgres, racing the live bot's critical
 sections exactly as they interleave in production. Mock sessions cannot catch these races.

@@ -15,7 +15,7 @@ from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.views import ButtonConfig, MitupView
-from tests.helpers import AnyFloat, MockDbSession, StubMitupContext, create_meetup
+from tests.helpers import AnyFloat, StubMitupContext, create_meetup
 from tests.helpers.context import build_context
 from tests.helpers.monitoring import MetricAssertions
 
@@ -186,9 +186,7 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
     await assert_time_metric_emitted(context, metrics)
 
 
-async def test_edit_meetup_messages(
-    user_with_settings: User, context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
-):
+async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, metrics: MetricAssertions):
     meeting = create_meetup(id=123, owner=user_with_settings, title="Test meeting", description="Test description")
     # Message in the chat with the owner
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
@@ -200,7 +198,7 @@ async def test_edit_meetup_messages(
     # Message in the chat of someone who is not the owner
     meeting.messages.append(Message(id=456, message_id=123, chat_id=234, buttons=buttons))
 
-    await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     edit: mock.MagicMock = context.bot.edit_message_text
     inline_view = meeting.inline_view()
@@ -255,13 +253,18 @@ async def test_edit_meetup_messages(
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in MESSAGE_NOT_FOUND_ERROR_PATTERNS])
-async def test_edit_meetup_messages_deletes_message_on_failure(
+async def test_edit_meetup_messages_counts_dead_message_and_continues(
     meeting: Meetup,
     context: StubMitupContext,
-    mock_session: MockDbSession,
     bad_request_message: str,
     metrics: MetricAssertions,
 ):
+    """A user-deleted message is counted and skipped; the other messages are still edited.
+
+    The stale row's DB cleanup is the write lifecycle's reconcile job (see
+    tests/test_api_wrapper.py::test_execute_queued_records_dead_message_for_reconcile) —
+    immediate mode only emits the metric.
+    """
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
         keyboard=[[ButtonConfig(text="Text1", callback_data="cb1"), ButtonConfig(text="Text2", callback_data="cb2")]]
@@ -270,19 +273,17 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 
     edit: mock.MagicMock = context.bot.edit_message_text
 
-    # Make the call fail for one call, we should delete the message but still edit properly the other one
     def raise_error(*args, **kwargs):
         if kwargs.get("message_id") == 123:
             raise BadRequest(bad_request_message)
 
     edit.side_effect = raise_error
 
-    await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
     # Since this is outside a callback, make sure we flush metrics
     await context.metrics.flush()
 
     assert edit.call_count == 2
-    mock_session.assert_deleted(meeting.messages[0])
 
     metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, value=1, unit=MetricUnit.COUNT)
     metrics.assert_emitted(
@@ -294,7 +295,6 @@ async def test_edit_meetup_messages_deletes_message_on_failure(
 async def test_edit_meetup_messages_ignore_unchanged_message(
     meeting: Meetup,
     context: StubMitupContext,
-    mock_session: MockDbSession,
     bad_request_message: str,
     metrics: MetricAssertions,
 ):
@@ -306,14 +306,14 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
 
     edit: mock.MagicMock = context.bot.edit_message_text
 
-    # Make the call fail for one call, we should delete the message but still edit properly the other one
+    # Make the call fail for one call, the other one should still be edited properly
     def raise_error(*args, **kwargs):
         if kwargs.get("message_id") == 123:
             raise BadRequest(bad_request_message)
 
     edit.side_effect = raise_error
 
-    await context.api.update_meeting_messages(session=mock_session, meeting=meeting)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     assert edit.call_count == 2
 

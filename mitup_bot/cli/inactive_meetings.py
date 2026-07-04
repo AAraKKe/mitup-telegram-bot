@@ -99,10 +99,12 @@ async def _deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api:
     return True
 
 
-# Write mode with the api as the last argument: commit (releasing the row lock) before the
-# queued fan-out drains. The undecorated critical section stays importable for the row-lock
-# race tests in tests/models/db_behavior/.
-_deactivate_meeting = db.with_session(write=True)(_deactivate_meeting_locked)
+async def deactivate_meeting(meetup_id: int, api: TelegramApiWrapper) -> bool:
+    """One meeting's deactivation in its own write lifecycle: commit (releasing the row
+    lock) before the queued fan-out drains. The bare critical section stays importable for
+    the row-lock race tests in tests/models/db_behavior/."""
+    async with db.begin_write(api) as session:
+        return await _deactivate_meeting_locked(session, meetup_id, api)
 
 
 @db.with_session
@@ -143,7 +145,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
 
     for meetup_id in meeting_ids:
         try:
-            if await _deactivate_meeting(meetup_id, api):
+            if await deactivate_meeting(meetup_id, api):
                 deactivated += 1
         except Exception as e:
             failed += 1

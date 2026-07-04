@@ -2,7 +2,7 @@ import datetime as dt
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
-from sqlalchemy import Column, DateTime, FetchedValue, String
+from sqlalchemy import Column, DateTime, Enum, FetchedValue
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -43,9 +43,17 @@ class User(BaseModel, SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
     )
+    # native_enum=False keeps the column a plain VARCHAR(16) (the type migration
+    # 77c3abe2f1d0 created — no DDL change), while coercing loaded rows back to UserStatus:
+    # a bare String column returns plain strs, silently failing `status is UserStatus.X`
+    # checks everywhere a User is loaded from the database.
     status: UserStatus = Field(
         default=UserStatus.MEMBER,
-        sa_column=Column(String(16), nullable=False, server_default=UserStatus.MEMBER.value),
+        sa_column=Column(
+            Enum(UserStatus, native_enum=False, length=16, values_callable=lambda enum: [m.value for m in enum]),
+            nullable=False,
+            server_default=UserStatus.MEMBER.value,
+        ),
     )
     last_name: str | None = None
     username: str | None = None

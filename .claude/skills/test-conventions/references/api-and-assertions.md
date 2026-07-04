@@ -26,7 +26,7 @@ Asserts `answer_callback_query` was called. Pass `text` and/or `show_alert` as n
 
 Asserts `answer_inline_query` was called with the given results list.
 
-### `context.api.assert_update_meeting_messages_called(session, meeting, current_message=DEFAULT, skip_current=None, was_deleted=None, times=1)`
+### `context.api.assert_update_meeting_messages_called(meeting, current_message=DEFAULT, skip_current=None, was_deleted=None, times=1)`
 
 Asserts `update_meeting_messages` was called. Only pass optional kwargs when you need to assert specific values.
 

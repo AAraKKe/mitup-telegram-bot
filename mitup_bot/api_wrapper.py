@@ -8,7 +8,6 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import structlog
-from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import (
     InlineKeyboardMarkup,
     InlineQueryResultArticle,
@@ -73,8 +72,8 @@ class ApiOutbox:
     """Queued Telegram calls plus the DB fix-ups their execution discovers.
 
     The fix-up lists (`dead_message_ids`, `inactive_tg_user_ids`) are filled while the queue
-    drains — after the handler's transaction committed — and applied by the write-mode
-    session decorator in a short follow-up transaction (see ``db.with_session``).
+    drains — after the caller's transaction committed — and applied by the write lifecycle
+    in a short follow-up transaction (see ``db.begin_write``).
     """
 
     calls: list[QueuedApiCall] = field(default_factory=list)
@@ -190,6 +189,10 @@ class TelegramApiWrapper(Protocol):
     def adapter(self, adapter: ContextOrBotAdapter): ...
     @property
     def immediate(self) -> TelegramApiWrapper: ...
+    # The capture lifecycle, driven by db.begin_write (directly or via with_session(write=True)).
+    def begin_capture(self) -> ApiOutbox: ...
+    def end_capture(self): ...
+    async def execute_queued(self, outbox: ApiOutbox): ...
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_messages_to_users(
@@ -211,7 +214,6 @@ class TelegramApiWrapper(Protocol):
     async def update_single_meeting_message(
         self,
         message: MessageModel,
-        session: AsyncSession | None,
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
@@ -219,7 +221,6 @@ class TelegramApiWrapper(Protocol):
     async def update_meeting_messages(
         self,
         *,
-        session: AsyncSession | None = None,
         meeting: Meetup,
         current_message: MessageModel | None = None,
         skip_current: bool = False,
@@ -284,8 +285,9 @@ class TelegramApi:
         return cast(TelegramApiWrapper, _ImmediateApi(self))
 
     # -- Outbox lifecycle -------------------------------------------------------------------
-    # Driven exclusively by db.with_session(write=True): capture between begin_capture and
-    # end_capture, then execute_queued after the transaction committed.
+    # Driven exclusively by db.begin_write (directly or via with_session(write=True)):
+    # capture between begin_capture and end_capture, then execute_queued after the
+    # transaction committed.
 
     def begin_capture(self) -> ApiOutbox:
         """Switch the api into capture mode: subsequent calls enqueue instead of executing."""
@@ -309,7 +311,7 @@ class TelegramApi:
             try:
                 await queued.invoke()
             except InactiveUserInteraction as exc:
-                # The reconcile transaction run by the decorator marks the user inactive.
+                # The write lifecycle's reconcile transaction marks the user inactive.
                 outbox.inactive_tg_user_ids.append(exc.tg_user_id)
                 log.info("User unreachable during post-commit fan-out", tg_user_id=exc.tg_user_id)
             except BadRequest as exc:
@@ -658,7 +660,6 @@ class TelegramApi:
     async def update_single_meeting_message(
         self,
         message: MessageModel,
-        session: AsyncSession | None,
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
@@ -667,21 +668,19 @@ class TelegramApi:
         Updates a single meeting message with the current meeting view.
 
         The view renders at call time; under capture the plain payload is queued and a
-        user-deleted message is recorded for the reconcile transaction. ``session`` exists
-        only for immediate mode's inline dead-row cleanup — CLI callers only, handlers omit it.
+        user-deleted message is recorded for the write lifecycle's reconcile transaction,
+        which owns the dead-row cleanup for every caller. In immediate mode a dead message
+        only emits its metric — the stale row is picked up by the next write-mode fan-out.
         """
         edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
         if self._outbox is not None:
             self._enqueue("update_meeting_message", partial(self._queued_meeting_message_edit, edit, self._outbox))
             return
-        if await self._edit_meeting_message_now(edit) and session is not None:
-            log.info("Message is invalid, deleting it", message_id=message.message_id)
-            await session.delete(message)
+        await self._edit_meeting_message_now(edit)
 
     async def update_meeting_messages(
         self,
         *,
-        session: AsyncSession | None = None,
         meeting: Meetup,
         current_message: MessageModel | None = None,
         skip_current: bool = False,
@@ -690,15 +689,12 @@ class TelegramApi:
     ):
         """
         Updates all tracked messages for a meeting, `current_message` first for immediate
-        feedback (`skip_current` when the caller already handles it separately). ``session``
-        is CLI-only (immediate mode, see ``update_single_meeting_message``); handlers run
-        under write mode and omit it.
+        feedback (`skip_current` when the caller already handles it separately).
         """
         # First lets update the current message for a better user experience
         if current_message and not skip_current:
             await self.update_single_meeting_message(
                 current_message,
-                session,
                 meeting,
                 was_deleted=was_deleted,
                 has_finished=has_finished,
@@ -708,7 +704,6 @@ class TelegramApi:
                 continue
             await self.update_single_meeting_message(
                 message,
-                session,
                 meeting,
                 was_deleted=was_deleted,
                 has_finished=has_finished,

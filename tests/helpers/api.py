@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Any
 from unittest import mock
 
-from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot.api_wrapper import ApiOutbox, TelegramApi
@@ -10,7 +9,6 @@ from mitup_bot.models import Meetup, Message, User
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_diff
-from tests.helpers.stub_db import MockDbSession
 
 from .constants import DEFAULT_CURRENT_MESSAGE, DEFAULT_FALSE, DEFAULT_NONE, DefaultValue
 
@@ -44,7 +42,6 @@ class MockApi(TelegramApi):
     def update_meeting_messages(
         self,
         *,
-        session: AsyncSession | None = DEFAULT_NONE,  # type: ignore
         meeting: Meetup,
         current_message: Message | None = DEFAULT_NONE,  # type: ignore
         skip_current: bool = DEFAULT_FALSE,  # type: ignore
@@ -53,7 +50,6 @@ class MockApi(TelegramApi):
     ):
         return self.call_mock(
             "update_meeting_messages",
-            session=session,
             meeting=meeting,
             current_message=current_message,
             skip_current=skip_current,
@@ -153,21 +149,15 @@ class MockApi(TelegramApi):
 
     def assert_update_meeting_messages_called(
         self,
-        session: MockDbSession | None,
         meeting: Meetup,
         current_message: Message | None = DEFAULT_CURRENT_MESSAGE,
         skip_current: bool | None = None,
         was_deleted: bool | None = None,
         times: int = 1,
     ):
-        # Write-mode handlers call update_meeting_messages without a session (payloads are
-        # snapshotted for the post-commit queue); their tests pass session=None to assert
-        # the session was NOT handed to the fan-out.
         arguments: dict[str, Any] = {
             "meeting": meeting,
         }
-        if session is not None:
-            arguments["session"] = session
         if current_message != DEFAULT_CURRENT_MESSAGE:
             arguments["current_message"] = current_message
         if skip_current is not None:

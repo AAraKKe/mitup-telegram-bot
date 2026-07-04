@@ -88,7 +88,7 @@ async def test_callback_set_meeting_language(
     )
 
     # Verify meeting messages were updated
-    context.api.assert_update_meeting_messages_called(None, meeting)
+    context.api.assert_update_meeting_messages_called(meeting)
 
     # Verify feature metric was emitted
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.MEETING_LANGUAGE_SET)})
@@ -133,4 +133,4 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
         assert new_keyboard == meeting.build_inline_keyboard()
 
     # Verify meeting messages were updated via API
-    context.api.assert_update_meeting_messages_called(None, meeting)
+    context.api.assert_update_meeting_messages_called(meeting)

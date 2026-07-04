@@ -1,13 +1,8 @@
-from asyncio import gather
-from collections.abc import Sequence
-from contextlib import contextmanager
-
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import and_, false, func, null, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
-from telegram.error import Forbidden
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
@@ -40,68 +35,65 @@ USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
 )
 
 
-async def joined_links_to_notify(session: AsyncSession) -> Sequence[JoinedUsers]:
-    return (await session.exec(USERS_TO_NOTIFY_STATEMENT)).all()
-
-
-@contextmanager
-def handle_forbidden(link: JoinedUsers):
-    try:
-        yield
-    except Forbidden:
-        link.user.mark_inactive()
-        # If we cannot send notification lets avoid doing it again
-        link.notification_sent = True
-
-
-async def send_notification(joined_link: JoinedUsers, api: TelegramApiWrapper):
-    view = MitupView(
-        description=NotificationMessages.STARTING_SOON.get(
-            lang=joined_link.user.lang, meeting_title=joined_link.meetup.title
-        ),
-        keyboard=[],
-    )
-    with handle_forbidden(joined_link):
-        await api.send_message_to_user(joined_link.user, view)
-
-    joined_link.notification_sent = True
-
-
 @db.with_session
-async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
-    """Send a notification to all users that have joined a meeting that is about to start"""
-    joined_links = await joined_links_to_notify(session)
-    failed = 0
+async def due_link_ids(session: AsyncSession) -> list[int]:
+    """Collect the ids of the joined links whose starting-soon notifications are due.
+
+    Ids only, in a short read-only transaction: each link is processed later in its own
+    write lifecycle, which re-checks that the notification is still due.
+    """
+    return [link.db_id for link in (await session.exec(USERS_TO_NOTIFY_STATEMENT)).all()]
+
+
+async def notify_joined_link(link_id: int, api: TelegramApiWrapper) -> bool:
+    """Send one participant's starting-soon notification and flag the link; returns False
+    when it is no longer due.
+
+    This job's unit of work is the joined link (the `notification_sent` flag lives there),
+    so the write lifecycle wraps one link at a time: the send is enqueued inside the
+    transaction and drains only after the flag committed — no transaction is held across
+    Telegram I/O, and a crash mid-sweep cannot re-notify this participant on the next run.
+    An unreachable user is marked inactive by the lifecycle's reconcile step.
+    """
+    async with db.begin_write(api) as session:
+        # Re-check under the fresh transaction: the link may have been flagged or its
+        # meeting rescheduled out of the window since the unlocked sweep nominated it.
+        link = (await session.exec(USERS_TO_NOTIFY_STATEMENT.where(JoinedUsers.id == link_id))).first()
+        if link is None:
+            log.info("Joined link no longer due for a notification, skipping", joined_link=link_id)
+            return False
+
+        view = MitupView(
+            description=NotificationMessages.STARTING_SOON.get(lang=link.user.lang, meeting_title=link.meetup.title),
+            keyboard=[],
+        )
+        await api.send_message_to_user(link.user, view)
+        link.notification_sent = True
+        return True
+
+
+async def run(api: TelegramApiWrapper, metrics: MetricsClient):
+    """Send a notification to all users that have joined a meeting that is about to start.
+
+    Each link commits in its own transaction: one participant's failure cannot roll back
+    the notifications already committed for the others, and a crash mid-sweep resumes
+    cleanly on the next run.
+    """
+    link_ids = await due_link_ids()
+    metrics.emit(MetricKey.NOTIFICATIONS_TO_SEND, len(link_ids), MetricUnit.COUNT)
+
     sent = 0
-
-    metrics.emit(MetricKey.NOTIFICATIONS_TO_SEND, len(joined_links), MetricUnit.COUNT)
-
-    pre_send_statuses = {link.user.id: link.user.status for link in joined_links}
-    notifications = [send_notification(joined_link, api) for joined_link in joined_links]
-    results = await gather(*notifications, return_exceptions=True)
-
-    for joined_link, result in zip(joined_links, results, strict=False):
-        if isinstance(result, Exception):
+    failed = 0
+    for link_id in link_ids:
+        try:
+            if await notify_joined_link(link_id, api):
+                sent += 1
+        except Exception as error:
             failed += 1
-            log.error(
-                "Failed to send notification",
-                user=joined_link.user_id,
-                meeting=joined_link.meetup_id,
-                exc_info=result,
-            )
-        else:
-            sent += 1
-
-    deactivated_user_ids = {
-        link.user.id
-        for link in joined_links
-        if pre_send_statuses[link.user.id] is UserStatus.MEMBER and link.user.status is UserStatus.LEFT
-    }
-    deactivated_users = len(deactivated_user_ids)
+            log.exception("Failed to send notification", joined_link=link_id, exc_info=error)
 
     metrics.emit(MetricKey.NOTIFICATIONS_SENT, sent, MetricUnit.COUNT)
     metrics.emit(MetricKey.NOTIFICATIONS_FAILED, failed, MetricUnit.COUNT)
-    metrics.emit(MetricKey.INACTIVE_USER_SET, deactivated_users, MetricUnit.COUNT)
 
     if failed:
         raise RuntimeError(f"Failed to send notification to {failed} users. Check logs for more details.")

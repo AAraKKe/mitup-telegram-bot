@@ -18,7 +18,7 @@ from sqlalchemy.pool import ConnectionPoolEntry, PoolProxiedConnection, QueuePoo
 from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mitup_bot.api_wrapper import ApiOutbox, TelegramApi
+from mitup_bot.api_wrapper import ApiOutbox, TelegramApi, TelegramApiWrapper
 from mitup_bot.config import DbConfig
 from mitup_bot.models import MeetupLocation, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
@@ -233,24 +233,20 @@ class _WriteHandlerDecorator(Protocol):
 
 
 def _capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> TelegramApi:
-    """Take the api to capture on from the last argument: handlers follow the
+    """Take the api to capture on from the handler's context: handlers follow the
     ``(session, update, context)`` convention, so at the call site the context is the last
-    positional argument (or an explicit ``context=`` keyword). Non-handler callers (CLI
-    batch jobs) have no MitupContext — they pass the ``TelegramApi`` itself in that
-    position instead."""
+    positional argument (or an explicit ``context=`` keyword)."""
     candidate = kwargs.get("context", args[-1] if args else None)
-    if isinstance(candidate, TelegramApi):
-        return candidate
     api = getattr(candidate, "api", None)
     if isinstance(api, TelegramApi):
         return api
     raise TypeError(
-        "with_session(write=True) requires the MitupContext (exposing `.api`) or the TelegramApi itself "
-        "as the last positional argument or the `context` keyword"
+        "with_session(write=True) requires the MitupContext (exposing `.api`) as the last positional "
+        "argument or the `context` keyword; non-handler code uses db.begin_write(api) directly"
     )
 
 
-async def _apply_reconcile(api: TelegramApi, outbox: ApiOutbox):
+async def _apply_reconcile(api: TelegramApiWrapper, outbox: ApiOutbox):
     """Apply the DB fix-ups discovered while draining the outbox, in one short transaction:
     drop Message rows Telegram reported gone and mark unreachable users inactive."""
     if not outbox.dead_message_ids and not outbox.inactive_tg_user_ids:
@@ -268,6 +264,38 @@ async def _apply_reconcile(api: TelegramApi, outbox: ApiOutbox):
                 api.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
 
 
+@asynccontextmanager
+async def begin_write(api: TelegramApiWrapper) -> AsyncGenerator[AsyncSession]:
+    """Run one write-mode critical section: the api is in capture mode for the body (every
+    ``api.*`` call enqueues a plain-data snapshot), the transaction commits — releasing the
+    pooled connection and any per-meeting row lock — and only then do the queued Telegram
+    calls drain, followed by their reconcile fix-ups in one short follow-up transaction.
+
+    This is the primitive behind ``with_session(write=True)``. Non-handler code (CLI batch
+    jobs) uses it directly, wrapping each per-meeting critical section:
+
+    >>> async with begin_write(api) as session:
+    ...     meeting = await Meetup.by_id(session, meetup_id, for_update=True)
+    ...     await api.update_meeting_messages(meeting=meeting)
+
+    A body exception discards the queue along with the rolled-back transaction — nothing
+    about aborted state is rendered.
+    """
+    outbox = api.begin_capture()
+    try:
+        async with begin() as session:
+            yield session
+    finally:
+        api.end_capture()
+    # The transaction is committed and its locks are released; only now run the captured
+    # fan-out. The reconcile applies whatever fix-ups were recorded even when a systemic
+    # failure aborts the drain midway.
+    try:
+        await api.execute_queued(outbox)
+    finally:
+        await _apply_reconcile(api, outbox)
+
+
 @overload
 def with_session[**P, R](
     func: Callable[Concatenate[AsyncSession, P], Coroutine[Any, Any, R]], /
@@ -282,9 +310,9 @@ def with_session(func: Callable | None = None, /, *, write: bool = False) -> Cal
     """Wrap an async function in a database transaction, injecting the open `AsyncSession`
     as its first positional argument; commits on clean return, rolls back on exception.
 
-    ``write=True`` is the two-phase mode: the decorator switches ``context.api`` into capture,
-    runs the handler, commits (releasing the connection and any row locks), then drains the
-    queued Telegram calls and applies their reconcile fix-ups — see the database skill for the
+    ``write=True`` is the two-phase mode: the decorator runs the handler inside
+    ``begin_write(context.api)``, which captures the ``context.api`` calls, commits, then
+    drains the queue and applies its reconcile fix-ups — see the database skill for the
     full lifecycle. A handler exception discards the queue along with the rolled-back
     transaction.
 
@@ -304,21 +332,8 @@ def with_session(func: Callable | None = None, /, *, write: bool = False) -> Cal
 
         @functools.wraps(func)
         async def write_wrapper(*args, **kwargs):
-            api = _capture_api(args, kwargs)
-            outbox = api.begin_capture()
-            try:
-                async with begin() as session:
-                    result = await func(session, *args, **kwargs)
-            finally:
-                api.end_capture()
-            # The transaction is committed and its locks are released; only now run the
-            # captured fan-out. The reconcile applies whatever fix-ups were recorded even
-            # when a systemic failure aborts the drain midway.
-            try:
-                await api.execute_queued(outbox)
-            finally:
-                await _apply_reconcile(api, outbox)
-            return result
+            async with begin_write(_capture_api(args, kwargs)) as session:
+                return await func(session, *args, **kwargs)
 
         return write_wrapper
 

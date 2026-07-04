@@ -187,7 +187,7 @@ async def test_set_meeting_date_callback(
             datetime_entity(int(expected_datetime.timestamp())),
         )
         context.api.assert_edit_message_called(update, expected_view)
-        context.api.assert_update_meeting_messages_called(None, meeting, None, True)
+        context.api.assert_update_meeting_messages_called(meeting, None, True)
     else:
         # Updating an existing datetime: re-show entry view with success context, return EDIT_DATETIME.
         # The handler uses meeting.lang (the meeting's own language, "en" from create_meetup), not the
@@ -203,7 +203,7 @@ async def test_set_meeting_date_callback(
             )
         )
         context.api.assert_edit_message_called(update, expected_view)
-        context.api.assert_update_meeting_messages_called(None, meeting, None, True)
+        context.api.assert_update_meeting_messages_called(meeting, None, True)
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +380,7 @@ async def test_set_time_message_with_valid_time(
             )
         ),
     )
-    context.api.assert_update_meeting_messages_called(None, meeting)
+    context.api.assert_update_meeting_messages_called(meeting)
 
 
 @pytest.mark.parametrize(
@@ -656,7 +656,7 @@ async def test_date_time_entity_message(
             )
         ),
     )
-    context.api.assert_update_meeting_messages_called(None, meeting)
+    context.api.assert_update_meeting_messages_called(meeting)
 
 
 @pytest.mark.parametrize(
@@ -1021,7 +1021,7 @@ async def test_datetime_entity_past_end_datetime_clears_end(
         update,
         meeting.when_view.with_context(expected_context_message),
     )
-    context.api.assert_update_meeting_messages_called(None, meeting)
+    context.api.assert_update_meeting_messages_called(meeting)
 
 
 # ---------------------------------------------------------------------------

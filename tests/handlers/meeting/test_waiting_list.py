@@ -66,7 +66,6 @@ async def test_user_joins_waiting_list_with_full_meeting(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=None,
         meeting=full_meeting,
         current_message=full_meeting.message_from_update(handler_context.update),
     )
