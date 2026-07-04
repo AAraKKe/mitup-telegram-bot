@@ -133,6 +133,13 @@ await client.flush()
 
 Use `NullBackend()` in tests and `EmfBackend(...)` in production. The `base_dimensions` are merged into every emission automatically.
 
+Pass `emit_global=True` to `MetricsClient.emit()` when a base-dimensioned client also needs an aggregate series to alarm on. It emits a second, dimensionless copy of the metric that drops `base_dimensions` but keeps them as EMF **properties** — so one alarm can watch across every base-dimension value while Logs Insights still breaks the aggregate down. This mirrors `MitupContext.emit_metric(emit_global=True)` for handlers. Example: the recurrent-events service emits per-`EventType` `Fault`/`Time` plus a dimensionless global copy (`EventType` demoted to a property) so a single `Mitup/Events` alarm catches any failing event type.
+
+```python
+client = MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})
+client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
+```
+
 <note>
 `BotAdapter` delegates metrics to the `MetricsClient` provided at construction. When a real backend (e.g., `EmfBackend`) is used, metrics are emitted normally. For convenience, `build_api(bare_ext_bot)` defaults to `NullBackend` when metrics are not needed (see the `api-wrapper` skill).
 </note>

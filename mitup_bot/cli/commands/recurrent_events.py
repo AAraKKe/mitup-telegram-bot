@@ -113,8 +113,11 @@ async def handle_maintainance(event_type: EventType, bot: ExtBot, client: Metric
         fault = True
         client.add_stack_trace("exception")
     finally:
-        client.emit(MetricKey.FAULT, 1 if fault else 0, MetricUnit.COUNT)
-        client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS)
+        # emit_global adds a dimensionless copy of Fault/Time so a single Mitup/Events alarm can
+        # watch "any event type is failing"/aggregate run duration; EventType stays as an EMF
+        # property on those copies for per-event breakdown in Logs Insights.
+        client.emit(MetricKey.FAULT, 1 if fault else 0, MetricUnit.COUNT, emit_global=True)
+        client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS, emit_global=True)
         client.emit(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections(event_type.value), MetricUnit.COUNT)
         await client.flush()
 

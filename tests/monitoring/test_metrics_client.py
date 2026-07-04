@@ -84,6 +84,59 @@ def test_emit_feature_with_named_args():
     assert client.records[0].dimensions_dict["Feature"] == str(Feature.JOIN_MEETING)
 
 
+def test_emit_global_emits_dimensionless_copy_with_base_dims_as_properties():
+    client = make_test_metrics_client(base_dimensions={"EventType": "cleanup"})
+    client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
+
+    assert len(client.records) == 2
+
+    dimensioned = MetricAssertions(client)
+    dimensioned.assert_emitted(
+        name=MetricKey.FAULT,
+        value=1,
+        dimensions={"EventType": "cleanup"},
+        dimensions_exact=True,
+    )
+    # Global copy: no dimensions, EventType demoted to a searchable property.
+    dimensioned.assert_emitted(
+        name=MetricKey.FAULT,
+        value=1,
+        dimensions={},
+        dimensions_exact=True,
+        properties={"EventType": "cleanup"},
+        properties_exact=True,
+    )
+
+
+def test_emit_global_defaults_off_emits_single_record():
+    client = make_test_metrics_client(base_dimensions={"EventType": "cleanup"})
+    client.emit(MetricKey.FAULT, 0, MetricUnit.COUNT)
+
+    assert len(client.records) == 1
+    assert client.records[0].dimensions_dict == {"EventType": "cleanup"}
+    assert client.records[0].properties == {}
+
+
+def test_emit_global_keeps_explicit_dimensions_on_copy():
+    """The global copy drops only base_dimensions; explicitly passed dimensions survive."""
+    client = make_test_metrics_client(base_dimensions={"EventType": "cleanup"})
+    client.emit(MetricKey.FAULT, 1, dimensions={"Region": "eu"}, emit_global=True)
+
+    global_record = next(r for r in client.records if "EventType" not in r.dimensions_dict)
+    assert global_record.dimensions_dict == {"Region": "eu"}
+    assert global_record.properties == {"EventType": "cleanup"}
+
+
+def test_emit_global_without_base_dimensions_still_emits_two_records():
+    client = make_client()
+    client.emit(MetricKey.FAULT, 1, emit_global=True)
+
+    assert len(client.records) == 2
+    for record in client.records:
+        assert record.dimensions_dict == {}
+        assert record.properties == {}
+
+
 async def test_flush_delegates_to_backend():
     """Flushing does not raise and does not clear records."""
     client = make_client()

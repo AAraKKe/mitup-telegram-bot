@@ -1,8 +1,14 @@
+import json
 from asyncio import CancelledError
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import structlog
+from aws_embedded_metrics.environment import Environment
+from aws_embedded_metrics.environment.local_environment import LocalEnvironment
+from aws_embedded_metrics.logger.metrics_context import MetricsContext
+from aws_embedded_metrics.serializers.log_serializer import LogSerializer
+from aws_embedded_metrics.sinks import Sink
 from click.testing import CliRunner
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
@@ -17,7 +23,7 @@ from mitup_bot.cli.commands.recurrent_events import (
     run_all_tasks,
     run_periodic,
 )
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, NullBackend
+from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, NullBackend
 from tests.helpers import MockApi
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
@@ -230,6 +236,30 @@ async def test_handle_maintainance(
             dimensions={"EventType": event_type.value},
         )
 
+        # Fault and Time additionally emit a dimensionless global copy (no EventType dimension) so
+        # a single Mitup/Events alarm can watch every event type; EventType survives as a property.
+        assertions.assert_emitted(
+            name=MetricKey.FAULT,
+            value=expected_fault,
+            unit=MetricUnit.COUNT,
+            dimensions={},
+            dimensions_exact=True,
+            properties={"EventType": event_type.value},
+        )
+        assertions.assert_emitted(
+            name=MetricKey.TIME,
+            unit=MetricUnit.MILLISECONDS,
+            dimensions={},
+            dimensions_exact=True,
+            properties={"EventType": event_type.value},
+        )
+        # DbConnectionsLeaked and any business stats stay EventType-dimensioned only — no global copy.
+        assertions.assert_not_emitted(
+            name=MetricKey.DB_CONNECTIONS_LEAKED,
+            dimensions={},
+            dimensions_exact=True,
+        )
+
 
 async def test_handle_maintainance_emits_telegram_api_time_metrics():
     """Verify TelegramApiTime metrics flow through the real MetricsClient via BotAdapter."""
@@ -268,6 +298,94 @@ async def test_handle_maintainance_emits_telegram_api_time_metrics():
             name="TelegramApiTime",
             unit=MetricUnit.MILLISECONDS,
         )
+
+
+class CapturingSink(Sink):
+    """Sink that records every serialized EMF line, mirroring tests/monitoring/test_backend.py."""
+
+    def __init__(self):
+        self.serializer = LogSerializer()
+        self.serialized: list[str] = []
+
+    def accept(self, context: MetricsContext):
+        self.serialized.extend(self.serializer.serialize(context))
+
+    @staticmethod
+    def name() -> str:
+        return "CapturingSink"
+
+
+class CapturingEnvironment(LocalEnvironment):
+    def __init__(self, sink: CapturingSink):
+        self.sink = sink
+
+
+def build_capturing_backend() -> tuple[EmfBackend, CapturingSink]:
+    sink = CapturingSink()
+    environment = CapturingEnvironment(sink)
+
+    async def resolver() -> Environment:
+        return environment
+
+    return EmfBackend(environment_provider=resolver), sink
+
+
+def dimension_sets(payload: dict) -> list[set[str]]:
+    return [set(dims) for directive in payload["_aws"]["CloudWatchMetrics"] for dims in directive["Dimensions"]]
+
+
+def metric_names(payload: dict) -> set[str]:
+    return {metric["Name"] for directive in payload["_aws"]["CloudWatchMetrics"] for metric in directive["Metrics"]}
+
+
+@pytest.mark.parametrize(
+    "launch_side_effect, expected_fault",
+    [(None, 0), (RuntimeError("boom"), 1)],
+    ids=["success", "fault"],
+)
+async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
+    launch_side_effect: Exception | None,
+    expected_fault: int,
+):
+    """End-to-end through the real EmfBackend: every run serializes two EMF lines — the
+    EventType-dimensioned series (Fault/Time/DbConnectionsLeaked) and a dimensionless global copy
+    of Fault/Time carrying EventType as a property (not a dimension) for cross-event alarming."""
+    event_type = EventType.USER_CLEANUP
+    backend, sink = build_capturing_backend()
+    client = MetricsClient(backend, base_dimensions={"EventType": event_type.value})
+
+    with (
+        patch(
+            "mitup_bot.cli.commands.recurrent_events.launch_event",
+            new_callable=AsyncMock,
+            side_effect=launch_side_effect,
+        ),
+        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
+        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
+    ):
+        mock_db.get_open_connections.return_value = 0
+        await handle_maintainance(event_type, MagicMock(), client=client)
+
+    payloads = [json.loads(line) for line in sink.serialized]
+    assert len(payloads) == 2
+
+    dimensioned = next(p for p in payloads if {"EventType"} in dimension_sets(p))
+    dimensionless = next(p for p in payloads if all(not dims for dims in dimension_sets(p)))
+
+    # Dimensioned series: EventType is a real dimension, all three metrics present.
+    assert dimensioned["EventType"] == event_type.value
+    assert dimensioned["Fault"] == expected_fault
+    assert metric_names(dimensioned) == {
+        str(MetricKey.FAULT),
+        str(MetricKey.TIME),
+        str(MetricKey.DB_CONNECTIONS_LEAKED),
+    }
+
+    # Global copy: only Fault/Time, EventType present as a property but not in any dimension set.
+    assert metric_names(dimensionless) == {str(MetricKey.FAULT), str(MetricKey.TIME)}
+    assert dimensionless["Fault"] == expected_fault
+    assert dimensionless["EventType"] == event_type.value
+    assert all("EventType" not in dims for dims in dimension_sets(dimensionless))
 
 
 async def test_run_periodic_runs_event():

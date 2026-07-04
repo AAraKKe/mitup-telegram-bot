@@ -69,14 +69,36 @@ class MetricsClient:
         *,
         dimensions: dict[str, str] | None = None,
         properties: dict[str, Any] | None = None,
+        emit_global: bool = False,
     ):
+        """Emit a metric record through the backend.
+
+        `emit_global=True` additionally emits a dimensionless copy that drops the client's
+        `base_dimensions` but keeps them as EMF properties. This gives an aggregate series
+        (no dimensions) to alarm on across every base-dimension value, while Logs Insights can
+        still break the aggregate down by the promoted properties.
+        """
         merged_dims = {**self._base_dimensions, **(dimensions or {})}
+        self._emit_record(name, value, unit, merged_dims, properties or {})
+
+        if emit_global:
+            global_properties = {**self._base_dimensions, **(properties or {})}
+            self._emit_record(name, value, unit, dict(dimensions or {}), global_properties)
+
+    def _emit_record(
+        self,
+        name: str | MetricKey,
+        value: float,
+        unit: MetricUnit,
+        dimensions: dict[str, str],
+        properties: dict[str, Any],
+    ):
         record = MetricRecord(
             name=str(name),
             value=value,
             unit=unit,
-            dimensions=frozenset(merged_dims.items()),
-            properties=properties or {},
+            dimensions=frozenset(dimensions.items()),
+            properties=properties,
         )
         if self._record_history:
             self._records.append(record)
