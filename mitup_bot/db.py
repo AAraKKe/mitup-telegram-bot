@@ -1,16 +1,24 @@
 import functools
 from collections import Counter
-from collections.abc import AsyncGenerator, Callable, Coroutine
+from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
-from typing import Any, Concatenate
+from typing import Any, Concatenate, Literal, Protocol, overload
 
+import structlog
 from pydantic import BaseModel, ValidationError
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from mitup_bot.api_wrapper import ApiOutbox, TelegramApi
 from mitup_bot.config import DbConfig
-from mitup_bot.models import MeetupLocation, MessageButtons
+from mitup_bot.models import MeetupLocation, Message, MessageButtons, User
+from mitup_bot.monitoring import MetricKey
+
+log = structlog.get_logger(__name__)
 
 __sessionmaker: async_sessionmaker[AsyncSession] | None = None
 __connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")
@@ -93,19 +101,146 @@ async def begin() -> AsyncGenerator[AsyncSession]:
             __active_connections[context] -= 1
 
 
+def _loaded_attributes(obj: object) -> set[str]:
+    state = sa_inspect(obj)
+    assert state is not None
+    return set(state.dict)
+
+
+async def racy_flush[T](session: AsyncSession, builder: Callable[[], T], *, constraint: str) -> T | None:
+    """Flush rows that may lose a uniqueness race, without poisoning the outer transaction.
+
+    ``builder`` must construct the racy rows inside the ``begin_nested()`` savepoint it runs
+    under — construction makes them session-pending via relationship cascades, which is what
+    lets a clash roll them back cleanly, reload the touched collections, and return ``None``.
+    An ``IntegrityError`` naming any other constraint re-raises.
+
+    >>> link = await racy_flush(
+    ...     session, lambda: meeting.add_participant(user), constraint=JOINED_USERS_UNIQUE_CONSTRAINT
+    ... )
+    """
+    # Snapshot which attributes each persistent object has loaded before the savepoint: a
+    # rollback resets whatever the builder dirtied (relationship collections appended to via
+    # backrefs, mutated scalars) to the unloaded state, and the async engine cannot reload
+    # them lazily on access — User's collections are lazy="raise" on top of that.
+    loaded_before = [(obj, _loaded_attributes(obj)) for obj in session.identity_map.values()]
+    try:
+        async with session.begin_nested():
+            built = builder()
+            if isinstance(built, SQLModel):
+                # The builder wires the new row up through relationship assignments, which only
+                # append it to the parent collections via backref events — SQLAlchemy 2.0 does
+                # not cascade backref-only associations into the session (it warns and skips
+                # the INSERT). Add the built row explicitly; its own save-update cascade then
+                # carries any other transient rows it references (e.g. the invite path's new
+                # User).
+                session.add(built)
+            await session.flush()
+    except IntegrityError as exc:
+        diag = getattr(exc.orig, "diag", None)
+        if diag is None or diag.constraint_name != constraint:
+            raise
+        # Reload exactly what the rollback unloaded (the explicit refresh is the sanctioned
+        # loading route for lazy="raise" relationships): this drops the phantom rows from the
+        # in-memory collections and picks up whatever the concurrent transaction committed.
+        for obj, loaded in loaded_before:
+            unloaded_by_rollback = loaded - _loaded_attributes(obj)
+            if unloaded_by_rollback:
+                await session.refresh(obj, list(unloaded_by_rollback))
+        return None
+    return built
+
+
+class _WriteHandlerDecorator(Protocol):
+    def __call__[**P, R](
+        self, func: Callable[Concatenate[AsyncSession, P], Coroutine[Any, Any, R]], /
+    ) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+
+def _capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> TelegramApi:
+    """Take the api to capture on from the context argument: handlers follow the
+    ``(session, update, context)`` convention, so at the call site the context is the last
+    positional argument (or an explicit ``context=`` keyword)."""
+    context = kwargs.get("context", args[-1] if args else None)
+    api = getattr(context, "api", None)
+    if isinstance(api, TelegramApi):
+        return api
+    raise TypeError(
+        "with_session(write=True) requires the MitupContext (exposing `.api`) as the last positional "
+        "argument or the `context` keyword"
+    )
+
+
+async def _apply_reconcile(api: TelegramApi, outbox: ApiOutbox) -> None:
+    """Apply the DB fix-ups discovered while draining the outbox, in one short transaction:
+    drop Message rows Telegram reported gone and mark unreachable users inactive."""
+    if not outbox.dead_message_ids and not outbox.inactive_tg_user_ids:
+        return
+    async with begin() as session:
+        if outbox.dead_message_ids:
+            log.info("Deleting messages reported gone during fan-out", message_ids=outbox.dead_message_ids)
+            await session.exec(  # type: ignore[call-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+                delete(Message).where(col(Message.id).in_(outbox.dead_message_ids))
+            )
+        for tg_user_id in dict.fromkeys(outbox.inactive_tg_user_ids):
+            user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
+            if user is not None and user.mark_inactive():
+                log.info("Marking user as inactive", tg_user_id=tg_user_id)
+                api.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
+
+
+@overload
 def with_session[**P, R](
-    func: Callable[Concatenate[AsyncSession, P], Coroutine[Any, Any, R]],
-) -> Callable[P, Coroutine[Any, Any, R]]:
+    func: Callable[Concatenate[AsyncSession, P], Coroutine[Any, Any, R]], /
+) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+
+@overload
+def with_session(*, write: Literal[True]) -> _WriteHandlerDecorator: ...
+
+
+def with_session(func: Callable | None = None, /, *, write: bool = False) -> Callable:
     """Wrap an async function in a database transaction, injecting the open `AsyncSession`
-    as its first positional argument. Commits on clean return, rolls back on exception.
+    as its first positional argument; commits on clean return, rolls back on exception.
+
+    ``write=True`` is the two-phase mode: the decorator switches ``context.api`` into capture,
+    runs the handler, commits (releasing the connection and any row locks), then drains the
+    queued Telegram calls and applies their reconcile fix-ups — see the database skill for the
+    full lifecycle. A handler exception discards the queue along with the rolled-back
+    transaction.
 
     >>> @with_session
     ... async def handler(session: AsyncSession, *args, **kwargs): ...
     """
 
-    @functools.wraps(func)
-    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        async with begin() as session:
-            return await func(session, *args, **kwargs)
+    def decorate(func: Callable) -> Callable:
+        if not write:
 
-    return async_wrapper
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                async with begin() as session:
+                    return await func(session, *args, **kwargs)
+
+            return async_wrapper
+
+        @functools.wraps(func)
+        async def write_wrapper(*args, **kwargs):
+            api = _capture_api(args, kwargs)
+            outbox = api.begin_capture()
+            try:
+                async with begin() as session:
+                    result = await func(session, *args, **kwargs)
+            finally:
+                api.end_capture()
+            # The transaction is committed and its locks are released; only now run the
+            # captured fan-out. The reconcile applies whatever fix-ups were recorded even
+            # when a systemic failure aborts the drain midway.
+            try:
+                await api.execute_queued(outbox)
+            finally:
+                await _apply_reconcile(api, outbox)
+            return result
+
+        return write_wrapper
+
+    return decorate if func is None else decorate(func)

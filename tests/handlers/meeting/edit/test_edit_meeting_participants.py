@@ -234,7 +234,8 @@ async def test_edit_meeting_no_limit_participants_works(
         EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, handler_context=handler_context
     )
 
-    mock_session.assert_flushed()
+    # No explicit flush: the capacity change lands at commit, before the queued send runs.
+    mock_session.assert_not_flushed()
     assert not meeting.max_members
 
     response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
@@ -427,7 +428,8 @@ async def test_edit_meeting_max_participants_message_works(
     )
 
     assert meeting.max_members == 4
-    mock_session.assert_flushed()
+    # No explicit flush: the capacity change lands at commit, before the queued sends run.
+    mock_session.assert_not_flushed()
     context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
 

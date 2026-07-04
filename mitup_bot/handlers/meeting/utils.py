@@ -1,57 +1,9 @@
 from typing import assert_never
 
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 from mitup_bot.callback_data import MeetingListSource
-from mitup_bot.models import Meetup
-from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import ButtonConfig
-
-
-async def flush_new_participant(session: AsyncSession, meeting: Meetup, *new_rows: SQLModel) -> bool:
-    """Persist freshly built membership rows inside a savepoint, closing the join race.
-
-    The caller must not add ``new_rows`` beforehand: the helper expunges them and re-adds inside a
-    ``begin_nested`` savepoint so a ``joined_users`` uniqueness clash rolls back without poisoning the
-    outer transaction, refreshing the meeting's and joining users' ``joined_links`` to the committed
-    state. Only that constraint is swallowed — any other IntegrityError re-raises — and the return is
-    ``True`` when the rows were inserted, ``False`` when the uniqueness constraint rejected them.
-    """
-    for row in new_rows:
-        if row in session:
-            session.expunge(row)
-    # Expunge detaches the rows but leaves them lingering in the meeting's and joining users'
-    # joined_links collections (they backref in via meetup=/user=). Expire those collections before the
-    # flush so it doesn't trip over a detached member, and so a rolled-back clash reloads the committed
-    # state (dropping the phantom, picking up a concurrent insert) rather than the stale in-memory list
-    # the join fast path reads. Skip users detached by the expunge above (the invite path's new user).
-    session.expire(meeting, ["joined_links"])
-    expired_participants = []
-    for row in new_rows:
-        participant = getattr(row, "user", None)
-        if participant is not None and participant in session:
-            session.expire(participant, ["joined_links"])
-            expired_participants.append(participant)
-    inserted = True
-    try:
-        async with session.begin_nested():
-            session.add_all(new_rows)
-            await session.flush()
-    except IntegrityError as exc:
-        diag = getattr(exc.orig, "diag", None)
-        if diag is None or diag.constraint_name != JOINED_USERS_UNIQUE_CONSTRAINT:
-            raise
-        inserted = False
-    # The async engine cannot lazy-load expired collections on attribute access, so reload them
-    # explicitly here — callers read the collections right after in plain Python.
-    await session.refresh(meeting, ["joined_links"])
-    for participant in expired_participants:
-        await session.refresh(participant, ["joined_links"])
-    return inserted
 
 
 def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:

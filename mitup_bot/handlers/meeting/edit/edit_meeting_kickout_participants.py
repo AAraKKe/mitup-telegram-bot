@@ -131,7 +131,7 @@ async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, cont
     callback_data=cb.CONFIRM_KICK_OUT,
     bindable=True,
 )
-@with_session
+@with_session(write=True)
 async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_meeting_callback_data(
         cb.CONFIRM_KICK_OUT.parse(context.match),
@@ -166,7 +166,6 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
     # If the participant is invited, remove it too
     if participant.invited_by is not None:
         await session.delete(participant.user)
-    await session.flush()
 
     # We need to decide whetehr we go back to the edit participatns view or the list of participants to kick out
     # If there are no more participants to kick out, we go back to the edit participants view
@@ -188,7 +187,6 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
     # After all has been taken care of, we need to update all messages for the meeting
     # Avoid editing current message since we have done that already
     await context.api.update_meeting_messages(
-        session=session,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,

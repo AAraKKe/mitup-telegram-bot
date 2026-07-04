@@ -1,20 +1,24 @@
 import re
 from asyncio import gather
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Coroutine, Generator, Sequence
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass, field
+from functools import partial
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import (
+    InlineKeyboardMarkup,
     InlineQueryResultArticle,
     InlineQueryResultsButton,
     InputTextMessageContent,
     Message,
+    MessageEntity,
     Update,
 )
-from telegram.error import BadRequest, Forbidden
+from telegram.error import BadRequest, Forbidden, NetworkError
 from telegram.ext import ExtBot
 
 from mitup_bot.exceptions import (
@@ -46,6 +50,46 @@ log = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     ...
+
+
+@dataclass
+class QueuedApiCall:
+    """A Telegram call captured during a write-mode handler, to be executed after commit.
+
+    ``invoke`` is a zero-argument closure over plain data (chat ids, message ids, rendered
+    view content) snapshotted at enqueue time — it must never touch the session or trigger
+    an ORM load when awaited.
+    """
+
+    name: str
+    invoke: Callable[[], Coroutine[Any, Any, object]]
+
+
+@dataclass
+class ApiOutbox:
+    """Queued Telegram calls plus the DB fix-ups their execution discovers.
+
+    The fix-up lists (`dead_message_ids`, `inactive_tg_user_ids`) are filled while the queue
+    drains — after the handler's transaction committed — and applied by the write-mode
+    session decorator in a short follow-up transaction (see ``db.with_session``).
+    """
+
+    calls: list[QueuedApiCall] = field(default_factory=list)
+    dead_message_ids: list[int] = field(default_factory=list)
+    inactive_tg_user_ids: list[int] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class MeetingMessageEdit:
+    """Plain-data snapshot of one meeting-message edit, rendered at enqueue time."""
+
+    message_db_id: int | None
+    chat_id: int | None
+    message_id: int | None
+    inline_message_id: str | None
+    text: str
+    entities: Sequence[MessageEntity] | None
+    reply_markup: InlineKeyboardMarkup | None
 
 
 class BotAdapter:
@@ -103,9 +147,7 @@ def build_api(adapter_or_bot: ContextOrBotAdapter | ExtBot) -> TelegramApiWrappe
 
 
 @asynccontextmanager
-async def handle_edit_errors(
-    adapter: ContextOrBotAdapter, message: MessageModel | None = None, session: AsyncSession | None = None
-):
+async def handle_edit_errors(adapter: ContextOrBotAdapter):
     try:
         yield
     except BadRequest as e:
@@ -114,11 +156,8 @@ async def handle_edit_errors(
         if any(pattern.findall(e.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
             return
 
-        # If we get an error saying that the message is not found, we should delete the message
+        # The message was deleted by the user; nothing to edit anymore
         if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
-            if session and message:
-                log.info("Message is invalid, deleting it", message_id=message.message_id)
-                await session.delete(message)
             adapter.emit_metric(MetricKey.MESSAGE_DELETED)
             return
         raise
@@ -132,11 +171,22 @@ def _resolve_view(view: MitupView | FormattedText | str) -> MitupView:
     return MitupView(view, keyboard=[])
 
 
+def _edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
+    """Extract (chat_id, message_id, inline_message_id) for an edit from the update."""
+    if update.effective_message:
+        return update.effective_message.chat.id, update.effective_message.id, None
+    if update.callback_query and update.callback_query.inline_message_id:
+        return None, None, update.callback_query.inline_message_id
+    raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
+
+
 class TelegramApiWrapper(Protocol):
     @property
     def adapter(self) -> ContextOrBotAdapter: ...
     @adapter.setter
     def adapter(self, adapter: ContextOrBotAdapter): ...
+    @property
+    def immediate(self) -> TelegramApiWrapper: ...
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_messages_to_users(
@@ -158,7 +208,7 @@ class TelegramApiWrapper(Protocol):
     async def update_single_meeting_message(
         self,
         message: MessageModel,
-        session: AsyncSession,
+        session: AsyncSession | None,
         meeting: Meetup,
         was_deleted: bool = False,
         has_finished: bool = False,
@@ -166,7 +216,7 @@ class TelegramApiWrapper(Protocol):
     async def update_meeting_messages(
         self,
         *,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         meeting: Meetup,
         current_message: MessageModel | None = None,
         skip_current: bool = False,
@@ -181,9 +231,40 @@ class TelegramApiWrapper(Protocol):
     async def clear_reply_markup(self, update: Update) -> None: ...
 
 
+class _ImmediateApi:
+    """Escape hatch for the rare call that must run before commit (`context.api.immediate.X(...)`).
+
+    Temporarily lifts the capture mode of the wrapped api so the call executes right away,
+    inside the open transaction — meaning its failure aborts the transaction. Keep usages
+    rare and greppable; the default under write-mode handlers is the post-commit queue.
+    """
+
+    def __init__(self, api: TelegramApi):
+        self._api = api
+
+    def __getattr__(self, name: str):
+        attribute = getattr(self._api, name)
+        if not callable(attribute):
+            return attribute
+
+        async def run_immediately(*args, **kwargs):
+            outbox, self._api._outbox = self._api._outbox, None
+            try:
+                return await attribute(*args, **kwargs)
+            finally:
+                self._api._outbox = outbox
+
+        return run_immediately
+
+
 class TelegramApi:
+    # Class-level default so subclasses that skip __init__ (the test MockApi) still start
+    # in immediate mode.
+    _outbox: ApiOutbox | None = None
+
     def __init__(self):
         self._adapter: ContextOrBotAdapter | None = None
+        self._outbox = None
 
     @property
     def adapter(self) -> ContextOrBotAdapter:
@@ -195,40 +276,115 @@ class TelegramApi:
     def adapter(self, adapter: ContextOrBotAdapter):
         self._adapter = adapter
 
+    @property
+    def immediate(self) -> TelegramApiWrapper:
+        return cast(TelegramApiWrapper, _ImmediateApi(self))
+
+    # -- Outbox lifecycle -------------------------------------------------------------------
+    # Driven exclusively by db.with_session(write=True): capture between begin_capture and
+    # end_capture, then execute_queued after the transaction committed.
+
+    def begin_capture(self) -> ApiOutbox:
+        """Switch the api into capture mode: subsequent calls enqueue instead of executing."""
+        if self._outbox is not None:
+            raise RuntimeError("Api capture already active; write-mode handlers cannot nest")
+        self._outbox = ApiOutbox()
+        return self._outbox
+
+    def end_capture(self) -> None:
+        self._outbox = None
+
+    async def execute_queued(self, outbox: ApiOutbox) -> None:
+        """Execute the queued calls in order, after the handler's transaction committed.
+
+        Failures here are partial rendering problems — the DB is already right — so calls are
+        isolated per the post-commit semantics documented in the api-wrapper skill; only
+        connectivity errors (``NetworkError`` excluding its ``BadRequest`` subclass) abort the
+        drain, because every remaining call would fail the same way.
+        """
+        for queued in outbox.calls:
+            try:
+                await queued.invoke()
+            except InactiveUserInteraction as exc:
+                # The reconcile transaction run by the decorator marks the user inactive.
+                outbox.inactive_tg_user_ids.append(exc.user_id)
+                log.info("User unreachable during post-commit fan-out", tg_user_id=exc.user_id)
+            except BadRequest as exc:
+                if any(pattern.findall(exc.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
+                    continue
+                self._record_queued_failure(queued, exc)
+            except NetworkError:
+                raise
+            except Exception as exc:
+                self._record_queued_failure(queued, exc)
+
+    def _record_queued_failure(self, queued: QueuedApiCall, exc: Exception) -> None:
+        log.exception("Queued Telegram call failed after commit", queued_call=queued.name, exc_info=exc)
+        # Mirror the error handler's fault shape: a per-error-type fault plus the aggregate.
+        self.adapter.emit_metric(
+            MetricKey.FAULT.with_prefix(type(exc).__name__), properties={"QueuedApiCall": queued.name}
+        )
+        self.adapter.emit_metric(MetricKey.FAULT, properties={"QueuedApiCall": queued.name})
+
+    def _enqueue(self, name: str, invoke: Callable[[], Coroutine[Any, Any, object]]) -> None:
+        assert self._outbox is not None
+        self._outbox.calls.append(QueuedApiCall(name, invoke))
+
+    async def _call_or_enqueue[T](
+        self, name: str, invoke: Callable[[], Coroutine[Any, Any, T]], default_result: T
+    ) -> T:
+        """Shared mode branch for the public api methods: execute ``invoke`` immediately, or
+        under capture enqueue it and return ``default_result``. Callers prepare ``invoke``
+        beforehand so validation and view rendering always happen at enqueue time."""
+        if self._outbox is not None:
+            self._enqueue(name, invoke)
+            return default_result
+        return await invoke()
+
+    # -- Public api -------------------------------------------------------------------------
+
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None:
         from mitup_bot import guards
 
         chat_id = guards.chat(update).id
         resolved = _resolve_view(view)
+        return await self._call_or_enqueue(
+            "send_message", partial(self._send_chat_message_now, chat_id, resolved), None
+        )
 
+    async def _send_chat_message_now(self, chat_id: int, view: MitupView) -> Message | None:
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             return await self.adapter.bot.send_message(
                 chat_id=chat_id,
-                text=resolved.description.text,
-                entities=resolved.description.entities or None,
-                reply_markup=resolved.markup,
+                text=view.description.text,
+                entities=view.description.entities or None,
+                reply_markup=view.markup,
                 disable_web_page_preview=True,
             )
 
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
         resolved = _resolve_view(view)
+        return await self._call_or_enqueue(
+            "send_message_to_user", partial(self._send_user_message_now, user.tg_user_id, resolved), None
+        )
 
+    async def _send_user_message_now(self, tg_user_id: int, view: MitupView) -> Message | None:
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             try:
                 return await self.adapter.bot.send_message(
-                    chat_id=user.tg_user_id,
-                    text=resolved.description.text,
-                    entities=resolved.description.entities or None,
-                    reply_markup=resolved.markup,
+                    chat_id=tg_user_id,
+                    text=view.description.text,
+                    entities=view.description.entities or None,
+                    reply_markup=view.markup,
                     disable_web_page_preview=True,
                 )
             except Forbidden as e:
-                log.warning("User has blocked the bot", tg_user_id=user.tg_user_id)
-                raise InactiveUserInteraction(user.tg_user_id, private=True) from e
+                log.warning("User has blocked the bot", tg_user_id=tg_user_id)
+                raise InactiveUserInteraction(tg_user_id, private=True) from e
             except BadRequest as e:
                 if "not found" in e.message:
-                    log.warning("User is not in Telegram", tg_user_id=user.tg_user_id)
-                    raise InactiveUserInteraction(user.tg_user_id, private=True) from e
+                    log.warning("User is not in Telegram", tg_user_id=tg_user_id)
+                    raise InactiveUserInteraction(tg_user_id, private=True) from e
                 raise
 
     async def send_messages_to_users(
@@ -242,11 +398,24 @@ class TelegramApi:
         Sends messages to multiple users.
 
         If a user has blocked the bot or is no longer available, they will be marked as inactive
-        in the database and no exception will be raised.
+        in the database and no exception will be raised. Under capture mode the marking happens
+        in the decorator's reconcile transaction instead of inline.
         """
 
         if len(users) != len(views):
             raise ValueError("The number of users and views must be the same")
+
+        if self._outbox is not None:
+            if on_success or on_error:
+                # The callbacks run against live ORM objects; after commit their effects would
+                # be silently lost. Callers that need them must opt into pre-commit execution.
+                raise ValueError("Result callbacks cannot run after commit; use context.api.immediate instead")
+            for user, view in zip(users, views, strict=True):
+                self._enqueue(
+                    "send_messages_to_users",
+                    partial(self._send_user_message_now, user.tg_user_id, _resolve_view(view)),
+                )
+            return
 
         awaitables = [
             self.send_message_to_user(
@@ -291,44 +460,34 @@ class TelegramApi:
 
     async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool:
         resolved = _resolve_view(view)
+        target = _edit_target(update)
+        return await self._call_or_enqueue(
+            "edit_message", partial(self._edit_message_now, target, resolved), cast("Message | bool", False)
+        )
 
-        chat_id = None
-        message_id = None
-        inline_message_id = None
-
-        if update.effective_message:
-            chat_id = update.effective_message.chat.id
-            message_id = update.effective_message.id
-        elif update.callback_query and update.callback_query.inline_message_id:
-            inline_message_id = update.callback_query.inline_message_id
-        else:
-            raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
-
+    async def _edit_message_now(
+        self, target: tuple[int | None, int | None, str | None], view: MitupView
+    ) -> Message | bool:
+        chat_id, message_id, inline_message_id = target
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             async with handle_edit_errors(adapter=self.adapter):
                 return await self.adapter.bot.edit_message_text(
-                    text=resolved.description.text,
-                    entities=resolved.description.entities or None,
+                    text=view.description.text,
+                    entities=view.description.entities or None,
                     chat_id=chat_id,
                     message_id=message_id,
                     inline_message_id=inline_message_id,
-                    reply_markup=resolved.markup,
+                    reply_markup=view.markup,
                     disable_web_page_preview=True,
                 )
+        return False
 
     async def clear_reply_markup(self, update: Update) -> None:
-        chat_id = None
-        message_id = None
-        inline_message_id = None
+        target = _edit_target(update)
+        await self._call_or_enqueue("clear_reply_markup", partial(self._clear_reply_markup_now, target), None)
 
-        if update.effective_message:
-            chat_id = update.effective_message.chat.id
-            message_id = update.effective_message.id
-        elif update.callback_query and update.callback_query.inline_message_id:
-            inline_message_id = update.callback_query.inline_message_id
-        else:
-            raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
-
+    async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]) -> None:
+        chat_id, message_id, inline_message_id = target
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             async with handle_edit_errors(adapter=self.adapter):
                 await self.adapter.bot.edit_message_reply_markup(
@@ -364,11 +523,25 @@ class TelegramApi:
         tg_button = (
             InlineQueryResultsButton(text=button.text, start_parameter=button.start_parameter) if button else None
         )
+        await self._call_or_enqueue(
+            "answer_inline_query",
+            partial(self._answer_inline_query_now, query.id, query.query, inline_results, tg_button, cache_time),
+            None,
+        )
+
+    async def _answer_inline_query_now(
+        self,
+        query_id: str,
+        query_text: str,
+        inline_results: list[InlineQueryResultArticle],
+        tg_button: InlineQueryResultsButton | None,
+        cache_time: int,
+    ) -> None:
         if await self.adapter.bot.answer_inline_query(
-            query.id, results=inline_results, button=tg_button, cache_time=cache_time
+            query_id, results=inline_results, button=tg_button, cache_time=cache_time
         ):
             return
-        raise AnswerInlineQueryError(query.query)
+        raise AnswerInlineQueryError(query_text)
 
     async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool):
         from mitup_bot import guards
@@ -381,18 +554,21 @@ class TelegramApi:
         if len(_text) > 200:
             CallbackQueryTextTooLong(_text)
         query = guards.valid_callback_query(update)
-        await self.adapter.bot.answer_callback_query(query.id, text=_text, show_alert=show_alert)
+        await self._call_or_enqueue(
+            "answer_callback_query", partial(self._answer_callback_query_now, query.id, _text, show_alert), None
+        )
 
-    async def update_single_meeting_message(
+    async def _answer_callback_query_now(self, query_id: str, text: str, show_alert: bool) -> None:
+        await self.adapter.bot.answer_callback_query(query_id, text=text, show_alert=show_alert)
+
+    def _render_meeting_message_edit(
         self,
         message: MessageModel,
-        session: AsyncSession,
         meeting: Meetup,
-        was_deleted: bool = False,
-        has_finished: bool = False,
-    ):
-        """
-        Updates a single meeting message with the current meeting view.
+        was_deleted: bool,
+        has_finished: bool,
+    ) -> MeetingMessageEdit:
+        """Render one stored meeting message into a plain edit payload.
 
         `has_finished` clears buttons; uses the enriched summary when `end_datetime` is set.
         """
@@ -403,11 +579,13 @@ class TelegramApi:
             else meeting.main_view()
         )
 
-        # Update the stored buttons to match the current view to ensure they are persisted
+        # Update the stored buttons to match the current view to ensure they are persisted.
+        # The mutation is tracked by MutableModel and lands with the surrounding transaction's
+        # flush/commit — the message is either already persistent or pending via the meeting's
+        # messages cascade, so no explicit session.add is needed.
         # TODO: We might want to remove the persistency on this message. Not sure what was the
         # reason to have it to begin with
         message.buttons.keyboard = view.keyboard
-        session.add(message)
 
         # Determine the text, entities and markup based on meeting state
         if was_deleted:
@@ -435,22 +613,73 @@ class TelegramApi:
             entities = view.description.entities or None
             reply_markup = view.markup
 
+        return MeetingMessageEdit(
+            message_db_id=message.id,
+            chat_id=message.chat_id,
+            message_id=message.message_id,
+            inline_message_id=message.inline_message_id,
+            text=text,
+            entities=entities,
+            reply_markup=reply_markup,
+        )
+
+    async def _edit_meeting_message_now(self, edit: MeetingMessageEdit) -> bool:
+        """Execute a rendered meeting-message edit. Returns True when Telegram reports the
+        message gone (deleted by the user), leaving the DB cleanup to the caller."""
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            async with handle_edit_errors(adapter=self.adapter, message=message, session=session):
+            try:
                 await self.adapter.bot.edit_message_text(
-                    text=text,
-                    entities=entities,
-                    chat_id=message.chat_id,
-                    message_id=message.message_id,
-                    inline_message_id=message.inline_message_id,
-                    reply_markup=reply_markup,
+                    text=edit.text,
+                    entities=edit.entities,
+                    chat_id=edit.chat_id,
+                    message_id=edit.message_id,
+                    inline_message_id=edit.inline_message_id,
+                    reply_markup=edit.reply_markup,
                     disable_web_page_preview=True,
                 )
+            except BadRequest as e:
+                # Sometimes the message does not need to be updated but we don't know that in
+                # advance — ignore the error when it happens
+                if any(pattern.findall(e.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
+                    return False
+                if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
+                    self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
+                    return True
+                raise
+        return False
+
+    async def _queued_meeting_message_edit(self, edit: MeetingMessageEdit, outbox: ApiOutbox) -> None:
+        if await self._edit_meeting_message_now(edit) and edit.message_db_id is not None:
+            outbox.dead_message_ids.append(edit.message_db_id)
+
+    async def update_single_meeting_message(
+        self,
+        message: MessageModel,
+        session: AsyncSession | None,
+        meeting: Meetup,
+        was_deleted: bool = False,
+        has_finished: bool = False,
+    ):
+        """
+        Updates a single meeting message with the current meeting view.
+
+        The view content is rendered immediately; under capture mode the resulting plain
+        payload is queued for post-commit execution and a message deleted by the user is
+        recorded on the outbox for the reconcile transaction. In immediate mode a deleted
+        message's DB record is removed via ``session`` when one is provided.
+        """
+        edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
+        if self._outbox is not None:
+            self._enqueue("update_meeting_message", partial(self._queued_meeting_message_edit, edit, self._outbox))
+            return
+        if await self._edit_meeting_message_now(edit) and session is not None:
+            log.info("Message is invalid, deleting it", message_id=message.message_id)
+            await session.delete(message)
 
     async def update_meeting_messages(
         self,
         *,
-        session: AsyncSession,
+        session: AsyncSession | None = None,
         meeting: Meetup,
         current_message: MessageModel | None = None,
         skip_current: bool = False,
@@ -461,6 +690,9 @@ class TelegramApi:
         Updates all tracked messages for a meeting. Edits `current_message` first for
         immediate feedback, then updates the rest. Use `skip_current` when the caller is
         already handling the current message separately.
+
+        ``session`` only matters in immediate mode (see ``update_single_meeting_message``);
+        capture-mode callers omit it — queued payloads never carry a live session.
         """
         # First lets update the current message for a better user experience
         if current_message and not skip_current:

@@ -15,8 +15,8 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
-from mitup_bot.handlers.meeting.utils import flush_new_participant
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 
 pytestmark = pytest.mark.db_test
 
@@ -130,7 +130,7 @@ async def _race[H, C](
 
 async def _join(session: AsyncSession, meetup_id: int, tg_user_id: int) -> bool:
     """The join critical section as handle_join_leave_operation runs it: lock the meetup row,
-    read capacity, insert through the savepoint helper. True when a membership row landed
+    read capacity, insert through the racy_flush savepoint. True when a membership row landed
     (participant or waiting), False when the join was rejected or the meeting vanished."""
     user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).one()
     await session.refresh(user, ["joined_links"])
@@ -139,10 +139,12 @@ async def _join(session: AsyncSession, meetup_id: int, tg_user_id: int) -> bool:
         return False
     if user.joined_meeting(meeting.db_id):
         return False
-    joined_link = meeting.add_participant(user)
-    if joined_link is None:
+    if not meeting.join_allowed():
         return False
-    return await flush_new_participant(session, meeting, joined_link)
+    joined_link = await db.racy_flush(
+        session, lambda: meeting.add_participant(user), constraint=JOINED_USERS_UNIQUE_CONSTRAINT
+    )
+    return joined_link is not None
 
 
 async def _remove_participant(session: AsyncSession, meetup_id: int, tg_user_id: int) -> list[int]:

@@ -5,9 +5,10 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import guards, views
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import ContextId
-from mitup_bot.db import with_session
+from mitup_bot.db import racy_flush, with_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
@@ -16,7 +17,6 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views.factory import confirmation_view, main_menu_view
 
 from .enums import ConversationInviteState, MeetingHandlerId
-from .utils import flush_new_participant
 
 
 async def handle_invite_from_external_chat(
@@ -215,7 +215,7 @@ async def invite_users_name_message_handler(
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.INVITE_USERS_CONFIRM_CALLBACK, bindable=False, callback_data=cb.CONFIRM_INVITE_USER
 )
-@with_session
+@with_session(write=True)
 async def callback_query_confirm_user_invitation(session: AsyncSession, update: Update, context: TMitupContext) -> int:
     user = await guards.current_user(update, session)
 
@@ -236,21 +236,16 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             )
             return ConversationHandler.END
 
+        # ensure_meeting_still_allows_invitations validated join_allowed under the per-meeting
+        # row lock we still hold, so add_participant cannot come back empty here — a None from
+        # racy_flush can only mean the uniqueness constraint rejected a duplicate membership.
         invited_user = User(first_name=invited_user_name, tg_user_id=-1, status=UserStatus.JOINED_ONLY)
-        joined_link = meeting.add_participant(invited_user, invited_by=user)
-
-        if joined_link is None:  # pragma: no cover
-            # This is unexpected since we have already validated this before but there might be a race condition
-            # Lets emit a fault metric and inform the user
-            context.emit_metric(MetricKey.FAULT.with_prefix("InviteUserMeetingFullOnConfirm"))
-            message = MeetingInviteMessages.MEETING_FULL.get(
-                lang=user.lang, name=invited_user_name, meeting_title=meeting.title
-            )
-            await context.api.edit_message(update=update, view=meeting.view_for(user).with_context(message=message))
-            context.clean_user_data([ContextId.INVITE_USERS])
-            return ConversationHandler.END
-
-        if not await flush_new_participant(session, meeting, joined_link, invited_user):
+        joined_link = await racy_flush(
+            session,
+            lambda: meeting.add_participant(invited_user, invited_by=user),
+            constraint=JOINED_USERS_UNIQUE_CONSTRAINT,
+        )
+        if joined_link is None:
             # A concurrent update already registered this participant; the joined_users unique
             # constraint rejected our duplicate. No-op: report the existing membership instead of
             # emitting a fault, leaving the transaction consistent.

@@ -315,10 +315,10 @@ async def test_concurrent_duplicate_invitation_is_idempotent_noop(
     setup_db(mock_session, user_with_settings, meeting)
 
     def _arm_clash():
-        # The confirm step adds the membership row and flushes it inside flush_new_participant's
-        # savepoint; make that flush raise the uniqueness violation as if a concurrent update already
-        # registered the participant.
-        mock_session.flush.side_effect = [integrity_error(JOINED_USERS_UNIQUE_CONSTRAINT), None]
+        # The confirm step builds the membership row inside racy_flush's savepoint; make its
+        # flush raise the uniqueness violation as if a concurrent update already registered
+        # the participant.
+        mock_session.flush.side_effect = integrity_error(JOINED_USERS_UNIQUE_CONSTRAINT)
 
     steps = [
         ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),

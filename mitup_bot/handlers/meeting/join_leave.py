@@ -4,10 +4,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
-from mitup_bot.db import with_session
+from mitup_bot.db import racy_flush, with_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, Message, User, utils
+from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
@@ -16,11 +17,10 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
 
 from .enums import MeetingHandlerId
-from .utils import flush_new_participant
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
-@with_session
+@with_session(write=True)
 async def join_meetup(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     """
     Handle the join action when clicked on a meeting. This action can be clicked by any user
@@ -46,10 +46,15 @@ async def user_joins_meeting(
         if user.joined_meeting(meeting.db_id):
             return MeetingJoinMessages.JOIN_ALREADY_JOINED
 
-        if (joined_link := meeting.add_participant(user)) is None:
+        # Checked under the per-meeting row lock, so the answer cannot change before the
+        # insert below — this is the only case where add_participant would produce nothing.
+        if not meeting.join_allowed():
             return MeetingJoinMessages.JOIN_FULL
 
-        if not await flush_new_participant(session, meeting, joined_link):
+        joined_link = await racy_flush(
+            session, lambda: meeting.add_participant(user), constraint=JOINED_USERS_UNIQUE_CONSTRAINT
+        )
+        if joined_link is None:
             # A concurrent join already created the membership row; the unique constraint on
             # joined_users rejected our duplicate. Treat it as an idempotent no-op.
             return MeetingJoinMessages.JOIN_ALREADY_JOINED
@@ -97,7 +102,7 @@ async def handle_non_existing_user_join(session: AsyncSession, update: Update, c
 
 
 @HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
-@with_session
+@with_session(write=True)
 async def leave_meetup(session: AsyncSession, update: Update, context: TMitupContext) -> None:
     """
     Handle the leave action when clicked on a meeting. This action can be clicked by any user
@@ -191,9 +196,7 @@ async def handle_join_leave_operation(
                 show_alert=False,
             )
 
-        await session.flush()
-
-        await context.api.update_meeting_messages(session=session, meeting=meeting, current_message=current_message)
+        await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
     else:
         # The meeting was not found, update the message to inform the user
         # This should never happen because when the meeting is deleted all messages are updated

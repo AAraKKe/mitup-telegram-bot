@@ -45,8 +45,8 @@ async def test_existing_user_joins_own_meeting(
     assert len(meeting.joined_links) == 1
     assert meeting.joined_links[0].user == user_with_settings
     assert len(meeting.messages) == 1
-    # Savepoint flush for the new membership row + the shared post-operation flush.
-    mock_session.assert_flushed(times=2)
+    # Single flush: the savepoint flush inside racy_flush; everything else lands at commit.
+    mock_session.assert_flushed()
 
     # We have emited a feature metric for user joined
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
@@ -60,7 +60,7 @@ async def test_existing_user_joins_own_meeting(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -87,7 +87,8 @@ async def test_user_already_join_does_not_join(
     assert len(meeting.joined_links) == 1
     # The mssage has been registered
     assert len(meeting.messages) == 1
-    mock_session.assert_flushed()
+    # No explicit flush: nothing racy was inserted and the rest lands at commit.
+    mock_session.assert_not_flushed()
 
     # No feature metric has been emitted
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
@@ -115,20 +116,18 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
     meeting = user_with_settings.meetups[0]
 
     # The user is NOT recorded as joined in the loaded Python state, so the fast path lets the join
-    # through; the clash only surfaces when the savepoint flush hits the DB constraint. The first flush
-    # (inside flush_new_participant's savepoint) raises the uniqueness IntegrityError; the shared
-    # post-op flush succeeds.
-    mock_session.flush.side_effect = [integrity_error(JOINED_USERS_UNIQUE_CONSTRAINT), None]
+    # through; the clash only surfaces when racy_flush's savepoint flush hits the DB constraint.
+    mock_session.flush.side_effect = integrity_error(JOINED_USERS_UNIQUE_CONSTRAINT)
 
     assert len(meeting.messages) == 0
 
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # The Message row created before the operation is still there — the savepoint rolled back only the
-    # duplicate insert, leaving the outer transaction consistent.
+    # duplicate insert, leaving the outer transaction consistent; the row lands at commit.
     assert len(meeting.messages) == 1
-    # Savepoint flush (raised) + shared post-operation flush.
-    mock_session.assert_flushed(times=2)
+    # Only racy_flush's savepoint flush ran (and raised the clash).
+    mock_session.assert_flushed()
 
     # No feature metric for a membership that was not actually inserted, and no fault raised — the
     # clash is an expected, handled outcome.
@@ -144,7 +143,7 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
 
     # The surrounding message-update work still runs.
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -197,8 +196,8 @@ async def test_join_with_existing_message_does_not_create_new_one(
 
     # No new message was created — the existing one is reused
     assert len(meeting.messages) == 1
-    # Savepoint flush for the new membership row + the shared post-operation flush.
-    mock_session.assert_flushed(times=2)
+    # Single flush: the savepoint flush inside racy_flush; everything else lands at commit.
+    mock_session.assert_flushed()
 
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
@@ -220,7 +219,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
 
     # The user should not have joined the meeting
     assert len(meeting.joined_links) == 1
-    mock_session.assert_flushed()
+    mock_session.assert_not_flushed()
 
     # No feature metric has been emitted
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
@@ -310,7 +309,7 @@ async def test_user_leaves_meeting(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(handler_context.update),
     )
@@ -385,10 +384,11 @@ async def test_leave_creates_new_message_when_no_existing_message_found(
 
     # A new message was created (branch 168→170 in handle_join_leave_operation)
     assert len(meeting.messages) == 1
-    mock_session.assert_flushed()
+    # No explicit flush on the leave path: the removal lands at commit.
+    mock_session.assert_not_flushed()
 
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=meeting,
         current_message=meeting.messages[0],
     )

@@ -44,6 +44,9 @@ class MockDbSession(mock.MagicMock):
         self.exec_return = mock.MagicMock()
         self.exec = mock.AsyncMock(side_effect=self.__exec_side_effect)
         self.delete = mock.AsyncMock()
+        # racy_flush's clash recovery sweeps the identity map for expired attributes; an
+        # empty real dict keeps that sweep a deterministic no-op under the mock session.
+        self.identity_map: dict = {}
         self.statements_registry: dict[str, Result] = {}
         self.objects_added: list[SQLModel] = []
         self.__last_id = 0
@@ -93,9 +96,9 @@ class MockDbSession(mock.MagicMock):
         """
         Asserts that the `flush` method has been called.
 
-        With no argument, asserts a single flush — the common case. The join path flushes the new
-        membership row inside a savepoint (to catch the joined_users uniqueness clash) before the
-        shared flush that persists the rest of the operation, so those tests assert ``times=2``.
+        With no argument, asserts a single flush — the common case, e.g. the savepoint flush
+        inside ``racy_flush`` on the join path. Pass ``times`` when a path stacks several
+        explicit flushes (such as registering a new user before joining them).
         """
         if times is None:
             self.flush.assert_called_once()

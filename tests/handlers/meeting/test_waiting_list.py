@@ -54,8 +54,8 @@ async def test_user_joins_waiting_list_with_full_meeting(
     assert full_meeting.n_participants == (1 if is_full else 2)
     assert full_meeting.n_waiting == (1 if is_full else 0)
 
-    # Savepoint flush for the new membership row + the shared post-operation flush.
-    mock_session.assert_flushed(times=2)
+    # Single flush: the savepoint flush inside racy_flush; everything else lands at commit.
+    mock_session.assert_flushed()
 
     # The user has been notified
     context.api.assert_answer_callback_query_called(
@@ -66,7 +66,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
 
     # All messages have been updated
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=full_meeting,
         current_message=full_meeting.message_from_update(handler_context.update),
     )
@@ -105,7 +105,8 @@ async def test_user_leaves_and_waiting_list_promotes(
     assert "Second" in users_joined
     assert "Owner" in users_joined
 
-    mock_session.assert_flushed()
+    # No explicit flush on the leave path: the removal and promotions land at commit.
+    mock_session.assert_not_flushed()
 
     # The user who was promoted has been notified
     context.api.assert_send_message_to_user_called(
@@ -171,7 +172,8 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     assert "SecondWaiting" in users_joined
     assert "Owner" in users_joined
 
-    mock_session.assert_flushed()
+    # No explicit flush on the leave path: the removal and promotions land at commit.
+    mock_session.assert_not_flushed()
 
     # The user who was promoted has been notified
     context.api.assert_send_message_to_user_called(
@@ -223,7 +225,8 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     assert "SecondWaiting" in users_joined
     assert "Owner" in users_joined
 
-    mock_session.assert_flushed()
+    # No explicit flush on the leave path: the removal and promotions land at commit.
+    mock_session.assert_not_flushed()
 
     # The users who were promoted have been notified
     context.api.assert_send_message_to_user_called(

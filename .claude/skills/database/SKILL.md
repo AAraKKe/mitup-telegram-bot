@@ -29,6 +29,34 @@ async def my_handler(session: AsyncSession, update: Update, context: MitupContex
 await my_handler(update, context)
 ```
 
+### Write mode: `@with_session(write=True)`
+
+Handlers that **mutate state and then fan out over Telegram** (edit meeting messages, notify users) use write mode. The decorator owns the whole two-phase lifecycle — ordering is infrastructure, not author discipline:
+
+1. `context.api` is switched into capture mode: every `context.api.*` call enqueues a plain-data snapshot instead of executing (see the `api-wrapper` skill).
+2. The handler runs and the transaction **commits**, releasing the pooled connection and any per-meeting row lock.
+3. The queued Telegram calls execute in order, and their DB fix-ups (dead message rows, unreachable users) are applied in one short reconcile transaction.
+
+Handler bodies keep their linear style — only the execution time of the api calls moves. Rules of thumb:
+
+- Use write mode for any handler that takes the per-meeting row lock (participant, capacity, or meeting-existence mutations) — locking paths MUST commit before their fan-out. Non-locking DB-mutating handlers that broadcast (the field editors, attach_to_chat, show_past_meeting) currently remain on plain `@with_session` in immediate mode; prefer write mode for NEW handlers of that shape, and migrating the existing ones is safe follow-up. Plain `@with_session` stays for read-only handlers.
+- Under write mode, don't pass `session=` to `update_meeting_messages` — payloads are snapshotted at enqueue time and no live session may cross into the fan-out.
+- Drop defensive "flush before send" calls: commit-before-drain provides fail-early ordering structurally.
+- `context.api.immediate.X(...)` is the escape hatch for a call that must run pre-commit (its failure aborts the transaction). Keep usages rare and greppable.
+- If the handler raises, the queue is discarded with the rolled-back transaction — nothing about aborted state is rendered.
+
+### `racy_flush` — the single racy-write primitive
+
+Inserts that can lose a uniqueness race against a concurrent transaction go through `db.racy_flush`:
+
+```python
+link = await racy_flush(session, lambda: meeting.add_participant(user), constraint=JOINED_USERS_UNIQUE_CONSTRAINT)
+if link is None:
+    ...  # a concurrent writer already inserted the row — treat as idempotent no-op
+```
+
+The builder callable runs **inside** `begin_nested()` — construct the racy rows in the builder, never before the call (construction is what makes rows session-pending through relationship cascades; building them inside the savepoint is what lets a clash roll back cleanly). The helper adds the built row explicitly (SQLAlchemy 2.0 does not cascade backref-only associations), flushes, narrows `IntegrityError` to the named constraint, and on a clash rolls the savepoint back and reloads exactly the attributes the rollback unloaded — so in-memory collections (including `lazy="raise"` ones) reflect committed state. Any other `IntegrityError` re-raises. Before checking capacity ahead of the call, make sure the meeting was loaded `for_update=True` so the pre-check cannot go stale.
+
 ## Lazy loading is forbidden at runtime
 
 The async engine cannot run implicit lazy loads: touching an unloaded relationship or expired attribute raises `MissingGreenlet`. The strategy:
@@ -47,7 +75,7 @@ Meeting capacity and waiting-list logic is computed in Python over the loaded `j
 - **Lock ordering:** meeting row first, then anything else. Never lock two meetings in one transaction — every handler operates on a single meeting, which keeps the deadlock surface at zero.
 - `FOR UPDATE` applies only to the meetups row; the `selectin` follow-up loads run unlocked. That's correct: the row lock is what serializes writers, the link rows don't need locking.
 - Unconditional writes that make no participant-dependent decision (e.g. reactivation setting `active = True`) don't need the explicit lock — the flush-time UPDATE acquires it.
-- **Interim caveat:** until #188 restructures handlers to commit before Telegram fan-outs, the lock is held across the fan-out. Acceptable short-lived state, by design.
+- **The lock is never held across Telegram I/O:** every locking path runs under `@with_session(write=True)`, which commits (releasing the lock) before the queued fan-out executes. A new locking handler must use write mode too; `tests/models/db_behavior/test_commit_before_fanout.py` pins the release-at-commit property on real Postgres.
 
 ## Models
 

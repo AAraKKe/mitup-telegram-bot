@@ -268,7 +268,7 @@ async def test_edit_meeting_kickout_participant_confirm(
 
     # Kickout should trigger meeting messages update
     context.api.assert_update_meeting_messages_called(
-        session=mock_session,
+        session=None,
         meeting=meeting,
         current_message=meeting.message_from_update(update),
         skip_current=True,

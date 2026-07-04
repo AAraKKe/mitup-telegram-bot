@@ -45,7 +45,7 @@ async def callback_query_delete_meeting(session: AsyncSession, update: Update, c
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, callback_data=cb.CONFIRM_DELETE_MEETING, bindable=True
 )
-@with_session
+@with_session(write=True)
 async def callback_query_confirm_delete_meeting(session: AsyncSession, update: Update, context: TMitupContext):
     callback_data = guards.valid_callback_data(
         cb.CONFIRM_DELETE_MEETING.parse(context.match),
@@ -67,7 +67,9 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
     if meeting is None:
         return
 
-    await context.api.update_meeting_messages(session=session, meeting=meeting, was_deleted=True)
+    # Rendered (and queued) before the rows are deleted below; the edits themselves run after
+    # the deletion commits.
+    await context.api.update_meeting_messages(meeting=meeting, was_deleted=True)
 
     # Keep all invited users ides to also delete them
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]

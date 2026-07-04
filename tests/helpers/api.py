@@ -5,7 +5,7 @@ from unittest import mock
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
-from mitup_bot.api_wrapper import TelegramApi
+from mitup_bot.api_wrapper import ApiOutbox, TelegramApi
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
@@ -25,6 +25,13 @@ class MockApi(TelegramApi):
     def __init__(self):
         self.mock_mapping: dict[str, mock.AsyncMock] = {}
 
+    def begin_capture(self) -> ApiOutbox:
+        """MockApi is transparent to write-mode capture: the decorator gets an outbox that
+        stays empty, so mocked calls record at call time exactly as under plain handlers and
+        the hundreds of existing assertions keep their semantics. Tests that need to observe
+        real enqueue/drain ordering should exercise a real TelegramApi instead."""
+        return ApiOutbox()
+
     def send_message_to_user(self, user: User, view: MitupView | FormattedText | str):
         return self.call_mock("send_message_to_user", user=user, view=view)
 
@@ -37,7 +44,7 @@ class MockApi(TelegramApi):
     def update_meeting_messages(
         self,
         *,
-        session: AsyncSession,
+        session: AsyncSession | None = DEFAULT_NONE,  # type: ignore
         meeting: Meetup,
         current_message: Message | None = DEFAULT_NONE,  # type: ignore
         skip_current: bool = DEFAULT_FALSE,  # type: ignore
@@ -146,17 +153,21 @@ class MockApi(TelegramApi):
 
     def assert_update_meeting_messages_called(
         self,
-        session: MockDbSession,
+        session: MockDbSession | None,
         meeting: Meetup,
         current_message: Message | None = DEFAULT_CURRENT_MESSAGE,
         skip_current: bool | None = None,
         was_deleted: bool | None = None,
         times: int = 1,
     ):
+        # Write-mode handlers call update_meeting_messages without a session (payloads are
+        # snapshotted for the post-commit queue); their tests pass session=None to assert
+        # the session was NOT handed to the fan-out.
         arguments: dict[str, Any] = {
-            "session": session,
             "meeting": meeting,
         }
+        if session is not None:
+            arguments["session"] = session
         if current_message != DEFAULT_CURRENT_MESSAGE:
             arguments["current_message"] = current_message
         if skip_current is not None:
