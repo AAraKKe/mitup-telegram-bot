@@ -14,6 +14,7 @@ from mitup_bot.config import (
     GoogleApiConfig,
     MetricsConfig,
     MetricsEnv,
+    PatreonConfig,
     RunModes,
     TomlConfigProvider,
 )
@@ -45,6 +46,43 @@ CONFIG_FROM_ENV = {
     "google_api": {
         "gmaps_geocode_key": "1a2b3c45d6e7f8g",
         "gmaps_timezone_key": "9h0i1j2k3l4m5n6o",
+    },
+}
+
+FULL_PATREON_TOML_SECTION = """
+[patreon]
+client_id = "patreon-client-abc"
+client_secret = "patreon-secret-xyz"
+campaign_id = "1234567"
+redirect_uri = "https://bot.example/patreon/callback"
+creator_access_token = "seed-access-token"
+creator_refresh_token = "seed-refresh-token"
+state_secret = "fernet-state-key"
+encryption_key = "fernet-encryption-key"
+"""
+
+PARTIAL_PATREON_TOML_SECTION = """
+[patreon]
+client_id = "patreon-client-abc"
+client_secret = "patreon-secret-xyz"
+"""
+
+EMPTY_PATREON_TOML_SECTION = """
+[patreon]
+"""
+
+FULL_PATREON_ENV_SECTION = {
+    "patreon": {
+        "client_id": "patreon-client-abc",
+        "client_secret": "patreon-secret-xyz",
+        # Numeric on purpose: the env provider hands this back as an int, exercising the
+        # coerce_numbers_to_str path on PatreonConfig.
+        "campaign_id": "1234567",
+        "redirect_uri": "https://bot.example/patreon/callback",
+        "creator_access_token": "seed-access-token",
+        "creator_refresh_token": "seed-refresh-token",
+        "state_secret": "fernet-state-key",
+        "encryption_key": "fernet-encryption-key",
     },
 }
 
@@ -198,3 +236,145 @@ def test_config_without_log_level_still_builds(
     config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
     assert config.app.log_level == "INFO"
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT, CONFIG_FROM_ENV],),
+    indirect=True,
+    ids=["patreon_absent"],
+)
+def test_config_without_patreon_section_is_none(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    # The Patreon section is optional; the bot must boot with it entirely absent.
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    assert config.patreon is None
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT + FULL_PATREON_TOML_SECTION, CONFIG_FROM_ENV],),
+    indirect=True,
+    ids=["patreon_via_toml"],
+)
+def test_full_patreon_section_from_toml_is_parsed(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    assert config.patreon is not None
+    assert config.patreon.client_id == "patreon-client-abc"
+    assert config.patreon.campaign_id == "1234567"
+    assert config.patreon.redirect_uri == "https://bot.example/patreon/callback"
+    assert config.patreon.client_secret.get_secret_value() == "patreon-secret-xyz"
+    assert config.patreon.creator_access_token.get_secret_value() == "seed-access-token"
+    assert config.patreon.creator_refresh_token.get_secret_value() == "seed-refresh-token"
+    assert config.patreon.state_secret.get_secret_value() == "fernet-state-key"
+    assert config.patreon.encryption_key.get_secret_value() == "fernet-encryption-key"
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT, {**CONFIG_FROM_ENV, **FULL_PATREON_ENV_SECTION}],),
+    indirect=True,
+    ids=["patreon_via_env"],
+)
+def test_full_patreon_section_from_env_is_parsed(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    assert config.patreon is not None
+    # campaign_id arrives as an int from the env provider and is coerced back to str.
+    assert config.patreon.campaign_id == "1234567"
+    assert config.patreon.client_id == "patreon-client-abc"
+    assert config.patreon.client_secret.get_secret_value() == "patreon-secret-xyz"
+    assert config.patreon.encryption_key.get_secret_value() == "fernet-encryption-key"
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT + EMPTY_PATREON_TOML_SECTION, CONFIG_FROM_ENV],),
+    indirect=True,
+    ids=["patreon_empty_section"],
+)
+def test_empty_patreon_section_is_treated_as_absent(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    # An empty [patreon] header (the preemptive-section-with-env-overrides pattern) must read
+    # as absent rather than firing eight "field required" errors at boot.
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    assert config.patreon is None
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT + PARTIAL_PATREON_TOML_SECTION, CONFIG_FROM_ENV],),
+    indirect=True,
+    ids=["partial_patreon_toml"],
+)
+def test_partial_patreon_section_from_toml_raises(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    # A partial section falls through to pydantic, which reports each missing field by name.
+    with pytest.raises(ValidationError) as exc_info:
+        Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    missing_locations = {error["loc"] for error in exc_info.value.errors() if error["type"] == "missing"}
+    assert ("patreon", "campaign_id") in missing_locations
+    assert ("patreon", "encryption_key") in missing_locations
+    assert ("patreon", "creator_access_token") in missing_locations
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT, {**CONFIG_FROM_ENV, "patreon": {"client_id": "patreon-client-abc"}}],),
+    indirect=True,
+    ids=["partial_patreon_env"],
+)
+def test_partial_patreon_section_from_env_raises(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    # A lone MITUPBOT__PATREON__CLIENT_ID env var lands in the same partial-dict shape as a
+    # partial TOML block, so pydantic rejects it the same way.
+    with pytest.raises(ValidationError) as exc_info:
+        Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    missing_locations = {error["loc"] for error in exc_info.value.errors() if error["type"] == "missing"}
+    assert ("patreon", "client_secret") in missing_locations
+
+
+def test_patreon_secrets_are_masked_in_repr():
+    patreon = PatreonConfig(
+        client_id="patreon-client-abc",
+        client_secret=SecretStr("super-secret"),
+        campaign_id="1234567",
+        redirect_uri="https://bot.example/patreon/callback",
+        creator_access_token=SecretStr("seed-access-token"),
+        creator_refresh_token=SecretStr("seed-refresh-token"),
+        state_secret=SecretStr("fernet-state-key"),
+        encryption_key=SecretStr("fernet-encryption-key"),
+    )
+
+    rendered = f"{patreon!r}{patreon}"
+
+    secrets = (
+        "super-secret",
+        "seed-access-token",
+        "seed-refresh-token",
+        "fernet-state-key",
+        "fernet-encryption-key",
+    )
+    for secret in secrets:
+        assert secret not in rendered
+    # Non-secret fields stay visible for debugging.
+    assert "patreon-client-abc" in rendered

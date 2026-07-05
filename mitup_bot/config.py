@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import structlog
-from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from sqlalchemy import URL
 
 from . import environments
@@ -195,6 +195,36 @@ class MetricsConfig(BaseModel):
     flush_on_emission: bool = False
 
 
+class PatreonConfig(BaseModel):
+    """Patreon OAuth integration credentials.
+
+    Wired into `Config` as an optional section: the bot boots without a `[patreon]` block. Every
+    field is required, so a partially-filled section fails validation with pydantic's per-field
+    "field required" errors.
+    """
+
+    # Numeric env-var values arrive as int (the env provider coerces digit-only strings);
+    # Patreon campaign/client IDs are numeric, so coerce them back to str instead of failing.
+    model_config = ConfigDict(coerce_numbers_to_str=True)
+
+    client_id: str
+    client_secret: SecretStr
+    campaign_id: str
+    redirect_uri: str
+    # Seed value only. The daily refresh job (#158) persists the live creator token pair in
+    # the DB (#155), which is the source of truth after the first refresh — this seed is
+    # re-adopted only when its value changes (fingerprint comparison in #158), so rotating the
+    # credential is just replacing the CI/SSM variable.
+    creator_access_token: SecretStr
+    # Seed value only, adopted together with `creator_access_token` (same fingerprint check).
+    creator_refresh_token: SecretStr
+    # Fernet key for the OAuth `state` parameter (tg_user_id + nonce, validated with ttl=600).
+    state_secret: SecretStr
+    # Fernet key for encrypting Patreon tokens at rest in the DB. Kept separate from
+    # `state_secret` so the two keys have a different blast radius.
+    encryption_key: SecretStr
+
+
 # Connections kept free for work that runs outside update handlers: the job queue and the
 # post-fan-out reconcile transactions must never find the pool fully claimed by handlers.
 POOL_CONNECTION_HEADROOM = 2
@@ -222,6 +252,27 @@ class Config(BaseModel):
     google_api: GoogleApiConfig
     app: AppConfig
     metrics: MetricsConfig
+    # First optional section: Patreon may be absent entirely during rollout. When present, every
+    # field is required, so pydantic rejects a partial section on its own.
+    patreon: PatreonConfig | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def treat_empty_patreon_section_as_absent(cls, data: Any) -> Any:
+        """Drop an empty `[patreon]` section so the optional `None` default applies.
+
+        This repo's TOML style ships empty sections that are filled by `MITUPBOT__*` env-var
+        overrides at deploy time (prod.toml carries an empty `[bot]` today). A preemptive empty
+        `[patreon]` header must therefore read as "absent", not as a fully-unset section — which
+        would otherwise fail with eight "field required" errors at boot. A partial section still
+        falls through to pydantic, which reports each missing key by name.
+        """
+        if not isinstance(data, dict):
+            return data
+        patreon = data.get("patreon")
+        if isinstance(patreon, dict) and not patreon:
+            return {key: value for key, value in data.items() if key != "patreon"}
+        return data
 
     @model_validator(mode="after")
     def validate_concurrency_fits_pool(self) -> Config:

@@ -59,3 +59,24 @@ gmaps_timezone_key = "key_to_use_timezone_api"
 [metrics]
 namespace = "MitupBot"
 environment = "local"
+
+[patreon]
+# Patreon OAuth integration. This whole section is OPTIONAL — omit it entirely and the bot
+# starts without Patreon support. If you include it, it is all-or-nothing: every key below
+# must be set or config loading fails naming the missing ones.
+# OAuth app credentials from https://www.patreon.com/portal/registration/register-clients
+client_id = "patreon_client_id"
+client_secret = "patreon_client_secret"
+# Campaign whose membership the bot checks against.
+campaign_id = "1234567"
+# Must exactly match the redirect URI registered on the Patreon client.
+redirect_uri = "https://your.bot.domain/patreon/callback"
+# SEED VALUES ONLY for the creator token pair. The daily refresh job persists the live pair
+# in the DB, which is the source of truth after the first refresh; these seeds are re-adopted
+# only when their value changes, so rotating the credential is just replacing these values.
+creator_access_token = "patreon_creator_access_token"
+creator_refresh_token = "patreon_creator_refresh_token"
+# Separate Fernet keys (different blast radius): one signs the OAuth `state` parameter, the
+# other encrypts Patreon tokens at rest in the DB.
+state_secret = "fernet_key_for_oauth_state"
+encryption_key = "fernet_key_for_token_encryption"
