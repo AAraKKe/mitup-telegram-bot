@@ -191,6 +191,15 @@ msgstr "⌛ Duración de la quedada"
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivar quedada"
 
+msgid "ButtonMessages.LINK_PATREON"
+msgstr "♥ Vincular cuenta de Patreon"
+
+msgid "ButtonMessages.BECOME_PATRON"
+msgstr "💶 Hazte mecenas"
+
+msgid "ButtonMessages.UNLINK_PATREON"
+msgstr "Desvincular cuenta de Patreon"
+
 msgid "MainMenuMessages.DESCRIPTION"
 msgstr "¡Bienvenido a MitUp Bot!\n\n"
 "Elige una de las siguientes opciones:"
@@ -642,6 +651,27 @@ msgstr "¡La quedada <b>${meeting_title}</b> va a comenzar pronto!"
 
 msgid "NotificationMessages.STARTED"
 msgstr "¡La quedada <b>${meeting_title}</b> ha comenzado!"
+
+msgid "CollaborateMessages.NOT_LINKED"
+msgstr "<b>Apoya a Mitup con Patreon</b>\n\nMitup es gratis. Si te ayuda a reunir a tu gente, puedes apoyarlo en Patreon y desbloquear ventajas premium como agradecimiento.\n\nVincula tu cuenta de Patreon para empezar."
+
+msgid "CollaborateMessages.LINKED_NOT_PATRON"
+msgstr "<b>Cuenta de Patreon vinculada</b>\n\nTodo listo. Aún no eres mecenas, así que las ventajas premium siguen desactivadas. Hazte mecenas y se activan solas, sin necesidad de volver a vincular."
+
+msgid "CollaborateMessages.LINKED_PATRON"
+msgstr "<b>Eres un mecenas premium</b>\n\nGracias por apoyar a Mitup. Tus ventajas premium están activas. Puedes desvincular tu cuenta de Patreon aquí cuando quieras."
+
+msgid "CollaborateMessages.UNAVAILABLE"
+msgstr "<b>Colabora</b>\n\nEl soporte de Patreon todavía no está disponible. Vuelve pronto."
+
+msgid "CollaborateMessages.UNLINKED"
+msgstr "Tu cuenta de Patreon se ha desvinculado."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
+msgstr "<b>Premium desbloqueado</b>\n\nTu cuenta de Patreon está vinculada y tus ventajas premium están activas. Gracias por apoyar a Mitup."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
+msgstr "<b>Cuenta de Patreon vinculada</b>\n\nYa estás conectado. Hazte mecenas para desbloquear las ventajas premium. Se activarán solas en cuanto tu aportación esté activa."
 
 msgid "Weekday.MONDAY"
 msgstr "Lun"

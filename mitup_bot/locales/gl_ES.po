@@ -813,3 +813,33 @@ msgstr "Por agora podes programar quedadas ata ${days} días por diante. Escolle
 
 msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
 msgstr "Podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima."
+
+msgid "ButtonMessages.LINK_PATREON"
+msgstr "♥ Enlazar conta Patreon"
+
+msgid "ButtonMessages.BECOME_PATRON"
+msgstr "💶 Ser patrón"
+
+msgid "ButtonMessages.UNLINK_PATREON"
+msgstr "Desenlazar conta Patreon"
+
+msgid "CollaborateMessages.NOT_LINKED"
+msgstr "<b>Apoiar Mitup con Patreon</b>\n\nMitup é gratuíto. Se che axuda a xuntar xente, podes apoiar Mitup en Patreon e desbloquear privilexios especiais como agradecemento.\n\nEnlaza a túa conta de Patreon para comezar."
+
+msgid "CollaborateMessages.LINKED_NOT_PATRON"
+msgstr "<b>Conta Patreon enlazada</b>\n\nPerfecto. Aínda non es patrón, polo que os privilexios especiais aínda están desactivados. Podes ser patrón e activaranse automaticamente, sen necesidade de enlazar de novo."
+
+msgid "CollaborateMessages.LINKED_PATRON"
+msgstr "<b>Es un apoiante premium</b>\n\nGrazas por apoiar Mitup. Os teus privilexios especiais están activos. Podes desenlazar a túa conta de Patreon aquí sempre que queiras."
+
+msgid "CollaborateMessages.UNAVAILABLE"
+msgstr "<b>Colabora</b>\n\nO apoio de Patreon non está dispoñible aínda. Volve pronto."
+
+msgid "CollaborateMessages.UNLINKED"
+msgstr "A túa conta de Patreon foi desenlazada."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
+msgstr "<b>Premium desbloqueado</b>\n\nA túa conta de Patreon está enlazada e os teus privilexios especiais están activos. Grazas por apoiar Mitup."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
+msgstr "<b>Conta Patreon enlazada</b>\n\nEstás conectado. Podes ser patrón para desbloquear privilexios especiais. Activaranse automaticamente cando o teu apoio estea activo."

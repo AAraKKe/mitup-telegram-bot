@@ -173,3 +173,39 @@ class CallbackQueryTextTooLong(ValueError):
 class TokenEncryptionNotConfigured(RuntimeError):
     def __init__(self):
         super().__init__("Patreon token encryption was used before configure_token_encryption() supplied a Fernet key.")
+
+
+class PatreonNotConfigured(RuntimeError):
+    def __init__(self):
+        super().__init__("Patreon support was used before a [patreon] config section was supplied at startup.")
+
+
+class PatreonApiError(RuntimeError):
+    """A Patreon HTTP call returned an unexpected status or body."""
+
+    def __init__(self, message: str):
+        super().__init__(f"Patreon API error: {message}")
+
+
+class PatreonTokenRevoked(RuntimeError):
+    """A token refresh failed with OAuth ``invalid_grant`` — the user disconnected the app on
+    Patreon's side. The daily job (#158) treats this as a business event, not a transient fault."""
+
+    def __init__(self):
+        super().__init__("Patreon refused the refresh token with invalid_grant (app disconnected on Patreon's side).")
+
+
+class PatreonStateExpired(ValueError):
+    """The OAuth ``state`` token is authentic but older than its TTL — the inline button was
+    tapped long after it was rendered. The callback tells the user to tap the button again."""
+
+    def __init__(self):
+        super().__init__("The Patreon OAuth state token has expired.")
+
+
+class PatreonStateInvalid(ValueError):
+    """The OAuth ``state`` token failed signature validation (tampered, truncated, or signed with
+    a different key). Distinct from expiry so the callback can render a different message."""
+
+    def __init__(self):
+        super().__init__("The Patreon OAuth state token is invalid.")

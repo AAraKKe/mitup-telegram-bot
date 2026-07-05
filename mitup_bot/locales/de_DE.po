@@ -813,3 +813,33 @@ msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle e
 
 msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
 msgstr "Du kannst Treffen bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum."
+
+msgid "ButtonMessages.LINK_PATREON"
+msgstr "♥ Patreon-Konto verbinden"
+
+msgid "ButtonMessages.BECOME_PATRON"
+msgstr "💶 Unterstützer werden"
+
+msgid "ButtonMessages.UNLINK_PATREON"
+msgstr "Patreon-Konto trennen"
+
+msgid "CollaborateMessages.NOT_LINKED"
+msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und als Dankeschön exklusive Vorteile freischalten.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
+
+msgid "CollaborateMessages.LINKED_NOT_PATRON"
+msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Unterstützer, daher sind die exklusiven Vorteile noch nicht aktiv. Werde ein Unterstützer und sie werden automatisch aktiviert, ohne dass du erneut verlinken musst."
+
+msgid "CollaborateMessages.LINKED_PATRON"
+msgstr "<b>Du bist ein Premium-Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Deine Premium-Vorteile sind aktiv. Du kannst dein Patreon-Konto hier jederzeit trennen."
+
+msgid "CollaborateMessages.UNAVAILABLE"
+msgstr "<b>Mithelfen</b>\n\nPatreon-Unterstützung ist noch nicht verfügbar. Schau bald wieder vorbei."
+
+msgid "CollaborateMessages.UNLINKED"
+msgstr "Dein Patreon-Konto wurde getrennt."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
+msgstr "<b>Premium freigeschaltet</b>\n\nDein Patreon-Konto ist verbunden und deine Premium-Vorteile sind aktiv. Danke, dass du Mitup unterstützt."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
+msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Unterstützer, um Premium-Vorteile freizuschalten. Sie werden automatisch aktiviert, sobald dein Beitrag aktiv ist."

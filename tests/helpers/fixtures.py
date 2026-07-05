@@ -2,11 +2,14 @@ import datetime as dt
 from dataclasses import dataclass
 from unittest import mock
 
+from cryptography.fernet import Fernet
+from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Location, Message, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.config import PatreonConfig
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import (
     JoinedUsers,
@@ -188,6 +191,28 @@ def create_premium_subscription(
         revoked_time=revoked_time,
         premium_expiration=premium_expiration,
         expiration_notified=expiration_notified,
+    )
+
+
+def create_patreon_config(
+    client_id: str = "test-client-id",
+    client_secret: str = "test-client-secret",
+    campaign_id: str = "12345",
+    redirect_uri: str = "https://bot.example/patreon/callback",
+    state_secret: str | None = None,
+    encryption_key: str | None = None,
+) -> PatreonConfig:
+    """Build a valid PatreonConfig for tests. ``state_secret`` and ``encryption_key`` default to
+    freshly generated Fernet keys so OAuth state signing and token encryption work out of the box."""
+    return PatreonConfig(
+        client_id=client_id,
+        client_secret=SecretStr(client_secret),
+        campaign_id=campaign_id,
+        redirect_uri=redirect_uri,
+        creator_access_token=SecretStr("creator-access-seed"),
+        creator_refresh_token=SecretStr("creator-refresh-seed"),
+        state_secret=SecretStr(state_secret or Fernet.generate_key().decode()),
+        encryption_key=SecretStr(encryption_key or Fernet.generate_key().decode()),
     )
 
 

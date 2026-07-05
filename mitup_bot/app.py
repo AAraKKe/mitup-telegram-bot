@@ -4,11 +4,12 @@ import structlog
 import uvicorn
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
-from mitup_bot import db, limits, timezone_api
+from mitup_bot import db, limits, patreon, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.logging_config import configure_logging
+from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.update_processor import PerUserUpdateProcessor
@@ -45,6 +46,19 @@ class MitupRuntime:
         self.__configure_metrics()
         self.__setup_db()
         self.__setup_timezone_api()
+        self.__setup_patreon()
+
+    def __setup_patreon(self):
+        """Wire Patreon support when a ``[patreon]`` section is present; skip entirely otherwise.
+
+        The bot must stay fully bootable without Patreon configured, so both the token cipher and
+        the runtime config holder are only initialized when the optional section exists.
+        """
+        if self.config.patreon is None:
+            log.info("Patreon section absent, skipping Patreon setup")
+            return
+        configure_token_encryption(self.config.patreon.encryption_key.get_secret_value())
+        patreon.configure(self.config.patreon)
 
     def __setup_db(self):
         metrics_client = MetricsClient(EmfBackend()) if self.config.db.pool_metrics_enabled else None

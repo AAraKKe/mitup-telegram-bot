@@ -18,6 +18,7 @@ __all__ = [
     "create_joined_link",
     "create_premium_subscription",
     "create_patreon_creator_token",
+    "create_patreon_config",
     "owner_with_meeting",
     "MockDbSession",
     "MITUP_DIR",
@@ -51,6 +52,7 @@ from .fixtures import (
     create_joined_link,
     create_premium_subscription,
     create_patreon_creator_token,
+    create_patreon_config,
     owner_with_meeting,
 )
 from .stub_db import MockDbSession, Result

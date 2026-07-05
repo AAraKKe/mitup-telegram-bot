@@ -20,11 +20,13 @@ from mitup_bot.config import (
     GoogleApiConfig,
     MetricsConfig,
     MetricsEnv,
+    PatreonConfig,
     RunModes,
     TomlConfigProvider,
 )
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.update_processor import PerUserUpdateProcessor
+from tests.helpers import create_patreon_config
 
 
 def build_config(
@@ -34,6 +36,7 @@ def build_config(
     secret_token: SecretStr | None = None,
     concurrent_updates: int = 1,
     pool_metrics_enabled: bool = False,
+    patreon: PatreonConfig | None = None,
 ) -> Config:
     return Config(
         db=DbConfig(
@@ -55,6 +58,7 @@ def build_config(
         ),
         app=AppConfig(run_mode=run_mode),
         metrics=MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False),
+        patreon=patreon,
     )
 
 
@@ -176,6 +180,34 @@ def test_init_configures_metrics(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
     patch_runtime_deps.metrics.assert_called_once_with(runtime.config.metrics)
+
+
+def test_init_configures_patreon_when_section_present(patch_runtime_deps: RuntimeDeps):
+    patreon_config = create_patreon_config()
+    config = build_config(patreon=patreon_config)
+
+    with (
+        mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
+        mock.patch("mitup_bot.app.configure_token_encryption") as mock_encrypt,
+        mock.patch("mitup_bot.app.patreon.configure") as mock_configure,
+    ):
+        MitupRuntime(Env.DEV)
+
+    # The token cipher is seeded with the encryption key and the runtime holder gets the section.
+    mock_encrypt.assert_called_once_with(patreon_config.encryption_key.get_secret_value())
+    mock_configure.assert_called_once_with(patreon_config)
+
+
+def test_init_skips_patreon_when_section_absent(patch_runtime_deps: RuntimeDeps):
+    # build_config defaults patreon to None, so neither the cipher nor the holder is touched.
+    with (
+        mock.patch("mitup_bot.app.configure_token_encryption") as mock_encrypt,
+        mock.patch("mitup_bot.app.patreon.configure") as mock_configure,
+    ):
+        MitupRuntime(Env.DEV)
+
+    mock_encrypt.assert_not_called()
+    mock_configure.assert_not_called()
 
 
 # --- Build application ---

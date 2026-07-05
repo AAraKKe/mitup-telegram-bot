@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$title · Mitup</title>
+<style>
+  :root {
+    --mitup-blue: #2AA1E0;
+    --mitup-blue-deep: #1F87BF;
+    --mitup-ink: #0E1A23;
+    --mitup-ink-2: #36505F;
+    --mitup-paper: #F6FAFD;
+    --mitup-line: #E2ECF2;
+    --mitup-yellow: #FFC850;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--mitup-paper);
+    color: var(--mitup-ink);
+  }
+  header { padding: 1.5rem 2rem; }
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--mitup-blue);
+  }
+  .wordmark .dot { color: var(--mitup-yellow); }
+  main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .card {
+    max-width: 30rem;
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--mitup-line);
+    border-radius: 16px;
+    padding: 2.5rem;
+    text-align: center;
+    box-shadow: 0 6px 24px rgba(14, 26, 35, .06);
+  }
+  h1 { margin: 0 0 .75rem; font-size: 1.4rem; }
+  p { margin: 0; color: var(--mitup-ink-2); line-height: 1.6; }
+  .cta {
+    display: inline-block;
+    margin-top: 1.75rem;
+    padding: .8rem 1.75rem;
+    background: var(--mitup-blue);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 10px;
+  }
+  .cta:hover { background: var(--mitup-blue-deep); }
+  footer { padding: 1.5rem 2rem; text-align: center; color: var(--mitup-ink-2); font-size: .85rem; }
+</style>
+</head>
+<body>
+  <header><span class="wordmark">mitup<span class="dot">.</span></span></header>
+  <main>
+    <div class="card">
+      <h1>$title</h1>
+      <p>$message</p>
+      $return_link
+    </div>
+  </main>
+  <footer>Mitup — bring your people together</footer>
+</body>
+</html>

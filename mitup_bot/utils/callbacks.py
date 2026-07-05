@@ -105,6 +105,7 @@ PAST_MEETINGS = CallbackData(entity="past_meetings")
 SETTINGS = CallbackData(entity="settings")
 HELP = CallbackData(entity="help")
 COLLABORATE = CallbackData(entity="collaborate")
+UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
 
 # ----------------------------------------
 # Settings callbacks

@@ -9,24 +9,13 @@ from telegram.ext import Application
 
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application, get_webhook_secret
 
 log = structlog.get_logger(__name__)
 
 TELEGRAM_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 
 router = APIRouter()
-
-
-def get_ptb_application(request: Request) -> Application:
-    return request.app.state.ptb_app
-
-
-def get_webhook_secret(request: Request) -> str | None:
-    return request.app.state.secret_token
-
-
-def get_metrics_client(request: Request) -> MetricsClient:
-    return request.app.state.metrics_client
 
 
 def validate_secret(

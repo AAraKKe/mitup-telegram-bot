@@ -30,3 +30,20 @@ Always also read the closest existing test file in the same directory — existi
 ## Test signatures must be fully typed
 
 Every parameter in a test or fixture signature must have a type annotation, including parameters that pytest injects from fixtures. A signature like `async def test_foo(web_app, ptb_app: MagicMock):` is **incomplete** — annotate every parameter (`async def test_foo(web_app: FastAPI, ptb_app: MagicMock):`). The annotation requirement from the `coding-standards` skill applies to test parameters with no exception.
+
+## Cover new and changed code before handing off
+
+CI measures coverage (`.gitlab/ci/test.yml` runs the `test-cov` script and tracks the reported total), but a healthy *total* can still hide an undertested new module. Before declaring a testing task done or opening an MR, check coverage of the code this branch adds or changes — don't rely on the aggregate.
+
+Run the same command CI runs; it prints a per-file `term-missing` table:
+
+```bash
+hatch run dev:test-cov
+```
+
+For **every module you added or touched**, read its line. Then either:
+
+- bring it up to the project's coverage baseline (the level CI enforces on the total — see `.gitlab/ci/test.yml`, don't assume a fixed number), **or**
+- justify the shortfall explicitly in the MR description. The common legitimate reason here: logic exercised only by db-gated integration tests (`pytest.mark.db_test`), which run in the separate `test-db` job and do **not** feed the unit coverage total — add mock-session unit tests to close the gap, or call out that the real coverage lives in the db suite.
+
+A new feature module landing well below the baseline with no justification is incomplete. To read just the modules you care about, filter the `term-missing` output (e.g. `hatch run dev:test-cov 2>&1 | grep mitup_bot/<package>`).

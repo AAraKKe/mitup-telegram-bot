@@ -32,6 +32,7 @@ dependencies = [
     "fastapi==0.139.0",
     "uvicorn[standard]==0.50.0",
     "cryptography==49.0.0",
+    "httpx==0.28.1",
 ]
 
 [project.urls]
@@ -201,7 +202,6 @@ dependencies = [
     "deepdiff",
     "boto3-stubs[essential,ecs,cloudfront]",
     "testcontainers[postgres]==4.14.2",
-    "httpx==0.28.1",
     "asgi-lifespan==2.1.0",
 ]
 

@@ -129,6 +129,11 @@ class ButtonMessages(MessageBase):
     # Notification buttons
     REACTIVATE_MEETING = "Reactivate meeting"
 
+    # Collaborate / Patreon buttons
+    LINK_PATREON = f"{Emojis.HEART} Link Patreon account"
+    BECOME_PATRON = f"{Emojis.DONATE} Become a patron"
+    UNLINK_PATREON = "Unlink Patreon account"
+
     def back(self, lang: str, **kwargs: str) -> str:
         return f"{self.GO_BACK} {self.get(lang=lang, **kwargs)}"
 
@@ -654,6 +659,43 @@ class NotificationMessages(MessageBase):
     DELETED = "The meeting <b>${meeting_title}</b> has been permanently deleted."
     STARTING_SOON = "The meeting <b>${meeting_title}</b> is starting soon!"
     STARTED = "The meeting <b>${meeting_title}</b> has started!"
+
+
+class CollaborateMessages(MessageBase):
+    # Collaborate view, shown when Patreon is configured and the account is not linked yet.
+    NOT_LINKED = (
+        "<b>Support Mitup with Patreon</b>\n\n"
+        "Mitup is free to use. If it helps you bring people together, you can back it on Patreon "
+        "and unlock premium perks as a thank you.\n\n"
+        "Link your Patreon account to get started."
+    )
+    # Collaborate view, shown when the account is linked but not an active patron of the campaign.
+    LINKED_NOT_PATRON = (
+        "<b>Patreon account linked</b>\n\n"
+        "You're all set. You're not a patron yet, so premium perks are still off. Become a patron "
+        "and they turn on automatically, with no need to link again."
+    )
+    # Collaborate view, shown to a linked, active patron with premium.
+    LINKED_PATRON = (
+        "<b>You're a premium supporter</b>\n\n"
+        "Thanks for backing Mitup. Your premium perks are active. You can unlink your Patreon "
+        "account here whenever you want."
+    )
+    # Collaborate view, shown when the bot runs without a [patreon] config section.
+    UNAVAILABLE = "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
+    # Context line edited onto the view right after the user unlinks.
+    UNLINKED = "Your Patreon account has been unlinked."
+    # Telegram message sent from the OAuth callback when the linked user is already an active patron.
+    LINK_CONFIRMED_PREMIUM = (
+        "<b>Premium unlocked</b>\n\n"
+        "Your Patreon account is linked and your premium perks are active. Thanks for supporting Mitup."
+    )
+    # Telegram message sent from the OAuth callback when the linked user is not a patron yet.
+    LINK_CONFIRMED_NO_PATRON = (
+        "<b>Patreon account linked</b>\n\n"
+        "You're connected. Become a patron to unlock premium perks. They'll switch on automatically "
+        "once your pledge is active."
+    )
 
 
 class Weekday(MessageBase):

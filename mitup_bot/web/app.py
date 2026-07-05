@@ -9,7 +9,7 @@ from telegram.ext import Application
 from mitup_bot.config import RunModes
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.web import telegram
+from mitup_bot.web import patreon, telegram
 
 log = structlog.get_logger(__name__)
 
@@ -112,5 +112,6 @@ def create_app(
     app.state.metrics_client = metrics_client
 
     app.include_router(telegram.router)
+    app.include_router(patreon.router)
 
     return app

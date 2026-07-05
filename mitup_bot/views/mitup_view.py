@@ -21,6 +21,9 @@ class ButtonConfig(BaseModel):
     callback_data: CallbackData | str | None = None
     switch_inline_query: str | None = None
     switch_inline_query_current_chat: str | None = None
+    # An https:// or tg:// deep link. Used by buttons that open an external page (e.g. the Patreon
+    # OAuth consent screen), which produce no callback query and so carry no callback_data.
+    url: str | None = None
 
     model_config = {
         "arbitrary_types_allowed": True,
@@ -51,11 +54,13 @@ class ButtonConfig(BaseModel):
                 self.callback_data,
                 self.switch_inline_query,
                 self.switch_inline_query_current_chat,
+                self.url,
             ]
         )
         if action_count != 1:
             raise ValueError(
-                "Exactly one of callback_data, switch_inline_query, or switch_inline_query_current_chat must be set"
+                "Exactly one of callback_data, switch_inline_query, switch_inline_query_current_chat, "
+                "or url must be set"
             )
         return self
 
@@ -71,6 +76,7 @@ class ButtonConfig(BaseModel):
             callback_data=str(self.callback_data) if self.callback_data else None,
             switch_inline_query=self.switch_inline_query,
             switch_inline_query_current_chat=self.switch_inline_query_current_chat,
+            url=self.url,
         )
 
 

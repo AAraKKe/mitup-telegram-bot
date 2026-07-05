@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-05 14:51\n"
+"PO-Revision-Date: 2026-07-05 15:15\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -205,6 +205,15 @@ msgstr "⌛ Meeting duration"
 
 msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reactivate meeting"
+
+msgid "ButtonMessages.LINK_PATREON"
+msgstr "♥ Link Patreon account"
+
+msgid "ButtonMessages.BECOME_PATRON"
+msgstr "💶 Become a patron"
+
+msgid "ButtonMessages.UNLINK_PATREON"
+msgstr "Unlink Patreon account"
 
 msgid "MainMenuMessages.DESCRIPTION"
 msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
@@ -673,6 +682,27 @@ msgstr "The meeting <b>${meeting_title}</b> is starting soon!"
 
 msgid "NotificationMessages.STARTED"
 msgstr "The meeting <b>${meeting_title}</b> has started!"
+
+msgid "CollaborateMessages.NOT_LINKED"
+msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock premium perks as a thank you.\n\nLink your Patreon account to get started."
+
+msgid "CollaborateMessages.LINKED_NOT_PATRON"
+msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a patron yet, so premium perks are still off. Become a patron and they turn on automatically, with no need to link again."
+
+msgid "CollaborateMessages.LINKED_PATRON"
+msgstr "<b>You're a premium supporter</b>\n\nThanks for backing Mitup. Your premium perks are active. You can unlink your Patreon account here whenever you want."
+
+msgid "CollaborateMessages.UNAVAILABLE"
+msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
+
+msgid "CollaborateMessages.UNLINKED"
+msgstr "Your Patreon account has been unlinked."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
+msgstr "<b>Premium unlocked</b>\n\nYour Patreon account is linked and your premium perks are active. Thanks for supporting Mitup."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
+msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a patron to unlock premium perks. They'll switch on automatically once your pledge is active."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

@@ -39,6 +39,17 @@ def test_inline_keyboard_button():
     assert expected_inline_button == button
 
 
+def test_url_button_renders_url():
+    button = ButtonConfig(text="Link Patreon", url="https://www.patreon.com/oauth2/authorize?state=x").button
+
+    assert button == InlineKeyboardButton(text="Link Patreon", url="https://www.patreon.com/oauth2/authorize?state=x")
+
+
+def test_url_and_callback_data_are_mutually_exclusive():
+    with pytest.raises(ValidationError):
+        ButtonConfig(text="both", url="https://example.com", callback_data="show;meeting:1")
+
+
 def test_no_action_field_raises_validation_error():
     with pytest.raises(ValidationError):
         ButtonConfig(text="some text")

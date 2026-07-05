@@ -16,6 +16,7 @@ from telegram import Location, MessageEntity, Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.handlers.command_enums import CommandsId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
@@ -836,6 +837,19 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1)),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="show_joined_meetings",
+    ),
+    # --- Collaborate handlers ---
+    Context(
+        handler_id=CollaborateHandlerId.SHOW,
+        update_request=UpdateRequest(callback_query=cb.COLLABORATE),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="collaborate_show",
+    ),
+    Context(
+        handler_id=CollaborateHandlerId.UNLINK,
+        update_request=UpdateRequest(callback_query=cb.UNLINK_PATREON),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="collaborate_unlink",
     ),
     # --- Settings handlers ---
     Context(

@@ -1,0 +1,36 @@
+from sqlmodel.ext.asyncio.session import AsyncSession
+from telegram import Update
+
+from mitup_bot import guards
+from mitup_bot.db import with_session
+from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import CollaborateMessages
+from mitup_bot.utils.mitup_types import TMitupContext
+
+from .enums import CollaborateHandlerId
+from .utils import build_collaborate_view, subscription_for_user
+
+
+@HandlersRegistry.register_callback_query(CollaborateHandlerId.SHOW, callback_data=cb.COLLABORATE, bindable=True)
+@with_session
+async def callback_query_collaborate(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
+    view = await build_collaborate_view(session, user)
+    await context.api.edit_message(update=update, view=view)
+
+
+@HandlersRegistry.register_callback_query(CollaborateHandlerId.UNLINK, callback_data=cb.UNLINK_PATREON, bindable=True)
+@with_session
+async def callback_query_unlink_patreon(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
+
+    subscription = await subscription_for_user(session, user)
+    if subscription is not None:
+        await session.delete(subscription)
+        user.is_premium = False
+
+    # The pending delete flushes before build_collaborate_view re-reads the subscription, so the
+    # view resolves to the not-linked state; the context line confirms the unlink above it.
+    view = (await build_collaborate_view(session, user)).with_context(CollaborateMessages.UNLINKED.get(lang=user.lang))
+    await context.api.edit_message(update=update, view=view)

@@ -813,3 +813,33 @@ msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Esc
 
 msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
 msgstr "Você pode agendar eventos até ${days} dias no futuro. Escolha uma data mais próxima."
+
+msgid "ButtonMessages.LINK_PATREON"
+msgstr "♥ Conectar conta Patreon"
+
+msgid "ButtonMessages.BECOME_PATRON"
+msgstr "💶 Ser um patrono"
+
+msgid "ButtonMessages.UNLINK_PATREON"
+msgstr "Desconectar conta Patreon"
+
+msgid "CollaborateMessages.NOT_LINKED"
+msgstr "<b>Apoie o Mitup com Patreon</b>\n\nMitup é gratuito. Se ajuda você a reunir suas pessoas, você pode apoiá-lo no Patreon e desbloquear benefícios premium como agradecimento.\n\nConecte sua conta Patreon para começar."
+
+msgid "CollaborateMessages.LINKED_NOT_PATRON"
+msgstr "<b>Conta Patreon conectada</b>\n\nTudo pronto. Você ainda não é um patrono, então os benefícios premium ainda estão desativados. Torne-se um patrono e eles serão ativados automaticamente, sem necessidade de conectar novamente."
+
+msgid "CollaborateMessages.LINKED_PATRON"
+msgstr "<b>Você é um patrono premium</b>\n\nObrigado por apoiar o Mitup. Seus benefícios premium estão ativos. Você pode desconectar sua conta Patreon aqui quando quiser."
+
+msgid "CollaborateMessages.UNAVAILABLE"
+msgstr "<b>Colabore</b>\n\nO apoio do Patreon ainda não está disponível. Volte em breve."
+
+msgid "CollaborateMessages.UNLINKED"
+msgstr "Sua conta Patreon foi desconectada."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
+msgstr "<b>Premium desbloqueado</b>\n\nSua conta Patreon está conectada e seus benefícios premium estão ativos. Obrigado por apoiar o Mitup."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
+msgstr "<b>Conta Patreon conectada</b>\n\nVocê está conectado. Torne-se um patrono para desbloquear os benefícios premium. Eles serão ativados automaticamente assim que seu apoio estiver ativo."

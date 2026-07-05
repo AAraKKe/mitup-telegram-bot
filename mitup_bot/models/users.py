@@ -95,27 +95,36 @@ class User(BaseModel, SQLModel, table=True):
 
     @overload
     @classmethod
-    async def by_tg_user_id(cls, session: AsyncSession, tg_user_id: int, must_exist: Literal[True]) -> Self: ...
+    async def by_tg_user_id(
+        cls, session: AsyncSession, tg_user_id: int, must_exist: Literal[True], *, load_collections: bool = ...
+    ) -> Self: ...
 
     @overload
     @classmethod
-    async def by_tg_user_id(cls, session: AsyncSession, tg_user_id: int, must_exist: bool = ...) -> Self | None: ...
+    async def by_tg_user_id(
+        cls, session: AsyncSession, tg_user_id: int, must_exist: bool = ..., *, load_collections: bool = ...
+    ) -> Self | None: ...
 
     @classmethod
-    async def by_tg_user_id(cls, session: AsyncSession, tg_user_id: int, must_exist: bool = False) -> Self | None:
-        # Eagerly load the user's own meetings and memberships: handlers traverse them through
-        # `own_meeting`/`joined_meeting` and the list views, and the async engine cannot lazy-load
-        # on attribute access. Relationship-level selectin loading takes over from there.
-        statement = (
-            select(cls)
-            .where(cls.tg_user_id == tg_user_id)
+    async def by_tg_user_id(
+        cls, session: AsyncSession, tg_user_id: int, must_exist: bool = False, *, load_collections: bool = True
+    ) -> Self | None:
+        # By default eagerly load the user's own meetings and memberships: handlers traverse them
+        # through `own_meeting`/`joined_meeting` and the list views, and the async engine cannot
+        # lazy-load on attribute access. Relationship-level selectin loading takes over from there.
+        #
+        # Pass `load_collections=False` for callers that only need the user's own columns (e.g. the
+        # Patreon OAuth callback): it skips those two selectin queries. Because `meetups` and
+        # `joined_links` are `lazy="raise"`, such an instance must NOT touch either collection — any
+        # access raises InvalidRequestError rather than silently emitting a query.
+        statement = select(cls).where(cls.tg_user_id == tg_user_id)
+        if load_collections:
             # cast: SQLModel types relationship class attributes as their instance values,
             # not as the InstrumentedAttribute SQLAlchemy actually puts on the class.
-            .options(
+            statement = statement.options(
                 selectinload(cast("QueryableAttribute[Any]", cls.meetups)),
                 selectinload(cast("QueryableAttribute[Any]", cls.joined_links)),
             )
-        )
         if (found_user := (await session.exec(statement)).first()) is not None:
             return found_user
 

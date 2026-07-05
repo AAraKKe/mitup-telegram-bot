@@ -244,6 +244,9 @@ class PatreonConfig(BaseModel):
     # Fernet key for encrypting Patreon tokens at rest in the DB. Kept separate from
     # `state_secret` so the two keys have a different blast radius.
     encryption_key: SecretStr
+    # Per-request timeout (seconds) for the httpx client that talks to the Patreon API. Optional
+    # with a sensible default so operators can tune it without a code change if Patreon is slow.
+    request_timeout_seconds: float = 30.0
 
 
 # Connections kept free for work that runs outside update handlers: the job queue and the
