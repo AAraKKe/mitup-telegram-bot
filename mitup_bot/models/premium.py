@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import ClassVar
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from sqlalchemy import Boolean, Column, DateTime, FetchedValue, ForeignKey, Integer, String, Text, false
 from sqlalchemy.engine import Dialect
 from sqlalchemy.types import TypeDecorator
@@ -13,35 +13,39 @@ from .base_model import BaseModel
 
 
 class TokenCipher:
-    """Holds the process-wide Fernet used to encrypt Patreon token columns.
+    """Holds the process-wide MultiFernet used to encrypt Patreon token columns.
 
-    The key is injected at startup via `configure_token_encryption` rather than read from
+    The key(s) are injected at startup via `configure_token_encryption` rather than read from
     config at import time, so the models package never imports the config layer (the Patreon
-    config lands in a separate change). Encryption raises until a key has been configured.
+    config lands in a separate change). Encryption raises until at least one key has been configured.
     """
 
-    fernet: ClassVar[Fernet | None] = None
+    cipher: ClassVar[MultiFernet | None] = None
 
     @classmethod
     def encrypt(cls, value: str) -> str:
-        if cls.fernet is None:
+        if cls.cipher is None:
             raise TokenEncryptionNotConfigured
-        return cls.fernet.encrypt(value.encode()).decode()
+        return cls.cipher.encrypt(value.encode()).decode()
 
     @classmethod
     def decrypt(cls, value: str) -> str:
-        if cls.fernet is None:
+        if cls.cipher is None:
             raise TokenEncryptionNotConfigured
-        return cls.fernet.decrypt(value.encode()).decode()
+        return cls.cipher.decrypt(value.encode()).decode()
 
 
-def configure_token_encryption(key: str):
-    """Inject the Fernet key used to encrypt Patreon token columns at rest.
+def configure_token_encryption(*keys: str):
+    """Inject the Fernet key(s) used to encrypt Patreon token columns at rest.
 
-    Called once during process setup (bot runtime / CLI) before any token column is read
-    or written. A later change wires this to `PatreonConfig.encryption_key`.
+    The first key is primary and encrypts every new write; all keys decrypt, so passing
+    `(new, old)` during a rotation keeps legacy ciphertext readable while the daily token
+    refresh re-encrypts everything under the new key within a day. Called once during process
+    setup (bot runtime / CLI); a later change wires this to `PatreonConfig.encryption_key`.
     """
-    TokenCipher.fernet = Fernet(key)
+    if not keys:
+        raise ValueError("configure_token_encryption requires at least one Fernet key")
+    TokenCipher.cipher = MultiFernet([Fernet(key) for key in keys])
 
 
 class EncryptedToken(TypeDecorator):

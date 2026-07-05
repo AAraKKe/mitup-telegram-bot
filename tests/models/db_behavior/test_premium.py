@@ -17,12 +17,12 @@ pytestmark = pytest.mark.db_test
 @pytest.fixture(autouse=True, scope="module")
 def configured_token_encryption() -> Iterator[None]:
     """Encrypt/decrypt the token columns with a throwaway key for the duration of this module."""
-    saved = TokenCipher.fernet
+    saved = TokenCipher.cipher
     configure_token_encryption(Fernet.generate_key().decode())
     try:
         yield
     finally:
-        TokenCipher.fernet = saved
+        TokenCipher.cipher = saved
 
 
 async def new_user(db_session: AsyncSession, tg_user_id: int) -> User:
