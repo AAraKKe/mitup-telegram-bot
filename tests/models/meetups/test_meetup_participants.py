@@ -12,10 +12,13 @@ from tests.helpers import create_meetup, create_user
     "max_members,is_full", [[1, True], [2, False], [None, False]], ids=["full_not", "not_full", "not_full_no_limit"]
 )
 def test_meeting_is_full(max_members: int | None, is_full: bool):
-    meeting = create_meetup(id=1, max_members=max_members)
+    # A free owner is required: `full` now resolves capacity through the owner's premium status.
+    # With the default cap (20) well above these limits, the effective cap equals `max_members`, so
+    # the None case is still not full at one participant.
+    owner = create_user(id=1, first_name="John")
+    meeting = create_meetup(id=1, owner=owner, max_members=max_members)
 
-    meeting.max_members = max_members
-    JoinedUsers(user=meeting.owner, meetup=meeting)
+    JoinedUsers(user=owner, meetup=meeting)
     assert meeting.full is is_full
 
 

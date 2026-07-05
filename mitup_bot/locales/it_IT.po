@@ -811,3 +811,6 @@ msgstr "<b>Premium sbloccato</b>\n\nIl tuo account Patreon è collegato e i tuoi
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Account Patreon collegato</b>\n\nSei collegato. Diventa un mecenate per sbloccare i vantaggi premium. Si attiveranno automaticamente una volta che il tuo contributo è attivo."
+
+msgid "PremiumMessages.PARTICIPANT_CAPACITY"
+msgstr "Gli incontri gratuiti possono ospitare fino a ${cap} partecipanti. Imposta un limite inferiore, oppure tocca Collabora nel menu principale per supportare Mitup e ospitare altri."

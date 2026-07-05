@@ -4,7 +4,9 @@ import pytest
 from telegram import Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot import limits
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
@@ -12,7 +14,7 @@ from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view, ed
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages, PremiumMessages
 from mitup_bot.views import factory
 from tests.helpers import (
     AnyFloat,
@@ -434,6 +436,97 @@ async def test_edit_meeting_max_participants_message_works(
     assert result is ConversationHandler.END
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="21")], indirect=True)
+async def test_edit_max_participants_free_owner_over_cap_is_rejected(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A free owner asking for more than the cap gets the upsell banner, keeps their current limit,
+    and stays in the max-participants state so they can try again."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=20))
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 5  # a known current value to prove it is left untouched
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, result = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
+    )
+
+    # The banner is addressed to the acting owner, so it renders in their language with the cap.
+    rejection = PremiumMessages.PARTICIPANT_CAPACITY.get_text(lang=user_with_settings.lang, cap=20)
+    expected_view = edit_max_participants_view(meeting).with_context(rejection)
+
+    assert meeting.max_members == 5  # unchanged
+    mock_session.assert_not_flushed()
+    context.api.assert_send_message_called(update, expected_view)
+    assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="20")], indirect=True)
+async def test_edit_max_participants_free_owner_at_cap_is_accepted(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The cap itself is a valid limit: a free owner entering exactly the cap succeeds."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=20))
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, result = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
+    )
+
+    expected_view = edit_participants_view(meeting).with_context(
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
+    )
+
+    assert meeting.max_members == 20
+    context.api.assert_send_message_called(update, expected_view)
+    assert result is ConversationHandler.END
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="500")], indirect=True)
+async def test_edit_max_participants_premium_owner_over_cap_is_accepted(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A premium owner is uncapped, so a limit well above the free cap is stored as-is."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=20))
+    user_with_settings.is_premium = True
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, result = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
+    )
+
+    expected_view = edit_participants_view(meeting).with_context(
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
+    )
+
+    assert meeting.max_members == 500
+    context.api.assert_send_message_called(update, expected_view)
+    assert result is ConversationHandler.END
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="420")], indirect=True)

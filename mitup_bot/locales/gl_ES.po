@@ -843,3 +843,6 @@ msgstr "<b>Premium desbloqueado</b>\n\nA túa conta de Patreon está enlazada e 
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Conta Patreon enlazada</b>\n\nEstás conectado. Podes ser patrón para desbloquear privilexios especiais. Activaranse automaticamente cando o teu apoio estea activo."
+
+msgid "PremiumMessages.PARTICIPANT_CAPACITY"
+msgstr "Por agora podes acoller ata ${cap} participantes nas quedadas gratuitas. Establece un límite máis baixo, ou toca Colabora no menú principal para apoiar a Mitup e acoller máis."

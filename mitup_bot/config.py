@@ -211,8 +211,10 @@ class LimitsConfig(BaseModel):
     # far in the future they clog the database, which is exactly what supporters offset.
     free_scheduling_horizon_days: int = 90
     premium_scheduling_horizon_days: int = 365
-    # Free-tier per-meeting participant capacity. Defined here to reserve the config field and keep
-    # the plumbing in one place; #209 is the issue that actually enforces it.
+    # Free-tier per-meeting participant capacity, enforced as an effective cap on joins and
+    # waiting-list promotions (a free owner's "no limit" resolves to this value). Premium owners
+    # are uncapped. Participant rows are a direct DB-growth lever, which is the cost supporters
+    # offset.
     free_participant_capacity: int = 20
 
 

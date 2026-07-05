@@ -206,6 +206,12 @@ class PremiumMessages(MessageBase):
     )
     # Premium user beyond the extended horizon.
     SCHEDULING_HORIZON_PREMIUM = "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
+    # Free owner trying to set a participant limit above the free-tier capacity: explain and point at
+    # Collaborate. Premium owners are uncapped, so there is no premium counterpart.
+    PARTICIPANT_CAPACITY = (
+        "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in "
+        "the main menu to support Mitup and host more."
+    )
 
 
 # --- Registration and settings ---

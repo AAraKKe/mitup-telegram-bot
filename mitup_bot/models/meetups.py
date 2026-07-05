@@ -9,6 +9,7 @@ from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
+from mitup_bot import limits
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.models import Message
 from mitup_bot.utils import (
@@ -125,8 +126,21 @@ class Meetup(BaseModel, SQLModel, table=True):
         return sum(link.is_waiting_list for link in self.joined_links)
 
     @property
+    def effective_max_members(self) -> int | None:
+        """`max_members` tightened by the owner's free-tier participant cap (#209), or None
+        (unlimited) which is only reachable for premium owners.
+
+        Every capacity read — `full`, waiting-list promotion, and the capacity displays — resolves
+        through this, so a free owner's meeting never exceeds the cap whether they set a higher limit
+        or none at all. A meeting already over the cap (owner lost premium, or pre-cap data) keeps
+        its participants and simply reads as full until it drops back under the cap.
+        """
+        return limits.effective_participant_capacity(self.owner, self.max_members)
+
+    @property
     def full(self) -> bool:
-        return False if self.max_members is None else self.n_participants >= self.max_members
+        cap = self.effective_max_members
+        return False if cap is None else self.n_participants >= cap
 
     @property
     def is_in_progress(self) -> bool:
@@ -206,11 +220,8 @@ class Meetup(BaseModel, SQLModel, table=True):
         to the joined based on the order they joined the waiting list.
         """
         if waiting_links := self.waiting_links():
-            to_promote = (
-                self.n_waiting
-                if self.max_members is None
-                else min(self.n_waiting, self.max_members - self.n_participants)
-            )
+            cap = self.effective_max_members
+            to_promote = self.n_waiting if cap is None else min(self.n_waiting, cap - self.n_participants)
             promoted = []
 
             for link in waiting_links[:to_promote]:
@@ -296,13 +307,14 @@ class Meetup(BaseModel, SQLModel, table=True):
 
         incognito_prefix = f"{Emojis.GLASSES} " if self.incognito else ""
 
-        if self.max_members is None:
+        cap = self.effective_max_members
+        if cap is None:
             result_badged = empty if joined_count == 0 else t"{len(self.joined_links)} {no_limit}"
             return t"{incognito_prefix}{result_badged}"
 
-        max_label = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=self.lang, max_participants=self.max_members)
+        max_label = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=self.lang, max_participants=cap)
         empty_with_max = t"{empty} {max_label}"
-        result_badged = empty_with_max if joined_count == 0 else t"({joined_count}/{self.max_members})"
+        result_badged = empty_with_max if joined_count == 0 else t"({joined_count}/{cap})"
         return t"{incognito_prefix}{result_badged}"
 
     @property
@@ -360,9 +372,10 @@ class Meetup(BaseModel, SQLModel, table=True):
             n = len(self.joined_links)
             total_participants = t"{n} {MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=self.lang)}"
 
+        cap = self.effective_max_members
         max_participants: FormattedText | Template = (
-            MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=self.lang, max_participants=self.max_members)
-            if self.max_members
+            MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=self.lang, max_participants=cap)
+            if cap is not None
             else t"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=self.lang)})"
         )
 

@@ -70,7 +70,8 @@ premium_active_meetings = 50
 # How many days ahead a meeting's start date may be set.
 free_scheduling_horizon_days = 90
 premium_scheduling_horizon_days = 365
-# Free-tier per-meeting participant capacity (enforced by #209, defined here for the plumbing).
+# Free-tier per-meeting participant capacity, applied as an effective cap on joins and waiting-list
+# promotions (a free owner's "no limit" resolves to this). Premium owners are uncapped.
 free_participant_capacity = 20
 
 [patreon]

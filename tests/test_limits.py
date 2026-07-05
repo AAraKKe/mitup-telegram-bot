@@ -21,6 +21,7 @@ def configured_limits(monkeypatch: pytest.MonkeyPatch) -> LimitsConfig:
         premium_active_meetings=4,
         free_scheduling_horizon_days=31,
         premium_scheduling_horizon_days=365,
+        free_participant_capacity=5,
     )
     monkeypatch.setattr(limits.LimitsState, "config", config)
     return config
@@ -45,6 +46,35 @@ def test_scheduling_horizon_days_is_raised_for_premium(user_with_settings: User,
     assert limits.scheduling_horizon_days(user_with_settings) == configured_limits.free_scheduling_horizon_days
     user_with_settings.is_premium = True
     assert limits.scheduling_horizon_days(user_with_settings) == configured_limits.premium_scheduling_horizon_days
+
+
+def test_participant_capacity_is_lifted_for_premium(user_with_settings: User, configured_limits: LimitsConfig):
+    assert limits.participant_capacity(user_with_settings) == configured_limits.free_participant_capacity
+    user_with_settings.is_premium = True
+    # Premium supporters are uncapped, so there is no participant ceiling to resolve.
+    assert limits.participant_capacity(user_with_settings) is None
+
+
+@pytest.mark.parametrize(
+    "is_premium,max_members,expected",
+    [
+        (False, None, 5),  # free + no explicit limit resolves to the cap
+        (False, 3, 3),  # free + explicit below cap is left untouched
+        (False, 10, 5),  # free + explicit above cap is clamped down to it (grandfathered)
+        (True, None, None),  # premium + no explicit limit stays unlimited
+        (True, 100, 100),  # premium + explicit limit is honored as-is
+    ],
+    ids=["free_no_limit", "free_below_cap", "free_above_cap", "premium_no_limit", "premium_explicit"],
+)
+def test_effective_participant_capacity(
+    user_with_settings: User,
+    configured_limits: LimitsConfig,  # pins free_participant_capacity=5
+    is_premium: bool,
+    max_members: int | None,
+    expected: int | None,
+):
+    user_with_settings.is_premium = is_premium
+    assert limits.effective_participant_capacity(user_with_settings, max_members) == expected
 
 
 def test_at_active_meetings_cap_counts_only_active(user_with_settings: User, configured_limits: LimitsConfig):

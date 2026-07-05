@@ -843,3 +843,6 @@ msgstr "<b>Premium desbloqueado</b>\n\nSua conta Patreon está conectada e seus 
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Conta Patreon conectada</b>\n\nVocê está conectado. Torne-se um patrono para desbloquear os benefícios premium. Eles serão ativados automaticamente assim que seu apoio estiver ativo."
+
+msgid "PremiumMessages.PARTICIPANT_CAPACITY"
+msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Defina um limite mais baixo, ou toque em Colabore no menu principal para apoiar o Mitup e hospedar mais."

@@ -80,6 +80,19 @@ def scheduling_horizon_rejection(user: User, when: dt.datetime) -> str | None:
     return message.get_text(lang=user.lang, days=days)
 
 
+def participant_capacity_rejection(user: User, max_members: int) -> str | None:
+    """Plain-text rejection when a free owner sets a participant limit above the free-tier cap, else
+    None.
+
+    Premium owners are uncapped, so they never hit this; a free owner is pointed at Collaborate.
+    Returned as plain text so it fits both a sent message and a callback-query alert.
+    """
+    cap = limits.participant_capacity(user)
+    if cap is None or max_members <= cap:
+        return None
+    return PremiumMessages.PARTICIPANT_CAPACITY.get_text(lang=user.lang, cap=cap)
+
+
 def meeting_list_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:
     """Button pointing at the originating list page, labelled after the list itself.
 

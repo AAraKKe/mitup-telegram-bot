@@ -6,7 +6,9 @@ import pytest
 from telegram import Chat, MessageEntity, Update
 from telegram import Message as TgMessage
 
+from mitup_bot import limits
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.config import LimitsConfig
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, MessageButtons, Settings, User
 from mitup_bot.translations import SUPPORTED_LANGUAGES
@@ -38,6 +40,16 @@ EXAMPLE_MEETING = Meetup(
     incognito=False,
 )
 COORDINATES = (123.1, -321.1)
+# The free-tier participant cap these render tests exercise. Pinned via the autouse fixture below so
+# a free owner's "no explicit limit" resolves to it (instead of rendering as unlimited) and the
+# expectations stay deterministic regardless of any config another test might leave behind.
+FREE_CAP = 20
+
+
+@pytest.fixture(autouse=True)
+def pin_free_participant_cap(monkeypatch: pytest.MonkeyPatch) -> int:
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=FREE_CAP))
+    return FREE_CAP
 
 
 def expected_location_name(lang: str, expected_name: str | None, expected_coordinates: str | None) -> FormattedText:
@@ -52,11 +64,11 @@ def expected_participants_message(max_participants: bool, lang: str, n_participa
         if n_participants == 1
         else MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=lang).text
     )
-    max_text = (
-        MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=5).text
-        if max_participants
-        else f"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"
-    )
+    # The meeting owner here is free, so "no explicit limit" resolves to the free cap rather than
+    # rendering as unlimited.
+    max_text = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(
+        lang=lang, max_participants=5 if max_participants else FREE_CAP
+    ).text
     return f"{n_participants} {participant_label} {max_text}"
 
 
@@ -342,8 +354,16 @@ def test_incognito_meeting_omits_premium_participant_badge():
 @pytest.mark.parametrize(
     "participants,max_participants,expected",
     [
-        (1, None, lambda lang: f"1 ({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"),
-        (0, None, lambda lang: MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text),
+        # A free owner's "no explicit limit" resolves to the cap, so the badge reads against it.
+        (1, None, lambda lang: f"(1/{FREE_CAP})"),
+        (
+            0,
+            None,
+            lambda lang: (
+                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text}"
+            ),
+        ),
         (
             0,
             2,
@@ -354,7 +374,7 @@ def test_incognito_meeting_omits_premium_participant_badge():
         ),
         (1, 2, lambda lang: "(1/2)"),
     ],
-    ids=["one_participant_no_limit", "empty", "empty_with_limit", "one_participant_with_limit"],
+    ids=["one_participant_free_cap", "empty_free_cap", "empty_with_limit", "one_participant_with_limit"],
 )
 @pytest.mark.parametrize(
     "incognito, expected_incognito", [(True, f"{Emojis.GLASSES} "), (False, "")], ids=["incognito", "no_incognito"]
@@ -413,7 +433,10 @@ def test_short_description(description: str | None, expected_description: str | 
 
 
 def build_inline_message(lang: str, meeting_datetime: datetime | None) -> str:
-    result = [f"{Emojis.JOINED} {MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text}"]
+    # Free owner + no explicit limit: the empty badge carries the effective cap label.
+    empty = MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text
+    max_label = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text
+    result = [f"{Emojis.JOINED} {empty} {max_label}"]
     if meeting_datetime:
         # inline_query_message uses _plain_datetime: plain UTC string with no timezone suffix
         result.append(f"{Emojis.CLOCK} 2024-01-12 12:30")
@@ -449,12 +472,13 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
 @pytest.mark.parametrize(
     "joined_count,max_participants,expected",
     [
+        # A free owner's "no explicit limit" resolves to the cap, so both None cases read against it.
         (
             0,
             None,
             lambda lang: (
                 f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
-                f"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text}"
             ),
         ),
         (
@@ -462,7 +486,8 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
             None,
             lambda lang: (
                 f"1 {MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text} "
-                f"({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})|\n  Joined_0"
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text}"
+                f"|\n  Joined_0"
             ),
         ),
         (
@@ -483,7 +508,7 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
             ),
         ),
     ],
-    ids=["empty", "no_limit", "limit_reached", "limit_not_reached"],
+    ids=["empty_free_cap", "free_cap", "limit_reached", "limit_not_reached"],
 )
 @pytest.mark.parametrize(
     "incognito, expected_incognito", [(True, f"{Emojis.GLASSES} "), (False, "")], ids=["incognito", "no_incognito"]
@@ -526,6 +551,42 @@ def test_participants_text(
     )
     participants_text = meeting.participants_text_with_list if with_list else meeting.participants_text
     assert f"{expected_incognito}{expected_text}" == render(participants_text).text
+
+
+@pytest.mark.parametrize(
+    "joined_count,expected",
+    [
+        # Premium owner keeps "no explicit limit" as unlimited, so the badge never shows the cap.
+        (0, lambda lang: MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text),
+        (1, lambda lang: f"1 ({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"),
+    ],
+    ids=["empty", "one_participant"],
+)
+def test_participants_badge_premium_owner_stays_no_limit(
+    user_with_settings: User, joined_count: int, expected: Callable[[str], str]
+):
+    user_with_settings.is_premium = True
+    meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
+
+    # sourcery skip: no-loop-in-tests
+    for idx in range(joined_count):
+        joined = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
+        JoinedUsers(user=joined, meetup=meeting)
+
+    assert render(meeting.participants_badge).text == expected(user_with_settings.lang)
+
+
+def test_participants_text_premium_owner_stays_no_limit(user_with_settings: User):
+    """A premium owner's meeting with no explicit limit renders 'No limit', never the free cap."""
+    user_with_settings.is_premium = True
+    meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
+    joined = User(first_name="Joined_0", tg_user_id=0, settings=user_with_settings.settings)
+    JoinedUsers(user=joined, meetup=meeting)
+
+    label = MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=user_with_settings.lang).text
+    no_limit = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user_with_settings.lang).text
+    expected_text = f"1 {label} ({no_limit})\n  Joined_0"
+    assert render(meeting.participants_text_with_list).text == expected_text
 
 
 @pytest.mark.parametrize(

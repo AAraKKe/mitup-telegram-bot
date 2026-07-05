@@ -604,6 +604,9 @@ msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. 
 msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
 msgstr "Puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana."
 
+msgid "PremiumMessages.PARTICIPANT_CAPACITY"
+msgstr "Las quedadas gratuitas admiten hasta ${cap} participantes. Elige un límite menor, o pulsa Colabora en el menú principal para apoyar a Mitup y admitir más."
+
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 

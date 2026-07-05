@@ -39,6 +39,26 @@ def scheduling_horizon_days(user: User) -> int:
     return config.premium_scheduling_horizon_days if user.is_premium else config.free_scheduling_horizon_days
 
 
+def participant_capacity(user: User) -> int | None:
+    """The participant cap on meetings this user owns, or None (unlimited) for premium supporters."""
+    config = LimitsState.config
+    return None if user.is_premium else config.free_participant_capacity
+
+
+def effective_participant_capacity(owner: User, max_members: int | None) -> int | None:
+    """The capacity actually enforced on a meeting: the owner's explicit `max_members` tightened by
+    the owner's free-tier cap, or None (unlimited) which is only reachable for premium owners.
+
+    A free owner's `None` resolves to the cap and a limit above the cap is clamped to it, so a
+    free-owned meeting never behaves as unlimited. Grandfathered meetings already above the cap keep
+    their participants; they simply read as full until they drop back under it.
+    """
+    cap = participant_capacity(owner)
+    if cap is None:
+        return max_members
+    return cap if max_members is None else min(max_members, cap)
+
+
 def at_active_meetings_cap(user: User) -> bool:
     """Whether the user already owns their cap's worth of active meetings.
 

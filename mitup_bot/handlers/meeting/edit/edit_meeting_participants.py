@@ -9,6 +9,7 @@ from mitup_bot import guards
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
+from mitup_bot.handlers.meeting.utils import participant_capacity_rejection
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup
@@ -161,7 +162,15 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     if meeting is None:
         return ConversationHandler.END
 
-    meeting.max_members = int(cast(str, number))
+    requested_max = int(cast(str, number))
+
+    # A free owner is capped by the free-tier participant limit; reject anything above it and keep
+    # the conversation open so they can enter a valid number. Premium owners set any limit.
+    if rejection := participant_capacity_rejection(user, requested_max):
+        await context.api.send_message(update=update, view=edit_max_participants_view(meeting).with_context(rejection))
+        return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
+
+    meeting.max_members = requested_max
 
     response_view = edit_participants_view(meeting).with_context(
         MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)

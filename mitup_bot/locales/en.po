@@ -272,6 +272,9 @@ msgstr "You can schedule meetings up to ${days} days ahead for now. Pick an earl
 msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
 msgstr "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
 
+msgid "PremiumMessages.PARTICIPANT_CAPACITY"
+msgstr "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in the main menu to support Mitup and host more."
+
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."
 
