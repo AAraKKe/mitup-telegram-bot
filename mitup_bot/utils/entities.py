@@ -242,38 +242,92 @@ def build_datetime_link() -> FormattedText:
 
 # --- parse_format_tags() ---
 
-TOKEN_RE = re.compile(r"<(/?[a-z]+)>|\$\{(\w+)\}")
+# A tag is `<name attr="value" ...>` or a closing `</name>`; attributes are
+# optional `name="value"` (or single-quoted) pairs. The variable alternative
+# stays byte-identical to the original so `${var}` substitution is unchanged.
+# Tag names require a leading letter, so `<3`, a bare `<`, and `<https://…>`
+# never match and are preserved verbatim.
+TOKEN_RE = re.compile(
+    r"<(?P<close>/?)(?P<tag>[a-z][a-z-]*)"
+    r"""(?P<attrs>(?:\s+[a-zA-Z-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*>"""
+    r"|\$\{(?P<var>\w+)\}"
+)
 
+# Tag name → Telegram entity type. `<a>` (link) and `<span>` (spoiler) depend on
+# their attributes and are resolved in `resolve_open_tag` instead.
 STYLE_MAP: dict[str, str] = {
-    "b": "bold",
-    "i": "italic",
-    "u": "underline",
-    "s": "strikethrough",
-    "code": "code",
-    "pre": "pre",
-    "spoiler": "spoiler",
+    "b": MessageEntity.BOLD,
+    "strong": MessageEntity.BOLD,
+    "i": MessageEntity.ITALIC,
+    "em": MessageEntity.ITALIC,
+    "u": MessageEntity.UNDERLINE,
+    "ins": MessageEntity.UNDERLINE,
+    "s": MessageEntity.STRIKETHROUGH,
+    "strike": MessageEntity.STRIKETHROUGH,
+    "del": MessageEntity.STRIKETHROUGH,
+    "code": MessageEntity.CODE,
+    "pre": MessageEntity.PRE,
+    "spoiler": MessageEntity.SPOILER,
+    "tg-spoiler": MessageEntity.SPOILER,
+    "blockquote": MessageEntity.BLOCKQUOTE,
 }
+
+ATTR_RE = re.compile(r"""([a-zA-Z-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+
+
+@dataclass
+class OpenTag:
+    """An unclosed opening tag: the offset it began at and the entity to emit on close."""
+
+    offset: int
+    entity_type: str | None
+    url: str | None
+
+
+def parse_tag_attributes(attrs: str) -> dict[str, str]:
+    """Parse an attribute blob (`href="x" class='y'`) into a name→value mapping."""
+    return {m.group(1).lower(): m.group(2) if m.group(2) is not None else m.group(3) for m in ATTR_RE.finditer(attrs)}
+
+
+def resolve_open_tag(tag: str, attrs: str) -> tuple[str | None, str | None]:
+    """Map an opening tag and its attributes to an entity type and optional URL.
+
+    Returns `(None, None)` for tags that carry no entity — an unknown tag, an
+    `<a>` without `href`, or a `<span>` that is not a `tg-spoiler` — so the tag
+    is stripped from the output without producing an entity.
+    """
+    match tag:
+        case "a":
+            href = parse_tag_attributes(attrs).get("href")
+            return (MessageEntity.TEXT_LINK, href) if href else (None, None)
+        case "span":
+            classes = parse_tag_attributes(attrs).get("class", "").split()
+            return (MessageEntity.SPOILER, None) if "tg-spoiler" in classes else (None, None)
+        case _:
+            return STYLE_MAP.get(tag), None
 
 
 def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) -> FormattedText:
     """Parse a tag-annotated translated string into a `FormattedText`.
 
-    Supported formatting tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`,
-    `<pre>`, `<spoiler>`. Variable placeholders use `${varname}` syntax.
+    Supports the Telegram HTML subset: `<b>`/`<strong>`, `<i>`/`<em>`,
+    `<u>`/`<ins>`, `<s>`/`<strike>`/`<del>`, `<code>`, `<pre>`, `<blockquote>`,
+    `<spoiler>`/`<tg-spoiler>`/`<span class="tg-spoiler">`, and
+    `<a href="…">` links. Variable placeholders use `${varname}` syntax.
 
     Substitution values may be plain `str` or `FormattedText`.  When a
     `FormattedText` value is substituted its entities are preserved with
     offsets adjusted to their final position.  Plain-string values are never
     scanned for tags, so user-supplied content cannot introduce spurious entities.
 
-    Tags may be arbitrarily nested; each style tracks its own start offset
-    independently.  Unclosed tags are silently dropped.  To add a new entity
-    type, insert an entry into `STYLE_MAP`.
+    Tags may be arbitrarily nested; each tag tracks its own start offset
+    independently.  Unclosed, unbalanced, or unknown tags are silently dropped.
+    To add a new alias, insert an entry into `STYLE_MAP`.
     """
     plain = ""
     utf16_offset = 0
     entities: list[MessageEntity] = []
-    active: dict[str, int] = {}  # style → UTF-16 offset where the opening tag appeared
+    active: dict[str, OpenTag] = {}  # tag name → opening tag awaiting its close
     cursor = 0
 
     def flush(s: str):
@@ -281,29 +335,33 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         plain += s
         utf16_offset += utf16_len(s)
 
+    def substitute(var: str):
+        value = substitutions.get(var, f"${{{var}}}")
+        if isinstance(value, FormattedText):
+            entities.extend(shift_entity(e, utf16_offset) for e in value.entities)
+            flush(value.text)
+        else:
+            flush(value)
+
+    def close_tag(tag: str):
+        open_tag = active.pop(tag, None)
+        if open_tag is None or open_tag.entity_type is None:
+            return
+        entity_type = open_tag.entity_type
+        length = utf16_offset - open_tag.offset
+        if length > 0:
+            entities.append(MessageEntity(type=entity_type, offset=open_tag.offset, length=length, url=open_tag.url))
+
     for m in TOKEN_RE.finditer(text):
         flush(text[cursor : m.start()])
         cursor = m.end()
-
-        tag, var = m.group(1), m.group(2)
-
-        if var is not None:
-            value = substitutions.get(var, m.group(0))
-            if isinstance(value, FormattedText):
-                for e in value.entities:
-                    entities.append(shift_entity(e, utf16_offset))
-                flush(value.text)
-            else:
-                flush(value)
-        elif tag.startswith("/"):
-            style = tag[1:]
-            if style in active:
-                start = active.pop(style)
-                length = utf16_offset - start
-                if length > 0 and (etype := STYLE_MAP.get(style)):
-                    entities.append(MessageEntity(type=etype, offset=start, length=length))
+        if (var := m.group("var")) is not None:
+            substitute(var)
+        elif m.group("close"):
+            close_tag(m.group("tag"))
         else:
-            active[tag] = utf16_offset
+            entity_type, url = resolve_open_tag(m.group("tag"), m.group("attrs"))
+            active[m.group("tag")] = OpenTag(utf16_offset, entity_type, url)
 
     flush(text[cursor:])
     entities.sort(key=lambda e: (e.offset, e.type))
