@@ -801,3 +801,15 @@ msgstr "Die Startzeit muss in der Zukunft liegen."
 
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "Die Startzeit wurde gelöscht. Stelle sie erneut fest, bevor du eine Endzeit wählst."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgstr "Du hast das Maximum von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, bevor du ein weiteres erstellst."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und noch weiter zu planen."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgstr "Du kannst Treffen bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum."

@@ -2,15 +2,19 @@ import datetime as dt
 from typing import cast
 
 import pytest
+from freezegun import freeze_time
 from telegram import Chat, Message, MessageEntity, Update
 from telegram import User as TelegramUser
+from telegram.ext import Application, ConversationHandler
 
+from mitup_bot import limits
+from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback_query_create_meeting
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils import MeetingCreationMessages
+from mitup_bot.utils import MeetingCreationMessages, PremiumMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
@@ -19,6 +23,7 @@ from tests.helpers import (
     HandlerContext,
     MockDbSession,
     StubMitupContext,
+    UpdateRequest,
     call_handler,
 )
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, DEFAULT_TEST_DATE, DEFAULT_TG_USER_PARAMS
@@ -207,7 +212,7 @@ async def test_meeting_creation_with_single_word_datetime_title_preserves_title(
 async def test_meeting_creation_with_date_entity_without_unix_time_preserves_title_and_leaves_datetime_none(
     user_with_settings: User,
     mock_session: MockDbSession,
-    app,
+    app: Application,
     metrics_client: MetricsClient,
 ):
     """A date_time entity whose to_dict() lacks 'unix_time' preserves the full title and does NOT
@@ -270,7 +275,7 @@ async def test_meeting_creation_with_date_entity_without_unix_time_preserves_tit
 async def test_invalid_title_fires_fallback_handler(
     user_with_settings: User,
     mock_session: MockDbSession,
-    app,
+    app: Application,
     bad_update: Update,
     metrics_client: MetricsClient,
 ):
@@ -388,3 +393,114 @@ def test_valid_title_filter_multiple_date_entities_rejects():
     update = make_message_update("tomorrow later", entities=[first_date_entity, second_date_entity])
     assert update.effective_message is not None
     assert title_filter.filter(update.effective_message) is False
+
+
+# ---------------------------------------------------------------------------
+# Free-tier limits: active-meetings cap and scheduling horizon
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CREATE_MEETING)], indirect=True)
+async def test_create_meeting_entry_blocked_at_cap_shows_upsell(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The New Meeting button stops at the cap: an alert is shown and the conversation never starts."""
+    # The fixture owner already has two active meetings.
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_active_meetings=2))
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    state = await callback_query_create_meeting(update, context)
+
+    assert state == ConversationHandler.END
+    assert context.user_data is not None
+    assert ContextId.CREATE_MEETING not in context.user_data.registry  # flow not entered
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=PremiumMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=2),
+        show_alert=True,
+    )
+
+
+async def test_create_meeting_title_blocked_at_cap_sends_message(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    metrics_client: MetricsClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The title-message path (used by the inline deep link) backstops the cap with a sent message."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_active_meetings=2))
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    title_update = make_message_update("My meeting")
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    context, state = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, handler_context=ctx)
+
+    assert state == ConversationHandler.END
+    assert len(mock_session.objects_added) == 0  # no meeting created
+    context.api.assert_send_message_called(
+        title_update,
+        PremiumMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+    )
+
+
+@freeze_time("2025-01-15 12:00:00", tz_offset=0)
+async def test_create_meeting_title_date_beyond_horizon_stays_in_title(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    metrics_client: MetricsClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A title-embedded date past the free horizon is rejected, keeping the user in TITLE."""
+    monkeypatch.setattr(
+        limits.LimitsState, "config", LimitsConfig(free_active_meetings=5, free_scheduling_horizon_days=31)
+    )
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    # 60 days ahead of the frozen now — beyond the 31-day free horizon.
+    far_dt = dt.datetime(2025, 3, 16, 12, 0, tzinfo=dt.UTC)
+    date_entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=3, unix_time=far_dt)
+    title_update = make_message_update("Ski trip", entities=[date_entity])
+
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    context, state = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, handler_context=ctx)
+
+    assert state == ConversationMeetingState.TITLE
+    assert len(mock_session.objects_added) == 0  # no meeting created
+    context.api.assert_send_message_called(
+        title_update,
+        PremiumMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+    )
+
+
+@freeze_time("2025-01-15 12:00:00", tz_offset=0)
+async def test_create_meeting_title_date_within_horizon_is_created(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    metrics_client: MetricsClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A title-embedded date exactly on the horizon boundary is accepted and the meeting is created."""
+    monkeypatch.setattr(
+        limits.LimitsState, "config", LimitsConfig(free_active_meetings=5, free_scheduling_horizon_days=31)
+    )
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    # Exactly 31 days ahead (Europe/Madrid date) — the boundary is allowed.
+    on_horizon = dt.datetime(2025, 2, 15, 12, 0, tzinfo=dt.UTC)
+    date_entity = MessageEntity(type=MessageEntity.DATE_TIME, offset=0, length=3, unix_time=on_horizon)
+    title_update = make_message_update("Gig", entities=[date_entity])
+
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    _, state = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, handler_context=ctx)
+
+    assert state == ConversationHandler.END
+    assert len(mock_session.objects_added) == 1
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    assert new_meeting.datetime == on_horizon

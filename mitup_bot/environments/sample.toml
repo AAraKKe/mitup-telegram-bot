@@ -60,6 +60,19 @@ gmaps_timezone_key = "key_to_use_timezone_api"
 namespace = "MitupBot"
 environment = "local"
 
+[limits]
+# Free-tier limits that premium (Patreon) users have raised. This whole section is OPTIONAL:
+# every field is defaulted, so the values below are what the bot uses when the section is omitted.
+# Tune a value in a deployed service via MITUPBOT__LIMITS__<KEY> so a revert stays config-only.
+# Active meetings a user may own at once (enforced at creation and reactivation).
+free_active_meetings = 5
+premium_active_meetings = 50
+# How many days ahead a meeting's start date may be set.
+free_scheduling_horizon_days = 90
+premium_scheduling_horizon_days = 365
+# Free-tier per-meeting participant capacity (enforced by #209, defined here for the plumbing).
+free_participant_capacity = 20
+
 [patreon]
 # Patreon OAuth integration. This whole section is OPTIONAL — omit it entirely and the bot
 # starts without Patreon support. If you include it, it is all-or-nothing: every key below

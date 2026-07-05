@@ -19,6 +19,7 @@ from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisp
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
+from ..utils import scheduling_horizon_rejection
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date
 
@@ -44,13 +45,19 @@ log = structlog.get_logger(__name__)
 # --- Shared helpers ---
 
 
-def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -> str | None:
-    """Return an error message string if start_dt is in the past, or None if valid.
+def validate_start_datetime(
+    start_dt: dt.datetime, meeting: Meetup, lang: str, *, check_horizon: bool = False
+) -> str | None:
+    """Return an error message string if start_dt is invalid, or None if valid.
 
-    Symmetric with ``validate_end_datetime`` in edit_meeting_duration.py.
+    Symmetric with ``validate_end_datetime`` in edit_meeting_duration.py. `check_horizon` is set only
+    when the user is picking a new date (calendar selection, date_time entity); it is left off for
+    time-only edits so a grandfathered far-future meeting can still have its time adjusted.
     """
     if is_in_past(start_dt, meeting):
         return MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=lang)
+    if check_horizon and (rejection := scheduling_horizon_rejection(meeting.owner, start_dt)) is not None:
+        return rejection
     return None
 
 
@@ -256,7 +263,7 @@ async def handle_first_datetime_set(
     context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
     proposed_start = dt.datetime.combine(cb_date, dt.time(0, 0, tzinfo=meeting.timezone)).astimezone(dt.UTC)
-    if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
+    if error := validate_start_datetime(proposed_start, meeting, meeting.lang, check_horizon=True):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
         return ConversationMeetingState.EDIT_DATE
 
@@ -312,7 +319,7 @@ async def handle_datetime_update(
         cast(dt.datetime, meeting.datetime).time(),
         tzinfo=dt.UTC,
     )
-    if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
+    if error := validate_start_datetime(proposed_start, meeting, meeting.lang, check_horizon=True):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
         return ConversationMeetingState.EDIT_DATE
 
@@ -421,7 +428,7 @@ async def date_time_entity_message_handler(
         if meeting is None:
             return ConversationHandler.END
 
-        if error := validate_start_datetime(unix_time, meeting, current_user.lang):
+        if error := validate_start_datetime(unix_time, meeting, current_user.lang, check_horizon=True):
             await context.api.send_message(update=update, view=error)
             return ConversationMeetingState.EDIT_DATETIME
 

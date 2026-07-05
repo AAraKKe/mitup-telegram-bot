@@ -769,3 +769,15 @@ msgstr "Il nuovo orario di inizio è dopo l'orario di fine, quindi l'orario di f
 
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "L'orario di inizio è stato cancellato. Impostalo di nuovo prima di scegliere un orario di fine."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per creare un altro, oppure tocca Collabora nel menu principale per supportare Mitup e sbloccare altri."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgstr "Hai raggiunto il massimo di ${cap} incontri attivi. Chiudi o elimina uno prima di crearne un altro."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgstr "Per ora puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina, oppure tocca Collabora nel menu principale per supportare Mitup e pianificare più lontano."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgstr "Puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina."

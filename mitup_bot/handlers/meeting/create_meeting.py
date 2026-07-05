@@ -19,6 +19,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
 from .enums import ConversationMeetingState, MeetingHandlerId
+from .utils import active_meetings_cap_reached, scheduling_horizon_rejection
 
 
 class ValidTitleFilter(filters.MessageFilter):
@@ -42,8 +43,14 @@ class ValidTitleFilter(filters.MessageFilter):
 @with_session
 async def callback_query_create_meeting(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationMeetingState:
+) -> ConversationMeetingState | int:
     user = await guards.current_user(update, session)
+
+    # Stop the common button path before the title prompt when the user is at their cap; the
+    # title-message handler backstops the inline deep-link path, which never reaches here.
+    if await active_meetings_cap_reached(user, update, context):
+        return ConversationHandler.END
+
     view = views.factory.create_meeting_view(lang=user.lang, datetime_link=build_datetime_link())
 
     context.store_on_exit(
@@ -63,8 +70,15 @@ async def callback_query_create_meeting(
     bindable=False,
 )
 @with_session
-async def create_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext) -> int:
+async def create_meeting_message_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationMeetingState | int:
     user = await guards.current_user(update, session)
+
+    # Backstops the inline deep-link creation path (the button path is already stopped at entry).
+    if await active_meetings_cap_reached(user, update, context):
+        return ConversationHandler.END
+
     message = guards.message(update)
     title = message.text
     assert title is not None, "TEXT filter ensures this is set"
@@ -76,6 +90,11 @@ async def create_meeting_message_handler(session: AsyncSession, update: Update, 
     if date_entity is not None:
         unix_time = date_entity.unix_time
         if unix_time is not None:
+            # A title-embedded date beyond the horizon keeps the user in TITLE to pick a nearer one
+            # rather than silently dropping the date.
+            if rejection := scheduling_horizon_rejection(user, unix_time):
+                await context.api.send_message(update=update, view=rejection)
+                return ConversationMeetingState.TITLE
             meeting_datetime = unix_time
 
     meetup = Meetup(

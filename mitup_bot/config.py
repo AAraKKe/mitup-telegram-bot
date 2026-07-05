@@ -195,6 +195,27 @@ class MetricsConfig(BaseModel):
     flush_on_emission: bool = False
 
 
+class LimitsConfig(BaseModel):
+    """Free-tier limits that premium (Patreon) users have raised.
+
+    Every field is defaulted so the limits ship without any TOML or env change: the code default
+    is the live value until a deploy tunes it through a `MITUPBOT__LIMITS__*` override, keeping the
+    revert config-only. The premium values are deliberately generous sanity caps, not real limits.
+    """
+
+    # Active meetings a user may own at once (enforced at meeting creation and reactivation).
+    free_active_meetings: int = 5
+    premium_active_meetings: int = 50
+    # How many days ahead a meeting's start date may be set. The free horizon stays wide enough
+    # for normal planning (a dinner a couple of months out); the limit only targets meetings so
+    # far in the future they clog the database, which is exactly what supporters offset.
+    free_scheduling_horizon_days: int = 90
+    premium_scheduling_horizon_days: int = 365
+    # Free-tier per-meeting participant capacity. Defined here to reserve the config field and keep
+    # the plumbing in one place; #209 is the issue that actually enforces it.
+    free_participant_capacity: int = 20
+
+
 class PatreonConfig(BaseModel):
     """Patreon OAuth integration credentials.
 
@@ -252,6 +273,8 @@ class Config(BaseModel):
     google_api: GoogleApiConfig
     app: AppConfig
     metrics: MetricsConfig
+    # Every field is defaulted, so the section is always present without any TOML entry.
+    limits: LimitsConfig = Field(default_factory=LimitsConfig)
     # First optional section: Patreon may be absent entirely during rollout. When present, every
     # field is required, so pydantic rejects a partial section on its own.
     patreon: PatreonConfig | None = None

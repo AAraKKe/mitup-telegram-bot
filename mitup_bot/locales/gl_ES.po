@@ -801,3 +801,15 @@ msgstr "A nova hora de inicio é posterior á hora de remate, polo que a hora de
 
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "A hora de inicio foi eliminada. Estabelécela de novo antes de escoller unha hora de remate."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Alcanzaches o teu límite de ${cap} quedadas activas. Pecha ou elimina unha para crear outra, ou toca Colabora no menú principal para apoiar a Mitup e desbloquear máis."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgstr "Alcanzaches o máximo de ${cap} quedadas activas. Pecha ou elimina unha antes de crear outra."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgstr "Por agora podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima, ou toca Colabora no menú principal para apoiar a Mitup e programar máis lonxe."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgstr "Podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima."

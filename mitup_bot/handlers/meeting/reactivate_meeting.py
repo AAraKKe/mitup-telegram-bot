@@ -10,6 +10,7 @@ from mitup_bot.utils.mitup_types import TMitupContext
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
+from .utils import active_meetings_cap_reached
 
 
 @HandlersRegistry.register_callback_query(
@@ -25,6 +26,11 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
 
     meeting = await guards.user_owns_meeting(user, callback_data.id, "Reactivate meeting", update, context)
     if meeting is None:
+        return
+
+    # Reactivating turns an inactive meeting active again, so it counts against the cap. The meeting
+    # being reactivated is inactive and therefore excluded from the count.
+    if await active_meetings_cap_reached(user, update, context):
         return
 
     # No for_update here: reactivation writes `active` unconditionally without reading any

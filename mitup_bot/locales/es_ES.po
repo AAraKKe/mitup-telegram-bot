@@ -583,6 +583,18 @@ msgstr "Ya has respondido esta pregunta"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "¡Uy! Algo inesperado sucedió. Te he vuelto a llevar al menú principal. Por favor, inténtalo de nuevo."
 
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgstr "Has alcanzado el máximo de ${cap} quedadas activas. Cierra o elimina una antes de crear otra."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para apoyar a Mitup y programar más lejos."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgstr "Puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana."
+
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 

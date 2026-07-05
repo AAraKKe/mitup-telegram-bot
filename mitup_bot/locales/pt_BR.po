@@ -801,3 +801,15 @@ msgstr "A nova hora de início é posterior à hora de término, portanto a hora
 
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "A hora de início foi limpa. Defina-a novamente antes de escolher uma hora de término."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgstr "Você atingiu o máximo de ${cap} eventos ativos. Encerre ou exclua um antes de criar outro."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Escolha uma data mais próxima, ou toque em Colabore no menu principal para apoiar o Mitup e agendar mais para o futuro."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgstr "Você pode agendar eventos até ${days} dias no futuro. Escolha uma data mais próxima."

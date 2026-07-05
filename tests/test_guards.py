@@ -24,6 +24,7 @@ from mitup_bot.guards import (
     meeting_accessible,
     meeting_viewable,
     message,
+    premium_required,
     user_language,
     user_owns_meeting,
     user_registered,
@@ -37,7 +38,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, PremiumMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import (
@@ -540,3 +541,35 @@ async def test_user_owns_meeting_returns_none_silently_when_redirect_false(
     # No warning logged and no message sent because redirect is disabled
     assert "User tried" not in caplog.text
     context.api.assert_method_just_called("edit_message", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
+async def test_premium_required_passes_premium_user_through(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    user_with_settings.is_premium = True
+
+    result = await premium_required(user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, cap=5)
+
+    assert result is user_with_settings
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
+async def test_premium_required_alerts_and_returns_none_for_free_user(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    user_with_settings.is_premium = False
+
+    result = await premium_required(user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, cap=5)
+
+    assert result is None
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=PremiumMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=5),
+        show_alert=True,
+    )

@@ -32,7 +32,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase, MessageParams
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
@@ -326,6 +326,27 @@ async def meeting_viewable(
         return meeting
 
     return await user_owns_meeting(user, meeting_id, action, update, context)
+
+
+async def premium_required(
+    user: User, update: Update, context: TMitupContext, alert_message: MessageBase, **message_kwargs: MessageParams
+) -> User | None:
+    """Return the user when they are premium; otherwise answer the callback query with an alert and
+    return None, on which the caller must bail immediately.
+
+    Call-and-check, mirroring `user_registered`. `is_premium` is a plain column kept in sync by the
+    recurring job and the OAuth callback, so this never queries Patreon inline. `alert_message` is
+    supplied per feature and is expected to point the user at the Collaborate menu entry; any
+    `${...}` placeholders it carries are filled from `message_kwargs`. It is rendered as plain text,
+    so it must carry no inline-formatting entities.
+    """
+    if user.is_premium:
+        return user
+
+    await context.api.answer_callback_query(
+        update=update, text=alert_message.get_text(lang=user.lang, **message_kwargs), show_alert=True
+    )
+    return None
 
 
 async def user_registered(

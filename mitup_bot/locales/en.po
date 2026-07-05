@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-04 21:35\n"
+"PO-Revision-Date: 2026-07-05 14:51\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -250,6 +250,18 @@ msgstr "This meeting has been deleted"
 
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgstr "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start another, or tap Collaborate in the main menu to support Mitup and unlock more."
+
+msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgstr "You've reached the maximum of ${cap} active meetings. Wrap up or delete one before starting another."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgstr "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap Collaborate in the main menu to support Mitup and schedule further out."
+
+msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgstr "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
 
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."

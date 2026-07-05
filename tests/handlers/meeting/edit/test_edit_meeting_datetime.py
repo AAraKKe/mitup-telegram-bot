@@ -7,6 +7,8 @@ from telegram import CallbackQuery, Location, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
 
+from mitup_bot import limits
+from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as build_entry_view
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
@@ -16,7 +18,13 @@ from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDateTimeMessages
+from mitup_bot.utils.messages import (
+    ButtonMessages,
+    CommonMessages,
+    MeetingDisplayMessages,
+    MeetingEditDateTimeMessages,
+    PremiumMessages,
+)
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
     AnyFloat,
@@ -71,6 +79,18 @@ def freeze_current_date():
     """Allow all calls to now or today to return the same date."""
     with freeze_time(TEST_CURRENT_DATE.strftime("%Y-%m-%d")):
         yield
+
+
+@pytest.fixture(autouse=True)
+def wide_scheduling_horizon(monkeypatch: pytest.MonkeyPatch):
+    """Keep the date-mechanic tests focused on date/time handling rather than the scheduling limit:
+    default to a horizon far beyond any date they pick. The dedicated horizon tests below override
+    this within their own bodies."""
+    monkeypatch.setattr(
+        limits.LimitsState,
+        "config",
+        LimitsConfig(free_scheduling_horizon_days=3650, premium_scheduling_horizon_days=3650),
+    )
 
 
 @pytest.mark.parametrize(
@@ -1249,3 +1269,140 @@ async def test_set_time_in_past_sends_error_and_stays_in_edit_time(
     context.api.assert_send_message_called(
         update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
     )
+
+
+# ---------------------------------------------------------------------------
+# Scheduling horizon — enforced only on date picks, never on time-only edits
+#
+# Frozen now is 2025-01-15 (UTC). The owner is Europe/Madrid. The free horizon is 31 days, so
+# 2025-02-15 is the boundary (allowed) and 2025-02-16 is one day past it (rejected).
+# ---------------------------------------------------------------------------
+
+HORIZON_FROZEN_NOW = "2025-01-15 12:00:00"  # UTC
+HORIZON_BOUNDARY_DATE = dt.date(2025, 2, 15)  # exactly 31 days ahead
+HORIZON_BEYOND_DATE = dt.date(2025, 2, 16)  # 32 days ahead
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(HORIZON_BEYOND_DATE))],
+    indirect=True,
+)
+@freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
+async def test_set_date_beyond_horizon_shows_alert_and_stays_in_edit_date(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A free user picking a date past the horizon gets the upsell alert; the date is not saved."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATE
+    assert meeting.datetime is None  # not saved
+    mock_session.assert_not_flushed()
+    # The horizon alert is addressed to the acting user, so it renders in the owner's language
+    # (what scheduling_horizon_rejection uses), not the meeting's content language.
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=PremiumMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(HORIZON_BOUNDARY_DATE))],
+    indirect=True,
+)
+@freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
+async def test_set_date_exactly_on_horizon_is_allowed(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The boundary date (exactly the horizon) is accepted: the first date is saved and time prompted."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    assert meeting.datetime is not None  # saved
+    assert meeting.owner.datetime_in_tz(meeting.datetime).date() == HORIZON_BOUNDARY_DATE
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(HORIZON_BEYOND_DATE))],
+    indirect=True,
+)
+@freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
+async def test_set_date_beyond_free_horizon_allowed_for_premium(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A premium owner gets the extended horizon, so a date past the free limit is accepted."""
+    monkeypatch.setattr(
+        limits.LimitsState,
+        "config",
+        LimitsConfig(free_scheduling_horizon_days=31, premium_scheduling_horizon_days=365),
+    )
+    user_with_settings.is_premium = True
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    assert meeting.datetime is not None  # saved
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="20:20")], indirect=["update"])
+@freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
+async def test_time_edit_on_grandfathered_far_future_meeting_is_not_blocked(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Grandfathering: a meeting already scheduled far beyond the horizon can still have its time
+    edited. The horizon check applies to new date picks only, not to time-only edits."""
+    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    # Existing start is ~5 months out, well beyond the 31-day horizon.
+    far_future = dt.datetime(2025, 6, 1, 10, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=far_future)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationHandler.END
+    # Time updated to 20:20 Madrid (19:20 UTC) while the far-future date is preserved.
+    assert meeting.datetime == dt.datetime(2025, 6, 1, 18, 20, tzinfo=dt.UTC)
+    context.api.assert_method_just_called("answer_callback_query", times=0)
