@@ -168,3 +168,8 @@ class CallbackQueryTextTooLong(ValueError):
     def __init__(self, text: str):
         length = len(text)
         super().__init__(f"Callback query text is too long [{length}, max: 200]: {text!r}")
+
+
+class TokenEncryptionNotConfigured(RuntimeError):
+    def __init__(self):
+        super().__init__("Patreon token encryption was used before configure_token_encryption() supplied a Fernet key.")

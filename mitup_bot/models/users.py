@@ -2,7 +2,7 @@ import datetime as dt
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
-from sqlalchemy import Column, DateTime, Enum, FetchedValue
+from sqlalchemy import Boolean, Column, DateTime, Enum, FetchedValue, false
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -57,6 +57,10 @@ class User(BaseModel, SQLModel, table=True):
     )
     last_name: str | None = None
     username: str | None = None
+    # Kept directly on User (rather than joined from premium_subscriptions) so every handler that
+    # gates on premium status reads it without a join; the recurring job and OAuth callback keep it
+    # in sync with the subscription row.
+    is_premium: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, server_default=false()))
     # lazy="selectin": `user.lang` is read for virtually every loaded user (including meeting
     # participants), and implicit lazy loads raise MissingGreenlet under the async engine.
     settings: Settings = Relationship(

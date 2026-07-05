@@ -16,6 +16,8 @@ __all__ = [
     "create_settings",
     "create_message",
     "create_joined_link",
+    "create_premium_subscription",
+    "create_patreon_creator_token",
     "owner_with_meeting",
     "MockDbSession",
     "MITUP_DIR",
@@ -47,6 +49,8 @@ from .fixtures import (
     create_settings,
     telegram_user_from_user,
     create_joined_link,
+    create_premium_subscription,
+    create_patreon_creator_token,
     owner_with_meeting,
 )
 from .stub_db import MockDbSession, Result
