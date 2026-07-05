@@ -49,7 +49,7 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
 
     @property
     def participant_name(self) -> FormattedText:
-        name = self.user.inline_name
+        name = self.user.display_name
         if self.invited_by is not None:
             language = self.meetup.lang
             invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=language, user=self.invited_by.inline_name)

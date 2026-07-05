@@ -306,6 +306,39 @@ def test_meetup_message(
         assert not dt_entities
 
 
+def test_meeting_message_badges_premium_owner():
+    owner = create_user(id=1, username="alice", tg_user_id=997_720)
+    owner.is_premium = True
+    meeting = create_meetup(id=1, owner=owner, language="en")
+    JoinedUsers(user=owner, meetup=meeting)
+
+    badged_owner = f"alice {Emojis.SUPPORTER}"
+    assert badged_owner in meeting.message.text
+    assert badged_owner in meeting.inline_message.text
+
+
+def test_meeting_message_has_no_badge_for_free_owner():
+    owner = create_user(id=1, username="alice", tg_user_id=997_721)
+    meeting = create_meetup(id=1, owner=owner, language="en")
+    JoinedUsers(user=owner, meetup=meeting)
+
+    assert str(Emojis.SUPPORTER) not in meeting.message.text
+    assert str(Emojis.SUPPORTER) not in meeting.inline_message.text
+
+
+def test_incognito_meeting_omits_premium_participant_badge():
+    """Incognito hides the participant list, so a premium member's name — and its badge — never render."""
+    owner = create_user(id=1, first_name="Owner", tg_user_id=997_722)
+    meeting = create_meetup(id=1, owner=owner, incognito=True, language="en")
+    premium = create_user(id=2, username="alice", tg_user_id=997_723)
+    premium.is_premium = True
+    meeting.create_joined_link(premium, is_waiting_list=False)
+
+    inline_text = meeting.inline_message.text
+    assert "alice" not in inline_text
+    assert str(Emojis.SUPPORTER) not in inline_text
+
+
 @pytest.mark.parametrize(
     "participants,max_participants,expected",
     [

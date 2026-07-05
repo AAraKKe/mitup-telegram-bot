@@ -5,6 +5,7 @@ import pytest
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
+from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
 from tests.helpers import MockDbSession, create_meetup, create_user
@@ -46,6 +47,20 @@ async def test_send_message_calls_bot_with_correct_args():
         entities=None,  # no entities in plain FormattedText, entities list is empty → None
         reply_markup=None,  # empty keyboard → markup is None
     )
+
+
+def test_display_name_is_plain_inline_name_for_free_user():
+    user = create_user(id=1, username="alice", tg_user_id=997_701)
+
+    assert user.is_premium is False
+    assert user.display_name == "alice"
+
+
+def test_display_name_appends_supporter_badge_for_premium_user():
+    user = create_user(id=1, username="alice", tg_user_id=997_701)
+    user.is_premium = True
+
+    assert user.display_name == f"alice {Emojis.SUPPORTER}"
 
 
 @pytest.mark.parametrize(

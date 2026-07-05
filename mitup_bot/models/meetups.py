@@ -400,7 +400,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def message(self) -> FormattedText:
         description = self.description or MeetingDisplayMessages.DESCRIPTION_NOT_SET.get(lang=self.lang)
-        created_by = MeetingDisplayMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
+        created_by = MeetingDisplayMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.display_name)
         location = self.location.description(lang=self.lang)
         datetime_section = self._datetime_section
         participants_text_with_list = self.participants_text_with_list
@@ -418,7 +418,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         Similar to message but used when the meeting is shared inline.
         Properties that are not set are omitted.
         """
-        created_by = MeetingDisplayMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.inline_name)
+        created_by = MeetingDisplayMessages.CREATED_BY.get(lang=self.lang, owner=self.owner.display_name)
         description_section: Template | str = (
             t"\n--- {Emojis.DESCRIPTION} {self.description}" if self.description else ""
         )

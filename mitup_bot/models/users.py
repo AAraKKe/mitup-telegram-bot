@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import ExtBot
 
 from mitup_bot.exceptions import UserNotFound
+from mitup_bot.utils.emojis import Emojis
 from mitup_bot.views import MitupView
 
 from . import JoinedUsers, Meetup
@@ -131,6 +132,18 @@ class User(BaseModel, SQLModel, table=True):
         If the user has a username, use that, otherwise fall back to first name.
         """
         return self.username or self.first_name
+
+    @property
+    def display_name(self) -> str:
+        """`inline_name` with the supporter badge appended for premium users.
+
+        The badge rides existing name displays only: callers that hide a name (e.g. incognito
+        meetings omit the participant list entirely) never reach this, so the badge inherits the
+        same visibility as the name it decorates and creates no new identity exposure.
+        """
+        if self.is_premium:
+            return f"{self.inline_name} {Emojis.SUPPORTER}"
+        return self.inline_name
 
     @property
     def lang(self) -> str:

@@ -36,6 +36,7 @@ class Emojis(Enum):
     HELP = "❓"
     HEART = "♥"
     DONATE = "💶"
+    SUPPORTER = "🧡"
     REPLY = "▶"
     REPLY_ALL = "⏩"
     ACTIVATE = "🔄"
