@@ -783,6 +783,11 @@ class Meetup(BaseModel, SQLModel, table=True):
             # SELECT would return the stale pre-lock state instead of re-reading it. FOR UPDATE
             # applies only to the meetups row — the selectin follow-ups run unlocked, which is
             # fine because the row lock itself is what serializes writers.
+            # Footgun: populate_existing re-hydrates EVERY entity this statement pulls in,
+            # including identity-mapped Users reached through owner/joined_links — which resets
+            # their lazy="raise" collections (User.meetups/joined_links) to unloaded. Callers
+            # holding an already-loaded User must re-load those collections after this call:
+            # `await session.refresh(user, ["meetups", "joined_links"])`.
             statement = statement.with_for_update().execution_options(populate_existing=True)
         found_meetup = (await session.exec(statement)).first()
         if found_meetup is not None and (found_meetup.active or include_inactive):

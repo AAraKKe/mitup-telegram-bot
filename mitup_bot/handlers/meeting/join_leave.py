@@ -163,6 +163,12 @@ async def handle_join_leave_operation(
     # for_update: both operations read capacity/waiting-list state and mutate participants, so
     # the meetup row must be locked before the first read to serialize cross-user races.
     if meeting := await Meetup.by_id(session, data.id, for_update=True):
+        # The locked load ran with populate_existing, which re-hydrates every entity its selectin
+        # cascade touches — including `user` when they own or participate in this meeting —
+        # resetting the lazy="raise" collections read below (own_meeting via Message.from_update,
+        # joined_meeting in the operations) to unloaded. Re-load them; the row lock is already
+        # held, so the re-read is race-safe.
+        await session.refresh(user, ["meetups", "joined_links"])
         if not meeting.active:
             await context.api.edit_message(
                 update=update,

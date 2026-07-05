@@ -280,6 +280,13 @@ async def meeting_accessible(
         await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
         return None
 
+    if for_update:
+        # The locked load ran with populate_existing, which re-hydrates every entity its selectin
+        # cascade touches — including `user` when they own or participate in the meeting —
+        # resetting the lazy="raise" collections the ownership checks below traverse. Re-load
+        # them; the row lock is already held, so the re-read is race-safe.
+        await session.refresh(user, ["meetups", "joined_links"])
+
     if not meeting.active and user.own_meeting(meeting_id):
         await show_reactivation_prompt(user, meeting_id, update, context, custom_keyboard)
         return None
