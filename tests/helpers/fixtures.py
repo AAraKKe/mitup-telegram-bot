@@ -17,6 +17,7 @@ from mitup_bot.models import (
     Meetup,
     MeetupLocation,
     PatreonCreatorToken,
+    PatreonWebhook,
     PremiumSubscription,
     Settings,
     User,
@@ -238,6 +239,18 @@ def create_patreon_creator_token(
         refresh_token=refresh_token,
         token_expiration=token_expiration or dt.datetime.now(dt.UTC),
         seed_fingerprint=seed_fingerprint,
+    )
+
+
+def create_patreon_webhook(
+    patreon_webhook_id: str = "wh-12345",
+    uri: str = "https://bot.example/patreon/webhook",
+    secret: str = "webhook-signing-secret",
+) -> PatreonWebhook:
+    return PatreonWebhook(
+        patreon_webhook_id=patreon_webhook_id,
+        uri=uri,
+        secret=secret,
     )
 
 

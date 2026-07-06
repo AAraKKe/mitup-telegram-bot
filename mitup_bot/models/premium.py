@@ -107,3 +107,20 @@ class PatreonCreatorToken(BaseModel, SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
     )
+
+
+class PatreonWebhook(BaseModel, SQLModel, table=True):
+    __tablename__: str = "patreon_webhooks"
+
+    id: int | None = Field(default=None, primary_key=True)
+    # Patreon-side id of the single registered webhook; needed to PATCH it when its uri drifts.
+    patreon_webhook_id: str = Field(sa_column=Column(String, unique=True, nullable=False))
+    # The receiving URI including its query params, so startup can detect drift against the configured one.
+    uri: str = Field(sa_column=Column(String, nullable=False))
+    # HMAC signing secret, Fernet-encrypted at rest exactly like the other token columns.
+    secret: str = Field(sa_column=Column(EncryptedToken, nullable=False))
+    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    updated_time: dt.datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+    )
