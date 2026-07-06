@@ -91,7 +91,7 @@ def configure_patreon(config: Config):
     if config.patreon is None:
         log.info("Patreon section absent, skipping Patreon setup")
         return
-    configure_token_encryption(config.patreon.encryption_key.get_secret_value())
+    configure_token_encryption(*config.patreon.encryption_keys())
     patreon.configure(config.patreon)
 
 

@@ -97,7 +97,9 @@ redirect_uri = "https://your.bot.domain/patreon/callback"
 creator_access_token = "patreon_creator_access_token"
 creator_refresh_token = "patreon_creator_refresh_token"
 # Separate Fernet keys (different blast radius): one signs the OAuth `state` parameter, the
-# other encrypts Patreon tokens at rest in the DB.
+# other encrypts Patreon tokens at rest in the DB. To rotate the encryption key, set
+# `encryption_key` to "new,old" (comma/whitespace-separated); the first key encrypts new writes
+# and both decrypt, then set it back to just "new" once the daily refresh has rewritten every row.
 state_secret = "fernet_key_for_oauth_state"
 encryption_key = "fernet_key_for_token_encryption"
 # Supporter-tier thresholds in cents of `currently_entitled_amount_cents` (the VAT-exclusive pledge

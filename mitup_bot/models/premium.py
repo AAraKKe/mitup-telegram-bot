@@ -41,7 +41,7 @@ def configure_token_encryption(*keys: str):
     The first key is primary and encrypts every new write; all keys decrypt, so passing
     `(new, old)` during a rotation keeps legacy ciphertext readable while the daily token
     refresh re-encrypts everything under the new key within a day. Called once during process
-    setup (bot runtime / CLI); a later change wires this to `PatreonConfig.encryption_key`.
+    setup (bot runtime / CLI) with `*PatreonConfig.encryption_keys()`.
     """
     if not keys:
         raise ValueError("configure_token_encryption requires at least one Fernet key")

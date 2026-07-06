@@ -60,7 +60,7 @@ class MitupRuntime:
         if self.config.patreon is None:
             log.info("Patreon section absent, skipping Patreon setup")
             return
-        configure_token_encryption(self.config.patreon.encryption_key.get_secret_value())
+        configure_token_encryption(*self.config.patreon.encryption_keys())
         patreon.configure(self.config.patreon)
 
     def __setup_db(self):

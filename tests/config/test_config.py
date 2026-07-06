@@ -2,6 +2,7 @@ from typing import cast
 from unittest import mock
 
 import pytest
+from cryptography.fernet import Fernet
 from pydantic import SecretStr, ValidationError
 from sqlalchemy import URL
 
@@ -19,6 +20,7 @@ from mitup_bot.config import (
     RunModes,
     TomlConfigProvider,
 )
+from mitup_bot.models.premium import TokenCipher, configure_token_encryption
 
 TOML_CONTENT = """
 [db]
@@ -413,3 +415,53 @@ def test_patreon_secrets_are_masked_in_repr():
         assert secret not in rendered
     # Non-secret fields stay visible for debugging.
     assert "patreon-client-abc" in rendered
+
+
+def make_patreon_config(encryption_key: str) -> PatreonConfig:
+    return PatreonConfig(
+        client_id="patreon-client-abc",
+        client_secret=SecretStr("super-secret"),
+        campaign_id="1234567",
+        redirect_uri="https://bot.example/patreon/callback",
+        creator_access_token=SecretStr("seed-access-token"),
+        creator_refresh_token=SecretStr("seed-refresh-token"),
+        state_secret=SecretStr("fernet-state-key"),
+        encryption_key=SecretStr(encryption_key),
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("single-key", ["single-key"]),
+        ("new-key,old-key", ["new-key", "old-key"]),
+        ("new-key old-key", ["new-key", "old-key"]),
+        ("  new-key , old-key ,, ", ["new-key", "old-key"]),
+        ("new-key,\n old-key", ["new-key", "old-key"]),
+    ],
+)
+def test_patreon_encryption_keys_parsing(raw: str, expected: list[str]):
+    assert make_patreon_config(raw).encryption_keys() == expected
+
+
+@pytest.mark.parametrize("raw", ["", "   ", " , , "])
+def test_patreon_encryption_key_rejects_no_usable_key(raw: str):
+    with pytest.raises(ValidationError, match="at least one Fernet key"):
+        make_patreon_config(raw)
+
+
+def test_patreon_encryption_keys_wire_a_rotation():
+    old_key = Fernet.generate_key().decode()
+    new_key = Fernet.generate_key().decode()
+
+    configure_token_encryption(old_key)
+    legacy_ciphertext = TokenCipher.encrypt("token")
+
+    config = make_patreon_config(f"{new_key},{old_key}")
+    configure_token_encryption(*config.encryption_keys())
+
+    # A token written under the old key still decrypts after the rotation config is applied.
+    assert TokenCipher.decrypt(legacy_ciphertext) == "token"
+    # Fresh writes use the new primary key.
+    rotated_ciphertext = TokenCipher.encrypt("token")
+    assert Fernet(new_key).decrypt(rotated_ciphertext.encode()).decode() == "token"

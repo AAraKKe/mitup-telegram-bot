@@ -274,8 +274,10 @@ class PatreonConfig(BaseModel):
     # Fernet key for the OAuth `state` parameter (carries the initiating tg_user_id, age-validated
     # against `oauth.STATE_TTL_SECONDS`).
     state_secret: SecretStr
-    # Fernet key for encrypting Patreon tokens at rest in the DB. Kept separate from
-    # `state_secret` so the two keys have a different blast radius.
+    # Fernet key(s) for encrypting Patreon tokens at rest in the DB. Kept separate from
+    # `state_secret` so the two keys have a different blast radius. Accepts one or more keys
+    # separated by commas and/or whitespace: the first is primary (encrypts new writes), the
+    # rest only decrypt, so an operator sets `new,old` to rotate (see `encryption_keys`).
     encryption_key: SecretStr
     # Per-request timeout (seconds) for the httpx client that talks to the Patreon API. Optional
     # with a sensible default so operators can tune it without a code change if Patreon is slow.
@@ -288,6 +290,26 @@ class PatreonConfig(BaseModel):
     supporter_min_cents: int = 300
     patron_min_cents: int = 500
     organizer_min_cents: int = 1000
+
+    @staticmethod
+    def parse_encryption_keys(raw: str) -> list[str]:
+        """Split a raw `encryption_key` value into ordered Fernet keys.
+
+        Fernet keys are urlsafe base64, so treating commas as whitespace and splitting keeps a
+        lone key intact while yielding `[new, old]` for a rotation value.
+        """
+        return raw.replace(",", " ").split()
+
+    @field_validator("encryption_key", mode="after")
+    @classmethod
+    def validate_encryption_key(cls, value: SecretStr) -> SecretStr:
+        if not cls.parse_encryption_keys(value.get_secret_value()):
+            raise ValueError("encryption_key must contain at least one Fernet key")
+        return value
+
+    def encryption_keys(self) -> list[str]:
+        """Ordered Fernet keys; first is primary (encrypts writes), all decrypt."""
+        return self.parse_encryption_keys(self.encryption_key.get_secret_value())
 
 
 # Connections kept free for work that runs outside update handlers: the job queue and the
