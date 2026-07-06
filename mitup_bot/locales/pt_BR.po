@@ -856,10 +856,6 @@ msgstr "<b>Seu premium terminou</b>\n\nAinda não conseguimos confirmar um apoio
 msgid "PremiumNotificationMessages.UPGRADED"
 msgstr "<b>Premium desbloqueado</b>\n\nObrigado por apoiar o Mitup. Seu apoio no Patreon está ativo, então seus benefícios premium estão ativos agora."
 
-msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
-msgstr "Notamos que você desconectou sua conta Patreon. Se você quer manter seu premium, reconecte no menu Colabore dentro de uma semana."
-
-
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
 

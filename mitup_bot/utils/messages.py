@@ -736,11 +736,6 @@ class PremiumNotificationMessages(MessageBase):
         "<b>Premium unlocked</b>\n\n"
         "Thanks for backing Mitup. Your Patreon pledge is active, so your premium perks are now on."
     )
-    # A user token refresh failed with invalid_grant: the user disconnected the app on Patreon's side.
-    DISCONNECTED_RECONNECT = (
-        "We noticed you disconnected your Patreon account. If you want to keep your premium "
-        "membership, reconnect from the Collaborate menu within a week."
-    )
 
 
 class Weekday(MessageBase):

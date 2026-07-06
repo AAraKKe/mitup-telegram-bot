@@ -824,12 +824,8 @@ msgstr "<b>Il tuo premium è finito</b>\n\nNon abbiamo ancora potuto confermare 
 msgid "PremiumNotificationMessages.UPGRADED"
 msgstr "<b>Premium sbloccato</b>\n\nGrazie per aver sostenuto Mitup. Il tuo contributo Patreon è attivo, quindi i tuoi vantaggi premium sono ora attivi."
 
-msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
-msgstr "Abbiamo notato che hai scollegato il tuo account Patreon. Se vuoi mantenere l'iscrizione premium, ricollegati dal menu Collabora entro una settimana."
-
 msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
 msgstr "<b>Il tuo premium è in un periodo di grazia</b>\n\nIl tuo contributo Patreon è finito, e ci dispiace vederti andare via. I tuoi vantaggi premium restano attivi ancora ${days} giorni nel caso cambiassi idea. Per mantenerli, sostieni di nuovo Mitup dal menu Collabora."
-
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""

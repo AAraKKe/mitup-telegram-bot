@@ -856,10 +856,6 @@ msgstr "<b>Dein Premium ist beendet</b>\n\nWir konnten immer noch keinen aktiven
 msgid "PremiumNotificationMessages.UPGRADED"
 msgstr "<b>Premium freigeschaltet</b>\n\nDanke, dass du Mitup unterstützt. Dein Patreon-Beitrag ist aktiv, daher sind deine Premium-Vorteile jetzt aktiviert."
 
-msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
-msgstr "Wir haben bemerkt, dass du dein Patreon-Konto getrennt hast. Wenn du deine Premium-Mitgliedschaft behalten möchtest, verbinde es im Mithelfen-Menü innerhalb einer Woche erneut."
-
-
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
 

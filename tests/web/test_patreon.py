@@ -600,13 +600,12 @@ async def test_upsert_creates_subscription_when_absent():
     assert subscription.patreon_user_id == "p-653"
 
 
-async def test_upsert_updates_in_place_and_clears_revoke():
+async def test_upsert_updates_in_place():
     session = MockDbSession()
     user = create_user(id=1, tg_user_id=997_654)
     existing = create_premium_subscription(
         user_id=user.db_id,
         patreon_user_id="p-old",
-        revoked_time=dt.datetime.now(dt.UTC),
     )
     session.add_object(existing, "user_id")
 
@@ -614,5 +613,4 @@ async def test_upsert_updates_in_place_and_clears_revoke():
 
     assert result is existing
     assert existing not in session.objects_added  # updated in place, not recreated
-    assert existing.revoked_time is None
     assert existing.patreon_user_id == "p-654"

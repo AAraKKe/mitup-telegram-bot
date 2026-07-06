@@ -75,10 +75,6 @@ class PremiumSubscription(BaseModel, SQLModel, table=True):
     # Captured from Patreon's /identity at link time; the join key against the daily bulk
     # member list. Unique so one Patreon account cannot grant premium to several TG accounts.
     patreon_user_id: str = Field(sa_column=Column(String, unique=True, nullable=False))
-    # Set when a refresh fails with invalid_grant (user disconnected the app on Patreon's side).
-    # The row survives through the grace period so a re-link is a token update, not a from-scratch
-    # flow; revoked rows are excluded from token refresh and TTL metrics.
-    revoked_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
     premium_expiration: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
     expiration_notified: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, server_default=false()))
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))

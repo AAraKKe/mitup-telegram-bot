@@ -187,14 +187,12 @@ def create_joined_link(
 def create_premium_subscription(
     user_id: int,
     patreon_user_id: str,
-    revoked_time: dt.datetime | None = None,
     premium_expiration: dt.datetime | None = None,
     expiration_notified: bool = False,
 ) -> PremiumSubscription:
     return PremiumSubscription(
         user_id=user_id,
         patreon_user_id=patreon_user_id,
-        revoked_time=revoked_time,
         premium_expiration=premium_expiration,
         expiration_notified=expiration_notified,
     )

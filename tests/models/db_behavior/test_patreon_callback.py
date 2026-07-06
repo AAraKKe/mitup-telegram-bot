@@ -6,7 +6,6 @@ Committed cross-session data uses the 997 range; this file claims the 997_6xx su
 """
 
 import contextlib
-import datetime as dt
 from collections.abc import AsyncIterator, Iterator
 from typing import cast
 
@@ -125,14 +124,13 @@ async def test_new_link_for_non_patron_stores_without_premium():
         assert len(bot.sent) == 1
 
 
-async def test_relink_during_grace_updates_in_place_and_clears_revoke():
+async def test_relink_updates_subscription_in_place():
     async with committed_user(997_620) as user_id:
         async with db.begin() as session:
             session.add(
                 PremiumSubscription(
                     user_id=user_id,
                     patreon_user_id="patreon-6001",
-                    revoked_time=dt.datetime.now(dt.UTC),
                 )
             )
             await session.flush()
@@ -153,7 +151,6 @@ async def test_relink_during_grace_updates_in_place_and_clears_revoke():
         user, subscription = await read_user_and_subscription(user_id)
         assert subscription is not None
         assert subscription.db_id == original_id  # updated in place, not recreated
-        assert subscription.revoked_time is None
         assert user.supporter_level is SupporterLevel.PATRON
 
 

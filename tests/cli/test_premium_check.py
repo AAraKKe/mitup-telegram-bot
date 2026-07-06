@@ -261,7 +261,6 @@ def make_subscription_user(
     patreon_user_id: str = "patreon-1",
     *,
     premium_expiration: dt.datetime | None = None,
-    revoked_time: dt.datetime | None = None,
     expiration_notified: bool = False,
 ) -> tuple[PremiumSubscription, User]:
     user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
@@ -269,7 +268,6 @@ def make_subscription_user(
         user_id=1,
         patreon_user_id=patreon_user_id,
         premium_expiration=premium_expiration,
-        revoked_time=revoked_time,
         expiration_notified=expiration_notified,
     )
     subscription.id = 1
@@ -321,24 +319,6 @@ async def test_due_lapsed_after_grace_revokes_to_none(mock_session: MockDbSessio
     register_due(mock_session, subscription, user)
 
     outcome = await premium_check.process_due_subscription(subscription.db_id, {}, api)
-
-    assert outcome is premium_check.DueOutcome.PREMIUM_LOST
-    assert user.supporter_level is SupporterLevel.NONE
-    api.assert_send_message_to_user_called(user=user, view=PremiumNotificationMessages.PREMIUM_LOST.get(lang=user.lang))
-
-
-async def test_due_revoked_row_counts_as_non_member(mock_session: MockDbSession, api: MockApi):
-    """A revoked row is treated as non-member even if its Patreon id lingers in the active set, so a
-    disconnected user's support ends after the grace week instead of silently renewing."""
-    subscription, user = make_subscription_user(
-        premium_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1),
-        expiration_notified=True,
-        revoked_time=dt.datetime.now(dt.UTC) - dt.timedelta(days=7),
-    )
-    user.supporter_level = SupporterLevel.PATRON
-    register_due(mock_session, subscription, user)
-
-    outcome = await premium_check.process_due_subscription(subscription.db_id, {"patreon-1": 500}, api)
 
     assert outcome is premium_check.DueOutcome.PREMIUM_LOST
     assert user.supporter_level is SupporterLevel.NONE

@@ -415,9 +415,8 @@ async def link_patreon_account(
 ) -> LinkOutcome:
     """Upsert the subscription and, on success, queue the confirmation message to the user.
 
-    A re-link during the revoke grace period updates the existing row in place and clears
-    ``revoked_time``, so the user never has to unlink first. The write and the send run inside
-    ``begin_write`` so the message drains only after the row is committed.
+    A re-link updates the existing row in place, so the user never has to unlink first. The write
+    and the send run inside ``begin_write`` so the message drains only after the row is committed.
     """
     async with db.begin_write(api) as session:
         # The callback only needs the user's own columns (id, lang, supporter_level);
@@ -479,8 +478,7 @@ async def link_patreon_account(
 async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> PremiumSubscription:
     """Create the user's subscription row, or update the existing one in place.
 
-    A re-link during the revoke grace period updates the existing row and clears ``revoked_time``,
-    so a returning user never has to unlink first.
+    A re-link updates the existing row, so a returning user never has to unlink first.
     """
     subscription = (
         await session.exec(select(PremiumSubscription).where(PremiumSubscription.user_id == user.db_id))
@@ -491,8 +489,6 @@ async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id
         return subscription
 
     subscription.patreon_user_id = patreon_user_id
-    # A re-link clears any pending revoke so the grace-period row becomes active again.
-    subscription.revoked_time = None
     return subscription
 
 

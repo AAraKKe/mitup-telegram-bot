@@ -92,18 +92,13 @@ DUE_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
         )
     )
 )
-# Every live linked member (status MEMBER, not revoked). Feeds the level sync, which re-levels active
+# Every live linked member (status MEMBER). Feeds the level sync, which re-levels active
 # members against their entitled amount — NONE -> tier promotion and between-tier moves in both
 # directions; members absent from the amounts map are lapsing and left to the grace flow above.
 LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
     select(PremiumSubscription)
     .join(User, col(PremiumSubscription.user_id) == col(User.id))
-    .where(
-        and_(
-            User.status == UserStatus.MEMBER,
-            PremiumSubscription.revoked_time == null(),
-        )
-    )
+    .where(User.status == UserStatus.MEMBER)
 )
 
 
@@ -169,9 +164,8 @@ async def process_due_subscription(
 
     Owns the lapse lifecycle only: for a still-active member it extends grace (the level itself is
     reconciled by the level-sync pass), and for a lapsed member it starts grace and then revokes to
-    NONE. Re-checks under the fresh transaction that the row is still due; a revoked row counts as
-    non-member here so a lingering campaign pledge cannot silently re-grant support after the user
-    disconnected the app. Returns the transition taken so ``run`` can tally lifecycle counts."""
+    NONE. Re-checks under the fresh transaction that the row is still due. Returns the transition
+    taken so ``run`` can tally lifecycle counts."""
     async with db.begin_write(api) as session:
         subscription = (await session.exec(DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))).first()
         if subscription is None:
@@ -180,7 +174,7 @@ async def process_due_subscription(
         if user is None:
             return DueOutcome.SKIPPED
 
-        is_member = subscription.revoked_time is None and subscription.patreon_user_id in active_amounts
+        is_member = subscription.patreon_user_id in active_amounts
         if is_member:
             subscription.expiration_notified = False
             subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
