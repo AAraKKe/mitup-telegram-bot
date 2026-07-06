@@ -56,9 +56,6 @@ async def broadcast_invalid_content_message_handler(
 
 @with_session
 async def load_operator(session: AsyncSession, update: Update) -> User | None:
-    # member_user is a light SELECT (status=MEMBER) whose settings selectin-load for `.lang`; it
-    # avoids the meetups/joined_links eager loads current_user pulls that broadcasting never needs.
-    # Returns None for non-members (no raise) — a defensive path, since the entry gated on admin.
     return await guards.member_user(update, session)
 
 

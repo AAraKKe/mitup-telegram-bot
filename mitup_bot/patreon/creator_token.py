@@ -3,8 +3,7 @@
 The creator OAuth pair (campaign-wide access, distinct from the per-user tokens) is seeded from config
 and then rotated into ``PatreonCreatorToken`` by whichever process refreshes it first. Both the daily
 ``premium_check`` job and the startup webhook registration need a *fresh* creator access token, so the
-adopt-or-refresh lifecycle lives here in the Patreon domain — this keeps the web-layer webhook
-registration from importing ``mitup_bot.cli`` just to reach it. The job wraps ``load``/``store`` with
+adopt-or-refresh lifecycle lives here in the Patreon domain. The job wraps ``load``/``store`` with
 its TTL/fault metrics; registration only needs a token, so it calls
 :func:`acquire_creator_access_token`.
 """
@@ -101,9 +100,8 @@ async def acquire_creator_access_token(client: TokenRefresher, config: PatreonCo
 
     Returns ``None`` when Patreon rejects the refresh with ``invalid_grant``: that cannot be auto-healed
     (recovery is re-seeding the credential from the developer portal), so it logs an error and lets the
-    caller treat it as "no creator token available" rather than raising. The daily job's declining TTL
-    metric is what drives the #159 alarm for this case; a caller that only needs a token (webhook
-    registration) simply no-ops."""
+    caller treat it as "no creator token available" rather than raising. A caller that only needs a
+    token (webhook registration) simply no-ops."""
     state = await load_creator_state(config, seed_fingerprint(config))
     try:
         pair = await client.refresh(state.pair)

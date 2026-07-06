@@ -45,9 +45,8 @@ class User(BaseModel, SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
     )
-    # native_enum=False keeps the column a plain VARCHAR(16) (the type migration
-    # 77c3abe2f1d0 created — no DDL change), while coercing loaded rows back to UserStatus:
-    # a bare String column returns plain strs, silently failing `status is UserStatus.X`
+    # native_enum=False keeps the column a plain VARCHAR(16) while coercing loaded rows back to
+    # UserStatus: a bare String column returns plain strs, silently failing `status is UserStatus.X`
     # checks everywhere a User is loaded from the database.
     status: UserStatus = Field(
         default=UserStatus.MEMBER,
@@ -62,7 +61,7 @@ class User(BaseModel, SQLModel, table=True):
     # Kept directly on User (rather than joined from premium_subscriptions) so every handler that
     # gates on support status reads it without a join; the recurring job and OAuth callback keep it
     # in sync with the subscription row. native_enum=False keeps the column a plain VARCHAR (no DB
-    # enum type, mirroring `status`) while coercing loaded rows back to SupporterLevel.
+    # enum type) while coercing loaded rows back to SupporterLevel.
     supporter_level: SupporterLevel = Field(
         default=SupporterLevel.NONE,
         sa_column=Column(

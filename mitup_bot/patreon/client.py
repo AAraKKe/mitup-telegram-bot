@@ -1,8 +1,8 @@
 """The async Patreon API client.
 
-Every Patreon HTTP call in the bot goes through :class:`PatreonClient` — the OAuth linking flow in
-this issue and the daily creator-token sweep and membership reconciliation built on top of it — so
-the recurring job codes against one client rather than reaching into ``httpx`` itself. Responses are
+Every Patreon HTTP call in the bot goes through :class:`PatreonClient` — the OAuth linking flow and
+the daily creator-token sweep and membership reconciliation built on top of it — so the recurring
+job codes against one client rather than reaching into ``httpx`` itself. Responses are
 deserialized with the pydantic models in :mod:`mitup_bot.patreon.models` and returned as-is; the
 "active patron" rule lives on those models. The one value type defined here is :class:`TokenPair`,
 which is not a projection of a single response: its ``expires_at`` folds the response with the clock,
@@ -32,9 +32,9 @@ from mitup_bot.patreon.models import (
 TOKEN_URL = "https://www.patreon.com/api/oauth2/token"
 API_BASE_URL = "https://www.patreon.com/api/oauth2/v2"
 # The member lifecycle events we subscribe our webhook to; a create/update/delete on a membership is
-# exactly what drives supporter-tier reconciliation, replacing the daily creator-token poll. The
-# individual trigger strings are named so the webhook endpoint can branch on the delivered event
-# (``X-Patreon-Event``) — a delete cancels the tier — without re-hardcoding the string.
+# exactly what drives supporter-tier reconciliation. The individual trigger strings are named so the
+# webhook endpoint can branch on the delivered event (``X-Patreon-Event``) — a delete cancels the
+# tier — without re-hardcoding the string.
 MEMBER_CREATE_TRIGGER = "members:create"
 MEMBER_UPDATE_TRIGGER = "members:update"
 MEMBER_DELETE_TRIGGER = "members:delete"
@@ -127,7 +127,7 @@ class PatreonClient:
     async def iter_campaign_members(self, access_token: str) -> AsyncIterator[MemberResource]:
         """Yield every member of the configured campaign, following Patreon's cursor pagination.
 
-        Driven with the creator access token by the daily reconciliation job (#158). Each yielded
+        Driven with the creator access token by the daily reconciliation job. Each yielded
         :class:`~mitup_bot.patreon.models.MemberResource` exposes ``.patreon_user_id`` and
         ``.is_active_patron``. Pages are fetched lazily, so the caller can process members without
         holding the whole list in memory.

@@ -1,4 +1,4 @@
-"""Lambda entry point for CloudWatch alarm actions (Dec-2023 alarm → Lambda feature).
+"""Lambda entry point for CloudWatch alarm actions.
 
 CloudWatch invokes this function asynchronously when any alarm transitions to a new state.
 It forwards a generic alert to GitLab's HTTP Endpoint alert integration so that GitLab's
@@ -89,7 +89,7 @@ class AlarmEvent(BaseModel):
     alarm_data: AlarmData
 
 
-# --- SSM credential fetch (isolated so tests can mock it cleanly) ---
+# --- SSM credential fetch ---
 
 
 class GitLabAlertCredentials(BaseModel):

@@ -11,9 +11,7 @@ signature. Two properties distinguish it from ``set_webhook``:
   registration error is logged and metered but never aborts bot startup. ``set_webhook`` is allowed to
   hard-fail; this is not.
 
-The single-row :class:`~mitup_bot.models.PatreonWebhook` I/O (the stored id/uri/secret) lives here too,
-so both the registration writer and the endpoint's signature-secret reader share one module rather
-than each re-selecting the table.
+The single-row :class:`~mitup_bot.models.PatreonWebhook` I/O (the stored id/uri/secret) lives here too.
 """
 
 import structlog
@@ -33,7 +31,7 @@ log = structlog.get_logger(__name__)
 # Stable machine key bound on every log line of a single registration attempt.
 REGISTRATION_FLOW = "patreon_webhook_registration"
 
-# The path the membership webhook is served on (mirrors the ``/telegram`` path).
+# The path the membership webhook is served on.
 MEMBER_WEBHOOK_PATH = "/patreon/webhook"
 # Patreon serializes the registered URI's query string into every delivery, so these params are what
 # make each payload carry the ``user`` relationship and ``patron_status``/entitled amount; v2 omits
@@ -42,7 +40,7 @@ MEMBER_PAYLOAD_QUERY = "include=user&fields[member]=patron_status,currently_enti
 
 
 def webhook_uri(domain: str, port: int) -> str:
-    """The public URI Patreon should POST membership events to, mirroring the Telegram webhook URL."""
+    """The public URI Patreon should POST membership events to."""
     return f"https://{domain}:{port}{MEMBER_WEBHOOK_PATH}?{MEMBER_PAYLOAD_QUERY}"
 
 

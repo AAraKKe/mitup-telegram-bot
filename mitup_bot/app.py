@@ -86,7 +86,7 @@ class MitupRuntime:
 
         # Updates sharing a (user, chat) key are serialized by construction; distinct keys may
         # overlap once the cap rises above 1. The default cap of 1 keeps processing observably
-        # sequential — raising it via config is the deliberate concurrency flip (#190).
+        # sequential — raising it via config is the deliberate concurrency flip.
         builder.concurrent_updates(PerUserUpdateProcessor(self.config.bot.concurrent_updates))
 
         # In webhook mode, FastAPI feeds updates directly into Application.process_update so

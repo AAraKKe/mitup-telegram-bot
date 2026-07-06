@@ -3,8 +3,7 @@
 Patreon config is optional (the bot boots without a ``[patreon]`` section), so the live
 :class:`~mitup_bot.config.PatreonConfig` is injected here at startup via :func:`configure` and read
 back through :func:`current_config` / :func:`is_configured` from the handler and web layers, which
-have no direct config access of their own. Mirrors the configure-at-startup pattern used by
-``db.configure_db`` and the token cipher.
+have no direct config access of their own.
 """
 
 from typing import ClassVar

@@ -127,8 +127,7 @@ class DbConfig(BaseModel):
     url_schema: str = "postgresql+psycopg"
     engine_echo: bool = False
     # Connection pool sizing for the bot engine. Defaults mirror SQLAlchemy's own
-    # (5 persistent + 10 overflow), which is the capacity the bot ran with before
-    # the pool was made explicit.
+    # (5 persistent + 10 overflow).
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
@@ -178,7 +177,7 @@ class BotConfig(BaseModel):
     max_connections: int = 100
     retries_on_throttle: int = 3
     # Cap on updates the PTB application processes concurrently. 1 keeps update handling
-    # strictly sequential; raising it is the deliberate concurrency flip (#190), done via
+    # strictly sequential; raising it is the deliberate concurrency flip, done via
     # env var override at rollout time so the revert stays config-only.
     concurrent_updates: int = Field(default=1, ge=1)
     # Telegram user ids allowed to operate the mass-broadcast feature. Empty by default, which
@@ -264,9 +263,9 @@ class PatreonConfig(BaseModel):
     client_secret: SecretStr
     campaign_id: str
     redirect_uri: str
-    # Seed value only. The daily refresh job (#158) persists the live creator token pair in
-    # the DB (#155), which is the source of truth after the first refresh — this seed is
-    # re-adopted only when its value changes (fingerprint comparison in #158), so rotating the
+    # Seed value only. The daily refresh job persists the live creator token pair in
+    # the DB, which is the source of truth after the first refresh — this seed is
+    # re-adopted only when its value changes (fingerprint comparison), so rotating the
     # credential is just replacing the CI/SSM variable.
     creator_access_token: SecretStr
     # Seed value only, adopted together with `creator_access_token` (same fingerprint check).

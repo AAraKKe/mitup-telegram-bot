@@ -97,7 +97,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     # lazy="selectin" on all three: model properties traverse them in plain Python
     # (`lang`/`timezone` via owner, `message_from_update` via messages, participant counts and
     # lists via joined_links), and implicit lazy loads raise MissingGreenlet under the async
-    # engine. This also removes the old per-meeting N+1 on list views.
+    # engine.
     owner: User = Relationship(back_populates="meetups", sa_relationship_kwargs={"lazy": "selectin"})
     messages: list[Message] = Relationship(back_populates="meetup", sa_relationship_kwargs={"lazy": "selectin"})
     joined_links: list[JoinedUsers] = Relationship(
@@ -127,7 +127,7 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def effective_max_members(self) -> int | None:
-        """`max_members` tightened by the owner's participant cap (#209), or None (unlimited) which is
+        """`max_members` tightened by the owner's participant cap, or None (unlimited) which is
         only reachable for uncapped (Patron/Organizer) owners.
 
         Every capacity read — `full`, waiting-list promotion, and the capacity displays — resolves
@@ -236,8 +236,8 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     def waiting_links(self) -> list[JoinedUsers]:
         """Get the joined links that are in the waiting list sorted by the time they joined"""
-        # id breaks created_time ties in insert order: rows written before #191 share one
-        # process-start timestamp per deploy, so without it their promotion order is arbitrary.
+        # id breaks created_time ties in insert order, so promotion order stays deterministic when
+        # rows share a timestamp.
         return sorted(
             (link for link in self.joined_links if link.is_waiting_list),
             key=lambda x: (cast(dt.datetime, x.created_time), x.id or 0),

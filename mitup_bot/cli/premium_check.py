@@ -6,7 +6,7 @@ supporter tier against the amount they are currently entitled to on the campaign
 grace/upgrade/downgrade/revoke transitions. A member's tier is derived from their
 ``currently_entitled_amount_cents`` via ``supporter.level_for_amount``; both between-tier upgrades and
 between-tier downgrades sync on this daily pass, while a full lapse follows the existing grace/revoke
-machinery. The creator token-TTL metric feeds the infra alarms in #159, so its name is pinned as a
+machinery. The creator token-TTL metric feeds the infra alarms, so its name is pinned as a
 literal string rather than routed through ``MetricKey`` (whose CamelCase folding would lowercase the
 ``TTL`` acronym).
 """
@@ -43,7 +43,7 @@ class CampaignMemberReader(Protocol):
     def iter_campaign_members(self, access_token: str) -> AsyncIterator[MemberResource]: ...
 
 
-# Pinned metric name for the #159 alarm. Kept as a literal because the CamelCaseStrEnum used by
+# Pinned metric name for the alarm. Kept as a literal because the CamelCaseStrEnum used by
 # MetricKey would emit "PatreonCreatorTokenTtl", breaking the alarm's exact-name match.
 CREATOR_TOKEN_TTL_METRIC = "PatreonCreatorTokenTTL"
 
@@ -122,7 +122,7 @@ async def refresh_creator_token(client: TokenRefresher, config: PatreonConfig, m
 
     Returns ``None`` when the refresh is rejected with ``invalid_grant``: that cannot be auto-healed
     (recovery is re-seeding from the developer portal), so it logs an error and lets the declining
-    TTL metric drive the #159 alarm rather than raising."""
+    TTL metric drive the alarm rather than raising."""
     state = await load_creator_state(config, seed_fingerprint(config))
     try:
         pair = await client.refresh(state.pair)

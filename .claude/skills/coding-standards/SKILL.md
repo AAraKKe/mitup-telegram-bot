@@ -244,6 +244,33 @@ object.__setattr__(self, "unix_time", unix_time)
 object.__setattr__(self, "unix_time", unix_time)
 ```
 
+### No implementation-story comments
+
+A comment must help someone reading the code *as it stands now*. Delete any comment — or any clause within a comment or docstring — that narrates the *story of how the code came to be*. That context was only valuable while the change was being built; afterwards it is noise. Remove:
+
+- **Narrative section blocks** recounting a feature's design or flow (the code and its docstrings already carry this).
+- **Issue/MR references used as narration** — `(issue #220)`, `per the !382 review`, `# see #158`.
+- **Build cross-references** — "mirrors the X path", "extracted here so the web layer doesn't import cli", "distinct from A because…", "instead of the old B", "this keeps Y from re-selecting the table".
+- **Historical rationale** — "was a pre-tiers artifact", "we used to…", "changed in review", "the earlier approach…".
+- Anything that merely restates an adjacent docstring or the code.
+
+Keep a comment only when it explains a non-obvious *local* fact a future maintainer needs to understand this line — an external-API quirk (Telegram/Patreon), a security reason (constant-time compare), a subtle ownership note (`server_default` so the DB owns the value). Litmus test: *would this still help someone six months from now who never saw the original work?* If not, delete it. This refines the "explain why, not what" rule above — not every *why* survives; build-story *why* does not.
+
+**Bad** (implementation story):
+
+```python
+# --- Membership webhook: real-time detection (issue #220) ---
+# Patreon POSTs a signed event here instead of waiting for the daily job; this mirrors set_webhook and
+# lives here so the web layer doesn't import cli. See webhooks.py for the registration.
+```
+
+**Good** (durable local why):
+
+```python
+# Patreon serializes the URI's query string into every delivery, so these params are what make the
+# payload carry patron_status; v2 omits unrequested attributes.
+```
+
 ## Data structure choices
 
 | Use | When |

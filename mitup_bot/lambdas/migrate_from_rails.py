@@ -30,7 +30,7 @@ log = structlog.get_logger(__name__)
 def handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
     configure_logging(Env.PROD, os.environ.get("LOG_LEVEL", "INFO"))
 
-    # dry_run defaults to True here for Lambda safety; the CLI defaults to False.
+    # dry_run defaults to True here for Lambda safety.
     dry_run = bool(event.get("dry_run", True))
     phases = event.get("phases") or ",".join(ALL_PHASES)
     secret_arn = event.get("rails_secret_arn") or os.environ["RAILS_DB_SECRET_ARN"]

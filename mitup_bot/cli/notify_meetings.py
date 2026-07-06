@@ -16,7 +16,7 @@ log = structlog.get_logger(__name__)
 
 # The ON clauses are explicit because FK inference picks the users join through
 # meetups.owner_id, silently evaluating every per-user condition (status, notification
-# toggle, lead-time window) against the meeting OWNER instead of the participant (#201).
+# toggle, lead-time window) against the meeting OWNER instead of the participant.
 USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
     select(JoinedUsers)
     .join(Meetup, col(JoinedUsers.meetup_id) == col(Meetup.id))

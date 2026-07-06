@@ -52,7 +52,7 @@ def callback_with_metrics(
     async def inner_callback(update: Update, context: TMitupContext):
         # Attach the handler identity to every metric emitted from within this callback as EMF
         # properties (not dimensions): per-handler drill-down stays available in Logs Insights
-        # without minting a billed CloudWatch series per handler. See issue #205.
+        # without minting a billed CloudWatch series per handler.
         context.prepare_handler_metrics({"Handler": handler_id.dimension, "HandlerType": handler_type})
 
         # Keep the context for counter as Bot to differentiate this from the recurrent events

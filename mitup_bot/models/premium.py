@@ -16,8 +16,8 @@ class TokenCipher:
     """Holds the process-wide MultiFernet used to encrypt Patreon token columns.
 
     The key(s) are injected at startup via `configure_token_encryption` rather than read from
-    config at import time, so the models package never imports the config layer (the Patreon
-    config lands in a separate change). Encryption raises until at least one key has been configured.
+    config at import time, so the models package never imports the config layer. Encryption raises
+    until at least one key has been configured.
     """
 
     cipher: ClassVar[MultiFernet | None] = None
@@ -97,7 +97,7 @@ class PatreonCreatorToken(BaseModel, SQLModel, table=True):
     token_expiration: dt.datetime = Field(sa_column=Column(DateTime, nullable=False))
     # SHA-256 of the seed access token that initialized (or last reset) this row. The daily job
     # compares it against the configured seed: a mismatch means the operator provided a new seed,
-    # so the config pair is adopted (self-service reset via CI variable, see #158).
+    # so the config pair is adopted (self-service reset via CI variable).
     seed_fingerprint: str = Field(sa_column=Column(String, nullable=False))
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(

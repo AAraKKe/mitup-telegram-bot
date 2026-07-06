@@ -15,9 +15,6 @@ from mitup_bot.utils.entities import FormattedText
 
 class ButtonConfig(BaseModel):
     text: str | FormattedText
-    # Allow str as type as an intermediate step for backward compatibility
-    # will be moving this to CallbackData to make sure we have safeguards in
-    # the future
     callback_data: CallbackData | str | None = None
     switch_inline_query: str | None = None
     switch_inline_query_current_chat: str | None = None

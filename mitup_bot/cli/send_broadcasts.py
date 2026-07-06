@@ -34,7 +34,7 @@ The count rollup and delivery purge are idempotent either way, but the one-time 
 DM is not — `transition_to_terminal` guards it with a compare-and-swap UPDATE on
 `status still SENDING`, so only the worker whose UPDATE actually wins the transition notifies.
 
-Durability otherwise mirrors `notify_meetings`: the whole-broadcast anti-resend guarantee is the
+Durability guarantees: the whole-broadcast anti-resend guarantee is the
 `Broadcast.status` transition; resume never re-sends an already-claimed delivery because only
 `PENDING` rows are ever eligible for the atomic claim; the audience snapshot is idempotent via
 INSERT ... ON CONFLICT DO NOTHING on (broadcast_id, user_id); and final counts are derived by
@@ -360,8 +360,7 @@ def log_delivery(broadcast_id: int, pending: PendingDelivery, status: BroadcastD
 async def record_batch_outcomes(session: AsyncSession, outcomes: list[DeliveryOutcome], metrics: MetricsClient):
     """Resolve each claimed (IN_PROGRESS) delivery to its real terminal outcome.
 
-    Every outcome group needs an explicit write now — the claim no longer pre-sets FAILED, it
-    only marks the row as claimed. A skipped recipient is also flipped to LEFT.
+    A skipped recipient is also flipped to LEFT.
     """
     by_status: dict[BroadcastDeliveryStatus, list[DeliveryOutcome]] = defaultdict(list)
     for outcome in outcomes:
@@ -390,7 +389,7 @@ async def mark_deliveries(
 
 
 async def deactivate_skipped_users(session: AsyncSession, skipped: list[DeliveryOutcome], metrics: MetricsClient):
-    """Reuse `User.mark_inactive` to flip unreachable MEMBERs to LEFT, mirroring the batch-send path."""
+    """Flip unreachable MEMBERs to LEFT via `User.mark_inactive`."""
     user_ids = [outcome.user_id for outcome in skipped]
     users = (await session.exec(select(User).where(col(User.id).in_(user_ids)))).all()
     left = sum(user.mark_inactive() for user in users)

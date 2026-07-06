@@ -1,8 +1,7 @@
 """Shared FastAPI dependency getters for the web layer.
 
 These narrow the ``Any`` that Starlette's ``app.state`` returns to concrete types at the parameter
-level. They graduated out of ``telegram.py`` once the Patreon callback route became a second
-consumer of the same PTB app and metrics client.
+level.
 """
 
 from fastapi import Request

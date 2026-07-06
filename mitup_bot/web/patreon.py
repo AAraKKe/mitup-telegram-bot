@@ -3,8 +3,7 @@
 Patreon redirects the user's browser here after the consent screen, so unlike ``/telegram`` this
 route renders HTML for a human and deep-links back to the bot chat. It owns its own DB and api
 plumbing: there is no per-request session dependency, so it builds an api from the PTB bot and runs
-the write plus the confirmation send through ``db.begin_write`` (capture, commit, drain), exactly
-like the CLI batch jobs.
+the write plus the confirmation send through ``db.begin_write`` (capture, commit, drain).
 
 The page markup lives in ``templates/patreon_result.html`` (a Mitup-branded shell filled via
 ``string.Template``); only the per-outcome title and message live here. This copy is intentionally
@@ -55,7 +54,7 @@ OAUTH_FLOW = "patreon_oauth_callback"
 
 router = APIRouter()
 
-# A freshly linked patron gets premium immediately with a short runway; the daily job (#158)
+# A freshly linked patron gets premium immediately with a short runway; the daily job
 # extends it while the pledge stays active and lets it lapse otherwise.
 PREMIUM_GRACE_DAYS = 7
 
@@ -183,11 +182,7 @@ def failure_page(
     status_code: int,
     **log_fields: object,
 ) -> HTMLResponse:
-    """Log a structured record of the failure (so support can trace it) and render its page.
-
-    ``reason`` is kept for existing log consumers; ``outcome`` mirrors it as the new stable key that
-    the happy-path line also carries, so success and failure share one filterable series.
-    """
+    """Log a structured record of the failure (so support can trace it) and render its page."""
     log.info(
         "Patreon callback did not complete",
         stage=stage,
@@ -565,7 +560,7 @@ def verify_signature(secret: str | None, raw_body: bytes, signature: str | None)
 def target_level(trigger: str | None, member: MemberResource, config: PatreonConfig) -> SupporterLevel:
     """The tier a membership event maps to: NONE for a delete or any non-active member (a loss, which
     starts cancellation grace — see ``apply_membership_transition``), otherwise the tier their entitled
-    amount reaches via the central policy (never an inline compare)."""
+    amount reaches via the central policy."""
     if trigger == MEMBER_DELETE_TRIGGER or not member.is_active_patron:
         return SupporterLevel.NONE
     return supporter.level_for_amount(member.attributes.currently_entitled_amount_cents, config)
@@ -576,12 +571,12 @@ def apply_membership_transition(
 ) -> WebhookApplied:
     """Apply ``target`` to the user and reconcile the subscription runway. Returns what changed.
 
-    A gain (``target`` is a paying tier) applies instantly, mirroring the daily ``sync_subscription_level``:
-    on a level change it refreshes the grace runway; an event landing on the level the user already holds
-    changes nothing. A loss (``target`` is NONE — a decline, former patron, or delete) does NOT cut perks
-    off; instead it keeps the user's current level and opens a cancellation grace window, marking the row
-    already-notified so the daily job goes straight to revoke when the window elapses (no duplicate grace
-    message). A loss for a user who already has nothing to lose is a no-op."""
+    A gain (``target`` is a paying tier) applies instantly: on a level change it refreshes the grace
+    runway; an event landing on the level the user already holds changes nothing. A loss (``target`` is
+    NONE — a decline, former patron, or delete) does NOT cut perks off; instead it keeps the user's
+    current level and opens a cancellation grace window, marking the row already-notified so the daily
+    job goes straight to revoke when the window elapses (no duplicate grace message). A loss for a user
+    who already has nothing to lose is a no-op."""
     previous = user.supporter_level
     if supporter.is_supporter(target):
         # Gain or between-tier change: apply the entitled tier instantly.
@@ -591,8 +586,7 @@ def apply_membership_transition(
         subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
         subscription.expiration_notified = False
         if supporter.meets(previous, target):
-            # A drop to a lower paying tier: adjust silently (per-tier copy is a later phase), matching
-            # the daily sync's silent downgrade.
+            # A drop to a lower paying tier: adjust silently.
             return WebhookApplied.DOWNGRADED
         return WebhookApplied.UPGRADED
 
@@ -601,16 +595,14 @@ def apply_membership_transition(
         # Nothing to lose — the user is already at NONE.
         return WebhookApplied.UNCHANGED
     # Keep the current level (perks stay on) and let the daily job revoke when the window elapses.
-    # Reuse the same one-week grace the callback and daily job use; expiration_notified=True so the
-    # daily due-flow revokes straight away rather than re-announcing grace.
+    # expiration_notified=True so the daily due-flow revokes straight away rather than re-announcing grace.
     subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
     subscription.expiration_notified = True
     return WebhookApplied.GRACE_STARTED
 
 
 async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome: WebhookApplied):
-    """Send the DM matching the transition; silent for a no-op or a between-tier downgrade (which the
-    daily sync also applies silently)."""
+    """Send the DM matching the transition; silent for a no-op or a between-tier downgrade."""
     match outcome:
         case WebhookApplied.UPGRADED:
             await api.send_message_to_user(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))

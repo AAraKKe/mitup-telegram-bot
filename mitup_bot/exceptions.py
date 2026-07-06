@@ -135,8 +135,7 @@ class MetricsNotSetError(ValueError):
 
 
 class InlineQueryNotSetError(GuardError, ValueError):
-    # Also subclasses ValueError to preserve its original public type: it was a ValueError
-    # before being reparented under GuardError, so any `except ValueError` still catches it.
+    # Also subclasses ValueError so any `except ValueError` still catches it.
     def __init__(self):
         super().__init__("InlineQueryId is not set but expected.")
 
@@ -156,8 +155,7 @@ class InvalidLanguageError(ValueError):
 
 
 class InactiveUserInteraction(RuntimeError):
-    # Carries the TELEGRAM user id (raise sites pass user.tg_user_id) — named explicitly
-    # after the id-space bug fixed in #196.
+    # Carries the TELEGRAM user id (raise sites pass user.tg_user_id).
     def __init__(self, tg_user_id: int, private: bool):
         self.tg_user_id = tg_user_id
         self.private = private
@@ -189,7 +187,7 @@ class PatreonApiError(RuntimeError):
 
 class PatreonTokenRevoked(RuntimeError):
     """A token refresh failed with OAuth ``invalid_grant`` — the user disconnected the app on
-    Patreon's side. The daily job (#158) treats this as a business event, not a transient fault."""
+    Patreon's side. The daily job treats this as a business event, not a transient fault."""
 
     def __init__(self):
         super().__init__("Patreon refused the refresh token with invalid_grant (app disconnected on Patreon's side).")

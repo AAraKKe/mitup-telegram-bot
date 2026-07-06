@@ -97,7 +97,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
         return
 
     # Emit an error-class-specific fault metric plus the general aggregate FAULT. Both are
-    # dimensionless — the handler identity rides as an EMF property (see issue #205) — so the
+    # dimensionless — the handler identity rides as an EMF property — so the
     # dimensionless FAULT the infra alarms read is emitted exactly once per fault.
     error_class = error.__class__.__name__
     context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1)
