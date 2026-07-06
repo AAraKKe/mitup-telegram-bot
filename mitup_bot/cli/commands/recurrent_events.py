@@ -19,6 +19,7 @@ from mitup_bot.cli import (
     notify_meetings,
     notify_meetings_started,
     premium_check,
+    send_broadcasts,
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
@@ -34,6 +35,7 @@ DEFAULT_NOTIFY_MEETINGS_START = 60
 DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
 DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
 DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL = 60
+DEFAULT_SEND_BROADCASTS_INTERVAL = 60
 DEFAULT_PREMIUM_CHECK_INTERVAL = 86400  # 24 hours
 
 
@@ -44,6 +46,7 @@ class EventType(Enum):
     NOTIFY_MEETING_STARTED = "NotifyMeetingStarted"
     DEACTIVATE_MEETINGS = "DeactivateMeetings"
     MEETUPS_CLEANUP = "MeetupsCleanup"
+    SEND_BROADCASTS = "SendBroadcasts"
     PREMIUM_CHECK = "PremiumCheck"
 
 
@@ -55,6 +58,7 @@ class IntervalsConfiguration:
     generate_stats: int
     deactivate_meetings: int
     meetups_cleanup: int
+    send_broadcasts: int
     premium_check: int
 
     def get(self, event_type: EventType) -> int:
@@ -71,6 +75,8 @@ class IntervalsConfiguration:
                 return self.deactivate_meetings
             case EventType.MEETUPS_CLEANUP:
                 return self.meetups_cleanup
+            case EventType.SEND_BROADCASTS:
+                return self.send_broadcasts
             case EventType.PREMIUM_CHECK:
                 return self.premium_check
             case never:  # pragma: no cover
@@ -96,7 +102,9 @@ def build_bot(config: BotConfig) -> ExtBot:
     )
 
 
-async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient):
+async def dispatch_event(
+    event_type: EventType, api: TelegramApiWrapper, client: MetricsClient, admin_tg_ids: list[int]
+):
     match event_type:
         case EventType.USER_CLEANUP:
             await user_cleanup.run(api, client)
@@ -110,18 +118,22 @@ async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client:
             await inactive_meetings.run(api, client)
         case EventType.MEETUPS_CLEANUP:
             await meetups_cleanup.run(api, client)
+        case EventType.SEND_BROADCASTS:
+            await send_broadcasts.run(api, client, admin_tg_ids)
         case EventType.PREMIUM_CHECK:
             await premium_check.run(api, client)
         case never:  # pragma: no cover
             assert_never(never)  # pragma: no cover
 
 
-async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient):
+async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient, admin_tg_ids: list[int]):
     with structlog.contextvars.bound_contextvars(event_type=event_type.value, run_id=uuid4().hex):
-        await dispatch_event(event_type, api, client)
+        await dispatch_event(event_type, api, client, admin_tg_ids)
 
 
-async def handle_maintainance(event_type: EventType, bot: ExtBot, client: MetricsClient | None = None):
+async def handle_maintainance(
+    event_type: EventType, bot: ExtBot, admin_tg_ids: list[int], client: MetricsClient | None = None
+):
     client = client or MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})
     api = build_api(BotAdapter(bot, client))
 
@@ -129,7 +141,7 @@ async def handle_maintainance(event_type: EventType, bot: ExtBot, client: Metric
     fault = False
     try:
         db.set_connection_context(event_type.value)
-        await launch_event(event_type, api, client)
+        await launch_event(event_type, api, client, admin_tg_ids)
     except Exception:
         fault = True
         client.add_stack_trace("exception")
@@ -147,6 +159,7 @@ async def run_periodic(
     interval: int,
     event_type: EventType,
     bot: ExtBot,
+    admin_tg_ids: list[int],
     time_before_start: float | None = None,
 ):
     # If no time provided add 1% interval jitter
@@ -155,11 +168,11 @@ async def run_periodic(
 
     # Run the coroutine indefinitely
     while True:
-        await handle_maintainance(event_type, bot)
+        await handle_maintainance(event_type, bot, admin_tg_ids)
         await asyncio.sleep(interval)
 
 
-async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, start_time: float):
+async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, admin_tg_ids: list[int], start_time: float):
     async with asyncio.TaskGroup() as tg:
         for event_type in EventType:
             tg.create_task(
@@ -168,6 +181,7 @@ async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, start_ti
                     time_before_start=start_time,
                     event_type=event_type,
                     bot=bot,
+                    admin_tg_ids=admin_tg_ids,
                 )
             )
 
@@ -210,6 +224,12 @@ async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, start_ti
     show_default=True,
 )
 @click.option(
+    "--send-broadcasts-interval",
+    default=DEFAULT_SEND_BROADCASTS_INTERVAL,
+    help="Interval in seconds to send queued mass broadcasts",
+    show_default=True,
+)
+@click.option(
     "--premium-check-interval",
     default=DEFAULT_PREMIUM_CHECK_INTERVAL,
     help="Interval in seconds to validate premium memberships against Patreon",
@@ -235,6 +255,7 @@ def cli(
     deactivate_meetings_interval: int,
     meetups_cleanup_interval: int,
     notify_meeting_started_interval: int,
+    send_broadcasts_interval: int,
     premium_check_interval: int,
     env: Env,
     start_time: float,
@@ -260,6 +281,7 @@ def cli(
         generate_stats=generate_stats_interval,
         deactivate_meetings=deactivate_meetings_interval,
         meetups_cleanup=meetups_cleanup_interval,
+        send_broadcasts=send_broadcasts_interval,
         premium_check=premium_check_interval,
     )
-    asyncio.run(run_all_tasks(intervals, bot, start_time))
+    asyncio.run(run_all_tasks(intervals, bot, config.bot.admin_tg_ids, start_time))

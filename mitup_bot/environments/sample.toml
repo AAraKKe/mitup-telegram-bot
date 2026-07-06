@@ -19,6 +19,11 @@ token = "123123123987987987"
 # (headroom for the job queue and reconcile transactions); startup fails otherwise.
 # Optional; defaults to 1 when omitted.
 concurrent_updates = 1
+# Telegram user ids allowed to operate the mass-broadcast feature. Empty by default, which keeps
+# the feature dormant until ids are set. In production set it via the env var override
+# MITUPBOT__BOT__ADMIN_TG_IDS (accepts "123456789", "123,456", or a JSON array "[123, 456]").
+# Optional; defaults to an empty list when omitted.
+admin_tg_ids = [123456789]
 
 [db]
 # Database connection configuration

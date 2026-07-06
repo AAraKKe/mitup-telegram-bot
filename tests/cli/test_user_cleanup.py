@@ -46,7 +46,7 @@ async def test_inactive_users_deleted(
     inactive_2 = create_user(id=11, tg_user_id=11, status=UserStatus.LEFT)
 
     # Register select result — returns user IDs
-    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive_1.id, inactive_2.id))  # ty: ignore[invalid-argument-type]  # https://github.com/astral-sh/ty/issues/2839
+    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive_1.id, inactive_2.id))
 
     await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()

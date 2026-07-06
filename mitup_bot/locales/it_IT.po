@@ -826,3 +826,91 @@ msgstr "<b>Premium sbloccato</b>\n\nGrazie per aver sostenuto Mitup. Il tuo cont
 
 msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
 msgstr "Abbiamo notato che hai scollegato il tuo account Patreon. Se vuoi mantenere l'iscrizione premium, ricollegati dal menu Collabora entro una settimana."
+
+
+msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_INVALID_YAML"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_NOT_A_LIST"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_EMPTY_LIST"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_ENTRY_SHAPE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_DUPLICATE_LANGUAGE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_MISSING_ENGLISH"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_EMPTY_MESSAGE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_MESSAGE_TOO_LONG"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_TOO_LARGE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_DECODE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_SUMMARY_HEADER"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_SUMMARY_LINE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_TOTAL_RECIPIENTS"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_WARNINGS_HEADER"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_WARNING_LINE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_FOOTER"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.BUTTON_CONFIRM"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.BUTTON_CANCEL"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.QUEUED_CONFIRMATION"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.CANCELLED_CONFIRMATION"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.DRAFT_NOT_FOUND"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED"
+msgstr "<b>${language}</b>: ${sent} inviati, ${failed} falliti, ${skipped} saltati, ${orphaned} orfani"
+
+msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
+msgstr "🚫 <b>${orphaned}</b> consegne sono state interrotte da un crash del worker e il loro risultato è sconosciuto. Non verranno riprovate."
+
+msgid "BroadcastOperatorMessages.SENDER_FAILED"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_HEADER"
+msgstr ""
+
+msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
+msgstr ""

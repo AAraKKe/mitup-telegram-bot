@@ -9,9 +9,10 @@ from telegram import User as TgUser
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.config import PatreonConfig
+from mitup_bot.config import BotConfig, PatreonConfig
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.models import (
+    Broadcast,
     JoinedUsers,
     Meetup,
     MeetupLocation,
@@ -21,6 +22,7 @@ from mitup_bot.models import (
     User,
 )
 from mitup_bot.models import Message as MeetupMessage
+from mitup_bot.models.broadcasts import BroadcastStatus
 from mitup_bot.models.users import UserStatus
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
@@ -150,6 +152,12 @@ def create_user(
     )
 
 
+def create_member(id: int, tg_user_id: int, language: str = "en", status: UserStatus = UserStatus.MEMBER) -> User:
+    """A member with its own Settings row whose id is tied to the user id, so building several
+    members in one test yields distinct settings instead of colliding on the default id=1."""
+    return create_user(id=id, tg_user_id=tg_user_id, status=status, settings=create_settings(id=id, language=language))
+
+
 def create_joined_link(
     user: User,
     meetup: Meetup,
@@ -246,6 +254,28 @@ def create_message(
         message_id=message_id,
         chat_id=chat_id,
     )
+
+
+def create_broadcast(
+    id: int | None = None,
+    name: str = "Campaign",
+    author_tg_id: int = 999,
+    status: BroadcastStatus = BroadcastStatus.DRAFT,
+    attempts: int = 0,
+    total_recipients: int | None = None,
+) -> Broadcast:
+    return Broadcast(
+        id=id,
+        name=name,
+        author_tg_id=author_tg_id,
+        status=status,
+        attempts=attempts,
+        total_recipients=total_recipients,
+    )
+
+
+def create_bot_config(admin_tg_ids: list[int]) -> BotConfig:
+    return BotConfig(token=SecretStr("test-token"), admin_tg_ids=admin_tg_ids)
 
 
 def owner_with_meeting(meeting_id: int = 1) -> tuple[User, Meetup]:

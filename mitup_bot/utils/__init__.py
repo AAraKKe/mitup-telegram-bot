@@ -1,6 +1,7 @@
 __all__ = (
     "Bold",
     "BoldItalic",
+    "BroadcastOperatorMessages",
     "ButtonMessages",
     "callbacks",
     "CommonMessages",
@@ -53,6 +54,7 @@ from .entities import (
     utf16_len,
 )
 from .messages import (
+    BroadcastOperatorMessages,
     ButtonMessages,
     CommonMessages,
     InlineQueryMessages,

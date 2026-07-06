@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-05 22:46\n"
+"PO-Revision-Date: 2026-07-06 15:19\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -829,3 +829,90 @@ msgstr "🇧🇷 Portuguese"
 
 msgid "Languages.ITALIAN"
 msgstr "🇮🇹 Italian"
+
+msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
+msgstr "<b>New broadcast</b>\n\nUpload a YAML file, or paste the YAML directly as a message.\n\nIt must be a list of entries, each with a <code>language</code> code and an HTML <code>message</code>. English (<code>en</code>) is required as the fallback."
+
+msgid "BroadcastOperatorMessages.ERROR_INVALID_YAML"
+msgstr "🚫 I could not parse that as YAML.\n\n<code>${detail}</code>\n\nFix it and send it again."
+
+msgid "BroadcastOperatorMessages.ERROR_NOT_A_LIST"
+msgstr "🚫 The content must be a list of entries, each with a language and a message."
+
+msgid "BroadcastOperatorMessages.ERROR_EMPTY_LIST"
+msgstr "🚫 The list is empty. Add at least an English entry."
+
+msgid "BroadcastOperatorMessages.ERROR_ENTRY_SHAPE"
+msgstr "🚫 Entry ${position} is not valid. Each entry needs exactly two fields: <code>language</code> and <code>message</code>, both text."
+
+msgid "BroadcastOperatorMessages.ERROR_DUPLICATE_LANGUAGE"
+msgstr "🚫 Language <b>${language}</b> appears more than once. Keep one entry per language."
+
+msgid "BroadcastOperatorMessages.ERROR_MISSING_ENGLISH"
+msgstr "🚫 English (<code>${language}</code>) is required as the fallback. Add an <code>en</code> entry."
+
+msgid "BroadcastOperatorMessages.ERROR_EMPTY_MESSAGE"
+msgstr "🚫 The message for <b>${language}</b> is empty."
+
+msgid "BroadcastOperatorMessages.ERROR_MESSAGE_TOO_LONG"
+msgstr "🚫 The message for <b>${language}</b> is ${length} characters, over the limit of ${limit}. Shorten it and resend."
+
+msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_TOO_LARGE"
+msgstr "🚫 That file is too large. The limit is ${limit_kb} KB."
+
+msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_DECODE"
+msgstr "🚫 I could not read that file as UTF-8 text. Save it as UTF-8 and resend."
+
+msgid "BroadcastOperatorMessages.PREVIEW_HEADER"
+msgstr "<b>Broadcast preview</b>\n\nHere is exactly what each language will receive."
+
+msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
+msgstr "<b>${language}</b>"
+
+msgid "BroadcastOperatorMessages.PREVIEW_SUMMARY_HEADER"
+msgstr "<b>Summary</b>"
+
+msgid "BroadcastOperatorMessages.PREVIEW_SUMMARY_LINE"
+msgstr "<b>${language}</b>: ${char_count} chars, ${recipient_count} recipients"
+
+msgid "BroadcastOperatorMessages.PREVIEW_TOTAL_RECIPIENTS"
+msgstr "<b>Total recipients:</b> ${total}"
+
+msgid "BroadcastOperatorMessages.PREVIEW_WARNINGS_HEADER"
+msgstr "🤔 Skipped unknown languages:"
+
+msgid "BroadcastOperatorMessages.PREVIEW_WARNING_LINE"
+msgstr "- ${language}"
+
+msgid "BroadcastOperatorMessages.PREVIEW_FOOTER"
+msgstr "Confirm to queue this broadcast, or Cancel to discard it."
+
+msgid "BroadcastOperatorMessages.BUTTON_CONFIRM"
+msgstr "✅ Confirm"
+
+msgid "BroadcastOperatorMessages.BUTTON_CANCEL"
+msgstr "❌ Cancel"
+
+msgid "BroadcastOperatorMessages.QUEUED_CONFIRMATION"
+msgstr "✅ Broadcast <b>${name}</b> is queued. It will start sending shortly."
+
+msgid "BroadcastOperatorMessages.CANCELLED_CONFIRMATION"
+msgstr "❌ Broadcast discarded. Nothing was sent."
+
+msgid "BroadcastOperatorMessages.DRAFT_NOT_FOUND"
+msgstr "🤔 This draft is no longer available. Send /broadcast to start again."
+
+msgid "BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY"
+msgstr "✅ Broadcast <b>${name}</b> finished.\n\n<b>Total:</b> ${total} · <b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\n${breakdown}"
+
+msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE"
+msgstr "<b>${language}</b>: ${sent} sent, ${failed} failed, ${skipped} skipped"
+
+msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED"
+msgstr "<b>${language}</b>: ${sent} sent, ${failed} failed, ${skipped} skipped, ${orphaned} orphaned"
+
+msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
+msgstr "🚫 <b>${orphaned}</b> deliveries were interrupted by a worker crash and their outcome is unknown. They will not be retried."
+
+msgid "BroadcastOperatorMessages.SENDER_FAILED"
+msgstr "🚫 Broadcast <b>${name}</b> failed after ${attempts} attempts.\n\n<b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\nCheck the logs for details."

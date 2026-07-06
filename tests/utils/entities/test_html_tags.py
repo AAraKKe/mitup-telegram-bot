@@ -240,3 +240,51 @@ def test_parse_format_tags_formatted_text_substitution_inside_link():
     assert link_entity.length == 3
     assert italic_entity.offset == 0
     assert italic_entity.length == 3
+
+
+# ---------------------------------------------------------------------------
+# parse_format_tags() — HTML character reference decoding on plain-text runs
+# ---------------------------------------------------------------------------
+
+
+def test_parse_format_tags_decodes_amp_reference():
+    result = parse_format_tags("&amp;", {})
+    assert result.text == "&"
+    assert result.entities == []
+
+
+def test_parse_format_tags_escaped_angle_brackets_render_literally():
+    # `&lt;i&gt;` is escaped markup, not a real tag: it must render as the literal text "<i>"
+    # with no entity, so an operator who types the characters sees them verbatim.
+    result = parse_format_tags("&lt;i&gt;", {})
+    assert result.text == "<i>"
+    assert result.entities == []
+
+
+def test_parse_format_tags_real_tag_beside_escaped_ampersand():
+    # A real <b> tag still formats, while the escaped &amp; in the plain run decodes to "&".
+    result = parse_format_tags("<b>Hi</b> &amp; bye", {})
+    assert result.text == "Hi & bye"
+    assert len(result.entities) == 1
+    assert result.entities[0].type == "bold"
+    assert result.entities[0].offset == 0
+    assert result.entities[0].length == 2  # "Hi"
+
+
+def test_parse_format_tags_decodes_numeric_reference():
+    result = parse_format_tags("It&#39;s", {})
+    assert result.text == "It's"
+    assert result.entities == []
+
+
+def test_parse_format_tags_plain_string_without_references_unchanged():
+    result = parse_format_tags("plain text no refs", {})
+    assert result.text == "plain text no refs"
+    assert result.entities == []
+
+
+def test_parse_format_tags_substitution_value_is_not_unescaped():
+    # Substitution values are inserted verbatim: an `&amp;` in a value stays `&amp;`, never decoded.
+    result = parse_format_tags("value ${payload}", {"payload": "a &amp; b"})
+    assert result.text == "value a &amp; b"
+    assert result.entities == []

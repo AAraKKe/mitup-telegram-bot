@@ -1,6 +1,7 @@
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import overload
+from typing import Any, overload
 from unittest import mock
 
 from sqlalchemy.dialects import postgresql
@@ -14,16 +15,31 @@ from mitup_bot.models import User
 
 @dataclass
 class Result:
-    """This is a stub of the SQLAlchemy ScalarResult class. Implement any method we might need for testing"""
+    """This is a stub of the SQLAlchemy ScalarResult class. Implement any method we might need for testing.
 
-    results: tuple[SQLModel, ...] = field(default_factory=tuple)
+    ``results`` is typed ``Any`` because ScalarResult rows are not always ORM models: scalar
+    aggregates (``SELECT count(*)``), grouped ``(key, count)`` rows and ``UPDATE ... RETURNING``
+    tuples all flow through here too.
+    """
+
+    results: tuple[Any, ...] = field(default_factory=tuple)
     rowcount: int | None = None
 
-    def first(self) -> SQLModel | None:
+    def first(self) -> Any | None:
         return self.results[0] if self.results else None
 
-    def all(self) -> tuple[SQLModel, ...]:
+    def all(self) -> tuple[Any, ...]:
         return self.results
+
+    def one(self) -> Any:
+        # Mirrors ScalarResult.one for scalar aggregates (e.g. `SELECT count(*)`), which the
+        # sender's delivery counters read via `.one()`.
+        return self.results[0]
+
+    def __iter__(self) -> Iterator[Any]:
+        # The real ScalarResult is iterable; some callers loop over the result directly
+        # (e.g. grouped aggregates and the draft sweep) instead of calling .all().
+        return iter(self.results)
 
 
 class MockDbSession(mock.MagicMock):
@@ -203,7 +219,7 @@ class MockDbSession(mock.MagicMock):
             raise ValueError(f"The object {obj!r} is already registered!")
         self.statements_registry[statement_str] = Result(results=(obj,))
 
-    def add_objects_with_statement(self, statement: SelectBase, objects: tuple[SQLModel, ...]):
+    def add_objects_with_statement(self, statement: SelectBase, objects: tuple[Any, ...]):
         statement_str = str(statement.compile(compile_kwargs={"literal_binds": True}))
         if statement_str in self.statements_registry:
             raise ValueError(f"The statement {statement_str!r} is already registered!")

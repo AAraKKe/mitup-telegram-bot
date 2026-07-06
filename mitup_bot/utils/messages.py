@@ -812,3 +812,90 @@ MonthShortList = [
     MonthShort.NOVEMBER,
     MonthShort.DECEMBER,
 ]
+
+
+# --- Broadcast (operator-only) ---
+# Operator-facing strings for the mass-broadcast authoring flow and the sender's finalization DMs.
+# English-only is acceptable: only allowlisted admins ever see them, and any missing locale falls
+# back to English. Placeholders live in plain (non-f) string segments so `${...}` is never eaten by
+# f-string interpolation; leading emojis go in adjacent f-string segments.
+class BroadcastOperatorMessages(MessageBase):
+    UPLOAD_PROMPT = (
+        "<b>New broadcast</b>\n\n"
+        "Upload a YAML file, or paste the YAML directly as a message.\n\n"
+        "It must be a list of entries, each with a <code>language</code> code and an HTML "
+        "<code>message</code>. English (<code>en</code>) is required as the fallback."
+    )
+
+    # Validation errors. Each keeps the operator on the upload step so they can fix and resend.
+    ERROR_INVALID_YAML = (
+        f"{Emojis.PROHIB} I could not parse that as YAML.\n\n<code>${{detail}}</code>\n\nFix it and send it again."
+    )
+    ERROR_NOT_A_LIST = f"{Emojis.PROHIB} The content must be a list of entries, each with a language and a message."
+    ERROR_EMPTY_LIST = f"{Emojis.PROHIB} The list is empty. Add at least an English entry."
+    ERROR_ENTRY_SHAPE = (
+        f"{Emojis.PROHIB} "
+        "Entry ${position} is not valid. Each entry needs exactly two fields: "
+        "<code>language</code> and <code>message</code>, both text."
+    )
+    ERROR_DUPLICATE_LANGUAGE = (
+        f"{Emojis.PROHIB} Language <b>${{language}}</b> appears more than once. Keep one entry per language."
+    )
+    ERROR_MISSING_ENGLISH = (
+        f"{Emojis.PROHIB} "
+        "English (<code>${language}</code>) is required as the fallback. Add an <code>en</code> entry."
+    )
+    ERROR_EMPTY_MESSAGE = f"{Emojis.PROHIB} The message for <b>${{language}}</b> is empty."
+    ERROR_MESSAGE_TOO_LONG = (
+        f"{Emojis.PROHIB} "
+        "The message for <b>${language}</b> is ${length} characters, over the limit of ${limit}. "
+        "Shorten it and resend."
+    )
+    ERROR_DOCUMENT_TOO_LARGE = f"{Emojis.PROHIB} That file is too large. The limit is ${{limit_kb}} KB."
+    ERROR_DOCUMENT_DECODE = f"{Emojis.PROHIB} I could not read that file as UTF-8 text. Save it as UTF-8 and resend."
+
+    # Preview and summary.
+    # Header shown once, before the labelled per-language previews.
+    PREVIEW_HEADER = "<b>Broadcast preview</b>\n\nHere is exactly what each language will receive."
+    # Bold language name shown right before that language's rendered preview message.
+    PREVIEW_LANGUAGE_LABEL = "<b>${language}</b>"
+    PREVIEW_SUMMARY_HEADER = "<b>Summary</b>"
+    PREVIEW_SUMMARY_LINE = "<b>${language}</b>: ${char_count} chars, ${recipient_count} recipients"
+    PREVIEW_TOTAL_RECIPIENTS = "<b>Total recipients:</b> ${total}"
+    PREVIEW_WARNINGS_HEADER = f"{Emojis.THINK} Skipped unknown languages:"
+    PREVIEW_WARNING_LINE = "- ${language}"
+    PREVIEW_FOOTER = "Confirm to queue this broadcast, or Cancel to discard it."
+
+    # Buttons.
+    BUTTON_CONFIRM = f"{Emojis.CHECK} Confirm"
+    BUTTON_CANCEL = f"{Emojis.CANCEL} Cancel"
+
+    # Outcomes.
+    QUEUED_CONFIRMATION = f"{Emojis.CHECK} Broadcast <b>${{name}}</b> is queued. It will start sending shortly."
+    CANCELLED_CONFIRMATION = f"{Emojis.CANCEL} Broadcast discarded. Nothing was sent."
+    DRAFT_NOT_FOUND = f"{Emojis.THINK} This draft is no longer available. Send /broadcast to start again."
+
+    # Sender finalization DMs. Referenced by the sender phase, which does not edit this file.
+    SENDER_COMPLETE_SUMMARY = (
+        f"{Emojis.CHECK} "
+        "Broadcast <b>${name}</b> finished.\n\n"
+        "<b>Total:</b> ${total} · <b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · "
+        "<b>Skipped:</b> ${skipped}\n\n${breakdown}"
+    )
+    SENDER_BREAKDOWN_LINE = "<b>${language}</b>: ${sent} sent, ${failed} failed, ${skipped} skipped"
+    SENDER_BREAKDOWN_LINE_WITH_ORPHANED = (
+        "<b>${language}</b>: ${sent} sent, ${failed} failed, ${skipped} skipped, ${orphaned} orphaned"
+    )
+    # Shown once, appended below the summary/breakdown, only when at least one delivery was left
+    # IN_PROGRESS by a worker that crashed between claiming it and recording its outcome.
+    SENDER_ORPHANED_WARNING = (
+        f"{Emojis.PROHIB} "
+        "<b>${orphaned}</b> deliveries were interrupted by a worker crash and their outcome is "
+        "unknown. They will not be retried."
+    )
+    SENDER_FAILED = (
+        f"{Emojis.PROHIB} "
+        "Broadcast <b>${name}</b> failed after ${attempts} attempts.\n\n"
+        "<b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\n"
+        "Check the logs for details."
+    )

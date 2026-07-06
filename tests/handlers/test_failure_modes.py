@@ -16,6 +16,7 @@ from telegram import Location, MessageEntity, Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.handlers.command_enums import CommandsId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
@@ -1086,6 +1087,35 @@ CONTEXTS = [
         update_request=UpdateRequest(message_text="not a number"),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_max_participants_wrong_message",
+    ),
+    # --- Broadcast authoring handlers ---
+    # Only the confirm/cancel callbacks belong here. command_broadcast gates on
+    # guards.broadcast_admin (returns None, silent END), and the content/invalid-content handlers
+    # gate on guards.member_user via load_operator (returns None → silent AWAITING_CONTENT); none
+    # of those raise UserNotFound, so they are covered by their own handler tests instead.
+    Context(
+        handler_id=BroadcastHandlerId.BROADCAST_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_BROADCAST.with_id(1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="broadcast_confirm",
+    ),
+    Context(
+        handler_id=BroadcastHandlerId.BROADCAST_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_BROADCAST),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="broadcast_confirm_malformed",
+    ),
+    Context(
+        handler_id=BroadcastHandlerId.BROADCAST_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_BROADCAST.with_id(1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="broadcast_cancel",
+    ),
+    Context(
+        handler_id=BroadcastHandlerId.BROADCAST_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_BROADCAST),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="broadcast_cancel_malformed",
     ),
 ]
 

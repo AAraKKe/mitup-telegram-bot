@@ -37,6 +37,7 @@ INTERVAL_PARAMS = [
     (EventType.GENERATE_STATS, "generate_stats"),
     (EventType.DEACTIVATE_MEETINGS, "deactivate_meetings"),
     (EventType.MEETUPS_CLEANUP, "meetups_cleanup"),
+    (EventType.SEND_BROADCASTS, "send_broadcasts"),
     (EventType.PREMIUM_CHECK, "premium_check"),
 ]
 
@@ -54,6 +55,7 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
         generate_stats=30,
         deactivate_meetings=40,
         meetups_cleanup=50,
+        send_broadcasts=60,
         premium_check=60,
     )
     assert config.get(event_type) == getattr(config, field_name)
@@ -99,8 +101,19 @@ async def test_launch_event_async(event_type: EventType, module_path: str):
     client = make_test_metrics_client()
 
     with patch(f"{module_path}.run", new_callable=AsyncMock) as mock_run:
-        await launch_event(event_type, api, client)
+        await launch_event(event_type, api, client, [])
         mock_run.assert_awaited_once_with(api, client)
+
+
+async def test_launch_event_send_broadcasts():
+    """SEND_BROADCASTS dispatches send_broadcasts.run with the operator allowlist appended."""
+    api = MockApi()
+    client = make_test_metrics_client()
+    admin_tg_ids = [111, 222]
+
+    with patch("mitup_bot.cli.commands.recurrent_events.send_broadcasts.run", new_callable=AsyncMock) as mock_run:
+        await launch_event(EventType.SEND_BROADCASTS, api, client, admin_tg_ids)
+        mock_run.assert_awaited_once_with(api, client, admin_tg_ids)
 
 
 @pytest.mark.parametrize(
@@ -113,7 +126,7 @@ async def test_launch_event_sync(event_type: EventType, module_path: str):
     client = make_test_metrics_client()
 
     with patch(f"{module_path}.run") as mock_run:
-        await launch_event(event_type, api, client)
+        await launch_event(event_type, api, client, [])
         mock_run.assert_called_once_with(api, client)
 
 
@@ -128,7 +141,7 @@ async def test_launch_event_binds_event_contextvars():
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run", side_effect=run_emitting_log):
-            await launch_event(EventType.USER_CLEANUP, api, client)
+            await launch_event(EventType.USER_CLEANUP, api, client, [])
 
     event_logs = [log for log in logs if log["event"] == "event running"]
     assert len(event_logs) == 1
@@ -148,7 +161,7 @@ async def test_launch_event_clears_contextvars_between_events():
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run"):
-            await launch_event(EventType.USER_CLEANUP, api, client)
+            await launch_event(EventType.USER_CLEANUP, api, client, [])
         # Emitted after launch_event returned — must carry neither event field.
         structlog.get_logger("mitup_bot").info("between events")
 
@@ -169,8 +182,8 @@ async def test_launch_event_uses_distinct_run_id_per_invocation():
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run", side_effect=capture_run_id):
-            await launch_event(EventType.USER_CLEANUP, api, client)
-            await launch_event(EventType.USER_CLEANUP, api, client)
+            await launch_event(EventType.USER_CLEANUP, api, client, [])
+            await launch_event(EventType.USER_CLEANUP, api, client, [])
 
     run_ids = [log["run_id"] for log in logs if log["event"] == "event running"]
     assert len(run_ids) == 2
@@ -216,12 +229,12 @@ async def test_handle_maintainance(
     ):
         mock_db.get_open_connections.return_value = leaked_connections
 
-        await handle_maintainance(event_type, MagicMock())
+        await handle_maintainance(event_type, MagicMock(), [])
 
         mock_db.set_connection_context.assert_called_once_with(event_type.value)
         assert len(captured_client) == 1
         client = captured_client[0]
-        mock_launch.assert_awaited_once_with(event_type, fake_api, client)
+        mock_launch.assert_awaited_once_with(event_type, fake_api, client, [])
 
         assertions = MetricAssertions(client)
         assertions.assert_emitted(
@@ -279,7 +292,7 @@ async def test_handle_maintainance_emits_telegram_api_time_metrics():
 
     bot = AsyncMock()
 
-    async def trigger_api_call(event_type, api, client):
+    async def trigger_api_call(event_type, api, client, admin_tg_ids):
         """Simulate a Telegram API call inside an event to exercise with_time_metric."""
         await api.send_message_to_user(MagicMock(tg_user_id=123, lang="en"), "test")
 
@@ -293,7 +306,7 @@ async def test_handle_maintainance_emits_telegram_api_time_metrics():
     ):
         mock_db.get_open_connections.return_value = 0
 
-        await handle_maintainance(EventType.USER_CLEANUP, bot)
+        await handle_maintainance(EventType.USER_CLEANUP, bot, [])
 
         assert len(captured_client) == 1
         client = captured_client[0]
@@ -370,7 +383,7 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
     ):
         mock_db.get_open_connections.return_value = 0
-        await handle_maintainance(event_type, MagicMock(), client=client)
+        await handle_maintainance(event_type, MagicMock(), [], client=client)
 
     payloads = [json.loads(line) for line in sink.serialized]
     assert len(payloads) == 2
@@ -403,9 +416,9 @@ async def test_run_periodic_runs_event():
         patch("mitup_bot.cli.commands.recurrent_events.handle_maintainance", new_callable=AsyncMock) as mock_handle,
     ):
         with pytest.raises(CancelledError):
-            await run_periodic(60, EventType.USER_CLEANUP, bot, time_before_start=0)
+            await run_periodic(60, EventType.USER_CLEANUP, bot, [], time_before_start=0)
 
-        mock_handle.assert_awaited_once_with(EventType.USER_CLEANUP, bot)
+        mock_handle.assert_awaited_once_with(EventType.USER_CLEANUP, bot, [])
 
 
 async def test_run_periodic_default_jitter():
@@ -421,7 +434,7 @@ async def test_run_periodic_default_jitter():
         patch("mitup_bot.cli.commands.recurrent_events.handle_maintainance", new_callable=AsyncMock),
     ):
         with pytest.raises(CancelledError):
-            await run_periodic(100, EventType.USER_CLEANUP, bot, time_before_start=None)
+            await run_periodic(100, EventType.USER_CLEANUP, bot, [], time_before_start=None)
 
     assert len(sleep_values) == 1
     # Jitter should be between 0 and 1% of the interval (100 * 0.01 = 1.0)
@@ -437,6 +450,7 @@ async def test_run_all_tasks_creates_all_tasks():
         generate_stats=30,
         deactivate_meetings=40,
         meetups_cleanup=50,
+        send_broadcasts=60,
         premium_check=60,
     )
 
@@ -448,13 +462,14 @@ async def test_run_all_tasks_creates_all_tasks():
         interval: int,
         event_type: EventType,
         bot,
+        admin_tg_ids: list[int],
         time_before_start: float | None = None,
     ):
         created_tasks.append(event_type)
         propagated_start_times.append(time_before_start)
 
     with patch("mitup_bot.cli.commands.recurrent_events.run_periodic", side_effect=fake_run_periodic):
-        await run_all_tasks(intervals, bot, start_time=start_time)
+        await run_all_tasks(intervals, bot, [], start_time=start_time)
 
     assert set(created_tasks) == set(EventType)
     assert propagated_start_times == [start_time] * len(EventType)
@@ -541,8 +556,10 @@ def test_cli_passes_custom_intervals():
                 "444",
                 "--meetups-cleanup-interval",
                 "555",
-                "--premium-check-interval",
+                "--send-broadcasts-interval",
                 "666",
+                "--premium-check-interval",
+                "777",
                 "--start-time",
                 "1.5",
             ],
@@ -553,13 +570,14 @@ def test_cli_passes_custom_intervals():
 
         # Verify the IntervalsConfiguration passed to run_all_tasks has the correct values
         mock_run_all_tasks.assert_called_once()
-        intervals_arg, _, start_time_arg = mock_run_all_tasks.call_args.args
+        intervals_arg, _, _, start_time_arg = mock_run_all_tasks.call_args.args
         assert intervals_arg.user_cleanup == 111
         assert intervals_arg.notify_start_meeting == 222
         assert intervals_arg.generate_stats == 333
         assert intervals_arg.deactivate_meetings == 444
         assert intervals_arg.meetups_cleanup == 555
-        assert intervals_arg.premium_check == 666
+        assert intervals_arg.send_broadcasts == 666
+        assert intervals_arg.premium_check == 777
         assert start_time_arg == 1.5
 
 

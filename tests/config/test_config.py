@@ -1,3 +1,4 @@
+from typing import cast
 from unittest import mock
 
 import pytest
@@ -188,6 +189,40 @@ def test_bot_config_concurrent_updates_must_be_positive():
         BotConfig(token=SecretStr("fake-bot-token"), concurrent_updates=0)
 
     assert exc_info.value.errors()[0]["loc"] == ("concurrent_updates",)
+
+
+def test_bot_config_admin_tg_ids_defaults_to_empty():
+    config = BotConfig(token=SecretStr("fake-bot-token"))
+
+    assert config.admin_tg_ids == []
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        pytest.param([123, 456], [123, 456], id="native_toml_array"),
+        pytest.param(123456789, [123456789], id="single_int_from_env"),
+        pytest.param("123,456", [123, 456], id="comma_separated_string"),
+        pytest.param(" 123 , 456 ", [123, 456], id="comma_separated_with_spaces"),
+        pytest.param("[123, 456]", [123, 456], id="json_array_string"),
+        pytest.param("123456789", [123456789], id="single_id_string"),
+        pytest.param("", [], id="empty_string"),
+        pytest.param([], [], id="empty_list"),
+    ],
+)
+def test_bot_config_admin_tg_ids_coercion(raw: object, expected: list[int]):
+    # The before-validator coerces every provider shape (list, int, comma/JSON string) into a
+    # list[int]; cast documents that we deliberately feed it a non-list to exercise that path.
+    config = BotConfig(token=SecretStr("fake-bot-token"), admin_tg_ids=cast(list[int], raw))
+
+    assert config.admin_tg_ids == expected
+
+
+def test_bot_config_admin_tg_ids_rejects_non_numeric():
+    with pytest.raises(ValidationError) as exc_info:
+        BotConfig(token=SecretStr("fake-bot-token"), admin_tg_ids=cast(list[int], "abc,def"))
+
+    assert exc_info.value.errors()[0]["loc"][0] == "admin_tg_ids"
 
 
 def test_concurrency_cap_at_connection_budget_accepted():

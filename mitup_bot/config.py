@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 import tomllib
@@ -180,6 +181,34 @@ class BotConfig(BaseModel):
     # strictly sequential; raising it is the deliberate concurrency flip (#190), done via
     # env var override at rollout time so the revert stays config-only.
     concurrent_updates: int = Field(default=1, ge=1)
+    # Telegram user ids allowed to operate the mass-broadcast feature. Empty by default, which
+    # keeps the feature dormant until ids are set. In production it is set via env var override
+    # (MITUPBOT__BOT__ADMIN_TG_IDS) so the allowlist stays out of the checked-in TOML.
+    admin_tg_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("admin_tg_ids", mode="before")
+    @classmethod
+    def parse_admin_tg_ids(cls, value: object) -> object:
+        """Coerce the allowlist from every shape a config provider can deliver.
+
+        A native TOML array arrives already as a list. The env provider collapses a single
+        `MITUPBOT__BOT__ADMIN_TG_IDS` var to an int (one id), a comma-separated string, or a
+        JSON array string, so all three must fold back to a list before `list[int]` validation.
+        """
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, int):
+            return [value]
+        if isinstance(value, str):
+            if not (text := value.strip()):
+                return []
+            with contextlib.suppress(json.JSONDecodeError):
+                parsed = json.loads(text)
+                return parsed if isinstance(parsed, list) else [parsed]
+            return [part.strip() for part in text.split(",") if part.strip()]
+        return value
 
 
 class GoogleApiConfig(BaseModel):

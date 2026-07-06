@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import html
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -323,6 +324,11 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
     Tags may be arbitrarily nested; each tag tracks its own start offset
     independently.  Unclosed, unbalanced, or unknown tags are silently dropped.
     To add a new alias, insert an entry into `STYLE_MAP`.
+
+    HTML character references (`&amp;`, `&lt;`, `&#39;`, …) in the literal text
+    runs are decoded to their characters, matching Telegram's HTML spec. Decoding
+    happens only on the non-tag segments and only after tag detection, so an
+    escaped `&lt;` renders as a literal `<` and is never re-parsed as a tag.
     """
     plain = ""
     utf16_offset = 0
@@ -334,6 +340,9 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         nonlocal plain, utf16_offset
         plain += s
         utf16_offset += utf16_len(s)
+
+    def flush_literal(s: str):
+        flush(html.unescape(s))
 
     def substitute(var: str):
         value = substitutions.get(var, f"${{{var}}}")
@@ -353,7 +362,7 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
             entities.append(MessageEntity(type=entity_type, offset=open_tag.offset, length=length, url=open_tag.url))
 
     for m in TOKEN_RE.finditer(text):
-        flush(text[cursor : m.start()])
+        flush_literal(text[cursor : m.start()])
         cursor = m.end()
         if (var := m.group("var")) is not None:
             substitute(var)
@@ -363,6 +372,6 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
             entity_type, url = resolve_open_tag(m.group("tag"), m.group("attrs"))
             active[m.group("tag")] = OpenTag(utf16_offset, entity_type, url)
 
-    flush(text[cursor:])
+    flush_literal(text[cursor:])
     entities.sort(key=lambda e: (e.offset, e.type))
     return FormattedText(plain, entities)

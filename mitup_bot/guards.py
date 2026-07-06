@@ -16,6 +16,7 @@ from mitup_bot.callback_data import (
     ValidMeetingCallbackData,
     ValidPaginatedCallbackData,
 )
+from mitup_bot.config import BotConfig
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -55,6 +56,18 @@ async def member_user(update: Update, session: AsyncSession) -> User | None:
         User.status == UserStatus.MEMBER,
     )
     return (await session.exec(statement)).first()
+
+
+async def broadcast_admin(update: Update, session: AsyncSession, config: BotConfig) -> User | None:
+    """Return the effective user only when they are a reachable member on the broadcast allowlist.
+
+    Gates the `/broadcast` entry point. Non-members, unregistered users, and members whose
+    `tg_user_id` is absent from `config.admin_tg_ids` all get None so the handler bails silently,
+    never revealing the feature. An empty allowlist keeps the whole feature dormant.
+    """
+    if user := await member_user(update, session):
+        return user if user.tg_user_id in config.admin_tg_ids else None
+    return None
 
 
 async def current_user(update: Update, session: AsyncSession) -> User:

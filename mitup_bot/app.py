@@ -8,6 +8,7 @@ from mitup_bot import db, limits, patreon, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers.broadcast.utils import BOT_CONFIG_KEY
 from mitup_bot.logging_config import configure_logging
 from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
@@ -93,6 +94,9 @@ class MitupRuntime:
             builder.updater(None)
 
         app = builder.build()
+
+        # Stash BotConfig so handlers (the broadcast admin gate) can read it via context.bot_data.
+        app.bot_data[BOT_CONFIG_KEY] = self.config.bot
 
         HandlersRegistry.bind(app)
 

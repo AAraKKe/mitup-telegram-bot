@@ -128,3 +128,11 @@ EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
 # Notifications
 TOGGLE_NOTIFICATIONS = CallbackData(action="toggle", entity="notif")
 SET_NOTIFICATION_TIME = CallbackData(action="set", entity="notif_time")
+
+# ----------------------------------------
+# Broadcast callbacks (operator-only)
+# CANCEL_BROADCAST uses action="cancel" so the global stale-cancel handler catches a tap that
+# lands outside an active broadcast conversation.
+# ----------------------------------------
+CONFIRM_BROADCAST = CallbackData(action="confirm", entity="broadcast")
+CANCEL_BROADCAST = CallbackData(action="cancel", entity="broadcast")

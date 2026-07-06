@@ -119,6 +119,16 @@ class MetricKey(CamelCaseStrEnum):
     DB_POOL_CHECKOUT_WAIT_TIME = auto()
     """Checkout attempts that gave up after waiting pool_timeout seconds for an exhausted pool"""
     DB_POOL_TIMEOUT = auto()
+    """Number of recipients materialized for the broadcast the sender picked up this run"""
+    BROADCAST_MESSAGES_TO_SEND = auto()
+    """Number of broadcast deliveries that reached the recipient (aggregated at finalization)"""
+    BROADCAST_MESSAGES_SENT = auto()
+    """Number of broadcast deliveries that failed to send (aggregated at finalization)"""
+    BROADCAST_MESSAGES_FAILED = auto()
+    """Number of broadcast deliveries skipped because the recipient was unreachable (aggregated at finalization)"""
+    BROADCAST_MESSAGES_SKIPPED = auto()
+    """Number of broadcast deliveries left claimed but unresolved by a worker crash (aggregated at finalization)"""
+    BROADCAST_MESSAGES_ORPHANED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

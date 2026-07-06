@@ -95,8 +95,53 @@ Never instantiate models directly. Always use these from `tests.helpers`:
 | `create_settings(id=1, ...)` | Creates a `Settings` model |
 | `create_joined_link(user, meetup, ...)` | Creates a `JoinedUsers` link |
 | `create_message(id=1, ...)` | Creates a `MeetupMessage` (DB message record) |
+| `create_broadcast(id=None, ...)` | Creates a `Broadcast` model |
+| `create_bot_config(admin_tg_ids)` | Creates a `BotConfig` |
 | `owner_with_meeting(meeting_id=1)` | Shortcut: returns `(user, meeting)` pair |
 | `telegram_user_from_user(user)` | Converts a `User` model to a Telegram `TgUser` |
+
+### All model-generation helpers live in `tests/helpers/fixtures.py`
+
+Every helper that builds a model (or config) instance MUST live in `tests/helpers/fixtures.py` as a
+`create_*` factory and be exported from `tests.helpers`. This is a hard rule: do **not** define a
+local `def draft(...) -> Broadcast` / `def make_broadcast(...)` builder inside a test module, and do
+**not** wrap a centralized factory in a thin local alias. Centralizing them keeps a single source of
+truth for model construction instead of re-declaring the same builder in every test file.
+
+When a test needs a model the factories don't cover, add a new `create_*` factory (with sensible,
+model-aligned defaults) to `fixtures.py`, export it via `tests/helpers/__init__.py`, then call it
+from the test — never build the model inline in a reusable helper.
+
+Mock-session or app *plumbing* helpers (e.g. one that stubs `session.get` or seeds a query result)
+are **not** model factories — they may stay local to the test module, or become fixtures (see below).
+
+### Never import functions from `conftest.py`
+
+Test modules must never `from .conftest import ...` (or import any callable defined in a `conftest`).
+`conftest.py` is for fixtures pytest injects automatically, not a helper module to import from. When
+shared setup logic takes runtime arguments (so it can't be a plain autouse fixture), expose it as a
+**factory fixture** that returns a callable, and type the callable with a `Protocol` (define the
+Protocol in `tests/helpers/types.py` and import it under `TYPE_CHECKING`):
+
+```python
+# tests/helpers/types.py
+class RegisterMember(Protocol):
+    def __call__(self, user: User) -> None: ...
+
+# conftest.py — factory fixture, injected not imported
+@pytest.fixture
+def register_member(mock_session: MockDbSession) -> RegisterMember:
+    def register(user: User) -> None:
+        mock_session.add_objects_with_statement(select(User).where(...), (user,))
+    return register
+
+# test module — inject the fixture, annotate with the Protocol
+if TYPE_CHECKING:
+    from tests.helpers.types import RegisterMember
+
+async def test_x(register_member: RegisterMember, user_with_settings: User):
+    register_member(user_with_settings)
+```
 
 ### Relationship trap
 
