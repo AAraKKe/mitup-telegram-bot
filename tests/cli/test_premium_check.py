@@ -81,19 +81,17 @@ def active_member(patreon_user_id: str, *, active: bool = True, cents: int = 500
 
 class FakePatreonClient:
     """Async-context Patreon client stand-in. ``refresh`` rotates a pair unless its refresh token is
-    flagged revoked (raises ``PatreonTokenRevoked``) or errored (raises ``RuntimeError``)."""
+    flagged revoked (raises ``PatreonTokenRevoked``)."""
 
     def __init__(
         self,
         *,
         members: tuple[MemberResource, ...] = (),
         revoked_refresh_tokens: frozenset[str] = frozenset(),
-        error_refresh_tokens: frozenset[str] = frozenset(),
         new_ttl_days: int = 30,
     ):
         self.members = members
         self.revoked = revoked_refresh_tokens
-        self.errored = error_refresh_tokens
         self.new_ttl_days = new_ttl_days
         self.refresh_calls: list[TokenPair] = []
         self.members_access_token: str | None = None
@@ -108,8 +106,6 @@ class FakePatreonClient:
         self.refresh_calls.append(pair)
         if pair.refresh_token in self.revoked:
             raise PatreonTokenRevoked
-        if pair.refresh_token in self.errored:
-            raise RuntimeError("patreon boom")
         return TokenPair(
             access_token=f"{pair.access_token}-new",
             refresh_token=f"{pair.refresh_token}-new",
@@ -444,58 +440,8 @@ async def test_sync_skips_when_not_active_member(mock_session: MockDbSession, ap
 
 
 # ---------------------------------------------------------------------------
-# Step 4: user token refresh + revoke-as-unlink
+# process_all: failure isolation
 # ---------------------------------------------------------------------------
-
-
-def register_refreshable(mock_session: MockDbSession, subscription: PremiumSubscription, user: User):
-    mock_session.add_object(subscription)
-    mock_session.add_objects_with_statement(
-        premium_check.LIVE_LINKED_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription.id), (subscription,)
-    )
-    mock_session.add_object(user)
-
-
-async def test_user_token_refresh_persists_and_returns_ttl(mock_session: MockDbSession, api: MockApi):
-    subscription, user = make_subscription_user(access_token="user-access", refresh_token="user-refresh")
-    register_refreshable(mock_session, subscription, user)
-    client = FakePatreonClient()
-
-    result = await premium_check.refresh_user_token(subscription.db_id, client, api)
-
-    assert isinstance(result, tuple)
-    user_id, expiration = result
-    assert user_id == 1
-    assert subscription.access_token == "user-access-new"
-    assert subscription.refresh_token == "user-refresh-new"
-    assert subscription.token_expiration == expiration
-    api.assert_method_just_called("send_message_to_user", times=0)
-
-
-async def test_user_token_invalid_grant_runs_revoke_as_unlink(mock_session: MockDbSession, api: MockApi):
-    subscription, user = make_subscription_user(refresh_token="user-refresh")
-    register_refreshable(mock_session, subscription, user)
-    client = FakePatreonClient(revoked_refresh_tokens=frozenset({"user-refresh"}))
-
-    result = await premium_check.refresh_user_token(subscription.db_id, client, api)
-
-    assert result is premium_check.UserTokenOutcome.REVOKED  # excluded from the TTL series
-    assert subscription.revoked_time is not None
-    assert subscription.expiration_notified is True
-    assert subscription.premium_expiration is not None
-    assert subscription.premium_expiration > dt.datetime.now(dt.UTC)
-    api.assert_send_message_to_user_called(
-        user=user, view=PremiumNotificationMessages.DISCONNECTED_RECONNECT.get(lang=user.lang)
-    )
-
-
-async def test_user_token_skips_vanished_row(mock_session: MockDbSession, api: MockApi):
-    client = FakePatreonClient()
-
-    result = await premium_check.refresh_user_token(999, client, api)
-
-    assert result is premium_check.UserTokenOutcome.GONE
-    assert client.refresh_calls == []
 
 
 async def test_process_all_counts_successes():
@@ -544,7 +490,7 @@ async def test_run_noops_when_unconfigured(
     assert metrics_client.records == []
 
 
-async def test_run_happy_path_emits_creator_and_user_ttls(
+async def test_run_happy_path_emits_creator_ttl_and_counters(
     mock_session: MockDbSession,
     api: MockApi,
     config: PatreonConfig,
@@ -553,13 +499,13 @@ async def test_run_happy_path_emits_creator_and_user_ttls(
     monkeypatch: pytest.MonkeyPatch,
 ):
     configure(config)
-    subscription, user = make_subscription_user(patreon_user_id="patreon-1", refresh_token="user-refresh")
-    # Already at the entitled tier, so the level sync is a no-op and this run only exercises token TTLs.
+    subscription, user = make_subscription_user(patreon_user_id="patreon-1")
+    # Already at the entitled tier, so the level sync is a no-op and this run only exercises the counters.
     user.supporter_level = SupporterLevel.PATRON
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, ())
     mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
-    register_refreshable(mock_session, subscription, user)
+    register_syncable(mock_session, subscription, user)
 
     client = FakePatreonClient(members=(active_member("patreon-1"),))
     monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
@@ -569,15 +515,7 @@ async def test_run_happy_path_emits_creator_and_user_ttls(
     # The freshly rotated creator token drives the member sweep.
     assert client.members_access_token == "creator-access-seed-new"
     metrics.assert_emitted(name=premium_check.CREATOR_TOKEN_TTL_METRIC, unit=MetricUnit.NONE)
-    metrics.assert_emitted(
-        name=premium_check.USER_TOKEN_TTL_METRIC,
-        unit=MetricUnit.NONE,
-        properties={"UserId": 1},
-    )
-    # Outcome counters: one token refreshed, everything else a continuous zero.
-    metrics.assert_emitted(name=premium_check.USER_TOKENS_REFRESHED_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.USER_TOKENS_REVOKED_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.USER_TOKEN_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
+    # Outcome counters: everything a continuous zero on this no-op run.
     metrics.assert_emitted(name=premium_check.CREATOR_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=premium_check.UPGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=premium_check.DOWNGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
@@ -593,13 +531,13 @@ async def test_run_logs_summary_on_success(
     monkeypatch: pytest.MonkeyPatch,
 ):
     configure(config)
-    subscription, user = make_subscription_user(patreon_user_id="patreon-1", refresh_token="user-refresh")
-    # Already at the entitled tier, so the level sync is a no-op and this run only exercises token TTLs.
+    subscription, user = make_subscription_user(patreon_user_id="patreon-1")
+    # Already at the entitled tier, so the level sync is a no-op and this run just logs its summary.
     user.supporter_level = SupporterLevel.PATRON
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, ())
     mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
-    register_refreshable(mock_session, subscription, user)
+    register_syncable(mock_session, subscription, user)
 
     client = FakePatreonClient(members=(active_member("patreon-1"),))
     monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
@@ -613,8 +551,6 @@ async def test_run_logs_summary_on_success(
     assert summary["premium_lost"] == 0
     assert summary["upgraded"] == 0
     assert summary["downgraded"] == 0
-    assert summary["tokens_refreshed"] == 1
-    assert summary["tokens_revoked"] == 0
     assert summary["active_patrons"] == 1
 
 
@@ -636,15 +572,13 @@ async def test_run_stops_after_creator_invalid_grant(
 
     await premium_check.run(api, metrics_client)
 
-    # No member fetch, no user TTL: the run bailed out on the unrecoverable creator token.
+    # No member fetch: the run bailed out on the unrecoverable creator token.
     assert client.members_access_token is None
-    user_ttls = [record for record in metrics_client.records if record.name == premium_check.USER_TOKEN_TTL_METRIC]
-    assert user_ttls == []
     # The creator-fault counter is this branch's only CloudWatch trace (it returns without raising).
     metrics.assert_emitted(name=premium_check.CREATOR_REFRESH_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
     # Downstream outcome counters never ran, so they are absent (not zeroed) this run.
     emitted_names = {record.name for record in metrics_client.records}
-    assert premium_check.USER_TOKENS_REFRESHED_METRIC not in emitted_names
+    assert premium_check.GRACE_STARTED_METRIC not in emitted_names
 
 
 async def test_run_raises_when_a_subscription_fails(
@@ -656,51 +590,24 @@ async def test_run_raises_when_a_subscription_fails(
     monkeypatch: pytest.MonkeyPatch,
 ):
     configure(config)
-    subscription, user = make_subscription_user(refresh_token="user-refresh")
+    subscription, user = make_subscription_user()
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
-    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, ())
-    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
-    register_refreshable(mock_session, subscription, user)
+    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, (subscription,))
+    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, ())
 
-    client = FakePatreonClient(error_refresh_tokens=frozenset({"user-refresh"}))
+    client = FakePatreonClient(members=(active_member("patreon-1"),))
     monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
+
+    async def boom(subscription_id: int, active_amounts: dict[str, int], api: MockApi) -> premium_check.DueOutcome:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(premium_check, "process_due_subscription", boom)
 
     with pytest.raises(RuntimeError, match="Premium check failed for 1 subscriptions"):
         await premium_check.run(api, metrics_client)
 
-    # An API error is a genuine fault (distinct from a deliberate revoke) and is counted before the
-    # raise, so the series records it even on a failing run.
-    metrics.assert_emitted(name=premium_check.USER_TOKEN_REFRESH_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.USER_TOKENS_REFRESHED_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.USER_TOKENS_REVOKED_METRIC, value=0, unit=MetricUnit.COUNT)
-
-
-async def test_run_counts_revoked_disconnect(
-    mock_session: MockDbSession,
-    api: MockApi,
-    config: PatreonConfig,
-    metrics_client: MetricsClient,
-    metrics: MetricAssertions,
-    monkeypatch: pytest.MonkeyPatch,
-):
-    configure(config)
-    subscription, user = make_subscription_user(patreon_user_id="patreon-1", refresh_token="user-refresh")
-    mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
-    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, ())
-    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
-    register_refreshable(mock_session, subscription, user)
-
-    client = FakePatreonClient(revoked_refresh_tokens=frozenset({"user-refresh"}))
-    monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
-
-    await premium_check.run(api, metrics_client)
-
-    # A disconnect is a business event, not a fault: counted as revoked, no TTL sample, no fault.
-    metrics.assert_emitted(name=premium_check.USER_TOKENS_REVOKED_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.USER_TOKENS_REFRESHED_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.USER_TOKEN_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
-    user_ttls = [record for record in metrics_client.records if record.name == premium_check.USER_TOKEN_TTL_METRIC]
-    assert user_ttls == []
+    # The lifecycle counters are emitted before the raise, so the series stay continuous on a failing run.
+    metrics.assert_emitted(name=premium_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_counts_lifecycle_transitions(
@@ -734,10 +641,10 @@ async def test_run_counts_lifecycle_transitions(
     mock_session.add_objects_with_statement(
         premium_check.DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == 1), (due_sub,)
     )
-    # The two live members feed both the level sync and the token refresh from one nomination.
+    # The two live members feed the level sync from one nomination.
     mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (upgrade_sub, downgrade_sub))
-    register_refreshable(mock_session, upgrade_sub, upgrade_user)
-    register_refreshable(mock_session, downgrade_sub, downgrade_user)
+    register_syncable(mock_session, upgrade_sub, upgrade_user)
+    register_syncable(mock_session, downgrade_sub, downgrade_user)
     mock_session.add_object(due_user)
 
     client = FakePatreonClient(

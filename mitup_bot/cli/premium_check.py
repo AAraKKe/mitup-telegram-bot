@@ -1,13 +1,13 @@
 """Daily supporter-membership validation against Patreon.
 
-Plugs into the recurrent-events framework as the ``PREMIUM_CHECK`` job. Each run keeps both token
-families fresh (the single creator token and every linked user token), reconciles every linked
-member's supporter tier against the amount they are currently entitled to on the campaign, and drives
-the grace/upgrade/downgrade/revoke transitions. A member's tier is derived from their
+Plugs into the recurrent-events framework as the ``PREMIUM_CHECK`` job. Each run refreshes the single
+creator token, sweeps the campaign roster it grants access to, and reconciles every linked member's
+supporter tier against the amount they are currently entitled to on the campaign, driving the
+grace/upgrade/downgrade/revoke transitions. A member's tier is derived from their
 ``currently_entitled_amount_cents`` via ``supporter.level_for_amount``; both between-tier upgrades and
 between-tier downgrades sync on this daily pass, while a full lapse follows the existing grace/revoke
-machinery. The two token-TTL metrics feed the infra alarms in #159, so their names are pinned as
-literal strings rather than routed through ``MetricKey`` (whose CamelCase folding would lowercase the
+machinery. The creator token-TTL metric feeds the infra alarms in #159, so its name is pinned as a
+literal string rather than routed through ``MetricKey`` (whose CamelCase folding would lowercase the
 ``TTL`` acronym).
 """
 
@@ -51,18 +51,13 @@ class CampaignMemberReader(Protocol):
     def iter_campaign_members(self, access_token: str) -> AsyncIterator[MemberResource]: ...
 
 
-# Pinned metric names for the #159 alarms. Kept as literals because the CamelCaseStrEnum used by
+# Pinned metric name for the #159 alarm. Kept as a literal because the CamelCaseStrEnum used by
 # MetricKey would emit "PatreonCreatorTokenTtl", breaking the alarm's exact-name match.
 CREATOR_TOKEN_TTL_METRIC = "PatreonCreatorTokenTTL"
-USER_TOKEN_TTL_METRIC = "PatreonUserTokenTTL"
 
-# Per-run outcome counters (same literal-name rationale as the TTL metrics above). Dashboard/diagnosis
+# Per-run outcome counters (same literal-name rationale as the TTL metric above). Dashboard/diagnosis
 # material, not a paging surface: they ride the run's MetricsClient with its EventType=PremiumCheck base
-# dimension only (one series per name, no per-user dimensions). Emitted every run — zeros included — so
-# the series stay continuous.
-USER_TOKENS_REFRESHED_METRIC = "PatreonUserTokensRefreshed"
-USER_TOKEN_REFRESH_FAULTS_METRIC = "PatreonUserTokenRefreshFaults"
-USER_TOKENS_REVOKED_METRIC = "PatreonUserTokensRevoked"
+# dimension only (one series per name). Emitted every run — zeros included — so the series stay continuous.
 CREATOR_REFRESH_FAULTS_METRIC = "PatreonCreatorRefreshFaults"
 UPGRADES_METRIC = "PatreonUpgrades"
 DOWNGRADES_METRIC = "PatreonDowngrades"
@@ -77,13 +72,6 @@ class DueOutcome(Enum):
     GRACE_STARTED = auto()
     PREMIUM_LOST = auto()
     SKIPPED = auto()
-
-
-class UserTokenOutcome(Enum):
-    """The non-refreshed results of a user-token pass (a successful refresh returns its id/expiry pair)."""
-
-    REVOKED = auto()
-    GONE = auto()
 
 
 class LevelSyncOutcome(Enum):
@@ -112,12 +100,9 @@ DUE_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
         )
     )
 )
-# Every live linked member (status MEMBER, not revoked). This single set feeds both passes that
-# operate on the whole live population: the token refresh (keep-alive + TTL, revoked rows excluded so
-# a deliberate disconnect never drags the alarm's Min down) and the level sync (re-levels active
+# Every live linked member (status MEMBER, not revoked). Feeds the level sync, which re-levels active
 # members against their entitled amount — NONE -> tier promotion and between-tier moves in both
-# directions; members absent from the amounts map are lapsing and left to the grace flow above).
-# run() nominates it once and drives both passes from the same id list.
+# directions; members absent from the amounts map are lapsing and left to the grace flow above.
 LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
     select(PremiumSubscription)
     .join(User, col(PremiumSubscription.user_id) == col(User.id))
@@ -140,16 +125,6 @@ class CreatorState:
     pair: TokenPair
     fingerprint: str
     fallback_expiration: dt.datetime | None
-
-
-@dataclass(frozen=True, slots=True)
-class RefreshSummary:
-    """Per-run tallies from the user-token sweep: successful refreshes, deliberate disconnects
-    (``invalid_grant`` business events), and genuine refresh faults (API/unexpected errors)."""
-
-    refreshed: int
-    revoked: int
-    faults: int
 
 
 def seed_fingerprint(config: PatreonConfig) -> str:
@@ -328,62 +303,6 @@ async def sync_subscription_level(
         return LevelSyncOutcome.DOWNGRADED
 
 
-@db.with_session
-async def load_subscription_pair(session: AsyncSession, subscription_id: int) -> TokenPair | None:
-    """Read a live subscription's token pair for an out-of-transaction refresh, or ``None`` if gone."""
-    subscription = (
-        await session.exec(select(PremiumSubscription).where(PremiumSubscription.id == subscription_id))
-    ).first()
-    if subscription is None or subscription.revoked_time is not None:
-        return None
-    return TokenPair(
-        access_token=subscription.access_token,
-        refresh_token=subscription.refresh_token,
-        expires_at=subscription.token_expiration,
-    )
-
-
-async def refresh_user_token(
-    subscription_id: int, client: TokenRefresher, api: TelegramApiWrapper
-) -> tuple[int, dt.datetime] | UserTokenOutcome:
-    """Refresh one user token and persist it, or run the revoke-as-unlink flow on ``invalid_grant``.
-
-    Returns ``(user_id, new_expiration)`` for the caller to emit a TTL sample, ``UserTokenOutcome.REVOKED``
-    for a deliberate disconnect (excluded from the TTL series), or ``UserTokenOutcome.GONE`` when the row
-    vanished. The HTTP refresh runs outside the transaction so no DB connection is held across Patreon I/O."""
-    pair = await load_subscription_pair(subscription_id)
-    if pair is None:
-        return UserTokenOutcome.GONE
-
-    try:
-        new_pair = await client.refresh(pair)
-    except PatreonTokenRevoked:
-        new_pair = None
-
-    async with db.begin_write(api) as session:
-        subscription = (
-            await session.exec(LIVE_LINKED_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))
-        ).first()
-        if subscription is None:
-            return UserTokenOutcome.GONE
-        user = await load_user(session, subscription.user_id)
-
-        if new_pair is None:
-            subscription.revoked_time = dt.datetime.now(dt.UTC)
-            subscription.expiration_notified = True
-            subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
-            if user is not None:
-                await api.send_message_to_user(
-                    user, PremiumNotificationMessages.DISCONNECTED_RECONNECT.get(lang=user.lang)
-                )
-            return UserTokenOutcome.REVOKED
-
-        subscription.access_token = new_pair.access_token
-        subscription.refresh_token = new_pair.refresh_token
-        subscription.token_expiration = new_pair.expires_at
-        return subscription.user_id, new_pair.expires_at
-
-
 async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int], failures: list[str]) -> list[T]:
     """Run ``handler`` over each nominated id, isolating failures so one bad row cannot abort the run.
 
@@ -400,7 +319,7 @@ async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int],
 
 
 async def run(api: TelegramApiWrapper, metrics: MetricsClient):
-    """Validate supporter memberships against Patreon and keep both token families fresh.
+    """Validate supporter memberships against Patreon and keep the creator token fresh.
 
     No-ops cleanly when Patreon is unconfigured, so the bot can deploy before any credentials exist.
     Each subscription is handled in its own write lifecycle; a mid-run failure leaves earlier commits
@@ -420,9 +339,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
             return
         active_amounts = await active_patreon_amounts(client, creator_access_token)
 
-        # The level sync and the token refresh both sweep the whole live-linked population, so it is
-        # nominated once and drives both passes.
-        live_ids = await nominate(LIVE_LINKED_SUBSCRIPTIONS)
         due_outcomes = await process_all(
             lambda subscription_id: process_due_subscription(subscription_id, active_amounts, api),
             await nominate(DUE_SUBSCRIPTIONS),
@@ -430,10 +346,9 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         )
         sync_outcomes = await process_all(
             lambda subscription_id: sync_subscription_level(subscription_id, active_amounts, config, api),
-            live_ids,
+            await nominate(LIVE_LINKED_SUBSCRIPTIONS),
             failures,
         )
-        refresh = await refresh_user_tokens(client, api, metrics, failures, live_ids)
 
     grace_started = sum(1 for outcome in due_outcomes if outcome is DueOutcome.GRACE_STARTED)
     premium_lost = sum(1 for outcome in due_outcomes if outcome is DueOutcome.PREMIUM_LOST)
@@ -444,9 +359,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     metrics.emit(PREMIUM_LOST_METRIC, premium_lost, MetricUnit.COUNT)
     metrics.emit(UPGRADES_METRIC, upgraded, MetricUnit.COUNT)
     metrics.emit(DOWNGRADES_METRIC, downgraded, MetricUnit.COUNT)
-    metrics.emit(USER_TOKENS_REFRESHED_METRIC, refresh.refreshed, MetricUnit.COUNT)
-    metrics.emit(USER_TOKENS_REVOKED_METRIC, refresh.revoked, MetricUnit.COUNT)
-    metrics.emit(USER_TOKEN_REFRESH_FAULTS_METRIC, refresh.faults, MetricUnit.COUNT)
 
     if failures:
         raise RuntimeError(f"Premium check failed for {len(failures)} subscriptions. Check logs for details.")
@@ -458,42 +370,5 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         premium_lost=premium_lost,
         upgraded=upgraded,
         downgraded=downgraded,
-        tokens_refreshed=refresh.refreshed,
-        tokens_revoked=refresh.revoked,
         active_patrons=len(active_amounts),
     )
-
-
-async def refresh_user_tokens(
-    client: PatreonClient,
-    api: TelegramApiWrapper,
-    metrics: MetricsClient,
-    failures: list[str],
-    subscription_ids: list[int],
-) -> RefreshSummary:
-    """Refresh each live user token in ``subscription_ids``, emitting one dimensionless TTL sample per
-    surviving row.
-
-    Returns the run tallies (refreshed / revoked / faults). ``UserId`` rides as an EMF property (not a
-    dimension) so the ``Min`` over the single series is the fleet's worst token and Logs Insights can
-    name the user. A deliberate ``invalid_grant`` revocation is a business event, not a fault."""
-    refreshed = 0
-    revoked = 0
-    faults = 0
-    for subscription_id in subscription_ids:
-        try:
-            result = await refresh_user_token(subscription_id, client, api)
-        except Exception as error:
-            failures.append(f"subscription {subscription_id}: {error}")
-            faults += 1
-            log.exception("User token refresh failed", subscription=subscription_id, exc_info=error)
-            continue
-        if result is UserTokenOutcome.REVOKED:
-            revoked += 1
-        elif result is UserTokenOutcome.GONE:
-            continue
-        else:
-            user_id, expiration = result
-            metrics.emit(USER_TOKEN_TTL_METRIC, days_until(expiration), MetricUnit.NONE, properties={"UserId": user_id})
-            refreshed += 1
-    return RefreshSummary(refreshed=refreshed, revoked=revoked, faults=faults)
