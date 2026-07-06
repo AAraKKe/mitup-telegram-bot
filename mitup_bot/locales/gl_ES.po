@@ -859,6 +859,9 @@ msgstr "<b>Premium desbloqueado</b>\n\nGrazas por apoiar a Mitup. O teu apoio de
 msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
 msgstr "Notamos que desenlazaches a túa conta de Patreon. Se queres manter o teu estado premium, enlaza de novo dende Colabora no menú principal dentro dunha semana."
 
+msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>O teu premium está en período de graza</b>\n\nO teu apoio de Patreon rematou, e dános pena que marches. Os teus privilexios especiais seguirán activos durante ${days} días por se cambias de opinión. Para mantelos, apoia a Mitup de novo dende Colabora no menú principal."
+
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""

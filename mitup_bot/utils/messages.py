@@ -717,6 +717,14 @@ class PremiumNotificationMessages(MessageBase):
         "to switch off in a week. If your pledge is still active, there's nothing to do and it will "
         "renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
     )
+    # Webhook told us the user is no longer an active patron: perks stay on for a parameterized
+    # grace period (the daily job revokes only if they're still lapsed when it ends).
+    SUPPORT_ENDED_GRACE = (
+        "<b>Your premium is in a grace period</b>\n\n"
+        "Your Patreon support ended, and we're sad to see you go. Your premium perks stay on for "
+        "${days} days in case you change your mind. To keep them, back Mitup again from the "
+        "Collaborate menu."
+    )
     # Grace week elapsed without a confirmed pledge: perks are now off.
     PREMIUM_LOST = (
         "<b>Your premium has ended</b>\n\n"

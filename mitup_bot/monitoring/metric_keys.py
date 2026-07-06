@@ -87,6 +87,14 @@ class MetricKey(CamelCaseStrEnum):
     WEBHOOK_FORBIDDEN = auto()
     """Webhook received a payload that could not be parsed as a Telegram Update"""
     WEBHOOK_MALFORMED_UPDATE = auto()
+    """A membership delivery reached the Patreon webhook endpoint (before signature verification)"""
+    PATREON_WEBHOOK_RECEIVED = auto()
+    """A Patreon webhook delivery was rejected for a missing or invalid HMAC signature"""
+    PATREON_WEBHOOK_FORBIDDEN = auto()
+    """A verified Patreon webhook delivery changed a linked user's supporter level"""
+    PATREON_WEBHOOK_APPLIED = auto()
+    """Startup registration of the Patreon membership webhook failed (isolated; startup continues)"""
+    PATREON_WEBHOOK_REGISTRATION_FAILED = auto()
     """FastAPI/uvicorn lifespan failed during startup"""
     LIFESPAN_STARTUP_FAILED = auto()
     """FastAPI/uvicorn lifespan failed during shutdown"""

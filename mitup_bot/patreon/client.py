@@ -32,8 +32,13 @@ from mitup_bot.patreon.models import (
 TOKEN_URL = "https://www.patreon.com/api/oauth2/token"
 API_BASE_URL = "https://www.patreon.com/api/oauth2/v2"
 # The member lifecycle events we subscribe our webhook to; a create/update/delete on a membership is
-# exactly what drives supporter-tier reconciliation, replacing the daily creator-token poll.
-MEMBER_WEBHOOK_TRIGGERS: tuple[str, ...] = ("members:create", "members:update", "members:delete")
+# exactly what drives supporter-tier reconciliation, replacing the daily creator-token poll. The
+# individual trigger strings are named so the webhook endpoint can branch on the delivered event
+# (``X-Patreon-Event``) — a delete cancels the tier — without re-hardcoding the string.
+MEMBER_CREATE_TRIGGER = "members:create"
+MEMBER_UPDATE_TRIGGER = "members:update"
+MEMBER_DELETE_TRIGGER = "members:delete"
+MEMBER_WEBHOOK_TRIGGERS: tuple[str, ...] = (MEMBER_CREATE_TRIGGER, MEMBER_UPDATE_TRIGGER, MEMBER_DELETE_TRIGGER)
 # The webhook fields Patreon omits unless explicitly requested — notably ``secret``, without which a
 # read-back webhook could not be used to verify delivery signatures.
 WEBHOOK_FIELDS = "triggers,uri,paused,secret,last_attempted_at,num_consecutive_times_failed"

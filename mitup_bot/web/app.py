@@ -9,6 +9,7 @@ from telegram.ext import Application
 from mitup_bot.config import RunModes
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.patreon import webhooks as patreon_webhooks
 from mitup_bot.web import patreon, telegram
 
 log = structlog.get_logger(__name__)
@@ -31,6 +32,7 @@ def build_webhook_lifespan(
     metrics_client: MetricsClient,
     webhook_url: str | None,
     max_connections: int | None,
+    patreon_webhook_url: str | None,
 ) -> Lifespan:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -46,6 +48,13 @@ def build_webhook_lifespan(
             metrics_client.emit(MetricKey.LIFESPAN_STARTUP_FAILED)
             log.exception("Lifespan startup failed in webhook mode")
             raise
+
+        # Register the Patreon membership webhook after Telegram's. Unlike set_webhook this is fully
+        # failure-isolated (register_membership_webhook swallows its own errors): Patreon is optional
+        # and the daily job is the backstop, so a registration failure must not abort startup. Only
+        # set when Patreon is configured and a public domain exists (built in app.py).
+        if patreon_webhook_url is not None:
+            await patreon_webhooks.register_membership_webhook(patreon_webhook_url, metrics_client)
 
         try:
             yield
@@ -91,6 +100,7 @@ def create_app(
     run_mode: RunModes,
     webhook_url: str | None = None,
     max_connections: int | None = None,
+    patreon_webhook_url: str | None = None,
 ) -> FastAPI:
     """Build the FastAPI application that hosts the PTB webhook and side routes.
 
@@ -100,7 +110,9 @@ def create_app(
     """
     match run_mode:
         case RunModes.WEBHOOK:
-            lifespan = build_webhook_lifespan(ptb_app, secret_token, metrics_client, webhook_url, max_connections)
+            lifespan = build_webhook_lifespan(
+                ptb_app, secret_token, metrics_client, webhook_url, max_connections, patreon_webhook_url
+            )
         case RunModes.POLLING:
             lifespan = build_polling_lifespan(ptb_app, metrics_client)
         case _ as unreachable:

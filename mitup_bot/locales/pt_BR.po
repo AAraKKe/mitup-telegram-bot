@@ -946,3 +946,6 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} falhados, ${skipped} ign
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas foram interrompidas por uma falha no worker e seu resultado é desconhecido. Elas não serão tentadas novamente."
+
+msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Seu premium está em período de carência</b>\n\nSeu apoio no Patreon terminou, e ficamos tristes em ver você partir. Seus benefícios premium continuam ativos por mais ${days} dias, caso você mude de ideia. Para mantê-los, apoie o Mitup novamente no menu Colabore."

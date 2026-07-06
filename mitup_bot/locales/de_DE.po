@@ -946,3 +946,6 @@ msgstr "<b>${language}</b>: ${sent} versendet, ${failed} fehlgeschlagen, ${skipp
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> Zustellungen wurden durch einen Worker-Absturz unterbrochen und das Ergebnis ist unbekannt. Sie werden nicht erneut versucht."
+
+msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Dein Premium ist in einer Kulanzfrist</b>\n\nDein Patreon-Beitrag ist beendet, und es tut uns leid, dass du gehst. Deine Premium-Vorteile bleiben noch ${days} Tage aktiv, falls du es dir anders überlegst. Um sie zu behalten, unterstütze Mitup erneut im Mithelfen-Menü."

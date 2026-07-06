@@ -13,6 +13,7 @@ from mitup_bot.logging_config import configure_logging
 from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.patreon import webhooks as patreon_webhooks
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from mitup_bot.web import create_app
 
@@ -117,6 +118,15 @@ class MitupRuntime:
         if self.config.bot.secret_token is None:
             raise ValueError("Secret token must be set when running with webhook")
 
+        # In webhook mode a public domain is guaranteed, so the Patreon membership webhook can be
+        # registered too — gated on Patreon being configured. Startup itself stays isolated from any
+        # registration failure (handled inside the lifespan); here we only decide whether to attempt it.
+        patreon_webhook_url = (
+            patreon_webhooks.webhook_uri(self.config.bot.domain, self.config.bot.port)
+            if patreon.is_configured()
+            else None
+        )
+
         return create_app(
             self.app,
             secret_token=self.config.bot.secret_token.get_secret_value(),
@@ -124,6 +134,7 @@ class MitupRuntime:
             run_mode=RunModes.WEBHOOK,
             webhook_url=f"https://{self.config.bot.domain}:{self.config.bot.port}/telegram",
             max_connections=self.config.bot.max_connections,
+            patreon_webhook_url=patreon_webhook_url,
         )
 
     def run(self):

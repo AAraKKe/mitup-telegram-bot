@@ -16,6 +16,8 @@ trace a support question back to its cause.
 """
 
 import datetime as dt
+import hashlib
+import hmac
 import uuid
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -24,21 +26,25 @@ from string import Template
 from typing import Annotated, assert_never
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import Application
 
 from mitup_bot import db, patreon, supporter
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
+from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
 from mitup_bot.models import PremiumSubscription, User
 from mitup_bot.monitoring.client import MetricsClient
-from mitup_bot.patreon import PatreonClient, oauth
+from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.patreon import PatreonClient, oauth, webhooks
+from mitup_bot.patreon.client import MEMBER_DELETE_TRIGGER
+from mitup_bot.patreon.models import MemberResource, WebhookMemberPayload
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import CollaborateMessages
+from mitup_bot.utils.messages import CollaborateMessages, PremiumNotificationMessages
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
 
 log = structlog.get_logger(__name__)
@@ -528,3 +534,192 @@ def result_page_for(outcome: LinkOutcome, bot_username: str | None) -> HTMLRespo
             )
         case _ as unreachable:
             assert_never(unreachable)
+
+
+PATREON_SIGNATURE_HEADER = "X-Patreon-Signature"
+PATREON_EVENT_HEADER = "X-Patreon-Event"
+WEBHOOK_FLOW = "patreon_membership_webhook"
+
+
+class WebhookApplied(Enum):
+    """What a verified membership event changed, so the endpoint meters and notifies consistently."""
+
+    UPGRADED = auto()
+    DOWNGRADED = auto()
+    GRACE_STARTED = auto()
+    UNCHANGED = auto()
+
+
+def verify_signature(secret: str | None, raw_body: bytes, signature: str | None) -> bool:
+    """Constant-time check of Patreon's ``X-Patreon-Signature`` (HMAC-MD5 of the exact raw body bytes).
+
+    A missing secret (no webhook registered yet) or a missing header fails closed. MD5 is not our
+    choice — it is the algorithm Patreon signs deliveries with — so this is not a security downgrade.
+    """
+    if secret is None or signature is None:
+        return False
+    expected = hmac.new(secret.encode(), raw_body, hashlib.md5).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def target_level(trigger: str | None, member: MemberResource, config: PatreonConfig) -> SupporterLevel:
+    """The tier a membership event maps to: NONE for a delete or any non-active member (a loss, which
+    starts cancellation grace — see ``apply_membership_transition``), otherwise the tier their entitled
+    amount reaches via the central policy (never an inline compare)."""
+    if trigger == MEMBER_DELETE_TRIGGER or not member.is_active_patron:
+        return SupporterLevel.NONE
+    return supporter.level_for_amount(member.attributes.currently_entitled_amount_cents, config)
+
+
+def apply_membership_transition(
+    user: User, subscription: PremiumSubscription, target: SupporterLevel
+) -> WebhookApplied:
+    """Apply ``target`` to the user and reconcile the subscription runway. Returns what changed.
+
+    A gain (``target`` is a paying tier) applies instantly, mirroring the daily ``sync_subscription_level``:
+    on a level change it refreshes the grace runway; an event landing on the level the user already holds
+    changes nothing. A loss (``target`` is NONE — a decline, former patron, or delete) does NOT cut perks
+    off; instead it keeps the user's current level and opens a cancellation grace window, marking the row
+    already-notified so the daily job goes straight to revoke when the window elapses (no duplicate grace
+    message). A loss for a user who already has nothing to lose is a no-op."""
+    previous = user.supporter_level
+    if supporter.is_supporter(target):
+        # Gain or between-tier change: apply the entitled tier instantly.
+        if previous == target:
+            return WebhookApplied.UNCHANGED
+        user.supporter_level = target
+        subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
+        subscription.expiration_notified = False
+        if supporter.meets(previous, target):
+            # A drop to a lower paying tier: adjust silently (per-tier copy is a later phase), matching
+            # the daily sync's silent downgrade.
+            return WebhookApplied.DOWNGRADED
+        return WebhookApplied.UPGRADED
+
+    # target is NONE: membership loss. Give our own grace rather than cutting perks now.
+    if not supporter.is_supporter(previous):
+        # Nothing to lose — the user is already at NONE.
+        return WebhookApplied.UNCHANGED
+    # Keep the current level (perks stay on) and let the daily job revoke when the window elapses.
+    # Reuse the same one-week grace the callback and daily job use; expiration_notified=True so the
+    # daily due-flow revokes straight away rather than re-announcing grace.
+    subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
+    subscription.expiration_notified = True
+    return WebhookApplied.GRACE_STARTED
+
+
+async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome: WebhookApplied):
+    """Send the DM matching the transition; silent for a no-op or a between-tier downgrade (which the
+    daily sync also applies silently)."""
+    match outcome:
+        case WebhookApplied.UPGRADED:
+            await api.send_message_to_user(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+        case WebhookApplied.GRACE_STARTED:
+            # The catalog copy phrases the window in days (``${days}``), fed from PREMIUM_GRACE_DAYS so
+            # the number in the message can never drift from the expiry math above.
+            await api.send_message_to_user(
+                user,
+                PremiumNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=PREMIUM_GRACE_DAYS),
+            )
+        case WebhookApplied.DOWNGRADED | WebhookApplied.UNCHANGED:
+            ...
+
+
+async def apply_membership_event(
+    api: TelegramApiWrapper, trigger: str | None, payload: WebhookMemberPayload
+) -> WebhookApplied:
+    """Resolve the linked user by ``patreon_user_id`` and apply the event's target level, sending the
+    matching notification. An event for a patron we don't track (no linked subscription) is a benign
+    no-op — we return 200 so Patreon does not retry a delivery there is nothing to do about."""
+    member = payload.data
+    patreon_user_id = member.patreon_user_id
+    if patreon_user_id is None:
+        log.info("Patreon webhook member without a user relationship", stage="resolve", trigger=trigger)
+        return WebhookApplied.UNCHANGED
+
+    config = patreon.current_config()
+    level = target_level(trigger, member, config)
+
+    async with db.begin_write(api) as session:
+        subscription = (
+            await session.exec(
+                select(PremiumSubscription).where(PremiumSubscription.patreon_user_id == patreon_user_id)
+            )
+        ).first()
+        if subscription is None:
+            log.info(
+                "Patreon webhook for an untracked patron",
+                stage="resolve",
+                trigger=trigger,
+                patreon_user_id=patreon_user_id,
+            )
+            return WebhookApplied.UNCHANGED
+        user = (await session.exec(select(User).where(User.id == subscription.user_id))).first()
+        if user is None:
+            log.warning(
+                "Patreon webhook subscription without a user",
+                stage="resolve",
+                trigger=trigger,
+                patreon_user_id=patreon_user_id,
+                user_id=subscription.user_id,
+            )
+            return WebhookApplied.UNCHANGED
+
+        outcome = apply_membership_transition(user, subscription, level)
+        await notify_membership_change(api, user, outcome)
+        log.info(
+            "Patreon webhook applied",
+            stage="apply",
+            trigger=trigger,
+            patreon_user_id=patreon_user_id,
+            tg_user_id=user.tg_user_id,
+            # The event's target tier and the user's actual level after applying it — these differ on a
+            # loss, where we keep the level and open a grace window instead of dropping to the target.
+            target_level=level.value,
+            supporter_level=user.supporter_level.value,
+            outcome=outcome.name.lower(),
+        )
+        return outcome
+
+
+@router.post("/patreon/webhook")
+async def patreon_webhook(
+    request: Request,
+    ptb_app: Annotated[Application, Depends(get_ptb_application)],
+    metrics_client: Annotated[MetricsClient, Depends(get_metrics_client)],
+) -> Response:
+    """Verify a Patreon membership delivery and apply it to the linked user.
+
+    Status-code contract: **403** on a missing/invalid signature (no write), **400** on an unparseable
+    body, **200** on a successful apply or a benign no-op (unknown patron). Our own processing failures
+    are deliberately *not* caught, so a DB/transient error surfaces as **500** and Patreon's retry queue
+    redelivers. The signature is checked against the exact raw bytes, before any JSON re-parse.
+    """
+    with structlog.contextvars.bound_contextvars(flow=WEBHOOK_FLOW, request_id=uuid.uuid4().hex[:8]):
+        metrics_client.emit(MetricKey.PATREON_WEBHOOK_RECEIVED)
+        raw_body = await request.body()
+        trigger = request.headers.get(PATREON_EVENT_HEADER)
+
+        secret = await webhooks.load_webhook_secret()
+        if not verify_signature(secret, raw_body, request.headers.get(PATREON_SIGNATURE_HEADER)):
+            metrics_client.emit(MetricKey.PATREON_WEBHOOK_FORBIDDEN)
+            client_host = request.client.host if request.client is not None else "unknown"
+            log.warning(
+                "Rejected Patreon webhook, invalid or missing signature",
+                stage="verify",
+                trigger=trigger,
+                client_host=client_host,
+            )
+            raise HTTPException(status_code=403)
+
+        try:
+            payload = WebhookMemberPayload.model_validate_json(raw_body)
+        except ValidationError:
+            log.warning("Malformed Patreon webhook payload", stage="parse", trigger=trigger)
+            return Response(status_code=400)
+
+        api = build_api(BotAdapter(ptb_app.bot, metrics_client))
+        outcome = await apply_membership_event(api, trigger, payload)
+        if outcome is not WebhookApplied.UNCHANGED:
+            metrics_client.emit(MetricKey.PATREON_WEBHOOK_APPLIED)
+        return Response(status_code=200)

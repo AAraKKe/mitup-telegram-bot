@@ -47,12 +47,14 @@ def build_test_web_app(
     run_mode: RunModes = RunModes.WEBHOOK,
     webhook_url: str | None = "https://example.com/telegram",
     max_connections: int | None = 100,
+    patreon_webhook_url: str | None = None,
 ) -> FastAPI:
     """Build a FastAPI app via the real factory with safe defaults.
 
     Tests that don't care about a specific argument can rely on the defaults;
     tests that exercise lifespan or argument forwarding should pass their own
-    mocks so they can introspect them.
+    mocks so they can introspect them. ``patreon_webhook_url`` defaults to None,
+    so the Patreon webhook registration is skipped unless a test opts in.
     """
     if ptb_app is None:
         ptb_app = build_ptb_app_mock()
@@ -66,6 +68,7 @@ def build_test_web_app(
         run_mode=run_mode,
         webhook_url=webhook_url,
         max_connections=max_connections,
+        patreon_webhook_url=patreon_webhook_url,
     )
 
 

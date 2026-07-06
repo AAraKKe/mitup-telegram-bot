@@ -160,3 +160,14 @@ class WebhookResponse(BaseModel):
     """The single-resource ``POST``/``PATCH /webhooks`` reply carrying the created/updated webhook."""
 
     data: WebhookResource
+
+
+class WebhookMemberPayload(BaseModel):
+    """The body Patreon POSTs to a ``members:*`` webhook: a single ``member`` resource in ``data``.
+
+    We register the webhook with ``include=user&fields[member]=patron_status,currently_entitled_amount_cents``,
+    so the reused :class:`MemberResource` resolves ``patreon_user_id`` from the ``user`` relationship and
+    ``is_active_patron`` from the entitled amount exactly as in the daily campaign sweep. The signature is
+    verified against the raw request bytes before this is parsed."""
+
+    data: MemberResource

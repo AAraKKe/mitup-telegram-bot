@@ -118,6 +118,56 @@ async def test_webhook_lifespan_shutdown_order_stop_shutdown(metrics_client: Met
     assert calls[3:] == ["stop", "shutdown"]
 
 
+async def test_webhook_lifespan_registers_patreon_webhook_after_set_webhook(
+    metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    from mitup_bot.web import app as web_app_module
+
+    register_mock = AsyncMock()
+    monkeypatch.setattr(web_app_module.patreon_webhooks, "register_membership_webhook", register_mock)
+
+    ptb_app, _parent = build_tracked_ptb_app()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=metrics_client,
+        run_mode=RunModes.WEBHOOK,
+        webhook_url=WEBHOOK_URL,
+        max_connections=MAX_CONNECTIONS,
+        patreon_webhook_url="https://example.com:443/patreon/webhook?include=user",
+    )
+
+    async with lifespan_runner(web_app):
+        ...
+
+    register_mock.assert_awaited_once_with("https://example.com:443/patreon/webhook?include=user", metrics_client)
+
+
+async def test_webhook_lifespan_skips_patreon_registration_when_url_absent(
+    metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    from mitup_bot.web import app as web_app_module
+
+    register_mock = AsyncMock()
+    monkeypatch.setattr(web_app_module.patreon_webhooks, "register_membership_webhook", register_mock)
+
+    ptb_app, _parent = build_tracked_ptb_app()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=metrics_client,
+        run_mode=RunModes.WEBHOOK,
+        webhook_url=WEBHOOK_URL,
+        max_connections=MAX_CONNECTIONS,
+        patreon_webhook_url=None,
+    )
+
+    async with lifespan_runner(web_app):
+        ...
+
+    register_mock.assert_not_awaited()
+
+
 # --- Polling lifespan ---
 
 
