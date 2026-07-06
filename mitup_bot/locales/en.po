@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-05 15:15\n"
+"PO-Revision-Date: 2026-07-05 22:46\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -706,6 +706,18 @@ msgstr "<b>Premium unlocked</b>\n\nYour Patreon account is linked and your premi
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a patron to unlock premium perks. They'll switch on automatically once your pledge is active."
+
+msgid "PremiumNotificationMessages.GRACE_STARTED"
+msgstr "<b>Your premium is in a grace period</b>\n\nWe couldn't confirm an active Patreon pledge on your account, so your premium perks are set to switch off in a week. If your pledge is still active, there's nothing to do and it will renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
+
+msgid "PremiumNotificationMessages.PREMIUM_LOST"
+msgstr "<b>Your premium has ended</b>\n\nWe still couldn't confirm an active Patreon pledge, so your premium perks are now off. Become a patron again from the Collaborate menu to turn them back on."
+
+msgid "PremiumNotificationMessages.UPGRADED"
+msgstr "<b>Premium unlocked</b>\n\nThanks for backing Mitup. Your Patreon pledge is active, so your premium perks are now on."
+
+msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
+msgstr "We noticed you disconnected your Patreon account. If you want to keep your premium membership, reconnect from the Collaborate menu within a week."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

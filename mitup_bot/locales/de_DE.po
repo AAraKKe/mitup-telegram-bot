@@ -846,3 +846,15 @@ msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Unterstü
 
 msgid "PremiumMessages.PARTICIPANT_CAPACITY"
 msgstr "Kostenlose Treffen können bis zu ${cap} Teilnehmer aufnehmen. Setze ein niedrigeres Limit, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr Teilnehmer zu hosten."
+
+msgid "PremiumNotificationMessages.GRACE_STARTED"
+msgstr "<b>Dein Premium ist in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Premium-Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Ansonsten kannst du Mitup im Mithelfen-Menü erneut unterstützen."
+
+msgid "PremiumNotificationMessages.PREMIUM_LOST"
+msgstr "<b>Dein Premium ist beendet</b>\n\nWir konnten immer noch keinen aktiven Patreon-Beitrag bestätigen, daher sind deine Premium-Vorteile jetzt deaktiviert. Werde im Mithelfen-Menü erneut Unterstützer, um sie wieder zu aktivieren."
+
+msgid "PremiumNotificationMessages.UPGRADED"
+msgstr "<b>Premium freigeschaltet</b>\n\nDanke, dass du Mitup unterstützt. Dein Patreon-Beitrag ist aktiv, daher sind deine Premium-Vorteile jetzt aktiviert."
+
+msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
+msgstr "Wir haben bemerkt, dass du dein Patreon-Konto getrennt hast. Wenn du deine Premium-Mitgliedschaft behalten möchtest, verbinde es im Mithelfen-Menü innerhalb einer Woche erneut."

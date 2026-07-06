@@ -814,3 +814,15 @@ msgstr "<b>Account Patreon collegato</b>\n\nSei collegato. Diventa un mecenate p
 
 msgid "PremiumMessages.PARTICIPANT_CAPACITY"
 msgstr "Gli incontri gratuiti possono ospitare fino a ${cap} partecipanti. Imposta un limite inferiore, oppure tocca Collabora nel menu principale per supportare Mitup e ospitare altri."
+
+msgid "PremiumNotificationMessages.GRACE_STARTED"
+msgstr "<b>Il tuo premium è in un periodo di grazia</b>\n\nNon abbiamo potuto confermare un contributo Patreon attivo sul tuo account, quindi i tuoi vantaggi premium sono impostati per disattivarsi tra una settimana. Se il tuo contributo è ancora attivo, non c'è nulla da fare e si rinnoverà automaticamente. Altrimenti, puoi sostenere Mitup di nuovo dal menu Collabora."
+
+msgid "PremiumNotificationMessages.PREMIUM_LOST"
+msgstr "<b>Il tuo premium è finito</b>\n\nNon abbiamo ancora potuto confermare un contributo Patreon attivo, quindi i tuoi vantaggi premium sono ora disattivati. Diventa di nuovo un mecenate dal menu Collabora per riattivarli."
+
+msgid "PremiumNotificationMessages.UPGRADED"
+msgstr "<b>Premium sbloccato</b>\n\nGrazie per aver sostenuto Mitup. Il tuo contributo Patreon è attivo, quindi i tuoi vantaggi premium sono ora attivi."
+
+msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
+msgstr "Abbiamo notato che hai scollegato il tuo account Patreon. Se vuoi mantenere l'iscrizione premium, ricollegati dal menu Collabora entro una settimana."

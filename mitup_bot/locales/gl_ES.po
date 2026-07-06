@@ -846,3 +846,15 @@ msgstr "<b>Conta Patreon enlazada</b>\n\nEstás conectado. Podes ser patrón par
 
 msgid "PremiumMessages.PARTICIPANT_CAPACITY"
 msgstr "Por agora podes acoller ata ${cap} participantes nas quedadas gratuitas. Establece un límite máis baixo, ou toca Colabora no menú principal para apoiar a Mitup e acoller máis."
+
+msgid "PremiumNotificationMessages.GRACE_STARTED"
+msgstr "<b>O teu premium está en período de graza</b>\n\nNon puidemos confirmar un apoio activo de Patreon na túa conta, polo que os teus privilexios especiais están configurados para desactivarse nunha semana. Se o teu apoio aínda está activo, non tes que facer nada e renovarase automaticamente. Se non, podes apoiar a Mitup de novo dende Colabora no menú principal."
+
+msgid "PremiumNotificationMessages.PREMIUM_LOST"
+msgstr "<b>O teu premium rematou</b>\n\nAínda non puidemos confirmar un apoio activo de Patreon, polo que os teus privilexios especiais están desactivados agora. Apoia a Mitup de novo dende Colabora no menú principal para activalos."
+
+msgid "PremiumNotificationMessages.UPGRADED"
+msgstr "<b>Premium desbloqueado</b>\n\nGrazas por apoiar a Mitup. O teu apoio de Patreon está activo, polo que os teus privilexios especiais están activados agora."
+
+msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
+msgstr "Notamos que desenlazaches a túa conta de Patreon. Se queres manter o teu estado premium, enlaza de novo dende Colabora no menú principal dentro dunha semana."

@@ -704,6 +704,37 @@ class CollaborateMessages(MessageBase):
     )
 
 
+class PremiumNotificationMessages(MessageBase):
+    """Direct messages sent by the daily premium-validation job when a supporter's status changes.
+
+    Full messages (not callback-query alerts), so inline `<b>` tags are allowed. Each mirrors a
+    transition in the grace/upgrade/revoke flow the job drives against Patreon."""
+
+    # Premium expired while we could not confirm an active pledge: perks stay on for one grace week.
+    GRACE_STARTED = (
+        "<b>Your premium is in a grace period</b>\n\n"
+        "We couldn't confirm an active Patreon pledge on your account, so your premium perks are set "
+        "to switch off in a week. If your pledge is still active, there's nothing to do and it will "
+        "renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
+    )
+    # Grace week elapsed without a confirmed pledge: perks are now off.
+    PREMIUM_LOST = (
+        "<b>Your premium has ended</b>\n\n"
+        "We still couldn't confirm an active Patreon pledge, so your premium perks are now off. "
+        "Become a patron again from the Collaborate menu to turn them back on."
+    )
+    # A linked account became an active patron: perks turned on without any action from the user.
+    UPGRADED = (
+        "<b>Premium unlocked</b>\n\n"
+        "Thanks for backing Mitup. Your Patreon pledge is active, so your premium perks are now on."
+    )
+    # A user token refresh failed with invalid_grant: the user disconnected the app on Patreon's side.
+    DISCONNECTED_RECONNECT = (
+        "We noticed you disconnected your Patreon account. If you want to keep your premium "
+        "membership, reconnect from the Collaborate menu within a week."
+    )
+
+
 class Weekday(MessageBase):
     MONDAY = "Mon"
     TUESDAY = "Tue"

@@ -843,3 +843,15 @@ msgstr "La hora de finalización debe ser posterior a la hora de inicio."
 
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "La hora de finalización debe ser en el futuro."
+
+msgid "PremiumNotificationMessages.GRACE_STARTED"
+msgstr "<b>Tu premium está en periodo de gracia</b>\n\nNo hemos podido confirmar una aportación activa de Patreon en tu cuenta, así que tus ventajas premium se desactivarán en una semana. Si tu aportación sigue activa, no tienes que hacer nada y se renovará automáticamente. Si no, puedes volver a apoyar a Mitup desde el menú Colabora."
+
+msgid "PremiumNotificationMessages.PREMIUM_LOST"
+msgstr "<b>Tu premium ha terminado</b>\n\nSeguimos sin poder confirmar una aportación activa de Patreon, así que tus ventajas premium están ahora desactivadas. Hazte mecenas de nuevo desde el menú Colabora para volver a activarlas."
+
+msgid "PremiumNotificationMessages.UPGRADED"
+msgstr "<b>Premium desbloqueado</b>\n\nGracias por apoyar a Mitup. Tu aportación de Patreon está activa, así que tus ventajas premium ya están activadas."
+
+msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
+msgstr "Hemos detectado que has desconectado tu cuenta de Patreon. Si quieres mantener tu membresía premium, vuelve a conectarla desde el menú Colabora en el plazo de una semana."

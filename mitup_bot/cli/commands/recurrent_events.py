@@ -10,7 +10,7 @@ import click
 import structlog
 from telegram.ext import AIORateLimiter, ExtBot
 
-from mitup_bot import db
+from mitup_bot import db, patreon
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.cli import (
     generate_stats,
@@ -18,10 +18,12 @@ from mitup_bot.cli import (
     meetups_cleanup,
     notify_meetings,
     notify_meetings_started,
+    premium_check,
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.logging_config import configure_logging
+from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, configure_emf_backend
 
 log = structlog.get_logger(__name__)
@@ -32,6 +34,7 @@ DEFAULT_NOTIFY_MEETINGS_START = 60
 DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
 DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
 DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL = 60
+DEFAULT_PREMIUM_CHECK_INTERVAL = 86400  # 24 hours
 
 
 class EventType(Enum):
@@ -41,6 +44,7 @@ class EventType(Enum):
     NOTIFY_MEETING_STARTED = "NotifyMeetingStarted"
     DEACTIVATE_MEETINGS = "DeactivateMeetings"
     MEETUPS_CLEANUP = "MeetupsCleanup"
+    PREMIUM_CHECK = "PremiumCheck"
 
 
 @dataclass
@@ -51,6 +55,7 @@ class IntervalsConfiguration:
     generate_stats: int
     deactivate_meetings: int
     meetups_cleanup: int
+    premium_check: int
 
     def get(self, event_type: EventType) -> int:
         match event_type:
@@ -66,8 +71,22 @@ class IntervalsConfiguration:
                 return self.deactivate_meetings
             case EventType.MEETUPS_CLEANUP:
                 return self.meetups_cleanup
+            case EventType.PREMIUM_CHECK:
+                return self.premium_check
             case never:  # pragma: no cover
                 assert_never(never)  # pragma: no cover
+
+
+def configure_patreon(config: Config):
+    """Wire the token cipher and Patreon runtime for the events process when a section is present.
+
+    Mirrors ``MitupRuntime.__setup_patreon`` so the PREMIUM_CHECK job can decrypt/encrypt tokens and
+    read the live config; a no-op otherwise, keeping the process bootable without Patreon."""
+    if config.patreon is None:
+        log.info("Patreon section absent, skipping Patreon setup")
+        return
+    configure_token_encryption(config.patreon.encryption_key.get_secret_value())
+    patreon.configure(config.patreon)
 
 
 def build_bot(config: BotConfig) -> ExtBot:
@@ -91,6 +110,8 @@ async def dispatch_event(event_type: EventType, api: TelegramApiWrapper, client:
             await inactive_meetings.run(api, client)
         case EventType.MEETUPS_CLEANUP:
             await meetups_cleanup.run(api, client)
+        case EventType.PREMIUM_CHECK:
+            await premium_check.run(api, client)
         case never:  # pragma: no cover
             assert_never(never)  # pragma: no cover
 
@@ -189,6 +210,12 @@ async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, start_ti
     show_default=True,
 )
 @click.option(
+    "--premium-check-interval",
+    default=DEFAULT_PREMIUM_CHECK_INTERVAL,
+    help="Interval in seconds to validate premium memberships against Patreon",
+    show_default=True,
+)
+@click.option(
     "--env",
     default=Env.DEV,
     type=click.Choice(Env, case_sensitive=False),
@@ -208,6 +235,7 @@ def cli(
     deactivate_meetings_interval: int,
     meetups_cleanup_interval: int,
     notify_meeting_started_interval: int,
+    premium_check_interval: int,
     env: Env,
     start_time: float,
 ):
@@ -221,6 +249,7 @@ def cli(
     db.configure_db(config.db, metrics_client=pool_metrics_client)
     configure_logging(env, config.app.log_level)
     configure_emf_backend(config.metrics)
+    configure_patreon(config)
 
     bot = build_bot(config.bot)
 
@@ -231,5 +260,6 @@ def cli(
         generate_stats=generate_stats_interval,
         deactivate_meetings=deactivate_meetings_interval,
         meetups_cleanup=meetups_cleanup_interval,
+        premium_check=premium_check_interval,
     )
     asyncio.run(run_all_tasks(intervals, bot, start_time))

@@ -846,3 +846,15 @@ msgstr "<b>Conta Patreon conectada</b>\n\nVocê está conectado. Torne-se um pat
 
 msgid "PremiumMessages.PARTICIPANT_CAPACITY"
 msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Defina um limite mais baixo, ou toque em Colabore no menu principal para apoiar o Mitup e hospedar mais."
+
+msgid "PremiumNotificationMessages.GRACE_STARTED"
+msgstr "<b>Seu premium está em período de carência</b>\n\nNão conseguimos confirmar um apoio ativo no Patreon em sua conta, portanto seus benefícios premium serão desativados em uma semana. Se seu apoio ainda estiver ativo, não há nada a fazer e ele será renovado automaticamente. Caso contrário, você pode apoiar novamente o Mitup no menu Colabore."
+
+msgid "PremiumNotificationMessages.PREMIUM_LOST"
+msgstr "<b>Seu premium terminou</b>\n\nAinda não conseguimos confirmar um apoio ativo no Patreon, então seus benefícios premium foram desativados. Torne-se um patrono novamente no menu Colabore para ativá-los."
+
+msgid "PremiumNotificationMessages.UPGRADED"
+msgstr "<b>Premium desbloqueado</b>\n\nObrigado por apoiar o Mitup. Seu apoio no Patreon está ativo, então seus benefícios premium estão ativos agora."
+
+msgid "PremiumNotificationMessages.DISCONNECTED_RECONNECT"
+msgstr "Notamos que você desconectou sua conta Patreon. Se você quer manter seu premium, reconecte no menu Colabore dentro de uma semana."

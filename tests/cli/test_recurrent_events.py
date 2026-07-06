@@ -1,5 +1,6 @@
 import json
 from asyncio import CancelledError
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,8 +24,10 @@ from mitup_bot.cli.commands.recurrent_events import (
     run_all_tasks,
     run_periodic,
 )
+from mitup_bot.models.premium import TokenCipher
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, NullBackend
-from tests.helpers import MockApi
+from mitup_bot.patreon.runtime import PatreonRuntime
+from tests.helpers import MockApi, create_patreon_config
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 INTERVAL_PARAMS = [
@@ -34,6 +37,7 @@ INTERVAL_PARAMS = [
     (EventType.GENERATE_STATS, "generate_stats"),
     (EventType.DEACTIVATE_MEETINGS, "deactivate_meetings"),
     (EventType.MEETUPS_CLEANUP, "meetups_cleanup"),
+    (EventType.PREMIUM_CHECK, "premium_check"),
 ]
 
 
@@ -50,6 +54,7 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
         generate_stats=30,
         deactivate_meetings=40,
         meetups_cleanup=50,
+        premium_check=60,
     )
     assert config.get(event_type) == getattr(config, field_name)
 
@@ -75,6 +80,7 @@ ASYNC_LAUNCH_PARAMS = [
     (EventType.NOTIFY_MEETING_STARTED, "mitup_bot.cli.commands.recurrent_events.notify_meetings_started"),
     (EventType.DEACTIVATE_MEETINGS, "mitup_bot.cli.commands.recurrent_events.inactive_meetings"),
     (EventType.MEETUPS_CLEANUP, "mitup_bot.cli.commands.recurrent_events.meetups_cleanup"),
+    (EventType.PREMIUM_CHECK, "mitup_bot.cli.commands.recurrent_events.premium_check"),
 ]
 
 SYNC_LAUNCH_PARAMS = [
@@ -431,6 +437,7 @@ async def test_run_all_tasks_creates_all_tasks():
         generate_stats=30,
         deactivate_meetings=40,
         meetups_cleanup=50,
+        premium_check=60,
     )
 
     created_tasks: list[EventType] = []
@@ -466,6 +473,7 @@ def test_cli_invokes_with_defaults():
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
+        mock_config.patreon = None
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
@@ -492,6 +500,7 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = True
+        mock_config.patreon = None
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
@@ -516,6 +525,7 @@ def test_cli_passes_custom_intervals():
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
     ):
         mock_config = MagicMock()
+        mock_config.patreon = None
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(
@@ -531,6 +541,8 @@ def test_cli_passes_custom_intervals():
                 "444",
                 "--meetups-cleanup-interval",
                 "555",
+                "--premium-check-interval",
+                "666",
                 "--start-time",
                 "1.5",
             ],
@@ -547,7 +559,47 @@ def test_cli_passes_custom_intervals():
         assert intervals_arg.generate_stats == 333
         assert intervals_arg.deactivate_meetings == 444
         assert intervals_arg.meetups_cleanup == 555
+        assert intervals_arg.premium_check == 666
         assert start_time_arg == 1.5
+
+
+@pytest.fixture
+def restore_patreon_state() -> Iterator[None]:
+    """Save/restore the process-wide Patreon seams that ``configure_patreon`` mutates."""
+    saved_config, saved_cipher = PatreonRuntime.config, TokenCipher.cipher
+    try:
+        yield
+    finally:
+        PatreonRuntime.config = saved_config
+        TokenCipher.cipher = saved_cipher
+
+
+def test_cli_configures_patreon_when_section_present(restore_patreon_state: None):
+    """A present [patreon] section installs the token cipher and the runtime config for the process.
+
+    Driven through the CLI (the no-section path is already exercised by the other cli tests, which
+    all set ``patreon = None``)."""
+    runner = CliRunner()
+    patreon_config = create_patreon_config()
+
+    with (
+        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.cli.commands.recurrent_events.db"),
+        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
+        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
+    ):
+        mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = False
+        mock_config.patreon = patreon_config
+        mock_config_cls.return_value = mock_config
+
+        result = runner.invoke(cli, [])
+
+    assert result.exit_code == 0, result.output
+    assert PatreonRuntime.config is patreon_config
+    assert TokenCipher.cipher is not None
 
 
 def test_cli_env_option():
@@ -562,6 +614,7 @@ def test_cli_env_option():
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
     ):
         mock_config = MagicMock()
+        mock_config.patreon = None
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, ["--env", "prod"])
