@@ -8,6 +8,7 @@ from freezegun import freeze_time
 
 from mitup_bot.exceptions import PatreonApiError, PatreonTokenRevoked
 from mitup_bot.patreon import PatreonClient, TokenPair
+from mitup_bot.patreon.client import MEMBER_WEBHOOK_TRIGGERS
 from tests.helpers import create_patreon_config
 
 CAMPAIGN_ID = "12345"
@@ -215,3 +216,115 @@ async def test_get_maps_non_200_to_api_error():
     async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(PatreonApiError):
             await client.fetch_identity("bad-token")
+
+
+def webhook_payload(webhook_id: str, *, uri: str, secret: str, triggers: list[str]) -> dict:
+    return {
+        "type": "webhook",
+        "id": webhook_id,
+        "attributes": {
+            "triggers": triggers,
+            "uri": uri,
+            "paused": False,
+            "secret": secret,
+            "last_attempted_at": None,
+            "num_consecutive_times_failed": 0,
+        },
+    }
+
+
+async def test_list_webhooks_returns_webhooks_including_secret():
+    triggers = list(MEMBER_WEBHOOK_TRIGGERS)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/oauth2/v2/webhooks"
+        assert request.headers["Authorization"] == "Bearer creator-access"
+        # The secret only comes back when requested via fields[webhook], so the client must ask for it.
+        assert "secret" in request.url.params["fields[webhook]"]
+        return httpx.Response(
+            200,
+            json={
+                "data": [webhook_payload("wh-1", uri="https://bot.example/hook", secret="sh-secret", triggers=triggers)]
+            },
+        )
+
+    config = create_patreon_config()
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        webhooks = await client.list_webhooks("creator-access")
+
+    assert [webhook.id for webhook in webhooks] == ["wh-1"]
+    assert webhooks[0].secret == "sh-secret"
+    assert webhooks[0].attributes.triggers == triggers
+
+
+async def test_create_webhook_sends_jsonapi_body_and_returns_secret():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/api/oauth2/v2/webhooks"
+        assert request.headers["Authorization"] == "Bearer creator-access"
+        body = json.loads(request.content.decode())
+        assert body == {
+            "data": {
+                "type": "webhook",
+                "attributes": {
+                    "triggers": list(MEMBER_WEBHOOK_TRIGGERS),
+                    "uri": "https://bot.example/hook",
+                },
+                "relationships": {"campaign": {"data": {"type": "campaign", "id": CAMPAIGN_ID}}},
+            }
+        }
+        return httpx.Response(
+            201,
+            json={
+                "data": webhook_payload(
+                    "wh-new",
+                    uri="https://bot.example/hook",
+                    secret="fresh-secret",
+                    triggers=list(MEMBER_WEBHOOK_TRIGGERS),
+                )
+            },
+        )
+
+    config = create_patreon_config(campaign_id=CAMPAIGN_ID)
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        webhook = await client.create_webhook(
+            "creator-access", uri="https://bot.example/hook", triggers=MEMBER_WEBHOOK_TRIGGERS
+        )
+
+    assert webhook.id == "wh-new"
+    assert webhook.secret == "fresh-secret"
+
+
+async def test_update_webhook_patches_only_given_fields():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "PATCH"
+        assert request.url.path == "/api/oauth2/v2/webhooks/wh-1"
+        body = json.loads(request.content.decode())
+        # Only ``paused`` was supplied, so uri/triggers must be absent from the attributes.
+        assert body == {"data": {"type": "webhook", "id": "wh-1", "attributes": {"paused": True}}}
+        return httpx.Response(
+            200,
+            json={
+                "data": webhook_payload(
+                    "wh-1", uri="https://bot.example/hook", secret="s", triggers=list(MEMBER_WEBHOOK_TRIGGERS)
+                )
+            },
+        )
+
+    config = create_patreon_config()
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        webhook = await client.update_webhook("creator-access", "wh-1", paused=True)
+
+    assert webhook.id == "wh-1"
+
+
+async def test_create_webhook_maps_non_2xx_to_api_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, text="forbidden")
+
+    config = create_patreon_config()
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(PatreonApiError):
+            await client.create_webhook(
+                "creator-access", uri="https://bot.example/hook", triggers=MEMBER_WEBHOOK_TRIGGERS
+            )

@@ -30,6 +30,12 @@ AUTHORIZE_URL = "https://www.patreon.com/oauth2/authorize"
 # viewer's membership to our own campaign). ``identity.memberships`` would only add the user's pledges
 # to *other* creators — which we never read — at the cost of a scarier consent screen, so we omit it.
 USER_SCOPES = "identity"
+# The scopes the *creator* (campaign-owner) token must carry to manage member webhooks:
+# ``w:campaigns.webhook`` authorizes the create/list/patch calls in the client, and ``identity``
+# lets the token resolve its own campaign. This token is seeded out-of-band via CI (it is never
+# minted through the user OAuth flow above), so nothing here consumes this constant — it is the
+# codified record of what that seeded token needs to be granted.
+CREATOR_SCOPES = "identity w:campaigns.webhook"
 # The state is a Fernet token frozen into the Collaborate-menu button at render time, so this TTL is
 # the clock from when the menu is drawn. A first-time Patreon login (email, 2FA, verification) routinely
 # runs past ten minutes, so an hour tolerates a realistic sitting. The cost is negligible: re-linking is

@@ -10,19 +10,33 @@ and it is also the shape persisted to / re-read from the DB and passed back into
 """
 
 import datetime as dt
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import Self
+from typing import Any, Self
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonTokenRevoked
-from mitup_bot.patreon.models import IdentityResponse, MemberResource, MembersResponse, TokenResponse
+from mitup_bot.patreon.models import (
+    IdentityResponse,
+    MemberResource,
+    MembersResponse,
+    TokenResponse,
+    WebhookResource,
+    WebhookResponse,
+    WebhooksResponse,
+)
 
 TOKEN_URL = "https://www.patreon.com/api/oauth2/token"
 API_BASE_URL = "https://www.patreon.com/api/oauth2/v2"
+# The member lifecycle events we subscribe our webhook to; a create/update/delete on a membership is
+# exactly what drives supporter-tier reconciliation, replacing the daily creator-token poll.
+MEMBER_WEBHOOK_TRIGGERS: tuple[str, ...] = ("members:create", "members:update", "members:delete")
+# The webhook fields Patreon omits unless explicitly requested — notably ``secret``, without which a
+# read-back webhook could not be used to verify delivery signatures.
+WEBHOOK_FIELDS = "triggers,uri,paused,secret,last_attempted_at,num_consecutive_times_failed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +143,45 @@ class PatreonClient:
             if not cursor:
                 return
 
+    async def list_webhooks(self, access_token: str) -> list[WebhookResource]:
+        """List the campaign's webhooks with the creator token, requesting ``secret`` explicitly so
+        each returned webhook carries the HMAC key needed to verify its deliveries."""
+        response = await self._get("/webhooks", access_token, params={"fields[webhook]": WEBHOOK_FIELDS})
+        return self._parse(WebhooksResponse, response, "webhooks").data
+
+    async def create_webhook(self, access_token: str, *, uri: str, triggers: Sequence[str]) -> WebhookResource:
+        """Create a webhook on the configured campaign; the returned resource carries the secret."""
+        body = {
+            "data": {
+                "type": "webhook",
+                "attributes": {"triggers": list(triggers), "uri": uri},
+                "relationships": {"campaign": {"data": {"type": "campaign", "id": self._config.campaign_id}}},
+            }
+        }
+        response = await self._post("/webhooks", access_token, json=body)
+        return self._parse(WebhookResponse, response, "create webhook").data
+
+    async def update_webhook(
+        self,
+        access_token: str,
+        webhook_id: str,
+        *,
+        uri: str | None = None,
+        triggers: Sequence[str] | None = None,
+        paused: bool | None = None,
+    ) -> WebhookResource:
+        """PATCH only the provided attributes of an existing webhook (e.g. re-point ``uri`` or pause)."""
+        attributes: dict[str, Any] = {}
+        if uri is not None:
+            attributes["uri"] = uri
+        if triggers is not None:
+            attributes["triggers"] = list(triggers)
+        if paused is not None:
+            attributes["paused"] = paused
+        body = {"data": {"type": "webhook", "id": webhook_id, "attributes": attributes}}
+        response = await self._patch(f"/webhooks/{webhook_id}", access_token, json=body)
+        return self._parse(WebhookResponse, response, "update webhook").data
+
     async def _request_token(self, data: dict[str, str], *, revoke_on_invalid_grant: bool = False) -> TokenPair:
         response = await self._client.post(TOKEN_URL, data=data)
         is_bad_request = response.status_code == httpx.codes.BAD_REQUEST
@@ -148,6 +201,26 @@ class PatreonClient:
         )
         if response.status_code != httpx.codes.OK:
             raise PatreonApiError(f"GET {path} returned {response.status_code}")
+        return response
+
+    async def _post(self, path: str, access_token: str, *, json: dict[str, Any]) -> httpx.Response:
+        response = await self._client.post(
+            f"{API_BASE_URL}{path}",
+            json=json,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if not response.is_success:
+            raise PatreonApiError(f"POST {path} returned {response.status_code}")
+        return response
+
+    async def _patch(self, path: str, access_token: str, *, json: dict[str, Any]) -> httpx.Response:
+        response = await self._client.patch(
+            f"{API_BASE_URL}{path}",
+            json=json,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if not response.is_success:
+            raise PatreonApiError(f"PATCH {path} returned {response.status_code}")
         return response
 
     @staticmethod

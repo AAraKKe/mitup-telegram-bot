@@ -120,3 +120,43 @@ class MembersResponse(BaseModel):
     @property
     def next_cursor(self) -> str | None:
         return self.meta.pagination.cursors.next
+
+
+class WebhookAttributes(BaseModel):
+    """The mutable state of a Patreon webhook subscription.
+
+    ``secret`` is the HMAC key Patreon signs each delivery with. It is returned on create but only
+    comes back on a read when explicitly requested via ``fields[webhook]=...secret...`` — otherwise
+    it is absent, hence the optional default.
+    """
+
+    triggers: list[str] = Field(default_factory=list)
+    uri: str | None = None
+    paused: bool = False
+    secret: str | None = None
+    last_attempted_at: str | None = None
+    num_consecutive_times_failed: int = 0
+
+
+class WebhookResource(BaseModel):
+    """A ``webhook`` resource returned by the webhook-management endpoints."""
+
+    id: str
+    type: str | None = None
+    attributes: WebhookAttributes = Field(default_factory=WebhookAttributes)
+
+    @property
+    def secret(self) -> str | None:
+        return self.attributes.secret
+
+
+class WebhooksResponse(BaseModel):
+    """``GET /webhooks``: the campaign's existing webhook subscriptions."""
+
+    data: list[WebhookResource] = Field(default_factory=list)
+
+
+class WebhookResponse(BaseModel):
+    """The single-resource ``POST``/``PATCH /webhooks`` reply carrying the created/updated webhook."""
+
+    data: WebhookResource
