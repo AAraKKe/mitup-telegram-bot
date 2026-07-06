@@ -89,8 +89,8 @@ class PatreonClient:
         )
 
     async def fetch_identity(self, access_token: str) -> IdentityResponse:
-        """Fetch the user's ``/identity`` (with memberships) using their own access token (scopes
-        ``identity identity.memberships``).
+        """Fetch the user's ``/identity`` (with memberships) using their own access token (scope
+        ``identity``, which already returns the viewer's membership to our own campaign).
 
         Returns the parsed response; the caller reads ``.patreon_user_id`` and evaluates membership
         with ``.is_active_member_of(campaign_id)`` (the campaign id lives in config, not the response).

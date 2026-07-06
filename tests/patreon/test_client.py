@@ -21,7 +21,7 @@ def token_response(access: str, refresh: str, expires_in: int = 2_592_000) -> ht
             "refresh_token": refresh,
             "expires_in": expires_in,
             "token_type": "Bearer",
-            "scope": "identity identity.memberships",
+            "scope": "identity",
         },
     )
 

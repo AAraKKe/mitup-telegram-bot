@@ -24,21 +24,46 @@ def test_encode_produces_distinct_tokens_via_fernet_iv():
     assert oauth.encode_state(config, TG_USER_ID) != oauth.encode_state(config, TG_USER_ID)
 
 
-def test_decode_expired_state_raises():
+def test_decode_expired_state_raises_and_carries_age():
     config = create_patreon_config()
     with freeze_time("2026-07-05 12:00:00"):
         state = oauth.encode_state(config, TG_USER_ID)
-    # Past the 600s TTL.
-    with freeze_time("2026-07-05 12:11:00"), pytest.raises(PatreonStateExpired):
+    # Past the 3600s (1h) TTL: 71 minutes later.
+    with freeze_time("2026-07-05 13:11:00"), pytest.raises(PatreonStateExpired) as excinfo:
         oauth.decode_state(config, state)
+    # The token's embedded timestamp is authentic, so the age is measurable and roughly 71 minutes.
+    assert excinfo.value.age_seconds == pytest.approx(71 * 60, abs=2)
 
 
-def test_decode_within_ttl_succeeds():
+def test_decode_just_under_ttl_still_succeeds():
     config = create_patreon_config()
     with freeze_time("2026-07-05 12:00:00"):
         state = oauth.encode_state(config, TG_USER_ID)
-    with freeze_time("2026-07-05 12:09:00"):
+    # 59 minutes is still inside the 1h window.
+    with freeze_time("2026-07-05 12:59:00"):
         assert oauth.decode_state(config, state) == TG_USER_ID
+
+
+def test_scope_requests_only_base_identity():
+    # identity alone returns the viewer's membership to our own campaign; identity.memberships would
+    # only add other creators' pledges (unused) and a scarier consent screen.
+    assert oauth.USER_SCOPES == "identity"
+
+
+def test_state_ttl_is_one_hour():
+    assert oauth.STATE_TTL_SECONDS == 3600
+
+
+def test_decode_future_dated_state_reports_negative_age():
+    # A token minted "ahead" of the validating clock is rejected as expired; its age is negative,
+    # which is the clock-skew signal the callback surfaces (age below the TTL yet still rejected).
+    config = create_patreon_config()
+    with freeze_time("2026-07-05 12:10:00"):
+        state = oauth.encode_state(config, TG_USER_ID)
+    with freeze_time("2026-07-05 12:00:00"), pytest.raises(PatreonStateExpired) as excinfo:
+        oauth.decode_state(config, state)
+    assert excinfo.value.age_seconds == pytest.approx(-600, abs=2)
+    assert excinfo.value.age_seconds < oauth.STATE_TTL_SECONDS
 
 
 def test_decode_tampered_state_raises_invalid():
@@ -68,7 +93,7 @@ def test_authorization_url_carries_oauth_parameters():
     assert query["response_type"] == ["code"]
     assert query["client_id"] == ["cid"]
     assert query["redirect_uri"] == ["https://bot.example/patreon/callback"]
-    assert query["scope"] == ["identity identity.memberships"]
+    assert query["scope"] == ["identity"]
     # The state round-trips back to the same user id.
     assert oauth.decode_state(config, query["state"][0]) == TG_USER_ID
 

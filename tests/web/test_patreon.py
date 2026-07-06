@@ -6,6 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import FastAPI
 from freezegun import freeze_time
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
+from structlog.typing import EventDict
 
 from mitup_bot import patreon
 from mitup_bot.config import PatreonConfig, RunModes
@@ -14,7 +17,15 @@ from mitup_bot.models import PremiumSubscription
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
 from mitup_bot.patreon.models import IdentityData, IdentityResponse
 from mitup_bot.web import patreon as web_patreon
-from mitup_bot.web.patreon import LinkOutcome, link_patreon_account, upsert_subscription
+from mitup_bot.web.patreon import (
+    CallbackOutcome,
+    LinkOutcome,
+    PatreonCallbackParams,
+    ResolvedCallback,
+    link_patreon_account,
+    resolve_callback,
+    upsert_subscription,
+)
 from tests.helpers import (
     MockApi,
     build_ptb_app_mock,
@@ -27,6 +38,13 @@ from tests.helpers import (
 from tests.helpers.stub_db import MockDbSession
 
 BOT_USERNAME = "MitupTestBot"
+
+
+def one_log(logs: list[EventDict], event: str) -> EventDict:
+    """Return the single captured structlog entry whose event string matches ``event``."""
+    matching = [entry for entry in logs if entry["event"] == event]
+    assert len(matching) == 1, f"expected exactly one {event!r} log, got {len(matching)}"
+    return matching[0]
 
 
 @pytest.fixture
@@ -113,9 +131,11 @@ async def test_callback_other_patreon_error_locates_failure_on_patreon(web_app: 
     assert "on patreon's side, not yours" in response.text.lower()
 
 
-async def test_callback_missing_params_reassures_and_names_button(web_app: FastAPI, patreon_config: PatreonConfig):
+async def test_callback_partial_params_reassures_and_names_button(web_app: FastAPI, patreon_config: PatreonConfig):
+    # A partial Patreon hit (code present, state missing) still gets the missing_params page — only a
+    # fully bare hit falls through to the generic Mitup landing.
     async with build_web_client(web_app) as client:
-        response = await client.get("/patreon/callback")
+        response = await client.get("/patreon/callback", params={"code": "c"})
 
     assert response.status_code == 400
     assert "incomplete" in response.text.lower()
@@ -123,11 +143,59 @@ async def test_callback_missing_params_reassures_and_names_button(web_app: FastA
     assert "Link Patreon account in the Collaborate menu" in response.text
 
 
+async def test_bare_hit_renders_generic_mitup_404_without_mentioning_patreon(
+    web_app: FastAPI, patreon_config: PatreonConfig
+):
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback")
+
+    assert response.status_code == 404
+    assert "patreon" not in response.text.lower()
+    assert "mitup" in response.text.lower()
+    assert f"https://t.me/{BOT_USERNAME}" in response.text
+
+
+async def test_bare_hit_is_logged_with_bare_landing_outcome(web_app: FastAPI, patreon_config: PatreonConfig):
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        async with build_web_client(web_app) as client:
+            await client.get("/patreon/callback")
+
+    bare = one_log(logs, "Patreon callback bare hit")
+    assert bare["flow"] == "patreon_oauth_callback"
+    assert bare["stage"] == "entry"
+    assert bare["outcome"] == "bare_landing"
+    assert bare["has_code"] is False
+    assert bare["has_state"] is False
+    assert bare["has_error"] is False
+
+
+async def test_bare_hit_first_even_when_patreon_unconfigured(web_app: FastAPI):
+    # No patreon_config fixture: Patreon is switched off. A bare visit must not reveal that — it still
+    # gets the generic 404 landing, not the unconfigured page.
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback")
+
+    assert response.status_code == 404
+    assert "isn't switched on yet" not in response.text.lower()
+    assert "patreon" not in response.text.lower()
+
+
+async def test_unknown_query_params_still_hit_bare_landing_without_422(web_app: FastAPI, patreon_config: PatreonConfig):
+    # extra="ignore" must survive end-to-end through FastAPI: junk query params with no Patreon fields
+    # classify as a bare hit (404), never a 422 validation error.
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback", params={"foo": "bar", "utm_source": "scan"})
+
+    assert response.status_code == 404
+    assert "patreon" not in response.text.lower()
+
+
 async def test_callback_expired_state_prompts_retry(web_app: FastAPI, patreon_config: PatreonConfig):
     with freeze_time("2026-07-05 12:00:00"):
         state = oauth.encode_state(patreon_config, 997_620)
 
-    with freeze_time("2026-07-05 12:20:00"):
+    # 80 minutes later: past the 1h TTL.
+    with freeze_time("2026-07-05 13:20:00"):
         async with build_web_client(web_app) as client:
             response = await client.get("/patreon/callback", params={"code": "c", "state": state})
 
@@ -190,6 +258,198 @@ async def test_callback_outcome_pages_render_expected_content(
     link_mock.assert_awaited_once()
 
 
+# --- Input classification: PatreonCallbackParams + resolve_callback ---
+
+
+@pytest.mark.parametrize(
+    "params, has_code, has_state, has_error, is_redirect, has_required",
+    [
+        (PatreonCallbackParams(), False, False, False, False, False),
+        (PatreonCallbackParams(code="c"), True, False, False, True, False),
+        (PatreonCallbackParams(state="s"), False, True, False, True, False),
+        (PatreonCallbackParams(error="e"), False, False, True, True, False),
+        (PatreonCallbackParams(code="c", state="s"), True, True, False, True, True),
+        (PatreonCallbackParams(code="c", state="s", error="e"), True, True, True, True, True),
+    ],
+)
+def test_callback_params_flags(
+    params: PatreonCallbackParams,
+    has_code: bool,
+    has_state: bool,
+    has_error: bool,
+    is_redirect: bool,
+    has_required: bool,
+):
+    assert params.has_code is has_code
+    assert params.has_state is has_state
+    assert params.has_error is has_error
+    assert params.looks_like_patreon_redirect is is_redirect
+    assert params.has_required_params is has_required
+
+
+def test_callback_params_ignores_unknown_fields():
+    params = PatreonCallbackParams.model_validate({"foo": "bar", "code": "c"})
+    assert params.code == "c"
+    assert not hasattr(params, "foo")
+
+
+def test_resolve_bare_hit_when_no_params():
+    assert resolve_callback(PatreonCallbackParams()).outcome is CallbackOutcome.BARE
+
+
+def test_resolve_unconfigured_when_patreon_off():
+    # No patreon_config fixture: Patreon is switched off, but the params look like a redirect.
+    resolved = resolve_callback(PatreonCallbackParams(code="c", state="s"))
+    assert resolved.outcome is CallbackOutcome.UNCONFIGURED
+
+
+def test_resolve_patreon_error_carries_error(patreon_config: PatreonConfig):
+    resolved = resolve_callback(PatreonCallbackParams(error="access_denied"))
+    assert resolved.outcome is CallbackOutcome.PATREON_ERROR
+    assert resolved.error == "access_denied"
+
+
+def test_resolve_missing_params_when_state_absent(patreon_config: PatreonConfig):
+    resolved = resolve_callback(PatreonCallbackParams(code="c"))
+    assert resolved.outcome is CallbackOutcome.MISSING_PARAMS
+
+
+def test_resolve_state_expired_carries_age(patreon_config: PatreonConfig):
+    with freeze_time("2026-07-05 12:00:00"):
+        state = oauth.encode_state(patreon_config, 997_670)
+    with freeze_time("2026-07-05 13:20:00"):
+        resolved = resolve_callback(PatreonCallbackParams(code="c", state=state))
+    assert resolved.outcome is CallbackOutcome.STATE_EXPIRED
+    assert resolved.state_age_seconds == pytest.approx(80 * 60, abs=2)
+
+
+def test_resolve_state_invalid_never_raises(patreon_config: PatreonConfig):
+    # A tampered token must map to an outcome, never let PatreonStateInvalid escape as a 422.
+    resolved = resolve_callback(PatreonCallbackParams(code="c", state="tampered-token"))
+    assert resolved.outcome is CallbackOutcome.STATE_INVALID
+
+
+def test_resolve_valid_carries_tg_user_id_and_credentials(patreon_config: PatreonConfig):
+    state = oauth.encode_state(patreon_config, 997_671)
+    resolved = resolve_callback(PatreonCallbackParams(code="the-code", state=state))
+    assert resolved.outcome is CallbackOutcome.VALID
+    assert resolved.tg_user_id == 997_671
+    assert resolved.code == "the-code"
+    assert resolved.state == state
+
+
+def test_render_terminal_page_rejects_valid_outcome():
+    # VALID is the side-effecting path handled by render_resolved_callback; it must never reach the
+    # terminal-page renderer, which is a pure page-picker for the non-VALID outcomes.
+    with pytest.raises(AssertionError):
+        web_patreon.render_terminal_page(
+            PatreonCallbackParams(code="c", state="s"), ResolvedCallback(CallbackOutcome.VALID), BOT_USERNAME
+        )
+
+
+# --- Structured logging: every line carries flow + request_id + stage, terminal lines carry outcome ---
+
+
+async def test_callback_entry_and_missing_params_are_logged(web_app: FastAPI, patreon_config: PatreonConfig):
+    # Partial hit (code without state): entry line records the booleans, terminal line is missing_params.
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        async with build_web_client(web_app) as client:
+            await client.get("/patreon/callback", params={"code": "c"})
+
+    entry = one_log(logs, "Patreon callback received")
+    assert entry["flow"] == "patreon_oauth_callback"
+    assert isinstance(entry["request_id"], str) and entry["request_id"]
+    assert entry["stage"] == "entry"
+    assert entry["has_code"] is True
+    assert entry["has_state"] is False
+    assert entry["has_error"] is False
+
+    failure = one_log(logs, "Patreon callback did not complete")
+    assert failure["flow"] == "patreon_oauth_callback"
+    assert failure["request_id"] == entry["request_id"]
+    assert failure["stage"] == "entry"
+    assert failure["outcome"] == "missing_params"
+    assert failure["reason"] == "missing_params"
+    assert failure["has_code"] is True
+    assert failure["has_state"] is False
+
+
+async def test_callback_state_expired_logs_age_ttl_and_no_skew(web_app: FastAPI, patreon_config: PatreonConfig):
+    with freeze_time("2026-07-05 12:00:00"):
+        state = oauth.encode_state(patreon_config, 997_620)
+
+    # 80 minutes later: well past the 1h TTL, so slow-consent rather than clock skew.
+    with freeze_time("2026-07-05 13:20:00"):
+        with capture_logs(processors=[merge_contextvars]) as logs:
+            async with build_web_client(web_app) as client:
+                await client.get("/patreon/callback", params={"code": "c", "state": state})
+
+    failure = one_log(logs, "Patreon callback did not complete")
+    assert failure["stage"] == "decode_state"
+    assert failure["outcome"] == "state_expired"
+    assert failure["state_age_seconds"] == pytest.approx(80 * 60, abs=2)
+    assert failure["state_ttl_seconds"] == 3600
+    assert failure["clock_skew_suspected"] is False
+
+
+async def test_callback_clock_skew_is_flagged_when_age_below_ttl(web_app: FastAPI, patreon_config: PatreonConfig):
+    # A token minted "ahead" of the validating clock is rejected as expired with an age under the TTL.
+    with freeze_time("2026-07-05 12:10:00"):
+        state = oauth.encode_state(patreon_config, 997_621)
+
+    with freeze_time("2026-07-05 12:00:00"):
+        with capture_logs(processors=[merge_contextvars]) as logs:
+            async with build_web_client(web_app) as client:
+                await client.get("/patreon/callback", params={"code": "c", "state": state})
+
+    failure = one_log(logs, "Patreon callback did not complete")
+    assert failure["outcome"] == "state_expired"
+    assert failure["clock_skew_suspected"] is True
+
+
+async def test_callback_token_exchange_failure_logs_stage_and_error_type(
+    web_app: FastAPI, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
+):
+    FakePatreonClient.exchange_error = PatreonApiError("boom")
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+    state = oauth.encode_state(patreon_config, 997_622)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        async with build_web_client(web_app) as client:
+            await client.get("/patreon/callback", params={"code": "c", "state": state})
+
+    FakePatreonClient.exchange_error = None
+
+    exchange_log = one_log(logs, "Patreon token or identity exchange failed")
+    assert exchange_log["stage"] == "token_exchange"
+    assert exchange_log["error_type"] == "PatreonApiError"
+    assert exchange_log["tg_user_id"] == 997_622
+
+    failure = one_log(logs, "Patreon callback did not complete")
+    assert failure["outcome"] == "patreon_api_error"
+    assert failure["tg_user_id"] == 997_622
+
+
+async def test_callback_logs_identity_fetch_before_persist(
+    web_app: FastAPI, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
+):
+    FakePatreonClient.exchange_error = None
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+    monkeypatch.setattr(web_patreon, "link_patreon_account", AsyncMock(return_value=LinkOutcome.LINKED_NO_PATRON))
+    state = oauth.encode_state(patreon_config, 997_623)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        async with build_web_client(web_app) as client:
+            await client.get("/patreon/callback", params={"code": "the-code", "state": state})
+
+    identity_log = one_log(logs, "Patreon identity fetched")
+    assert identity_log["flow"] == "patreon_oauth_callback"
+    assert identity_log["stage"] == "identity_fetch"
+    assert identity_log["patreon_user_id"] == "patreon-1"
+    assert identity_log["is_active_member"] is False
+    assert identity_log["tg_user_id"] == 997_623
+
+
 # --- Branded template rendering (the pages are filled from templates/patreon_result.html) ---
 
 
@@ -247,7 +507,8 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     patch_begin_write(session)
 
     api = MockApi()
-    outcome = await link_patreon_account(api, 997_650, link_pair(), patreon_user_id="p-650", is_active_member=True)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        outcome = await link_patreon_account(api, 997_650, link_pair(), patreon_user_id="p-650", is_active_member=True)
 
     assert outcome is LinkOutcome.LINKED_PREMIUM
     assert user.is_premium is True
@@ -256,6 +517,14 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     assert added[0].patreon_user_id == "p-650"
     assert added[0].premium_expiration is not None
     api.assert_method_just_called("send_message_to_user", times=1)
+
+    linked = one_log(logs, "Patreon account linked")
+    assert linked["flow"] == "patreon_oauth_callback"
+    assert linked["stage"] == "persist"
+    assert linked["outcome"] == "linked_premium"
+    assert linked["tg_user_id"] == 997_650
+    assert linked["patreon_user_id"] == "p-650"
+    assert linked["is_active_member"] is True
 
 
 async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Callable[[MockDbSession], None]):
@@ -280,11 +549,17 @@ async def test_link_unknown_user_returns_unknown(patch_begin_write: Callable[[Mo
     patch_begin_write(session)
 
     api = MockApi()
-    outcome = await link_patreon_account(api, 997_659, link_pair(), patreon_user_id="p-659", is_active_member=True)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        outcome = await link_patreon_account(api, 997_659, link_pair(), patreon_user_id="p-659", is_active_member=True)
 
     assert outcome is LinkOutcome.UNKNOWN_USER
     assert not session.objects_added
     api.assert_method_just_called("send_message_to_user", times=0)
+
+    warning = one_log(logs, "Patreon callback for an unknown Telegram user")
+    assert warning["flow"] == "patreon_oauth_callback"
+    assert warning["stage"] == "persist"
+    assert warning["outcome"] == "unknown_user"
 
 
 async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: Callable[[MockDbSession], None]):
@@ -297,12 +572,20 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
     patch_begin_write(session)
 
     api = MockApi()
-    outcome = await link_patreon_account(api, 997_652, link_pair(), patreon_user_id="p-shared", is_active_member=True)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        outcome = await link_patreon_account(
+            api, 997_652, link_pair(), patreon_user_id="p-shared", is_active_member=True
+        )
 
     assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE
     assert user.is_premium is False
     assert not any(isinstance(obj, PremiumSubscription) for obj in session.objects_added)
     api.assert_method_just_called("send_message_to_user", times=0)
+
+    warning = one_log(logs, "Patreon account already linked to another Telegram user")
+    assert warning["flow"] == "patreon_oauth_callback"
+    assert warning["stage"] == "persist"
+    assert warning["outcome"] == "already_linked_elsewhere"
 
 
 async def test_upsert_creates_subscription_when_absent():

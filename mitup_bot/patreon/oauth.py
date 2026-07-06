@@ -7,7 +7,7 @@ so the value is opaque and tamper-evident. Fernet stamps every token with a crea
 
 Replay is bounded by that TTL, not by a stored nonce: Fernet already gives every token a random 128-bit
 IV, so two states for the same user are distinct ciphertexts, and re-linking is idempotent (it upserts
-the same row), so replaying a still-valid state within the 10-minute window links the account the user
+the same row), so replaying a still-valid state within the TTL window links the account the user
 already meant to link. Persisting and consuming a single-use nonce would add a datastore round-trip for
 no security gain over the TTL, so we deliberately don't.
 
@@ -15,6 +15,7 @@ These are pure functions over a ``PatreonConfig`` so they stay unit-testable wit
 config holder; callers resolve the live config from :mod:`mitup_bot.patreon` and pass it in.
 """
 
+import datetime as dt
 import json
 from urllib.parse import urlencode
 
@@ -24,12 +25,17 @@ from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonStateExpired, PatreonStateInvalid
 
 AUTHORIZE_URL = "https://www.patreon.com/oauth2/authorize"
-# The user-facing flow only needs to read the user's identity and their memberships to decide
-# whether they are an active patron of the configured campaign.
-USER_SCOPES = "identity identity.memberships"
-# The inline button can sit in a chat for days, so the round-trip is validated against this TTL
-# rather than trusting that the redirect happens promptly.
-STATE_TTL_SECONDS = 600
+# We only need the user's identity and their membership to the configured campaign, both of which
+# base ``identity`` already returns via ``GET /identity?include=memberships`` (it always includes the
+# viewer's membership to our own campaign). ``identity.memberships`` would only add the user's pledges
+# to *other* creators — which we never read — at the cost of a scarier consent screen, so we omit it.
+USER_SCOPES = "identity"
+# The state is a Fernet token frozen into the Collaborate-menu button at render time, so this TTL is
+# the clock from when the menu is drawn. A first-time Patreon login (email, 2FA, verification) routinely
+# runs past ten minutes, so an hour tolerates a realistic sitting. The cost is negligible: re-linking is
+# idempotent and the state only carries the initiator's own tg_user_id. Buttons older than the TTL still
+# degrade gracefully to the friendly retry page, which re-renders a fresh state.
+STATE_TTL_SECONDS = 3600
 
 
 def encode_state(config: PatreonConfig, tg_user_id: int) -> str:
@@ -44,7 +50,9 @@ def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS
 
     Signature validation and age are checked separately so the caller can distinguish an expired
     button (friendly "tap it again") from a genuinely invalid token: decrypting without a ttl
-    proves authenticity, then a second decrypt with the ttl gates on age.
+    proves authenticity, then a second decrypt with the ttl gates on age. On expiry the token's
+    embedded timestamp is authentic, so the age is measured and carried on the exception — that lets
+    the callback tell slow consent from clock skew from a stale button.
     """
     fernet = Fernet(config.state_secret.get_secret_value())
     token = state.encode()
@@ -56,7 +64,9 @@ def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS
     try:
         fernet.decrypt(token, ttl=ttl)
     except InvalidToken as error:
-        raise PatreonStateExpired from error
+        minted_at = dt.datetime.fromtimestamp(fernet.extract_timestamp(token), tz=dt.UTC)
+        age_seconds = (dt.datetime.now(dt.UTC) - minted_at).total_seconds()
+        raise PatreonStateExpired(age_seconds=age_seconds) from error
 
     payload = json.loads(raw)
     return int(payload["tg_user_id"])

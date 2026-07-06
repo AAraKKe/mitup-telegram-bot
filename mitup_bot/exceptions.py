@@ -197,10 +197,14 @@ class PatreonTokenRevoked(RuntimeError):
 
 class PatreonStateExpired(ValueError):
     """The OAuth ``state`` token is authentic but older than its TTL — the inline button was
-    tapped long after it was rendered. The callback tells the user to tap the button again."""
+    tapped long after it was rendered. The callback tells the user to tap the button again.
 
-    def __init__(self):
-        super().__init__("The Patreon OAuth state token has expired.")
+    Carries ``age_seconds`` (the token's authentic minted-to-now age) so the callback can tell
+    slow consent from clock skew from a button left sitting for hours."""
+
+    def __init__(self, age_seconds: float):
+        self.age_seconds = age_seconds
+        super().__init__(f"The Patreon OAuth state token has expired ({age_seconds:.0f}s old).")
 
 
 class PatreonStateInvalid(ValueError):

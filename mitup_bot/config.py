@@ -270,7 +270,8 @@ class PatreonConfig(BaseModel):
     creator_access_token: SecretStr
     # Seed value only, adopted together with `creator_access_token` (same fingerprint check).
     creator_refresh_token: SecretStr
-    # Fernet key for the OAuth `state` parameter (tg_user_id + nonce, validated with ttl=600).
+    # Fernet key for the OAuth `state` parameter (carries the initiating tg_user_id, age-validated
+    # against `oauth.STATE_TTL_SECONDS`).
     state_secret: SecretStr
     # Fernet key for encrypting Patreon tokens at rest in the DB. Kept separate from
     # `state_secret` so the two keys have a different blast radius.
