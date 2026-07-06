@@ -6,6 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
 from telegram import User as TgUser
 
+from mitup_bot import supporter
 from mitup_bot.callback_data import (
     CallbackData,
     DateCallbackData,
@@ -31,6 +32,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase, MessageParams
@@ -341,19 +343,26 @@ async def meeting_viewable(
     return await user_owns_meeting(user, meeting_id, action, update, context)
 
 
-async def premium_required(
-    user: User, update: Update, context: TMitupContext, alert_message: MessageBase, **message_kwargs: MessageParams
+async def supporter_required(
+    user: User,
+    update: Update,
+    context: TMitupContext,
+    alert_message: MessageBase,
+    *,
+    minimum: SupporterLevel,
+    **message_kwargs: MessageParams,
 ) -> User | None:
-    """Return the user when they are premium; otherwise answer the callback query with an alert and
-    return None, on which the caller must bail immediately.
+    """Return the user when their tier reaches `minimum`; otherwise answer the callback query with an
+    alert and return None, on which the caller must bail immediately.
 
-    Call-and-check, mirroring `user_registered`. `is_premium` is a plain column kept in sync by the
-    recurring job and the OAuth callback, so this never queries Patreon inline. `alert_message` is
-    supplied per feature and is expected to point the user at the Collaborate menu entry; any
-    `${...}` placeholders it carries are filled from `message_kwargs`. It is rendered as plain text,
-    so it must carry no inline-formatting entities.
+    Call-and-check, mirroring `user_registered`. The decision is resolved through the supporter-tier
+    policy (`supporter.meets`) rather than comparing levels here; `supporter_level` is a plain column
+    kept in sync by the recurring job and the OAuth callback, so this never queries Patreon inline.
+    `alert_message` is supplied per feature and is expected to point the user at the Collaborate menu
+    entry; any `${...}` placeholders it carries are filled from `message_kwargs`. It is rendered as
+    plain text, so it must carry no inline-formatting entities.
     """
-    if user.is_premium:
+    if supporter.meets(user.supporter_level, minimum):
         return user
 
     await context.api.answer_callback_query(

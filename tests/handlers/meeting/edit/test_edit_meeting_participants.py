@@ -4,7 +4,7 @@ import pytest
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import limits
+from mitup_bot import supporter
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
@@ -13,6 +13,7 @@ from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, Edit
 from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view, edit_participants_view
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages, PremiumMessages
 from mitup_bot.views import factory
@@ -448,7 +449,7 @@ async def test_edit_max_participants_free_owner_over_cap_is_rejected(
 ):
     """A free owner asking for more than the cap gets the upsell banner, keeps their current limit,
     and stays in the max-participants state so they can try again."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=20))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
     meeting = user_with_settings.meetups[0]
     meeting.max_members = 5  # a known current value to prove it is left untouched
     mock_session.add_object(meeting)
@@ -479,7 +480,7 @@ async def test_edit_max_participants_free_owner_at_cap_is_accepted(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """The cap itself is a valid limit: a free owner entering exactly the cap succeeds."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=20))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -500,16 +501,16 @@ async def test_edit_max_participants_free_owner_at_cap_is_accepted(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="500")], indirect=True)
-async def test_edit_max_participants_premium_owner_over_cap_is_accepted(
+async def test_edit_max_participants_patron_owner_over_cap_is_accepted(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """A premium owner is uncapped, so a limit well above the free cap is stored as-is."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=20))
-    user_with_settings.is_premium = True
+    """A Patron owner is uncapped, so a limit well above the free cap is stored as-is."""
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")

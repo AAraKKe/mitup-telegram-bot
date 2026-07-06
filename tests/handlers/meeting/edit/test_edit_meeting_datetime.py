@@ -7,7 +7,7 @@ from telegram import CallbackQuery, Location, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
 
-from mitup_bot import limits
+from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as build_entry_view
@@ -15,6 +15,7 @@ from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, Edit
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
 from mitup_bot.monitoring import MetricKey, MetricUnit
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link
@@ -87,9 +88,9 @@ def wide_scheduling_horizon(monkeypatch: pytest.MonkeyPatch):
     default to a horizon far beyond any date they pick. The dedicated horizon tests below override
     this within their own bodies."""
     monkeypatch.setattr(
-        limits.LimitsState,
+        supporter.PolicyState,
         "config",
-        LimitsConfig(free_scheduling_horizon_days=3650, premium_scheduling_horizon_days=3650),
+        LimitsConfig(free_scheduling_horizon_days=3650, patron_scheduling_horizon_days=3650),
     )
 
 
@@ -1297,7 +1298,7 @@ async def test_set_date_beyond_horizon_shows_alert_and_stays_in_edit_date(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """A free user picking a date past the horizon gets the upsell alert; the date is not saved."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_scheduling_horizon_days=31))
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -1331,7 +1332,7 @@ async def test_set_date_exactly_on_horizon_is_allowed(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """The boundary date (exactly the horizon) is accepted: the first date is saved and time prompted."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_scheduling_horizon_days=31))
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -1358,13 +1359,13 @@ async def test_set_date_beyond_free_horizon_allowed_for_premium(
     handler_context: HandlerContext,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """A premium owner gets the extended horizon, so a date past the free limit is accepted."""
+    """A Patron owner gets the extended horizon, so a date past the free limit is accepted."""
     monkeypatch.setattr(
-        limits.LimitsState,
+        supporter.PolicyState,
         "config",
-        LimitsConfig(free_scheduling_horizon_days=31, premium_scheduling_horizon_days=365),
+        LimitsConfig(free_scheduling_horizon_days=31, patron_scheduling_horizon_days=365),
     )
-    user_with_settings.is_premium = True
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -1388,7 +1389,7 @@ async def test_time_edit_on_grandfathered_far_future_meeting_is_not_blocked(
 ):
     """Grandfathering: a meeting already scheduled far beyond the horizon can still have its time
     edited. The horizon check applies to new date picks only, not to time-only edits."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_scheduling_horizon_days=31))
     # Existing start is ~5 months out, well beyond the 31-day horizon.
     far_future = dt.datetime(2025, 6, 1, 10, 0, tzinfo=dt.UTC)
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=far_future)

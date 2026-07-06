@@ -1,8 +1,9 @@
 import pytest
 
-from mitup_bot import limits
+from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.models import JoinedUsers, Meetup
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers import create_meetup, create_user
 
 # A small, explicit cap keeps the boundary and promotion setups readable; the enforcement is
@@ -14,7 +15,7 @@ CAP = 3
 def pin_participant_cap(monkeypatch: pytest.MonkeyPatch) -> int:
     """Pin the free-tier participant cap so the effective-cap behaviours are deterministic and no
     leaked config from another test can move the boundary."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=CAP))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=CAP))
     return CAP
 
 
@@ -29,19 +30,18 @@ def add_participants(meeting: Meetup, count: int, *, waiting: bool, start_id: in
 
 
 @pytest.mark.parametrize(
-    "is_premium,max_members,expected",
+    "level,max_members,expected",
     [
-        (False, None, CAP),  # free + no explicit limit resolves to the cap
-        (False, 2, 2),  # free + explicit below cap is left untouched
-        (False, 10, CAP),  # free + explicit above cap is clamped down (grandfathered)
-        (True, None, None),  # premium + no explicit limit stays unlimited
-        (True, 100, 100),  # premium + explicit limit is honored as-is
+        (SupporterLevel.NONE, None, CAP),  # capped + no explicit limit resolves to the cap
+        (SupporterLevel.NONE, 2, 2),  # capped + explicit below cap is left untouched
+        (SupporterLevel.NONE, 10, CAP),  # capped + explicit above cap is clamped down (grandfathered)
+        (SupporterLevel.PATRON, None, None),  # uncapped + no explicit limit stays unlimited
+        (SupporterLevel.PATRON, 100, 100),  # uncapped + explicit limit is honored as-is
     ],
-    ids=["free_no_limit", "free_below_cap", "free_above_cap", "premium_no_limit", "premium_explicit"],
+    ids=["free_no_limit", "free_below_cap", "free_above_cap", "patron_no_limit", "patron_explicit"],
 )
-def test_effective_max_members(is_premium: bool, max_members: int | None, expected: int | None):
-    owner = create_user(id=1, first_name="Owner")
-    owner.is_premium = is_premium
+def test_effective_max_members(level: SupporterLevel, max_members: int | None, expected: int | None):
+    owner = create_user(id=1, first_name="Owner", supporter_level=level)
     meeting = create_meetup(id=1, owner=owner, max_members=max_members)
 
     assert meeting.effective_max_members == expected
@@ -58,10 +58,9 @@ def test_full_free_no_limit_meeting_is_capped(n_participants: int, expected_full
     assert meeting.full is expected_full
 
 
-def test_full_premium_no_limit_meeting_never_full():
-    """A premium owner stays uncapped, so no participant count makes the meeting full."""
-    owner = create_user(id=1, first_name="Owner")
-    owner.is_premium = True
+def test_full_patron_no_limit_meeting_never_full():
+    """A Patron owner stays uncapped, so no participant count makes the meeting full."""
+    owner = create_user(id=1, first_name="Owner", supporter_level=SupporterLevel.PATRON)
     meeting = create_meetup(id=1, owner=owner, max_members=None)
     add_participants(meeting, CAP + 3, waiting=False, start_id=2)
 

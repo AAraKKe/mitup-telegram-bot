@@ -90,6 +90,14 @@ class IdentityResponse(BaseModel):
     def is_active_member_of(self, campaign_id: str) -> bool:
         return any(member.is_active_patron_of(campaign_id) for member in self.included)
 
+    def entitled_amount_cents_of(self, campaign_id: str) -> int:
+        """Cents currently entitled on this user's active membership of `campaign_id`, or 0 when they
+        are not an active member of it. Feeds `supporter.level_for_amount` to derive the tier."""
+        for member in self.included:
+            if member.is_active_patron_of(campaign_id):
+                return member.attributes.currently_entitled_amount_cents
+        return 0
+
 
 class Cursors(BaseModel):
     next: str | None = None

@@ -1,4 +1,6 @@
+import importlib.util
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from cryptography.fernet import Fernet
@@ -7,11 +9,30 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+import mitup_bot
 from mitup_bot.models import PatreonCreatorToken, PremiumSubscription, Settings, User, configure_token_encryption
 from mitup_bot.models.premium import TokenCipher
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers import create_patreon_creator_token, create_premium_subscription
 
 pytestmark = pytest.mark.db_test
+
+SUPPORTER_LEVEL_MIGRATION_PATH = (
+    Path(mitup_bot.__file__).parent / "migrations" / "versions" / "c459065f341a_replace_users_is_premium_with_users_.py"
+)
+
+
+def load_supporter_level_migration():
+    """Load the revision module by file path (its name starts with a digit, so no dotted import) to
+    reuse the exact data-migration SQL, keeping this test in lockstep with the migration."""
+    spec = importlib.util.spec_from_file_location("_migration_c459065f341a", SUPPORTER_LEVEL_MIGRATION_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+SUPPORTER_LEVEL_MIGRATION = load_supporter_level_migration()
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -44,24 +65,95 @@ async def test_table_exists(db_session: AsyncSession, table_name: str):
     assert result == 1
 
 
-async def test_users_has_is_premium_column(db_session: AsyncSession):
+async def test_users_has_supporter_level_column(db_session: AsyncSession):
     is_nullable, data_type, column_default = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(
                 "SELECT is_nullable, data_type, column_default FROM information_schema.columns"
-                " WHERE table_name='users' AND column_name='is_premium'"
+                " WHERE table_name='users' AND column_name='supporter_level'"
             )
         )
     ).one()
     assert is_nullable == "NO"
-    assert data_type == "boolean"
-    assert column_default is not None and "false" in column_default
+    assert data_type == "character varying"
+    assert column_default is not None and "none" in column_default
 
 
-async def test_is_premium_defaults_to_false(db_session: AsyncSession):
+async def test_supporter_level_defaults_to_none(db_session: AsyncSession):
     user = await new_user(db_session, 998_756)
     await db_session.refresh(user)
-    assert user.is_premium is False
+    assert user.supporter_level is SupporterLevel.NONE
+
+
+async def test_supporter_level_rejects_unknown_value(db_session: AsyncSession):
+    """The CHECK constraint the migration installs guards the column against tiers outside the enum."""
+    savepoint = await db_session.begin_nested()
+    try:
+        with pytest.raises(IntegrityError):
+            await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+                text("UPDATE users SET supporter_level = 'gold' WHERE tg_user_id = :t").bindparams(
+                    t=999_001
+                )  # seed_user
+            )
+            await db_session.flush()
+    finally:
+        await savepoint.rollback()
+
+
+async def test_migration_grandfathers_premium_users_to_patron(db_session: AsyncSession):
+    """The upgrade's data step maps existing `is_premium=true` rows to the Patron tier and leaves
+    everyone else at NONE. Reproduces the transient migration schema (both columns present) in a
+    savepoint and runs the migration's exact SQL."""
+    savepoint = await db_session.begin_nested()
+    try:
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text("ALTER TABLE users ADD COLUMN is_premium boolean NOT NULL DEFAULT false")
+        )
+        premium_user = await new_user(db_session, 998_770)
+        free_user = await new_user(db_session, 998_771)
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text("UPDATE users SET is_premium = true WHERE tg_user_id = :t").bindparams(t=998_770)
+        )
+
+        await db_session.exec(text(SUPPORTER_LEVEL_MIGRATION.GRANDFATHER_PREMIUM_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.flush()
+        await db_session.refresh(premium_user)
+        await db_session.refresh(free_user)
+
+        assert premium_user.supporter_level is SupporterLevel.PATRON
+        assert free_user.supporter_level is SupporterLevel.NONE
+    finally:
+        await savepoint.rollback()
+
+
+async def test_migration_downgrade_reverses_any_tier_to_premium(db_session: AsyncSession):
+    """The downgrade's data step maps any paying tier back to `is_premium=true` and NONE to false."""
+    savepoint = await db_session.begin_nested()
+    try:
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text("ALTER TABLE users ADD COLUMN is_premium boolean NOT NULL DEFAULT false")
+        )
+        organizer = await new_user(db_session, 998_772)
+        organizer.supporter_level = SupporterLevel.ORGANIZER
+        patron = await new_user(db_session, 998_773)
+        patron.supporter_level = SupporterLevel.PATRON
+        await new_user(db_session, 998_774)
+        await db_session.flush()
+
+        await db_session.exec(text(SUPPORTER_LEVEL_MIGRATION.REVERSE_TO_BOOLEAN_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.flush()
+
+        premium_flags = {
+            tg_user_id: (
+                await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+                    text("SELECT is_premium FROM users WHERE tg_user_id = :t").bindparams(t=tg_user_id)
+                )
+            ).scalar_one()
+            for tg_user_id in (998_772, 998_773, 998_774)
+        }
+        assert premium_flags == {998_772: True, 998_773: True, 998_774: False}
+    finally:
+        await savepoint.rollback()
 
 
 async def test_premium_subscription_encrypts_tokens_at_rest(db_session: AsyncSession):

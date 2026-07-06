@@ -36,7 +36,11 @@ class Emojis(Enum):
     HELP = "❓"
     HEART = "♥"
     DONATE = "💶"
+    # Per-tier supporter badges (issue #211). PATRON is the glowing star, deliberately not the plain
+    # ⭐ which reads as Telegram Stars.
     SUPPORTER = "🧡"
+    PATRON = "🌟"
+    ORGANIZER = "🏆"
     REPLY = "▶"
     REPLY_ALL = "⏩"
     ACTIVATE = "🔄"

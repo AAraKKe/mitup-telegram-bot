@@ -4,7 +4,7 @@ import structlog
 import uvicorn
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
-from mitup_bot import db, limits, patreon, timezone_api
+from mitup_bot import db, patreon, supporter, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
@@ -39,8 +39,9 @@ class MitupRuntime:
             TomlConfigProvider(env=env),
         )
         configure_logging(self.env, self.config.app.log_level)
-        # Adopt the merged free-tier limits so handlers resolve caps against the deployed values.
-        limits.configure(self.config.limits)
+        # Adopt the merged free-tier limits so the supporter-tier policy resolves caps against the
+        # deployed values.
+        supporter.configure(self.config.limits)
         self.app = self.__build_application()
         # Metrics before db: the pool-metrics client emits through the process-global EMF
         # configuration, which must be in place before the db layer starts using it.

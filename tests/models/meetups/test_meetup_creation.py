@@ -6,11 +6,12 @@ import pytest
 from telegram import Chat, MessageEntity, Update
 from telegram import Message as TgMessage
 
-from mitup_bot import limits
+from mitup_bot import supporter
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import LimitsConfig
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, MessageButtons, Settings, User
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
@@ -48,7 +49,7 @@ FREE_CAP = 20
 
 @pytest.fixture(autouse=True)
 def pin_free_participant_cap(monkeypatch: pytest.MonkeyPatch) -> int:
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_participant_capacity=FREE_CAP))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=FREE_CAP))
     return FREE_CAP
 
 
@@ -318,13 +319,12 @@ def test_meetup_message(
         assert not dt_entities
 
 
-def test_meeting_message_badges_premium_owner():
-    owner = create_user(id=1, username="alice", tg_user_id=997_720)
-    owner.is_premium = True
+def test_meeting_message_badges_patron_owner():
+    owner = create_user(id=1, username="alice", tg_user_id=997_720, supporter_level=SupporterLevel.PATRON)
     meeting = create_meetup(id=1, owner=owner, language="en")
     JoinedUsers(user=owner, meetup=meeting)
 
-    badged_owner = f"alice {Emojis.SUPPORTER}"
+    badged_owner = f"alice {Emojis.PATRON}"
     assert badged_owner in meeting.message.text
     assert badged_owner in meeting.inline_message.text
 
@@ -334,21 +334,20 @@ def test_meeting_message_has_no_badge_for_free_owner():
     meeting = create_meetup(id=1, owner=owner, language="en")
     JoinedUsers(user=owner, meetup=meeting)
 
-    assert str(Emojis.SUPPORTER) not in meeting.message.text
-    assert str(Emojis.SUPPORTER) not in meeting.inline_message.text
+    assert str(Emojis.PATRON) not in meeting.message.text
+    assert str(Emojis.PATRON) not in meeting.inline_message.text
 
 
-def test_incognito_meeting_omits_premium_participant_badge():
-    """Incognito hides the participant list, so a premium member's name — and its badge — never render."""
+def test_incognito_meeting_omits_supporter_participant_badge():
+    """Incognito hides the participant list, so a supporter's name — and its badge — never render."""
     owner = create_user(id=1, first_name="Owner", tg_user_id=997_722)
     meeting = create_meetup(id=1, owner=owner, incognito=True, language="en")
-    premium = create_user(id=2, username="alice", tg_user_id=997_723)
-    premium.is_premium = True
-    meeting.create_joined_link(premium, is_waiting_list=False)
+    patron_member = create_user(id=2, username="alice", tg_user_id=997_723, supporter_level=SupporterLevel.PATRON)
+    meeting.create_joined_link(patron_member, is_waiting_list=False)
 
     inline_text = meeting.inline_message.text
     assert "alice" not in inline_text
-    assert str(Emojis.SUPPORTER) not in inline_text
+    assert str(Emojis.PATRON) not in inline_text
 
 
 @pytest.mark.parametrize(
@@ -556,16 +555,16 @@ def test_participants_text(
 @pytest.mark.parametrize(
     "joined_count,expected",
     [
-        # Premium owner keeps "no explicit limit" as unlimited, so the badge never shows the cap.
+        # Uncapped owner keeps "no explicit limit" as unlimited, so the badge never shows the cap.
         (0, lambda lang: MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text),
         (1, lambda lang: f"1 ({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"),
     ],
     ids=["empty", "one_participant"],
 )
-def test_participants_badge_premium_owner_stays_no_limit(
+def test_participants_badge_patron_owner_stays_no_limit(
     user_with_settings: User, joined_count: int, expected: Callable[[str], str]
 ):
-    user_with_settings.is_premium = True
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
 
     # sourcery skip: no-loop-in-tests
@@ -576,9 +575,9 @@ def test_participants_badge_premium_owner_stays_no_limit(
     assert render(meeting.participants_badge).text == expected(user_with_settings.lang)
 
 
-def test_participants_text_premium_owner_stays_no_limit(user_with_settings: User):
-    """A premium owner's meeting with no explicit limit renders 'No limit', never the free cap."""
-    user_with_settings.is_premium = True
+def test_participants_text_patron_owner_stays_no_limit(user_with_settings: User):
+    """A Patron owner's meeting with no explicit limit renders 'No limit', never the free cap."""
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
     joined = User(first_name="Joined_0", tg_user_id=0, settings=user_with_settings.settings)
     JoinedUsers(user=joined, meetup=meeting)

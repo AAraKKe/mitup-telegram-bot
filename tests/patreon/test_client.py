@@ -160,6 +160,21 @@ async def test_fetch_identity_ignores_membership_of_other_campaign():
     assert identity.is_active_member_of(CAMPAIGN_ID) is False
 
 
+async def test_fetch_identity_reports_entitled_amount_for_active_membership():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json=identity_payload(campaign_id=CAMPAIGN_ID, patron_status="active_patron", cents=1000)
+        )
+
+    config = create_patreon_config(campaign_id=CAMPAIGN_ID)
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        identity = await client.fetch_identity("user-access")
+
+    assert identity.entitled_amount_cents_of(CAMPAIGN_ID) == 1000
+    # A campaign the user is not an active member of reports no entitlement, so it maps to NONE.
+    assert identity.entitled_amount_cents_of("99999") == 0
+
+
 async def test_iter_campaign_members_follows_cursor_pagination():
     def member(patreon_id: str, cents: int) -> dict:
         return {

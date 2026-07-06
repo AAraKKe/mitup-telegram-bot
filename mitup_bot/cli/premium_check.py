@@ -1,10 +1,14 @@
-"""Daily premium-membership validation against Patreon.
+"""Daily supporter-membership validation against Patreon.
 
 Plugs into the recurrent-events framework as the ``PREMIUM_CHECK`` job. Each run keeps both token
-families fresh (the single creator token and every linked user token), reconciles premium status
-against the campaign's active-patron set, and drives the grace/upgrade/revoke transitions. The two
-token-TTL metrics feed the infra alarms in #159, so their names are pinned as literal strings rather
-than routed through ``MetricKey`` (whose CamelCase folding would lowercase the ``TTL`` acronym).
+families fresh (the single creator token and every linked user token), reconciles every linked
+member's supporter tier against the amount they are currently entitled to on the campaign, and drives
+the grace/upgrade/downgrade/revoke transitions. A member's tier is derived from their
+``currently_entitled_amount_cents`` via ``supporter.level_for_amount``; both between-tier upgrades and
+between-tier downgrades sync on this daily pass, while a full lapse follows the existing grace/revoke
+machinery. The two token-TTL metrics feed the infra alarms in #159, so their names are pinned as
+literal strings rather than routed through ``MetricKey`` (whose CamelCase folding would lowercase the
+``TTL`` acronym).
 """
 
 import datetime as dt
@@ -15,11 +19,11 @@ from enum import Enum, auto
 from typing import Protocol
 
 import structlog
-from sqlmodel import and_, col, false, func, null, select
+from sqlmodel import and_, col, func, null, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
-from mitup_bot import db, patreon
+from mitup_bot import db, patreon, supporter
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonTokenRevoked
@@ -28,6 +32,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.patreon import PatreonClient, TokenPair
 from mitup_bot.patreon.models import MemberResource
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import PremiumNotificationMessages
 
 log = structlog.get_logger(__name__)
@@ -60,6 +65,7 @@ USER_TOKEN_REFRESH_FAULTS_METRIC = "PatreonUserTokenRefreshFaults"
 USER_TOKENS_REVOKED_METRIC = "PatreonUserTokensRevoked"
 CREATOR_REFRESH_FAULTS_METRIC = "PatreonCreatorRefreshFaults"
 UPGRADES_METRIC = "PatreonUpgrades"
+DOWNGRADES_METRIC = "PatreonDowngrades"
 GRACE_STARTED_METRIC = "PatreonGraceStarted"
 PREMIUM_LOST_METRIC = "PatreonPremiumLost"
 
@@ -80,6 +86,15 @@ class UserTokenOutcome(Enum):
     GONE = auto()
 
 
+class LevelSyncOutcome(Enum):
+    """What a level-sync pass did for one active member, so ``run`` can tally tier movements."""
+
+    UPGRADED = auto()
+    DOWNGRADED = auto()
+    UNCHANGED = auto()
+    SKIPPED = auto()
+
+
 # Supporters keep their perks for a week past each unconfirmed checkpoint, so a lapsed or
 # disconnected patron gets ~two weeks of leeway (grace start, then the grace expiry) before revocation.
 GRACE_PERIOD = dt.timedelta(days=7)
@@ -97,22 +112,13 @@ DUE_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
         )
     )
 )
-# Linked users without premium whose row is still live: candidates for auto-upgrade when their
-# Patreon id turns up in the active-patron set.
-UPGRADABLE_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
-    select(PremiumSubscription)
-    .join(User, col(PremiumSubscription.user_id) == col(User.id))
-    .where(
-        and_(
-            User.status == UserStatus.MEMBER,
-            User.is_premium == false(),
-            PremiumSubscription.revoked_time == null(),
-        )
-    )
-)
-# Every live linked user whose token is refreshed (and TTL-measured) this run. Revoked rows are
-# excluded so a deliberate disconnect never drags the alarm's Min down.
-REFRESHABLE_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
+# Every live linked member (status MEMBER, not revoked). This single set feeds both passes that
+# operate on the whole live population: the token refresh (keep-alive + TTL, revoked rows excluded so
+# a deliberate disconnect never drags the alarm's Min down) and the level sync (re-levels active
+# members against their entitled amount — NONE -> tier promotion and between-tier moves in both
+# directions; members absent from the amounts map are lapsing and left to the grace flow above).
+# run() nominates it once and drives both passes from the same id list.
+LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
     select(PremiumSubscription)
     .join(User, col(PremiumSubscription.user_id) == col(User.id))
     .where(
@@ -229,13 +235,15 @@ async def refresh_creator_token(client: TokenRefresher, config: PatreonConfig, m
     return pair.access_token
 
 
-async def active_patreon_ids(client: CampaignMemberReader, access_token: str) -> set[str]:
-    """Collect every active patron's Patreon user id across the campaign's paginated member list."""
-    ids: set[str] = set()
+async def active_patreon_amounts(client: CampaignMemberReader, access_token: str) -> dict[str, int]:
+    """Map each active patron's Patreon user id to their ``currently_entitled_amount_cents`` across the
+    campaign's paginated member list. The amount is what drives the per-member tier derivation; a
+    plain membership check is just ``patreon_user_id in amounts``."""
+    amounts: dict[str, int] = {}
     async for member in client.iter_campaign_members(access_token):
         if member.is_active_patron and member.patreon_user_id is not None:
-            ids.add(member.patreon_user_id)
-    return ids
+            amounts[member.patreon_user_id] = member.attributes.currently_entitled_amount_cents
+    return amounts
 
 
 @db.with_session
@@ -249,11 +257,15 @@ async def load_user(session: AsyncSession, user_id: int) -> User | None:
     return (await session.exec(select(User).where(User.id == user_id))).first()
 
 
-async def process_due_subscription(subscription_id: int, active_ids: set[str], api: TelegramApiWrapper) -> DueOutcome:
+async def process_due_subscription(
+    subscription_id: int, active_amounts: dict[str, int], api: TelegramApiWrapper
+) -> DueOutcome:
     """Advance one due subscription through the grace flow under its own write lifecycle.
 
-    Re-checks under the fresh transaction that the row is still due; a revoked row counts as
-    non-member here so a lingering campaign pledge cannot silently re-grant premium after the user
+    Owns the lapse lifecycle only: for a still-active member it extends grace (the level itself is
+    reconciled by the level-sync pass), and for a lapsed member it starts grace and then revokes to
+    NONE. Re-checks under the fresh transaction that the row is still due; a revoked row counts as
+    non-member here so a lingering campaign pledge cannot silently re-grant support after the user
     disconnected the app. Returns the transition taken so ``run`` can tally lifecycle counts."""
     async with db.begin_write(api) as session:
         subscription = (await session.exec(DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))).first()
@@ -263,7 +275,7 @@ async def process_due_subscription(subscription_id: int, active_ids: set[str], a
         if user is None:
             return DueOutcome.SKIPPED
 
-        is_member = subscription.revoked_time is None and subscription.patreon_user_id in active_ids
+        is_member = subscription.revoked_time is None and subscription.patreon_user_id in active_amounts
         if is_member:
             subscription.expiration_notified = False
             subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
@@ -273,29 +285,47 @@ async def process_due_subscription(subscription_id: int, active_ids: set[str], a
             subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
             await api.send_message_to_user(user, PremiumNotificationMessages.GRACE_STARTED.get(lang=user.lang))
             return DueOutcome.GRACE_STARTED
-        user.is_premium = False
+        user.supporter_level = SupporterLevel.NONE
         await api.send_message_to_user(user, PremiumNotificationMessages.PREMIUM_LOST.get(lang=user.lang))
         return DueOutcome.PREMIUM_LOST
 
 
-async def upgrade_subscription(subscription_id: int, active_ids: set[str], api: TelegramApiWrapper) -> bool:
-    """Turn premium on for a linked user who has become an active patron, in its own write lifecycle.
+async def sync_subscription_level(
+    subscription_id: int, active_amounts: dict[str, int], config: PatreonConfig, api: TelegramApiWrapper
+) -> LevelSyncOutcome:
+    """Reconcile one active member's supporter tier with their entitled amount, in its own write
+    lifecycle.
 
-    Returns whether an upgrade actually happened (False when the row is no longer eligible)."""
+    Derives the target tier from ``currently_entitled_amount_cents`` and writes it when it differs,
+    refreshing grace on any change (the member is confirmed active this run). A rank increase notifies
+    the user with the generic upgrade message; a between-tier drop (still an active supporter) adjusts
+    silently — per-level copy is a later phase. A member absent from the amounts map is lapsing and
+    left to the grace flow, so this returns SKIPPED for them."""
     async with db.begin_write(api) as session:
         subscription = (
-            await session.exec(UPGRADABLE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))
+            await session.exec(LIVE_LINKED_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))
         ).first()
-        if subscription is None or subscription.patreon_user_id not in active_ids:
-            return False
+        if subscription is None:
+            return LevelSyncOutcome.SKIPPED
+        amount = active_amounts.get(subscription.patreon_user_id)
+        if amount is None:
+            return LevelSyncOutcome.SKIPPED
         user = await load_user(session, subscription.user_id)
         if user is None:
-            return False
-        user.is_premium = True
+            return LevelSyncOutcome.SKIPPED
+
+        target = supporter.level_for_amount(amount, config)
+        if user.supporter_level == target:
+            return LevelSyncOutcome.UNCHANGED
+
+        previous = user.supporter_level
+        user.supporter_level = target
         subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
         subscription.expiration_notified = False
-        await api.send_message_to_user(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
-        return True
+        if not supporter.meets(previous, target):
+            await api.send_message_to_user(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+            return LevelSyncOutcome.UPGRADED
+        return LevelSyncOutcome.DOWNGRADED
 
 
 @db.with_session
@@ -332,7 +362,7 @@ async def refresh_user_token(
 
     async with db.begin_write(api) as session:
         subscription = (
-            await session.exec(REFRESHABLE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))
+            await session.exec(LIVE_LINKED_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))
         ).first()
         if subscription is None:
             return UserTokenOutcome.GONE
@@ -370,7 +400,7 @@ async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int],
 
 
 async def run(api: TelegramApiWrapper, metrics: MetricsClient):
-    """Validate premium memberships against Patreon and keep both token families fresh.
+    """Validate supporter memberships against Patreon and keep both token families fresh.
 
     No-ops cleanly when Patreon is unconfigured, so the bot can deploy before any credentials exist.
     Each subscription is handled in its own write lifecycle; a mid-run failure leaves earlier commits
@@ -388,27 +418,32 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         if creator_access_token is None:
             # No usable creator token means no member list; the TTL alarm already covers this.
             return
-        active_ids = await active_patreon_ids(client, creator_access_token)
+        active_amounts = await active_patreon_amounts(client, creator_access_token)
 
+        # The level sync and the token refresh both sweep the whole live-linked population, so it is
+        # nominated once and drives both passes.
+        live_ids = await nominate(LIVE_LINKED_SUBSCRIPTIONS)
         due_outcomes = await process_all(
-            lambda subscription_id: process_due_subscription(subscription_id, active_ids, api),
+            lambda subscription_id: process_due_subscription(subscription_id, active_amounts, api),
             await nominate(DUE_SUBSCRIPTIONS),
             failures,
         )
-        upgrade_results = await process_all(
-            lambda subscription_id: upgrade_subscription(subscription_id, active_ids, api),
-            await nominate(UPGRADABLE_SUBSCRIPTIONS),
+        sync_outcomes = await process_all(
+            lambda subscription_id: sync_subscription_level(subscription_id, active_amounts, config, api),
+            live_ids,
             failures,
         )
-        refresh = await refresh_user_tokens(client, api, metrics, failures)
+        refresh = await refresh_user_tokens(client, api, metrics, failures, live_ids)
 
     grace_started = sum(1 for outcome in due_outcomes if outcome is DueOutcome.GRACE_STARTED)
     premium_lost = sum(1 for outcome in due_outcomes if outcome is DueOutcome.PREMIUM_LOST)
-    upgraded = sum(1 for upgraded_flag in upgrade_results if upgraded_flag)
+    upgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.UPGRADED)
+    downgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.DOWNGRADED)
 
     metrics.emit(GRACE_STARTED_METRIC, grace_started, MetricUnit.COUNT)
     metrics.emit(PREMIUM_LOST_METRIC, premium_lost, MetricUnit.COUNT)
     metrics.emit(UPGRADES_METRIC, upgraded, MetricUnit.COUNT)
+    metrics.emit(DOWNGRADES_METRIC, downgraded, MetricUnit.COUNT)
     metrics.emit(USER_TOKENS_REFRESHED_METRIC, refresh.refreshed, MetricUnit.COUNT)
     metrics.emit(USER_TOKENS_REVOKED_METRIC, refresh.revoked, MetricUnit.COUNT)
     metrics.emit(USER_TOKEN_REFRESH_FAULTS_METRIC, refresh.faults, MetricUnit.COUNT)
@@ -422,16 +457,22 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         grace_started=grace_started,
         premium_lost=premium_lost,
         upgraded=upgraded,
+        downgraded=downgraded,
         tokens_refreshed=refresh.refreshed,
         tokens_revoked=refresh.revoked,
-        active_patrons=len(active_ids),
+        active_patrons=len(active_amounts),
     )
 
 
 async def refresh_user_tokens(
-    client: PatreonClient, api: TelegramApiWrapper, metrics: MetricsClient, failures: list[str]
+    client: PatreonClient,
+    api: TelegramApiWrapper,
+    metrics: MetricsClient,
+    failures: list[str],
+    subscription_ids: list[int],
 ) -> RefreshSummary:
-    """Refresh every live user token, emitting one dimensionless TTL sample per surviving row.
+    """Refresh each live user token in ``subscription_ids``, emitting one dimensionless TTL sample per
+    surviving row.
 
     Returns the run tallies (refreshed / revoked / faults). ``UserId`` rides as an EMF property (not a
     dimension) so the ``Min`` over the single series is the fleet's worst token and Logs Insights can
@@ -439,7 +480,7 @@ async def refresh_user_tokens(
     refreshed = 0
     revoked = 0
     faults = 0
-    for subscription_id in await nominate(REFRESHABLE_SUBSCRIPTIONS):
+    for subscription_id in subscription_ids:
         try:
             result = await refresh_user_token(subscription_id, client, api)
         except Exception as error:

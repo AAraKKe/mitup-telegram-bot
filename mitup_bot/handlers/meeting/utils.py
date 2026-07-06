@@ -3,9 +3,10 @@ from typing import assert_never
 
 from telegram import Update
 
-from mitup_bot import guards, limits
+from mitup_bot import guards, limits, supporter
 from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.models import User
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import ButtonMessages, PremiumMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -41,18 +42,23 @@ def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang
 async def active_meetings_cap_reached(user: User, update: Update, context: TMitupContext) -> bool:
     """Return True, having informed the user, when they are at their active-meetings cap; else False.
 
-    Premium raises the cap: a free user at the cap is shown the upsell via `premium_required`
-    (pointing to Collaborate), while a premium user at the sanity cap gets a plain limit notice.
-    The notice rides a callback-query alert when one is present (the New Meeting button and the
-    reactivation button) and a sent message otherwise (the title-message creation path).
+    The Patron tier raises the cap: a below-Patron user at the free cap is shown the upsell via
+    `supporter_required` (pointing to Collaborate), while a Patron at the sanity cap gets a plain
+    limit notice (the Organizer tier is uncapped and never reaches here). The notice rides a
+    callback-query alert when one is present (the New Meeting button and the reactivation button) and
+    a sent message otherwise (the title-message creation path).
     """
     if not limits.at_active_meetings_cap(user):
         return False
 
     cap = limits.active_meetings_cap(user)
+    assert cap is not None, "at_active_meetings_cap is only True when a finite cap is reached"
+    below_patron = not supporter.meets(user.supporter_level, SupporterLevel.PATRON)
     if update.callback_query is not None:
-        if not user.is_premium:
-            await guards.premium_required(user, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, cap=cap)
+        if below_patron:
+            await guards.supporter_required(
+                user, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=cap
+            )
         else:
             await context.api.answer_callback_query(
                 update,
@@ -60,9 +66,7 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
                 show_alert=True,
             )
     else:
-        message = (
-            PremiumMessages.ACTIVE_MEETINGS_CAP if not user.is_premium else PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM
-        )
+        message = PremiumMessages.ACTIVE_MEETINGS_CAP if below_patron else PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM
         await context.api.send_message(update=update, view=message.get(lang=user.lang, cap=cap))
     return True
 
@@ -70,22 +74,23 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
 def scheduling_horizon_rejection(user: User, when: dt.datetime) -> str | None:
     """Plain-text rejection when `when` is beyond the user's scheduling horizon, else None.
 
-    Premium raises the horizon; a free user is pointed at Collaborate. Returned as plain text so it
-    fits both a callback-query alert and a sent message.
+    The Patron tier raises the horizon; a below-Patron user is pointed at Collaborate. Returned as
+    plain text so it fits both a callback-query alert and a sent message.
     """
     if limits.within_scheduling_horizon(user, when):
         return None
     days = limits.scheduling_horizon_days(user)
-    message = PremiumMessages.SCHEDULING_HORIZON if not user.is_premium else PremiumMessages.SCHEDULING_HORIZON_PREMIUM
+    assert days is not None, "within_scheduling_horizon is only False when a finite horizon applies"
+    below_patron = not supporter.meets(user.supporter_level, SupporterLevel.PATRON)
+    message = PremiumMessages.SCHEDULING_HORIZON if below_patron else PremiumMessages.SCHEDULING_HORIZON_PREMIUM
     return message.get_text(lang=user.lang, days=days)
 
 
 def participant_capacity_rejection(user: User, max_members: int) -> str | None:
-    """Plain-text rejection when a free owner sets a participant limit above the free-tier cap, else
-    None.
+    """Plain-text rejection when a capped owner sets a participant limit above their cap, else None.
 
-    Premium owners are uncapped, so they never hit this; a free owner is pointed at Collaborate.
-    Returned as plain text so it fits both a sent message and a callback-query alert.
+    Patron and Organizer owners are uncapped, so they never hit this; a capped owner is pointed at
+    Collaborate. Returned as plain text so it fits both a sent message and a callback-query alert.
     """
     cap = limits.participant_capacity(user)
     if cap is None or max_members <= cap:

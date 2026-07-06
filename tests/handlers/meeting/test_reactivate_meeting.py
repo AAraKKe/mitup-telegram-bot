@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 from telegram import Update
 
-from mitup_bot import limits
+from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
@@ -93,7 +93,7 @@ async def test_reactivate_meeting_blocked_when_at_active_meetings_cap(
     """A free user already at their cap cannot reactivate: the meeting stays inactive and the upsell
     alert is shown. The other meeting the fixture owns stays active — the cap counts it."""
     # Cap of 1; the fixture's other meeting (id 2) is active, so the user is already at the cap.
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_active_meetings=1))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_active_meetings=1))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
@@ -120,7 +120,7 @@ async def test_reactivate_meeting_allowed_below_cap(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """With headroom under the cap the reactivation goes through as normal."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_active_meetings=5))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_active_meetings=5))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 

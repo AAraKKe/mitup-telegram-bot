@@ -3,6 +3,7 @@ import datetime as dt
 import pytest
 
 from mitup_bot.models import JoinedUsers
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages
 from tests.helpers import create_meetup, create_user
@@ -425,17 +426,16 @@ def test_participants_list_text_without_waiting_list():
     assert expected == meeting.participants_list_text.text
 
 
-def test_participants_list_text_badges_premium_participant():
+def test_participants_list_text_badges_supporter_participant():
     owner = create_user(id=1, first_name="Owner", tg_user_id=997_710)
     meeting = create_meetup(id=1, owner=owner)
     free = create_user(id=2, first_name="Bob", tg_user_id=997_711)
-    premium = create_user(id=3, username="alice", tg_user_id=997_712)
-    premium.is_premium = True
+    supporter_member = create_user(id=3, username="alice", tg_user_id=997_712, supporter_level=SupporterLevel.SUPPORTER)
 
     meeting.create_joined_link(free, is_waiting_list=False)
-    meeting.create_joined_link(premium, is_waiting_list=False)
+    meeting.create_joined_link(supporter_member, is_waiting_list=False)
 
-    # Only the premium participant carries the supporter badge; the free participant is untouched.
+    # Only the supporter carries the badge (their tier's emoji); the free participant is untouched.
     expected = f"\n  Bob\n  alice {Emojis.SUPPORTER}"
     assert expected == meeting.participants_list_text.text
 

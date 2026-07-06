@@ -225,25 +225,26 @@ class MetricsConfig(BaseModel):
 
 
 class LimitsConfig(BaseModel):
-    """Free-tier limits that premium (Patreon) users have raised.
+    """Free-tier limits that the Patron tier has raised (see `mitup_bot.supporter` for the level ->
+    cap policy; the Organizer tier skips these caps entirely).
 
     Every field is defaulted so the limits ship without any TOML or env change: the code default
     is the live value until a deploy tunes it through a `MITUPBOT__LIMITS__*` override, keeping the
-    revert config-only. The premium values are deliberately generous sanity caps, not real limits.
+    revert config-only. The Patron values are deliberately generous sanity caps, not real limits.
     """
 
     # Active meetings a user may own at once (enforced at meeting creation and reactivation).
     free_active_meetings: int = 5
-    premium_active_meetings: int = 50
+    patron_active_meetings: int = 50
     # How many days ahead a meeting's start date may be set. The free horizon stays wide enough
     # for normal planning (a dinner a couple of months out); the limit only targets meetings so
     # far in the future they clog the database, which is exactly what supporters offset.
     free_scheduling_horizon_days: int = 90
-    premium_scheduling_horizon_days: int = 365
+    patron_scheduling_horizon_days: int = 365
     # Free-tier per-meeting participant capacity, enforced as an effective cap on joins and
-    # waiting-list promotions (a free owner's "no limit" resolves to this value). Premium owners
-    # are uncapped. Participant rows are a direct DB-growth lever, which is the cost supporters
-    # offset.
+    # waiting-list promotions (a free owner's "no limit" resolves to this value). Patron and
+    # Organizer owners are uncapped. Participant rows are a direct DB-growth lever, which is the
+    # cost supporters offset.
     free_participant_capacity: int = 20
 
 
@@ -279,6 +280,14 @@ class PatreonConfig(BaseModel):
     # Per-request timeout (seconds) for the httpx client that talks to the Patreon API. Optional
     # with a sensible default so operators can tune it without a code change if Patreon is slow.
     request_timeout_seconds: float = 30.0
+    # Minimum `currently_entitled_amount_cents` (VAT-exclusive pledge base) an active member must
+    # reach for each supporter tier, matching the live €3/€5/€10 campaign tiers. A member's level is
+    # the highest threshold their entitled amount reaches (see `mitup_bot.supporter.level_for_amount`);
+    # an active member below the lowest threshold still counts as SUPPORTER. Defaulted so tuning a
+    # tier price is a config-only change.
+    supporter_min_cents: int = 300
+    patron_min_cents: int = 500
+    organizer_min_cents: int = 1000
 
 
 # Connections kept free for work that runs outside update handlers: the job queue and the

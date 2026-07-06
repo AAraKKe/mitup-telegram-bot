@@ -16,6 +16,7 @@ from mitup_bot.exceptions import PatreonApiError
 from mitup_bot.models import PremiumSubscription
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
 from mitup_bot.patreon.models import IdentityData, IdentityResponse
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
     CallbackOutcome,
@@ -508,10 +509,12 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
 
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(api, 997_650, link_pair(), patreon_user_id="p-650", is_active_member=True)
+        outcome = await link_patreon_account(
+            api, 997_650, link_pair(), patreon_user_id="p-650", supporter_level=SupporterLevel.PATRON
+        )
 
     assert outcome is LinkOutcome.LINKED_PREMIUM
-    assert user.is_premium is True
+    assert user.supporter_level is SupporterLevel.PATRON
     added = [obj for obj in session.objects_added if isinstance(obj, PremiumSubscription)]
     assert len(added) == 1
     assert added[0].patreon_user_id == "p-650"
@@ -524,7 +527,7 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     assert linked["outcome"] == "linked_premium"
     assert linked["tg_user_id"] == 997_650
     assert linked["patreon_user_id"] == "p-650"
-    assert linked["is_active_member"] is True
+    assert linked["supporter_level"] == "patron"
 
 
 async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Callable[[MockDbSession], None]):
@@ -534,10 +537,12 @@ async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Cal
     patch_begin_write(session)
 
     api = MockApi()
-    outcome = await link_patreon_account(api, 997_651, link_pair(), patreon_user_id="p-651", is_active_member=False)
+    outcome = await link_patreon_account(
+        api, 997_651, link_pair(), patreon_user_id="p-651", supporter_level=SupporterLevel.NONE
+    )
 
     assert outcome is LinkOutcome.LINKED_NO_PATRON
-    assert user.is_premium is False
+    assert user.supporter_level is SupporterLevel.NONE
     added = [obj for obj in session.objects_added if isinstance(obj, PremiumSubscription)]
     assert len(added) == 1
     assert added[0].premium_expiration is None
@@ -550,7 +555,9 @@ async def test_link_unknown_user_returns_unknown(patch_begin_write: Callable[[Mo
 
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(api, 997_659, link_pair(), patreon_user_id="p-659", is_active_member=True)
+        outcome = await link_patreon_account(
+            api, 997_659, link_pair(), patreon_user_id="p-659", supporter_level=SupporterLevel.PATRON
+        )
 
     assert outcome is LinkOutcome.UNKNOWN_USER
     assert not session.objects_added
@@ -574,11 +581,11 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_652, link_pair(), patreon_user_id="p-shared", is_active_member=True
+            api, 997_652, link_pair(), patreon_user_id="p-shared", supporter_level=SupporterLevel.PATRON
         )
 
     assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE
-    assert user.is_premium is False
+    assert user.supporter_level is SupporterLevel.NONE
     assert not any(isinstance(obj, PremiumSubscription) for obj in session.objects_added)
     api.assert_method_just_called("send_message_to_user", times=0)
 

@@ -5,6 +5,7 @@ import pytest
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
@@ -52,15 +53,23 @@ async def test_send_message_calls_bot_with_correct_args():
 def test_display_name_is_plain_inline_name_for_free_user():
     user = create_user(id=1, username="alice", tg_user_id=997_701)
 
-    assert user.is_premium is False
+    assert user.supporter_level is SupporterLevel.NONE
     assert user.display_name == "alice"
 
 
-def test_display_name_appends_supporter_badge_for_premium_user():
-    user = create_user(id=1, username="alice", tg_user_id=997_701)
-    user.is_premium = True
+@pytest.mark.parametrize(
+    "level,badge",
+    [
+        (SupporterLevel.SUPPORTER, Emojis.SUPPORTER),
+        (SupporterLevel.PATRON, Emojis.PATRON),
+        (SupporterLevel.ORGANIZER, Emojis.ORGANIZER),
+    ],
+    ids=["supporter", "patron", "organizer"],
+)
+def test_display_name_appends_per_tier_badge(level: SupporterLevel, badge: Emojis):
+    user = create_user(id=1, username="alice", tg_user_id=997_701, supporter_level=level)
 
-    assert user.display_name == f"alice {Emojis.SUPPORTER}"
+    assert user.display_name == f"alice {badge}"
 
 
 @pytest.mark.parametrize(

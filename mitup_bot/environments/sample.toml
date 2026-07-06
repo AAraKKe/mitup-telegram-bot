@@ -66,17 +66,18 @@ namespace = "MitupBot"
 environment = "local"
 
 [limits]
-# Free-tier limits that premium (Patreon) users have raised. This whole section is OPTIONAL:
-# every field is defaulted, so the values below are what the bot uses when the section is omitted.
-# Tune a value in a deployed service via MITUPBOT__LIMITS__<KEY> so a revert stays config-only.
+# Free-tier limits that the Patron tier has raised (the Organizer tier skips these caps entirely;
+# see the supporter-tier policy in mitup_bot/supporter.py). This whole section is OPTIONAL: every
+# field is defaulted, so the values below are what the bot uses when the section is omitted. Tune a
+# value in a deployed service via MITUPBOT__LIMITS__<KEY> so a revert stays config-only.
 # Active meetings a user may own at once (enforced at creation and reactivation).
 free_active_meetings = 5
-premium_active_meetings = 50
+patron_active_meetings = 50
 # How many days ahead a meeting's start date may be set.
 free_scheduling_horizon_days = 90
-premium_scheduling_horizon_days = 365
+patron_scheduling_horizon_days = 365
 # Free-tier per-meeting participant capacity, applied as an effective cap on joins and waiting-list
-# promotions (a free owner's "no limit" resolves to this). Premium owners are uncapped.
+# promotions (a free owner's "no limit" resolves to this). Patron and Organizer owners are uncapped.
 free_participant_capacity = 20
 
 [patreon]
@@ -99,3 +100,10 @@ creator_refresh_token = "patreon_creator_refresh_token"
 # other encrypts Patreon tokens at rest in the DB.
 state_secret = "fernet_key_for_oauth_state"
 encryption_key = "fernet_key_for_token_encryption"
+# Supporter-tier thresholds in cents of `currently_entitled_amount_cents` (the VAT-exclusive pledge
+# base Patreon reports), matching the live €3/€5/€10 campaign tiers. An active member's tier is the
+# highest threshold their entitled amount reaches; an active member below the lowest threshold still
+# counts as a Supporter. All three are OPTIONAL (defaulted), so tuning a tier price is config-only.
+supporter_min_cents = 300
+patron_min_cents = 500
+organizer_min_cents = 1000

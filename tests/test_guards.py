@@ -24,7 +24,7 @@ from mitup_bot.guards import (
     meeting_accessible,
     meeting_viewable,
     message,
-    premium_required,
+    supporter_required,
     user_language,
     user_owns_meeting,
     user_registered,
@@ -36,6 +36,7 @@ from mitup_bot.guards import (
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, PremiumMessages
@@ -544,28 +545,36 @@ async def test_user_owns_meeting_returns_none_silently_when_redirect_false(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
-async def test_premium_required_passes_premium_user_through(
+@pytest.mark.parametrize("level", [SupporterLevel.PATRON, SupporterLevel.ORGANIZER], ids=["patron", "organizer"])
+async def test_supporter_required_passes_user_meeting_minimum_through(
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
+    level: SupporterLevel,
 ):
-    user_with_settings.is_premium = True
+    user_with_settings.supporter_level = level
 
-    result = await premium_required(user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, cap=5)
+    result = await supporter_required(
+        user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
+    )
 
     assert result is user_with_settings
     context.api.assert_method_just_called("answer_callback_query", times=0)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
-async def test_premium_required_alerts_and_returns_none_for_free_user(
+@pytest.mark.parametrize("level", [SupporterLevel.NONE, SupporterLevel.SUPPORTER], ids=["none", "supporter"])
+async def test_supporter_required_alerts_and_returns_none_below_minimum(
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
+    level: SupporterLevel,
 ):
-    user_with_settings.is_premium = False
+    user_with_settings.supporter_level = level
 
-    result = await premium_required(user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, cap=5)
+    result = await supporter_required(
+        user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
+    )
 
     assert result is None
     context.api.assert_answer_callback_query_called(

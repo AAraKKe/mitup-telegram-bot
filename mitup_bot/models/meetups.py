@@ -127,13 +127,13 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     @property
     def effective_max_members(self) -> int | None:
-        """`max_members` tightened by the owner's free-tier participant cap (#209), or None
-        (unlimited) which is only reachable for premium owners.
+        """`max_members` tightened by the owner's participant cap (#209), or None (unlimited) which is
+        only reachable for uncapped (Patron/Organizer) owners.
 
         Every capacity read — `full`, waiting-list promotion, and the capacity displays — resolves
-        through this, so a free owner's meeting never exceeds the cap whether they set a higher limit
-        or none at all. A meeting already over the cap (owner lost premium, or pre-cap data) keeps
-        its participants and simply reads as full until it drops back under the cap.
+        through this, so a capped owner's meeting never exceeds the cap whether they set a higher
+        limit or none at all. A meeting already over the cap (owner dropped a tier, or pre-cap data)
+        keeps its participants and simply reads as full until it drops back under the cap.
         """
         return limits.effective_participant_capacity(self.owner, self.max_members)
 

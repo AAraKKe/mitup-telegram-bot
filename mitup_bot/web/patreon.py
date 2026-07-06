@@ -31,12 +31,13 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import Application
 
-from mitup_bot import db, patreon
+from mitup_bot import db, patreon, supporter
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
 from mitup_bot.models import PremiumSubscription, User
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.patreon import PatreonClient, TokenPair, oauth
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import CollaborateMessages
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
 
@@ -386,22 +387,30 @@ async def exchange_and_link(
         )
 
     is_active_member = identity.is_active_member_of(config.campaign_id)
+    # An active member maps to their entitled tier; a non-member maps to NONE. level_for_amount floors
+    # at SUPPORTER for any active member, so it must only see amounts of members already known active.
+    level = (
+        supporter.level_for_amount(identity.entitled_amount_cents_of(config.campaign_id), config)
+        if is_active_member
+        else SupporterLevel.NONE
+    )
     log.info(
         "Patreon identity fetched",
         stage="identity_fetch",
         patreon_user_id=identity.patreon_user_id,
         is_active_member=is_active_member,
+        supporter_level=level.value,
     )
 
     api = build_api(BotAdapter(ptb_app.bot, metrics_client))
     outcome = await link_patreon_account(
-        api, tg_user_id, pair, patreon_user_id=identity.patreon_user_id, is_active_member=is_active_member
+        api, tg_user_id, pair, patreon_user_id=identity.patreon_user_id, supporter_level=level
     )
     return result_page_for(outcome, bot_username)
 
 
 async def link_patreon_account(
-    api: TelegramApiWrapper, tg_user_id: int, pair: TokenPair, *, patreon_user_id: str, is_active_member: bool
+    api: TelegramApiWrapper, tg_user_id: int, pair: TokenPair, *, patreon_user_id: str, supporter_level: SupporterLevel
 ) -> LinkOutcome:
     """Upsert the subscription and, on success, queue the confirmation message to the user.
 
@@ -410,8 +419,8 @@ async def link_patreon_account(
     ``begin_write`` so the message drains only after the row is committed.
     """
     async with db.begin_write(api) as session:
-        # The callback only needs the user's own columns (id, lang, is_premium); load_collections=False
-        # skips the meetups/joined_links selectin queries. Do not touch those collections here.
+        # The callback only needs the user's own columns (id, lang, supporter_level);
+        # load_collections=False skips the meetups/joined_links selectin queries. Do not touch those.
         user = await User.by_tg_user_id(session, tg_user_id, load_collections=False)
         if user is None:
             log.warning(
@@ -442,13 +451,13 @@ async def link_patreon_account(
 
         subscription = await upsert_subscription(session, user, pair, patreon_user_id)
 
-        if is_active_member:
-            user.is_premium = True
+        if supporter.is_supporter(supporter_level):
+            user.supporter_level = supporter_level
             subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
             message = CollaborateMessages.LINK_CONFIRMED_PREMIUM
             outcome = LinkOutcome.LINKED_PREMIUM
         else:
-            user.is_premium = False
+            user.supporter_level = SupporterLevel.NONE
             subscription.premium_expiration = None
             message = CollaborateMessages.LINK_CONFIRMED_NO_PATRON
             outcome = LinkOutcome.LINKED_NO_PATRON
@@ -460,7 +469,7 @@ async def link_patreon_account(
             outcome=outcome.name.lower(),
             tg_user_id=tg_user_id,
             patreon_user_id=patreon_user_id,
-            is_active_member=is_active_member,
+            supporter_level=supporter_level.value,
         )
         await api.send_message_to_user(user, message.get(lang=user.lang))
         return outcome

@@ -7,7 +7,7 @@ from telegram import Chat, Message, MessageEntity, Update
 from telegram import User as TelegramUser
 from telegram.ext import Application, ConversationHandler
 
-from mitup_bot import limits
+from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback_query_create_meeting
@@ -410,7 +410,7 @@ async def test_create_meeting_entry_blocked_at_cap_shows_upsell(
 ):
     """The New Meeting button stops at the cap: an alert is shown and the conversation never starts."""
     # The fixture owner already has two active meetings.
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_active_meetings=2))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_active_meetings=2))
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     state = await callback_query_create_meeting(update, context)
@@ -433,7 +433,7 @@ async def test_create_meeting_title_blocked_at_cap_sends_message(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """The title-message path (used by the inline deep link) backstops the cap with a sent message."""
-    monkeypatch.setattr(limits.LimitsState, "config", LimitsConfig(free_active_meetings=2))
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_active_meetings=2))
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     title_update = make_message_update("My meeting")
@@ -458,7 +458,7 @@ async def test_create_meeting_title_date_beyond_horizon_stays_in_title(
 ):
     """A title-embedded date past the free horizon is rejected, keeping the user in TITLE."""
     monkeypatch.setattr(
-        limits.LimitsState, "config", LimitsConfig(free_active_meetings=5, free_scheduling_horizon_days=31)
+        supporter.PolicyState, "config", LimitsConfig(free_active_meetings=5, free_scheduling_horizon_days=31)
     )
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -488,7 +488,7 @@ async def test_create_meeting_title_date_within_horizon_is_created(
 ):
     """A title-embedded date exactly on the horizon boundary is accepted and the meeting is created."""
     monkeypatch.setattr(
-        limits.LimitsState, "config", LimitsConfig(free_active_meetings=5, free_scheduling_horizon_days=31)
+        supporter.PolicyState, "config", LimitsConfig(free_active_meetings=5, free_scheduling_horizon_days=31)
     )
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 

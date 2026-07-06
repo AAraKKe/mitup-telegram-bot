@@ -24,6 +24,7 @@ from mitup_bot.models import (
 from mitup_bot.models import Message as MeetupMessage
 from mitup_bot.models.broadcasts import BroadcastStatus
 from mitup_bot.models.users import UserStatus
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
     DEFAULT_MESSAGE_ID,
@@ -137,6 +138,7 @@ def create_user(
     first_name: str = "Test FirstName",
     last_name: str | None = None,
     status: UserStatus = UserStatus.MEMBER,
+    supporter_level: SupporterLevel = SupporterLevel.NONE,
     owned_meetings: list[Meetup] | None = None,
     settings: Settings | None = None,
 ) -> User:
@@ -147,6 +149,7 @@ def create_user(
         first_name=first_name,
         last_name=last_name,
         status=status,
+        supporter_level=supporter_level,
         meetups=owned_meetings or [],
         settings=settings or create_settings(),
     )

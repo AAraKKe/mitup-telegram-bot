@@ -2,14 +2,15 @@ import datetime as dt
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, FetchedValue, false
+from sqlalchemy import Column, DateTime, Enum, FetchedValue
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import ExtBot
 
+from mitup_bot import supporter
 from mitup_bot.exceptions import UserNotFound
-from mitup_bot.utils.emojis import Emojis
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.views import MitupView
 
 from . import JoinedUsers, Meetup
@@ -59,9 +60,22 @@ class User(BaseModel, SQLModel, table=True):
     last_name: str | None = None
     username: str | None = None
     # Kept directly on User (rather than joined from premium_subscriptions) so every handler that
-    # gates on premium status reads it without a join; the recurring job and OAuth callback keep it
-    # in sync with the subscription row.
-    is_premium: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, server_default=false()))
+    # gates on support status reads it without a join; the recurring job and OAuth callback keep it
+    # in sync with the subscription row. native_enum=False keeps the column a plain VARCHAR (no DB
+    # enum type, mirroring `status`) while coercing loaded rows back to SupporterLevel.
+    supporter_level: SupporterLevel = Field(
+        default=SupporterLevel.NONE,
+        sa_column=Column(
+            Enum(
+                SupporterLevel,
+                native_enum=False,
+                length=16,
+                values_callable=lambda enum: [member.value for member in enum],
+            ),
+            nullable=False,
+            server_default=SupporterLevel.NONE.value,
+        ),
+    )
     # lazy="selectin": `user.lang` is read for virtually every loaded user (including meeting
     # participants), and implicit lazy loads raise MissingGreenlet under the async engine.
     settings: Settings = Relationship(
@@ -144,14 +158,15 @@ class User(BaseModel, SQLModel, table=True):
 
     @property
     def display_name(self) -> str:
-        """`inline_name` with the supporter badge appended for premium users.
+        """`inline_name` with the supporter badge for the user's tier appended (none for NONE).
 
-        The badge rides existing name displays only: callers that hide a name (e.g. incognito
-        meetings omit the participant list entirely) never reach this, so the badge inherits the
-        same visibility as the name it decorates and creates no new identity exposure.
+        The per-tier badge is resolved through the supporter policy, so the emoji-per-level mapping
+        lives in one place. The badge rides existing name displays only: callers that hide a name
+        (e.g. incognito meetings omit the participant list entirely) never reach this, so the badge
+        inherits the same visibility as the name it decorates and creates no new identity exposure.
         """
-        if self.is_premium:
-            return f"{self.inline_name} {Emojis.SUPPORTER}"
+        if tier_badge := supporter.badge(self.supporter_level):
+            return f"{self.inline_name} {tier_badge}"
         return self.inline_name
 
     @property

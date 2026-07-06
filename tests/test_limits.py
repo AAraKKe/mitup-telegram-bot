@@ -3,9 +3,10 @@ import datetime as dt
 import pytest
 from freezegun import freeze_time
 
-from mitup_bot import limits
+from mitup_bot import limits, supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.models import User
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers import create_meetup
 
 # Europe/Madrid is UTC+1 in winter; the user_with_settings owner uses that zone, so a frozen
@@ -18,62 +19,94 @@ def configured_limits(monkeypatch: pytest.MonkeyPatch) -> LimitsConfig:
     """Small, explicit caps so the boundaries are easy to reason about in assertions."""
     config = LimitsConfig(
         free_active_meetings=2,
-        premium_active_meetings=4,
+        patron_active_meetings=4,
         free_scheduling_horizon_days=31,
-        premium_scheduling_horizon_days=365,
+        patron_scheduling_horizon_days=365,
         free_participant_capacity=5,
     )
-    monkeypatch.setattr(limits.LimitsState, "config", config)
+    monkeypatch.setattr(supporter.PolicyState, "config", config)
     return config
 
 
-def test_configure_replaces_the_active_config():
-    original = limits.LimitsState.config
-    try:
-        limits.configure(LimitsConfig(free_active_meetings=1))
-        assert limits.LimitsState.config.free_active_meetings == 1
-    finally:
-        limits.configure(original)
+@pytest.mark.parametrize(
+    "level,expected_attr",
+    [
+        (SupporterLevel.NONE, "free_active_meetings"),
+        (SupporterLevel.SUPPORTER, "free_active_meetings"),
+        (SupporterLevel.PATRON, "patron_active_meetings"),
+    ],
+    ids=["none", "supporter", "patron"],
+)
+def test_active_meetings_cap_by_level(
+    user_with_settings: User, configured_limits: LimitsConfig, level: SupporterLevel, expected_attr: str
+):
+    user_with_settings.supporter_level = level
+    assert limits.active_meetings_cap(user_with_settings) == getattr(configured_limits, expected_attr)
 
 
-def test_active_meetings_cap_is_raised_for_premium(user_with_settings: User, configured_limits: LimitsConfig):
-    assert limits.active_meetings_cap(user_with_settings) == configured_limits.free_active_meetings
-    user_with_settings.is_premium = True
-    assert limits.active_meetings_cap(user_with_settings) == configured_limits.premium_active_meetings
-
-
-def test_scheduling_horizon_days_is_raised_for_premium(user_with_settings: User, configured_limits: LimitsConfig):
-    assert limits.scheduling_horizon_days(user_with_settings) == configured_limits.free_scheduling_horizon_days
-    user_with_settings.is_premium = True
-    assert limits.scheduling_horizon_days(user_with_settings) == configured_limits.premium_scheduling_horizon_days
-
-
-def test_participant_capacity_is_lifted_for_premium(user_with_settings: User, configured_limits: LimitsConfig):
-    assert limits.participant_capacity(user_with_settings) == configured_limits.free_participant_capacity
-    user_with_settings.is_premium = True
-    # Premium supporters are uncapped, so there is no participant ceiling to resolve.
-    assert limits.participant_capacity(user_with_settings) is None
+def test_active_meetings_cap_is_unlimited_for_organizer(user_with_settings: User, configured_limits: LimitsConfig):
+    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    assert limits.active_meetings_cap(user_with_settings) is None
 
 
 @pytest.mark.parametrize(
-    "is_premium,max_members,expected",
+    "level,expected_attr",
     [
-        (False, None, 5),  # free + no explicit limit resolves to the cap
-        (False, 3, 3),  # free + explicit below cap is left untouched
-        (False, 10, 5),  # free + explicit above cap is clamped down to it (grandfathered)
-        (True, None, None),  # premium + no explicit limit stays unlimited
-        (True, 100, 100),  # premium + explicit limit is honored as-is
+        (SupporterLevel.NONE, "free_scheduling_horizon_days"),
+        (SupporterLevel.SUPPORTER, "free_scheduling_horizon_days"),
+        (SupporterLevel.PATRON, "patron_scheduling_horizon_days"),
     ],
-    ids=["free_no_limit", "free_below_cap", "free_above_cap", "premium_no_limit", "premium_explicit"],
+    ids=["none", "supporter", "patron"],
+)
+def test_scheduling_horizon_days_by_level(
+    user_with_settings: User, configured_limits: LimitsConfig, level: SupporterLevel, expected_attr: str
+):
+    user_with_settings.supporter_level = level
+    assert limits.scheduling_horizon_days(user_with_settings) == getattr(configured_limits, expected_attr)
+
+
+def test_scheduling_horizon_is_unlimited_for_organizer(user_with_settings: User, configured_limits: LimitsConfig):
+    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    assert limits.scheduling_horizon_days(user_with_settings) is None
+
+
+@pytest.mark.parametrize(
+    "level,expected",
+    [
+        (SupporterLevel.NONE, 5),
+        (SupporterLevel.SUPPORTER, 5),
+        (SupporterLevel.PATRON, None),
+        (SupporterLevel.ORGANIZER, None),
+    ],
+    ids=["none", "supporter", "patron", "organizer"],
+)
+def test_participant_capacity_by_level(
+    user_with_settings: User, configured_limits: LimitsConfig, level: SupporterLevel, expected: int | None
+):
+    # configured_limits pins free_participant_capacity=5; Patron and Organizer are uncapped.
+    user_with_settings.supporter_level = level
+    assert limits.participant_capacity(user_with_settings) == expected
+
+
+@pytest.mark.parametrize(
+    "level,max_members,expected",
+    [
+        (SupporterLevel.NONE, None, 5),  # capped + no explicit limit resolves to the cap
+        (SupporterLevel.NONE, 3, 3),  # capped + explicit below cap is left untouched
+        (SupporterLevel.NONE, 10, 5),  # capped + explicit above cap is clamped down (grandfathered)
+        (SupporterLevel.PATRON, None, None),  # uncapped + no explicit limit stays unlimited
+        (SupporterLevel.PATRON, 100, 100),  # uncapped + explicit limit is honored as-is
+    ],
+    ids=["free_no_limit", "free_below_cap", "free_above_cap", "patron_no_limit", "patron_explicit"],
 )
 def test_effective_participant_capacity(
     user_with_settings: User,
     configured_limits: LimitsConfig,  # pins free_participant_capacity=5
-    is_premium: bool,
+    level: SupporterLevel,
     max_members: int | None,
     expected: int | None,
 ):
-    user_with_settings.is_premium = is_premium
+    user_with_settings.supporter_level = level
     assert limits.effective_participant_capacity(user_with_settings, max_members) == expected
 
 
@@ -84,6 +117,12 @@ def test_at_active_meetings_cap_counts_only_active(user_with_settings: User, con
     # Grandfathering: wrapping one up (making it inactive) drops the count below the cap, so the
     # user can create/reactivate again without any retroactive deactivation of the rest.
     user_with_settings.meetups[0].active = False
+    assert limits.at_active_meetings_cap(user_with_settings) is False
+
+
+def test_organizer_is_never_at_active_meetings_cap(user_with_settings: User, configured_limits: LimitsConfig):
+    # The fixture owner is at the free cap, but an Organizer tier is uncapped.
+    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
     assert limits.at_active_meetings_cap(user_with_settings) is False
 
 
@@ -110,13 +149,22 @@ def test_within_scheduling_horizon_boundary_is_allowed(user_with_settings: User,
 
 
 @freeze_time(FROZEN_NOW, tz_offset=0)
-def test_within_scheduling_horizon_raised_for_premium(user_with_settings: User, configured_limits: LimitsConfig):
+def test_within_scheduling_horizon_raised_for_patron(user_with_settings: User, configured_limits: LimitsConfig):
     today = user_with_settings.now_in_tz().date()
     beyond_free = dt.datetime.combine(today + dt.timedelta(days=90), dt.time(12, 0), tzinfo=dt.UTC)
 
     assert limits.within_scheduling_horizon(user_with_settings, beyond_free) is False
-    user_with_settings.is_premium = True
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     assert limits.within_scheduling_horizon(user_with_settings, beyond_free) is True
+
+
+@freeze_time(FROZEN_NOW, tz_offset=0)
+def test_organizer_has_no_scheduling_horizon(user_with_settings: User, configured_limits: LimitsConfig):
+    today = user_with_settings.now_in_tz().date()
+    far_future = dt.datetime.combine(today + dt.timedelta(days=5000), dt.time(12, 0), tzinfo=dt.UTC)
+
+    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    assert limits.within_scheduling_horizon(user_with_settings, far_future) is True
 
 
 @freeze_time(FROZEN_NOW, tz_offset=0)

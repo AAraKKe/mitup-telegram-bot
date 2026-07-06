@@ -9,6 +9,7 @@ from mitup_bot.config import PatreonConfig
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.models import User
 from mitup_bot.patreon import PatreonRuntime, oauth
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CollaborateMessages
 from mitup_bot.views.collaborate import (
@@ -91,7 +92,7 @@ async def test_collaborate_linked_not_patron_view(
     user_with_settings: User,
     patreon_config: PatreonConfig,
 ):
-    user_with_settings.is_premium = False
+    user_with_settings.supporter_level = SupporterLevel.NONE
     mock_session.add_object(user_with_settings, "tg_user_id")
     subscription = create_premium_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")
@@ -112,7 +113,7 @@ async def test_collaborate_linked_patron_view(
     user_with_settings: User,
     patreon_config: PatreonConfig,
 ):
-    user_with_settings.is_premium = True
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     mock_session.add_object(user_with_settings, "tg_user_id")
     subscription = create_premium_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")
@@ -130,7 +131,7 @@ async def test_unlink_deletes_subscription_and_revokes_premium(
     user_with_settings: User,
     patreon_config: PatreonConfig,
 ):
-    user_with_settings.is_premium = True
+    user_with_settings.supporter_level = SupporterLevel.PATRON
     mock_session.add_object(user_with_settings, "tg_user_id")
     subscription = create_premium_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")
@@ -138,7 +139,7 @@ async def test_unlink_deletes_subscription_and_revokes_premium(
     context, _ = await call_handler(CollaborateHandlerId.UNLINK, handler_context=handler_context)
 
     mock_session.assert_deleted(subscription)
-    assert user_with_settings.is_premium is False
+    assert user_with_settings.supporter_level is SupporterLevel.NONE
     # The refreshed view confirms the unlink above the not-linked state.
     view = context.api.call_args("edit_message").kwargs["view"]
     assert view.description.text.startswith(CollaborateMessages.UNLINKED.get(lang=user_with_settings.lang).text)

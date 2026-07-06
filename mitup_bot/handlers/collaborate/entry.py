@@ -4,6 +4,7 @@ from telegram import Update
 from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CollaborateMessages
 from mitup_bot.utils.mitup_types import TMitupContext
@@ -28,7 +29,7 @@ async def callback_query_unlink_patreon(session: AsyncSession, update: Update, c
     subscription = await subscription_for_user(session, user)
     if subscription is not None:
         await session.delete(subscription)
-        user.is_premium = False
+        user.supporter_level = SupporterLevel.NONE
 
     # The pending delete flushes before build_collaborate_view re-reads the subscription, so the
     # view resolves to the not-linked state; the context line confirms the unlink above it.
