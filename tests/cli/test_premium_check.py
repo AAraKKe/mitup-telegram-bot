@@ -260,8 +260,6 @@ def register_due(mock_session: MockDbSession, subscription: PremiumSubscription,
 def make_subscription_user(
     patreon_user_id: str = "patreon-1",
     *,
-    access_token: str = "patreon-access-token",
-    refresh_token: str = "patreon-refresh-token",
     premium_expiration: dt.datetime | None = None,
     revoked_time: dt.datetime | None = None,
     expiration_notified: bool = False,
@@ -270,8 +268,6 @@ def make_subscription_user(
     subscription = create_premium_subscription(
         user_id=1,
         patreon_user_id=patreon_user_id,
-        access_token=access_token,
-        refresh_token=refresh_token,
         premium_expiration=premium_expiration,
         revoked_time=revoked_time,
         expiration_notified=expiration_notified,

@@ -23,7 +23,6 @@ from mitup_bot.models import PremiumSubscription, Settings, User, configure_toke
 from mitup_bot.models.premium import TokenCipher
 from mitup_bot.monitoring.backend import NullBackend
 from mitup_bot.monitoring.client import MetricsClient
-from mitup_bot.patreon import TokenPair
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.web.patreon import LinkOutcome, link_patreon_account
 
@@ -66,10 +65,6 @@ def make_api(bot: RecordingBot) -> TelegramApi:
     return api
 
 
-def fresh_pair() -> TokenPair:
-    return TokenPair("fresh-access", "fresh-refresh", dt.datetime.now(dt.UTC) + dt.timedelta(days=30))
-
-
 @contextlib.asynccontextmanager
 async def committed_user(tg_user_id: int) -> AsyncIterator[int]:
     async with db.begin() as session:
@@ -100,7 +95,7 @@ async def test_new_link_for_patron_grants_premium():
     async with committed_user(997_600) as user_id:
         bot = RecordingBot()
         outcome = await link_patreon_account(
-            make_api(bot), 997_600, fresh_pair(), patreon_user_id=PATRON_USER_ID, supporter_level=SupporterLevel.PATRON
+            make_api(bot), 997_600, patreon_user_id=PATRON_USER_ID, supporter_level=SupporterLevel.PATRON
         )
 
         assert outcome is LinkOutcome.LINKED_PREMIUM
@@ -108,7 +103,6 @@ async def test_new_link_for_patron_grants_premium():
         assert user.supporter_level is SupporterLevel.PATRON
         assert subscription is not None
         assert subscription.patreon_user_id == "patreon-6001"
-        assert subscription.access_token == "fresh-access"
         assert subscription.premium_expiration is not None
         assert len(bot.sent) == 1
 
@@ -119,7 +113,6 @@ async def test_new_link_for_non_patron_stores_without_premium():
         outcome = await link_patreon_account(
             make_api(bot),
             997_610,
-            fresh_pair(),
             patreon_user_id=NON_PATRON_USER_ID,
             supporter_level=SupporterLevel.NONE,
         )
@@ -139,9 +132,6 @@ async def test_relink_during_grace_updates_in_place_and_clears_revoke():
                 PremiumSubscription(
                     user_id=user_id,
                     patreon_user_id="patreon-6001",
-                    access_token="stale-access",
-                    refresh_token="stale-refresh",
-                    token_expiration=dt.datetime.now(dt.UTC),
                     revoked_time=dt.datetime.now(dt.UTC),
                 )
             )
@@ -155,7 +145,6 @@ async def test_relink_during_grace_updates_in_place_and_clears_revoke():
         outcome = await link_patreon_account(
             make_api(RecordingBot()),
             997_620,
-            fresh_pair(),
             patreon_user_id=PATRON_USER_ID,
             supporter_level=SupporterLevel.PATRON,
         )
@@ -165,7 +154,6 @@ async def test_relink_during_grace_updates_in_place_and_clears_revoke():
         assert subscription is not None
         assert subscription.db_id == original_id  # updated in place, not recreated
         assert subscription.revoked_time is None
-        assert subscription.access_token == "fresh-access"
         assert user.supporter_level is SupporterLevel.PATRON
 
 
@@ -176,9 +164,6 @@ async def test_patreon_account_already_linked_to_another_user_is_rejected():
                 PremiumSubscription(
                     user_id=first_user_id,
                     patreon_user_id="patreon-shared-663",
-                    access_token="a",
-                    refresh_token="r",
-                    token_expiration=dt.datetime.now(dt.UTC),
                 )
             )
             await session.flush()
@@ -186,7 +171,6 @@ async def test_patreon_account_already_linked_to_another_user_is_rejected():
         outcome = await link_patreon_account(
             make_api(RecordingBot()),
             997_631,
-            fresh_pair(),
             patreon_user_id="patreon-shared-663",
             supporter_level=SupporterLevel.PATRON,
         )
@@ -201,7 +185,6 @@ async def test_unknown_user_returns_unknown_outcome():
     outcome = await link_patreon_account(
         make_api(RecordingBot()),
         997_699,
-        fresh_pair(),
         patreon_user_id=PATRON_USER_ID,
         supporter_level=SupporterLevel.PATRON,
     )

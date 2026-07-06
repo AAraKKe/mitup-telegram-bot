@@ -187,9 +187,6 @@ def create_joined_link(
 def create_premium_subscription(
     user_id: int,
     patreon_user_id: str,
-    access_token: str = "patreon-access-token",
-    refresh_token: str = "patreon-refresh-token",
-    token_expiration: dt.datetime | None = None,
     revoked_time: dt.datetime | None = None,
     premium_expiration: dt.datetime | None = None,
     expiration_notified: bool = False,
@@ -197,9 +194,6 @@ def create_premium_subscription(
     return PremiumSubscription(
         user_id=user_id,
         patreon_user_id=patreon_user_id,
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_expiration=token_expiration or dt.datetime.now(dt.UTC),
         revoked_time=revoked_time,
         premium_expiration=premium_expiration,
         expiration_notified=expiration_notified,

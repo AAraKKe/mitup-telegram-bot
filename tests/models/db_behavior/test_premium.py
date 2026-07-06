@@ -156,33 +156,6 @@ async def test_migration_downgrade_reverses_any_tier_to_premium(db_session: Asyn
         await savepoint.rollback()
 
 
-async def test_premium_subscription_encrypts_tokens_at_rest(db_session: AsyncSession):
-    user = await new_user(db_session, 998_750)
-    subscription = create_premium_subscription(
-        user_id=user.db_id,
-        patreon_user_id="patreon-998750",
-        access_token="plain-access-token",
-        refresh_token="plain-refresh-token",
-    )
-    db_session.add(subscription)
-    await db_session.flush()
-    subscription_id = subscription.db_id
-
-    # Expire the identity-mapped instance so the reload runs the decrypting result processor.
-    db_session.expire(subscription)
-    loaded = (await db_session.exec(select(PremiumSubscription).where(PremiumSubscription.id == subscription_id))).one()
-    assert loaded.access_token == "plain-access-token"
-    assert loaded.refresh_token == "plain-refresh-token"
-
-    stored_access = (
-        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
-            text("SELECT access_token FROM premium_subscriptions WHERE id = :id").bindparams(id=subscription_id)
-        )
-    ).scalar_one()
-    assert stored_access != "plain-access-token"
-    assert TokenCipher.decrypt(stored_access) == "plain-access-token"
-
-
 async def test_patreon_creator_token_encrypts_tokens_at_rest(db_session: AsyncSession):
     token_row = create_patreon_creator_token(
         access_token="plain-creator-access",

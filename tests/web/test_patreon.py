@@ -482,10 +482,6 @@ def test_render_result_page_omits_return_link_without_username():
 # feed the unit coverage job; these mock-session tests exercise the same branches for coverage.
 
 
-def link_pair() -> TokenPair:
-    return TokenPair("new-access", "new-refresh", dt.datetime.now(dt.UTC) + dt.timedelta(days=30))
-
-
 @pytest.fixture
 def patch_begin_write(monkeypatch: pytest.MonkeyPatch) -> Callable[[MockDbSession], None]:
     """Return a helper that swaps ``db.begin_write`` for one yielding the given mock session, so
@@ -510,7 +506,7 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_650, link_pair(), patreon_user_id="p-650", supporter_level=SupporterLevel.PATRON
+            api, 997_650, patreon_user_id="p-650", supporter_level=SupporterLevel.PATRON
         )
 
     assert outcome is LinkOutcome.LINKED_PREMIUM
@@ -537,9 +533,7 @@ async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Cal
     patch_begin_write(session)
 
     api = MockApi()
-    outcome = await link_patreon_account(
-        api, 997_651, link_pair(), patreon_user_id="p-651", supporter_level=SupporterLevel.NONE
-    )
+    outcome = await link_patreon_account(api, 997_651, patreon_user_id="p-651", supporter_level=SupporterLevel.NONE)
 
     assert outcome is LinkOutcome.LINKED_NO_PATRON
     assert user.supporter_level is SupporterLevel.NONE
@@ -556,7 +550,7 @@ async def test_link_unknown_user_returns_unknown(patch_begin_write: Callable[[Mo
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_659, link_pair(), patreon_user_id="p-659", supporter_level=SupporterLevel.PATRON
+            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.PATRON
         )
 
     assert outcome is LinkOutcome.UNKNOWN_USER
@@ -581,7 +575,7 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_652, link_pair(), patreon_user_id="p-shared", supporter_level=SupporterLevel.PATRON
+            api, 997_652, patreon_user_id="p-shared", supporter_level=SupporterLevel.PATRON
         )
 
     assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE
@@ -599,12 +593,11 @@ async def test_upsert_creates_subscription_when_absent():
     session = MockDbSession()
     user = create_user(id=1, tg_user_id=997_653)
 
-    subscription = await upsert_subscription(session, user, link_pair(), "p-653")
+    subscription = await upsert_subscription(session, user, "p-653")
 
     assert subscription in session.objects_added
     assert subscription.user_id == user.db_id
     assert subscription.patreon_user_id == "p-653"
-    assert subscription.access_token == "new-access"
 
 
 async def test_upsert_updates_in_place_and_clears_revoke():
@@ -613,15 +606,13 @@ async def test_upsert_updates_in_place_and_clears_revoke():
     existing = create_premium_subscription(
         user_id=user.db_id,
         patreon_user_id="p-old",
-        access_token="old-access",
         revoked_time=dt.datetime.now(dt.UTC),
     )
     session.add_object(existing, "user_id")
 
-    result = await upsert_subscription(session, user, link_pair(), "p-654")
+    result = await upsert_subscription(session, user, "p-654")
 
     assert result is existing
     assert existing not in session.objects_added  # updated in place, not recreated
     assert existing.revoked_time is None
-    assert existing.access_token == "new-access"
     assert existing.patreon_user_id == "p-654"

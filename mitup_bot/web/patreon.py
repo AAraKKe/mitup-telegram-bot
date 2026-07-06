@@ -36,7 +36,7 @@ from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
 from mitup_bot.models import PremiumSubscription, User
 from mitup_bot.monitoring.client import MetricsClient
-from mitup_bot.patreon import PatreonClient, TokenPair, oauth
+from mitup_bot.patreon import PatreonClient, oauth
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import CollaborateMessages
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
@@ -404,13 +404,13 @@ async def exchange_and_link(
 
     api = build_api(BotAdapter(ptb_app.bot, metrics_client))
     outcome = await link_patreon_account(
-        api, tg_user_id, pair, patreon_user_id=identity.patreon_user_id, supporter_level=level
+        api, tg_user_id, patreon_user_id=identity.patreon_user_id, supporter_level=level
     )
     return result_page_for(outcome, bot_username)
 
 
 async def link_patreon_account(
-    api: TelegramApiWrapper, tg_user_id: int, pair: TokenPair, *, patreon_user_id: str, supporter_level: SupporterLevel
+    api: TelegramApiWrapper, tg_user_id: int, *, patreon_user_id: str, supporter_level: SupporterLevel
 ) -> LinkOutcome:
     """Upsert the subscription and, on success, queue the confirmation message to the user.
 
@@ -449,7 +449,7 @@ async def link_patreon_account(
             )
             return LinkOutcome.ALREADY_LINKED_ELSEWHERE
 
-        subscription = await upsert_subscription(session, user, pair, patreon_user_id)
+        subscription = await upsert_subscription(session, user, patreon_user_id)
 
         if supporter.is_supporter(supporter_level):
             user.supporter_level = supporter_level
@@ -475,9 +475,7 @@ async def link_patreon_account(
         return outcome
 
 
-async def upsert_subscription(
-    session: AsyncSession, user: User, pair: TokenPair, patreon_user_id: str
-) -> PremiumSubscription:
+async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> PremiumSubscription:
     """Create the user's subscription row, or update the existing one in place.
 
     A re-link during the revoke grace period updates the existing row and clears ``revoked_time``,
@@ -487,20 +485,11 @@ async def upsert_subscription(
         await session.exec(select(PremiumSubscription).where(PremiumSubscription.user_id == user.db_id))
     ).first()
     if subscription is None:
-        subscription = PremiumSubscription(
-            user_id=user.db_id,
-            patreon_user_id=patreon_user_id,
-            access_token=pair.access_token,
-            refresh_token=pair.refresh_token,
-            token_expiration=pair.expires_at,
-        )
+        subscription = PremiumSubscription(user_id=user.db_id, patreon_user_id=patreon_user_id)
         session.add(subscription)
         return subscription
 
     subscription.patreon_user_id = patreon_user_id
-    subscription.access_token = pair.access_token
-    subscription.refresh_token = pair.refresh_token
-    subscription.token_expiration = pair.expires_at
     # A re-link clears any pending revoke so the grace-period row becomes active again.
     subscription.revoked_time = None
     return subscription
