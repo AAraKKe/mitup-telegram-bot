@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-07 01:05\n"
+"PO-Revision-Date: 2026-07-07 02:43\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -701,9 +701,6 @@ msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back so
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Your Patreon account has been unlinked."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
-msgstr "<b>Supporter perks unlocked</b>\n\nYour Patreon account is linked and your supporter perks are active. Thanks for supporting Mitup."
-
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a patron to unlock your supporter perks. They'll switch on automatically once your pledge is active."
 
@@ -716,8 +713,14 @@ msgstr "<b>Your supporter perks are in a grace period</b>\n\nYour Patreon suppor
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
 msgstr "<b>Your supporter perks have ended</b>\n\nWe still couldn't confirm an active Patreon pledge, so your supporter perks are now off. Become a patron again from the Collaborate menu to turn them back on."
 
-msgid "SupporterNotificationMessages.UPGRADED"
-msgstr "<b>Supporter perks unlocked</b>\n\nThanks for backing Mitup. Your Patreon pledge is active, so your supporter perks are now on."
+msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
+msgstr "<b>🧡 You're a Supporter</b>\n\nThanks for backing Mitup. Your Supporter badge now shows on your profile, and your support helps keep Mitup running for everyone."
+
+msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
+msgstr "<b>🌟 You're a Patron</b>\n\nThanks for backing Mitup. Your Patron badge is on, and your limits just went up: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one."
+
+msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
+msgstr "<b>🏆 You're an Organizer</b>\n\nThanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

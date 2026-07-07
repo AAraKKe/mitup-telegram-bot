@@ -1,6 +1,9 @@
-from enum import StrEnum
-from typing import Protocol
+from __future__ import annotations
 
+from enum import StrEnum
+from typing import Protocol, assert_never
+
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import Emojis
 from mitup_bot.utils.entities import FormattedText, parse_format_tags
@@ -691,11 +694,6 @@ class CollaborateMessages(MessageBase):
     UNAVAILABLE = "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
-    # Telegram message sent from the OAuth callback when the linked user is already an active patron.
-    LINK_CONFIRMED_SUPPORTER = (
-        "<b>Supporter perks unlocked</b>\n\n"
-        "Your Patreon account is linked and your supporter perks are active. Thanks for supporting Mitup."
-    )
     # Telegram message sent from the OAuth callback when the linked user is not a patron yet.
     LINK_CONFIRMED_NO_PATRON = (
         "<b>Patreon account linked</b>\n\n"
@@ -731,11 +729,46 @@ class SupporterNotificationMessages(MessageBase):
         "We still couldn't confirm an active Patreon pledge, so your supporter perks are now off. "
         "Become a patron again from the Collaborate menu to turn them back on."
     )
-    # A linked account became an active patron: perks turned on without any action from the user.
-    UPGRADED = (
-        "<b>Supporter perks unlocked</b>\n\n"
-        "Thanks for backing Mitup. Your Patreon pledge is active, so your supporter perks are now on."
+    # Reached the Supporter tier: grants the badge and our thanks, but no raised limits, so the copy
+    # stays on the badge and the support rather than promising bigger or more meetings.
+    SUPPORTER_UNLOCKED = (
+        f"<b>{Emojis.SUPPORTER} You're a Supporter</b>\n\n"
+        "Thanks for backing Mitup. Your Supporter badge now shows on your profile, and your support "
+        "helps keep Mitup running for everyone."
     )
+    # Reached the Patron tier: raised active-meeting cap, further scheduling horizon, and unlimited
+    # participants per meeting, plus the badge.
+    PATRON_UNLOCKED = (
+        f"<b>{Emojis.PATRON} You're a Patron</b>\n\n"
+        "Thanks for backing Mitup. Your Patron badge is on, and your limits just went up: run more "
+        "meetings at once, schedule them further ahead, and invite as many people as you like to each one."
+    )
+    # Reached the Organizer tier: every limit lifted (active meetings, scheduling horizon,
+    # participants), plus the badge.
+    ORGANIZER_UNLOCKED = (
+        f"<b>{Emojis.ORGANIZER} You're an Organizer</b>\n\n"
+        "Thanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many "
+        "meetings as you want, schedule them as far ahead as you need, and invite as many people as "
+        "you like to each one."
+    )
+
+    @classmethod
+    def unlocked_for(cls, level: SupporterLevel) -> SupporterNotificationMessages:
+        """The per-tier unlock message for a newly active paying tier.
+
+        NONE never reaches here: callers only announce an unlock once a paying tier is confirmed, so
+        it raises rather than inventing copy for the free tier."""
+        match level:
+            case SupporterLevel.SUPPORTER:
+                return cls.SUPPORTER_UNLOCKED
+            case SupporterLevel.PATRON:
+                return cls.PATRON_UNLOCKED
+            case SupporterLevel.ORGANIZER:
+                return cls.ORGANIZER_UNLOCKED
+            case SupporterLevel.NONE:
+                raise ValueError("No unlock message exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
 
 
 class Weekday(MessageBase):

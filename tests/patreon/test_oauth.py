@@ -1,6 +1,8 @@
+import json
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from cryptography.fernet import Fernet
 from freezegun import freeze_time
 
 from mitup_bot.exceptions import PatreonStateExpired, PatreonStateInvalid
@@ -8,13 +10,38 @@ from mitup_bot.patreon import oauth
 from tests.helpers import create_patreon_config
 
 TG_USER_ID = 997_601
+MESSAGE_ID = 4242
 
 
 def test_encode_decode_round_trip_returns_tg_user_id():
     config = create_patreon_config()
     state = oauth.encode_state(config, TG_USER_ID)
 
-    assert oauth.decode_state(config, state) == TG_USER_ID
+    decoded = oauth.decode_state(config, state)
+    assert decoded.tg_user_id == TG_USER_ID
+    # No message id was supplied, so the round-trip carries None.
+    assert decoded.message_id is None
+
+
+def test_encode_decode_round_trip_carries_message_id():
+    config = create_patreon_config()
+    state = oauth.encode_state(config, TG_USER_ID, MESSAGE_ID)
+
+    decoded = oauth.decode_state(config, state)
+    assert decoded.tg_user_id == TG_USER_ID
+    assert decoded.message_id == MESSAGE_ID
+
+
+def test_decode_legacy_state_without_message_id_key_defaults_to_none():
+    # A state minted before message-id threading has no ``message_id`` key at all. Backward-compat:
+    # it must decode cleanly with message_id=None rather than raising a KeyError.
+    config = create_patreon_config()
+    fernet = Fernet(config.state_secret.get_secret_value())
+    legacy = fernet.encrypt(json.dumps({"tg_user_id": TG_USER_ID}).encode()).decode()
+
+    decoded = oauth.decode_state(config, legacy)
+    assert decoded.tg_user_id == TG_USER_ID
+    assert decoded.message_id is None
 
 
 def test_encode_produces_distinct_tokens_via_fernet_iv():
@@ -41,7 +68,7 @@ def test_decode_just_under_ttl_still_succeeds():
         state = oauth.encode_state(config, TG_USER_ID)
     # 59 minutes is still inside the 1h window.
     with freeze_time("2026-07-05 12:59:00"):
-        assert oauth.decode_state(config, state) == TG_USER_ID
+        assert oauth.decode_state(config, state).tg_user_id == TG_USER_ID
 
 
 def test_scope_requests_only_base_identity():
@@ -95,7 +122,25 @@ def test_authorization_url_carries_oauth_parameters():
     assert query["redirect_uri"] == ["https://bot.example/patreon/callback"]
     assert query["scope"] == ["identity"]
     # The state round-trips back to the same user id.
-    assert oauth.decode_state(config, query["state"][0]) == TG_USER_ID
+    assert oauth.decode_state(config, query["state"][0]).tg_user_id == TG_USER_ID
+
+
+def test_authorization_url_state_carries_message_id():
+    config = create_patreon_config()
+    url = oauth.authorization_url(config, TG_USER_ID, MESSAGE_ID)
+
+    state = parse_qs(urlparse(url).query)["state"][0]
+    decoded = oauth.decode_state(config, state)
+    assert decoded.tg_user_id == TG_USER_ID
+    assert decoded.message_id == MESSAGE_ID
+
+
+def test_authorization_url_without_message_id_decodes_to_none():
+    config = create_patreon_config()
+    url = oauth.authorization_url(config, TG_USER_ID)
+
+    state = parse_qs(urlparse(url).query)["state"][0]
+    assert oauth.decode_state(config, state).message_id is None
 
 
 def test_campaign_pledge_url_uses_campaign_id():

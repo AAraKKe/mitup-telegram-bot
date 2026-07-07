@@ -884,9 +884,6 @@ msgstr ""
 msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
 msgstr ""
 
-msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
-msgstr "<b>Vantaggi da sostenitore sbloccati</b>\n\nIl tuo account Patreon è collegato e i tuoi vantaggi da sostenitore sono attivi. Grazie per sostenere Mitup."
-
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per creare un altro, oppure tocca Collabora nel menu principale per supportare Mitup e sbloccare altri."
 
@@ -911,5 +908,11 @@ msgstr "<b>I tuoi vantaggi da sostenitore sono in un periodo di tolleranza</b>\n
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
 msgstr "<b>I tuoi vantaggi da sostenitore sono terminati</b>\n\nNon siamo ancora riusciti a confermare un contributo Patreon attivo, quindi i tuoi vantaggi da sostenitore sono ora disattivati. Diventa di nuovo un mecenate dal menu Collabora per riattivarli."
 
-msgid "SupporterNotificationMessages.UPGRADED"
-msgstr "<b>Vantaggi da sostenitore sbloccati</b>\n\nGrazie per aver sostenuto Mitup. Il tuo contributo Patreon è attivo, quindi i tuoi vantaggi da sostenitore sono ora attivi."
+msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
+msgstr "<b>🧡 Sei un Sostenitore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Sostenitore è ora visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti."
+
+msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
+msgstr "<b>🌟 Sei un Mecenate</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Mecenate è attivo e i tuoi limiti sono appena aumentati: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno."
+
+msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
+msgstr "<b>🏆 Sei un Organizzatore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Organizzatore è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno."

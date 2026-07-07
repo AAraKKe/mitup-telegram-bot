@@ -916,9 +916,6 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} falhados, ${skipped} ign
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas foram interrompidas por uma falha no worker e seu resultado é desconhecido. Elas não serão tentadas novamente."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
-msgstr "<b>Benefícios de apoiador desbloqueados</b>\n\nSua conta Patreon está conectada e seus benefícios de apoiador estão ativos. Obrigado por apoiar o Mitup."
-
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
 
@@ -943,5 +940,11 @@ msgstr "<b>Seus benefícios de apoiador estão em período de carência</b>\n\nS
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
 msgstr "<b>Seus benefícios de apoiador terminaram</b>\n\nAinda não conseguimos confirmar uma contribuição ativa no Patreon, então seus benefícios de apoiador agora estão desativados. Torne-se um patrono novamente pelo menu Colabore para reativá-los."
 
-msgid "SupporterNotificationMessages.UPGRADED"
-msgstr "<b>Benefícios de apoiador desbloqueados</b>\n\nObrigado por apoiar o Mitup. Sua contribuição no Patreon está ativa, então seus benefícios de apoiador agora estão ativos."
+msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
+msgstr "<b>🧡 Você é um Apoiador</b>\n\nObrigado por apoiar o Mitup. Seu selo de Apoiador agora aparece no seu perfil, e seu apoio ajuda a manter o Mitup funcionando para todos."
+
+msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
+msgstr "<b>🌟 Você é um Patrono</b>\n\nObrigado por apoiar o Mitup. Seu selo de Patrono está ativo, e seus limites acabaram de aumentar: realize mais eventos ao mesmo tempo, agende-os com mais antecedência e convide quantas pessoas quiser para cada um."
+
+msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
+msgstr "<b>🏆 Você é um Organizador</b>\n\nObrigado por apoiar o Mitup. Seu selo de Organizador está ativo, e todos os limites foram removidos: realize quantos eventos quiser, agende-os com toda a antecedência que precisar e convide quantas pessoas quiser para cada um."

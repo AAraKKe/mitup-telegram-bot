@@ -4,6 +4,7 @@ from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig, PatreonConfig
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.emojis import Emojis
+from mitup_bot.utils.messages import SupporterNotificationMessages
 from tests.helpers import create_patreon_config
 
 
@@ -130,3 +131,21 @@ def test_participant_capacity_by_level(configured_policy: LimitsConfig, level: S
 )
 def test_badge_per_level(level: SupporterLevel, expected: str | None):
     assert supporter.badge(level) == expected
+
+
+@pytest.mark.parametrize(
+    "level,expected",
+    [
+        (SupporterLevel.SUPPORTER, SupporterNotificationMessages.SUPPORTER_UNLOCKED),
+        (SupporterLevel.PATRON, SupporterNotificationMessages.PATRON_UNLOCKED),
+        (SupporterLevel.ORGANIZER, SupporterNotificationMessages.ORGANIZER_UNLOCKED),
+    ],
+)
+def test_unlocked_for_maps_each_paying_tier(level: SupporterLevel, expected: SupporterNotificationMessages):
+    assert SupporterNotificationMessages.unlocked_for(level) is expected
+
+
+def test_unlocked_for_rejects_none_tier():
+    # NONE never reaches the resolver: callers only announce an unlock once a paying tier is confirmed.
+    with pytest.raises(ValueError, match="NONE tier"):
+        SupporterNotificationMessages.unlocked_for(SupporterLevel.NONE)

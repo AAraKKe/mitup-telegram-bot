@@ -916,9 +916,6 @@ msgstr "<b>${language}</b>: ${sent} versendet, ${failed} fehlgeschlagen, ${skipp
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> Zustellungen wurden durch einen Worker-Absturz unterbrochen und das Ergebnis ist unbekannt. Sie werden nicht erneut versucht."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
-msgstr "<b>Vorteile freigeschaltet</b>\n\nDein Patreon-Konto ist verbunden und deine Vorteile sind aktiv. Danke, dass du Mitup unterstützt."
-
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
 
@@ -943,5 +940,11 @@ msgstr "<b>Deine Vorteile sind in einer Kulanzfrist</b>\n\nDeine Patreon-Unterst
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
 msgstr "<b>Deine Vorteile sind beendet</b>\n\nWir konnten immer noch keinen aktiven Patreon-Beitrag bestätigen, daher sind deine Vorteile jetzt deaktiviert. Werde über das Mithelfen-Menü erneut Unterstützer, um sie wieder zu aktivieren."
 
-msgid "SupporterNotificationMessages.UPGRADED"
-msgstr "<b>Vorteile freigeschaltet</b>\n\nDanke, dass du Mitup unterstützt. Dein Patreon-Beitrag ist aktiv, daher sind deine Vorteile jetzt aktiviert."
+msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
+msgstr "<b>🧡 Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Dein Unterstützer-Abzeichen wird jetzt in deinem Profil angezeigt, und deine Unterstützung hilft dabei, Mitup für alle am Laufen zu halten."
+
+msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
+msgstr "<b>🌟 Du bist ein Förderer</b>\n\nDanke, dass du Mitup unterstützt. Dein Förderer-Abzeichen ist aktiv, und deine Limits wurden gerade erhöht: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest."
+
+msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
+msgstr "<b>🏆 Du bist ein Veranstalter</b>\n\nDanke, dass du Mitup unterstützt. Dein Veranstalter-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."

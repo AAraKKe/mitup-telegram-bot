@@ -230,7 +230,8 @@ async def sync_subscription_level(
         subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
         subscription.expiration_notified = False
         if not supporter.meets(previous, target):
-            await api.send_message_to_user(user, SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
+            message = SupporterNotificationMessages.unlocked_for(user.supporter_level)
+            await api.send_message_to_user(user, message.get(lang=user.lang))
             return LevelSyncOutcome.UPGRADED
         return LevelSyncOutcome.DOWNGRADED
 

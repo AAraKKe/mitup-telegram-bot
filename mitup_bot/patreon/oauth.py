@@ -17,6 +17,7 @@ config holder; callers resolve the live config from :mod:`mitup_bot.patreon` and
 
 import datetime as dt
 import json
+from dataclasses import dataclass
 from urllib.parse import urlencode
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -44,21 +45,39 @@ CREATOR_SCOPES = "identity w:campaigns.webhook"
 STATE_TTL_SECONDS = 3600
 
 
-def encode_state(config: PatreonConfig, tg_user_id: int) -> str:
-    """Build the opaque, tamper-evident ``state`` token carrying the initiating Telegram user id."""
+@dataclass(frozen=True)
+class DecodedState:
+    """The payload carried through Patreon's consent screen inside the signed ``state`` token.
+
+    ``message_id`` is the Collaborate message the user tapped, threaded through so the callback can
+    refresh that message into the linked view. It is optional: states minted before message-id
+    threading carry only ``tg_user_id``, so a decode of such a token yields ``message_id=None`` and
+    the flow degrades to skipping the refresh.
+    """
+
+    tg_user_id: int
+    message_id: int | None
+
+
+def encode_state(config: PatreonConfig, tg_user_id: int, message_id: int | None = None) -> str:
+    """Build the opaque, tamper-evident ``state`` token carrying the initiating Telegram user id
+    and, when known, the Collaborate message id to refresh after linking."""
     fernet = Fernet(config.state_secret.get_secret_value())
-    payload = json.dumps({"tg_user_id": tg_user_id})
+    payload = json.dumps({"tg_user_id": tg_user_id, "message_id": message_id})
     return fernet.encrypt(payload.encode()).decode()
 
 
-def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS) -> int:
-    """Validate the ``state`` token and return the Telegram user id it carries.
+def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS) -> DecodedState:
+    """Validate the ``state`` token and return the :class:`DecodedState` it carries.
 
     Signature validation and age are checked separately so the caller can distinguish an expired
     button (friendly "tap it again") from a genuinely invalid token: decrypting without a ttl
     proves authenticity, then a second decrypt with the ttl gates on age. On expiry the token's
     embedded timestamp is authentic, so the age is measured and carried on the exception — that lets
     the callback tell slow consent from clock skew from a stale button.
+
+    ``message_id`` is read with ``.get`` so a token minted before message-id threading (no such key)
+    decodes cleanly with ``message_id=None`` rather than raising.
     """
     fernet = Fernet(config.state_secret.get_secret_value())
     token = state.encode()
@@ -75,18 +94,23 @@ def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS
         raise PatreonStateExpired(age_seconds=age_seconds) from error
 
     payload = json.loads(raw)
-    return int(payload["tg_user_id"])
+    raw_message_id = payload.get("message_id")
+    return DecodedState(
+        tg_user_id=int(payload["tg_user_id"]),
+        message_id=int(raw_message_id) if raw_message_id is not None else None,
+    )
 
 
-def authorization_url(config: PatreonConfig, tg_user_id: int) -> str:
-    """Build the Patreon consent URL the user is sent to, embedding a fresh signed ``state``."""
+def authorization_url(config: PatreonConfig, tg_user_id: int, message_id: int | None = None) -> str:
+    """Build the Patreon consent URL the user is sent to, embedding a fresh signed ``state`` that
+    carries the initiating user id and the Collaborate message id to refresh after linking."""
     query = urlencode(
         {
             "response_type": "code",
             "client_id": config.client_id,
             "redirect_uri": config.redirect_uri,
             "scope": USER_SCOPES,
-            "state": encode_state(config, tg_user_id),
+            "state": encode_state(config, tg_user_id, message_id),
         }
     )
     return f"{AUTHORIZE_URL}?{query}"

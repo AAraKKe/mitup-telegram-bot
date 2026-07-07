@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 from structlog.typing import EventDict
+from telegram.error import BadRequest
 
 from mitup_bot import patreon
 from mitup_bot.config import PatreonConfig, RunModes
@@ -17,6 +18,13 @@ from mitup_bot.models import SupporterSubscription
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
 from mitup_bot.patreon.models import IdentityData, IdentityResponse
 from mitup_bot.supporter import SupporterLevel
+from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
+from mitup_bot.views.collaborate import (
+    collaborate_linked_not_patron_view,
+    collaborate_linked_patron_view,
+    link_confirmation_view,
+)
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
     CallbackOutcome,
@@ -39,6 +47,7 @@ from tests.helpers import (
 from tests.helpers.stub_db import MockDbSession
 
 BOT_USERNAME = "MitupTestBot"
+TAPPED_MESSAGE_ID = 4242
 
 
 def one_log(logs: list[EventDict], event: str) -> EventDict:
@@ -516,6 +525,12 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     assert added[0].patreon_user_id == "p-650"
     assert added[0].support_expiration is not None
     api.assert_method_just_called("send_message_to_user", times=1)
+    # Linking as an active Patron must DM the Patron unlock message specifically, proving the OAuth
+    # callback wires the resulting tier through unlocked_for. The DM carries a Main-menu button.
+    api.assert_send_message_to_user_called(
+        user=user,
+        view=link_confirmation_view(SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang), user.lang),
+    )
 
     linked = one_log(logs, "Patreon account linked")
     assert linked["flow"] == "patreon_oauth_callback"
@@ -541,6 +556,105 @@ async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Cal
     assert len(added) == 1
     assert added[0].support_expiration is None
     api.assert_method_just_called("send_message_to_user", times=1)
+
+
+async def test_confirmation_dm_carries_main_menu_button(patch_begin_write: Callable[[MockDbSession], None]):
+    # The confirmation DM must not strand the user on a button-less message: it carries the shared
+    # link_confirmation_view, whose only row is a Main-menu button.
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_655)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    await link_patreon_account(api, 997_655, patreon_user_id="p-655", supporter_level=SupporterLevel.NONE)
+
+    view = api.call_args("send_message_to_user").kwargs["view"]
+    assert view == link_confirmation_view(CollaborateMessages.LINK_CONFIRMED_NO_PATRON.get(lang=user.lang), user.lang)
+    main_menu_button = view.keyboard[-1][0]
+    assert main_menu_button.callback_data == cb.MAIN_MENU
+
+
+async def test_link_refreshes_tapped_message_into_patron_view(patch_begin_write: Callable[[MockDbSession], None]):
+    # A Patron re-links from the Collaborate menu: the tapped message is edited in place into the
+    # linked-patron view, addressed by (user, message_id).
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_656)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    outcome = await link_patreon_account(
+        api, 997_656, patreon_user_id="p-656", supporter_level=SupporterLevel.PATRON, message_id=TAPPED_MESSAGE_ID
+    )
+
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
+    api.assert_edit_message_for_user_called(
+        user=user, message_id=TAPPED_MESSAGE_ID, view=collaborate_linked_patron_view(user.lang)
+    )
+
+
+async def test_link_refreshes_tapped_message_into_not_patron_view(
+    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
+):
+    # A non-patron links: the tapped message is refreshed into the linked-but-not-patron view, which
+    # needs the campaign pledge url — so the refresh resolves the live Patreon config.
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_657)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    outcome = await link_patreon_account(
+        api, 997_657, patreon_user_id="p-657", supporter_level=SupporterLevel.NONE, message_id=TAPPED_MESSAGE_ID
+    )
+
+    assert outcome is LinkOutcome.LINKED_NO_PATRON
+    api.assert_edit_message_for_user_called(
+        user=user,
+        message_id=TAPPED_MESSAGE_ID,
+        view=collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(patreon_config)),
+    )
+
+
+async def test_link_without_message_id_skips_refresh(patch_begin_write: Callable[[MockDbSession], None]):
+    # A state minted before message-id threading carries no message id, so the flow still links and
+    # DMs but never attempts to refresh a message it cannot address.
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_658)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    outcome = await link_patreon_account(api, 997_658, patreon_user_id="p-658", supporter_level=SupporterLevel.PATRON)
+
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
+    api.assert_method_just_called("send_message_to_user", times=1)
+    api.assert_method_just_called("edit_message_for_user", times=0)
+
+
+async def test_link_refresh_failure_is_swallowed(patch_begin_write: Callable[[MockDbSession], None]):
+    # The tapped message may have been deleted or aged out of the edit window. A failing refresh must
+    # never break the link or the confirmation DM — the outcome and the DM still stand.
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_659)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    api.mock_method("edit_message_for_user").side_effect = BadRequest("Message to edit not found")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        outcome = await link_patreon_account(
+            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.PATRON, message_id=TAPPED_MESSAGE_ID
+        )
+
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
+    api.assert_method_just_called("send_message_to_user", times=1)
+    api.assert_method_just_called("edit_message_for_user", times=1)
+    swallowed = one_log(logs, "Could not refresh the tapped Collaborate message after linking")
+    assert swallowed["stage"] == "refresh_message"
+    assert swallowed["message_id"] == TAPPED_MESSAGE_ID
 
 
 async def test_link_unknown_user_returns_unknown(patch_begin_write: Callable[[MockDbSession], None]):

@@ -24,6 +24,7 @@ from tests.helpers import (
     create_patreon_config,
     create_supporter_subscription,
 )
+from tests.helpers.constants import DEFAULT_MESSAGE_ID
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -81,7 +82,10 @@ async def test_collaborate_not_linked_offers_oauth_link(
     link_button = view.keyboard[0][0]
     assert link_button.url.startswith("https://www.patreon.com/oauth2/authorize")
     state = parse_qs(urlparse(link_button.url).query)["state"][0]
-    assert oauth.decode_state(patreon_config, state) == user_with_settings.tg_user_id
+    decoded = oauth.decode_state(patreon_config, state)
+    assert decoded.tg_user_id == user_with_settings.tg_user_id
+    # The tapped message id is threaded into the OAuth state so the web callback can refresh it.
+    assert decoded.message_id == DEFAULT_MESSAGE_ID
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)

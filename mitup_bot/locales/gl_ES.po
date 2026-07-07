@@ -916,9 +916,6 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} fallidos, ${skipped} sal
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas foron interrompidas por un colapso do traballador e o seu resultado é descoñecido. Non se reintentarán."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
-msgstr "<b>Privilexios especiais desbloqueados</b>\n\nA túa conta de Patreon está enlazada e os teus privilexios especiais están activos. Grazas por apoiar Mitup."
-
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Alcanzaches o teu límite de ${cap} quedadas activas. Pecha ou elimina unha para crear outra, ou toca Colabora no menú principal para apoiar a Mitup e desbloquear máis."
 
@@ -943,5 +940,11 @@ msgstr "<b>Os teus privilexios especiais están nun período de graza</b>\n\nO t
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
 msgstr "<b>Os teus privilexios especiais remataron</b>\n\nSeguimos sen poder confirmar unha achega activa de Patreon, así que os teus privilexios especiais están agora desactivados. Faite patrón de novo desde o menú Colabora para reactivalos."
 
-msgid "SupporterNotificationMessages.UPGRADED"
-msgstr "<b>Privilexios especiais desbloqueados</b>\n\nGrazas por apoiar Mitup. A túa achega de Patreon está activa, así que os teus privilexios especiais están agora activados."
+msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
+msgstr "<b>🧡 Xa es Colaborador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Colaborador xa aparece no teu perfil, e o teu apoio axuda a manter Mitup en marcha para todos."
+
+msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
+msgstr "<b>🌟 Xa es Mecenas</b>\n\nGrazas por apoiar Mitup. A túa insignia de Mecenas está activa e os teus límites acaban de subir: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha."
+
+msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
+msgstr "<b>🏆 Xa es Organizador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Organizador está activa e desaparecen todos os límites: organiza cantas quedadas queiras, prográmaas con toda a antelación que precises e convida a cantas persoas queiras a cada unha."

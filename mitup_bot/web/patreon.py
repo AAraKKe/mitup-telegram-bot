@@ -44,6 +44,11 @@ from mitup_bot.patreon.client import MEMBER_DELETE_TRIGGER
 from mitup_bot.patreon.models import MemberResource, WebhookMemberPayload
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
+from mitup_bot.views.collaborate import (
+    collaborate_linked_not_patron_view,
+    collaborate_linked_patron_view,
+    link_confirmation_view,
+)
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
 
 log = structlog.get_logger(__name__)
@@ -127,6 +132,9 @@ class ResolvedCallback:
 
     outcome: CallbackOutcome
     tg_user_id: int | None = None
+    # The Collaborate message the user tapped, carried through the OAuth state so the linked view can
+    # refresh it. Optional: states minted before message-id threading decode to None (see oauth).
+    message_id: int | None = None
     error: str | None = None
     state_age_seconds: int | None = None
     code: str | None = None
@@ -157,12 +165,18 @@ def resolve_state(code: str | None, state: str | None) -> ResolvedCallback:
     assert code is not None and state is not None, "has_required_params guarantees both are set"
     config = patreon.current_config()
     try:
-        tg_user_id = oauth.decode_state(config, state)
+        decoded = oauth.decode_state(config, state)
     except PatreonStateExpired as expired:
         return ResolvedCallback(CallbackOutcome.STATE_EXPIRED, state_age_seconds=round(expired.age_seconds))
     except PatreonStateInvalid:
         return ResolvedCallback(CallbackOutcome.STATE_INVALID)
-    return ResolvedCallback(CallbackOutcome.VALID, tg_user_id=tg_user_id, code=code, state=state)
+    return ResolvedCallback(
+        CallbackOutcome.VALID,
+        tg_user_id=decoded.tg_user_id,
+        message_id=decoded.message_id,
+        code=code,
+        state=state,
+    )
 
 
 def render_result_page(title: str, message: str, bot_username: str | None, *, status_code: int = 200) -> HTMLResponse:
@@ -337,7 +351,7 @@ async def render_resolved_callback(
     assert resolved.tg_user_id is not None and resolved.code is not None, "VALID carries tg_user_id and code"
     # The initiator is now known; every later line carries it.
     structlog.contextvars.bind_contextvars(tg_user_id=resolved.tg_user_id)
-    return await exchange_and_link(ptb_app, metrics_client, resolved.tg_user_id, resolved.code)
+    return await exchange_and_link(ptb_app, metrics_client, resolved.tg_user_id, resolved.code, resolved.message_id)
 
 
 def render_terminal_page(
@@ -364,9 +378,13 @@ def render_terminal_page(
 
 
 async def exchange_and_link(
-    ptb_app: Application, metrics_client: MetricsClient, tg_user_id: int, code: str
+    ptb_app: Application, metrics_client: MetricsClient, tg_user_id: int, code: str, message_id: int | None
 ) -> HTMLResponse:
-    """Exchange the code, read the user's identity, and persist the link."""
+    """Exchange the code, read the user's identity, and persist the link.
+
+    ``message_id`` is the Collaborate message the user tapped (None for states minted before
+    message-id threading); it is passed on so the linked view can refresh that message.
+    """
     bot_username = ptb_app.bot.username
     config = patreon.current_config()
     try:
@@ -405,18 +423,27 @@ async def exchange_and_link(
 
     api = build_api(BotAdapter(ptb_app.bot, metrics_client))
     outcome = await link_patreon_account(
-        api, tg_user_id, patreon_user_id=identity.patreon_user_id, supporter_level=level
+        api, tg_user_id, patreon_user_id=identity.patreon_user_id, supporter_level=level, message_id=message_id
     )
     return result_page_for(outcome, bot_username)
 
 
 async def link_patreon_account(
-    api: TelegramApiWrapper, tg_user_id: int, *, patreon_user_id: str, supporter_level: SupporterLevel
+    api: TelegramApiWrapper,
+    tg_user_id: int,
+    *,
+    patreon_user_id: str,
+    supporter_level: SupporterLevel,
+    message_id: int | None = None,
 ) -> LinkOutcome:
     """Upsert the subscription and, on success, queue the confirmation message to the user.
 
     A re-link updates the existing row in place, so the user never has to unlink first. The write
     and the send run inside ``begin_write`` so the message drains only after the row is committed.
+
+    When ``message_id`` is set (the Collaborate message the user tapped, threaded through the OAuth
+    state), the original message is refreshed into the linked view once the transaction has
+    committed — best-effort, so a failed refresh never affects the link or the confirmation DM.
     """
     async with db.begin_write(api) as session:
         # The callback only needs the user's own columns (id, lang, supporter_level);
@@ -454,7 +481,7 @@ async def link_patreon_account(
         if supporter.is_supporter(supporter_level):
             user.supporter_level = supporter_level
             subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
-            message = CollaborateMessages.LINK_CONFIRMED_SUPPORTER
+            message = SupporterNotificationMessages.unlocked_for(supporter_level)
             outcome = LinkOutcome.LINKED_SUPPORTER
         else:
             user.supporter_level = SupporterLevel.NONE
@@ -471,8 +498,56 @@ async def link_patreon_account(
             patreon_user_id=patreon_user_id,
             supporter_level=supporter_level.value,
         )
-        await api.send_message_to_user(user, message.get(lang=user.lang))
-        return outcome
+        # The confirmation DM carries a Main-menu button so the user is never stranded on a
+        # button-less message. expire_on_commit=False keeps `user` readable after the block below.
+        await api.send_message_to_user(user, link_confirmation_view(message.get(lang=user.lang), user.lang))
+        linked_user = user
+
+    # The transaction has committed; refreshing the tapped message is a best-effort UI touch-up that
+    # must never fail the link or the DM, so it runs out here (immediate mode) rather than enqueued.
+    await refresh_tapped_message(api, linked_user, message_id, outcome)
+    return outcome
+
+
+async def refresh_tapped_message(
+    api: TelegramApiWrapper, user: User, message_id: int | None, outcome: LinkOutcome
+) -> None:
+    """Edit the original Collaborate message the user tapped into its now-linked view.
+
+    Best-effort: the message may have been deleted or aged out of Telegram's edit window, so any
+    failure is logged and swallowed. A ``None`` ``message_id`` (state minted before message-id
+    threading) skips the refresh entirely. Only the linked outcomes reach here.
+    """
+    if message_id is None:
+        return
+
+    if outcome is LinkOutcome.LINKED_SUPPORTER:
+        view = collaborate_linked_patron_view(user.lang)
+    else:
+        config = patreon.current_config()
+        view = collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(config))
+
+    try:
+        await api.edit_message_for_user(user, message_id, view)
+    except Exception:
+        log.warning(
+            "Could not refresh the tapped Collaborate message after linking",
+            flow=OAUTH_FLOW,
+            stage="refresh_message",
+            outcome=outcome.name.lower(),
+            tg_user_id=user.tg_user_id,
+            message_id=message_id,
+        )
+        return
+
+    log.info(
+        "Refreshed the tapped Collaborate message after linking",
+        flow=OAUTH_FLOW,
+        stage="refresh_message",
+        outcome=outcome.name.lower(),
+        tg_user_id=user.tg_user_id,
+        message_id=message_id,
+    )
 
 
 async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> SupporterSubscription:
@@ -603,7 +678,8 @@ async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome:
     """Send the DM matching the transition; silent for a no-op or a between-tier downgrade."""
     match outcome:
         case WebhookApplied.UPGRADED:
-            await api.send_message_to_user(user, SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
+            message = SupporterNotificationMessages.unlocked_for(user.supporter_level)
+            await api.send_message_to_user(user, message.get(lang=user.lang))
         case WebhookApplied.GRACE_STARTED:
             # The catalog copy phrases the window in days (``${days}``), fed from SUPPORT_GRACE_DAYS so
             # the number in the message can never drift from the expiry math above.

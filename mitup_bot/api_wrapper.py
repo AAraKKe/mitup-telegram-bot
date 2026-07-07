@@ -203,6 +203,9 @@ class TelegramApiWrapper(Protocol):
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
     ): ...
     async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool: ...
+    async def edit_message_for_user(
+        self, user: User, message_id: int, view: MitupView | FormattedText | str
+    ) -> Message | bool: ...
     async def answer_inline_query(
         self,
         update: Update,
@@ -486,6 +489,22 @@ class TelegramApi:
                     disable_web_page_preview=True,
                 )
         return False
+
+    async def edit_message_for_user(
+        self, user: User, message_id: int, view: MitupView | FormattedText | str
+    ) -> Message | bool:
+        """Edit a message in a user's private chat by explicit ``message_id``, without an ``Update``.
+
+        The private-chat id equals the user's ``tg_user_id``, so the edit target is derived from the
+        user rather than an incoming update — this is the edit counterpart of ``send_message_to_user``
+        for out-of-band callers (e.g. the Patreon OAuth web callback refreshing the tapped Collaborate
+        message). Routes through the same ``_edit_message_now`` suppression as update-based edits.
+        """
+        resolved = resolve_view(view)
+        target: tuple[int | None, int | None, str | None] = (user.tg_user_id, message_id, None)
+        return await self._call_or_enqueue(
+            "edit_message_for_user", partial(self._edit_message_now, target, resolved), cast("Message | bool", False)
+        )
 
     async def clear_reply_markup(self, update: Update):
         target = edit_target(update)

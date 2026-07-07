@@ -913,9 +913,6 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} fallidos, ${skipped} omi
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas fueron interrumpidas por un fallo del trabajador y no se conoce su resultado. No se reintentarán."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
-msgstr "<b>Ventajas de apoyo desbloqueadas</b>\n\nTu cuenta de Patreon está vinculada y tus ventajas de apoyo están activas. Gracias por apoyar a Mitup."
-
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
 
@@ -940,5 +937,11 @@ msgstr "<b>Tus ventajas de apoyo están en periodo de gracia</b>\n\nTu apoyo en 
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
 msgstr "<b>Tus ventajas de apoyo han terminado</b>\n\nSeguimos sin poder confirmar una aportación activa de Patreon, así que tus ventajas de apoyo están ahora desactivadas. Hazte mecenas de nuevo desde el menú Colabora para reactivarlas."
 
-msgid "SupporterNotificationMessages.UPGRADED"
-msgstr "<b>Ventajas de apoyo desbloqueadas</b>\n\nGracias por apoyar a Mitup. Tu aportación de Patreon está activa, así que tus ventajas de apoyo están ahora activadas."
+msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
+msgstr "<b>🧡 Ya eres Colaborador</b>\n\nGracias por apoyar a Mitup. Tu insignia de Colaborador ya aparece en tu perfil, y tu apoyo ayuda a mantener Mitup en marcha para todos."
+
+msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
+msgstr "<b>🌟 Ya eres Mecenas</b>\n\nGracias por apoyar a Mitup. Tu insignia de Mecenas está activa y tus límites acaban de subir: organiza más quedadas a la vez, prográmalas con más antelación e invita a cuanta gente quieras a cada una."
+
+msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
+msgstr "<b>🏆 Ya eres Organizador</b>\n\nGracias por apoyar a Mitup. Tu insignia de Organizador está activa y todos los límites desaparecen: organiza tantas quedadas como quieras, prográmalas con toda la antelación que necesites e invita a cuanta gente quieras a cada una."

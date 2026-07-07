@@ -363,7 +363,10 @@ async def test_sync_promotes_none_user_to_entitled_tier(
     assert user.supporter_level is SupporterLevel.PATRON
     assert subscription.support_expiration is not None
     assert subscription.support_expiration > dt.datetime.now(dt.UTC)
-    api.assert_send_message_to_user_called(user=user, view=SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
+    # A none->patron promotion must announce the Patron tier specifically.
+    api.assert_send_message_to_user_called(
+        user=user, view=SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang)
+    )
 
 
 async def test_sync_promotes_patron_to_organizer_and_notifies(
@@ -377,7 +380,10 @@ async def test_sync_promotes_patron_to_organizer_and_notifies(
 
     assert outcome is supporter_check.LevelSyncOutcome.UPGRADED
     assert user.supporter_level is SupporterLevel.ORGANIZER
-    api.assert_send_message_to_user_called(user=user, view=SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
+    # A patron->organizer promotion must announce the Organizer tier specifically.
+    api.assert_send_message_to_user_called(
+        user=user, view=SupporterNotificationMessages.ORGANIZER_UNLOCKED.get(lang=user.lang)
+    )
 
 
 async def test_sync_downgrades_between_tiers_silently(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):

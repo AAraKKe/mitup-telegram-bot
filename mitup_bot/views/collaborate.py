@@ -1,6 +1,16 @@
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages
 from mitup_bot.views.mitup_view import ButtonConfig, MitupView
+
+
+def link_confirmation_view(text: str | FormattedText, lang: str) -> MitupView:
+    """DM sent back to the user after a successful Patreon link: the confirmation copy plus a
+    Main-menu button so the user is never stranded on a button-less message."""
+    return MitupView(
+        description=text,
+        keyboard=[],
+    ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
 
 def collaborate_unavailable_view(lang: str) -> MitupView:

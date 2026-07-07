@@ -39,6 +39,9 @@ class MockApi(TelegramApi):
     def edit_message(self, update: Update, view: MitupView | FormattedText | str):
         return self.call_mock("edit_message", update=update, view=view)
 
+    def edit_message_for_user(self, user: User, message_id: int, view: MitupView | FormattedText | str):
+        return self.call_mock("edit_message_for_user", user=user, message_id=message_id, view=view)
+
     def update_meeting_messages(
         self,
         *,
@@ -112,6 +115,18 @@ class MockApi(TelegramApi):
 
     def assert_edit_message_called(self, update: Update, view: MitupView | FormattedText | str, times: int = 1):
         self.assert_method_called("edit_message", update=update, view=view, times=times)
+
+    def assert_edit_message_for_user_called(
+        self, user: User, message_id: int, view: MitupView | FormattedText | str, times: int = 1
+    ):
+        if times == 1:
+            assert_awaited_once_with_diff(
+                self.mock_method("edit_message_for_user"), user=user, message_id=message_id, view=view
+            )
+        else:
+            assert_awaited_with_diff(
+                self.mock_method("edit_message_for_user"), times, user=user, message_id=message_id, view=view
+            )
 
     def assert_answer_callback_query_called(
         self,

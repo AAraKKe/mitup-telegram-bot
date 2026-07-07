@@ -342,7 +342,8 @@ async def test_apply_upgrade_grants_and_notifies(
 
     assert outcome is WebhookApplied.UPGRADED
     assert user.supporter_level is SupporterLevel.PATRON
-    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
+    # The 500-cent pledge lands on Patron, so the DM must be the Patron unlock message specifically.
+    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang))
 
 
 async def test_apply_downgrade_is_silent(
