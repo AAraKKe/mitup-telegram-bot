@@ -89,10 +89,14 @@ class MetricKey(CamelCaseStrEnum):
     WEBHOOK_MALFORMED_UPDATE = auto()
     """A membership delivery reached the Patreon webhook endpoint (before signature verification)"""
     PATREON_WEBHOOK_RECEIVED = auto()
-    """A Patreon webhook delivery was rejected for a missing or invalid HMAC signature"""
+    """A Patreon webhook delivery was rejected for a missing or invalid HMAC signature (1), or passed (0)"""
     PATREON_WEBHOOK_FORBIDDEN = auto()
-    """A verified Patreon webhook delivery changed a linked user's supporter level"""
+    """A verified Patreon webhook delivery changed a linked user's supporter level (1), or was a no-op (0)"""
     PATREON_WEBHOOK_APPLIED = auto()
+    """A Patreon webhook delivery carried a body that could not be parsed as a membership event"""
+    PATREON_WEBHOOK_MALFORMED = auto()
+    """The Patreon webhook endpoint failed to process a verified delivery (surfaced as 500; Patreon retries)"""
+    PATREON_WEBHOOK_FAULT = auto()
     """Startup registration of the Patreon membership webhook failed (isolated; startup continues)"""
     PATREON_WEBHOOK_REGISTRATION_FAILED = auto()
     """FastAPI/uvicorn lifespan failed during startup"""

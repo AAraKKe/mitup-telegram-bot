@@ -55,6 +55,10 @@ UPGRADES_METRIC = "PatreonUpgrades"
 DOWNGRADES_METRIC = "PatreonDowngrades"
 GRACE_STARTED_METRIC = "PatreonGraceStarted"
 SUPPORT_LOST_METRIC = "PatreonSupportLost"
+GRACE_EXTENDED_METRIC = "PatreonGraceExtended"
+# Per-subscription processing faults. Emitted every run (0 when the sweep is clean) so the series is
+# continuous rather than a failure-only signal; the run still raises after emitting when any row failed.
+SUBSCRIPTION_FAULTS_METRIC = "PatreonSubscriptionFaults"
 
 
 class DueOutcome(Enum):
@@ -130,8 +134,10 @@ async def refresh_creator_token(client: TokenRefresher, config: PatreonConfig, m
         metrics.emit(CREATOR_REFRESH_FAULTS_METRIC, 1, MetricUnit.COUNT)
         return None
     await store_creator_token(pair, state.fingerprint)
-    metrics.emit(CREATOR_TOKEN_TTL_METRIC, days_until(pair.expires_at), MetricUnit.NONE)
+    ttl_days = days_until(pair.expires_at)
+    metrics.emit(CREATOR_TOKEN_TTL_METRIC, ttl_days, MetricUnit.NONE)
     metrics.emit(CREATOR_REFRESH_FAULTS_METRIC, 0, MetricUnit.COUNT)
+    log.info("Patreon creator token refreshed", ttl_days=ttl_days)
     return pair.access_token
 
 
@@ -264,27 +270,35 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
             # No usable creator token means no member list; the TTL alarm already covers this.
             return
         active_amounts = await active_patreon_amounts(client, creator_access_token)
+        log.info("Fetched active Patreon members", count=len(active_amounts))
 
+        due_ids = await nominate(DUE_SUBSCRIPTIONS)
+        log.info("Nominated due subscriptions", count=len(due_ids))
         due_outcomes = await process_all(
             lambda subscription_id: process_due_subscription(subscription_id, active_amounts, api),
-            await nominate(DUE_SUBSCRIPTIONS),
+            due_ids,
             failures,
         )
+        live_ids = await nominate(LIVE_LINKED_SUBSCRIPTIONS)
+        log.info("Nominated live linked subscriptions", count=len(live_ids))
         sync_outcomes = await process_all(
             lambda subscription_id: sync_subscription_level(subscription_id, active_amounts, config, api),
-            await nominate(LIVE_LINKED_SUBSCRIPTIONS),
+            live_ids,
             failures,
         )
 
+    extended = sum(1 for outcome in due_outcomes if outcome is DueOutcome.EXTENDED)
     grace_started = sum(1 for outcome in due_outcomes if outcome is DueOutcome.GRACE_STARTED)
     support_lost = sum(1 for outcome in due_outcomes if outcome is DueOutcome.SUPPORT_LOST)
     upgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.UPGRADED)
     downgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.DOWNGRADED)
 
+    metrics.emit(GRACE_EXTENDED_METRIC, extended, MetricUnit.COUNT)
     metrics.emit(GRACE_STARTED_METRIC, grace_started, MetricUnit.COUNT)
     metrics.emit(SUPPORT_LOST_METRIC, support_lost, MetricUnit.COUNT)
     metrics.emit(UPGRADES_METRIC, upgraded, MetricUnit.COUNT)
     metrics.emit(DOWNGRADES_METRIC, downgraded, MetricUnit.COUNT)
+    metrics.emit(SUBSCRIPTION_FAULTS_METRIC, len(failures), MetricUnit.COUNT)
 
     if failures:
         raise RuntimeError(f"Supporter check failed for {len(failures)} subscriptions. Check logs for details.")
@@ -292,9 +306,11 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     log.info(
         "supporter check complete",
         due_processed=len(due_outcomes),
+        extended=extended,
         grace_started=grace_started,
         support_lost=support_lost,
         upgraded=upgraded,
         downgraded=downgraded,
         active_patrons=len(active_amounts),
+        subscription_faults=len(failures),
     )

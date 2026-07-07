@@ -497,8 +497,11 @@ async def test_run_happy_path_emits_creator_ttl_and_counters(
     metrics.assert_emitted(name=supporter_check.CREATOR_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.UPGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.DOWNGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=0, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
+    # Per-subscription faults: a clean run still emits the 0-baseline so the series stays continuous.
+    metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_logs_summary_on_success(
@@ -525,11 +528,13 @@ async def test_run_logs_summary_on_success(
 
     summary = next(entry for entry in logs if entry["event"] == "supporter check complete")
     assert summary["due_processed"] == 0
+    assert summary["extended"] == 0
     assert summary["grace_started"] == 0
     assert summary["support_lost"] == 0
     assert summary["upgraded"] == 0
     assert summary["downgraded"] == 0
     assert summary["active_patrons"] == 1
+    assert summary["subscription_faults"] == 0
 
 
 async def test_run_stops_after_creator_invalid_grant(
@@ -586,6 +591,8 @@ async def test_run_raises_when_a_subscription_fails(
 
     # The lifecycle counters are emitted before the raise, so the series stay continuous on a failing run.
     metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
+    # The per-subscription fault count is emitted before the raise: N failures land as a datapoint.
+    metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
 
 
 async def test_run_counts_lifecycle_transitions(
@@ -636,3 +643,33 @@ async def test_run_counts_lifecycle_transitions(
     metrics.assert_emitted(name=supporter_check.UPGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.DOWNGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
+    # No still-active due member this run, so grace-extensions stay at the 0-baseline.
+    metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=0, unit=MetricUnit.COUNT)
+
+
+async def test_run_counts_grace_extensions(
+    mock_session: MockDbSession,
+    api: MockApi,
+    config: PatreonConfig,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    configure(config)
+    # A due subscription whose patron is still active this run: the grace flow extends it (EXTENDED).
+    subscription, user = make_subscription_user(
+        patreon_user_id="patreon-1", support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
+    )
+    user.supporter_level = SupporterLevel.PATRON
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
+    mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, (subscription,))
+    mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, ())
+    register_due(mock_session, subscription, user)
+
+    client = FakePatreonClient(members=(active_member("patreon-1", cents=500),))
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
+
+    await supporter_check.run(api, metrics_client)
+
+    metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)

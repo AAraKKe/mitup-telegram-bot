@@ -72,9 +72,16 @@ def build_test_web_app(
     )
 
 
-def build_web_client(web_app: FastAPI) -> httpx.AsyncClient:
-    """Return an httpx.AsyncClient wired to the given FastAPI app via ASGITransport."""
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=web_app), base_url="http://test")
+def build_web_client(web_app: FastAPI, *, raise_app_exceptions: bool = True) -> httpx.AsyncClient:
+    """Return an httpx.AsyncClient wired to the given FastAPI app via ASGITransport.
+
+    ``raise_app_exceptions`` defaults to True so an unhandled endpoint error surfaces in the test.
+    Pass False to exercise the framework's 500 response (e.g. a webhook whose processing fault must
+    reach the client as 500 rather than propagate)."""
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=web_app, raise_app_exceptions=raise_app_exceptions),
+        base_url="http://test",
+    )
 
 
 @asynccontextmanager

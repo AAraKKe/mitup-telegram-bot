@@ -682,16 +682,23 @@ async def patreon_webhook(
 
     Status-code contract: **403** on a missing/invalid signature (no write), **400** on an unparseable
     body, **200** on a successful apply or a benign no-op (unknown patron). Our own processing failures
-    are deliberately *not* caught, so a DB/transient error surfaces as **500** and Patreon's retry queue
-    redelivers. The signature is checked against the exact raw bytes, before any JSON re-parse.
+    surface as **500** so Patreon's retry queue redelivers; the ``except`` only meters the fault before
+    re-raising, so that contract is unchanged. The signature is checked against the exact raw bytes,
+    before any JSON re-parse.
+
+    Every fault metric is emitted as a continuous 0/1 series: ``FORBIDDEN``, ``MALFORMED`` and ``FAULT``
+    each emit ``0`` on the path that clears them, and ``APPLIED`` emits ``0`` on a no-op / ``1`` on a
+    change, so a healthy endpoint is visible in CloudWatch, not just a failing one.
     """
     with structlog.contextvars.bound_contextvars(flow=WEBHOOK_FLOW, request_id=uuid.uuid4().hex[:8]):
         metrics_client.emit(MetricKey.PATREON_WEBHOOK_RECEIVED)
         raw_body = await request.body()
         trigger = request.headers.get(PATREON_EVENT_HEADER)
+        signature = request.headers.get(PATREON_SIGNATURE_HEADER)
+        log.info("Patreon webhook received", stage="receive", trigger=trigger, signed=signature is not None)
 
         secret = await webhooks.load_webhook_secret()
-        if not verify_signature(secret, raw_body, request.headers.get(PATREON_SIGNATURE_HEADER)):
+        if not verify_signature(secret, raw_body, signature):
             metrics_client.emit(MetricKey.PATREON_WEBHOOK_FORBIDDEN)
             client_host = request.client.host if request.client is not None else "unknown"
             log.warning(
@@ -701,15 +708,30 @@ async def patreon_webhook(
                 client_host=client_host,
             )
             raise HTTPException(status_code=403)
+        # Signature valid: emit the 0-baseline so FORBIDDEN is a continuous 0/1 series, not failure-only.
+        metrics_client.emit(MetricKey.PATREON_WEBHOOK_FORBIDDEN, 0)
+        log.info("Patreon webhook signature verified", stage="verify", outcome="valid", trigger=trigger)
 
         try:
             payload = WebhookMemberPayload.model_validate_json(raw_body)
         except ValidationError:
+            metrics_client.emit(MetricKey.PATREON_WEBHOOK_MALFORMED)
             log.warning("Malformed Patreon webhook payload", stage="parse", trigger=trigger)
             return Response(status_code=400)
+        # Parsed cleanly: 0-baseline keeps MALFORMED a continuous 0/1 series.
+        metrics_client.emit(MetricKey.PATREON_WEBHOOK_MALFORMED, 0)
 
         api = build_api(BotAdapter(ptb_app.bot, metrics_client))
-        outcome = await apply_membership_event(api, trigger, payload)
-        if outcome is not WebhookApplied.UNCHANGED:
-            metrics_client.emit(MetricKey.PATREON_WEBHOOK_APPLIED)
+        try:
+            outcome = await apply_membership_event(api, trigger, payload)
+        except Exception:
+            # Processing faults deliberately surface as 500 (uncaught → Patreon retries). There is no
+            # generic 500-fault metric on the web app, so this counter is the fault's only CloudWatch
+            # trace. Emit 1 and re-raise to preserve the 500 + retry contract.
+            metrics_client.emit(MetricKey.PATREON_WEBHOOK_FAULT)
+            log.exception("Patreon webhook processing failed", stage="apply", trigger=trigger)
+            raise
+        # Applied without fault: 0-baselines keep FAULT and APPLIED continuous 0/1 series.
+        metrics_client.emit(MetricKey.PATREON_WEBHOOK_FAULT, 0)
+        metrics_client.emit(MetricKey.PATREON_WEBHOOK_APPLIED, 0 if outcome is WebhookApplied.UNCHANGED else 1)
         return Response(status_code=200)

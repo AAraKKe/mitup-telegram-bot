@@ -158,10 +158,14 @@ async def test_valid_signature_applies_and_returns_200(
     assert response.status_code == 200
     apply_mock.assert_awaited_once()
     metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_RECEIVED)
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED)
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED, value=1)
+    # Every fault series clears to its 0-baseline on the healthy apply path.
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED, value=0)
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FAULT, value=0)
 
 
-async def test_unchanged_event_returns_200_without_applied_metric(
+async def test_unchanged_event_emits_applied_zero(
     endpoint_app: tuple[FastAPI, MetricAssertions], monkeypatch: pytest.MonkeyPatch
 ):
     app, metrics = endpoint_app
@@ -177,6 +181,30 @@ async def test_unchanged_event_returns_200_without_applied_metric(
         )
 
     assert response.status_code == 200
+    # A no-op emits APPLIED=0 (continuous series), never the change=1 value.
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED, value=0)
+    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED, value=1)
+
+
+async def test_processing_fault_returns_500_and_emits_fault(
+    endpoint_app: tuple[FastAPI, MetricAssertions], monkeypatch: pytest.MonkeyPatch
+):
+    app, metrics = endpoint_app
+    monkeypatch.setattr(web_patreon.webhooks, "load_webhook_secret", AsyncMock(return_value=SECRET))
+    monkeypatch.setattr(web_patreon, "apply_membership_event", AsyncMock(side_effect=RuntimeError("boom")))
+
+    body = json.dumps(member_dict()).encode()
+    async with build_web_client(app, raise_app_exceptions=False) as client:
+        response = await client.post(
+            "/patreon/webhook",
+            content=body,
+            headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
+        )
+
+    # The fault surfaces as 500 (Patreon retries); the metric fires 1 and no 0-baseline or APPLIED.
+    assert response.status_code == 500
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FAULT, value=1)
+    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_FAULT, value=0)
     metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED)
 
 
@@ -198,7 +226,10 @@ async def test_bad_signature_returns_403_without_processing(
 
     assert response.status_code == 403
     apply_mock.assert_not_awaited()
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN)
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=1)
+    # A rejected delivery never reaches the signature-valid 0-baseline or the downstream series.
+    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
+    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED)
 
 
 async def test_missing_signature_header_returns_403(
@@ -237,7 +268,7 @@ async def test_no_registered_secret_returns_403(
 async def test_malformed_body_returns_400(
     endpoint_app: tuple[FastAPI, MetricAssertions], monkeypatch: pytest.MonkeyPatch
 ):
-    app, _ = endpoint_app
+    app, metrics = endpoint_app
     monkeypatch.setattr(web_patreon.webhooks, "load_webhook_secret", AsyncMock(return_value=SECRET))
     apply_mock = AsyncMock()
     monkeypatch.setattr(web_patreon, "apply_membership_event", apply_mock)
@@ -252,6 +283,10 @@ async def test_malformed_body_returns_400(
 
     assert response.status_code == 400
     apply_mock.assert_not_awaited()
+    # The signature verified (FORBIDDEN cleared to 0), then the body failed to parse (MALFORMED=1).
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED, value=1)
+    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED, value=0)
 
 
 # --- apply_membership_event + apply_membership_transition (mock session) ---
