@@ -812,13 +812,19 @@ msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desconectar conta Patreon"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Apoie o Mitup com Patreon</b>\n\nO Mitup é gratuito. Se ele ajuda você a reunir suas pessoas, você pode apoiá-lo no Patreon e desbloquear benefícios de apoiador como agradecimento.\n\nConecte sua conta Patreon para começar."
+msgstr "<b>Apoie o Mitup com Patreon</b>\n\nO Mitup é gratuito. Se ele ajuda você a reunir suas pessoas, você pode apoiá-lo no Patreon e desbloquear benefícios de apoiador como agradecimento.\n\n<b>Como Patrono:</b> execute até ${active_meetings} eventos ativos ao mesmo tempo, agende até ${scheduling_days} dias adiante e convide participantes ilimitados por evento.\n\n<b>Como Organizador:</b> tudo ilimitado.\n\nConecte sua conta Patreon para começar."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Conta Patreon conectada</b>\n\nTudo pronto. Você ainda não é um patrono, então seus benefícios de apoiador ainda estão desativados. Torne-se um patrono e eles serão ativados automaticamente, sem necessidade de conectar novamente."
+msgstr "<b>Conta Patreon conectada</b>\n\nTudo pronto. Você ainda não é um patrono, então seus benefícios de apoiador ainda estão desativados.\n\n<b>Como Patrono:</b> execute até ${active_meetings} eventos ativos ao mesmo tempo, agende até ${scheduling_days} dias adiante e convide participantes ilimitados por evento.\n\n<b>Como Organizador:</b> tudo ilimitado.\n\nTorne-se um patrono e seus benefícios serão ativados automaticamente, sem necessidade de conectar novamente."
 
-msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Você é um apoiador</b>\n\nObrigado por apoiar o Mitup. Seus benefícios de apoiador estão ativos. Você pode desconectar sua conta Patreon aqui quando quiser."
+msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
+msgstr "<b>🧡 Você é um Apoiador</b>\n\nObrigado por apoiar o Mitup. Seu selo de Apoiador aparece no seu perfil, e seu apoio ajuda a manter o Mitup funcionando para todos. Você pode desconectar sua conta Patreon sempre que quiser."
+
+msgid "CollaborateMessages.LINKED_PATRON_PATRON"
+msgstr "<b>🌟 Você é um Patrono</b>\n\nObrigado por apoiar o Mitup. Seu selo de Patrono está ativo, e você pode executar até ${active_meetings} eventos ativos ao mesmo tempo, agendar até ${scheduling_days} dias adiante e convidar participantes ilimitados por evento. Você pode desconectar sua conta Patreon sempre que quiser."
+
+msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
+msgstr "<b>🏆 Você é um Organizador</b>\n\nObrigado por apoiar o Mitup. Seu selo de Organizador está ativo, e todos os limites foram removidos: realize quantos eventos quiser, agende-os com toda a antecedência que precisar e convide quantas pessoas quiser para cada um. Você pode desconectar sua conta Patreon sempre que quiser."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Colabore</b>\n\nO apoio do Patreon ainda não está disponível. Volte em breve."

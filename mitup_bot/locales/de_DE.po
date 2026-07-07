@@ -812,13 +812,10 @@ msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Patreon-Konto trennen"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und als Dankeschön exklusive Vorteile freischalten.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
+msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und Unterstützer-Vorteile freischalten.\n\n<b>Als Förderer:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Veranstalter:</b> alles unbegrenzt.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Unterstützer, daher sind die exklusiven Vorteile noch nicht aktiv. Werde ein Unterstützer und sie werden automatisch aktiviert, ohne dass du erneut verlinken musst."
-
-msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Deine Vorteile sind aktiv. Du kannst dein Patreon-Konto hier jederzeit trennen."
+msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Förderer, daher sind die Unterstützer-Vorteile noch nicht aktiv.\n\n<b>Als Förderer:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Veranstalter:</b> alles unbegrenzt.\n\nWerde ein Förderer und deine Vorteile werden automatisch aktiviert, ohne dass du erneut verlinken musst."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Mithelfen</b>\n\nPatreon-Unterstützung ist noch nicht verfügbar. Schau bald wieder vorbei."
@@ -828,6 +825,15 @@ msgstr "Dein Patreon-Konto wurde getrennt."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Unterstützer, um deine Vorteile freizuschalten. Sie werden automatisch aktiviert, sobald dein Beitrag aktiv ist."
+
+msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
+msgstr "<b>🧡 Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Dein Unterstützer-Abzeichen wird in deinem Profil angezeigt, und deine Unterstützung hilft dabei, Mitup für alle am Laufen zu halten. Du kannst dein Patreon-Konto jederzeit trennen."
+
+msgid "CollaborateMessages.LINKED_PATRON_PATRON"
+msgstr "<b>🌟 Du bist ein Förderer</b>\n\nDanke, dass du Mitup unterstützt. Dein Förderer-Abzeichen ist aktiv, und du kannst bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen. Du kannst dein Patreon-Konto jederzeit trennen."
+
+msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
+msgstr "<b>🏆 Du bist ein Veranstalter</b>\n\nDanke, dass du Mitup unterstützt. Dein Veranstalter-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest. Du kannst dein Patreon-Konto jederzeit trennen."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""

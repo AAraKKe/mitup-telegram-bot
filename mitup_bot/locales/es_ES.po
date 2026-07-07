@@ -641,13 +641,19 @@ msgid "NotificationMessages.STARTED"
 msgstr "¡La quedada <b>${meeting_title}</b> ha comenzado!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Apoya a Mitup con Patreon</b>\n\nMitup es gratis. Si te ayuda a reunir a tu gente, puedes apoyarlo en Patreon y desbloquear ventajas de apoyo como agradecimiento.\n\nVincula tu cuenta de Patreon para empezar."
+msgstr "<b>Apoya a Mitup con Patreon</b>\n\nMitup es gratis. Si te ayuda a reunir a tu gente, puedes apoyarlo en Patreon y desbloquear ventajas de apoyo como agradecimiento.\n\n<b>Como Mecenas:</b> organiza hasta ${active_meetings} quedadas activas a la vez, prográmalas hasta ${scheduling_days} días por adelantado e invita a un número ilimitado de participantes por quedada.\n\n<b>Como Organizador:</b> sin límites.\n\nVincula tu cuenta de Patreon para empezar."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Cuenta de Patreon vinculada</b>\n\nTodo listo. Aún no eres mecenas, así que tus ventajas de apoyo siguen desactivadas. Hazte mecenas y se activan solas, sin necesidad de volver a vincular."
+msgstr "<b>Cuenta de Patreon vinculada</b>\n\nTodo listo. Aún no eres mecenas, así que tus ventajas de apoyo siguen desactivadas.\n\n<b>Como Mecenas:</b> organiza hasta ${active_meetings} quedadas activas a la vez, prográmalas hasta ${scheduling_days} días por adelantado e invita a un número ilimitado de participantes por quedada.\n\n<b>Como Organizador:</b> sin límites.\n\nHazte mecenas y tus ventajas se activan automáticamente, sin necesidad de vincular de nuevo."
 
-msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Apoyas a Mitup</b>\n\nGracias por apoyar a Mitup. Tus ventajas de apoyo están activas. Puedes desvincular tu cuenta de Patreon aquí cuando quieras."
+msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
+msgstr "<b>🧡 Ya eres Colaborador</b>\n\nGracias por apoyar a Mitup. Tu insignia de Colaborador aparece en tu perfil, y tu apoyo ayuda a mantener Mitup en marcha para todos. Puedes desvincular tu cuenta de Patreon cuando quieras."
+
+msgid "CollaborateMessages.LINKED_PATRON_PATRON"
+msgstr "<b>🌟 Ya eres Mecenas</b>\n\nGracias por apoyar a Mitup. Tu insignia de Mecenas está activa, y puedes organizar hasta ${active_meetings} quedadas activas a la vez, programarlas hasta ${scheduling_days} días por adelantado e invitar a un número ilimitado de participantes por quedada. Puedes desvincular tu cuenta de Patreon cuando quieras."
+
+msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
+msgstr "<b>🏆 Ya eres Organizador</b>\n\nGracias por apoyar a Mitup. Tu insignia de Organizador está activa, y todos los límites desaparecen: organiza tantas quedadas como quieras, prográmalas con toda la antelación que necesites e invita a cuanta gente quieras a cada una. Puedes desvincular tu cuenta de Patreon cuando quieras."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Colabora</b>\n\nEl soporte de Patreon todavía no está disponible. Vuelve pronto."

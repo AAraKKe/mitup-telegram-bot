@@ -13,7 +13,7 @@ thresholds live on `PatreonConfig` and are passed in explicitly by the callers t
 """
 
 from enum import StrEnum
-from typing import assert_never
+from typing import Literal, assert_never, overload
 
 from mitup_bot.config import LimitsConfig, PatreonConfig
 from mitup_bot.utils.emojis import Emojis
@@ -80,6 +80,14 @@ def level_for_amount(cents: int, config: PatreonConfig) -> SupporterLevel:
     return SupporterLevel.SUPPORTER
 
 
+@overload
+def active_meetings_cap(level: Literal[SupporterLevel.ORGANIZER]) -> None: ...
+@overload
+def active_meetings_cap(
+    level: Literal[SupporterLevel.NONE, SupporterLevel.SUPPORTER, SupporterLevel.PATRON],
+) -> int: ...
+@overload
+def active_meetings_cap(level: SupporterLevel) -> int | None: ...
 def active_meetings_cap(level: SupporterLevel) -> int | None:
     """Maximum active meetings a level may own, or None (unlimited) for ORGANIZER."""
     config = PolicyState.config
@@ -94,6 +102,14 @@ def active_meetings_cap(level: SupporterLevel) -> int | None:
             assert_never(unreachable)
 
 
+@overload
+def scheduling_horizon_days(level: Literal[SupporterLevel.ORGANIZER]) -> None: ...
+@overload
+def scheduling_horizon_days(
+    level: Literal[SupporterLevel.NONE, SupporterLevel.SUPPORTER, SupporterLevel.PATRON],
+) -> int: ...
+@overload
+def scheduling_horizon_days(level: SupporterLevel) -> int | None: ...
 def scheduling_horizon_days(level: SupporterLevel) -> int | None:
     """How many days ahead a level may schedule a meeting, or None (unlimited) for ORGANIZER."""
     config = PolicyState.config
@@ -108,6 +124,12 @@ def scheduling_horizon_days(level: SupporterLevel) -> int | None:
             assert_never(unreachable)
 
 
+@overload
+def participant_capacity(level: Literal[SupporterLevel.PATRON, SupporterLevel.ORGANIZER]) -> None: ...
+@overload
+def participant_capacity(level: Literal[SupporterLevel.NONE, SupporterLevel.SUPPORTER]) -> int: ...
+@overload
+def participant_capacity(level: SupporterLevel) -> int | None: ...
 def participant_capacity(level: SupporterLevel) -> int | None:
     """The per-meeting participant cap for a level, or None (uncapped) for PATRON and ORGANIZER."""
     config = PolicyState.config

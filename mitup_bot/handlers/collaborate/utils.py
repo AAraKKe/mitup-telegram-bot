@@ -5,6 +5,7 @@ from telegram import Message, Update
 from mitup_bot import patreon, supporter
 from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.patreon import oauth
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
@@ -42,10 +43,16 @@ async def build_collaborate_view(session: AsyncSession, user: User, message_id: 
     if not patreon.is_configured():
         return collaborate_unavailable_view(user.lang)
 
+    active_meetings = supporter.active_meetings_cap(SupporterLevel.PATRON)
+    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.PATRON)
+
     config = patreon.current_config()
     subscription = await subscription_for_user(session, user)
     if subscription is None:
-        return collaborate_not_linked_view(user.lang, oauth.authorization_url(config, user.tg_user_id, message_id))
+        authorization_url = oauth.authorization_url(config, user.tg_user_id, message_id)
+        return collaborate_not_linked_view(user.lang, authorization_url, active_meetings, scheduling_days)
     if supporter.is_supporter(user.supporter_level):
-        return collaborate_linked_patron_view(user.lang)
-    return collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(config))
+        return collaborate_linked_patron_view(user.lang, user.supporter_level, active_meetings, scheduling_days)
+    return collaborate_linked_not_patron_view(
+        user.lang, oauth.campaign_pledge_url(config), active_meetings, scheduling_days
+    )

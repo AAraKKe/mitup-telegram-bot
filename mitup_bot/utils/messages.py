@@ -676,19 +676,39 @@ class CollaborateMessages(MessageBase):
         "<b>Support Mitup with Patreon</b>\n\n"
         "Mitup is free to use. If it helps you bring people together, you can back it on Patreon "
         "and unlock supporter perks as a thank you.\n\n"
+        "<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, "
+        "schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n"
+        "<b>As an Organizer:</b> unlimited everything.\n\n"
         "Link your Patreon account to get started."
     )
     # Collaborate view, shown when the account is linked but not an active patron of the campaign.
     LINKED_NOT_PATRON = (
         "<b>Patreon account linked</b>\n\n"
-        "You're all set. You're not a patron yet, so your supporter perks are still off. Become a patron "
-        "and they turn on automatically, with no need to link again."
+        "You're all set. You're not a patron yet, so your supporter perks are still off.\n\n"
+        "<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, "
+        "schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n"
+        "<b>As an Organizer:</b> unlimited everything.\n\n"
+        "Become a patron and your perks turn on automatically, with no need to link again."
     )
-    # Collaborate view, shown to a linked, active patron.
-    LINKED_PATRON = (
-        "<b>You're a supporter</b>\n\n"
-        "Thanks for backing Mitup. Your supporter perks are active. You can unlink your Patreon "
-        "account here whenever you want."
+    # Collaborate view, shown to a linked active supporter.
+    LINKED_PATRON_SUPPORTER = (
+        f"<b>{Emojis.SUPPORTER} You're a Supporter</b>\n\n"
+        "Thanks for backing Mitup. Your Supporter badge shows on your profile, and your support "
+        "helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
+    )
+    # Collaborate view, shown to a linked active patron.
+    LINKED_PATRON_PATRON = (
+        f"<b>{Emojis.PATRON} You're a Patron</b>\n\n"
+        "Thanks for backing Mitup. Your Patron badge is on, and you can run up to ${active_meetings} active meetings "
+        "at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting. "
+        "You can unlink your Patreon account whenever you want."
+    )
+    # Collaborate view, shown to a linked active organizer.
+    LINKED_PATRON_ORGANIZER = (
+        f"<b>{Emojis.ORGANIZER} You're an Organizer</b>\n\n"
+        "Thanks for backing Mitup. Your Organizer badge is on, and every limit is off: "
+        "run as many meetings as you want, schedule them as far ahead as you need, "
+        "and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
     )
     # Collaborate view, shown when the bot runs without a [patreon] config section.
     UNAVAILABLE = "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
@@ -700,6 +720,24 @@ class CollaborateMessages(MessageBase):
         "You're connected. Become a patron to unlock your supporter perks. They'll switch on automatically "
         "once your pledge is active."
     )
+
+    @classmethod
+    def status_for(cls, level: SupporterLevel) -> CollaborateMessages:
+        """The persistent status screen message for a linked, active paying tier.
+
+        NONE never reaches here: a non-patron never sees the linked patron screen, so it raises
+        rather than inventing copy for the free tier."""
+        match level:
+            case SupporterLevel.SUPPORTER:
+                return cls.LINKED_PATRON_SUPPORTER
+            case SupporterLevel.PATRON:
+                return cls.LINKED_PATRON_PATRON
+            case SupporterLevel.ORGANIZER:
+                return cls.LINKED_PATRON_ORGANIZER
+            case SupporterLevel.NONE:
+                raise ValueError("No status message exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
 
 
 class SupporterNotificationMessages(MessageBase):

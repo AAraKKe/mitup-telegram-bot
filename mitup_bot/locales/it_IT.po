@@ -780,13 +780,19 @@ msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Scollega account Patreon"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Sostieni Mitup con Patreon</b>\n\nMitup è gratuito. Se ti aiuta a riunire la tua gente, puoi sostenerlo su Patreon e sbloccare vantaggi premium come ringraziamento.\n\nCollega il tuo account Patreon per iniziare."
+msgstr "<b>Sostieni Mitup con Patreon</b>\n\nMitup è gratuito. Se ti aiuta a riunire la tua gente, puoi sostenerlo su Patreon e sbloccare vantaggi da sostenitore come ringraziamento.\n\n<b>Come Mecenate:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita quante persone vuoi a ciascun incontro.\n\n<b>Come Organizzatore:</b> tutto senza limiti.\n\nCollega il tuo account Patreon per iniziare."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Account Patreon collegato</b>\n\nTutto pronto. Non sei ancora un mecenate, quindi i vantaggi premium sono ancora disattivati. Diventa un mecenate e si attiveranno automaticamente, senza bisogno di collegare di nuovo."
+msgstr "<b>Account Patreon collegato</b>\n\nTutto pronto. Non sei ancora un mecenate, quindi i tuoi vantaggi da sostenitore sono ancora disattivati.\n\n<b>Come Mecenate:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita quante persone vuoi a ciascun incontro.\n\n<b>Come Organizzatore:</b> tutto senza limiti.\n\nDiventa un mecenate e si attiveranno automaticamente, senza bisogno di collegare di nuovo."
 
-msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Sei un sostenitore premium</b>\n\nGrazie per aver sostenuto Mitup. I tuoi vantaggi premium sono attivi. Puoi scollegare il tuo account Patreon qui quando vuoi."
+msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
+msgstr "<b>🧡 Sei un Sostenitore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Sostenitore è visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti. Puoi scollegare il tuo account Patreon quando vuoi."
+
+msgid "CollaborateMessages.LINKED_PATRON_PATRON"
+msgstr "<b>🌟 Sei un Mecenate</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Mecenate è attivo e puoi gestire fino a ${active_meetings} incontri attivi contemporaneamente, pianificare fino a ${scheduling_days} giorni in anticipo e invitare quante persone vuoi a ciascun incontro. Puoi scollegare il tuo account Patreon quando vuoi."
+
+msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
+msgstr "<b>🏆 Sei un Organizzatore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Organizzatore è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno. Puoi scollegare il tuo account Patreon quando vuoi."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Collabora</b>\n\nIl supporto Patreon non è ancora disponibile. Torna presto."

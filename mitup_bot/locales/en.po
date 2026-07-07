@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-07 08:44\n"
+"PO-Revision-Date: 2026-07-07 19:17\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -687,13 +687,19 @@ msgid "NotificationMessages.STARTED"
 msgstr "The meeting <b>${meeting_title}</b> has started!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock supporter perks as a thank you.\n\nLink your Patreon account to get started."
+msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock supporter perks as a thank you.\n\n<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As an Organizer:</b> unlimited everything.\n\nLink your Patreon account to get started."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a patron yet, so your supporter perks are still off. Become a patron and they turn on automatically, with no need to link again."
+msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a patron yet, so your supporter perks are still off.\n\n<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As an Organizer:</b> unlimited everything.\n\nBecome a patron and your perks turn on automatically, with no need to link again."
 
-msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>You're a supporter</b>\n\nThanks for backing Mitup. Your supporter perks are active. You can unlink your Patreon account here whenever you want."
+msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
+msgstr "<b>🧡 You're a Supporter</b>\n\nThanks for backing Mitup. Your Supporter badge shows on your profile, and your support helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
+
+msgid "CollaborateMessages.LINKED_PATRON_PATRON"
+msgstr "<b>🌟 You're a Patron</b>\n\nThanks for backing Mitup. Your Patron badge is on, and you can run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting. You can unlink your Patreon account whenever you want."
+
+msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
+msgstr "<b>🏆 You're an Organizer</b>\n\nThanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."

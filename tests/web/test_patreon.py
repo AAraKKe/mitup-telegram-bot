@@ -11,8 +11,8 @@ from structlog.testing import capture_logs
 from structlog.typing import EventDict
 from telegram.error import BadRequest
 
-from mitup_bot import patreon
-from mitup_bot.config import PatreonConfig, RunModes
+from mitup_bot import patreon, supporter
+from mitup_bot.config import LimitsConfig, PatreonConfig, RunModes
 from mitup_bot.exceptions import PatreonApiError
 from mitup_bot.models import SupporterSubscription
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
@@ -48,6 +48,18 @@ from tests.helpers.stub_db import MockDbSession
 
 BOT_USERNAME = "MitupTestBot"
 TAPPED_MESSAGE_ID = 4242
+PATRON_ACTIVE_MEETINGS = 12
+PATRON_SCHEDULING_DAYS = 200
+
+
+@pytest.fixture
+def patron_caps(monkeypatch: pytest.MonkeyPatch):
+    """Pin the Patron-tier caps so the refreshed Collaborate copy renders deterministic numbers."""
+    config = LimitsConfig(
+        patron_active_meetings=PATRON_ACTIVE_MEETINGS,
+        patron_scheduling_horizon_days=PATRON_SCHEDULING_DAYS,
+    )
+    monkeypatch.setattr(supporter.PolicyState, "config", config)
 
 
 def one_log(logs: list[EventDict], event: str) -> EventDict:
@@ -575,7 +587,9 @@ async def test_confirmation_dm_carries_main_menu_button(patch_begin_write: Calla
     assert main_menu_button.callback_data == cb.MAIN_MENU
 
 
-async def test_link_refreshes_tapped_message_into_patron_view(patch_begin_write: Callable[[MockDbSession], None]):
+async def test_link_refreshes_tapped_message_into_patron_view(
+    patch_begin_write: Callable[[MockDbSession], None], patron_caps: None
+):
     # A Patron re-links from the Collaborate menu: the tapped message is edited in place into the
     # linked-patron view, addressed by (user, message_id).
     session = MockDbSession()
@@ -589,13 +603,24 @@ async def test_link_refreshes_tapped_message_into_patron_view(patch_begin_write:
     )
 
     assert outcome is LinkOutcome.LINKED_SUPPORTER
+    assert user.supporter_level is SupporterLevel.PATRON
     api.assert_edit_message_for_user_called(
-        user=user, message_id=TAPPED_MESSAGE_ID, view=collaborate_linked_patron_view(user.lang)
+        user=user,
+        message_id=TAPPED_MESSAGE_ID,
+        view=collaborate_linked_patron_view(
+            user.lang, SupporterLevel.PATRON, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
+        ),
     )
+    # The refreshed screen uses the Patron-tier message with its caps substituted, not a generic one.
+    view = api.call_args("edit_message_for_user").kwargs["view"]
+    assert view.description == CollaborateMessages.LINKED_PATRON_PATRON.get(
+        lang=user.lang, active_meetings=PATRON_ACTIVE_MEETINGS, scheduling_days=PATRON_SCHEDULING_DAYS
+    )
+    assert "${" not in view.description.text
 
 
 async def test_link_refreshes_tapped_message_into_not_patron_view(
-    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
+    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig, patron_caps: None
 ):
     # A non-patron links: the tapped message is refreshed into the linked-but-not-patron view, which
     # needs the campaign pledge url — so the refresh resolves the live Patreon config.
@@ -613,8 +638,12 @@ async def test_link_refreshes_tapped_message_into_not_patron_view(
     api.assert_edit_message_for_user_called(
         user=user,
         message_id=TAPPED_MESSAGE_ID,
-        view=collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(patreon_config)),
+        view=collaborate_linked_not_patron_view(
+            user.lang, oauth.campaign_pledge_url(patreon_config), PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
+        ),
     )
+    view = api.call_args("edit_message_for_user").kwargs["view"]
+    assert "${" not in view.description.text
 
 
 async def test_link_without_message_id_skips_refresh(patch_begin_write: Callable[[MockDbSession], None]):

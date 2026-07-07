@@ -521,11 +521,15 @@ async def refresh_tapped_message(
     if message_id is None:
         return
 
+    active_meetings = supporter.active_meetings_cap(SupporterLevel.PATRON)
+    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.PATRON)
+
     if outcome is LinkOutcome.LINKED_SUPPORTER:
-        view = collaborate_linked_patron_view(user.lang)
+        view = collaborate_linked_patron_view(user.lang, user.supporter_level, active_meetings, scheduling_days)
     else:
         config = patreon.current_config()
-        view = collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(config))
+        pledge_url = oauth.campaign_pledge_url(config)
+        view = collaborate_linked_not_patron_view(user.lang, pledge_url, active_meetings, scheduling_days)
 
     try:
         await api.edit_message_for_user(user, message_id, view)
