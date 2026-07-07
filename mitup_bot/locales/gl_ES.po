@@ -806,25 +806,25 @@ msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Enlazar conta Patreon"
 
 msgid "ButtonMessages.BECOME_PATRON"
-msgstr "💶 Ser patrón"
+msgstr "💶 Ser Host"
 
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desenlazar conta Patreon"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Apoiar Mitup con Patreon</b>\n\nMitup é gratuíto. Se che axuda a xuntar xente, podes apoiar Mitup en Patreon e desbloquear privilexios especiais como agradecemento.\n\n<b>Como Mecenas:</b> executa ata ${active_meetings} quedadas activas á vez, prográmaas ata ${scheduling_days} días por diante e convida participantes ilimitados por quedada.\n\n<b>Como Organizador:</b> todo sen límites.\n\nEnlaza a túa conta de Patreon para comezar."
+msgstr "<b>Apoiar Mitup con Patreon</b>\n\nMitup é gratuíto. Se che axuda a xuntar xente, podes apoiar Mitup en Patreon e desbloquear privilexios de Host como agradecemento.\n\n<b>Como Gamemaster:</b> executa ata ${active_meetings} quedadas activas á vez, prográmaas ata ${scheduling_days} días por diante e convida participantes ilimitados por quedada.\n\n<b>Como Commissioner:</b> todo sen límites.\n\nEnlaza a túa conta de Patreon para comezar."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Conta Patreon enlazada</b>\n\nPerfecto. Aínda non es mecenas, polo que os privilexios especiais aínda están desactivados.\n\n<b>Como Mecenas:</b> executa ata ${active_meetings} quedadas activas á vez, prográmaas ata ${scheduling_days} días por diante e convida participantes ilimitados por quedada.\n\n<b>Como Organizador:</b> todo sen límites.\n\nFaite mecenas e os teus privilexios activaranse automaticamente, sen necesidade de enlazar de novo."
+msgstr "<b>Conta Patreon enlazada</b>\n\nPerfecto. Aínda non es Host, polo que os teus privilexios de Host aínda están desactivados.\n\n<b>Como Gamemaster:</b> executa ata ${active_meetings} quedadas activas á vez, prográmaas ata ${scheduling_days} días por diante e convida participantes ilimitados por quedada.\n\n<b>Como Commissioner:</b> todo sen límites.\n\nFaite Host e os teus privilexios activaranse automaticamente, sen necesidade de enlazar de novo."
 
 msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
-msgstr "<b>🧡 Xa es Colaborador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Colaborador xa aparece no teu perfil e o teu apoio axuda a manter Mitup en marcha para todos. Podes desenlazar a túa conta de Patreon cando queiras."
+msgstr "<b>☕️ Xa es Brewer</b>\n\nGrazas por apoiar Mitup. A túa insignia de Brewer xa aparece no teu perfil e o teu apoio axuda a manter Mitup en marcha para todos. Podes desenlazar a túa conta de Patreon cando queiras."
 
 msgid "CollaborateMessages.LINKED_PATRON_PATRON"
-msgstr "<b>🌟 Xa es Mecenas</b>\n\nGrazas por apoiar Mitup. A túa insignia de Mecenas está activa e podes executar ata ${active_meetings} quedadas activas á vez, programalas ata ${scheduling_days} días por diante e convidar participantes ilimitados por quedada. Podes desenlazar a túa conta de Patreon cando queiras."
+msgstr "<b>🎲 Xa es Gamemaster</b>\n\nGrazas por apoiar Mitup. A túa insignia de Gamemaster está activa e podes executar ata ${active_meetings} quedadas activas á vez, programalas ata ${scheduling_days} días por diante e convidar participantes ilimitados por quedada. Podes desenlazar a túa conta de Patreon cando queiras."
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
-msgstr "<b>🏆 Xa es Organizador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Organizador está activa e desaparecen todos os límites: executa cantas quedadas queiras, prográmaas con toda a antelación que precises e convida a cantas persoas queiras a cada unha. Podes desenlazar a túa conta de Patreon cando queiras."
+msgstr "<b>🏆 Xa es Commissioner</b>\n\nGrazas por apoiar Mitup. A túa insignia de Commissioner está activa e desaparecen todos os límites: executa cantas quedadas queiras, prográmaas con toda a antelación que precises e convida a cantas persoas queiras a cada unha. Podes desenlazar a túa conta de Patreon cando queiras."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Colabora</b>\n\nO apoio de Patreon non está dispoñible aínda. Volve pronto."
@@ -833,7 +833,7 @@ msgid "CollaborateMessages.UNLINKED"
 msgstr "A túa conta de Patreon foi desenlazada."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Conta Patreon enlazada</b>\n\nEstás conectado. Podes ser patrón para desbloquear privilexios especiais. Activaranse automaticamente cando o teu apoio estea activo."
+msgstr "<b>Conta Patreon enlazada</b>\n\nEstás conectado. Faite Host para desbloquear os teus privilexios de Host. Activaranse automaticamente cando o teu apoio estea activo."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -917,10 +917,10 @@ msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
 msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED"
-msgstr "<b>${language}</b>: ${sent} enviados, ${failed} fallidos, ${skipped} saltados, ${orphaned} orfos"
+msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
-msgstr "🚫 <b>${orphaned}</b> entregas foron interrompidas por un colapso do traballador e o seu resultado é descoñecido. Non se reintentarán."
+msgstr ""
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Alcanzaches o teu límite de ${cap} quedadas activas. Pecha ou elimina unha para crear outra, ou toca Colabora no menú principal para apoiar a Mitup e desbloquear máis."
@@ -938,25 +938,25 @@ msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
 msgstr "Podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
-msgstr "<b>Os teus privilexios especiais están nun período de graza</b>\n\nNon puidemos confirmar unha achega activa de Patreon na túa conta, así que os teus privilexios especiais desactivaranse nunha semana. Se a túa achega segue activa, non tes que facer nada e renovarase automaticamente. En caso contrario, podes volver apoiar Mitup desde o menú Colabora."
+msgstr "<b>Os teus privilexios de Host están nun período de graza</b>\n\nNon puidemos confirmar unha achega activa de Patreon na túa conta, así que os teus privilexios de Host desactivaranse nunha semana. Se a túa achega segue activa, non tes que facer nada e renovarase automaticamente. En caso contrario, podes volver apoiar Mitup desde o menú Colabora."
 
 msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Os teus privilexios especiais están nun período de graza</b>\n\nO teu apoio en Patreon rematou, e sentímolo moito. Os teus privilexios especiais seguirán activos durante ${days} días por se cambias de idea. Para mantelos, volve apoiar Mitup desde o menú Colabora."
+msgstr "<b>Os teus privilexios de Host están nun período de graza</b>\n\nO teu apoio en Patreon rematou, e sentímolo moito. Os teus privilexios de Host seguirán activos durante ${days} días por se cambias de idea. Para mantelos, volve apoiar Mitup desde o menú Colabora."
 
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
-msgstr "<b>Os teus privilexios especiais remataron</b>\n\nSeguimos sen poder confirmar unha achega activa de Patreon, así que os teus privilexios especiais están agora desactivados. Faite patrón de novo desde o menú Colabora para reactivalos."
+msgstr "<b>Os teus privilexios de Host remataron</b>\n\nSeguimos sen poder confirmar unha achega activa de Patreon, así que os teus privilexios de Host están agora desactivados. Faite Host de novo desde o menú Colabora para reactivalos."
 
 msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
-msgstr "<b>🧡 Xa es Colaborador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Colaborador xa aparece no teu perfil, e o teu apoio axuda a manter Mitup en marcha para todos."
+msgstr "<b>☕️ Xa es Brewer</b>\n\nGrazas por apoiar Mitup. A túa insignia de Brewer xa aparece no teu perfil, e o teu apoio axuda a manter Mitup en marcha para todos."
 
 msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
-msgstr "<b>🌟 Xa es Mecenas</b>\n\nGrazas por apoiar Mitup. A túa insignia de Mecenas está activa e os teus límites acaban de subir: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha."
+msgstr "<b>🎲 Xa es Gamemaster</b>\n\nGrazas por apoiar Mitup. A túa insignia de Gamemaster está activa e os teus límites acaban de subir: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha."
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
-msgstr "<b>🏆 Xa es Organizador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Organizador está activa e desaparecen todos os límites: organiza cantas quedadas queiras, prográmaas con toda a antelación que precises e convida a cantas persoas queiras a cada unha."
+msgstr "<b>🏆 Xa es Commissioner</b>\n\nGrazas por apoiar Mitup. A túa insignia de Commissioner está activa e desaparecen todos os límites: organiza cantas quedadas queiras, prográmaas con toda a antelación que precises e convida a cantas persoas queiras a cada unha."
 
 msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
-msgstr "<b>🧡 Agora es Colaborador</b>\n\nA túa insignia de Colaborador segue no teu perfil, e aplícanse os límites estándar das quedadas: un número fixo de quedadas activas á vez, o período de programación estándar e o tope estándar de participantes por quedada. Grazas por apoiar Mitup."
+msgstr "<b>☕️ Agora o teu nivel é Brewer</b>\n\nA túa insignia de Brewer segue no teu perfil, e aplícanse os límites estándar das quedadas: un número fixo de quedadas activas á vez, o período de programación estándar e o tope estándar de participantes por quedada. Grazas por apoiar Mitup."
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
-msgstr "<b>🌟 Agora es Mecenas</b>\n\nA túa insignia de Mecenas está activa e aplícanse os teus límites de Mecenas: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha. Grazas por apoiar Mitup."
+msgstr "<b>🎲 Agora o teu nivel é Gamemaster</b>\n\nA túa insignia de Gamemaster está activa e aplícanse os teus límites de Gamemaster: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha. Grazas por apoiar Mitup."

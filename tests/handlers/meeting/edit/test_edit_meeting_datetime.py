@@ -1365,7 +1365,7 @@ async def test_set_date_beyond_free_horizon_allowed_for_premium(
         "config",
         LimitsConfig(free_scheduling_horizon_days=31, patron_scheduling_horizon_days=365),
     )
-    user_with_settings.supporter_level = SupporterLevel.PATRON
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
     meeting = create_meetup(id=10, title="TestMeeting", description="Description")
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)

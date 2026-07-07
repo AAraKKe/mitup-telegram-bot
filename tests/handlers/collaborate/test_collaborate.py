@@ -136,9 +136,9 @@ async def test_collaborate_linked_not_patron_view(
 @pytest.mark.parametrize(
     "level,expected_message",
     [
-        (SupporterLevel.SUPPORTER, CollaborateMessages.LINKED_PATRON_SUPPORTER),
-        (SupporterLevel.PATRON, CollaborateMessages.LINKED_PATRON_PATRON),
-        (SupporterLevel.ORGANIZER, CollaborateMessages.LINKED_PATRON_ORGANIZER),
+        (SupporterLevel.HOST_1, CollaborateMessages.LINKED_PATRON_SUPPORTER),
+        (SupporterLevel.HOST_2, CollaborateMessages.LINKED_PATRON_PATRON),
+        (SupporterLevel.HOST_3, CollaborateMessages.LINKED_PATRON_ORGANIZER),
     ],
 )
 async def test_collaborate_linked_patron_view(
@@ -179,7 +179,7 @@ async def test_unlink_deletes_subscription_and_revokes_premium(
     user_with_settings: User,
     patreon_config: PatreonConfig,
 ):
-    user_with_settings.supporter_level = SupporterLevel.PATRON
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
     mock_session.add_object(user_with_settings, "tg_user_id")
     subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")

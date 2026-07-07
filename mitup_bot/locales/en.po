@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-07 19:17\n"
+"PO-Revision-Date: 2026-07-07 21:00\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -210,7 +210,7 @@ msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Link Patreon account"
 
 msgid "ButtonMessages.BECOME_PATRON"
-msgstr "💶 Become a patron"
+msgstr "💶 Become a Host"
 
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Unlink Patreon account"
@@ -687,19 +687,19 @@ msgid "NotificationMessages.STARTED"
 msgstr "The meeting <b>${meeting_title}</b> has started!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock supporter perks as a thank you.\n\n<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As an Organizer:</b> unlimited everything.\n\nLink your Patreon account to get started."
+msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock Host perks as a thank you.\n\n<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As a Commissioner:</b> unlimited everything.\n\nLink your Patreon account to get started."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a patron yet, so your supporter perks are still off.\n\n<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As an Organizer:</b> unlimited everything.\n\nBecome a patron and your perks turn on automatically, with no need to link again."
+msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a Host yet, so your Host perks are still off.\n\n<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As a Commissioner:</b> unlimited everything.\n\nBecome a Host and your perks turn on automatically, with no need to link again."
 
 msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
-msgstr "<b>🧡 You're a Supporter</b>\n\nThanks for backing Mitup. Your Supporter badge shows on your profile, and your support helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
+msgstr "<b>☕️ You're a Brewer</b>\n\nThanks for backing Mitup. Your Brewer badge shows on your profile, and your support helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
 
 msgid "CollaborateMessages.LINKED_PATRON_PATRON"
-msgstr "<b>🌟 You're a Patron</b>\n\nThanks for backing Mitup. Your Patron badge is on, and you can run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting. You can unlink your Patreon account whenever you want."
+msgstr "<b>🎲 You're a Gamemaster</b>\n\nThanks for backing Mitup. Your Gamemaster badge is on, and you can run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting. You can unlink your Patreon account whenever you want."
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
-msgstr "<b>🏆 You're an Organizer</b>\n\nThanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
+msgstr "<b>🏆 You're a Commissioner</b>\n\nThanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
@@ -708,31 +708,31 @@ msgid "CollaborateMessages.UNLINKED"
 msgstr "Your Patreon account has been unlinked."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a patron to unlock your supporter perks. They'll switch on automatically once your pledge is active."
+msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a Host to unlock your Host perks. They'll switch on automatically once your pledge is active."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
-msgstr "<b>Your supporter perks are in a grace period</b>\n\nWe couldn't confirm an active Patreon pledge on your account, so your supporter perks are set to switch off in a week. If your pledge is still active, there's nothing to do and it will renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
+msgstr "<b>Your Host perks are in a grace period</b>\n\nWe couldn't confirm an active Patreon pledge on your account, so your Host perks are set to switch off in a week. If your pledge is still active, there's nothing to do and it will renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
 
 msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Your supporter perks are in a grace period</b>\n\nYour Patreon support ended, and we're sad to see you go. Your supporter perks stay on for ${days} days in case you change your mind. To keep them, back Mitup again from the Collaborate menu."
+msgstr "<b>Your Host perks are in a grace period</b>\n\nYour Patreon support ended, and we're sad to see you go. Your Host perks stay on for ${days} days in case you change your mind. To keep them, back Mitup again from the Collaborate menu."
 
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
-msgstr "<b>Your supporter perks have ended</b>\n\nWe still couldn't confirm an active Patreon pledge, so your supporter perks are now off. Become a patron again from the Collaborate menu to turn them back on."
+msgstr "<b>Your Host perks have ended</b>\n\nWe still couldn't confirm an active Patreon pledge, so your Host perks are now off. Become a Host again from the Collaborate menu to turn them back on."
 
 msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
-msgstr "<b>🧡 You're a Supporter</b>\n\nThanks for backing Mitup. Your Supporter badge now shows on your profile, and your support helps keep Mitup running for everyone."
+msgstr "<b>☕️ You're a Brewer</b>\n\nThanks for backing Mitup. Your Brewer badge now shows on your profile, and your support helps keep Mitup running for everyone."
 
 msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
-msgstr "<b>🌟 You're a Patron</b>\n\nThanks for backing Mitup. Your Patron badge is on, and your limits just went up: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one."
+msgstr "<b>🎲 You're a Gamemaster</b>\n\nThanks for backing Mitup. Your Gamemaster badge is on, and your limits just went up: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one."
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
-msgstr "<b>🏆 You're an Organizer</b>\n\nThanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one."
+msgstr "<b>🏆 You're a Commissioner</b>\n\nThanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one."
 
 msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
-msgstr "<b>🧡 Your tier is now Supporter</b>\n\nYour Supporter badge stays on your profile, and the standard meeting limits apply: a set number of active meetings at once, the standard scheduling window, and the standard participant cap per meeting. Thanks for backing Mitup."
+msgstr "<b>☕️ Your tier is now Brewer</b>\n\nYour Brewer badge stays on your profile, and the standard meeting limits apply: a set number of active meetings at once, the standard scheduling window, and the standard participant cap per meeting. Thanks for backing Mitup."
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
-msgstr "<b>🌟 Your tier is now Patron</b>\n\nYour Patron badge is on, and your Patron limits apply: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
+msgstr "<b>🎲 Your tier is now Gamemaster</b>\n\nYour Gamemaster badge is on, and your Gamemaster limits apply: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

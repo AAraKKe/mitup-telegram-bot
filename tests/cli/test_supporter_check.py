@@ -278,7 +278,7 @@ async def test_due_still_member_is_extended_silently(mock_session: MockDbSession
     subscription, user = make_subscription_user(
         support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
     )
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     register_due(mock_session, subscription, user)
 
     outcome = await supporter_check.process_due_subscription(subscription.db_id, {"patreon-1": 500}, api)
@@ -288,7 +288,7 @@ async def test_due_still_member_is_extended_silently(mock_session: MockDbSession
     assert subscription.support_expiration is not None
     assert subscription.support_expiration > dt.datetime.now(dt.UTC)
     # The lapse flow only extends grace; the level itself is reconciled by the sync pass.
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_method_just_called("send_message_to_user", times=0)
 
 
@@ -296,7 +296,7 @@ async def test_due_lapsed_first_time_starts_grace(mock_session: MockDbSession, a
     subscription, user = make_subscription_user(
         support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=False
     )
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     register_due(mock_session, subscription, user)
 
     outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
@@ -305,7 +305,7 @@ async def test_due_lapsed_first_time_starts_grace(mock_session: MockDbSession, a
     assert subscription.expiration_notified is True
     assert subscription.support_expiration is not None
     assert subscription.support_expiration > dt.datetime.now(dt.UTC)
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_send_message_to_user_called(
         user=user, view=SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang)
     )
@@ -315,7 +315,7 @@ async def test_due_lapsed_after_grace_revokes_to_none(mock_session: MockDbSessio
     subscription, user = make_subscription_user(
         support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
     )
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     register_due(mock_session, subscription, user)
 
     outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
@@ -360,7 +360,7 @@ async def test_sync_promotes_none_user_to_entitled_tier(
     outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
     assert outcome is supporter_check.LevelSyncOutcome.UPGRADED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     assert subscription.support_expiration is not None
     assert subscription.support_expiration > dt.datetime.now(dt.UTC)
     # A none->patron promotion must announce the Patron tier specifically.
@@ -373,13 +373,13 @@ async def test_sync_promotes_patron_to_organizer_and_notifies(
     mock_session: MockDbSession, api: MockApi, config: PatreonConfig
 ):
     subscription, user = make_subscription_user()
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     register_syncable(mock_session, subscription, user)
 
     outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 1000}, config, api)
 
     assert outcome is supporter_check.LevelSyncOutcome.UPGRADED
-    assert user.supporter_level is SupporterLevel.ORGANIZER
+    assert user.supporter_level is SupporterLevel.HOST_3
     # A patron->organizer promotion must announce the Organizer tier specifically.
     api.assert_send_message_to_user_called(
         user=user, view=SupporterNotificationMessages.ORGANIZER_UNLOCKED.get(lang=user.lang)
@@ -388,7 +388,7 @@ async def test_sync_promotes_patron_to_organizer_and_notifies(
 
 async def test_sync_downgrades_between_tiers_notifies(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):
     subscription, user = make_subscription_user()
-    user.supporter_level = SupporterLevel.ORGANIZER
+    user.supporter_level = SupporterLevel.HOST_3
     register_syncable(mock_session, subscription, user)
 
     # Still an active member, but their entitled amount now only reaches the Patron threshold: the drop
@@ -396,7 +396,7 @@ async def test_sync_downgrades_between_tiers_notifies(mock_session: MockDbSessio
     outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
     assert outcome is supporter_check.LevelSyncOutcome.DOWNGRADED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_send_message_to_user_called(
         user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang)
     )
@@ -404,13 +404,13 @@ async def test_sync_downgrades_between_tiers_notifies(mock_session: MockDbSessio
 
 async def test_sync_unchanged_when_level_matches(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):
     subscription, user = make_subscription_user()
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     register_syncable(mock_session, subscription, user)
 
     outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
     assert outcome is supporter_check.LevelSyncOutcome.UNCHANGED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_method_just_called("send_message_to_user", times=0)
 
 
@@ -488,7 +488,7 @@ async def test_run_happy_path_emits_creator_ttl_and_counters(
     configure(config)
     subscription, user = make_subscription_user(patreon_user_id="patreon-1")
     # Already at the entitled tier, so the level sync is a no-op and this run only exercises the counters.
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, ())
     mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
@@ -523,7 +523,7 @@ async def test_run_logs_summary_on_success(
     configure(config)
     subscription, user = make_subscription_user(patreon_user_id="patreon-1")
     # Already at the entitled tier, so the level sync is a no-op and this run just logs its summary.
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, ())
     mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
@@ -616,7 +616,7 @@ async def test_run_counts_lifecycle_transitions(
     # A due, lapsed-but-unnotified row starts its grace; a separate linked non-patron gets upgraded;
     # a third active organizer drops to the patron tier (a silent between-tier downgrade).
     due_user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
-    due_user.supporter_level = SupporterLevel.PATRON
+    due_user.supporter_level = SupporterLevel.HOST_2
     due_sub = create_supporter_subscription(
         user_id=1, patreon_user_id="patreon-lapsed", support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
     )
@@ -625,7 +625,7 @@ async def test_run_counts_lifecycle_transitions(
     upgrade_sub = create_supporter_subscription(user_id=2, patreon_user_id="patreon-new")
     upgrade_sub.id = 2
     downgrade_user = create_user(
-        id=3, tg_user_id=103, settings=create_settings(id=3), supporter_level=SupporterLevel.ORGANIZER
+        id=3, tg_user_id=103, settings=create_settings(id=3), supporter_level=SupporterLevel.HOST_3
     )
     downgrade_sub = create_supporter_subscription(user_id=3, patreon_user_id="patreon-drop")
     downgrade_sub.id = 3
@@ -669,7 +669,7 @@ async def test_run_counts_grace_extensions(
     subscription, user = make_subscription_user(
         patreon_user_id="patreon-1", support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
     )
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, (subscription,))
     mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, ())

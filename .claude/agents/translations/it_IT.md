@@ -50,3 +50,16 @@ and register. They take priority over existing `.po` entries when there is a con
 - Kick-out button: **"Caccia"** — colloquial (lit. "chase out"). Do not change to "Rimuovi".
 - Time label: **"Orario"** (scheduled time slot), NOT "ora" (generic hour).
 - "Privacy" and "Timeout": kept as English loanwords — common and intentional in Italian UI.
+
+## Do NOT translate — fixed brand terms
+
+These English brand terms are product identity and must appear **verbatim** in Italian — never translated, transliterated, or localized. Translate the sentence around them; keep the words themselves exactly as written:
+
+| Term | Keep as |
+|---|---|
+| Host / Hosts | **Host / Hosts** |
+| Brewer | **Brewer** |
+| Gamemaster | **Gamemaster** |
+| Commissioner | **Commissioner** |
+
+"Host / Hosts" is the collective term for people who back the bot on Patreon; "Brewer", "Gamemaster", and "Commissioner" are the three Patreon tier names. All four appear identically on Patreon, so localizing them would break the mapping users see.

@@ -527,11 +527,11 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_650, patreon_user_id="p-650", supporter_level=SupporterLevel.PATRON
+            api, 997_650, patreon_user_id="p-650", supporter_level=SupporterLevel.HOST_2
         )
 
     assert outcome is LinkOutcome.LINKED_SUPPORTER
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     added = [obj for obj in session.objects_added if isinstance(obj, SupporterSubscription)]
     assert len(added) == 1
     assert added[0].patreon_user_id == "p-650"
@@ -550,7 +550,7 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
     assert linked["outcome"] == "linked_supporter"
     assert linked["tg_user_id"] == 997_650
     assert linked["patreon_user_id"] == "p-650"
-    assert linked["supporter_level"] == "patron"
+    assert linked["supporter_level"] == "host_2"
 
 
 async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Callable[[MockDbSession], None]):
@@ -599,16 +599,16 @@ async def test_link_refreshes_tapped_message_into_patron_view(
 
     api = MockApi()
     outcome = await link_patreon_account(
-        api, 997_656, patreon_user_id="p-656", supporter_level=SupporterLevel.PATRON, message_id=TAPPED_MESSAGE_ID
+        api, 997_656, patreon_user_id="p-656", supporter_level=SupporterLevel.HOST_2, message_id=TAPPED_MESSAGE_ID
     )
 
     assert outcome is LinkOutcome.LINKED_SUPPORTER
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_edit_message_for_user_called(
         user=user,
         message_id=TAPPED_MESSAGE_ID,
         view=collaborate_linked_patron_view(
-            user.lang, SupporterLevel.PATRON, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
+            user.lang, SupporterLevel.HOST_2, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
         ),
     )
     # The refreshed screen uses the Patron-tier message with its caps substituted, not a generic one.
@@ -655,7 +655,7 @@ async def test_link_without_message_id_skips_refresh(patch_begin_write: Callable
     patch_begin_write(session)
 
     api = MockApi()
-    outcome = await link_patreon_account(api, 997_658, patreon_user_id="p-658", supporter_level=SupporterLevel.PATRON)
+    outcome = await link_patreon_account(api, 997_658, patreon_user_id="p-658", supporter_level=SupporterLevel.HOST_2)
 
     assert outcome is LinkOutcome.LINKED_SUPPORTER
     api.assert_method_just_called("send_message_to_user", times=1)
@@ -675,7 +675,7 @@ async def test_link_refresh_failure_is_swallowed(patch_begin_write: Callable[[Mo
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.PATRON, message_id=TAPPED_MESSAGE_ID
+            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.HOST_2, message_id=TAPPED_MESSAGE_ID
         )
 
     assert outcome is LinkOutcome.LINKED_SUPPORTER
@@ -693,7 +693,7 @@ async def test_link_unknown_user_returns_unknown(patch_begin_write: Callable[[Mo
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.PATRON
+            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.HOST_2
         )
 
     assert outcome is LinkOutcome.UNKNOWN_USER
@@ -718,7 +718,7 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
     api = MockApi()
     with capture_logs(processors=[merge_contextvars]) as logs:
         outcome = await link_patreon_account(
-            api, 997_652, patreon_user_id="p-shared", supporter_level=SupporterLevel.PATRON
+            api, 997_652, patreon_user_id="p-shared", supporter_level=SupporterLevel.HOST_2
         )
 
     assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE

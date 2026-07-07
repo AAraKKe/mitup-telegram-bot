@@ -53,11 +53,11 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
 
     cap = limits.active_meetings_cap(user)
     assert cap is not None, "at_active_meetings_cap is only True when a finite cap is reached"
-    below_patron = not supporter.meets(user.supporter_level, SupporterLevel.PATRON)
+    below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
     if update.callback_query is not None:
         if below_patron:
             await guards.supporter_required(
-                user, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=cap
+                user, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.HOST_2, cap=cap
             )
         else:
             await context.api.answer_callback_query(
@@ -83,7 +83,7 @@ def scheduling_horizon_rejection(user: User, when: dt.datetime) -> str | None:
         return None
     days = limits.scheduling_horizon_days(user)
     assert days is not None, "within_scheduling_horizon is only False when a finite horizon applies"
-    below_patron = not supporter.meets(user.supporter_level, SupporterLevel.PATRON)
+    below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
     message = SupporterMessages.SCHEDULING_HORIZON if below_patron else SupporterMessages.SCHEDULING_HORIZON_PATRON
     return message.get_text(lang=user.lang, days=days)
 

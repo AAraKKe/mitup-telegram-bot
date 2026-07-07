@@ -430,13 +430,13 @@ def test_participants_list_text_badges_supporter_participant():
     owner = create_user(id=1, first_name="Owner", tg_user_id=997_710)
     meeting = create_meetup(id=1, owner=owner)
     free = create_user(id=2, first_name="Bob", tg_user_id=997_711)
-    supporter_member = create_user(id=3, username="alice", tg_user_id=997_712, supporter_level=SupporterLevel.SUPPORTER)
+    supporter_member = create_user(id=3, username="alice", tg_user_id=997_712, supporter_level=SupporterLevel.HOST_1)
 
     meeting.create_joined_link(free, is_waiting_list=False)
     meeting.create_joined_link(supporter_member, is_waiting_list=False)
 
     # Only the supporter carries the badge (their tier's emoji); the free participant is untouched.
-    expected = f"\n  Bob\n  alice {Emojis.SUPPORTER}"
+    expected = f"\n  Bob\n  {Emojis.HOST_1} alice"
     assert expected == meeting.participants_list_text.text
 
 

@@ -510,7 +510,7 @@ async def test_edit_max_participants_patron_owner_over_cap_is_accepted(
 ):
     """A Patron owner is uncapped, so a limit well above the free cap is stored as-is."""
     monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
-    user_with_settings.supporter_level = SupporterLevel.PATRON
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")

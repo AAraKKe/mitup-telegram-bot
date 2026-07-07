@@ -61,3 +61,16 @@ This framing extends to related strings:
 - Time label: **"Horário"** (scheduled time slot), NOT "hora"
 - Join success: **"Participação confirmada!"** — a deliberate confirmation framing,
   different from other languages by design
+
+## Do NOT translate — fixed brand terms
+
+These English brand terms are product identity and must appear **verbatim** in Portuguese — never translated, transliterated, or localized. Translate the sentence around them; keep the words themselves exactly as written:
+
+| Term | Keep as |
+|---|---|
+| Host / Hosts | **Host / Hosts** |
+| Brewer | **Brewer** |
+| Gamemaster | **Gamemaster** |
+| Commissioner | **Commissioner** |
+
+"Host / Hosts" is the collective term for people who back the bot on Patreon; "Brewer", "Gamemaster", and "Commissioner" are the three Patreon tier names. All four appear identically on Patreon, so localizing them would break the mapping users see.

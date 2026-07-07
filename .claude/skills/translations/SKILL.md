@@ -32,6 +32,15 @@ hatch run dev:build-locales             # compile .po → .mo
 hatch run dev:update-locales
 ```
 
+## Fixed brand terms — keep verbatim in every language
+
+A small set of English brand terms must appear **identically in every language** — never translated, transliterated, or localized. When a msgid contains one of these words, the translated `msgstr` must keep the exact same word (translate the sentence around it):
+
+- **Host / Hosts** — the collective term for people who back the bot on Patreon.
+- The Patreon tier display names: **Brewer**, **Gamemaster**, **Commissioner**.
+
+These are product identity and appear identically on Patreon; localizing them would break the mapping users see between the bot and their Patreon account. This is a **hard rule** — always restate it to every translator agent you spawn, and it is baked into the per-language glossaries under `.claude/agents/translations/<lang_code>.md`. The internal tier identifiers are kept neutral (`SupporterLevel.HOST_1/HOST_2/HOST_3`) so these display names live only in copy, never in code.
+
 ## Validating translations
 
 Two checks exist:

@@ -119,9 +119,9 @@ def test_verify_signature(secret: str | None, signature: str | None, ok: bool):
 
 
 def test_target_level_maps_amounts_and_cancellations(patreon_config: PatreonConfig):
-    assert target_level("members:update", member_resource(cents=100), patreon_config) is SupporterLevel.SUPPORTER
-    assert target_level("members:update", member_resource(cents=500), patreon_config) is SupporterLevel.PATRON
-    assert target_level("members:update", member_resource(cents=1000), patreon_config) is SupporterLevel.ORGANIZER
+    assert target_level("members:update", member_resource(cents=100), patreon_config) is SupporterLevel.HOST_1
+    assert target_level("members:update", member_resource(cents=500), patreon_config) is SupporterLevel.HOST_2
+    assert target_level("members:update", member_resource(cents=1000), patreon_config) is SupporterLevel.HOST_3
     # A delete or a non-active member is a cancellation regardless of amount.
     assert target_level("members:delete", member_resource(cents=1000), patreon_config) is SupporterLevel.NONE
     assert target_level("members:update", member_resource(active=False), patreon_config) is SupporterLevel.NONE
@@ -341,7 +341,7 @@ async def test_apply_upgrade_grants_and_notifies(
     )
 
     assert outcome is WebhookApplied.UPGRADED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     # The 500-cent pledge lands on Patron, so the DM must be the Patron unlock message specifically.
     api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang))
 
@@ -350,7 +350,7 @@ async def test_apply_downgrade_notifies(
     patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
 ):
     session = MockDbSession()
-    user, _subscription = seed_link(session, level=SupporterLevel.ORGANIZER)
+    user, _subscription = seed_link(session, level=SupporterLevel.HOST_3)
     patch_begin_write(session)
     api = MockApi()
 
@@ -361,7 +361,7 @@ async def test_apply_downgrade_notifies(
     )
 
     assert outcome is WebhookApplied.DOWNGRADED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang))
 
 
@@ -369,7 +369,7 @@ async def test_apply_delete_starts_grace_and_keeps_perks(
     patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
 ):
     session = MockDbSession()
-    user, subscription = seed_link(session, level=SupporterLevel.PATRON)
+    user, subscription = seed_link(session, level=SupporterLevel.HOST_2)
     patch_begin_write(session)
     api = MockApi()
 
@@ -379,7 +379,7 @@ async def test_apply_delete_starts_grace_and_keeps_perks(
 
     assert outcome is WebhookApplied.GRACE_STARTED
     # Perks stay on for the grace window; the daily job revokes when it elapses.
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)
     api.assert_send_message_to_user_called(
         user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS)
@@ -393,7 +393,7 @@ async def test_apply_non_active_member_starts_grace(
     patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
 ):
     session = MockDbSession()
-    user, subscription = seed_link(session, level=SupporterLevel.PATRON)
+    user, subscription = seed_link(session, level=SupporterLevel.HOST_2)
     patch_begin_write(session)
     api = MockApi()
 
@@ -402,7 +402,7 @@ async def test_apply_non_active_member_starts_grace(
     )
 
     assert outcome is WebhookApplied.GRACE_STARTED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)
     api.assert_send_message_to_user_called(
         user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS)
@@ -431,7 +431,7 @@ async def test_apply_unchanged_sends_nothing(
     patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
 ):
     session = MockDbSession()
-    user, _subscription = seed_link(session, level=SupporterLevel.PATRON)
+    user, _subscription = seed_link(session, level=SupporterLevel.HOST_2)
     patch_begin_write(session)
     api = MockApi()
 
@@ -440,7 +440,7 @@ async def test_apply_unchanged_sends_nothing(
     )
 
     assert outcome is WebhookApplied.UNCHANGED
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_method_just_called("send_message_to_user", times=0)
 
 
@@ -472,7 +472,7 @@ def test_apply_transition_refreshes_grace_on_upgrade():
     user.supporter_level = SupporterLevel.NONE
     subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1", expiration_notified=True)
 
-    outcome = apply_membership_transition(user, subscription, SupporterLevel.PATRON)
+    outcome = apply_membership_transition(user, subscription, SupporterLevel.HOST_2)
 
     assert outcome is WebhookApplied.UPGRADED
     assert subscription.support_expiration is not None
@@ -481,7 +481,7 @@ def test_apply_transition_refreshes_grace_on_upgrade():
 
 def test_apply_transition_starts_grace_on_loss_and_keeps_level():
     user = create_user(id=1, tg_user_id=1)
-    user.supporter_level = SupporterLevel.PATRON
+    user.supporter_level = SupporterLevel.HOST_2
     subscription = create_supporter_subscription(
         user_id=1, patreon_user_id="p-1", support_expiration=dt.datetime.now(dt.UTC), expiration_notified=False
     )
@@ -491,5 +491,5 @@ def test_apply_transition_starts_grace_on_loss_and_keeps_level():
     assert outcome is WebhookApplied.GRACE_STARTED
     # The level is retained (perks stay on) and the runway is pushed out to the cancellation grace,
     # marked notified so the daily due-flow revokes rather than re-announcing grace.
-    assert user.supporter_level is SupporterLevel.PATRON
+    assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)

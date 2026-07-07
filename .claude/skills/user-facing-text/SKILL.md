@@ -23,6 +23,15 @@ The bot is **not a chat bot** — it is an app whose UI happens to be a Telegram
 - **Narrating the obvious.** Don't recap what the button just did. A success message should confirm the new state or point at what's next, not describe the action the user just took.
 - **Impersonal passive constructions.** Prefer `"Meeting created"` or `"You're all set"` over `"The meeting has been created"`. Short and active reads more human.
 
+## Fixed brand terms — never reworded, never translated
+
+A small set of words are product identity with exactly one spelling. Use them verbatim in copy: don't paraphrase them, swap in a synonym, or reintroduce the words they replaced. They are also **never translated** — every language keeps them as-is (the `translations` skill enforces this on the locale side).
+
+- **Host / Hosts** — the collective term for people who back the bot on Patreon (always capitalized, singular "Host"). When copy refers to a person who pledges, they are a Host. Never "supporter", "patron", "backer", "member", or "subscriber".
+- **Patreon tier display names** — the three paid tiers are **Brewer** (☕️), **Gamemaster** (🎲), and **Commissioner** (🏆). These are the exact names shown on Patreon; never call a tier "Supporter", "Patron", or "Organizer" in copy.
+
+Keep the marketing name out of code identifiers. The internal tier enum members are deliberately neutral — `SupporterLevel.HOST_1` / `HOST_2` / `HOST_3`, resolved to a badge via the `supporter` policy — precisely so a future Patreon rename is a copy-only edit. Put the display name in the `MessageBase` string, never in an identifier, an enum value, or a metric key.
+
 ## Where strings live
 
 All user-facing strings are `StrEnum` members of `MessageBase` subclasses in `mitup_bot/utils/messages.py`.

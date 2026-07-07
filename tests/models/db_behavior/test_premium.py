@@ -1,6 +1,7 @@
 import importlib.util
 from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from cryptography.fernet import Fernet
@@ -17,22 +18,23 @@ from tests.helpers import create_patreon_creator_token, create_supporter_subscri
 
 pytestmark = pytest.mark.db_test
 
-SUPPORTER_LEVEL_MIGRATION_PATH = (
-    Path(mitup_bot.__file__).parent / "migrations" / "versions" / "c459065f341a_replace_users_is_premium_with_users_.py"
-)
+MIGRATIONS_DIR = Path(mitup_bot.__file__).parent / "migrations" / "versions"
+SUPPORTER_LEVEL_MIGRATION_PATH = MIGRATIONS_DIR / "c459065f341a_replace_users_is_premium_with_users_.py"
+HOST_LEVEL_RENAME_MIGRATION_PATH = MIGRATIONS_DIR / "0d0d349b705a_rename_supporter_tiers_to_host_levels.py"
 
 
-def load_supporter_level_migration():
-    """Load the revision module by file path (its name starts with a digit, so no dotted import) to
+def load_migration(module_name: str, path: Path) -> ModuleType:
+    """Load a revision module by file path (its name starts with a digit, so no dotted import) to
     reuse the exact data-migration SQL, keeping this test in lockstep with the migration."""
-    spec = importlib.util.spec_from_file_location("_migration_c459065f341a", SUPPORTER_LEVEL_MIGRATION_PATH)
+    spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-SUPPORTER_LEVEL_MIGRATION = load_supporter_level_migration()
+SUPPORTER_LEVEL_MIGRATION = load_migration("_migration_c459065f341a", SUPPORTER_LEVEL_MIGRATION_PATH)
+HOST_LEVEL_RENAME_MIGRATION = load_migration("_migration_0d0d349b705a", HOST_LEVEL_RENAME_MIGRATION_PATH)
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -100,14 +102,21 @@ async def test_supporter_level_rejects_unknown_value(db_session: AsyncSession):
         await savepoint.rollback()
 
 
-async def test_migration_grandfathers_premium_users_to_patron(db_session: AsyncSession):
-    """The upgrade's data step maps existing `is_premium=true` rows to the Patron tier and leaves
-    everyone else at NONE. Reproduces the transient migration schema (both columns present) in a
-    savepoint and runs the migration's exact SQL."""
+async def test_migration_grandfathers_premium_users_to_host_2(db_session: AsyncSession):
+    """Premium users end up on the HOST_2 tier through the real two-migration sequence: c459065
+    grandfathers `is_premium=true` rows onto the (then-named) `patron` value, and the follow-up
+    rename migration `0d0d349b705a` rewrites that to `host_2`. Everyone else stays at NONE.
+
+    The live schema is already at head, so its CHECK constraint only admits the host-level values;
+    we drop it inside the savepoint to write c459065's intermediate `patron` value before the rename
+    step maps it forward. The savepoint rollback restores the constraint."""
     savepoint = await db_session.begin_nested()
     try:
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text("ALTER TABLE users ADD COLUMN is_premium boolean NOT NULL DEFAULT false")
+        )
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text("ALTER TABLE users DROP CONSTRAINT users_supporter_level_valid")
         )
         premium_user = await new_user(db_session, 998_770)
         free_user = await new_user(db_session, 998_771)
@@ -116,11 +125,12 @@ async def test_migration_grandfathers_premium_users_to_patron(db_session: AsyncS
         )
 
         await db_session.exec(text(SUPPORTER_LEVEL_MIGRATION.GRANDFATHER_PREMIUM_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        await db_session.exec(text(HOST_LEVEL_RENAME_MIGRATION.RENAME_TO_HOST_LEVELS_SQL))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
         await db_session.flush()
         await db_session.refresh(premium_user)
         await db_session.refresh(free_user)
 
-        assert premium_user.supporter_level is SupporterLevel.PATRON
+        assert premium_user.supporter_level is SupporterLevel.HOST_2
         assert free_user.supporter_level is SupporterLevel.NONE
     finally:
         await savepoint.rollback()
@@ -134,9 +144,9 @@ async def test_migration_downgrade_reverses_any_tier_to_premium(db_session: Asyn
             text("ALTER TABLE users ADD COLUMN is_premium boolean NOT NULL DEFAULT false")
         )
         organizer = await new_user(db_session, 998_772)
-        organizer.supporter_level = SupporterLevel.ORGANIZER
+        organizer.supporter_level = SupporterLevel.HOST_3
         patron = await new_user(db_session, 998_773)
-        patron.supporter_level = SupporterLevel.PATRON
+        patron.supporter_level = SupporterLevel.HOST_2
         await new_user(db_session, 998_774)
         await db_session.flush()
 

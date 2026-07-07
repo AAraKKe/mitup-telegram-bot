@@ -806,16 +806,16 @@ msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Patreon-Konto verbinden"
 
 msgid "ButtonMessages.BECOME_PATRON"
-msgstr "💶 Unterstützer werden"
+msgstr "💶 Host werden"
 
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Patreon-Konto trennen"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und Unterstützer-Vorteile freischalten.\n\n<b>Als Förderer:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Veranstalter:</b> alles unbegrenzt.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
+msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und als Dankeschön Host-Vorteile freischalten.\n\n<b>Als Gamemaster:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Commissioner:</b> alles unbegrenzt.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Förderer, daher sind die Unterstützer-Vorteile noch nicht aktiv.\n\n<b>Als Förderer:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Veranstalter:</b> alles unbegrenzt.\n\nWerde ein Förderer und deine Vorteile werden automatisch aktiviert, ohne dass du erneut verlinken musst."
+msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Host, daher sind deine Host-Vorteile noch nicht aktiv.\n\n<b>Als Gamemaster:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Commissioner:</b> alles unbegrenzt.\n\nWerde ein Host und deine Vorteile werden automatisch aktiviert, ohne dass du erneut verlinken musst."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Mithelfen</b>\n\nPatreon-Unterstützung ist noch nicht verfügbar. Schau bald wieder vorbei."
@@ -824,16 +824,16 @@ msgid "CollaborateMessages.UNLINKED"
 msgstr "Dein Patreon-Konto wurde getrennt."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Unterstützer, um deine Vorteile freizuschalten. Sie werden automatisch aktiviert, sobald dein Beitrag aktiv ist."
+msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Host, um deine Host-Vorteile freizuschalten. Sie werden automatisch aktiviert, sobald dein Beitrag aktiv ist."
 
 msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
-msgstr "<b>🧡 Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Dein Unterstützer-Abzeichen wird in deinem Profil angezeigt, und deine Unterstützung hilft dabei, Mitup für alle am Laufen zu halten. Du kannst dein Patreon-Konto jederzeit trennen."
+msgstr "<b>☕️ Du bist ein Brewer</b>\n\nDanke, dass du Mitup unterstützt. Dein Brewer-Abzeichen wird in deinem Profil angezeigt, und deine Unterstützung hilft dabei, Mitup für alle am Laufen zu halten. Du kannst dein Patreon-Konto jederzeit trennen."
 
 msgid "CollaborateMessages.LINKED_PATRON_PATRON"
-msgstr "<b>🌟 Du bist ein Förderer</b>\n\nDanke, dass du Mitup unterstützt. Dein Förderer-Abzeichen ist aktiv, und du kannst bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen. Du kannst dein Patreon-Konto jederzeit trennen."
+msgstr "<b>🎲 Du bist ein Gamemaster</b>\n\nDanke, dass du Mitup unterstützt. Dein Gamemaster-Abzeichen ist aktiv, und du kannst bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen. Du kannst dein Patreon-Konto jederzeit trennen."
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
-msgstr "<b>🏆 Du bist ein Veranstalter</b>\n\nDanke, dass du Mitup unterstützt. Dein Veranstalter-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest. Du kannst dein Patreon-Konto jederzeit trennen."
+msgstr "<b>🏆 Du bist ein Commissioner</b>\n\nDanke, dass du Mitup unterstützt. Dein Commissioner-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest. Du kannst dein Patreon-Konto jederzeit trennen."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -917,10 +917,10 @@ msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
 msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED"
-msgstr "<b>${language}</b>: ${sent} versendet, ${failed} fehlgeschlagen, ${skipped} übersprungen, ${orphaned} verwaiste"
+msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
-msgstr "🚫 <b>${orphaned}</b> Zustellungen wurden durch einen Worker-Absturz unterbrochen und das Ergebnis ist unbekannt. Sie werden nicht erneut versucht."
+msgstr ""
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
@@ -938,25 +938,25 @@ msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
 msgstr "Du kannst Treffen bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
-msgstr "<b>Deine Vorteile sind in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Andernfalls kannst du Mitup über das Mithelfen-Menü erneut unterstützen."
+msgstr "<b>Deine Host-Vorteile sind in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Host-Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Andernfalls kannst du Mitup über das Mithelfen-Menü erneut unterstützen."
 
 msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Deine Vorteile sind in einer Kulanzfrist</b>\n\nDeine Patreon-Unterstützung ist beendet, und wir bedauern, dass du gehst. Deine Vorteile bleiben noch ${days} Tage aktiv, falls du es dir anders überlegst. Um sie zu behalten, unterstütze Mitup über das Mithelfen-Menü erneut."
+msgstr "<b>Deine Host-Vorteile sind in einer Kulanzfrist</b>\n\nDeine Patreon-Unterstützung ist beendet, und wir bedauern, dass du gehst. Deine Host-Vorteile bleiben noch ${days} Tage aktiv, falls du es dir anders überlegst. Um sie zu behalten, unterstütze Mitup über das Mithelfen-Menü erneut."
 
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
-msgstr "<b>Deine Vorteile sind beendet</b>\n\nWir konnten immer noch keinen aktiven Patreon-Beitrag bestätigen, daher sind deine Vorteile jetzt deaktiviert. Werde über das Mithelfen-Menü erneut Unterstützer, um sie wieder zu aktivieren."
+msgstr "<b>Deine Host-Vorteile sind beendet</b>\n\nWir konnten immer noch keinen aktiven Patreon-Beitrag bestätigen, daher sind deine Host-Vorteile jetzt deaktiviert. Werde über das Mithelfen-Menü erneut ein Host, um sie wieder zu aktivieren."
 
 msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
-msgstr "<b>🧡 Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Dein Unterstützer-Abzeichen wird jetzt in deinem Profil angezeigt, und deine Unterstützung hilft dabei, Mitup für alle am Laufen zu halten."
+msgstr "<b>☕️ Du bist ein Brewer</b>\n\nDanke, dass du Mitup unterstützt. Dein Brewer-Abzeichen wird jetzt in deinem Profil angezeigt, und deine Unterstützung hilft dabei, Mitup für alle am Laufen zu halten."
 
 msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
-msgstr "<b>🌟 Du bist ein Förderer</b>\n\nDanke, dass du Mitup unterstützt. Dein Förderer-Abzeichen ist aktiv, und deine Limits wurden gerade erhöht: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest."
+msgstr "<b>🎲 Du bist ein Gamemaster</b>\n\nDanke, dass du Mitup unterstützt. Dein Gamemaster-Abzeichen ist aktiv, und deine Limits wurden gerade erhöht: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest."
 
 msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
-msgstr "<b>🧡 Deine Stufe ist jetzt Unterstützer</b>\n\nDein Unterstützer-Abzeichen bleibt in deinem Profil, und es gelten die Standard-Limits für Treffen: eine feste Anzahl gleichzeitig aktiver Treffen, der Standard-Planungszeitraum und die Standard-Obergrenze für Teilnehmer pro Treffen. Danke, dass du Mitup unterstützt."
+msgstr "<b>☕️ Deine Stufe ist jetzt Brewer</b>\n\nDein Brewer-Abzeichen bleibt in deinem Profil, und es gelten die Standard-Limits für Treffen: eine feste Anzahl gleichzeitig aktiver Treffen, der Standard-Planungszeitraum und die Standard-Obergrenze für Teilnehmer pro Treffen. Danke, dass du Mitup unterstützt."
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
-msgstr "<b>🌟 Deine Stufe ist jetzt Förderer</b>\n\nDein Förderer-Abzeichen ist aktiv, und es gelten deine Förderer-Limits: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest. Danke, dass du Mitup unterstützt."
+msgstr "<b>🎲 Deine Stufe ist jetzt Gamemaster</b>\n\nDein Gamemaster-Abzeichen ist aktiv, und es gelten deine Gamemaster-Limits: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest. Danke, dass du Mitup unterstützt."
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
-msgstr "<b>🏆 Du bist ein Veranstalter</b>\n\nDanke, dass du Mitup unterstützt. Dein Veranstalter-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."
+msgstr "<b>🏆 Du bist ein Commissioner</b>\n\nDanke, dass du Mitup unterstützt. Dein Commissioner-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."

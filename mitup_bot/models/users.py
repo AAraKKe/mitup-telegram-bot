@@ -157,7 +157,7 @@ class User(BaseModel, SQLModel, table=True):
 
     @property
     def display_name(self) -> str:
-        """`inline_name` with the supporter badge for the user's tier appended (none for NONE).
+        """`inline_name` with the supporter badge for the user's tier prepended (none for NONE).
 
         The per-tier badge is resolved through the supporter policy, so the emoji-per-level mapping
         lives in one place. The badge rides existing name displays only: callers that hide a name
@@ -165,7 +165,7 @@ class User(BaseModel, SQLModel, table=True):
         inherits the same visibility as the name it decorates and creates no new identity exposure.
         """
         if tier_badge := supporter.badge(self.supporter_level):
-            return f"{self.inline_name} {tier_badge}"
+            return f"{tier_badge} {self.inline_name}"
         return self.inline_name
 
     @property

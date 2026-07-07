@@ -35,8 +35,8 @@ def add_participants(meeting: Meetup, count: int, *, waiting: bool, start_id: in
         (SupporterLevel.NONE, None, CAP),  # capped + no explicit limit resolves to the cap
         (SupporterLevel.NONE, 2, 2),  # capped + explicit below cap is left untouched
         (SupporterLevel.NONE, 10, CAP),  # capped + explicit above cap is clamped down (grandfathered)
-        (SupporterLevel.PATRON, None, None),  # uncapped + no explicit limit stays unlimited
-        (SupporterLevel.PATRON, 100, 100),  # uncapped + explicit limit is honored as-is
+        (SupporterLevel.HOST_2, None, None),  # uncapped + no explicit limit stays unlimited
+        (SupporterLevel.HOST_2, 100, 100),  # uncapped + explicit limit is honored as-is
     ],
     ids=["free_no_limit", "free_below_cap", "free_above_cap", "patron_no_limit", "patron_explicit"],
 )
@@ -60,7 +60,7 @@ def test_full_free_no_limit_meeting_is_capped(n_participants: int, expected_full
 
 def test_full_patron_no_limit_meeting_never_full():
     """A Patron owner stays uncapped, so no participant count makes the meeting full."""
-    owner = create_user(id=1, first_name="Owner", supporter_level=SupporterLevel.PATRON)
+    owner = create_user(id=1, first_name="Owner", supporter_level=SupporterLevel.HOST_2)
     meeting = create_meetup(id=1, owner=owner, max_members=None)
     add_participants(meeting, CAP + 3, waiting=False, start_id=2)
 

@@ -320,11 +320,11 @@ def test_meetup_message(
 
 
 def test_meeting_message_badges_patron_owner():
-    owner = create_user(id=1, username="alice", tg_user_id=997_720, supporter_level=SupporterLevel.PATRON)
+    owner = create_user(id=1, username="alice", tg_user_id=997_720, supporter_level=SupporterLevel.HOST_2)
     meeting = create_meetup(id=1, owner=owner, language="en")
     JoinedUsers(user=owner, meetup=meeting)
 
-    badged_owner = f"alice {Emojis.PATRON}"
+    badged_owner = f"{Emojis.HOST_2} alice"
     assert badged_owner in meeting.message.text
     assert badged_owner in meeting.inline_message.text
 
@@ -334,20 +334,20 @@ def test_meeting_message_has_no_badge_for_free_owner():
     meeting = create_meetup(id=1, owner=owner, language="en")
     JoinedUsers(user=owner, meetup=meeting)
 
-    assert str(Emojis.PATRON) not in meeting.message.text
-    assert str(Emojis.PATRON) not in meeting.inline_message.text
+    assert str(Emojis.HOST_2) not in meeting.message.text
+    assert str(Emojis.HOST_2) not in meeting.inline_message.text
 
 
 def test_incognito_meeting_omits_supporter_participant_badge():
     """Incognito hides the participant list, so a supporter's name — and its badge — never render."""
     owner = create_user(id=1, first_name="Owner", tg_user_id=997_722)
     meeting = create_meetup(id=1, owner=owner, incognito=True, language="en")
-    patron_member = create_user(id=2, username="alice", tg_user_id=997_723, supporter_level=SupporterLevel.PATRON)
+    patron_member = create_user(id=2, username="alice", tg_user_id=997_723, supporter_level=SupporterLevel.HOST_2)
     meeting.create_joined_link(patron_member, is_waiting_list=False)
 
     inline_text = meeting.inline_message.text
     assert "alice" not in inline_text
-    assert str(Emojis.PATRON) not in inline_text
+    assert str(Emojis.HOST_2) not in inline_text
 
 
 @pytest.mark.parametrize(
@@ -564,7 +564,7 @@ def test_participants_text(
 def test_participants_badge_patron_owner_stays_no_limit(
     user_with_settings: User, joined_count: int, expected: Callable[[str], str]
 ):
-    user_with_settings.supporter_level = SupporterLevel.PATRON
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
     meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
 
     # sourcery skip: no-loop-in-tests
@@ -577,7 +577,7 @@ def test_participants_badge_patron_owner_stays_no_limit(
 
 def test_participants_text_patron_owner_stays_no_limit(user_with_settings: User):
     """A Patron owner's meeting with no explicit limit renders 'No limit', never the free cap."""
-    user_with_settings.supporter_level = SupporterLevel.PATRON
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
     meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
     joined = User(first_name="Joined_0", tg_user_id=0, settings=user_with_settings.settings)
     JoinedUsers(user=joined, meetup=meeting)

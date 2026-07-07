@@ -94,12 +94,12 @@ async def test_new_link_for_patron_grants_premium():
     async with committed_user(997_600) as user_id:
         bot = RecordingBot()
         outcome = await link_patreon_account(
-            make_api(bot), 997_600, patreon_user_id=PATRON_USER_ID, supporter_level=SupporterLevel.PATRON
+            make_api(bot), 997_600, patreon_user_id=PATRON_USER_ID, supporter_level=SupporterLevel.HOST_2
         )
 
         assert outcome is LinkOutcome.LINKED_SUPPORTER
         user, subscription = await read_user_and_subscription(user_id)
-        assert user.supporter_level is SupporterLevel.PATRON
+        assert user.supporter_level is SupporterLevel.HOST_2
         assert subscription is not None
         assert subscription.patreon_user_id == "patreon-6001"
         assert subscription.support_expiration is not None
@@ -144,14 +144,14 @@ async def test_relink_updates_subscription_in_place():
             make_api(RecordingBot()),
             997_620,
             patreon_user_id=PATRON_USER_ID,
-            supporter_level=SupporterLevel.PATRON,
+            supporter_level=SupporterLevel.HOST_2,
         )
 
         assert outcome is LinkOutcome.LINKED_SUPPORTER
         user, subscription = await read_user_and_subscription(user_id)
         assert subscription is not None
         assert subscription.db_id == original_id  # updated in place, not recreated
-        assert user.supporter_level is SupporterLevel.PATRON
+        assert user.supporter_level is SupporterLevel.HOST_2
 
 
 async def test_patreon_account_already_linked_to_another_user_is_rejected():
@@ -169,7 +169,7 @@ async def test_patreon_account_already_linked_to_another_user_is_rejected():
             make_api(RecordingBot()),
             997_631,
             patreon_user_id="patreon-shared-663",
-            supporter_level=SupporterLevel.PATRON,
+            supporter_level=SupporterLevel.HOST_2,
         )
 
         assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE
@@ -183,6 +183,6 @@ async def test_unknown_user_returns_unknown_outcome():
         make_api(RecordingBot()),
         997_699,
         patreon_user_id=PATRON_USER_ID,
-        supporter_level=SupporterLevel.PATRON,
+        supporter_level=SupporterLevel.HOST_2,
     )
     assert outcome is LinkOutcome.UNKNOWN_USER

@@ -774,25 +774,25 @@ msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Collega account Patreon"
 
 msgid "ButtonMessages.BECOME_PATRON"
-msgstr "💶 Diventa un mecenate"
+msgstr "💶 Diventa Host"
 
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Scollega account Patreon"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Sostieni Mitup con Patreon</b>\n\nMitup è gratuito. Se ti aiuta a riunire la tua gente, puoi sostenerlo su Patreon e sbloccare vantaggi da sostenitore come ringraziamento.\n\n<b>Come Mecenate:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita quante persone vuoi a ciascun incontro.\n\n<b>Come Organizzatore:</b> tutto senza limiti.\n\nCollega il tuo account Patreon per iniziare."
+msgstr "<b>Sostieni Mitup con Patreon</b>\n\nMitup è gratuito. Se ti aiuta a riunire la tua gente, puoi sostenerlo su Patreon e sbloccare i vantaggi da Host come ringraziamento.\n\n<b>Come Gamemaster:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita partecipanti senza limiti per ogni incontro.\n\n<b>Come Commissioner:</b> tutto senza limiti.\n\nCollega il tuo account Patreon per iniziare."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Account Patreon collegato</b>\n\nTutto pronto. Non sei ancora un mecenate, quindi i tuoi vantaggi da sostenitore sono ancora disattivati.\n\n<b>Come Mecenate:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita quante persone vuoi a ciascun incontro.\n\n<b>Come Organizzatore:</b> tutto senza limiti.\n\nDiventa un mecenate e si attiveranno automaticamente, senza bisogno di collegare di nuovo."
+msgstr "<b>Account Patreon collegato</b>\n\nTutto pronto. Non sei ancora un Host, quindi i tuoi vantaggi da Host sono ancora disattivati.\n\n<b>Come Gamemaster:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita partecipanti senza limiti per ogni incontro.\n\n<b>Come Commissioner:</b> tutto senza limiti.\n\nDiventa un Host e i tuoi vantaggi si attiveranno automaticamente, senza bisogno di collegare di nuovo."
 
 msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
-msgstr "<b>🧡 Sei un Sostenitore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Sostenitore è visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti. Puoi scollegare il tuo account Patreon quando vuoi."
+msgstr "<b>☕️ Sei un Brewer</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Brewer è visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti. Puoi scollegare il tuo account Patreon quando vuoi."
 
 msgid "CollaborateMessages.LINKED_PATRON_PATRON"
-msgstr "<b>🌟 Sei un Mecenate</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Mecenate è attivo e puoi gestire fino a ${active_meetings} incontri attivi contemporaneamente, pianificare fino a ${scheduling_days} giorni in anticipo e invitare quante persone vuoi a ciascun incontro. Puoi scollegare il tuo account Patreon quando vuoi."
+msgstr "<b>🎲 Sei un Gamemaster</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Gamemaster è attivo e puoi gestire fino a ${active_meetings} incontri attivi contemporaneamente, pianificare fino a ${scheduling_days} giorni in anticipo e invitare partecipanti senza limiti per ogni incontro. Puoi scollegare il tuo account Patreon quando vuoi."
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
-msgstr "<b>🏆 Sei un Organizzatore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Organizzatore è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno. Puoi scollegare il tuo account Patreon quando vuoi."
+msgstr "<b>🏆 Sei un Commissioner</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Commissioner è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno. Puoi scollegare il tuo account Patreon quando vuoi."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Collabora</b>\n\nIl supporto Patreon non è ancora disponibile. Torna presto."
@@ -801,7 +801,7 @@ msgid "CollaborateMessages.UNLINKED"
 msgstr "Il tuo account Patreon è stato scollegato."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Account Patreon collegato</b>\n\nSei collegato. Diventa un mecenate per sbloccare i vantaggi premium. Si attiveranno automaticamente una volta che il tuo contributo è attivo."
+msgstr "<b>Account Patreon collegato</b>\n\nSei collegato. Diventa un Host per sbloccare i tuoi vantaggi da Host. Si attiveranno automaticamente una volta che il tuo contributo è attivo."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -876,10 +876,10 @@ msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE"
 msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED"
-msgstr "<b>${language}</b>: ${sent} inviati, ${failed} falliti, ${skipped} saltati, ${orphaned} orfani"
+msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
-msgstr "🚫 <b>${orphaned}</b> consegne sono state interrotte da un crash del worker e il loro risultato è sconosciuto. Non verranno riprovate."
+msgstr ""
 
 msgid "BroadcastOperatorMessages.SENDER_FAILED"
 msgstr ""
@@ -906,25 +906,25 @@ msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
 msgstr "Puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
-msgstr "<b>I tuoi vantaggi da sostenitore sono in un periodo di tolleranza</b>\n\nNon siamo riusciti a confermare un contributo Patreon attivo sul tuo account, quindi i tuoi vantaggi da sostenitore si disattiveranno tra una settimana. Se il tuo contributo è ancora attivo, non devi fare nulla e si rinnoverà automaticamente. Altrimenti, puoi sostenere di nuovo Mitup dal menu Collabora."
+msgstr "<b>I tuoi vantaggi da Host sono in un periodo di tolleranza</b>\n\nNon siamo riusciti a confermare un contributo Patreon attivo sul tuo account, quindi i tuoi vantaggi da Host si disattiveranno tra una settimana. Se il tuo contributo è ancora attivo, non devi fare nulla e si rinnoverà automaticamente. Altrimenti, puoi sostenere di nuovo Mitup dal menu Collabora."
 
 msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>I tuoi vantaggi da sostenitore sono in un periodo di tolleranza</b>\n\nIl tuo supporto su Patreon è terminato e ci dispiace vederti andare via. I tuoi vantaggi da sostenitore restano attivi per ${days} giorni nel caso cambiassi idea. Per mantenerli, sostieni di nuovo Mitup dal menu Collabora."
+msgstr "<b>I tuoi vantaggi da Host sono in un periodo di tolleranza</b>\n\nIl tuo supporto su Patreon è terminato e ci dispiace vederti andare via. I tuoi vantaggi da Host restano attivi per ${days} giorni nel caso cambiassi idea. Per mantenerli, sostieni di nuovo Mitup dal menu Collabora."
 
 msgid "SupporterNotificationMessages.SUPPORT_LOST"
-msgstr "<b>I tuoi vantaggi da sostenitore sono terminati</b>\n\nNon siamo ancora riusciti a confermare un contributo Patreon attivo, quindi i tuoi vantaggi da sostenitore sono ora disattivati. Diventa di nuovo un mecenate dal menu Collabora per riattivarli."
+msgstr "<b>I tuoi vantaggi da Host sono terminati</b>\n\nNon siamo ancora riusciti a confermare un contributo Patreon attivo, quindi i tuoi vantaggi da Host sono ora disattivati. Diventa di nuovo un Host dal menu Collabora per riattivarli."
 
 msgid "SupporterNotificationMessages.SUPPORTER_UNLOCKED"
-msgstr "<b>🧡 Sei un Sostenitore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Sostenitore è ora visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti."
+msgstr "<b>☕️ Sei un Brewer</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Brewer è ora visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti."
 
 msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
-msgstr "<b>🌟 Sei un Mecenate</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Mecenate è attivo e i tuoi limiti sono appena aumentati: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno."
+msgstr "<b>🎲 Sei un Gamemaster</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Gamemaster è attivo e i tuoi limiti sono appena aumentati: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno."
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
-msgstr "<b>🏆 Sei un Organizzatore</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Organizzatore è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno."
+msgstr "<b>🏆 Sei un Commissioner</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Commissioner è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno."
 
 msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
-msgstr "<b>🧡 Il tuo livello è ora Sostenitore</b>\n\nIl tuo badge da Sostenitore resta sul tuo profilo e valgono i limiti standard per gli incontri: un numero prefissato di incontri attivi contemporaneamente, la finestra di pianificazione standard e il tetto standard di partecipanti per ogni incontro. Grazie per sostenere Mitup."
+msgstr "<b>☕️ Il tuo livello è ora Brewer</b>\n\nIl tuo badge da Brewer resta sul tuo profilo e valgono i limiti standard per gli incontri: un numero prefissato di incontri attivi contemporaneamente, la finestra di pianificazione standard e il tetto standard di partecipanti per ogni incontro. Grazie per sostenere Mitup."
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
-msgstr "<b>🌟 Il tuo livello è ora Mecenate</b>\n\nIl tuo badge da Mecenate è attivo e valgono i tuoi limiti da Mecenate: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno. Grazie per sostenere Mitup."
+msgstr "<b>🎲 Il tuo livello è ora Gamemaster</b>\n\nIl tuo badge da Gamemaster è attivo e valgono i tuoi limiti da Gamemaster: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno. Grazie per sostenere Mitup."

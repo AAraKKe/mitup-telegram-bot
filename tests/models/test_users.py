@@ -60,16 +60,16 @@ def test_display_name_is_plain_inline_name_for_free_user():
 @pytest.mark.parametrize(
     "level,badge",
     [
-        (SupporterLevel.SUPPORTER, Emojis.SUPPORTER),
-        (SupporterLevel.PATRON, Emojis.PATRON),
-        (SupporterLevel.ORGANIZER, Emojis.ORGANIZER),
+        (SupporterLevel.HOST_1, Emojis.HOST_1),
+        (SupporterLevel.HOST_2, Emojis.HOST_2),
+        (SupporterLevel.HOST_3, Emojis.HOST_3),
     ],
-    ids=["supporter", "patron", "organizer"],
+    ids=["host_1", "host_2", "host_3"],
 )
-def test_display_name_appends_per_tier_badge(level: SupporterLevel, badge: Emojis):
+def test_display_name_prepends_per_tier_badge(level: SupporterLevel, badge: Emojis):
     user = create_user(id=1, username="alice", tg_user_id=997_701, supporter_level=level)
 
-    assert user.display_name == f"alice {badge}"
+    assert user.display_name == f"{badge} alice"
 
 
 @pytest.mark.parametrize(

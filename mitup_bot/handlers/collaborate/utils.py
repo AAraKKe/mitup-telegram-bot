@@ -43,8 +43,8 @@ async def build_collaborate_view(session: AsyncSession, user: User, message_id: 
     if not patreon.is_configured():
         return collaborate_unavailable_view(user.lang)
 
-    active_meetings = supporter.active_meetings_cap(SupporterLevel.PATRON)
-    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.PATRON)
+    active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
+    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
 
     config = patreon.current_config()
     subscription = await subscription_for_user(session, user)

@@ -521,8 +521,8 @@ async def refresh_tapped_message(
     if message_id is None:
         return
 
-    active_meetings = supporter.active_meetings_cap(SupporterLevel.PATRON)
-    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.PATRON)
+    active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
+    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
 
     if outcome is LinkOutcome.LINKED_SUPPORTER:
         view = collaborate_linked_patron_view(user.lang, user.supporter_level, active_meetings, scheduling_days)

@@ -545,7 +545,7 @@ async def test_user_owns_meeting_returns_none_silently_when_redirect_false(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
-@pytest.mark.parametrize("level", [SupporterLevel.PATRON, SupporterLevel.ORGANIZER], ids=["patron", "organizer"])
+@pytest.mark.parametrize("level", [SupporterLevel.HOST_2, SupporterLevel.HOST_3], ids=["patron", "organizer"])
 async def test_supporter_required_passes_user_meeting_minimum_through(
     update: Update,
     context: StubMitupContext,
@@ -555,7 +555,7 @@ async def test_supporter_required_passes_user_meeting_minimum_through(
     user_with_settings.supporter_level = level
 
     result = await supporter_required(
-        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
+        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.HOST_2, cap=5
     )
 
     assert result is user_with_settings
@@ -563,7 +563,7 @@ async def test_supporter_required_passes_user_meeting_minimum_through(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
-@pytest.mark.parametrize("level", [SupporterLevel.NONE, SupporterLevel.SUPPORTER], ids=["none", "supporter"])
+@pytest.mark.parametrize("level", [SupporterLevel.NONE, SupporterLevel.HOST_1], ids=["none", "supporter"])
 async def test_supporter_required_alerts_and_returns_none_below_minimum(
     update: Update,
     context: StubMitupContext,
@@ -573,7 +573,7 @@ async def test_supporter_required_alerts_and_returns_none_below_minimum(
     user_with_settings.supporter_level = level
 
     result = await supporter_required(
-        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
+        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.HOST_2, cap=5
     )
 
     assert result is None

@@ -73,9 +73,9 @@ def test_linked_not_patron_view_substitutes_patron_caps(lang: str):
 @pytest.mark.parametrize(
     "level,expected_message",
     [
-        (SupporterLevel.SUPPORTER, CollaborateMessages.LINKED_PATRON_SUPPORTER),
-        (SupporterLevel.PATRON, CollaborateMessages.LINKED_PATRON_PATRON),
-        (SupporterLevel.ORGANIZER, CollaborateMessages.LINKED_PATRON_ORGANIZER),
+        (SupporterLevel.HOST_1, CollaborateMessages.LINKED_PATRON_SUPPORTER),
+        (SupporterLevel.HOST_2, CollaborateMessages.LINKED_PATRON_PATRON),
+        (SupporterLevel.HOST_3, CollaborateMessages.LINKED_PATRON_ORGANIZER),
     ],
 )
 def test_linked_patron_view_renders_tier_message_and_only_unlink(
@@ -95,7 +95,7 @@ def test_linked_patron_view_renders_tier_message_and_only_unlink(
 def test_linked_patron_patron_view_renders_concrete_caps(lang: str):
     # The Patron tier message carries the ${active_meetings} / ${scheduling_days} placeholders; the
     # other two paying tiers have no vars, so only this one needs the substitution check.
-    view = collaborate_linked_patron_view(lang, SupporterLevel.PATRON, ACTIVE_MEETINGS, SCHEDULING_DAYS)
+    view = collaborate_linked_patron_view(lang, SupporterLevel.HOST_2, ACTIVE_MEETINGS, SCHEDULING_DAYS)
 
     assert "${" not in view.description.text
     assert str(ACTIVE_MEETINGS) in view.description.text
@@ -105,9 +105,9 @@ def test_linked_patron_patron_view_renders_concrete_caps(lang: str):
 @pytest.mark.parametrize(
     "level,expected_message",
     [
-        (SupporterLevel.SUPPORTER, CollaborateMessages.LINKED_PATRON_SUPPORTER),
-        (SupporterLevel.PATRON, CollaborateMessages.LINKED_PATRON_PATRON),
-        (SupporterLevel.ORGANIZER, CollaborateMessages.LINKED_PATRON_ORGANIZER),
+        (SupporterLevel.HOST_1, CollaborateMessages.LINKED_PATRON_SUPPORTER),
+        (SupporterLevel.HOST_2, CollaborateMessages.LINKED_PATRON_PATRON),
+        (SupporterLevel.HOST_3, CollaborateMessages.LINKED_PATRON_ORGANIZER),
     ],
 )
 def test_status_for_maps_each_paying_tier(level: SupporterLevel, expected_message: CollaborateMessages):

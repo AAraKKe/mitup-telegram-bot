@@ -32,8 +32,8 @@ def configured_limits(monkeypatch: pytest.MonkeyPatch) -> LimitsConfig:
     "level,expected_attr",
     [
         (SupporterLevel.NONE, "free_active_meetings"),
-        (SupporterLevel.SUPPORTER, "free_active_meetings"),
-        (SupporterLevel.PATRON, "patron_active_meetings"),
+        (SupporterLevel.HOST_1, "free_active_meetings"),
+        (SupporterLevel.HOST_2, "patron_active_meetings"),
     ],
     ids=["none", "supporter", "patron"],
 )
@@ -45,7 +45,7 @@ def test_active_meetings_cap_by_level(
 
 
 def test_active_meetings_cap_is_unlimited_for_organizer(user_with_settings: User, configured_limits: LimitsConfig):
-    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    user_with_settings.supporter_level = SupporterLevel.HOST_3
     assert limits.active_meetings_cap(user_with_settings) is None
 
 
@@ -53,8 +53,8 @@ def test_active_meetings_cap_is_unlimited_for_organizer(user_with_settings: User
     "level,expected_attr",
     [
         (SupporterLevel.NONE, "free_scheduling_horizon_days"),
-        (SupporterLevel.SUPPORTER, "free_scheduling_horizon_days"),
-        (SupporterLevel.PATRON, "patron_scheduling_horizon_days"),
+        (SupporterLevel.HOST_1, "free_scheduling_horizon_days"),
+        (SupporterLevel.HOST_2, "patron_scheduling_horizon_days"),
     ],
     ids=["none", "supporter", "patron"],
 )
@@ -66,7 +66,7 @@ def test_scheduling_horizon_days_by_level(
 
 
 def test_scheduling_horizon_is_unlimited_for_organizer(user_with_settings: User, configured_limits: LimitsConfig):
-    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    user_with_settings.supporter_level = SupporterLevel.HOST_3
     assert limits.scheduling_horizon_days(user_with_settings) is None
 
 
@@ -74,9 +74,9 @@ def test_scheduling_horizon_is_unlimited_for_organizer(user_with_settings: User,
     "level,expected",
     [
         (SupporterLevel.NONE, 5),
-        (SupporterLevel.SUPPORTER, 5),
-        (SupporterLevel.PATRON, None),
-        (SupporterLevel.ORGANIZER, None),
+        (SupporterLevel.HOST_1, 5),
+        (SupporterLevel.HOST_2, None),
+        (SupporterLevel.HOST_3, None),
     ],
     ids=["none", "supporter", "patron", "organizer"],
 )
@@ -94,8 +94,8 @@ def test_participant_capacity_by_level(
         (SupporterLevel.NONE, None, 5),  # capped + no explicit limit resolves to the cap
         (SupporterLevel.NONE, 3, 3),  # capped + explicit below cap is left untouched
         (SupporterLevel.NONE, 10, 5),  # capped + explicit above cap is clamped down (grandfathered)
-        (SupporterLevel.PATRON, None, None),  # uncapped + no explicit limit stays unlimited
-        (SupporterLevel.PATRON, 100, 100),  # uncapped + explicit limit is honored as-is
+        (SupporterLevel.HOST_2, None, None),  # uncapped + no explicit limit stays unlimited
+        (SupporterLevel.HOST_2, 100, 100),  # uncapped + explicit limit is honored as-is
     ],
     ids=["free_no_limit", "free_below_cap", "free_above_cap", "patron_no_limit", "patron_explicit"],
 )
@@ -122,7 +122,7 @@ def test_at_active_meetings_cap_counts_only_active(user_with_settings: User, con
 
 def test_organizer_is_never_at_active_meetings_cap(user_with_settings: User, configured_limits: LimitsConfig):
     # The fixture owner is at the free cap, but an Organizer tier is uncapped.
-    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    user_with_settings.supporter_level = SupporterLevel.HOST_3
     assert limits.at_active_meetings_cap(user_with_settings) is False
 
 
@@ -154,7 +154,7 @@ def test_within_scheduling_horizon_raised_for_patron(user_with_settings: User, c
     beyond_free = dt.datetime.combine(today + dt.timedelta(days=90), dt.time(12, 0), tzinfo=dt.UTC)
 
     assert limits.within_scheduling_horizon(user_with_settings, beyond_free) is False
-    user_with_settings.supporter_level = SupporterLevel.PATRON
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
     assert limits.within_scheduling_horizon(user_with_settings, beyond_free) is True
 
 
@@ -163,7 +163,7 @@ def test_organizer_has_no_scheduling_horizon(user_with_settings: User, configure
     today = user_with_settings.now_in_tz().date()
     far_future = dt.datetime.combine(today + dt.timedelta(days=5000), dt.time(12, 0), tzinfo=dt.UTC)
 
-    user_with_settings.supporter_level = SupporterLevel.ORGANIZER
+    user_with_settings.supporter_level = SupporterLevel.HOST_3
     assert limits.within_scheduling_horizon(user_with_settings, far_future) is True
 
 

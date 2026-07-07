@@ -134,7 +134,7 @@ class ButtonMessages(MessageBase):
 
     # Collaborate / Patreon buttons
     LINK_PATREON = f"{Emojis.HEART} Link Patreon account"
-    BECOME_PATRON = f"{Emojis.DONATE} Become a patron"
+    BECOME_PATRON = f"{Emojis.DONATE} Become a Host"
     UNLINK_PATREON = "Unlink Patreon account"
 
     def back(self, lang: str, **kwargs: str) -> str:
@@ -198,7 +198,7 @@ class SupporterMessages(MessageBase):
         "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start "
         "another, or tap Collaborate in the main menu to support Mitup and unlock more."
     )
-    # Patron-tier user at the (much higher) sanity cap: no upsell, just the limit.
+    # Gamemaster-tier user at the (much higher) sanity cap: no upsell, just the limit.
     ACTIVE_MEETINGS_CAP_PATRON = (
         "You've reached the maximum of ${cap} active meetings. Wrap up or delete one before starting another."
     )
@@ -207,10 +207,10 @@ class SupporterMessages(MessageBase):
         "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap "
         "Collaborate in the main menu to support Mitup and schedule further out."
     )
-    # Patron-tier user beyond the extended horizon.
+    # Gamemaster-tier user beyond the extended horizon.
     SCHEDULING_HORIZON_PATRON = "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
     # Free owner trying to set a participant limit above the free-tier capacity: explain and point at
-    # Collaborate. Patron-tier owners are uncapped, so there is no patron counterpart.
+    # Collaborate. Gamemaster-tier owners are uncapped, so there is no Gamemaster counterpart.
     PARTICIPANT_CAPACITY = (
         "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in "
         "the main menu to support Mitup and host more."
@@ -675,38 +675,38 @@ class CollaborateMessages(MessageBase):
     NOT_LINKED = (
         "<b>Support Mitup with Patreon</b>\n\n"
         "Mitup is free to use. If it helps you bring people together, you can back it on Patreon "
-        "and unlock supporter perks as a thank you.\n\n"
-        "<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, "
+        "and unlock Host perks as a thank you.\n\n"
+        "<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, "
         "schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n"
-        "<b>As an Organizer:</b> unlimited everything.\n\n"
+        "<b>As a Commissioner:</b> unlimited everything.\n\n"
         "Link your Patreon account to get started."
     )
-    # Collaborate view, shown when the account is linked but not an active patron of the campaign.
+    # Collaborate view, shown when the account is linked but not an active Host of the campaign.
     LINKED_NOT_PATRON = (
         "<b>Patreon account linked</b>\n\n"
-        "You're all set. You're not a patron yet, so your supporter perks are still off.\n\n"
-        "<b>As a Patron:</b> run up to ${active_meetings} active meetings at once, "
+        "You're all set. You're not a Host yet, so your Host perks are still off.\n\n"
+        "<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, "
         "schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n"
-        "<b>As an Organizer:</b> unlimited everything.\n\n"
-        "Become a patron and your perks turn on automatically, with no need to link again."
+        "<b>As a Commissioner:</b> unlimited everything.\n\n"
+        "Become a Host and your perks turn on automatically, with no need to link again."
     )
-    # Collaborate view, shown to a linked active supporter.
+    # Collaborate view, shown to a linked active Brewer.
     LINKED_PATRON_SUPPORTER = (
-        f"<b>{Emojis.SUPPORTER} You're a Supporter</b>\n\n"
-        "Thanks for backing Mitup. Your Supporter badge shows on your profile, and your support "
+        f"<b>{Emojis.HOST_1} You're a Brewer</b>\n\n"
+        "Thanks for backing Mitup. Your Brewer badge shows on your profile, and your support "
         "helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
     )
-    # Collaborate view, shown to a linked active patron.
+    # Collaborate view, shown to a linked active Gamemaster.
     LINKED_PATRON_PATRON = (
-        f"<b>{Emojis.PATRON} You're a Patron</b>\n\n"
-        "Thanks for backing Mitup. Your Patron badge is on, and you can run up to ${active_meetings} active meetings "
-        "at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting. "
-        "You can unlink your Patreon account whenever you want."
+        f"<b>{Emojis.HOST_2} You're a Gamemaster</b>\n\n"
+        "Thanks for backing Mitup. Your Gamemaster badge is on, and you can run up to ${active_meetings} "
+        "active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited "
+        "participants per meeting. You can unlink your Patreon account whenever you want."
     )
-    # Collaborate view, shown to a linked active organizer.
+    # Collaborate view, shown to a linked active Commissioner.
     LINKED_PATRON_ORGANIZER = (
-        f"<b>{Emojis.ORGANIZER} You're an Organizer</b>\n\n"
-        "Thanks for backing Mitup. Your Organizer badge is on, and every limit is off: "
+        f"<b>{Emojis.HOST_3} You're a Commissioner</b>\n\n"
+        "Thanks for backing Mitup. Your Commissioner badge is on, and every limit is off: "
         "run as many meetings as you want, schedule them as far ahead as you need, "
         "and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
     )
@@ -714,10 +714,10 @@ class CollaborateMessages(MessageBase):
     UNAVAILABLE = "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
-    # Telegram message sent from the OAuth callback when the linked user is not a patron yet.
+    # Telegram message sent from the OAuth callback when the linked user is not a Host yet.
     LINK_CONFIRMED_NO_PATRON = (
         "<b>Patreon account linked</b>\n\n"
-        "You're connected. Become a patron to unlock your supporter perks. They'll switch on automatically "
+        "You're connected. Become a Host to unlock your Host perks. They'll switch on automatically "
         "once your pledge is active."
     )
 
@@ -725,14 +725,14 @@ class CollaborateMessages(MessageBase):
     def status_for(cls, level: SupporterLevel) -> CollaborateMessages:
         """The persistent status screen message for a linked, active paying tier.
 
-        NONE never reaches here: a non-patron never sees the linked patron screen, so it raises
+        NONE never reaches here: a non-Host never sees the linked Host screen, so it raises
         rather than inventing copy for the free tier."""
         match level:
-            case SupporterLevel.SUPPORTER:
+            case SupporterLevel.HOST_1:
                 return cls.LINKED_PATRON_SUPPORTER
-            case SupporterLevel.PATRON:
+            case SupporterLevel.HOST_2:
                 return cls.LINKED_PATRON_PATRON
-            case SupporterLevel.ORGANIZER:
+            case SupporterLevel.HOST_3:
                 return cls.LINKED_PATRON_ORGANIZER
             case SupporterLevel.NONE:
                 raise ValueError("No status message exists for the NONE tier")
@@ -741,71 +741,71 @@ class CollaborateMessages(MessageBase):
 
 
 class SupporterNotificationMessages(MessageBase):
-    """Direct messages sent by the daily supporter-validation job when a supporter's status changes.
+    """Direct messages sent by the daily Host-validation job when a Host's status changes.
 
     Full messages (not callback-query alerts), so inline `<b>` tags are allowed. Each mirrors a
     transition in the grace/upgrade/revoke flow the job drives against Patreon."""
 
     # Support lapsed while we could not confirm an active pledge: perks stay on for one grace week.
     GRACE_STARTED = (
-        "<b>Your supporter perks are in a grace period</b>\n\n"
-        "We couldn't confirm an active Patreon pledge on your account, so your supporter perks are set "
+        "<b>Your Host perks are in a grace period</b>\n\n"
+        "We couldn't confirm an active Patreon pledge on your account, so your Host perks are set "
         "to switch off in a week. If your pledge is still active, there's nothing to do and it will "
         "renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
     )
-    # Webhook told us the user is no longer an active patron: perks stay on for a parameterized
+    # Webhook told us the user is no longer an active Host: perks stay on for a parameterized
     # grace period (the daily job revokes only if they're still lapsed when it ends).
     SUPPORT_ENDED_GRACE = (
-        "<b>Your supporter perks are in a grace period</b>\n\n"
-        "Your Patreon support ended, and we're sad to see you go. Your supporter perks stay on for "
+        "<b>Your Host perks are in a grace period</b>\n\n"
+        "Your Patreon support ended, and we're sad to see you go. Your Host perks stay on for "
         "${days} days in case you change your mind. To keep them, back Mitup again from the "
         "Collaborate menu."
     )
     # Grace week elapsed without a confirmed pledge: perks are now off.
     SUPPORT_LOST = (
-        "<b>Your supporter perks have ended</b>\n\n"
-        "We still couldn't confirm an active Patreon pledge, so your supporter perks are now off. "
-        "Become a patron again from the Collaborate menu to turn them back on."
+        "<b>Your Host perks have ended</b>\n\n"
+        "We still couldn't confirm an active Patreon pledge, so your Host perks are now off. "
+        "Become a Host again from the Collaborate menu to turn them back on."
     )
-    # Reached the Supporter tier: grants the badge and our thanks, but no raised limits, so the copy
+    # Reached the Brewer tier: grants the badge and our thanks, but no raised limits, so the copy
     # stays on the badge and the support rather than promising bigger or more meetings.
     SUPPORTER_UNLOCKED = (
-        f"<b>{Emojis.SUPPORTER} You're a Supporter</b>\n\n"
-        "Thanks for backing Mitup. Your Supporter badge now shows on your profile, and your support "
+        f"<b>{Emojis.HOST_1} You're a Brewer</b>\n\n"
+        "Thanks for backing Mitup. Your Brewer badge now shows on your profile, and your support "
         "helps keep Mitup running for everyone."
     )
-    # Reached the Patron tier: raised active-meeting cap, further scheduling horizon, and unlimited
+    # Reached the Gamemaster tier: raised active-meeting cap, further scheduling horizon, and unlimited
     # participants per meeting, plus the badge.
     PATRON_UNLOCKED = (
-        f"<b>{Emojis.PATRON} You're a Patron</b>\n\n"
-        "Thanks for backing Mitup. Your Patron badge is on, and your limits just went up: run more "
+        f"<b>{Emojis.HOST_2} You're a Gamemaster</b>\n\n"
+        "Thanks for backing Mitup. Your Gamemaster badge is on, and your limits just went up: run more "
         "meetings at once, schedule them further ahead, and invite as many people as you like to each one."
     )
-    # Reached the Organizer tier: every limit lifted (active meetings, scheduling horizon,
+    # Reached the Commissioner tier: every limit lifted (active meetings, scheduling horizon,
     # participants), plus the badge.
     ORGANIZER_UNLOCKED = (
-        f"<b>{Emojis.ORGANIZER} You're an Organizer</b>\n\n"
-        "Thanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many "
+        f"<b>{Emojis.HOST_3} You're a Commissioner</b>\n\n"
+        "Thanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as many "
         "meetings as you want, schedule them as far ahead as you need, and invite as many people as "
         "you like to each one."
     )
 
-    # Settled at the Supporter tier after a between-tier change (still a paying supporter, lower tier).
+    # Settled at the Brewer tier after a between-tier change (still a paying Host, lower tier).
     # Neutral by design: it states the current tier and its standard limits without framing the move
-    # as a loss or comparing it to the prior tier. Supporter carries the badge and our thanks, but no
+    # as a loss or comparing it to the prior tier. Brewer carries the badge and our thanks, but no
     # raised limits, so the copy names the standard limits rather than promising bigger or more.
     SUPPORTER_TIER_SET = (
-        f"<b>{Emojis.SUPPORTER} Your tier is now Supporter</b>\n\n"
-        "Your Supporter badge stays on your profile, and the standard meeting limits apply: a set "
+        f"<b>{Emojis.HOST_1} Your tier is now Brewer</b>\n\n"
+        "Your Brewer badge stays on your profile, and the standard meeting limits apply: a set "
         "number of active meetings at once, the standard scheduling window, and the standard "
         "participant cap per meeting. Thanks for backing Mitup."
     )
-    # Settled at the Patron tier after a between-tier change. Neutral by design (see SUPPORTER_TIER_SET):
-    # it states the current tier and what it includes without framing the move as a loss. Patron carries
+    # Settled at the Gamemaster tier after a between-tier change. Neutral by design (see SUPPORTER_TIER_SET):
+    # it states the current tier and what it includes without framing the move as a loss. Gamemaster carries
     # a raised active-meeting cap, a further scheduling horizon, and unlimited participants, plus the badge.
     PATRON_TIER_SET = (
-        f"<b>{Emojis.PATRON} Your tier is now Patron</b>\n\n"
-        "Your Patron badge is on, and your Patron limits apply: run more meetings at once, schedule "
+        f"<b>{Emojis.HOST_2} Your tier is now Gamemaster</b>\n\n"
+        "Your Gamemaster badge is on, and your Gamemaster limits apply: run more meetings at once, schedule "
         "them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
     )
 
@@ -816,11 +816,11 @@ class SupporterNotificationMessages(MessageBase):
         NONE never reaches here: callers only announce an unlock once a paying tier is confirmed, so
         it raises rather than inventing copy for the free tier."""
         match level:
-            case SupporterLevel.SUPPORTER:
+            case SupporterLevel.HOST_1:
                 return cls.SUPPORTER_UNLOCKED
-            case SupporterLevel.PATRON:
+            case SupporterLevel.HOST_2:
                 return cls.PATRON_UNLOCKED
-            case SupporterLevel.ORGANIZER:
+            case SupporterLevel.HOST_3:
                 return cls.ORGANIZER_UNLOCKED
             case SupporterLevel.NONE:
                 raise ValueError("No unlock message exists for the NONE tier")
@@ -829,17 +829,17 @@ class SupporterNotificationMessages(MessageBase):
 
     @classmethod
     def downgraded_to(cls, level: SupporterLevel) -> SupporterNotificationMessages:
-        """The neutral tier-set message for a between-tier downgrade (still a paying supporter).
+        """The neutral tier-set message for a between-tier downgrade (still a paying Host).
 
-        Only the lower paying tiers are valid targets: ORGANIZER is the top tier so nothing downgrades
+        Only the lower paying tiers are valid targets: HOST_3 is the top tier so nothing downgrades
         *to* it, and a drop to NONE is a full loss handled by the grace/revoke messages, not here."""
         match level:
-            case SupporterLevel.SUPPORTER:
+            case SupporterLevel.HOST_1:
                 return cls.SUPPORTER_TIER_SET
-            case SupporterLevel.PATRON:
+            case SupporterLevel.HOST_2:
                 return cls.PATRON_TIER_SET
-            case SupporterLevel.ORGANIZER:
-                raise ValueError("Organizer is the top tier, not a downgrade target")
+            case SupporterLevel.HOST_3:
+                raise ValueError("HOST_3 is the top tier, not a downgrade target")
             case SupporterLevel.NONE:
                 raise ValueError("A drop to NONE is a loss, not a downgrade")
             case _ as unreachable:
