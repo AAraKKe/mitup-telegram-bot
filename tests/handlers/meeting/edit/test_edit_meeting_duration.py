@@ -9,7 +9,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.utils import safe_anchor_date
-from mitup_bot.models import Settings
+from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages
@@ -343,9 +343,9 @@ async def test_update_existing_end_date_valid(
         handler_context=handler_context,
     )
 
-    # Date changed to Jun 16, time kept from original end_datetime (11:30 UTC)
-    assert meeting.end_datetime is not None
-    assert meeting.end_datetime.date() == dt.date(2026, 6, 16)
+    # UTC owner (no DST): changing only the date is a no-op on the local time-of-day, so the
+    # existing 11:30 end time is kept and only the date moves to Jun 16.
+    assert meeting.end_datetime == dt.datetime(2026, 6, 16, 11, 30, tzinfo=dt.UTC)
     assert state == ConversationMeetingState.EDIT_END_DATETIME
     mock_session.assert_flushed()
 
@@ -1037,3 +1037,91 @@ async def test_past_end_with_naive_stored_start_does_not_raise(
     context.api.assert_send_message_called(
         handler_context.update, MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
     )
+
+
+# ---------------------------------------------------------------------------
+# callback_query_duration_end_set_date — "end already set" branch is DST-safe:
+# changing only the date preserves the owner-LOCAL wall clock of the end time.
+# ---------------------------------------------------------------------------
+
+
+def madrid_owner_with_meeting(
+    meeting_datetime: dt.datetime | None = None,
+    end_datetime: dt.datetime | None = None,
+) -> tuple[User, Meetup]:
+    """Build a user in Europe/Madrid (a DST zone) owning a single meeting."""
+    meeting = create_meetup(id=1, title="Test Meeting", datetime=meeting_datetime)
+    meeting.end_datetime = end_datetime
+    user = create_user(
+        id=1, tg_user_id=123, owned_meetings=[meeting], settings=Settings(id=1, timezone="Europe/Madrid")
+    )
+    return user, meeting
+
+
+@pytest.mark.parametrize(
+    "update",
+    # Move the end date across the spring DST boundary into summer time.
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 4, 10)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_update_existing_end_date_preserves_local_time_across_dst(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """DST regression: changing only the end date keeps the owner-LOCAL wall clock. The stored UTC
+    value shifts by the offset delta; the displayed local end time does not move."""
+    # Existing end: 2026-03-20 09:00 UTC == 10:00 Madrid (winter, UTC+1).
+    start = dt.datetime(2026, 3, 20, 7, 0, tzinfo=dt.UTC)  # 08:00 Madrid, before the end
+    existing_end = dt.datetime(2026, 3, 20, 9, 0, tzinfo=dt.UTC)
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    # Local wall clock before the change is 10:00.
+    assert user.datetime_in_tz(existing_end).time() == dt.time(10, 0)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        handler_context=handler_context,
+    )
+
+    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    # 2026-04-10 is summer time (Madrid UTC+2), so 10:00 local == 08:00 UTC — the UTC time-of-day
+    # shifted by one hour relative to the winter value (09:00 UTC).
+    assert meeting.end_datetime == dt.datetime(2026, 4, 10, 8, 0, tzinfo=dt.UTC)
+    # The owner-local wall clock is preserved at 10:00.
+    assert meeting.end_datetime is not None
+    assert user.datetime_in_tz(meeting.end_datetime).time() == dt.time(10, 0)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 25)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_update_existing_end_date_with_naive_stored_datetime_treats_it_as_utc(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """A naive stored meeting.end_datetime is normalised via to_utc before the local-time
+    preservation, so it is treated as UTC and not reinterpreted against the system timezone."""
+    start = dt.datetime(2026, 6, 20, 8, 0, tzinfo=dt.UTC)
+    # Naive end value (no tzinfo) — the fix tags it as UTC: 2026-06-20 10:00 UTC.
+    naive_end = dt.datetime(2026, 6, 20, 10, 0)
+    assert naive_end.tzinfo is None
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=naive_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        handler_context=handler_context,
+    )
+
+    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    # 10:00 UTC == 12:00 Madrid (summer, UTC+2); preserved on 2026-06-25 that local 12:00 == 10:00 UTC.
+    assert meeting.end_datetime == dt.datetime(2026, 6, 25, 10, 0, tzinfo=dt.UTC)

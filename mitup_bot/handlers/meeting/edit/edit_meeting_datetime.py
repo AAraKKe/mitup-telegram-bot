@@ -21,7 +21,7 @@ from mitup_bot.views import ButtonConfig, MitupView, factory
 
 from ..utils import scheduling_horizon_rejection
 from .enums import ConversationMeetingState, EditMeetingHandlerId
-from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date
+from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date, to_utc
 
 # This module manages the start-time editing sub-flow for a meeting.
 #
@@ -32,7 +32,7 @@ from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor
 #     * [Time] -> HH:MM prompt (EDIT_TIME state)
 #     * [Cancel] -> cleanup + END (exits to When hub)
 #   EDIT_DATE -- calendar view: click a date or press [Back]
-#     * Clicking a date when no time set -> saves date at 00:00, prompts for time (EDIT_TIME)
+#     * Clicking a date when no time set -> saves date at 23:59, prompts for time (EDIT_TIME)
 #     * Clicking a date when time already set -> updates date, re-shows entry (EDIT_DATETIME)
 #     * [Back] -> re-shows entry (EDIT_DATETIME, no cleanup -- navigating within conversation)
 #   EDIT_TIME -- HH:MM prompt
@@ -73,8 +73,15 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
         MeetingEditDateTimeMessages.ON_EXIT.get(lang=lang),
         cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
     )
+    description: str | FormattedText = CommonMessages.TIME_PROMPT.get(lang=lang)
+    if meeting.datetime is None:
+        description = (
+            MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE.get(lang=lang)
+            .append("\n\n")
+            .append(CommonMessages.TIME_PROMPT.get(lang=lang))
+        )
     view = MitupView(
-        description=CommonMessages.TIME_PROMPT.get(lang=lang),
+        description=description,
         keyboard=[
             [
                 ButtonConfig(
@@ -262,7 +269,7 @@ async def callback_query_back_to_edit_datetime(
 async def handle_first_datetime_set(
     context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
-    proposed_start = dt.datetime.combine(cb_date, dt.time(0, 0, tzinfo=meeting.timezone)).astimezone(dt.UTC)
+    proposed_start = dt.datetime.combine(cb_date, dt.time(23, 59, tzinfo=meeting.timezone)).astimezone(dt.UTC)
     if error := validate_start_datetime(proposed_start, meeting, meeting.lang, check_horizon=True):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
         return ConversationMeetingState.EDIT_DATE
@@ -314,11 +321,8 @@ async def handle_first_datetime_set(
 async def handle_datetime_update(
     context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
-    proposed_start = dt.datetime.combine(
-        dt.date(cb_date.year, cb_date.month, cb_date.day),
-        cast(dt.datetime, meeting.datetime).time(),
-        tzinfo=dt.UTC,
-    )
+    local_time = to_utc(cast(dt.datetime, meeting.datetime)).astimezone(meeting.timezone).time()
+    proposed_start = dt.datetime.combine(cb_date, local_time, tzinfo=meeting.timezone).astimezone(dt.UTC)
     if error := validate_start_datetime(proposed_start, meeting, meeting.lang, check_horizon=True):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
         return ConversationMeetingState.EDIT_DATE

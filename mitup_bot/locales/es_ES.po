@@ -511,7 +511,10 @@ msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
 msgstr "Selecciona la fecha."
 
 msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
-msgstr "La fecha ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 00:00.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 00:00."
+msgstr "La fecha se ha establecido en <b>${datetime}</b>. La hora se establece por defecto en 23:59, justo antes de medianoche.\n\nEnvía una hora distinta en formato <i>HH:MM</i>, o toca Hecho para mantener 23:59."
+
+msgid "MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE"
+msgstr "La fecha se establece por defecto en hoy, pero puedes elegir otra."
 
 msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
 msgstr "La fecha de fin ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 23:59.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 23:59."

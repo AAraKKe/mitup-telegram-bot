@@ -188,11 +188,13 @@ async def test_set_meeting_date_callback(
     context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
 
     expected_datetime = (
-        # The meeting is set to 00:00 on the user timezone (Europe/Madrid, UTC+1 in December),
-        # which is 23:00 UTC on the previous day (2024-12-20).
-        dt.datetime(2024, 12, 20, 23, 0, tzinfo=dt.UTC)
+        # First date defaults to 23:59 in the owner timezone (Europe/Madrid, UTC+1 in December),
+        # so 23:59 on 2024-12-21 local == 22:59 UTC the same day.
+        dt.datetime(2024, 12, 21, 22, 59, tzinfo=dt.UTC)
         if new
-        # If the meeting already has a time, it should be updated to the new date keeping the time
+        # Changing only the date preserves the owner-local wall clock. Existing 12:30 UTC ==
+        # 13:30 Madrid (Nov, UTC+1); on 2024-12-21 (Dec, UTC+1) 13:30 Madrid is again 12:30 UTC —
+        # no DST crossed, so the UTC value is unchanged.
         else dt.datetime.combine(TEST_MEETING_DATETIME_UTC.date(), dt.time(12, 30, tzinfo=dt.UTC))
     )
 
@@ -938,7 +940,8 @@ async def test_set_date_first_time_clears_end_datetime_when_past_end(
     context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
 
     assert response == ConversationMeetingState.EDIT_TIME
-    # end_datetime was cleared because new start (2026-06-14 23:00 UTC in Europe/Madrid) > end (2025-01-01)
+    # end_datetime was cleared because the new start (23:59 on 2026-06-15 Madrid == 21:59 UTC,
+    # summer UTC+2) is after the old end (2025-01-01).
     assert meeting.end_datetime is None
     assert meeting.lock_on_start is False
 
@@ -1407,3 +1410,186 @@ async def test_time_edit_on_grandfathered_far_future_meeting_is_not_blocked(
     # Time updated to 20:20 Madrid (19:20 UTC) while the far-future date is preserved.
     assert meeting.datetime == dt.datetime(2025, 6, 1, 18, 20, tzinfo=dt.UTC)
     context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+# ---------------------------------------------------------------------------
+# START date-first default is 23:59 in the owner timezone (was 00:00).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    # Pick TODAY (frozen to 2024-11-15) as the very first date.
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(dt.date(2024, 11, 15)))],
+    indirect=True,
+)
+@freeze_time("2024-11-15 08:00:00", tz_offset=0)  # 08:00 UTC == 09:00 Madrid, earlier in the day
+async def test_set_date_first_time_today_succeeds_with_2359_default(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Regression: picking TODAY as the first date now succeeds. The default of 23:59 (owner-local)
+    is still in the future, whereas the old 00:00 default made today <= now and was rejected."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    assert meeting.datetime is None
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    # No START_IN_PAST rejection: conversation advances to EDIT_TIME.
+    assert response == ConversationMeetingState.EDIT_TIME
+    # 23:59 on 2024-11-15 Madrid (Nov, UTC+1) == 22:59 UTC the same day.
+    assert meeting.datetime == dt.datetime(2024, 11, 15, 22, 59, tzinfo=dt.UTC)
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+# ---------------------------------------------------------------------------
+# handle_datetime_update — DST-safe date-only change preserves owner-LOCAL wall clock.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    # Move the date across the spring DST boundary into summer time.
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(dt.date(2026, 4, 10)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_date_update_preserves_local_time_across_dst(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Changing only the date across a DST boundary keeps the owner-LOCAL wall clock time. The
+    stored UTC value shifts by the offset delta; the displayed local time does not move."""
+    # Existing start: 2026-03-20 09:00 UTC == 10:00 Madrid (winter, UTC+1).
+    existing = dt.datetime(2026, 3, 20, 9, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
+
+    # Local wall clock before the change is 10:00.
+    assert meeting.owner.datetime_in_tz(existing).time() == dt.time(10, 0)
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+    # 2026-04-10 is summer time (Madrid UTC+2), so 10:00 local == 08:00 UTC — the UTC time-of-day
+    # shifted by one hour relative to the winter value (09:00 UTC).
+    assert meeting.datetime == dt.datetime(2026, 4, 10, 8, 0, tzinfo=dt.UTC)
+    # The owner-local wall clock is preserved at 10:00.
+    assert meeting.datetime is not None
+    assert meeting.owner.datetime_in_tz(meeting.datetime).time() == dt.time(10, 0)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(dt.date(2026, 6, 25)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_date_update_with_naive_stored_datetime_treats_it_as_utc(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """A naive stored meeting.datetime is normalised via to_utc before the local-time preservation,
+    so it is treated as UTC and never reinterpreted against the system timezone."""
+    # Naive value (no tzinfo) — the fix tags it as UTC: 2026-06-20 10:00 UTC.
+    naive_existing = dt.datetime(2026, 6, 20, 10, 0)
+    assert naive_existing.tzinfo is None
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=naive_existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+    # 10:00 UTC == 12:00 Madrid (summer, UTC+2); preserved on 2026-06-25 that local 12:00 == 10:00 UTC.
+    assert meeting.datetime == dt.datetime(2026, 6, 25, 10, 0, tzinfo=dt.UTC)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_id(10).with_date(dt.date(2026, 4, 10)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_date_update_utc_owner_is_local_time_noop(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Sanity: for a UTC owner (no DST) changing only the date is a no-op on the local time-of-day."""
+    user_with_settings.settings.timezone = "UTC"
+    # Existing start: 2026-03-20 09:00 UTC (== 09:00 local for a UTC owner).
+    existing = dt.datetime(2026, 3, 20, 9, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
+
+    context, response = await call_handler(EditMeetingHandlerId.SET_DATE_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+    # UTC owner: the time-of-day is unchanged, only the date moves.
+    assert meeting.datetime == dt.datetime(2026, 4, 10, 9, 0, tzinfo=dt.UTC)
+
+
+# ---------------------------------------------------------------------------
+# show_edit_time_prompt — time-first prompt note only when meeting.datetime is None.
+# Reached via [Time] -> EDIT_TIME_CALLBACK -> callback_query_set_meeting_time.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(10))],
+    indirect=True,
+)
+async def test_edit_meeting_time_prompt_without_datetime_shows_default_note(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """With meeting.datetime is None the prompt prepends TIME_DATE_DEFAULT_NOTE before TIME_PROMPT."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    assert meeting.datetime is None
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.EDIT_TIME_CALLBACK, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.EDIT_TIME
+    # show_edit_time_prompt uses meeting.lang (the meeting's own language), not user.lang.
+    expected_description = (
+        MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE.get(lang=meeting.lang)
+        .append("\n\n")
+        .append(CommonMessages.TIME_PROMPT.get(lang=meeting.lang))
+    )
+    expected_view = MitupView(
+        description=expected_description,
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.CANCEL.get(lang=meeting.lang),
+                    callback_data=cb.CANCEL_EDIT_START_TIME.with_id(10),
+                )
+            ]
+        ],
+    )
+    context.api.assert_edit_message_called(update, expected_view)

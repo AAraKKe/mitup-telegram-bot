@@ -494,8 +494,11 @@ msgstr "Selecione a nova data. Pressione <b>🗑️ Remover data</b> se você qu
 msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
 msgstr "Selecione a data."
 
+msgid "MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE"
+msgstr "A data está predefinida como hoje, mas você pode escolher outra."
+
 msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
-msgstr "A data foi definida para <b>${datetime}</b>. A hora está predefinida como 00:00.\n\nEnvie a hora no formato <i>HH:MM</i> para alterá-la, ou toque em Concluído para manter 00:00."
+msgstr "A data foi definida para <b>${datetime}</b>. A hora está predefinida como 23:59, pouco antes da meia-noite.\n\nEnvie a hora no formato <i>HH:MM</i> para alterá-la, ou toque em Concluído para manter 23:59."
 
 msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
 msgstr "A data de término foi definida para <b>${datetime}</b>. A hora está predefinida como 23:59.\n\nEnvie a hora no formato <i>HH:MM</i> para alterá-la, ou toque em Concluído para manter 23:59."

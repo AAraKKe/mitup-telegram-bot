@@ -570,11 +570,13 @@ class MeetingEditDateTimeMessages(MessageBase):
         "unset the date and time of the meeting."
     )
     DATE_ADD_PROMPT = "Select the date."
+    # Shown alongside CommonMessages.TIME_PROMPT in the time-first flow
+    TIME_DATE_DEFAULT_NOTE = "The date defaults to today, but you can set a different one."
     # Sets date AND prompts for time
     DATE_ADDED_TIME_PROMPT = (
         "The date has been set to <b>${datetime}</b>. "
-        "The time defaults to 00:00.\n\n"
-        "Send the time in <i>HH:MM</i> format to change it, or tap Done to keep 00:00."
+        "The time defaults to 23:59, just before midnight.\n\n"
+        "Send a different time in <i>HH:MM</i> format, or tap Done to keep 23:59."
     )
     DATE_UPDATED = "Date set to: ${datetime}"
     TIME_SUCCESS = "Time set to ${datetime}"

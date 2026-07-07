@@ -408,7 +408,10 @@ msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
 msgstr "Wähle das Datum."
 
 msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
-msgstr "Das Datum wurde auf <b>${datetime}</b> eingestellt. Die Uhrzeit ist auf 00:00 voreingestellt.\n\nSende die Uhrzeit im Format <i>HH:MM</i>, um sie zu ändern, oder drücke Fertig stellen, um 00:00 beizubehalten."
+msgstr "Das Datum wurde auf <b>${datetime}</b> eingestellt. Die Uhrzeit ist auf 23:59 voreingestellt, kurz vor Mitternacht.\n\nSende die Uhrzeit im Format <i>HH:MM</i>, um sie zu ändern, oder drücke Fertig stellen, um 23:59 beizubehalten."
+
+msgid "MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE"
+msgstr "Als Datum ist heute voreingestellt, du kannst aber ein anderes wählen."
 
 msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
 msgstr "Das Enddatum wurde auf <b>${datetime}</b> eingestellt. Die Uhrzeit ist auf 23:59 voreingestellt.\n\nSende die Uhrzeit im Format <i>HH:MM</i>, um sie zu ändern, oder drücke Fertig stellen, um 23:59 beizubehalten."

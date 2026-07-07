@@ -359,11 +359,8 @@ async def callback_query_duration_end_set_date(
 
         return await show_end_time_prompt(context, update, meeting)
 
-    proposed_end = dt.datetime.combine(
-        callback_data.date,
-        meeting.end_datetime.time(),
-        tzinfo=dt.UTC,
-    )
+    local_end_time = to_utc(meeting.end_datetime).astimezone(meeting.timezone).time()
+    proposed_end = dt.datetime.combine(callback_data.date, local_end_time, tzinfo=meeting.timezone).astimezone(dt.UTC)
 
     if error := validate_end_datetime(proposed_end, meeting, user.lang):
         await context.api.answer_callback_query(update, text=error, show_alert=True)

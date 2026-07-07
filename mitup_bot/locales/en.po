@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-07 21:00\n"
+"PO-Revision-Date: 2026-07-07 21:06\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -581,8 +581,11 @@ msgstr "Select the new date. Press <b>🗑️ Delete date</b> if you want to uns
 msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
 msgstr "Select the date."
 
+msgid "MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE"
+msgstr "The date defaults to today, but you can set a different one."
+
 msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
-msgstr "The date has been set to <b>${datetime}</b>. The time defaults to 00:00.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 00:00."
+msgstr "The date has been set to <b>${datetime}</b>. The time defaults to 23:59, just before midnight.\n\nSend a different time in <i>HH:MM</i> format, or tap Done to keep 23:59."
 
 msgid "MeetingEditDateTimeMessages.DATE_UPDATED"
 msgstr "Date set to: ${datetime}"
