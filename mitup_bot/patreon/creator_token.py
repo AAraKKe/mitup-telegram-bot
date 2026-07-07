@@ -2,7 +2,7 @@
 
 The creator OAuth pair (campaign-wide access, distinct from the per-user tokens) is seeded from config
 and then rotated into ``PatreonCreatorToken`` by whichever process refreshes it first. Both the daily
-``premium_check`` job and the startup webhook registration need a *fresh* creator access token, so the
+``supporter_check`` job and the startup webhook registration need a *fresh* creator access token, so the
 adopt-or-refresh lifecycle lives here in the Patreon domain. The job wraps ``load``/``store`` with
 its TTL/fault metrics; registration only needs a token, so it calls
 :func:`acquire_creator_access_token`.

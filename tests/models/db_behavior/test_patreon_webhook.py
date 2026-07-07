@@ -17,7 +17,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.models import PatreonWebhook, configure_token_encryption
-from mitup_bot.models.premium import TokenCipher
+from mitup_bot.models.subscriptions import TokenCipher
 from tests.helpers import create_patreon_webhook
 
 pytestmark = pytest.mark.db_test

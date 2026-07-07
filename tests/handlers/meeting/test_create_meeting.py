@@ -14,7 +14,7 @@ from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils import MeetingCreationMessages, PremiumMessages
+from mitup_bot.utils import MeetingCreationMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
@@ -420,7 +420,7 @@ async def test_create_meeting_entry_blocked_at_cap_shows_upsell(
     assert ContextId.CREATE_MEETING not in context.user_data.registry  # flow not entered
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=PremiumMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=2),
+        text=SupporterMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=2),
         show_alert=True,
     )
 
@@ -444,7 +444,7 @@ async def test_create_meeting_title_blocked_at_cap_sends_message(
     assert len(mock_session.objects_added) == 0  # no meeting created
     context.api.assert_send_message_called(
         title_update,
-        PremiumMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+        SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
     )
 
 
@@ -474,7 +474,7 @@ async def test_create_meeting_title_date_beyond_horizon_stays_in_title(
     assert len(mock_session.objects_added) == 0  # no meeting created
     context.api.assert_send_message_called(
         title_update,
-        PremiumMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+        SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
     )
 
 

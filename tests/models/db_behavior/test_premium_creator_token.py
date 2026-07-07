@@ -17,9 +17,9 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
-from mitup_bot.cli import premium_check
+from mitup_bot.cli import supporter_check
 from mitup_bot.models import PatreonCreatorToken, configure_token_encryption
-from mitup_bot.models.premium import TokenCipher
+from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.monitoring.backend import NullBackend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.patreon import TokenPair
@@ -77,14 +77,14 @@ async def read_single_row() -> PatreonCreatorToken:
 async def test_adopt_persists_encrypted_seed_pair(clean_creator_tokens: None):
     config = create_patreon_config()
 
-    token = await premium_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
+    token = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
 
     assert token == "creator-access-seed-new"
     row = await read_single_row()
     # Decrypted round-trip through the EncryptedToken column matches the rotated seed pair.
     assert row.access_token == "creator-access-seed-new"
     assert row.refresh_token == "creator-refresh-seed-new"
-    assert row.seed_fingerprint == premium_check.seed_fingerprint(config)
+    assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)
     assert row.token_expiration is not None
 
     # The tokens are ciphertext at rest, not the plaintext we read back above.
@@ -101,19 +101,19 @@ async def test_matching_fingerprint_refreshes_db_pair_in_place(clean_creator_tok
                 access_token="db-access",
                 refresh_token="db-refresh",
                 token_expiration=dt.datetime.now(dt.UTC),
-                seed_fingerprint=premium_check.seed_fingerprint(config),
+                seed_fingerprint=supporter_check.seed_fingerprint(config),
             )
         )
         await session.flush()
         original_id = (await session.exec(select(PatreonCreatorToken))).one().db_id
 
-    token = await premium_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
+    token = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
 
     assert token == "db-access-new"
     row = await read_single_row()
     assert row.db_id == original_id  # updated in place, not a second row
     assert row.access_token == "db-access-new"
-    assert row.seed_fingerprint == premium_check.seed_fingerprint(config)
+    assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)
 
 
 async def test_changed_seed_reseeds_and_rotates_fingerprint(clean_creator_tokens: None):
@@ -128,10 +128,10 @@ async def test_changed_seed_reseeds_and_rotates_fingerprint(clean_creator_tokens
             )
         )
 
-    token = await premium_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
+    token = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
 
     # The seed changed, so the config pair is adopted and the stored fingerprint rotates to it.
     assert token == "creator-access-seed-new"
     row = await read_single_row()
     assert row.access_token == "creator-access-seed-new"
-    assert row.seed_fingerprint == premium_check.seed_fingerprint(config)
+    assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)

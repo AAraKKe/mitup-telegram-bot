@@ -36,14 +36,14 @@ from mitup_bot import db, patreon, supporter
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
-from mitup_bot.models import PremiumSubscription, User
+from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.patreon import PatreonClient, oauth, webhooks
 from mitup_bot.patreon.client import MEMBER_DELETE_TRIGGER
 from mitup_bot.patreon.models import MemberResource, WebhookMemberPayload
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import CollaborateMessages, PremiumNotificationMessages
+from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
 
 log = structlog.get_logger(__name__)
@@ -54,9 +54,9 @@ OAUTH_FLOW = "patreon_oauth_callback"
 
 router = APIRouter()
 
-# A freshly linked patron gets premium immediately with a short runway; the daily job
+# A freshly linked patron gets support immediately with a short runway; the daily job
 # extends it while the pledge stays active and lets it lapse otherwise.
-PREMIUM_GRACE_DAYS = 7
+SUPPORT_GRACE_DAYS = 7
 
 RESULT_TEMPLATE = Template((Path(__file__).parent / "templates" / "patreon_result.html").read_text(encoding="utf-8"))
 
@@ -67,7 +67,7 @@ RETRY_HINT = "Head back to Mitup and tap Link Patreon account in the Collaborate
 class LinkOutcome(Enum):
     """Result of persisting the link, used to pick the browser page shown to the user."""
 
-    LINKED_PREMIUM = auto()
+    LINKED_SUPPORTER = auto()
     LINKED_NO_PATRON = auto()
     UNKNOWN_USER = auto()
     ALREADY_LINKED_ELSEWHERE = auto()
@@ -434,7 +434,7 @@ async def link_patreon_account(
 
         claimed_elsewhere = (
             await session.exec(
-                select(PremiumSubscription).where(PremiumSubscription.patreon_user_id == patreon_user_id)
+                select(SupporterSubscription).where(SupporterSubscription.patreon_user_id == patreon_user_id)
             )
         ).first()
         if claimed_elsewhere is not None and claimed_elsewhere.user_id != user.db_id:
@@ -453,12 +453,12 @@ async def link_patreon_account(
 
         if supporter.is_supporter(supporter_level):
             user.supporter_level = supporter_level
-            subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
-            message = CollaborateMessages.LINK_CONFIRMED_PREMIUM
-            outcome = LinkOutcome.LINKED_PREMIUM
+            subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
+            message = CollaborateMessages.LINK_CONFIRMED_SUPPORTER
+            outcome = LinkOutcome.LINKED_SUPPORTER
         else:
             user.supporter_level = SupporterLevel.NONE
-            subscription.premium_expiration = None
+            subscription.support_expiration = None
             message = CollaborateMessages.LINK_CONFIRMED_NO_PATRON
             outcome = LinkOutcome.LINKED_NO_PATRON
 
@@ -475,16 +475,16 @@ async def link_patreon_account(
         return outcome
 
 
-async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> PremiumSubscription:
+async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> SupporterSubscription:
     """Create the user's subscription row, or update the existing one in place.
 
     A re-link updates the existing row, so a returning user never has to unlink first.
     """
     subscription = (
-        await session.exec(select(PremiumSubscription).where(PremiumSubscription.user_id == user.db_id))
+        await session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user.db_id))
     ).first()
     if subscription is None:
-        subscription = PremiumSubscription(user_id=user.db_id, patreon_user_id=patreon_user_id)
+        subscription = SupporterSubscription(user_id=user.db_id, patreon_user_id=patreon_user_id)
         session.add(subscription)
         return subscription
 
@@ -494,16 +494,18 @@ async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id
 
 def result_page_for(outcome: LinkOutcome, bot_username: str | None) -> HTMLResponse:
     match outcome:
-        case LinkOutcome.LINKED_PREMIUM:
+        case LinkOutcome.LINKED_SUPPORTER:
             return render_result_page(
                 "You're all set",
-                "Your Patreon account is connected and premium is active. Head back to Mitup to keep going.",
+                "Your Patreon account is connected and your supporter perks are active. "
+                "Head back to Mitup to keep going.",
                 bot_username,
             )
         case LinkOutcome.LINKED_NO_PATRON:
             return render_result_page(
                 "Account connected",
-                "Your Patreon account is connected. Become a patron to unlock premium, then head back to Mitup.",
+                "Your Patreon account is connected. Become a patron to unlock your supporter perks, "
+                "then head back to Mitup.",
                 bot_username,
             )
         case LinkOutcome.UNKNOWN_USER:
@@ -563,7 +565,7 @@ def target_level(trigger: str | None, member: MemberResource, config: PatreonCon
 
 
 def apply_membership_transition(
-    user: User, subscription: PremiumSubscription, target: SupporterLevel
+    user: User, subscription: SupporterSubscription, target: SupporterLevel
 ) -> WebhookApplied:
     """Apply ``target`` to the user and reconcile the subscription runway. Returns what changed.
 
@@ -579,7 +581,7 @@ def apply_membership_transition(
         if previous == target:
             return WebhookApplied.UNCHANGED
         user.supporter_level = target
-        subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
+        subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
         subscription.expiration_notified = False
         if supporter.meets(previous, target):
             # A drop to a lower paying tier: adjust silently.
@@ -592,7 +594,7 @@ def apply_membership_transition(
         return WebhookApplied.UNCHANGED
     # Keep the current level (perks stay on) and let the daily job revoke when the window elapses.
     # expiration_notified=True so the daily due-flow revokes straight away rather than re-announcing grace.
-    subscription.premium_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=PREMIUM_GRACE_DAYS)
+    subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
     subscription.expiration_notified = True
     return WebhookApplied.GRACE_STARTED
 
@@ -601,13 +603,13 @@ async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome:
     """Send the DM matching the transition; silent for a no-op or a between-tier downgrade."""
     match outcome:
         case WebhookApplied.UPGRADED:
-            await api.send_message_to_user(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+            await api.send_message_to_user(user, SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
         case WebhookApplied.GRACE_STARTED:
-            # The catalog copy phrases the window in days (``${days}``), fed from PREMIUM_GRACE_DAYS so
+            # The catalog copy phrases the window in days (``${days}``), fed from SUPPORT_GRACE_DAYS so
             # the number in the message can never drift from the expiry math above.
             await api.send_message_to_user(
                 user,
-                PremiumNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=PREMIUM_GRACE_DAYS),
+                SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS),
             )
         case WebhookApplied.DOWNGRADED | WebhookApplied.UNCHANGED:
             ...
@@ -631,7 +633,7 @@ async def apply_membership_event(
     async with db.begin_write(api) as session:
         subscription = (
             await session.exec(
-                select(PremiumSubscription).where(PremiumSubscription.patreon_user_id == patreon_user_id)
+                select(SupporterSubscription).where(SupporterSubscription.patreon_user_id == patreon_user_id)
             )
         ).first()
         if subscription is None:

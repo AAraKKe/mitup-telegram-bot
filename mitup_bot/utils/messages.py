@@ -186,7 +186,7 @@ class CommonMessages(MessageBase):
     UNEXPECTED_ERROR = "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
 
 
-class PremiumMessages(MessageBase):
+class SupporterMessages(MessageBase):
     """Free-tier limit notices. All are shown as plain callback-query alerts or short messages, so
     they must stay entity-free (no inline-formatting tags)."""
 
@@ -195,8 +195,8 @@ class PremiumMessages(MessageBase):
         "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start "
         "another, or tap Collaborate in the main menu to support Mitup and unlock more."
     )
-    # Premium user at the (much higher) sanity cap: no upsell, just the limit.
-    ACTIVE_MEETINGS_CAP_PREMIUM = (
+    # Patron-tier user at the (much higher) sanity cap: no upsell, just the limit.
+    ACTIVE_MEETINGS_CAP_PATRON = (
         "You've reached the maximum of ${cap} active meetings. Wrap up or delete one before starting another."
     )
     # Free user picking a start date beyond the horizon.
@@ -204,10 +204,10 @@ class PremiumMessages(MessageBase):
         "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap "
         "Collaborate in the main menu to support Mitup and schedule further out."
     )
-    # Premium user beyond the extended horizon.
-    SCHEDULING_HORIZON_PREMIUM = "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
+    # Patron-tier user beyond the extended horizon.
+    SCHEDULING_HORIZON_PATRON = "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
     # Free owner trying to set a participant limit above the free-tier capacity: explain and point at
-    # Collaborate. Premium owners are uncapped, so there is no premium counterpart.
+    # Collaborate. Patron-tier owners are uncapped, so there is no patron counterpart.
     PARTICIPANT_CAPACITY = (
         "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in "
         "the main menu to support Mitup and host more."
@@ -672,19 +672,19 @@ class CollaborateMessages(MessageBase):
     NOT_LINKED = (
         "<b>Support Mitup with Patreon</b>\n\n"
         "Mitup is free to use. If it helps you bring people together, you can back it on Patreon "
-        "and unlock premium perks as a thank you.\n\n"
+        "and unlock supporter perks as a thank you.\n\n"
         "Link your Patreon account to get started."
     )
     # Collaborate view, shown when the account is linked but not an active patron of the campaign.
     LINKED_NOT_PATRON = (
         "<b>Patreon account linked</b>\n\n"
-        "You're all set. You're not a patron yet, so premium perks are still off. Become a patron "
+        "You're all set. You're not a patron yet, so your supporter perks are still off. Become a patron "
         "and they turn on automatically, with no need to link again."
     )
-    # Collaborate view, shown to a linked, active patron with premium.
+    # Collaborate view, shown to a linked, active patron.
     LINKED_PATRON = (
-        "<b>You're a premium supporter</b>\n\n"
-        "Thanks for backing Mitup. Your premium perks are active. You can unlink your Patreon "
+        "<b>You're a supporter</b>\n\n"
+        "Thanks for backing Mitup. Your supporter perks are active. You can unlink your Patreon "
         "account here whenever you want."
     )
     # Collaborate view, shown when the bot runs without a [patreon] config section.
@@ -692,49 +692,49 @@ class CollaborateMessages(MessageBase):
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
     # Telegram message sent from the OAuth callback when the linked user is already an active patron.
-    LINK_CONFIRMED_PREMIUM = (
-        "<b>Premium unlocked</b>\n\n"
-        "Your Patreon account is linked and your premium perks are active. Thanks for supporting Mitup."
+    LINK_CONFIRMED_SUPPORTER = (
+        "<b>Supporter perks unlocked</b>\n\n"
+        "Your Patreon account is linked and your supporter perks are active. Thanks for supporting Mitup."
     )
     # Telegram message sent from the OAuth callback when the linked user is not a patron yet.
     LINK_CONFIRMED_NO_PATRON = (
         "<b>Patreon account linked</b>\n\n"
-        "You're connected. Become a patron to unlock premium perks. They'll switch on automatically "
+        "You're connected. Become a patron to unlock your supporter perks. They'll switch on automatically "
         "once your pledge is active."
     )
 
 
-class PremiumNotificationMessages(MessageBase):
-    """Direct messages sent by the daily premium-validation job when a supporter's status changes.
+class SupporterNotificationMessages(MessageBase):
+    """Direct messages sent by the daily supporter-validation job when a supporter's status changes.
 
     Full messages (not callback-query alerts), so inline `<b>` tags are allowed. Each mirrors a
     transition in the grace/upgrade/revoke flow the job drives against Patreon."""
 
-    # Premium expired while we could not confirm an active pledge: perks stay on for one grace week.
+    # Support lapsed while we could not confirm an active pledge: perks stay on for one grace week.
     GRACE_STARTED = (
-        "<b>Your premium is in a grace period</b>\n\n"
-        "We couldn't confirm an active Patreon pledge on your account, so your premium perks are set "
+        "<b>Your supporter perks are in a grace period</b>\n\n"
+        "We couldn't confirm an active Patreon pledge on your account, so your supporter perks are set "
         "to switch off in a week. If your pledge is still active, there's nothing to do and it will "
         "renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
     )
     # Webhook told us the user is no longer an active patron: perks stay on for a parameterized
     # grace period (the daily job revokes only if they're still lapsed when it ends).
     SUPPORT_ENDED_GRACE = (
-        "<b>Your premium is in a grace period</b>\n\n"
-        "Your Patreon support ended, and we're sad to see you go. Your premium perks stay on for "
+        "<b>Your supporter perks are in a grace period</b>\n\n"
+        "Your Patreon support ended, and we're sad to see you go. Your supporter perks stay on for "
         "${days} days in case you change your mind. To keep them, back Mitup again from the "
         "Collaborate menu."
     )
     # Grace week elapsed without a confirmed pledge: perks are now off.
-    PREMIUM_LOST = (
-        "<b>Your premium has ended</b>\n\n"
-        "We still couldn't confirm an active Patreon pledge, so your premium perks are now off. "
+    SUPPORT_LOST = (
+        "<b>Your supporter perks have ended</b>\n\n"
+        "We still couldn't confirm an active Patreon pledge, so your supporter perks are now off. "
         "Become a patron again from the Collaborate menu to turn them back on."
     )
     # A linked account became an active patron: perks turned on without any action from the user.
     UPGRADED = (
-        "<b>Premium unlocked</b>\n\n"
-        "Thanks for backing Mitup. Your Patreon pledge is active, so your premium perks are now on."
+        "<b>Supporter perks unlocked</b>\n\n"
+        "Thanks for backing Mitup. Your Patreon pledge is active, so your supporter perks are now on."
     )
 
 

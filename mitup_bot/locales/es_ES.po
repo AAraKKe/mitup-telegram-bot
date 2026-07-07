@@ -592,21 +592,6 @@ msgstr "Ya has respondido esta pregunta"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "¡Uy! Algo inesperado sucedió. Te he vuelto a llevar al menú principal. Por favor, inténtalo de nuevo."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
-
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
-msgstr "Has alcanzado el máximo de ${cap} quedadas activas. Cierra o elimina una antes de crear otra."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON"
-msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para apoyar a Mitup y programar más lejos."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
-msgstr "Puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana."
-
-msgid "PremiumMessages.PARTICIPANT_CAPACITY"
-msgstr "Las quedadas gratuitas admiten hasta ${cap} participantes. Elige un límite menor, o pulsa Colabora en el menú principal para apoyar a Mitup y admitir más."
-
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 
@@ -656,13 +641,13 @@ msgid "NotificationMessages.STARTED"
 msgstr "¡La quedada <b>${meeting_title}</b> ha comenzado!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Apoya a Mitup con Patreon</b>\n\nMitup es gratis. Si te ayuda a reunir a tu gente, puedes apoyarlo en Patreon y desbloquear ventajas premium como agradecimiento.\n\nVincula tu cuenta de Patreon para empezar."
+msgstr "<b>Apoya a Mitup con Patreon</b>\n\nMitup es gratis. Si te ayuda a reunir a tu gente, puedes apoyarlo en Patreon y desbloquear ventajas de apoyo como agradecimiento.\n\nVincula tu cuenta de Patreon para empezar."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Cuenta de Patreon vinculada</b>\n\nTodo listo. Aún no eres mecenas, así que las ventajas premium siguen desactivadas. Hazte mecenas y se activan solas, sin necesidad de volver a vincular."
+msgstr "<b>Cuenta de Patreon vinculada</b>\n\nTodo listo. Aún no eres mecenas, así que tus ventajas de apoyo siguen desactivadas. Hazte mecenas y se activan solas, sin necesidad de volver a vincular."
 
 msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Eres un mecenas premium</b>\n\nGracias por apoyar a Mitup. Tus ventajas premium están activas. Puedes desvincular tu cuenta de Patreon aquí cuando quieras."
+msgstr "<b>Apoyas a Mitup</b>\n\nGracias por apoyar a Mitup. Tus ventajas de apoyo están activas. Puedes desvincular tu cuenta de Patreon aquí cuando quieras."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Colabora</b>\n\nEl soporte de Patreon todavía no está disponible. Vuelve pronto."
@@ -670,11 +655,8 @@ msgstr "<b>Colabora</b>\n\nEl soporte de Patreon todavía no está disponible. V
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Tu cuenta de Patreon se ha desvinculado."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
-msgstr "<b>Premium desbloqueado</b>\n\nTu cuenta de Patreon está vinculada y tus ventajas premium están activas. Gracias por apoyar a Mitup."
-
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Cuenta de Patreon vinculada</b>\n\nYa estás conectado. Hazte mecenas para desbloquear las ventajas premium. Se activarán solas en cuanto tu aportación esté activa."
+msgstr "<b>Cuenta de Patreon vinculada</b>\n\nYa estás conectado. Hazte mecenas para desbloquear tus ventajas de apoyo. Se activarán solas en cuanto tu aportación esté activa."
 
 msgid "Weekday.MONDAY"
 msgstr "Lun"
@@ -844,18 +826,6 @@ msgstr "La hora de finalización debe ser posterior a la hora de inicio."
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "La hora de finalización debe ser en el futuro."
 
-msgid "PremiumNotificationMessages.GRACE_STARTED"
-msgstr "<b>Tu premium está en periodo de gracia</b>\n\nNo hemos podido confirmar una aportación activa de Patreon en tu cuenta, así que tus ventajas premium se desactivarán en una semana. Si tu aportación sigue activa, no tienes que hacer nada y se renovará automáticamente. Si no, puedes volver a apoyar a Mitup desde el menú Colabora."
-
-msgid "PremiumNotificationMessages.PREMIUM_LOST"
-msgstr "<b>Tu premium ha terminado</b>\n\nSeguimos sin poder confirmar una aportación activa de Patreon, así que tus ventajas premium están ahora desactivadas. Hazte mecenas de nuevo desde el menú Colabora para volver a activarlas."
-
-msgid "PremiumNotificationMessages.UPGRADED"
-msgstr "<b>Premium desbloqueado</b>\n\nGracias por apoyar a Mitup. Tu aportación de Patreon está activa, así que tus ventajas premium ya están activadas."
-
-msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Tu premium está en periodo de gracia</b>\n\nTu aportación de Patreon ha terminado y nos da pena que te vayas. Tus ventajas premium seguirán activas durante ${days} días por si cambias de idea. Para mantenerlas, vuelve a apoyar a Mitup desde el menú Colabora."
-
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
 
@@ -942,3 +912,33 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} fallidos, ${skipped} omi
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas fueron interrumpidas por un fallo del trabajador y no se conoce su resultado. No se reintentarán."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
+msgstr "<b>Ventajas de apoyo desbloqueadas</b>\n\nTu cuenta de Patreon está vinculada y tus ventajas de apoyo están activas. Gracias por apoyar a Mitup."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
+msgstr "Has alcanzado el máximo de ${cap} quedadas activas. Cierra o elimina una antes de crear otra."
+
+msgid "SupporterMessages.PARTICIPANT_CAPACITY"
+msgstr "Las quedadas gratuitas admiten hasta ${cap} participantes. Elige un límite menor, o pulsa Colabora en el menú principal para apoyar a Mitup y admitir más."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON"
+msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para apoyar a Mitup y programar más lejos."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
+msgstr "Puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana."
+
+msgid "SupporterNotificationMessages.GRACE_STARTED"
+msgstr "<b>Tus ventajas de apoyo están en periodo de gracia</b>\n\nNo hemos podido confirmar una aportación activa de Patreon en tu cuenta, así que tus ventajas de apoyo se desactivarán en una semana. Si tu aportación sigue activa, no tienes que hacer nada y se renovará automáticamente. Si no, puedes volver a apoyar a Mitup desde el menú Colabora."
+
+msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Tus ventajas de apoyo están en periodo de gracia</b>\n\nTu apoyo en Patreon ha terminado y nos da pena verte marchar. Tus ventajas de apoyo seguirán activas durante ${days} días por si cambias de opinión. Para conservarlas, vuelve a apoyar a Mitup desde el menú Colabora."
+
+msgid "SupporterNotificationMessages.SUPPORT_LOST"
+msgstr "<b>Tus ventajas de apoyo han terminado</b>\n\nSeguimos sin poder confirmar una aportación activa de Patreon, así que tus ventajas de apoyo están ahora desactivadas. Hazte mecenas de nuevo desde el menú Colabora para reactivarlas."
+
+msgid "SupporterNotificationMessages.UPGRADED"
+msgstr "<b>Ventajas de apoyo desbloqueadas</b>\n\nGracias por apoyar a Mitup. Tu aportación de Patreon está activa, así que tus ventajas de apoyo están ahora activadas."

@@ -18,8 +18,8 @@ from mitup_bot.cli import (
     meetups_cleanup,
     notify_meetings,
     notify_meetings_started,
-    premium_check,
     send_broadcasts,
+    supporter_check,
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
@@ -36,7 +36,7 @@ DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
 DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
 DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL = 60
 DEFAULT_SEND_BROADCASTS_INTERVAL = 60
-DEFAULT_PREMIUM_CHECK_INTERVAL = 86400  # 24 hours
+DEFAULT_SUPPORTER_CHECK_INTERVAL = 86400  # 24 hours
 
 
 class EventType(Enum):
@@ -47,7 +47,7 @@ class EventType(Enum):
     DEACTIVATE_MEETINGS = "DeactivateMeetings"
     MEETUPS_CLEANUP = "MeetupsCleanup"
     SEND_BROADCASTS = "SendBroadcasts"
-    PREMIUM_CHECK = "PremiumCheck"
+    SUPPORTER_CHECK = "SupporterCheck"
 
 
 @dataclass
@@ -59,7 +59,7 @@ class IntervalsConfiguration:
     deactivate_meetings: int
     meetups_cleanup: int
     send_broadcasts: int
-    premium_check: int
+    supporter_check: int
 
     def get(self, event_type: EventType) -> int:
         match event_type:
@@ -77,8 +77,8 @@ class IntervalsConfiguration:
                 return self.meetups_cleanup
             case EventType.SEND_BROADCASTS:
                 return self.send_broadcasts
-            case EventType.PREMIUM_CHECK:
-                return self.premium_check
+            case EventType.SUPPORTER_CHECK:
+                return self.supporter_check
             case never:  # pragma: no cover
                 assert_never(never)  # pragma: no cover
 
@@ -86,7 +86,7 @@ class IntervalsConfiguration:
 def configure_patreon(config: Config):
     """Wire the token cipher and Patreon runtime for the events process when a section is present.
 
-    Lets the PREMIUM_CHECK job decrypt/encrypt tokens and read the live config; a no-op otherwise,
+    Lets the SUPPORTER_CHECK job decrypt/encrypt tokens and read the live config; a no-op otherwise,
     keeping the process bootable without Patreon."""
     if config.patreon is None:
         log.info("Patreon section absent, skipping Patreon setup")
@@ -120,8 +120,8 @@ async def dispatch_event(
             await meetups_cleanup.run(api, client)
         case EventType.SEND_BROADCASTS:
             await send_broadcasts.run(api, client, admin_tg_ids)
-        case EventType.PREMIUM_CHECK:
-            await premium_check.run(api, client)
+        case EventType.SUPPORTER_CHECK:
+            await supporter_check.run(api, client)
         case never:  # pragma: no cover
             assert_never(never)  # pragma: no cover
 
@@ -230,9 +230,9 @@ async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, admin_tg
     show_default=True,
 )
 @click.option(
-    "--premium-check-interval",
-    default=DEFAULT_PREMIUM_CHECK_INTERVAL,
-    help="Interval in seconds to validate premium memberships against Patreon",
+    "--supporter-check-interval",
+    default=DEFAULT_SUPPORTER_CHECK_INTERVAL,
+    help="Interval in seconds to validate supporter memberships against Patreon",
     show_default=True,
 )
 @click.option(
@@ -256,7 +256,7 @@ def cli(
     meetups_cleanup_interval: int,
     notify_meeting_started_interval: int,
     send_broadcasts_interval: int,
-    premium_check_interval: int,
+    supporter_check_interval: int,
     env: Env,
     start_time: float,
 ):
@@ -282,6 +282,6 @@ def cli(
         deactivate_meetings=deactivate_meetings_interval,
         meetups_cleanup=meetups_cleanup_interval,
         send_broadcasts=send_broadcasts_interval,
-        premium_check=premium_check_interval,
+        supporter_check=supporter_check_interval,
     )
     asyncio.run(run_all_tasks(intervals, bot, config.bot.admin_tg_ids, start_time))

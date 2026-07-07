@@ -18,8 +18,8 @@ from telegram.ext import ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import BotAdapter, TelegramApi
-from mitup_bot.models import PremiumSubscription, Settings, User, configure_token_encryption
-from mitup_bot.models.premium import TokenCipher
+from mitup_bot.models import Settings, SupporterSubscription, User, configure_token_encryption
+from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.monitoring.backend import NullBackend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.supporter import SupporterLevel
@@ -74,18 +74,18 @@ async def committed_user(tg_user_id: int) -> AsyncIterator[int]:
     try:
         yield user_id
     finally:
-        # premium_subscriptions has ON DELETE CASCADE, so removing the user clears its row too.
+        # supporter_subscriptions has ON DELETE CASCADE, so removing the user clears its row too.
         async with db.begin() as session:
             await session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
                 text("DELETE FROM users WHERE tg_user_id = :t").bindparams(t=tg_user_id)
             )
 
 
-async def read_user_and_subscription(user_id: int) -> tuple[User, PremiumSubscription | None]:
+async def read_user_and_subscription(user_id: int) -> tuple[User, SupporterSubscription | None]:
     async with db.begin() as session:
         user = (await session.exec(select(User).where(User.id == user_id))).one()
         subscription = (
-            await session.exec(select(PremiumSubscription).where(PremiumSubscription.user_id == user_id))
+            await session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user_id))
         ).first()
         return user, subscription
 
@@ -97,12 +97,12 @@ async def test_new_link_for_patron_grants_premium():
             make_api(bot), 997_600, patreon_user_id=PATRON_USER_ID, supporter_level=SupporterLevel.PATRON
         )
 
-        assert outcome is LinkOutcome.LINKED_PREMIUM
+        assert outcome is LinkOutcome.LINKED_SUPPORTER
         user, subscription = await read_user_and_subscription(user_id)
         assert user.supporter_level is SupporterLevel.PATRON
         assert subscription is not None
         assert subscription.patreon_user_id == "patreon-6001"
-        assert subscription.premium_expiration is not None
+        assert subscription.support_expiration is not None
         assert len(bot.sent) == 1
 
 
@@ -120,7 +120,7 @@ async def test_new_link_for_non_patron_stores_without_premium():
         user, subscription = await read_user_and_subscription(user_id)
         assert user.supporter_level is SupporterLevel.NONE
         assert subscription is not None
-        assert subscription.premium_expiration is None
+        assert subscription.support_expiration is None
         assert len(bot.sent) == 1
 
 
@@ -128,14 +128,14 @@ async def test_relink_updates_subscription_in_place():
     async with committed_user(997_620) as user_id:
         async with db.begin() as session:
             session.add(
-                PremiumSubscription(
+                SupporterSubscription(
                     user_id=user_id,
                     patreon_user_id="patreon-6001",
                 )
             )
             await session.flush()
             original_id = (
-                (await session.exec(select(PremiumSubscription).where(PremiumSubscription.user_id == user_id)))
+                (await session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user_id)))
                 .one()
                 .db_id
             )
@@ -147,7 +147,7 @@ async def test_relink_updates_subscription_in_place():
             supporter_level=SupporterLevel.PATRON,
         )
 
-        assert outcome is LinkOutcome.LINKED_PREMIUM
+        assert outcome is LinkOutcome.LINKED_SUPPORTER
         user, subscription = await read_user_and_subscription(user_id)
         assert subscription is not None
         assert subscription.db_id == original_id  # updated in place, not recreated
@@ -158,7 +158,7 @@ async def test_patreon_account_already_linked_to_another_user_is_rejected():
     async with committed_user(997_630) as first_user_id, committed_user(997_631) as second_user_id:
         async with db.begin() as session:
             session.add(
-                PremiumSubscription(
+                SupporterSubscription(
                     user_id=first_user_id,
                     patreon_user_id="patreon-shared-663",
                 )

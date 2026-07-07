@@ -2,7 +2,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import patreon, supporter
-from mitup_bot.models import PremiumSubscription, User
+from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.patreon import oauth
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
@@ -13,9 +13,9 @@ from mitup_bot.views.collaborate import (
 from mitup_bot.views.mitup_view import MitupView
 
 
-async def subscription_for_user(session: AsyncSession, user: User) -> PremiumSubscription | None:
-    """Return the user's premium subscription row, or None when they have never linked."""
-    statement = select(PremiumSubscription).where(PremiumSubscription.user_id == user.id)
+async def subscription_for_user(session: AsyncSession, user: User) -> SupporterSubscription | None:
+    """Return the user's supporter subscription row, or None when they have never linked."""
+    statement = select(SupporterSubscription).where(SupporterSubscription.user_id == user.id)
     return (await session.exec(statement)).first()
 
 

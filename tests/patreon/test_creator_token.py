@@ -1,6 +1,6 @@
 """Unit coverage for the shared creator-token acquisition (adopt / refresh / persist).
 
-The metric-wrapped ``premium_check.refresh_creator_token`` is exercised in ``tests/cli`` and the live-DB
+The metric-wrapped ``supporter_check.refresh_creator_token`` is exercised in ``tests/cli`` and the live-DB
 behavior suite; here we cover the metric-free ``acquire_creator_access_token`` that webhook registration
 calls, against the mock session."""
 

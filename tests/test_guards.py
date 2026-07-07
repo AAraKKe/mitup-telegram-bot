@@ -39,7 +39,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, PremiumMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, SupporterMessages
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import (
@@ -555,7 +555,7 @@ async def test_supporter_required_passes_user_meeting_minimum_through(
     user_with_settings.supporter_level = level
 
     result = await supporter_required(
-        user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
+        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
     )
 
     assert result is user_with_settings
@@ -573,12 +573,12 @@ async def test_supporter_required_alerts_and_returns_none_below_minimum(
     user_with_settings.supporter_level = level
 
     result = await supporter_required(
-        user_with_settings, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
+        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=5
     )
 
     assert result is None
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=PremiumMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=5),
+        text=SupporterMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=5),
         show_alert=True,
     )

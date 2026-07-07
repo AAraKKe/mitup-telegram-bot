@@ -9,7 +9,7 @@ from mitup_bot.config import LimitsConfig
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingLifecycleMessages, PremiumMessages
+from mitup_bot.utils.messages import MeetingLifecycleMessages, SupporterMessages
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -102,7 +102,7 @@ async def test_reactivate_meeting_blocked_when_at_active_meetings_cap(
     assert inactive_meeting.active is False  # not reactivated
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=PremiumMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=1),
+        text=SupporterMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=1),
         show_alert=True,
     )
     context.api.assert_method_just_called("edit_message", times=0)

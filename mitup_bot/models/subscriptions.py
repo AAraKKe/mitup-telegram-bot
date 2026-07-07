@@ -65,17 +65,17 @@ class EncryptedToken(TypeDecorator):
         return TokenCipher.decrypt(value)
 
 
-class PremiumSubscription(BaseModel, SQLModel, table=True):
-    __tablename__: str = "premium_subscriptions"
+class SupporterSubscription(BaseModel, SQLModel, table=True):
+    __tablename__: str = "supporter_subscriptions"
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         sa_column=Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     )
     # Captured from Patreon's /identity at link time; the join key against the daily bulk
-    # member list. Unique so one Patreon account cannot grant premium to several TG accounts.
+    # member list. Unique so one Patreon account cannot grant support to several TG accounts.
     patreon_user_id: str = Field(sa_column=Column(String, unique=True, nullable=False))
-    premium_expiration: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
+    support_expiration: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
     expiration_notified: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, server_default=false()))
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(

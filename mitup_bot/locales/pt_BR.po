@@ -802,18 +802,6 @@ msgstr "A nova hora de início é posterior à hora de término, portanto a hora
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "A hora de início foi limpa. Defina-a novamente antes de escolher uma hora de término."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
-
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
-msgstr "Você atingiu o máximo de ${cap} eventos ativos. Encerre ou exclua um antes de criar outro."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON"
-msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Escolha uma data mais próxima, ou toque em Colabore no menu principal para apoiar o Mitup e agendar mais para o futuro."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
-msgstr "Você pode agendar eventos até ${days} dias no futuro. Escolha uma data mais próxima."
-
 msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Conectar conta Patreon"
 
@@ -824,13 +812,13 @@ msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desconectar conta Patreon"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Apoie o Mitup com Patreon</b>\n\nMitup é gratuito. Se ajuda você a reunir suas pessoas, você pode apoiá-lo no Patreon e desbloquear benefícios premium como agradecimento.\n\nConecte sua conta Patreon para começar."
+msgstr "<b>Apoie o Mitup com Patreon</b>\n\nO Mitup é gratuito. Se ele ajuda você a reunir suas pessoas, você pode apoiá-lo no Patreon e desbloquear benefícios de apoiador como agradecimento.\n\nConecte sua conta Patreon para começar."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Conta Patreon conectada</b>\n\nTudo pronto. Você ainda não é um patrono, então os benefícios premium ainda estão desativados. Torne-se um patrono e eles serão ativados automaticamente, sem necessidade de conectar novamente."
+msgstr "<b>Conta Patreon conectada</b>\n\nTudo pronto. Você ainda não é um patrono, então seus benefícios de apoiador ainda estão desativados. Torne-se um patrono e eles serão ativados automaticamente, sem necessidade de conectar novamente."
 
 msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Você é um patrono premium</b>\n\nObrigado por apoiar o Mitup. Seus benefícios premium estão ativos. Você pode desconectar sua conta Patreon aqui quando quiser."
+msgstr "<b>Você é um apoiador</b>\n\nObrigado por apoiar o Mitup. Seus benefícios de apoiador estão ativos. Você pode desconectar sua conta Patreon aqui quando quiser."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Colabore</b>\n\nO apoio do Patreon ainda não está disponível. Volte em breve."
@@ -838,23 +826,8 @@ msgstr "<b>Colabore</b>\n\nO apoio do Patreon ainda não está disponível. Volt
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Sua conta Patreon foi desconectada."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
-msgstr "<b>Premium desbloqueado</b>\n\nSua conta Patreon está conectada e seus benefícios premium estão ativos. Obrigado por apoiar o Mitup."
-
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Conta Patreon conectada</b>\n\nVocê está conectado. Torne-se um patrono para desbloquear os benefícios premium. Eles serão ativados automaticamente assim que seu apoio estiver ativo."
-
-msgid "PremiumMessages.PARTICIPANT_CAPACITY"
-msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Defina um limite mais baixo, ou toque em Colabore no menu principal para apoiar o Mitup e hospedar mais."
-
-msgid "PremiumNotificationMessages.GRACE_STARTED"
-msgstr "<b>Seu premium está em período de carência</b>\n\nNão conseguimos confirmar um apoio ativo no Patreon em sua conta, portanto seus benefícios premium serão desativados em uma semana. Se seu apoio ainda estiver ativo, não há nada a fazer e ele será renovado automaticamente. Caso contrário, você pode apoiar novamente o Mitup no menu Colabore."
-
-msgid "PremiumNotificationMessages.PREMIUM_LOST"
-msgstr "<b>Seu premium terminou</b>\n\nAinda não conseguimos confirmar um apoio ativo no Patreon, então seus benefícios premium foram desativados. Torne-se um patrono novamente no menu Colabore para ativá-los."
-
-msgid "PremiumNotificationMessages.UPGRADED"
-msgstr "<b>Premium desbloqueado</b>\n\nObrigado por apoiar o Mitup. Seu apoio no Patreon está ativo, então seus benefícios premium estão ativos agora."
+msgstr "<b>Conta Patreon conectada</b>\n\nVocê está conectado. Torne-se um patrono para desbloquear seus benefícios de apoiador. Eles serão ativados automaticamente assim que sua contribuição estiver ativa."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -943,5 +916,32 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} falhados, ${skipped} ign
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas foram interrompidas por uma falha no worker e seu resultado é desconhecido. Elas não serão tentadas novamente."
 
-msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Seu premium está em período de carência</b>\n\nSeu apoio no Patreon terminou, e ficamos tristes em ver você partir. Seus benefícios premium continuam ativos por mais ${days} dias, caso você mude de ideia. Para mantê-los, apoie o Mitup novamente no menu Colabore."
+msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
+msgstr "<b>Benefícios de apoiador desbloqueados</b>\n\nSua conta Patreon está conectada e seus benefícios de apoiador estão ativos. Obrigado por apoiar o Mitup."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
+msgstr "Você atingiu o máximo de ${cap} eventos ativos. Encerre ou exclua um antes de criar outro."
+
+msgid "SupporterMessages.PARTICIPANT_CAPACITY"
+msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Defina um limite mais baixo, ou toque em Colabore no menu principal para apoiar o Mitup e hospedar mais."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON"
+msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Escolha uma data mais próxima, ou toque em Colabore no menu principal para apoiar o Mitup e agendar mais para o futuro."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
+msgstr "Você pode agendar eventos até ${days} dias no futuro. Escolha uma data mais próxima."
+
+msgid "SupporterNotificationMessages.GRACE_STARTED"
+msgstr "<b>Seus benefícios de apoiador estão em período de carência</b>\n\nNão conseguimos confirmar uma contribuição ativa no Patreon na sua conta, então seus benefícios de apoiador serão desativados em uma semana. Se sua contribuição ainda estiver ativa, não é preciso fazer nada e ela será renovada automaticamente. Caso contrário, você pode apoiar o Mitup novamente pelo menu Colabore."
+
+msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Seus benefícios de apoiador estão em período de carência</b>\n\nSeu apoio no Patreon terminou, e ficamos tristes em ver você partir. Seus benefícios de apoiador continuam ativos por ${days} dias caso você mude de ideia. Para mantê-los, apoie o Mitup novamente pelo menu Colabore."
+
+msgid "SupporterNotificationMessages.SUPPORT_LOST"
+msgstr "<b>Seus benefícios de apoiador terminaram</b>\n\nAinda não conseguimos confirmar uma contribuição ativa no Patreon, então seus benefícios de apoiador agora estão desativados. Torne-se um patrono novamente pelo menu Colabore para reativá-los."
+
+msgid "SupporterNotificationMessages.UPGRADED"
+msgstr "<b>Benefícios de apoiador desbloqueados</b>\n\nObrigado por apoiar o Mitup. Sua contribuição no Patreon está ativa, então seus benefícios de apoiador agora estão ativos."

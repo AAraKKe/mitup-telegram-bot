@@ -17,7 +17,7 @@ from fastapi import FastAPI
 
 from mitup_bot import patreon
 from mitup_bot.config import PatreonConfig, RunModes
-from mitup_bot.models import PremiumSubscription, User
+from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.patreon import PatreonRuntime
 from mitup_bot.patreon.models import (
@@ -29,10 +29,10 @@ from mitup_bot.patreon.models import (
     WebhookMemberPayload,
 )
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import PremiumNotificationMessages
+from mitup_bot.utils.messages import SupporterNotificationMessages
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
-    PREMIUM_GRACE_DAYS,
+    SUPPORT_GRACE_DAYS,
     WebhookApplied,
     apply_membership_event,
     apply_membership_transition,
@@ -45,7 +45,7 @@ from tests.helpers import (
     build_test_web_app,
     build_web_client,
     create_patreon_config,
-    create_premium_subscription,
+    create_supporter_subscription,
     create_user,
 )
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
@@ -271,24 +271,24 @@ def patch_begin_write(monkeypatch: pytest.MonkeyPatch) -> Callable[[MockDbSessio
 
 def seed_link(
     session: MockDbSession, *, level: SupporterLevel, patreon_user_id: str = "patreon-1"
-) -> tuple[User, PremiumSubscription]:
+) -> tuple[User, SupporterSubscription]:
     user = create_user(id=1, tg_user_id=997_700)
     user.supporter_level = level
-    subscription = create_premium_subscription(user_id=1, patreon_user_id=patreon_user_id)
+    subscription = create_supporter_subscription(user_id=1, patreon_user_id=patreon_user_id)
     session.add_object(subscription, "patreon_user_id")
     session.add_object(user, "id")
     return user, subscription
 
 
-def assert_grace_window(subscription: PremiumSubscription):
-    """A loss event opens the one-week grace: the runway is set ~PREMIUM_GRACE_DAYS out and the row is
+def assert_grace_window(subscription: SupporterSubscription):
+    """A loss event opens the one-week grace: the runway is set ~SUPPORT_GRACE_DAYS out and the row is
     marked already-notified so the daily job revokes straight away when the window elapses."""
-    assert subscription.premium_expiration is not None
-    remaining = subscription.premium_expiration - dt.datetime.now(dt.UTC)
+    assert subscription.support_expiration is not None
+    remaining = subscription.support_expiration - dt.datetime.now(dt.UTC)
     assert (
-        dt.timedelta(days=PREMIUM_GRACE_DAYS) - dt.timedelta(minutes=1)
+        dt.timedelta(days=SUPPORT_GRACE_DAYS) - dt.timedelta(minutes=1)
         <= remaining
-        <= dt.timedelta(days=PREMIUM_GRACE_DAYS)
+        <= dt.timedelta(days=SUPPORT_GRACE_DAYS)
     )
     assert subscription.expiration_notified is True
 
@@ -307,7 +307,7 @@ async def test_apply_upgrade_grants_and_notifies(
 
     assert outcome is WebhookApplied.UPGRADED
     assert user.supporter_level is SupporterLevel.PATRON
-    api.assert_send_message_to_user_called(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
 
 
 async def test_apply_downgrade_is_silent(
@@ -345,11 +345,11 @@ async def test_apply_delete_starts_grace_and_keeps_perks(
     assert user.supporter_level is SupporterLevel.PATRON
     assert_grace_window(subscription)
     api.assert_send_message_to_user_called(
-        user, PremiumNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=PREMIUM_GRACE_DAYS)
+        user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS)
     )
     # Non-tautological guard: the day count must actually interpolate into the rendered copy.
     sent = api.call_args("send_message_to_user").kwargs["view"]
-    assert f"{PREMIUM_GRACE_DAYS} days" in sent.text
+    assert f"{SUPPORT_GRACE_DAYS} days" in sent.text
 
 
 async def test_apply_non_active_member_starts_grace(
@@ -368,7 +368,7 @@ async def test_apply_non_active_member_starts_grace(
     assert user.supporter_level is SupporterLevel.PATRON
     assert_grace_window(subscription)
     api.assert_send_message_to_user_called(
-        user, PremiumNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=PREMIUM_GRACE_DAYS)
+        user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS)
     )
 
 
@@ -433,20 +433,20 @@ async def test_apply_member_without_user_relationship_is_noop(patreon_config: Pa
 def test_apply_transition_refreshes_grace_on_upgrade():
     user = create_user(id=1, tg_user_id=1)
     user.supporter_level = SupporterLevel.NONE
-    subscription = create_premium_subscription(user_id=1, patreon_user_id="p-1", expiration_notified=True)
+    subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1", expiration_notified=True)
 
     outcome = apply_membership_transition(user, subscription, SupporterLevel.PATRON)
 
     assert outcome is WebhookApplied.UPGRADED
-    assert subscription.premium_expiration is not None
+    assert subscription.support_expiration is not None
     assert subscription.expiration_notified is False
 
 
 def test_apply_transition_starts_grace_on_loss_and_keeps_level():
     user = create_user(id=1, tg_user_id=1)
     user.supporter_level = SupporterLevel.PATRON
-    subscription = create_premium_subscription(
-        user_id=1, patreon_user_id="p-1", premium_expiration=dt.datetime.now(dt.UTC), expiration_notified=False
+    subscription = create_supporter_subscription(
+        user_id=1, patreon_user_id="p-1", support_expiration=dt.datetime.now(dt.UTC), expiration_notified=False
     )
 
     outcome = apply_membership_transition(user, subscription, SupporterLevel.NONE)

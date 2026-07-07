@@ -7,7 +7,7 @@ from mitup_bot import guards, limits, supporter
 from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.models import User
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils import ButtonMessages, PremiumMessages
+from mitup_bot.utils import ButtonMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import ButtonConfig
@@ -57,16 +57,18 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
     if update.callback_query is not None:
         if below_patron:
             await guards.supporter_required(
-                user, update, context, PremiumMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=cap
+                user, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.PATRON, cap=cap
             )
         else:
             await context.api.answer_callback_query(
                 update,
-                text=PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM.get_text(lang=user.lang, cap=cap),
+                text=SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON.get_text(lang=user.lang, cap=cap),
                 show_alert=True,
             )
     else:
-        message = PremiumMessages.ACTIVE_MEETINGS_CAP if below_patron else PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM
+        message = (
+            SupporterMessages.ACTIVE_MEETINGS_CAP if below_patron else SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON
+        )
         await context.api.send_message(update=update, view=message.get(lang=user.lang, cap=cap))
     return True
 
@@ -82,7 +84,7 @@ def scheduling_horizon_rejection(user: User, when: dt.datetime) -> str | None:
     days = limits.scheduling_horizon_days(user)
     assert days is not None, "within_scheduling_horizon is only False when a finite horizon applies"
     below_patron = not supporter.meets(user.supporter_level, SupporterLevel.PATRON)
-    message = PremiumMessages.SCHEDULING_HORIZON if below_patron else PremiumMessages.SCHEDULING_HORIZON_PREMIUM
+    message = SupporterMessages.SCHEDULING_HORIZON if below_patron else SupporterMessages.SCHEDULING_HORIZON_PATRON
     return message.get_text(lang=user.lang, days=days)
 
 
@@ -95,7 +97,7 @@ def participant_capacity_rejection(user: User, max_members: int) -> str | None:
     cap = limits.participant_capacity(user)
     if cap is None or max_members <= cap:
         return None
-    return PremiumMessages.PARTICIPANT_CAPACITY.get_text(lang=user.lang, cap=cap)
+    return SupporterMessages.PARTICIPANT_CAPACITY.get_text(lang=user.lang, cap=cap)
 
 
 def meeting_list_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:

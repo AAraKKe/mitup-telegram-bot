@@ -12,7 +12,7 @@ def collaborate_unavailable_view(lang: str) -> MitupView:
 
 
 def collaborate_not_linked_view(lang: str, authorization_url: str) -> MitupView:
-    """Not-linked screen: premium pitch plus the Patreon OAuth link button (a URL button)."""
+    """Not-linked screen: supporter pitch plus the Patreon OAuth link button (a URL button)."""
     return MitupView(
         description=CollaborateMessages.NOT_LINKED.get(lang=lang),
         keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get(lang=lang), url=authorization_url)]],
@@ -31,7 +31,7 @@ def collaborate_linked_not_patron_view(lang: str, pledge_url: str) -> MitupView:
 
 
 def collaborate_linked_patron_view(lang: str) -> MitupView:
-    """Premium screen for a linked, active patron: status plus the Unlink button."""
+    """Supporter screen for a linked, active patron: status plus the Unlink button."""
     return MitupView(
         description=CollaborateMessages.LINKED_PATRON.get(lang=lang),
         keyboard=[

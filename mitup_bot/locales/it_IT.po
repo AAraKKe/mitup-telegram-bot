@@ -770,18 +770,6 @@ msgstr "Il nuovo orario di inizio è dopo l'orario di fine, quindi l'orario di f
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "L'orario di inizio è stato cancellato. Impostalo di nuovo prima di scegliere un orario di fine."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per creare un altro, oppure tocca Collabora nel menu principale per supportare Mitup e sbloccare altri."
-
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
-msgstr "Hai raggiunto il massimo di ${cap} incontri attivi. Chiudi o elimina uno prima di crearne un altro."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON"
-msgstr "Per ora puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina, oppure tocca Collabora nel menu principale per supportare Mitup e pianificare più lontano."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
-msgstr "Puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina."
-
 msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Collega account Patreon"
 
@@ -806,26 +794,8 @@ msgstr "<b>Collabora</b>\n\nIl supporto Patreon non è ancora disponibile. Torna
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Il tuo account Patreon è stato scollegato."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
-msgstr "<b>Premium sbloccato</b>\n\nIl tuo account Patreon è collegato e i tuoi vantaggi premium sono attivi. Grazie per aver sostenuto Mitup."
-
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Account Patreon collegato</b>\n\nSei collegato. Diventa un mecenate per sbloccare i vantaggi premium. Si attiveranno automaticamente una volta che il tuo contributo è attivo."
-
-msgid "PremiumMessages.PARTICIPANT_CAPACITY"
-msgstr "Gli incontri gratuiti possono ospitare fino a ${cap} partecipanti. Imposta un limite inferiore, oppure tocca Collabora nel menu principale per supportare Mitup e ospitare altri."
-
-msgid "PremiumNotificationMessages.GRACE_STARTED"
-msgstr "<b>Il tuo premium è in un periodo di grazia</b>\n\nNon abbiamo potuto confermare un contributo Patreon attivo sul tuo account, quindi i tuoi vantaggi premium sono impostati per disattivarsi tra una settimana. Se il tuo contributo è ancora attivo, non c'è nulla da fare e si rinnoverà automaticamente. Altrimenti, puoi sostenere Mitup di nuovo dal menu Collabora."
-
-msgid "PremiumNotificationMessages.PREMIUM_LOST"
-msgstr "<b>Il tuo premium è finito</b>\n\nNon abbiamo ancora potuto confermare un contributo Patreon attivo, quindi i tuoi vantaggi premium sono ora disattivati. Diventa di nuovo un mecenate dal menu Collabora per riattivarli."
-
-msgid "PremiumNotificationMessages.UPGRADED"
-msgstr "<b>Premium sbloccato</b>\n\nGrazie per aver sostenuto Mitup. Il tuo contributo Patreon è attivo, quindi i tuoi vantaggi premium sono ora attivi."
-
-msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Il tuo premium è in un periodo di grazia</b>\n\nIl tuo contributo Patreon è finito, e ci dispiace vederti andare via. I tuoi vantaggi premium restano attivi ancora ${days} giorni nel caso cambiassi idea. Per mantenerli, sostieni di nuovo Mitup dal menu Collabora."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -913,3 +883,33 @@ msgstr ""
 
 msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
 msgstr ""
+
+msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
+msgstr "<b>Vantaggi da sostenitore sbloccati</b>\n\nIl tuo account Patreon è collegato e i tuoi vantaggi da sostenitore sono attivi. Grazie per sostenere Mitup."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per creare un altro, oppure tocca Collabora nel menu principale per supportare Mitup e sbloccare altri."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
+msgstr "Hai raggiunto il massimo di ${cap} incontri attivi. Chiudi o elimina uno prima di crearne un altro."
+
+msgid "SupporterMessages.PARTICIPANT_CAPACITY"
+msgstr "Gli incontri gratuiti possono ospitare fino a ${cap} partecipanti. Imposta un limite inferiore, oppure tocca Collabora nel menu principale per supportare Mitup e ospitare altri."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON"
+msgstr "Per ora puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina, oppure tocca Collabora nel menu principale per supportare Mitup e pianificare più lontano."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
+msgstr "Puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina."
+
+msgid "SupporterNotificationMessages.GRACE_STARTED"
+msgstr "<b>I tuoi vantaggi da sostenitore sono in un periodo di tolleranza</b>\n\nNon siamo riusciti a confermare un contributo Patreon attivo sul tuo account, quindi i tuoi vantaggi da sostenitore si disattiveranno tra una settimana. Se il tuo contributo è ancora attivo, non devi fare nulla e si rinnoverà automaticamente. Altrimenti, puoi sostenere di nuovo Mitup dal menu Collabora."
+
+msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>I tuoi vantaggi da sostenitore sono in un periodo di tolleranza</b>\n\nIl tuo supporto su Patreon è terminato e ci dispiace vederti andare via. I tuoi vantaggi da sostenitore restano attivi per ${days} giorni nel caso cambiassi idea. Per mantenerli, sostieni di nuovo Mitup dal menu Collabora."
+
+msgid "SupporterNotificationMessages.SUPPORT_LOST"
+msgstr "<b>I tuoi vantaggi da sostenitore sono terminati</b>\n\nNon siamo ancora riusciti a confermare un contributo Patreon attivo, quindi i tuoi vantaggi da sostenitore sono ora disattivati. Diventa di nuovo un mecenate dal menu Collabora per riattivarli."
+
+msgid "SupporterNotificationMessages.UPGRADED"
+msgstr "<b>Vantaggi da sostenitore sbloccati</b>\n\nGrazie per aver sostenuto Mitup. Il tuo contributo Patreon è attivo, quindi i tuoi vantaggi da sostenitore sono ora attivi."

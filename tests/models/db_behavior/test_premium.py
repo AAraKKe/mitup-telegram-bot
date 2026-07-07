@@ -10,10 +10,10 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import mitup_bot
-from mitup_bot.models import PatreonCreatorToken, PremiumSubscription, Settings, User, configure_token_encryption
-from mitup_bot.models.premium import TokenCipher
+from mitup_bot.models import PatreonCreatorToken, Settings, SupporterSubscription, User, configure_token_encryption
+from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.supporter import SupporterLevel
-from tests.helpers import create_patreon_creator_token, create_premium_subscription
+from tests.helpers import create_patreon_creator_token, create_supporter_subscription
 
 pytestmark = pytest.mark.db_test
 
@@ -53,7 +53,7 @@ async def new_user(db_session: AsyncSession, tg_user_id: int) -> User:
     return user
 
 
-@pytest.mark.parametrize("table_name", ["premium_subscriptions", "patreon_creator_tokens"])
+@pytest.mark.parametrize("table_name", ["supporter_subscriptions", "patreon_creator_tokens"])
 async def test_table_exists(db_session: AsyncSession, table_name: str):
     result = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
@@ -183,43 +183,45 @@ async def test_patreon_creator_token_encrypts_tokens_at_rest(db_session: AsyncSe
 
 async def test_user_id_is_unique(db_session: AsyncSession):
     user = await new_user(db_session, 998_751)
-    db_session.add(create_premium_subscription(user_id=user.db_id, patreon_user_id="patreon-998751-a"))
+    db_session.add(create_supporter_subscription(user_id=user.db_id, patreon_user_id="patreon-998751-a"))
     await db_session.flush()
 
     with pytest.raises(IntegrityError):
         async with db_session.begin_nested():
-            db_session.add(create_premium_subscription(user_id=user.db_id, patreon_user_id="patreon-998751-b"))
+            db_session.add(create_supporter_subscription(user_id=user.db_id, patreon_user_id="patreon-998751-b"))
             await db_session.flush()
 
 
 async def test_patreon_user_id_is_unique(db_session: AsyncSession):
     first_user = await new_user(db_session, 998_752)
     second_user = await new_user(db_session, 998_753)
-    db_session.add(create_premium_subscription(user_id=first_user.db_id, patreon_user_id="patreon-shared"))
+    db_session.add(create_supporter_subscription(user_id=first_user.db_id, patreon_user_id="patreon-shared"))
     await db_session.flush()
 
     with pytest.raises(IntegrityError):
         async with db_session.begin_nested():
-            db_session.add(create_premium_subscription(user_id=second_user.db_id, patreon_user_id="patreon-shared"))
+            db_session.add(create_supporter_subscription(user_id=second_user.db_id, patreon_user_id="patreon-shared"))
             await db_session.flush()
 
 
 async def test_deleting_user_cascades_to_premium_subscription(db_session: AsyncSession):
     user = await new_user(db_session, 998_755)
-    db_session.add(create_premium_subscription(user_id=user.db_id, patreon_user_id="patreon-998755"))
+    db_session.add(create_supporter_subscription(user_id=user.db_id, patreon_user_id="patreon-998755"))
     await db_session.flush()
     user_id = user.db_id
 
     await db_session.delete(user)
     await db_session.flush()
 
-    remaining = (await db_session.exec(select(PremiumSubscription).where(PremiumSubscription.user_id == user_id))).all()
+    remaining = (
+        await db_session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user_id))
+    ).all()
     assert remaining == []
 
 
 async def test_premium_subscription_timestamps_set_on_insert(db_session: AsyncSession):
     user = await new_user(db_session, 998_757)
-    subscription = create_premium_subscription(user_id=user.db_id, patreon_user_id="patreon-998757")
+    subscription = create_supporter_subscription(user_id=user.db_id, patreon_user_id="patreon-998757")
     db_session.add(subscription)
     await db_session.flush()
     await db_session.refresh(subscription)
@@ -240,7 +242,7 @@ async def test_patreon_creator_token_timestamps_set_on_insert(db_session: AsyncS
 
 async def test_expiration_notified_defaults_to_false(db_session: AsyncSession):
     user = await new_user(db_session, 998_759)
-    subscription = create_premium_subscription(user_id=user.db_id, patreon_user_id="patreon-998759")
+    subscription = create_supporter_subscription(user_id=user.db_id, patreon_user_id="patreon-998759")
     db_session.add(subscription)
     await db_session.flush()
     await db_session.refresh(subscription)

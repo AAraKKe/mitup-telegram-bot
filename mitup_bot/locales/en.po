@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-07 00:39\n"
+"PO-Revision-Date: 2026-07-07 01:05\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -260,19 +260,19 @@ msgstr "This meeting has been deleted"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start another, or tap Collaborate in the main menu to support Mitup and unlock more."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
 msgstr "You've reached the maximum of ${cap} active meetings. Wrap up or delete one before starting another."
 
-msgid "PremiumMessages.SCHEDULING_HORIZON"
+msgid "SupporterMessages.SCHEDULING_HORIZON"
 msgstr "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap Collaborate in the main menu to support Mitup and schedule further out."
 
-msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
+msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
 msgstr "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
 
-msgid "PremiumMessages.PARTICIPANT_CAPACITY"
+msgid "SupporterMessages.PARTICIPANT_CAPACITY"
 msgstr "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in the main menu to support Mitup and host more."
 
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
@@ -687,13 +687,13 @@ msgid "NotificationMessages.STARTED"
 msgstr "The meeting <b>${meeting_title}</b> has started!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock premium perks as a thank you.\n\nLink your Patreon account to get started."
+msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock supporter perks as a thank you.\n\nLink your Patreon account to get started."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a patron yet, so premium perks are still off. Become a patron and they turn on automatically, with no need to link again."
+msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a patron yet, so your supporter perks are still off. Become a patron and they turn on automatically, with no need to link again."
 
 msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>You're a premium supporter</b>\n\nThanks for backing Mitup. Your premium perks are active. You can unlink your Patreon account here whenever you want."
+msgstr "<b>You're a supporter</b>\n\nThanks for backing Mitup. Your supporter perks are active. You can unlink your Patreon account here whenever you want."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
@@ -701,23 +701,23 @@ msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back so
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Your Patreon account has been unlinked."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
-msgstr "<b>Premium unlocked</b>\n\nYour Patreon account is linked and your premium perks are active. Thanks for supporting Mitup."
+msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
+msgstr "<b>Supporter perks unlocked</b>\n\nYour Patreon account is linked and your supporter perks are active. Thanks for supporting Mitup."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a patron to unlock premium perks. They'll switch on automatically once your pledge is active."
+msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a patron to unlock your supporter perks. They'll switch on automatically once your pledge is active."
 
-msgid "PremiumNotificationMessages.GRACE_STARTED"
-msgstr "<b>Your premium is in a grace period</b>\n\nWe couldn't confirm an active Patreon pledge on your account, so your premium perks are set to switch off in a week. If your pledge is still active, there's nothing to do and it will renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
+msgid "SupporterNotificationMessages.GRACE_STARTED"
+msgstr "<b>Your supporter perks are in a grace period</b>\n\nWe couldn't confirm an active Patreon pledge on your account, so your supporter perks are set to switch off in a week. If your pledge is still active, there's nothing to do and it will renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."
 
-msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Your premium is in a grace period</b>\n\nYour Patreon support ended, and we're sad to see you go. Your premium perks stay on for ${days} days in case you change your mind. To keep them, back Mitup again from the Collaborate menu."
+msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Your supporter perks are in a grace period</b>\n\nYour Patreon support ended, and we're sad to see you go. Your supporter perks stay on for ${days} days in case you change your mind. To keep them, back Mitup again from the Collaborate menu."
 
-msgid "PremiumNotificationMessages.PREMIUM_LOST"
-msgstr "<b>Your premium has ended</b>\n\nWe still couldn't confirm an active Patreon pledge, so your premium perks are now off. Become a patron again from the Collaborate menu to turn them back on."
+msgid "SupporterNotificationMessages.SUPPORT_LOST"
+msgstr "<b>Your supporter perks have ended</b>\n\nWe still couldn't confirm an active Patreon pledge, so your supporter perks are now off. Become a patron again from the Collaborate menu to turn them back on."
 
-msgid "PremiumNotificationMessages.UPGRADED"
-msgstr "<b>Premium unlocked</b>\n\nThanks for backing Mitup. Your Patreon pledge is active, so your premium perks are now on."
+msgid "SupporterNotificationMessages.UPGRADED"
+msgstr "<b>Supporter perks unlocked</b>\n\nThanks for backing Mitup. Your Patreon pledge is active, so your supporter perks are now on."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

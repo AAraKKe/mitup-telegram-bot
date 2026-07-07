@@ -24,7 +24,7 @@ from mitup_bot.utils.messages import (
     CommonMessages,
     MeetingDisplayMessages,
     MeetingEditDateTimeMessages,
-    PremiumMessages,
+    SupporterMessages,
 )
 from mitup_bot.views import ButtonConfig, MitupView, factory
 from tests.helpers import (
@@ -1313,7 +1313,7 @@ async def test_set_date_beyond_horizon_shows_alert_and_stays_in_edit_date(
     # (what scheduling_horizon_rejection uses), not the meeting's content language.
     context.api.assert_answer_callback_query_called(
         update=update,
-        text=PremiumMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+        text=SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
         show_alert=True,
     )
 

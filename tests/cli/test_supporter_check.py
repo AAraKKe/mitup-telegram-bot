@@ -6,11 +6,11 @@ import pytest
 from sqlmodel import select
 from structlog.testing import capture_logs
 
-from mitup_bot.cli import premium_check
+from mitup_bot.cli import supporter_check
 from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonTokenRevoked
-from mitup_bot.models import PatreonCreatorToken, PremiumSubscription, User
+from mitup_bot.models import PatreonCreatorToken, SupporterSubscription, User
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.patreon import TokenPair
 from mitup_bot.patreon.models import (
@@ -22,14 +22,14 @@ from mitup_bot.patreon.models import (
 )
 from mitup_bot.patreon.runtime import PatreonRuntime, configure
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import PremiumNotificationMessages
+from mitup_bot.utils.messages import SupporterNotificationMessages
 from tests.helpers import (
     MockApi,
     MockDbSession,
     create_patreon_config,
     create_patreon_creator_token,
-    create_premium_subscription,
     create_settings,
+    create_supporter_subscription,
     create_user,
 )
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
@@ -60,7 +60,7 @@ def config() -> PatreonConfig:
 
 @pytest.fixture
 def metrics_client() -> MetricsClient:
-    return make_test_metrics_client(base_dimensions={"EventType": EventType.PREMIUM_CHECK.value})
+    return make_test_metrics_client(base_dimensions={"EventType": EventType.SUPPORTER_CHECK.value})
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ class FakePatreonClient:
 
 def test_seed_fingerprint_is_sha256_of_access_seed(config: PatreonConfig):
     expected = hashlib.sha256(b"creator-access-seed").hexdigest()
-    assert premium_check.seed_fingerprint(config) == expected
+    assert supporter_check.seed_fingerprint(config) == expected
 
 
 @pytest.mark.parametrize("aware", [True, False], ids=["aware", "naive"])
@@ -133,7 +133,7 @@ def test_days_until_handles_aware_and_naive(aware: bool):
     expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=10)
     if not aware:
         expiration = expiration.replace(tzinfo=None)
-    assert premium_check.days_until(expiration) == pytest.approx(10, abs=0.01)
+    assert supporter_check.days_until(expiration) == pytest.approx(10, abs=0.01)
 
 
 async def test_active_patreon_amounts_keeps_only_active_patrons():
@@ -145,7 +145,7 @@ async def test_active_patreon_amounts_keeps_only_active_patrons():
             active_member("patreon-4", cents=1000),
         )
     )
-    assert await premium_check.active_patreon_amounts(client, "token") == {"patreon-1": 500, "patreon-4": 1000}
+    assert await supporter_check.active_patreon_amounts(client, "token") == {"patreon-1": 500, "patreon-4": 1000}
     assert client.members_access_token == "token"
 
 
@@ -160,18 +160,18 @@ async def test_creator_token_adopted_when_no_row(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     client = FakePatreonClient()
 
-    access_token = await premium_check.refresh_creator_token(client, config, metrics_client)
+    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     assert access_token == "creator-access-seed-new"
     # The seed pair was the one refreshed, and a fresh row was stored with the seed fingerprint.
     assert client.refresh_calls[0].refresh_token == "creator-refresh-seed"
     stored = next(obj for obj in mock_session.objects_added if isinstance(obj, PatreonCreatorToken))
-    assert stored.seed_fingerprint == premium_check.seed_fingerprint(config)
+    assert stored.seed_fingerprint == supporter_check.seed_fingerprint(config)
     assert stored.access_token == "creator-access-seed-new"
     metrics.assert_emitted(
-        name=premium_check.CREATOR_TOKEN_TTL_METRIC,
+        name=supporter_check.CREATOR_TOKEN_TTL_METRIC,
         unit=MetricUnit.NONE,
-        dimensions={"EventType": EventType.PREMIUM_CHECK.value},
+        dimensions={"EventType": EventType.SUPPORTER_CHECK.value},
     )
 
 
@@ -181,18 +181,18 @@ async def test_creator_token_db_pair_wins_when_fingerprint_matches(
     row = create_patreon_creator_token(
         access_token="db-access",
         refresh_token="db-refresh",
-        seed_fingerprint=premium_check.seed_fingerprint(config),
+        seed_fingerprint=supporter_check.seed_fingerprint(config),
     )
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient()
 
-    access_token = await premium_check.refresh_creator_token(client, config, metrics_client)
+    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     # The stored pair (fresher than the seed) is refreshed and updated in place; no adopt happens.
     assert client.refresh_calls[0].refresh_token == "db-refresh"
     assert access_token == "db-access-new"
     assert row.access_token == "db-access-new"
-    assert row.seed_fingerprint == premium_check.seed_fingerprint(config)
+    assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)
     mock_session.assert_not_added()
 
 
@@ -203,12 +203,12 @@ async def test_creator_token_reseeded_on_fingerprint_mismatch(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient()
 
-    access_token = await premium_check.refresh_creator_token(client, config, metrics_client)
+    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     # A changed seed means an operator re-seed: the config pair is adopted and the fingerprint rotates.
     assert client.refresh_calls[0].refresh_token == "creator-refresh-seed"
     assert access_token == "creator-access-seed-new"
-    assert row.seed_fingerprint == premium_check.seed_fingerprint(config)
+    assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)
 
 
 async def test_creator_token_invalid_grant_emits_fallback_ttl(
@@ -217,17 +217,17 @@ async def test_creator_token_invalid_grant_emits_fallback_ttl(
     row = create_patreon_creator_token(
         refresh_token="db-refresh",
         token_expiration=dt.datetime.now(dt.UTC) + dt.timedelta(days=5),
-        seed_fingerprint=premium_check.seed_fingerprint(config),
+        seed_fingerprint=supporter_check.seed_fingerprint(config),
     )
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient(revoked_refresh_tokens=frozenset({"db-refresh"}))
 
-    access_token = await premium_check.refresh_creator_token(client, config, metrics_client)
+    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     # No auto-heal: the token is not returned and the declining stored TTL is what drives the alarm.
     assert access_token is None
     creator_ttls = [
-        record for record in metrics_client.records if record.name == premium_check.CREATOR_TOKEN_TTL_METRIC
+        record for record in metrics_client.records if record.name == supporter_check.CREATOR_TOKEN_TTL_METRIC
     ]
     assert len(creator_ttls) == 1
     assert creator_ttls[0].value == pytest.approx(5, abs=0.01)
@@ -239,10 +239,10 @@ async def test_creator_token_invalid_grant_without_row_emits_zero_ttl(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     client = FakePatreonClient(revoked_refresh_tokens=frozenset({"creator-refresh-seed"}))
 
-    access_token = await premium_check.refresh_creator_token(client, config, metrics_client)
+    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     assert access_token is None
-    metrics.assert_emitted(name=premium_check.CREATOR_TOKEN_TTL_METRIC, value=0.0, unit=MetricUnit.NONE)
+    metrics.assert_emitted(name=supporter_check.CREATOR_TOKEN_TTL_METRIC, value=0.0, unit=MetricUnit.NONE)
 
 
 # ---------------------------------------------------------------------------
@@ -250,9 +250,9 @@ async def test_creator_token_invalid_grant_without_row_emits_zero_ttl(
 # ---------------------------------------------------------------------------
 
 
-def register_due(mock_session: MockDbSession, subscription: PremiumSubscription, user: User):
+def register_due(mock_session: MockDbSession, subscription: SupporterSubscription, user: User):
     mock_session.add_objects_with_statement(
-        premium_check.DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription.id), (subscription,)
+        supporter_check.DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription.id), (subscription,)
     )
     mock_session.add_object(user)
 
@@ -260,14 +260,14 @@ def register_due(mock_session: MockDbSession, subscription: PremiumSubscription,
 def make_subscription_user(
     patreon_user_id: str = "patreon-1",
     *,
-    premium_expiration: dt.datetime | None = None,
+    support_expiration: dt.datetime | None = None,
     expiration_notified: bool = False,
-) -> tuple[PremiumSubscription, User]:
+) -> tuple[SupporterSubscription, User]:
     user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
-    subscription = create_premium_subscription(
+    subscription = create_supporter_subscription(
         user_id=1,
         patreon_user_id=patreon_user_id,
-        premium_expiration=premium_expiration,
+        support_expiration=support_expiration,
         expiration_notified=expiration_notified,
     )
     subscription.id = 1
@@ -276,17 +276,17 @@ def make_subscription_user(
 
 async def test_due_still_member_is_extended_silently(mock_session: MockDbSession, api: MockApi):
     subscription, user = make_subscription_user(
-        premium_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
     )
     user.supporter_level = SupporterLevel.PATRON
     register_due(mock_session, subscription, user)
 
-    outcome = await premium_check.process_due_subscription(subscription.db_id, {"patreon-1": 500}, api)
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {"patreon-1": 500}, api)
 
-    assert outcome is premium_check.DueOutcome.EXTENDED
+    assert outcome is supporter_check.DueOutcome.EXTENDED
     assert subscription.expiration_notified is False
-    assert subscription.premium_expiration is not None
-    assert subscription.premium_expiration > dt.datetime.now(dt.UTC)
+    assert subscription.support_expiration is not None
+    assert subscription.support_expiration > dt.datetime.now(dt.UTC)
     # The lapse flow only extends grace; the level itself is reconciled by the sync pass.
     assert user.supporter_level is SupporterLevel.PATRON
     api.assert_method_just_called("send_message_to_user", times=0)
@@ -294,46 +294,48 @@ async def test_due_still_member_is_extended_silently(mock_session: MockDbSession
 
 async def test_due_lapsed_first_time_starts_grace(mock_session: MockDbSession, api: MockApi):
     subscription, user = make_subscription_user(
-        premium_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=False
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=False
     )
     user.supporter_level = SupporterLevel.PATRON
     register_due(mock_session, subscription, user)
 
-    outcome = await premium_check.process_due_subscription(subscription.db_id, {}, api)
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
 
-    assert outcome is premium_check.DueOutcome.GRACE_STARTED
+    assert outcome is supporter_check.DueOutcome.GRACE_STARTED
     assert subscription.expiration_notified is True
-    assert subscription.premium_expiration is not None
-    assert subscription.premium_expiration > dt.datetime.now(dt.UTC)
+    assert subscription.support_expiration is not None
+    assert subscription.support_expiration > dt.datetime.now(dt.UTC)
     assert user.supporter_level is SupporterLevel.PATRON
     api.assert_send_message_to_user_called(
-        user=user, view=PremiumNotificationMessages.GRACE_STARTED.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang)
     )
 
 
 async def test_due_lapsed_after_grace_revokes_to_none(mock_session: MockDbSession, api: MockApi):
     subscription, user = make_subscription_user(
-        premium_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
     )
     user.supporter_level = SupporterLevel.PATRON
     register_due(mock_session, subscription, user)
 
-    outcome = await premium_check.process_due_subscription(subscription.db_id, {}, api)
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
 
-    assert outcome is premium_check.DueOutcome.PREMIUM_LOST
+    assert outcome is supporter_check.DueOutcome.SUPPORT_LOST
     assert user.supporter_level is SupporterLevel.NONE
-    api.assert_send_message_to_user_called(user=user, view=PremiumNotificationMessages.PREMIUM_LOST.get(lang=user.lang))
+    api.assert_send_message_to_user_called(
+        user=user, view=SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang)
+    )
 
 
 async def test_due_no_longer_due_is_skipped(mock_session: MockDbSession, api: MockApi):
     subscription, _ = make_subscription_user()
     mock_session.add_objects_with_statement(
-        premium_check.DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription.id), ()
+        supporter_check.DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription.id), ()
     )
 
-    outcome = await premium_check.process_due_subscription(subscription.db_id, {}, api)
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
 
-    assert outcome is premium_check.DueOutcome.SKIPPED
+    assert outcome is supporter_check.DueOutcome.SKIPPED
     api.assert_method_just_called("send_message_to_user", times=0)
 
 
@@ -342,9 +344,9 @@ async def test_due_no_longer_due_is_skipped(mock_session: MockDbSession, api: Mo
 # ---------------------------------------------------------------------------
 
 
-def register_syncable(mock_session: MockDbSession, subscription: PremiumSubscription, user: User):
+def register_syncable(mock_session: MockDbSession, subscription: SupporterSubscription, user: User):
     mock_session.add_objects_with_statement(
-        premium_check.LIVE_LINKED_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription.id), (subscription,)
+        supporter_check.LIVE_LINKED_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription.id), (subscription,)
     )
     mock_session.add_object(user)
 
@@ -355,13 +357,13 @@ async def test_sync_promotes_none_user_to_entitled_tier(
     subscription, user = make_subscription_user()  # user starts at SupporterLevel.NONE
     register_syncable(mock_session, subscription, user)
 
-    outcome = await premium_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
+    outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
-    assert outcome is premium_check.LevelSyncOutcome.UPGRADED
+    assert outcome is supporter_check.LevelSyncOutcome.UPGRADED
     assert user.supporter_level is SupporterLevel.PATRON
-    assert subscription.premium_expiration is not None
-    assert subscription.premium_expiration > dt.datetime.now(dt.UTC)
-    api.assert_send_message_to_user_called(user=user, view=PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+    assert subscription.support_expiration is not None
+    assert subscription.support_expiration > dt.datetime.now(dt.UTC)
+    api.assert_send_message_to_user_called(user=user, view=SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
 
 
 async def test_sync_promotes_patron_to_organizer_and_notifies(
@@ -371,11 +373,11 @@ async def test_sync_promotes_patron_to_organizer_and_notifies(
     user.supporter_level = SupporterLevel.PATRON
     register_syncable(mock_session, subscription, user)
 
-    outcome = await premium_check.sync_subscription_level(subscription.db_id, {"patreon-1": 1000}, config, api)
+    outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 1000}, config, api)
 
-    assert outcome is premium_check.LevelSyncOutcome.UPGRADED
+    assert outcome is supporter_check.LevelSyncOutcome.UPGRADED
     assert user.supporter_level is SupporterLevel.ORGANIZER
-    api.assert_send_message_to_user_called(user=user, view=PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+    api.assert_send_message_to_user_called(user=user, view=SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
 
 
 async def test_sync_downgrades_between_tiers_silently(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):
@@ -384,9 +386,9 @@ async def test_sync_downgrades_between_tiers_silently(mock_session: MockDbSessio
     register_syncable(mock_session, subscription, user)
 
     # Still an active member, but their entitled amount now only reaches the Patron threshold.
-    outcome = await premium_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
+    outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
-    assert outcome is premium_check.LevelSyncOutcome.DOWNGRADED
+    assert outcome is supporter_check.LevelSyncOutcome.DOWNGRADED
     assert user.supporter_level is SupporterLevel.PATRON
     api.assert_method_just_called("send_message_to_user", times=0)
 
@@ -396,9 +398,9 @@ async def test_sync_unchanged_when_level_matches(mock_session: MockDbSession, ap
     user.supporter_level = SupporterLevel.PATRON
     register_syncable(mock_session, subscription, user)
 
-    outcome = await premium_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
+    outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
-    assert outcome is premium_check.LevelSyncOutcome.UNCHANGED
+    assert outcome is supporter_check.LevelSyncOutcome.UNCHANGED
     assert user.supporter_level is SupporterLevel.PATRON
     api.assert_method_just_called("send_message_to_user", times=0)
 
@@ -408,9 +410,9 @@ async def test_sync_skips_when_not_active_member(mock_session: MockDbSession, ap
     register_syncable(mock_session, subscription, user)
 
     # Absent from the amounts map: lapsing, so the sync leaves it to the grace flow.
-    outcome = await premium_check.sync_subscription_level(subscription.db_id, {}, config, api)
+    outcome = await supporter_check.sync_subscription_level(subscription.db_id, {}, config, api)
 
-    assert outcome is premium_check.LevelSyncOutcome.SKIPPED
+    assert outcome is supporter_check.LevelSyncOutcome.SKIPPED
     assert user.supporter_level is SupporterLevel.NONE
     api.assert_method_just_called("send_message_to_user", times=0)
 
@@ -427,7 +429,7 @@ async def test_process_all_counts_successes():
         handled.append(subscription_id)
 
     failures: list[str] = []
-    results = await premium_check.process_all(handler, [1, 2, 3], failures)
+    results = await supporter_check.process_all(handler, [1, 2, 3], failures)
 
     assert len(results) == 3
     assert handled == [1, 2, 3]
@@ -440,7 +442,7 @@ async def test_process_all_isolates_a_failing_subscription():
             raise RuntimeError("boom")
 
     failures: list[str] = []
-    results = await premium_check.process_all(handler, [1, 2, 3], failures)
+    results = await supporter_check.process_all(handler, [1, 2, 3], failures)
 
     # One row's failure is recorded but the sweep still processes the rest.
     assert len(results) == 2
@@ -459,9 +461,9 @@ async def test_run_noops_when_unconfigured(
     def fail_construct(*args: object, **kwargs: object):
         raise AssertionError("PatreonClient must not be constructed when unconfigured")
 
-    monkeypatch.setattr(premium_check, "PatreonClient", fail_construct)
+    monkeypatch.setattr(supporter_check, "PatreonClient", fail_construct)
 
-    await premium_check.run(api, metrics_client)
+    await supporter_check.run(api, metrics_client)
 
     assert metrics_client.records == []
 
@@ -479,24 +481,24 @@ async def test_run_happy_path_emits_creator_ttl_and_counters(
     # Already at the entitled tier, so the level sync is a no-op and this run only exercises the counters.
     user.supporter_level = SupporterLevel.PATRON
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
-    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, ())
-    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
+    mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, ())
+    mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
     register_syncable(mock_session, subscription, user)
 
     client = FakePatreonClient(members=(active_member("patreon-1"),))
-    monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
-    await premium_check.run(api, metrics_client)
+    await supporter_check.run(api, metrics_client)
 
     # The freshly rotated creator token drives the member sweep.
     assert client.members_access_token == "creator-access-seed-new"
-    metrics.assert_emitted(name=premium_check.CREATOR_TOKEN_TTL_METRIC, unit=MetricUnit.NONE)
+    metrics.assert_emitted(name=supporter_check.CREATOR_TOKEN_TTL_METRIC, unit=MetricUnit.NONE)
     # Outcome counters: everything a continuous zero on this no-op run.
-    metrics.assert_emitted(name=premium_check.CREATOR_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.UPGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.DOWNGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.PREMIUM_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.CREATOR_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.UPGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.DOWNGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_logs_summary_on_success(
@@ -511,20 +513,20 @@ async def test_run_logs_summary_on_success(
     # Already at the entitled tier, so the level sync is a no-op and this run just logs its summary.
     user.supporter_level = SupporterLevel.PATRON
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
-    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, ())
-    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
+    mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, ())
+    mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, (subscription,))
     register_syncable(mock_session, subscription, user)
 
     client = FakePatreonClient(members=(active_member("patreon-1"),))
-    monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
     with capture_logs() as logs:
-        await premium_check.run(api, metrics_client)
+        await supporter_check.run(api, metrics_client)
 
-    summary = next(entry for entry in logs if entry["event"] == "premium check complete")
+    summary = next(entry for entry in logs if entry["event"] == "supporter check complete")
     assert summary["due_processed"] == 0
     assert summary["grace_started"] == 0
-    assert summary["premium_lost"] == 0
+    assert summary["support_lost"] == 0
     assert summary["upgraded"] == 0
     assert summary["downgraded"] == 0
     assert summary["active_patrons"] == 1
@@ -540,21 +542,21 @@ async def test_run_stops_after_creator_invalid_grant(
 ):
     configure(config)
     row = create_patreon_creator_token(
-        refresh_token="db-refresh", seed_fingerprint=premium_check.seed_fingerprint(config)
+        refresh_token="db-refresh", seed_fingerprint=supporter_check.seed_fingerprint(config)
     )
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient(revoked_refresh_tokens=frozenset({"db-refresh"}))
-    monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
-    await premium_check.run(api, metrics_client)
+    await supporter_check.run(api, metrics_client)
 
     # No member fetch: the run bailed out on the unrecoverable creator token.
     assert client.members_access_token is None
     # The creator-fault counter is this branch's only CloudWatch trace (it returns without raising).
-    metrics.assert_emitted(name=premium_check.CREATOR_REFRESH_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.CREATOR_REFRESH_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
     # Downstream outcome counters never ran, so they are absent (not zeroed) this run.
     emitted_names = {record.name for record in metrics_client.records}
-    assert premium_check.GRACE_STARTED_METRIC not in emitted_names
+    assert supporter_check.GRACE_STARTED_METRIC not in emitted_names
 
 
 async def test_run_raises_when_a_subscription_fails(
@@ -568,22 +570,22 @@ async def test_run_raises_when_a_subscription_fails(
     configure(config)
     subscription, user = make_subscription_user()
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
-    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, (subscription,))
-    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, ())
+    mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, (subscription,))
+    mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, ())
 
     client = FakePatreonClient(members=(active_member("patreon-1"),))
-    monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
-    async def boom(subscription_id: int, active_amounts: dict[str, int], api: MockApi) -> premium_check.DueOutcome:
+    async def boom(subscription_id: int, active_amounts: dict[str, int], api: MockApi) -> supporter_check.DueOutcome:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(premium_check, "process_due_subscription", boom)
+    monkeypatch.setattr(supporter_check, "process_due_subscription", boom)
 
-    with pytest.raises(RuntimeError, match="Premium check failed for 1 subscriptions"):
-        await premium_check.run(api, metrics_client)
+    with pytest.raises(RuntimeError, match="Supporter check failed for 1 subscriptions"):
+        await supporter_check.run(api, metrics_client)
 
     # The lifecycle counters are emitted before the raise, so the series stay continuous on a failing run.
-    metrics.assert_emitted(name=premium_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_counts_lifecycle_transitions(
@@ -599,26 +601,26 @@ async def test_run_counts_lifecycle_transitions(
     # a third active organizer drops to the patron tier (a silent between-tier downgrade).
     due_user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
     due_user.supporter_level = SupporterLevel.PATRON
-    due_sub = create_premium_subscription(
-        user_id=1, patreon_user_id="patreon-lapsed", premium_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
+    due_sub = create_supporter_subscription(
+        user_id=1, patreon_user_id="patreon-lapsed", support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
     )
     due_sub.id = 1
     upgrade_user = create_user(id=2, tg_user_id=102, settings=create_settings(id=2))
-    upgrade_sub = create_premium_subscription(user_id=2, patreon_user_id="patreon-new")
+    upgrade_sub = create_supporter_subscription(user_id=2, patreon_user_id="patreon-new")
     upgrade_sub.id = 2
     downgrade_user = create_user(
         id=3, tg_user_id=103, settings=create_settings(id=3), supporter_level=SupporterLevel.ORGANIZER
     )
-    downgrade_sub = create_premium_subscription(user_id=3, patreon_user_id="patreon-drop")
+    downgrade_sub = create_supporter_subscription(user_id=3, patreon_user_id="patreon-drop")
     downgrade_sub.id = 3
 
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
-    mock_session.add_objects_with_statement(premium_check.DUE_SUBSCRIPTIONS, (due_sub,))
+    mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, (due_sub,))
     mock_session.add_objects_with_statement(
-        premium_check.DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == 1), (due_sub,)
+        supporter_check.DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == 1), (due_sub,)
     )
     # The two live members feed the level sync from one nomination.
-    mock_session.add_objects_with_statement(premium_check.LIVE_LINKED_SUBSCRIPTIONS, (upgrade_sub, downgrade_sub))
+    mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, (upgrade_sub, downgrade_sub))
     register_syncable(mock_session, upgrade_sub, upgrade_user)
     register_syncable(mock_session, downgrade_sub, downgrade_user)
     mock_session.add_object(due_user)
@@ -626,11 +628,11 @@ async def test_run_counts_lifecycle_transitions(
     client = FakePatreonClient(
         members=(active_member("patreon-new", cents=500), active_member("patreon-drop", cents=500))
     )
-    monkeypatch.setattr(premium_check, "PatreonClient", lambda _config: client)
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
-    await premium_check.run(api, metrics_client)
+    await supporter_check.run(api, metrics_client)
 
-    metrics.assert_emitted(name=premium_check.GRACE_STARTED_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.UPGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.DOWNGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=premium_check.PREMIUM_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.UPGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.DOWNGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)

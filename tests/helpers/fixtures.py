@@ -18,8 +18,8 @@ from mitup_bot.models import (
     MeetupLocation,
     PatreonCreatorToken,
     PatreonWebhook,
-    PremiumSubscription,
     Settings,
+    SupporterSubscription,
     User,
 )
 from mitup_bot.models import Message as MeetupMessage
@@ -184,16 +184,16 @@ def create_joined_link(
     )
 
 
-def create_premium_subscription(
+def create_supporter_subscription(
     user_id: int,
     patreon_user_id: str,
-    premium_expiration: dt.datetime | None = None,
+    support_expiration: dt.datetime | None = None,
     expiration_notified: bool = False,
-) -> PremiumSubscription:
-    return PremiumSubscription(
+) -> SupporterSubscription:
+    return SupporterSubscription(
         user_id=user_id,
         patreon_user_id=patreon_user_id,
-        premium_expiration=premium_expiration,
+        support_expiration=support_expiration,
         expiration_notified=expiration_notified,
     )
 

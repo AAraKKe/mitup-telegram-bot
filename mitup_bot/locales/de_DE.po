@@ -802,18 +802,6 @@ msgstr "Die Startzeit muss in der Zukunft liegen."
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "Die Startzeit wurde gelöscht. Stelle sie erneut fest, bevor du eine Endzeit wählst."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
-
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
-msgstr "Du hast das Maximum von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, bevor du ein weiteres erstellst."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON"
-msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und noch weiter zu planen."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
-msgstr "Du kannst Treffen bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum."
-
 msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Patreon-Konto verbinden"
 
@@ -830,7 +818,7 @@ msgid "CollaborateMessages.LINKED_NOT_PATRON"
 msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Unterstützer, daher sind die exklusiven Vorteile noch nicht aktiv. Werde ein Unterstützer und sie werden automatisch aktiviert, ohne dass du erneut verlinken musst."
 
 msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Du bist ein Premium-Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Deine Premium-Vorteile sind aktiv. Du kannst dein Patreon-Konto hier jederzeit trennen."
+msgstr "<b>Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstützt. Deine Vorteile sind aktiv. Du kannst dein Patreon-Konto hier jederzeit trennen."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Mithelfen</b>\n\nPatreon-Unterstützung ist noch nicht verfügbar. Schau bald wieder vorbei."
@@ -838,23 +826,8 @@ msgstr "<b>Mithelfen</b>\n\nPatreon-Unterstützung ist noch nicht verfügbar. Sc
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Dein Patreon-Konto wurde getrennt."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
-msgstr "<b>Premium freigeschaltet</b>\n\nDein Patreon-Konto ist verbunden und deine Premium-Vorteile sind aktiv. Danke, dass du Mitup unterstützt."
-
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Unterstützer, um Premium-Vorteile freizuschalten. Sie werden automatisch aktiviert, sobald dein Beitrag aktiv ist."
-
-msgid "PremiumMessages.PARTICIPANT_CAPACITY"
-msgstr "Kostenlose Treffen können bis zu ${cap} Teilnehmer aufnehmen. Setze ein niedrigeres Limit, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr Teilnehmer zu hosten."
-
-msgid "PremiumNotificationMessages.GRACE_STARTED"
-msgstr "<b>Dein Premium ist in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Premium-Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Ansonsten kannst du Mitup im Mithelfen-Menü erneut unterstützen."
-
-msgid "PremiumNotificationMessages.PREMIUM_LOST"
-msgstr "<b>Dein Premium ist beendet</b>\n\nWir konnten immer noch keinen aktiven Patreon-Beitrag bestätigen, daher sind deine Premium-Vorteile jetzt deaktiviert. Werde im Mithelfen-Menü erneut Unterstützer, um sie wieder zu aktivieren."
-
-msgid "PremiumNotificationMessages.UPGRADED"
-msgstr "<b>Premium freigeschaltet</b>\n\nDanke, dass du Mitup unterstützt. Dein Patreon-Beitrag ist aktiv, daher sind deine Premium-Vorteile jetzt aktiviert."
+msgstr "<b>Patreon-Konto verbunden</b>\n\nDu bist verbunden. Werde ein Unterstützer, um deine Vorteile freizuschalten. Sie werden automatisch aktiviert, sobald dein Beitrag aktiv ist."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -943,5 +916,32 @@ msgstr "<b>${language}</b>: ${sent} versendet, ${failed} fehlgeschlagen, ${skipp
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> Zustellungen wurden durch einen Worker-Absturz unterbrochen und das Ergebnis ist unbekannt. Sie werden nicht erneut versucht."
 
-msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>Dein Premium ist in einer Kulanzfrist</b>\n\nDein Patreon-Beitrag ist beendet, und es tut uns leid, dass du gehst. Deine Premium-Vorteile bleiben noch ${days} Tage aktiv, falls du es dir anders überlegst. Um sie zu behalten, unterstütze Mitup erneut im Mithelfen-Menü."
+msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
+msgstr "<b>Vorteile freigeschaltet</b>\n\nDein Patreon-Konto ist verbunden und deine Vorteile sind aktiv. Danke, dass du Mitup unterstützt."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
+msgstr "Du hast das Maximum von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, bevor du ein weiteres erstellst."
+
+msgid "SupporterMessages.PARTICIPANT_CAPACITY"
+msgstr "Kostenlose Treffen können bis zu ${cap} Teilnehmer aufnehmen. Setze ein niedrigeres Limit, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr Teilnehmer zu hosten."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON"
+msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und noch weiter zu planen."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
+msgstr "Du kannst Treffen bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum."
+
+msgid "SupporterNotificationMessages.GRACE_STARTED"
+msgstr "<b>Deine Vorteile sind in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Andernfalls kannst du Mitup über das Mithelfen-Menü erneut unterstützen."
+
+msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Deine Vorteile sind in einer Kulanzfrist</b>\n\nDeine Patreon-Unterstützung ist beendet, und wir bedauern, dass du gehst. Deine Vorteile bleiben noch ${days} Tage aktiv, falls du es dir anders überlegst. Um sie zu behalten, unterstütze Mitup über das Mithelfen-Menü erneut."
+
+msgid "SupporterNotificationMessages.SUPPORT_LOST"
+msgstr "<b>Deine Vorteile sind beendet</b>\n\nWir konnten immer noch keinen aktiven Patreon-Beitrag bestätigen, daher sind deine Vorteile jetzt deaktiviert. Werde über das Mithelfen-Menü erneut Unterstützer, um sie wieder zu aktivieren."
+
+msgid "SupporterNotificationMessages.UPGRADED"
+msgstr "<b>Vorteile freigeschaltet</b>\n\nDanke, dass du Mitup unterstützt. Dein Patreon-Beitrag ist aktiv, daher sind deine Vorteile jetzt aktiviert."

@@ -24,7 +24,7 @@ from mitup_bot.cli.commands.recurrent_events import (
     run_all_tasks,
     run_periodic,
 )
-from mitup_bot.models.premium import TokenCipher
+from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, NullBackend
 from mitup_bot.patreon.runtime import PatreonRuntime
 from tests.helpers import MockApi, create_patreon_config
@@ -38,7 +38,7 @@ INTERVAL_PARAMS = [
     (EventType.DEACTIVATE_MEETINGS, "deactivate_meetings"),
     (EventType.MEETUPS_CLEANUP, "meetups_cleanup"),
     (EventType.SEND_BROADCASTS, "send_broadcasts"),
-    (EventType.PREMIUM_CHECK, "premium_check"),
+    (EventType.SUPPORTER_CHECK, "supporter_check"),
 ]
 
 
@@ -56,7 +56,7 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
         deactivate_meetings=40,
         meetups_cleanup=50,
         send_broadcasts=60,
-        premium_check=60,
+        supporter_check=60,
     )
     assert config.get(event_type) == getattr(config, field_name)
 
@@ -82,7 +82,7 @@ ASYNC_LAUNCH_PARAMS = [
     (EventType.NOTIFY_MEETING_STARTED, "mitup_bot.cli.commands.recurrent_events.notify_meetings_started"),
     (EventType.DEACTIVATE_MEETINGS, "mitup_bot.cli.commands.recurrent_events.inactive_meetings"),
     (EventType.MEETUPS_CLEANUP, "mitup_bot.cli.commands.recurrent_events.meetups_cleanup"),
-    (EventType.PREMIUM_CHECK, "mitup_bot.cli.commands.recurrent_events.premium_check"),
+    (EventType.SUPPORTER_CHECK, "mitup_bot.cli.commands.recurrent_events.supporter_check"),
 ]
 
 SYNC_LAUNCH_PARAMS = [
@@ -451,7 +451,7 @@ async def test_run_all_tasks_creates_all_tasks():
         deactivate_meetings=40,
         meetups_cleanup=50,
         send_broadcasts=60,
-        premium_check=60,
+        supporter_check=60,
     )
 
     created_tasks: list[EventType] = []
@@ -558,7 +558,7 @@ def test_cli_passes_custom_intervals():
                 "555",
                 "--send-broadcasts-interval",
                 "666",
-                "--premium-check-interval",
+                "--supporter-check-interval",
                 "777",
                 "--start-time",
                 "1.5",
@@ -577,7 +577,7 @@ def test_cli_passes_custom_intervals():
         assert intervals_arg.deactivate_meetings == 444
         assert intervals_arg.meetups_cleanup == 555
         assert intervals_arg.send_broadcasts == 666
-        assert intervals_arg.premium_check == 777
+        assert intervals_arg.supporter_check == 777
         assert start_time_arg == 1.5
 
 

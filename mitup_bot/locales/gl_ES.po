@@ -802,18 +802,6 @@ msgstr "A nova hora de inicio é posterior á hora de remate, polo que a hora de
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "A hora de inicio foi eliminada. Estabelécela de novo antes de escoller unha hora de remate."
 
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Alcanzaches o teu límite de ${cap} quedadas activas. Pecha ou elimina unha para crear outra, ou toca Colabora no menú principal para apoiar a Mitup e desbloquear máis."
-
-msgid "PremiumMessages.ACTIVE_MEETINGS_CAP_PREMIUM"
-msgstr "Alcanzaches o máximo de ${cap} quedadas activas. Pecha ou elimina unha antes de crear outra."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON"
-msgstr "Por agora podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima, ou toca Colabora no menú principal para apoiar a Mitup e programar máis lonxe."
-
-msgid "PremiumMessages.SCHEDULING_HORIZON_PREMIUM"
-msgstr "Podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima."
-
 msgid "ButtonMessages.LINK_PATREON"
 msgstr "♥ Enlazar conta Patreon"
 
@@ -830,7 +818,7 @@ msgid "CollaborateMessages.LINKED_NOT_PATRON"
 msgstr "<b>Conta Patreon enlazada</b>\n\nPerfecto. Aínda non es patrón, polo que os privilexios especiais aínda están desactivados. Podes ser patrón e activaranse automaticamente, sen necesidade de enlazar de novo."
 
 msgid "CollaborateMessages.LINKED_PATRON"
-msgstr "<b>Es un apoiante premium</b>\n\nGrazas por apoiar Mitup. Os teus privilexios especiais están activos. Podes desenlazar a túa conta de Patreon aquí sempre que queiras."
+msgstr "<b>Es un apoiante</b>\n\nGrazas por apoiar Mitup. Os teus privilexios especiais están activos. Podes desenlazar a túa conta de Patreon acó sempre que queiras."
 
 msgid "CollaborateMessages.UNAVAILABLE"
 msgstr "<b>Colabora</b>\n\nO apoio de Patreon non está dispoñible aínda. Volve pronto."
@@ -838,26 +826,8 @@ msgstr "<b>Colabora</b>\n\nO apoio de Patreon non está dispoñible aínda. Volv
 msgid "CollaborateMessages.UNLINKED"
 msgstr "A túa conta de Patreon foi desenlazada."
 
-msgid "CollaborateMessages.LINK_CONFIRMED_PREMIUM"
-msgstr "<b>Premium desbloqueado</b>\n\nA túa conta de Patreon está enlazada e os teus privilexios especiais están activos. Grazas por apoiar Mitup."
-
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Conta Patreon enlazada</b>\n\nEstás conectado. Podes ser patrón para desbloquear privilexios especiais. Activaranse automaticamente cando o teu apoio estea activo."
-
-msgid "PremiumMessages.PARTICIPANT_CAPACITY"
-msgstr "Por agora podes acoller ata ${cap} participantes nas quedadas gratuitas. Establece un límite máis baixo, ou toca Colabora no menú principal para apoiar a Mitup e acoller máis."
-
-msgid "PremiumNotificationMessages.GRACE_STARTED"
-msgstr "<b>O teu premium está en período de graza</b>\n\nNon puidemos confirmar un apoio activo de Patreon na túa conta, polo que os teus privilexios especiais están configurados para desactivarse nunha semana. Se o teu apoio aínda está activo, non tes que facer nada e renovarase automaticamente. Se non, podes apoiar a Mitup de novo dende Colabora no menú principal."
-
-msgid "PremiumNotificationMessages.PREMIUM_LOST"
-msgstr "<b>O teu premium rematou</b>\n\nAínda non puidemos confirmar un apoio activo de Patreon, polo que os teus privilexios especiais están desactivados agora. Apoia a Mitup de novo dende Colabora no menú principal para activalos."
-
-msgid "PremiumNotificationMessages.UPGRADED"
-msgstr "<b>Premium desbloqueado</b>\n\nGrazas por apoiar a Mitup. O teu apoio de Patreon está activo, polo que os teus privilexios especiais están activados agora."
-
-msgid "PremiumNotificationMessages.SUPPORT_ENDED_GRACE"
-msgstr "<b>O teu premium está en período de graza</b>\n\nO teu apoio de Patreon rematou, e dános pena que marches. Os teus privilexios especiais seguirán activos durante ${days} días por se cambias de opinión. Para mantelos, apoia a Mitup de novo dende Colabora no menú principal."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
@@ -945,3 +915,33 @@ msgstr "<b>${language}</b>: ${sent} enviados, ${failed} fallidos, ${skipped} sal
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr "🚫 <b>${orphaned}</b> entregas foron interrompidas por un colapso do traballador e o seu resultado é descoñecido. Non se reintentarán."
+
+msgid "CollaborateMessages.LINK_CONFIRMED_SUPPORTER"
+msgstr "<b>Privilexios especiais desbloqueados</b>\n\nA túa conta de Patreon está enlazada e os teus privilexios especiais están activos. Grazas por apoiar Mitup."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
+msgstr "Alcanzaches o teu límite de ${cap} quedadas activas. Pecha ou elimina unha para crear outra, ou toca Colabora no menú principal para apoiar a Mitup e desbloquear máis."
+
+msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
+msgstr "Alcanzaches o máximo de ${cap} quedadas activas. Pecha ou elimina unha antes de crear outra."
+
+msgid "SupporterMessages.PARTICIPANT_CAPACITY"
+msgstr "Por agora podes acoller ata ${cap} participantes nas quedadas gratuitas. Establece un límite máis baixo, ou toca Colabora no menú principal para apoiar a Mitup e acoller máis."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON"
+msgstr "Por agora podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima, ou toca Colabora no menú principal para apoiar a Mitup e programar máis lonxe."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
+msgstr "Podes programar quedadas ata ${days} días por diante. Escolle unha data máis próxima."
+
+msgid "SupporterNotificationMessages.GRACE_STARTED"
+msgstr "<b>Os teus privilexios especiais están nun período de graza</b>\n\nNon puidemos confirmar unha achega activa de Patreon na túa conta, así que os teus privilexios especiais desactivaranse nunha semana. Se a túa achega segue activa, non tes que facer nada e renovarase automaticamente. En caso contrario, podes volver apoiar Mitup desde o menú Colabora."
+
+msgid "SupporterNotificationMessages.SUPPORT_ENDED_GRACE"
+msgstr "<b>Os teus privilexios especiais están nun período de graza</b>\n\nO teu apoio en Patreon rematou, e sentímolo moito. Os teus privilexios especiais seguirán activos durante ${days} días por se cambias de idea. Para mantelos, volve apoiar Mitup desde o menú Colabora."
+
+msgid "SupporterNotificationMessages.SUPPORT_LOST"
+msgstr "<b>Os teus privilexios especiais remataron</b>\n\nSeguimos sen poder confirmar unha achega activa de Patreon, así que os teus privilexios especiais están agora desactivados. Faite patrón de novo desde o menú Colabora para reactivalos."
+
+msgid "SupporterNotificationMessages.UPGRADED"
+msgstr "<b>Privilexios especiais desbloqueados</b>\n\nGrazas por apoiar Mitup. A túa achega de Patreon está activa, así que os teus privilexios especiais están agora activados."

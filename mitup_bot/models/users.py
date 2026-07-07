@@ -58,7 +58,7 @@ class User(BaseModel, SQLModel, table=True):
     )
     last_name: str | None = None
     username: str | None = None
-    # Kept directly on User (rather than joined from premium_subscriptions) so every handler that
+    # Kept directly on User (rather than joined from supporter_subscriptions) so every handler that
     # gates on support status reads it without a join; the recurring job and OAuth callback keep it
     # in sync with the subscription row. native_enum=False keeps the column a plain VARCHAR (no DB
     # enum type) while coercing loaded rows back to SupporterLevel.

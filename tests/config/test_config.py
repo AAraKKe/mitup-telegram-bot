@@ -20,7 +20,7 @@ from mitup_bot.config import (
     RunModes,
     TomlConfigProvider,
 )
-from mitup_bot.models.premium import TokenCipher, configure_token_encryption
+from mitup_bot.models.subscriptions import TokenCipher, configure_token_encryption
 
 TOML_CONTENT = """
 [db]

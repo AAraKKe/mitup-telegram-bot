@@ -1,6 +1,6 @@
 """Daily supporter-membership validation against Patreon.
 
-Plugs into the recurrent-events framework as the ``PREMIUM_CHECK`` job. Each run refreshes the single
+Plugs into the recurrent-events framework as the ``SUPPORTER_CHECK`` job. Each run refreshes the single
 creator token, sweeps the campaign roster it grants access to, and reconciles every linked member's
 supporter tier against the amount they are currently entitled to on the campaign, driving the
 grace/upgrade/downgrade/revoke transitions. A member's tier is derived from their
@@ -25,14 +25,14 @@ from mitup_bot import db, patreon, supporter
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonTokenRevoked
-from mitup_bot.models import PremiumSubscription, User
+from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.patreon import PatreonClient
 from mitup_bot.patreon.creator_token import TokenRefresher, load_creator_state, seed_fingerprint, store_creator_token
 from mitup_bot.patreon.models import MemberResource
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import PremiumNotificationMessages
+from mitup_bot.utils.messages import SupporterNotificationMessages
 
 log = structlog.get_logger(__name__)
 
@@ -48,13 +48,13 @@ class CampaignMemberReader(Protocol):
 CREATOR_TOKEN_TTL_METRIC = "PatreonCreatorTokenTTL"
 
 # Per-run outcome counters (same literal-name rationale as the TTL metric above). Dashboard/diagnosis
-# material, not a paging surface: they ride the run's MetricsClient with its EventType=PremiumCheck base
+# material, not a paging surface: they ride the run's MetricsClient with its EventType=SupporterCheck base
 # dimension only (one series per name). Emitted every run — zeros included — so the series stay continuous.
 CREATOR_REFRESH_FAULTS_METRIC = "PatreonCreatorRefreshFaults"
 UPGRADES_METRIC = "PatreonUpgrades"
 DOWNGRADES_METRIC = "PatreonDowngrades"
 GRACE_STARTED_METRIC = "PatreonGraceStarted"
-PREMIUM_LOST_METRIC = "PatreonPremiumLost"
+SUPPORT_LOST_METRIC = "PatreonSupportLost"
 
 
 class DueOutcome(Enum):
@@ -62,7 +62,7 @@ class DueOutcome(Enum):
 
     EXTENDED = auto()
     GRACE_STARTED = auto()
-    PREMIUM_LOST = auto()
+    SUPPORT_LOST = auto()
     SKIPPED = auto()
 
 
@@ -81,23 +81,23 @@ GRACE_PERIOD = dt.timedelta(days=7)
 
 # Nomination sweeps: read-only, ids only. Each nominated subscription is re-loaded and re-checked
 # inside its own write lifecycle, so nothing read here feeds a mutation directly.
-DUE_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
-    select(PremiumSubscription)
-    .join(User, col(PremiumSubscription.user_id) == col(User.id))
+DUE_SUBSCRIPTIONS: SelectOfScalar[SupporterSubscription] = (
+    select(SupporterSubscription)
+    .join(User, col(SupporterSubscription.user_id) == col(User.id))
     .where(
         and_(
             User.status == UserStatus.MEMBER,
-            PremiumSubscription.premium_expiration != null(),
-            PremiumSubscription.premium_expiration <= func.now(),
+            SupporterSubscription.support_expiration != null(),
+            SupporterSubscription.support_expiration <= func.now(),
         )
     )
 )
 # Every live linked member (status MEMBER). Feeds the level sync, which re-levels active
 # members against their entitled amount — NONE -> tier promotion and between-tier moves in both
 # directions; members absent from the amounts map are lapsing and left to the grace flow above.
-LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[PremiumSubscription] = (
-    select(PremiumSubscription)
-    .join(User, col(PremiumSubscription.user_id) == col(User.id))
+LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[SupporterSubscription] = (
+    select(SupporterSubscription)
+    .join(User, col(SupporterSubscription.user_id) == col(User.id))
     .where(User.status == UserStatus.MEMBER)
 )
 
@@ -147,7 +147,7 @@ async def active_patreon_amounts(client: CampaignMemberReader, access_token: str
 
 
 @db.with_session
-async def nominate(session: AsyncSession, statement: SelectOfScalar[PremiumSubscription]) -> list[int]:
+async def nominate(session: AsyncSession, statement: SelectOfScalar[SupporterSubscription]) -> list[int]:
     """Ids of the subscriptions matching a nomination sweep, read in a short read-only transaction."""
     return [subscription.db_id for subscription in (await session.exec(statement)).all()]
 
@@ -167,7 +167,9 @@ async def process_due_subscription(
     NONE. Re-checks under the fresh transaction that the row is still due. Returns the transition
     taken so ``run`` can tally lifecycle counts."""
     async with db.begin_write(api) as session:
-        subscription = (await session.exec(DUE_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))).first()
+        subscription = (
+            await session.exec(DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription_id))
+        ).first()
         if subscription is None:
             return DueOutcome.SKIPPED
         user = await load_user(session, subscription.user_id)
@@ -177,16 +179,16 @@ async def process_due_subscription(
         is_member = subscription.patreon_user_id in active_amounts
         if is_member:
             subscription.expiration_notified = False
-            subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
+            subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
             return DueOutcome.EXTENDED
         if not subscription.expiration_notified:
             subscription.expiration_notified = True
-            subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
-            await api.send_message_to_user(user, PremiumNotificationMessages.GRACE_STARTED.get(lang=user.lang))
+            subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
+            await api.send_message_to_user(user, SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang))
             return DueOutcome.GRACE_STARTED
         user.supporter_level = SupporterLevel.NONE
-        await api.send_message_to_user(user, PremiumNotificationMessages.PREMIUM_LOST.get(lang=user.lang))
-        return DueOutcome.PREMIUM_LOST
+        await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
+        return DueOutcome.SUPPORT_LOST
 
 
 async def sync_subscription_level(
@@ -202,7 +204,7 @@ async def sync_subscription_level(
     left to the grace flow, so this returns SKIPPED for them."""
     async with db.begin_write(api) as session:
         subscription = (
-            await session.exec(LIVE_LINKED_SUBSCRIPTIONS.where(PremiumSubscription.id == subscription_id))
+            await session.exec(LIVE_LINKED_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription_id))
         ).first()
         if subscription is None:
             return LevelSyncOutcome.SKIPPED
@@ -219,10 +221,10 @@ async def sync_subscription_level(
 
         previous = user.supporter_level
         user.supporter_level = target
-        subscription.premium_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
+        subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
         subscription.expiration_notified = False
         if not supporter.meets(previous, target):
-            await api.send_message_to_user(user, PremiumNotificationMessages.UPGRADED.get(lang=user.lang))
+            await api.send_message_to_user(user, SupporterNotificationMessages.UPGRADED.get(lang=user.lang))
             return LevelSyncOutcome.UPGRADED
         return LevelSyncOutcome.DOWNGRADED
 
@@ -238,7 +240,7 @@ async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int],
             results.append(await handler(subscription_id))
         except Exception as error:
             failures.append(f"subscription {subscription_id}: {error}")
-            log.exception("Premium check failed for a subscription", subscription=subscription_id, exc_info=error)
+            log.exception("Supporter check failed for a subscription", subscription=subscription_id, exc_info=error)
     return results
 
 
@@ -250,7 +252,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     intact and re-nominates the rest next run. Emits the per-run outcome counters (COUNT, EventType
     base dimension only) before any failure raise so the series stay continuous."""
     if not patreon.is_configured():
-        log.info("Patreon not configured, skipping premium check")
+        log.info("Patreon not configured, skipping supporter check")
         return
 
     config = patreon.current_config()
@@ -275,23 +277,23 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         )
 
     grace_started = sum(1 for outcome in due_outcomes if outcome is DueOutcome.GRACE_STARTED)
-    premium_lost = sum(1 for outcome in due_outcomes if outcome is DueOutcome.PREMIUM_LOST)
+    support_lost = sum(1 for outcome in due_outcomes if outcome is DueOutcome.SUPPORT_LOST)
     upgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.UPGRADED)
     downgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.DOWNGRADED)
 
     metrics.emit(GRACE_STARTED_METRIC, grace_started, MetricUnit.COUNT)
-    metrics.emit(PREMIUM_LOST_METRIC, premium_lost, MetricUnit.COUNT)
+    metrics.emit(SUPPORT_LOST_METRIC, support_lost, MetricUnit.COUNT)
     metrics.emit(UPGRADES_METRIC, upgraded, MetricUnit.COUNT)
     metrics.emit(DOWNGRADES_METRIC, downgraded, MetricUnit.COUNT)
 
     if failures:
-        raise RuntimeError(f"Premium check failed for {len(failures)} subscriptions. Check logs for details.")
+        raise RuntimeError(f"Supporter check failed for {len(failures)} subscriptions. Check logs for details.")
 
     log.info(
-        "premium check complete",
+        "supporter check complete",
         due_processed=len(due_outcomes),
         grace_started=grace_started,
-        premium_lost=premium_lost,
+        support_lost=support_lost,
         upgraded=upgraded,
         downgraded=downgraded,
         active_patrons=len(active_amounts),

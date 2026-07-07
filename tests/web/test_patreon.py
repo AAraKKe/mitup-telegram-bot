@@ -13,7 +13,7 @@ from structlog.typing import EventDict
 from mitup_bot import patreon
 from mitup_bot.config import PatreonConfig, RunModes
 from mitup_bot.exceptions import PatreonApiError
-from mitup_bot.models import PremiumSubscription
+from mitup_bot.models import SupporterSubscription
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
 from mitup_bot.patreon.models import IdentityData, IdentityResponse
 from mitup_bot.supporter import SupporterLevel
@@ -33,7 +33,7 @@ from tests.helpers import (
     build_test_web_app,
     build_web_client,
     create_patreon_config,
-    create_premium_subscription,
+    create_supporter_subscription,
     create_user,
 )
 from tests.helpers.stub_db import MockDbSession
@@ -231,7 +231,7 @@ async def test_callback_patreon_error_renders_retry(
 @pytest.mark.parametrize(
     "outcome, status, needle",
     [
-        (LinkOutcome.LINKED_PREMIUM, 200, "all set"),
+        (LinkOutcome.LINKED_SUPPORTER, 200, "all set"),
         (LinkOutcome.LINKED_NO_PATRON, 200, "connected"),
         (LinkOutcome.UNKNOWN_USER, 400, "couldn't find your mitup account"),
         (LinkOutcome.ALREADY_LINKED_ELSEWHERE, 409, "already linked"),
@@ -509,18 +509,18 @@ async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockD
             api, 997_650, patreon_user_id="p-650", supporter_level=SupporterLevel.PATRON
         )
 
-    assert outcome is LinkOutcome.LINKED_PREMIUM
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
     assert user.supporter_level is SupporterLevel.PATRON
-    added = [obj for obj in session.objects_added if isinstance(obj, PremiumSubscription)]
+    added = [obj for obj in session.objects_added if isinstance(obj, SupporterSubscription)]
     assert len(added) == 1
     assert added[0].patreon_user_id == "p-650"
-    assert added[0].premium_expiration is not None
+    assert added[0].support_expiration is not None
     api.assert_method_just_called("send_message_to_user", times=1)
 
     linked = one_log(logs, "Patreon account linked")
     assert linked["flow"] == "patreon_oauth_callback"
     assert linked["stage"] == "persist"
-    assert linked["outcome"] == "linked_premium"
+    assert linked["outcome"] == "linked_supporter"
     assert linked["tg_user_id"] == 997_650
     assert linked["patreon_user_id"] == "p-650"
     assert linked["supporter_level"] == "patron"
@@ -537,9 +537,9 @@ async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Cal
 
     assert outcome is LinkOutcome.LINKED_NO_PATRON
     assert user.supporter_level is SupporterLevel.NONE
-    added = [obj for obj in session.objects_added if isinstance(obj, PremiumSubscription)]
+    added = [obj for obj in session.objects_added if isinstance(obj, SupporterSubscription)]
     assert len(added) == 1
-    assert added[0].premium_expiration is None
+    assert added[0].support_expiration is None
     api.assert_method_just_called("send_message_to_user", times=1)
 
 
@@ -568,7 +568,7 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
     user = create_user(id=1, tg_user_id=997_652)
     session.add_object(user, "tg_user_id")
     # A subscription for the same Patreon account already belongs to a different user.
-    other = create_premium_subscription(user_id=2, patreon_user_id="p-shared")
+    other = create_supporter_subscription(user_id=2, patreon_user_id="p-shared")
     session.add_object(other, "patreon_user_id")
     patch_begin_write(session)
 
@@ -580,7 +580,7 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
 
     assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE
     assert user.supporter_level is SupporterLevel.NONE
-    assert not any(isinstance(obj, PremiumSubscription) for obj in session.objects_added)
+    assert not any(isinstance(obj, SupporterSubscription) for obj in session.objects_added)
     api.assert_method_just_called("send_message_to_user", times=0)
 
     warning = one_log(logs, "Patreon account already linked to another Telegram user")
@@ -603,7 +603,7 @@ async def test_upsert_creates_subscription_when_absent():
 async def test_upsert_updates_in_place():
     session = MockDbSession()
     user = create_user(id=1, tg_user_id=997_654)
-    existing = create_premium_subscription(
+    existing = create_supporter_subscription(
         user_id=user.db_id,
         patreon_user_id="p-old",
     )

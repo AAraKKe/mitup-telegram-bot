@@ -165,7 +165,7 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     requested_max = int(cast(str, number))
 
     # A free owner is capped by the free-tier participant limit; reject anything above it and keep
-    # the conversation open so they can enter a valid number. Premium owners set any limit.
+    # the conversation open so they can enter a valid number. Supporter owners set any limit.
     if rejection := participant_capacity_rejection(user, requested_max):
         await context.api.send_message(update=update, view=edit_max_participants_view(meeting).with_context(rejection))
         return ConversationMeetingState.EDIT_MAX_PARTICIPANTS

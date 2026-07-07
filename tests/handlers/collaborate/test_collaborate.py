@@ -22,7 +22,7 @@ from tests.helpers import (
     UpdateRequest,
     call_handler,
     create_patreon_config,
-    create_premium_subscription,
+    create_supporter_subscription,
 )
 from tests.helpers.stub_db import MockDbSession
 
@@ -94,7 +94,7 @@ async def test_collaborate_linked_not_patron_view(
 ):
     user_with_settings.supporter_level = SupporterLevel.NONE
     mock_session.add_object(user_with_settings, "tg_user_id")
-    subscription = create_premium_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")
 
     context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
@@ -115,7 +115,7 @@ async def test_collaborate_linked_patron_view(
 ):
     user_with_settings.supporter_level = SupporterLevel.PATRON
     mock_session.add_object(user_with_settings, "tg_user_id")
-    subscription = create_premium_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")
 
     context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
@@ -133,7 +133,7 @@ async def test_unlink_deletes_subscription_and_revokes_premium(
 ):
     user_with_settings.supporter_level = SupporterLevel.PATRON
     mock_session.add_object(user_with_settings, "tg_user_id")
-    subscription = create_premium_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
     mock_session.add_object(subscription, "user_id")
 
     context, _ = await call_handler(CollaborateHandlerId.UNLINK, handler_context=handler_context)

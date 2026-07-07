@@ -5,7 +5,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.engine.default import DefaultDialect
 
 from mitup_bot.exceptions import TokenEncryptionNotConfigured
-from mitup_bot.models.premium import EncryptedToken, TokenCipher, configure_token_encryption
+from mitup_bot.models.subscriptions import EncryptedToken, TokenCipher, configure_token_encryption
 
 
 @pytest.fixture(autouse=True)
