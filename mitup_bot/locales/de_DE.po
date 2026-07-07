@@ -946,5 +946,11 @@ msgstr "<b>🧡 Du bist ein Unterstützer</b>\n\nDanke, dass du Mitup unterstüt
 msgid "SupporterNotificationMessages.PATRON_UNLOCKED"
 msgstr "<b>🌟 Du bist ein Förderer</b>\n\nDanke, dass du Mitup unterstützt. Dein Förderer-Abzeichen ist aktiv, und deine Limits wurden gerade erhöht: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest."
 
+msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
+msgstr "<b>🧡 Deine Stufe ist jetzt Unterstützer</b>\n\nDein Unterstützer-Abzeichen bleibt in deinem Profil, und es gelten die Standard-Limits für Treffen: eine feste Anzahl gleichzeitig aktiver Treffen, der Standard-Planungszeitraum und die Standard-Obergrenze für Teilnehmer pro Treffen. Danke, dass du Mitup unterstützt."
+
+msgid "SupporterNotificationMessages.PATRON_TIER_SET"
+msgstr "<b>🌟 Deine Stufe ist jetzt Förderer</b>\n\nDein Förderer-Abzeichen ist aktiv, und es gelten deine Förderer-Limits: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest. Danke, dass du Mitup unterstützt."
+
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 Du bist ein Veranstalter</b>\n\nDanke, dass du Mitup unterstützt. Dein Veranstalter-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."

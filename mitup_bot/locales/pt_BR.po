@@ -948,3 +948,9 @@ msgstr "<b>🌟 Você é um Patrono</b>\n\nObrigado por apoiar o Mitup. Seu selo
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 Você é um Organizador</b>\n\nObrigado por apoiar o Mitup. Seu selo de Organizador está ativo, e todos os limites foram removidos: realize quantos eventos quiser, agende-os com toda a antecedência que precisar e convide quantas pessoas quiser para cada um."
+
+msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
+msgstr "<b>🧡 Seu nível agora é Apoiador</b>\n\nSeu selo de Apoiador continua no seu perfil, e valem os limites padrão para eventos: um número definido de eventos ativos ao mesmo tempo, a janela de agendamento padrão e o limite padrão de participantes por evento. Obrigado por apoiar o Mitup."
+
+msgid "SupporterNotificationMessages.PATRON_TIER_SET"
+msgstr "<b>🌟 Seu nível agora é Patrono</b>\n\nSeu selo de Patrono está ativo, e valem os limites de Patrono: realize mais eventos ao mesmo tempo, agende-os com mais antecedência e convide quantas pessoas quiser para cada um. Obrigado por apoiar o Mitup."

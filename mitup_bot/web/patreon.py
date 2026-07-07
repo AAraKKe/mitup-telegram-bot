@@ -675,10 +675,13 @@ def apply_membership_transition(
 
 
 async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome: WebhookApplied):
-    """Send the DM matching the transition; silent for a no-op or a between-tier downgrade."""
+    """Send the DM matching the transition; silent only for a no-op (unchanged)."""
     match outcome:
         case WebhookApplied.UPGRADED:
             message = SupporterNotificationMessages.unlocked_for(user.supporter_level)
+            await api.send_message_to_user(user, message.get(lang=user.lang))
+        case WebhookApplied.DOWNGRADED:
+            message = SupporterNotificationMessages.downgraded_to(user.supporter_level)
             await api.send_message_to_user(user, message.get(lang=user.lang))
         case WebhookApplied.GRACE_STARTED:
             # The catalog copy phrases the window in days (``${days}``), fed from SUPPORT_GRACE_DAYS so
@@ -687,7 +690,7 @@ async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome:
                 user,
                 SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS),
             )
-        case WebhookApplied.DOWNGRADED | WebhookApplied.UNCHANGED:
+        case WebhookApplied.UNCHANGED:
             ...
 
 

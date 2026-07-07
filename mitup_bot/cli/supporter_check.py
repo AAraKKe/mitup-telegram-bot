@@ -205,8 +205,8 @@ async def sync_subscription_level(
 
     Derives the target tier from ``currently_entitled_amount_cents`` and writes it when it differs,
     refreshing grace on any change (the member is confirmed active this run). A rank increase notifies
-    the user with the generic upgrade message; a between-tier drop (still an active supporter) adjusts
-    silently — per-level copy is a later phase. A member absent from the amounts map is lapsing and
+    the user with the per-tier unlock message; a between-tier drop (still an active supporter) notifies
+    with the neutral per-tier tier-set message. A member absent from the amounts map is lapsing and
     left to the grace flow, so this returns SKIPPED for them."""
     async with db.begin_write(api) as session:
         subscription = (
@@ -233,6 +233,8 @@ async def sync_subscription_level(
             message = SupporterNotificationMessages.unlocked_for(user.supporter_level)
             await api.send_message_to_user(user, message.get(lang=user.lang))
             return LevelSyncOutcome.UPGRADED
+        message = SupporterNotificationMessages.downgraded_to(user.supporter_level)
+        await api.send_message_to_user(user, message.get(lang=user.lang))
         return LevelSyncOutcome.DOWNGRADED
 
 

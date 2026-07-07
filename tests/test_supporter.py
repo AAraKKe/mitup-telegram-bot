@@ -149,3 +149,28 @@ def test_unlocked_for_rejects_none_tier():
     # NONE never reaches the resolver: callers only announce an unlock once a paying tier is confirmed.
     with pytest.raises(ValueError, match="NONE tier"):
         SupporterNotificationMessages.unlocked_for(SupporterLevel.NONE)
+
+
+@pytest.mark.parametrize(
+    "level,expected",
+    [
+        (SupporterLevel.SUPPORTER, SupporterNotificationMessages.SUPPORTER_TIER_SET),
+        (SupporterLevel.PATRON, SupporterNotificationMessages.PATRON_TIER_SET),
+    ],
+)
+def test_downgraded_to_maps_lower_paying_tiers(level: SupporterLevel, expected: SupporterNotificationMessages):
+    assert SupporterNotificationMessages.downgraded_to(level) is expected
+
+
+@pytest.mark.parametrize(
+    "level,match",
+    [
+        # ORGANIZER is the top tier, so nothing downgrades *to* it.
+        (SupporterLevel.ORGANIZER, "top tier"),
+        # A drop to NONE is a full loss handled by the grace/revoke messages, not a between-tier downgrade.
+        (SupporterLevel.NONE, "loss"),
+    ],
+)
+def test_downgraded_to_rejects_non_downgrade_targets(level: SupporterLevel, match: str):
+    with pytest.raises(ValueError, match=match):
+        SupporterNotificationMessages.downgraded_to(level)

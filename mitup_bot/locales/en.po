@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-07 02:43\n"
+"PO-Revision-Date: 2026-07-07 08:44\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -721,6 +721,12 @@ msgstr "<b>🌟 You're a Patron</b>\n\nThanks for backing Mitup. Your Patron bad
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 You're an Organizer</b>\n\nThanks for backing Mitup. Your Organizer badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one."
+
+msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
+msgstr "<b>🧡 Your tier is now Supporter</b>\n\nYour Supporter badge stays on your profile, and the standard meeting limits apply: a set number of active meetings at once, the standard scheduling window, and the standard participant cap per meeting. Thanks for backing Mitup."
+
+msgid "SupporterNotificationMessages.PATRON_TIER_SET"
+msgstr "<b>🌟 Your tier is now Patron</b>\n\nYour Patron badge is on, and your Patron limits apply: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

@@ -752,6 +752,25 @@ class SupporterNotificationMessages(MessageBase):
         "you like to each one."
     )
 
+    # Settled at the Supporter tier after a between-tier change (still a paying supporter, lower tier).
+    # Neutral by design: it states the current tier and its standard limits without framing the move
+    # as a loss or comparing it to the prior tier. Supporter carries the badge and our thanks, but no
+    # raised limits, so the copy names the standard limits rather than promising bigger or more.
+    SUPPORTER_TIER_SET = (
+        f"<b>{Emojis.SUPPORTER} Your tier is now Supporter</b>\n\n"
+        "Your Supporter badge stays on your profile, and the standard meeting limits apply: a set "
+        "number of active meetings at once, the standard scheduling window, and the standard "
+        "participant cap per meeting. Thanks for backing Mitup."
+    )
+    # Settled at the Patron tier after a between-tier change. Neutral by design (see SUPPORTER_TIER_SET):
+    # it states the current tier and what it includes without framing the move as a loss. Patron carries
+    # a raised active-meeting cap, a further scheduling horizon, and unlimited participants, plus the badge.
+    PATRON_TIER_SET = (
+        f"<b>{Emojis.PATRON} Your tier is now Patron</b>\n\n"
+        "Your Patron badge is on, and your Patron limits apply: run more meetings at once, schedule "
+        "them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
+    )
+
     @classmethod
     def unlocked_for(cls, level: SupporterLevel) -> SupporterNotificationMessages:
         """The per-tier unlock message for a newly active paying tier.
@@ -767,6 +786,24 @@ class SupporterNotificationMessages(MessageBase):
                 return cls.ORGANIZER_UNLOCKED
             case SupporterLevel.NONE:
                 raise ValueError("No unlock message exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    @classmethod
+    def downgraded_to(cls, level: SupporterLevel) -> SupporterNotificationMessages:
+        """The neutral tier-set message for a between-tier downgrade (still a paying supporter).
+
+        Only the lower paying tiers are valid targets: ORGANIZER is the top tier so nothing downgrades
+        *to* it, and a drop to NONE is a full loss handled by the grace/revoke messages, not here."""
+        match level:
+            case SupporterLevel.SUPPORTER:
+                return cls.SUPPORTER_TIER_SET
+            case SupporterLevel.PATRON:
+                return cls.PATRON_TIER_SET
+            case SupporterLevel.ORGANIZER:
+                raise ValueError("Organizer is the top tier, not a downgrade target")
+            case SupporterLevel.NONE:
+                raise ValueError("A drop to NONE is a loss, not a downgrade")
             case _ as unreachable:
                 assert_never(unreachable)
 

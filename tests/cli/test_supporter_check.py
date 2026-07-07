@@ -386,17 +386,20 @@ async def test_sync_promotes_patron_to_organizer_and_notifies(
     )
 
 
-async def test_sync_downgrades_between_tiers_silently(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):
+async def test_sync_downgrades_between_tiers_notifies(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):
     subscription, user = make_subscription_user()
     user.supporter_level = SupporterLevel.ORGANIZER
     register_syncable(mock_session, subscription, user)
 
-    # Still an active member, but their entitled amount now only reaches the Patron threshold.
+    # Still an active member, but their entitled amount now only reaches the Patron threshold: the drop
+    # sends the neutral per-tier DM naming the tier they settled on (Patron at 500 cents).
     outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
 
     assert outcome is supporter_check.LevelSyncOutcome.DOWNGRADED
     assert user.supporter_level is SupporterLevel.PATRON
-    api.assert_method_just_called("send_message_to_user", times=0)
+    api.assert_send_message_to_user_called(
+        user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang)
+    )
 
 
 async def test_sync_unchanged_when_level_matches(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):

@@ -948,3 +948,9 @@ msgstr "<b>🌟 Xa es Mecenas</b>\n\nGrazas por apoiar Mitup. A túa insignia de
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 Xa es Organizador</b>\n\nGrazas por apoiar Mitup. A túa insignia de Organizador está activa e desaparecen todos os límites: organiza cantas quedadas queiras, prográmaas con toda a antelación que precises e convida a cantas persoas queiras a cada unha."
+
+msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
+msgstr "<b>🧡 Agora es Colaborador</b>\n\nA túa insignia de Colaborador segue no teu perfil, e aplícanse os límites estándar das quedadas: un número fixo de quedadas activas á vez, o período de programación estándar e o tope estándar de participantes por quedada. Grazas por apoiar Mitup."
+
+msgid "SupporterNotificationMessages.PATRON_TIER_SET"
+msgstr "<b>🌟 Agora es Mecenas</b>\n\nA túa insignia de Mecenas está activa e aplícanse os teus límites de Mecenas: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha. Grazas por apoiar Mitup."

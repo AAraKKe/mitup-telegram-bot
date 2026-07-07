@@ -945,3 +945,9 @@ msgstr "<b>🌟 Ya eres Mecenas</b>\n\nGracias por apoyar a Mitup. Tu insignia d
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 Ya eres Organizador</b>\n\nGracias por apoyar a Mitup. Tu insignia de Organizador está activa y todos los límites desaparecen: organiza tantas quedadas como quieras, prográmalas con toda la antelación que necesites e invita a cuanta gente quieras a cada una."
+
+msgid "SupporterNotificationMessages.SUPPORTER_TIER_SET"
+msgstr "<b>🧡 Tu nivel ahora es Colaborador</b>\n\nTu insignia de Colaborador sigue en tu perfil, y se aplican los límites estándar de quedadas: un número fijo de quedadas activas a la vez, la ventana de programación estándar y el tope estándar de participantes por quedada. Gracias por apoyar a Mitup."
+
+msgid "SupporterNotificationMessages.PATRON_TIER_SET"
+msgstr "<b>🌟 Tu nivel ahora es Mecenas</b>\n\nTu insignia de Mecenas está activa y se aplican tus límites de Mecenas: organiza más quedadas a la vez, prográmalas con más antelación e invita a cuanta gente quieras a cada una. Gracias por apoyar a Mitup."

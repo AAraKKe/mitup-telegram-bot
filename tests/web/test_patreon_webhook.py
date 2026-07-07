@@ -346,7 +346,7 @@ async def test_apply_upgrade_grants_and_notifies(
     api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang))
 
 
-async def test_apply_downgrade_is_silent(
+async def test_apply_downgrade_notifies(
     patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig
 ):
     session = MockDbSession()
@@ -354,14 +354,15 @@ async def test_apply_downgrade_is_silent(
     patch_begin_write(session)
     api = MockApi()
 
-    # An active member now entitled to a lower tier: still a supporter, so the drop is silent.
+    # An active member now entitled to a lower tier: still a supporter, so the drop sends the neutral
+    # per-tier DM naming the tier they landed on (Organizer -> Patron at 500 cents).
     outcome = await apply_membership_event(
         api, "members:update", WebhookMemberPayload.model_validate(member_dict(cents=500))
     )
 
     assert outcome is WebhookApplied.DOWNGRADED
     assert user.supporter_level is SupporterLevel.PATRON
-    api.assert_method_just_called("send_message_to_user", times=0)
+    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang))
 
 
 async def test_apply_delete_starts_grace_and_keeps_perks(
