@@ -38,7 +38,7 @@ def test_handler_id_flow_derivation(handler_id: HandlerId, expected_flow: str):
 
 
 def test_handler_log_context_includes_request_fields(update: Update):
-    """handler_log_context binds flow/handler/handler_type/update_id plus user_id/chat_id when present."""
+    """handler_log_context binds flow/handler/handler_type/update_id plus tg_user_id/chat_id when present."""
     fields = handler_log_context(LoggingTestId.SOME_HANDLER, "Command", update)
 
     assert fields == {
@@ -46,7 +46,7 @@ def test_handler_log_context_includes_request_fields(update: Update):
         "handler": LoggingTestId.SOME_HANDLER.dimension,
         "handler_type": "Command",
         "update_id": DEFAULT_ID,
-        "user_id": DEFAULT_ID,
+        "tg_user_id": DEFAULT_ID,
         "chat_id": DEFAULT_ID,
     }
 
@@ -64,13 +64,13 @@ def test_handler_log_context_omits_missing_user_and_chat():
         "handler_type": "Callback",
         "update_id": 999,
     }
-    assert "user_id" not in fields
+    assert "tg_user_id" not in fields
     assert "chat_id" not in fields
 
 
 async def test_log_inside_callback_carries_request_contextvars(update: Update, app: StubMitupApp, mock_session: object):
     """A log emitted from inside a callback wrapped by callback_with_metrics carries the
-    handler/handler_type/user_id/chat_id/update_id fields bound for the request."""
+    handler/handler_type/tg_user_id/chat_id/update_id fields bound for the request."""
     context = build_context(update, app)
 
     async def callback(_update: Update, _context: StubMitupContext):
@@ -89,7 +89,7 @@ async def test_log_inside_callback_carries_request_contextvars(update: Update, a
     assert entry["flow"] == LoggingTestId.SOME_HANDLER.flow
     assert entry["handler"] == LoggingTestId.SOME_HANDLER.dimension
     assert entry["handler_type"] == "Command"
-    assert entry["user_id"] == DEFAULT_ID
+    assert entry["tg_user_id"] == DEFAULT_ID
     assert entry["chat_id"] == DEFAULT_ID
     assert entry["update_id"] == DEFAULT_ID
 
@@ -114,7 +114,7 @@ async def test_request_contextvars_cleared_after_callback_returns(
     after_logs = [log for log in logs if log["event"] == "after handler"]
     assert len(after_logs) == 1
     entry = after_logs[0]
-    for field in ("flow", "handler", "handler_type", "user_id", "chat_id", "update_id"):
+    for field in ("flow", "handler", "handler_type", "tg_user_id", "chat_id", "update_id"):
         assert field not in entry
 
 

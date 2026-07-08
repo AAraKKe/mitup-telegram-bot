@@ -103,10 +103,6 @@ Because `update_id` is also a global property in the EMF metrics payload (`Mitup
 
 Event strings stay human prose. Filtering and aggregation read the reserved keys above, never the message text.
 
-!!! note "Landing across three changes"
-
-    `component` is bound today. `flow`, and the split of `tg_user_id` from `user_id`, arrive in the two companion changes that follow this one.
-
 ## `MitupContext.log`
 
 `MitupContext.log` is a convenience accessor that returns a structlog logger. It is optional sugar for code that already holds a `MitupContext`; standalone modules should use `structlog.get_logger(__name__)` directly instead.

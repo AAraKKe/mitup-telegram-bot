@@ -131,7 +131,7 @@ def handler_log_context(handler_id: HandlerId, handler_type: str, update: Update
         "update_id": update.update_id,
     }
     if update.effective_user is not None:
-        fields["user_id"] = update.effective_user.id
+        fields["tg_user_id"] = update.effective_user.id
     if update.effective_chat is not None:
         fields["chat_id"] = update.effective_chat.id
     return fields
