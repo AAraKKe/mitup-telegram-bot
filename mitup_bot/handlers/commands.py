@@ -48,7 +48,7 @@ async def existing_user_start(
         await context.api.send_message(update=update, view=view)
         return ConversationMeetingState.TITLE
 
-    view = views.factory.main_menu_view(lang=user.lang)
+    view = views.factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
     await context.api.send_message(update=update, view=view)
     return ConversationHandler.END
 

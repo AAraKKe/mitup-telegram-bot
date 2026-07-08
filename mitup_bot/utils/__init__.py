@@ -1,4 +1,5 @@
 __all__ = (
+    "AdminMessages",
     "Bold",
     "BoldItalic",
     "BroadcastOperatorMessages",
@@ -54,6 +55,7 @@ from .entities import (
     utf16_len,
 )
 from .messages import (
+    AdminMessages,
     BroadcastOperatorMessages,
     ButtonMessages,
     CommonMessages,

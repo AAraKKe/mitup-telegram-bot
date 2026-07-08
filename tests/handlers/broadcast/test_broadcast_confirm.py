@@ -10,6 +10,7 @@ from mitup_bot.models import Broadcast, User
 from mitup_bot.models.broadcasts import BroadcastStatus
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import BroadcastOperatorMessages
+from mitup_bot.views import factory
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler, create_broadcast
 
 ADMIN_TG_ID = 123
@@ -103,8 +104,12 @@ async def test_cancel_deletes_the_draft(
 
     assert state == ConversationHandler.END
     mock_session.assert_deleted(broadcast)
+    # Cancelling returns the operator to the admin menu with the discard confirmation prepended.
     context.api.assert_edit_message_called(
-        update, BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=user_with_settings.lang)
+        update,
+        factory.admin_menu_view(lang=user_with_settings.lang).with_context(
+            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=user_with_settings.lang)
+        ),
     )
 
 
@@ -125,5 +130,8 @@ async def test_cancel_confirms_even_when_draft_already_gone(
     assert state == ConversationHandler.END
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
-        update, BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=user_with_settings.lang)
+        update,
+        factory.admin_menu_view(lang=user_with_settings.lang).with_context(
+            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=user_with_settings.lang)
+        ),
     )

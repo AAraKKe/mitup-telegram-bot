@@ -53,6 +53,10 @@ async def callback_query_show_joined_meetings(session: AsyncSession, update: Upd
         )
 
     else:
-        view = factory.main_menu_view(lang=user.lang, message=MeetingListMessages.JOINED_EMPTY.get(lang=user.lang))
+        view = factory.main_menu_view(
+            lang=user.lang,
+            message=MeetingListMessages.JOINED_EMPTY.get(lang=user.lang),
+            is_admin=guards.is_admin(update, context),
+        )
 
     await context.api.edit_message(update=update, view=view)

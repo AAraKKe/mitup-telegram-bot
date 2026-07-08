@@ -21,7 +21,9 @@ CONTENT_FILTER = filters.Document.ALL | (filters.TEXT & ~filters.COMMAND)
 # Deliberately undecorated: the document download and the per-language preview sends must not run
 # inside an open DB session. The operator load and the draft/recipient reads each take their own
 # short transaction (see load_operator and preview.py), so no connection is held across Telegram I/O.
-@HandlersRegistry.register_message(BroadcastHandlerId.BROADCAST_CONTENT_MESSAGE, CONTENT_FILTER, bindable=False)
+@HandlersRegistry.register_message(
+    BroadcastHandlerId.BROADCAST_CONTENT_MESSAGE, CONTENT_FILTER, bindable=False, admin_only=True
+)
 async def broadcast_content_message_handler(update: Update, context: TMitupContext) -> ConversationBroadcastState:
     operator = await load_operator(update)
     if operator is None:
@@ -42,7 +44,7 @@ async def broadcast_content_message_handler(update: Update, context: TMitupConte
 
 
 @HandlersRegistry.register_message(
-    BroadcastHandlerId.BROADCAST_INVALID_CONTENT_MESSAGE, ~filters.COMMAND, bindable=False
+    BroadcastHandlerId.BROADCAST_INVALID_CONTENT_MESSAGE, ~filters.COMMAND, bindable=False, admin_only=True
 )
 async def broadcast_invalid_content_message_handler(
     update: Update, context: TMitupContext

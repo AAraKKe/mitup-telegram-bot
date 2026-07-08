@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Chat, Message, Update
 
 from mitup_bot.callback_data import CallbackData, MeetingListSource, PaginatedCallbackData
+from mitup_bot.custom_context import BOT_CONFIG_KEY
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -21,6 +22,7 @@ from mitup_bot.guards import (
     callback_query,
     chat,
     current_user,
+    is_admin,
     meeting_accessible,
     meeting_viewable,
     message,
@@ -45,13 +47,44 @@ from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
+    create_bot_config,
     create_joined_link,
     create_meetup,
     create_settings,
     create_user,
 )
+from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
+
+
+def set_admin_ids(context: StubMitupContext, admin_ids: list[int]):
+    context.bot_data[BOT_CONFIG_KEY] = create_bot_config(admin_ids)
+
+
+def test_is_admin_true_for_allowlisted_user(context: StubMitupContext, update: Update):
+    set_admin_ids(context, [DEFAULT_USER_ID])
+
+    assert is_admin(update, context) is True
+
+
+def test_is_admin_false_for_non_allowlisted_user(context: StubMitupContext, update: Update):
+    set_admin_ids(context, [DEFAULT_USER_ID + 1])
+
+    assert is_admin(update, context) is False
+
+
+def test_is_admin_false_for_empty_allowlist(context: StubMitupContext, update: Update):
+    set_admin_ids(context, [])
+
+    assert is_admin(update, context) is False
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
+def test_is_admin_false_without_effective_user(context: StubMitupContext, update: Update):
+    set_admin_ids(context, [DEFAULT_USER_ID])
+
+    assert is_admin(update, context) is False
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)

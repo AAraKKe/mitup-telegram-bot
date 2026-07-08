@@ -86,7 +86,7 @@ async def registration_timezone_text_message_handler(
     user.status = UserStatus.MEMBER
 
     message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone)
-    view = factory.main_menu_view(lang=user.lang).with_context(message)
+    view = factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context)).with_context(message)
 
     await context.api.send_message(update=update, view=view)
 
@@ -126,7 +126,7 @@ async def registration_timezone_location_message_handler(
     user.status = UserStatus.MEMBER
 
     message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone)
-    view = factory.main_menu_view(lang=user.lang).with_context(message)
+    view = factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context)).with_context(message)
 
     await context.api.send_message(update=update, view=view)
 

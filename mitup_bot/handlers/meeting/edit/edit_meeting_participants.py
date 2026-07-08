@@ -152,7 +152,9 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
                 return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(
+            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+        )
         return ConversationHandler.END
 
     # for_update: capacity changes race with concurrent joins reading `full`, so the write happens
@@ -197,7 +199,9 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
             response_view = edit_max_participants_view(meeting, fail=True)
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(
+            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+        )
         return ConversationHandler.END
 
     await context.api.send_message(update=update, view=response_view)

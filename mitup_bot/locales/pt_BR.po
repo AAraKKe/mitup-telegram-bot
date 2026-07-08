@@ -963,3 +963,12 @@ msgstr "<b>☕️ Seu nível agora é Brewer</b>\n\nSeu selo de Brewer continua 
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Seu nível agora é Gamemaster</b>\n\nSeu selo de Gamemaster está ativo, e valem os limites de Gamemaster: realize mais eventos ao mesmo tempo, agende-os com mais antecedência e convide quantas pessoas quiser para cada um. Obrigado por apoiar o Mitup."
+
+msgid "AdminMessages.MENU_DESCRIPTION"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_ADMIN"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_BROADCAST"
+msgstr ""

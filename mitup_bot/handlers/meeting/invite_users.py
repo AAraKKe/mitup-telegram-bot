@@ -153,7 +153,7 @@ async def abort_invitation(
     if meeting is not None and user.own_meeting(meeting_id):
         view = meeting.view_for(user).with_context(message=message)
     else:
-        view = main_menu_view(lang=user.lang, message=message)
+        view = main_menu_view(lang=user.lang, message=message, is_admin=guards.is_admin(update, context))
 
     await context.api.edit_message(update, view)
     return ConversationHandler.END
@@ -192,7 +192,7 @@ async def invite_users_name_message_handler(
             # If the user cannot continue mid conversation, go back to the main menu
             await context.api.edit_message(
                 update=update,
-                view=main_menu_view(lang=user.lang),
+                view=main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context)),
             )
             return ConversationHandler.END
 
@@ -232,7 +232,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             # If the user cannot continue mid conversation, go back to the main menu
             await context.api.edit_message(
                 update=update,
-                view=main_menu_view(lang=user.lang),
+                view=main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context)),
             )
             return ConversationHandler.END
 
@@ -285,7 +285,7 @@ async def callback_query_fallback_invite_user(session: AsyncSession, update: Upd
     context.clean_user_data([ContextId.INVITE_USERS])
 
     message = MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user.lang)
-    view = main_menu_view(lang=user.lang, message=message)
+    view = main_menu_view(lang=user.lang, message=message, is_admin=guards.is_admin(update, context))
 
     await context.api.send_message_to_user(user, view)
 

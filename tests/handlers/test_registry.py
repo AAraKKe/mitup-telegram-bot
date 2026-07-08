@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CommandHand
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.custom_context import BOT_CONFIG_KEY
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
@@ -22,8 +23,10 @@ from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
     build_context,
+    create_bot_config,
     make_test_metrics_client,
 )
+from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -276,3 +279,136 @@ def test_conversation_handler_can_be_registered():
     )
 
     assert ConversationsTestId.CONVERSATION_WITH_HANDLERS in HandlersRegistry.handlers
+
+
+# ---------------------------------------------------------------------------
+# Admin-only gate (admin_only=True on register_command/message/callback_query)
+# ---------------------------------------------------------------------------
+
+
+def admin_context(update: Update, app: StubMitupApp) -> StubMitupContext:
+    """A context whose acting user (DEFAULT_USER_ID) is on the admin allowlist."""
+    app.bot_data[BOT_CONFIG_KEY] = create_bot_config([DEFAULT_USER_ID])
+    return build_context(update, app)
+
+
+def non_admin_context(update: Update, app: StubMitupApp) -> StubMitupContext:
+    """A context whose acting user is not on the (empty) admin allowlist."""
+    app.bot_data[BOT_CONFIG_KEY] = create_bot_config([])
+    return build_context(update, app)
+
+
+async def invoke(handler_id: HandlerId, update: Update, context: StubMitupContext) -> object:
+    """Run a ClearableRegistry handler's wrapped callback (metrics + gate + auto-answer)."""
+    result = await ClearableRegistry.handlers[handler_id].handler.callback(update, context)
+    await context.flush_metrics()
+    return result
+
+
+async def test_admin_only_command_runs_for_admin(update: Update, app: StubMitupApp):
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="admincmd", admin_only=True)
+    async def command_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    result = await invoke(HandlerTestId.SOME_COMMAND, update, admin_context(update, app))
+
+    called.assert_awaited_once()
+    assert result == "RESULT"
+    ClearableRegistry.clear()
+
+
+async def test_admin_only_command_dropped_for_non_admin(update: Update, app: StubMitupApp):
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="admincmd", admin_only=True)
+    async def command_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    result = await invoke(HandlerTestId.SOME_COMMAND, update, non_admin_context(update, app))
+
+    called.assert_not_awaited()
+    assert result is None
+    ClearableRegistry.clear()
+
+
+async def test_admin_only_message_runs_for_admin(update: Update, app: StubMitupApp):
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_message(HandlerTestId.BINDABLE, filters=TEXT, admin_only=True)
+    async def message_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    await invoke(HandlerTestId.BINDABLE, update, admin_context(update, app))
+
+    called.assert_awaited_once()
+    ClearableRegistry.clear()
+
+
+async def test_admin_only_message_dropped_for_non_admin(update: Update, app: StubMitupApp):
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_message(HandlerTestId.BINDABLE, filters=TEXT, admin_only=True)
+    async def message_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    result = await invoke(HandlerTestId.BINDABLE, update, non_admin_context(update, app))
+
+    called.assert_not_awaited()
+    assert result is None
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_admin_only_callback_query_runs_for_admin(update: Update, app: StubMitupApp):
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, admin_only=True)
+    async def callback_query_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    context = admin_context(update, app)
+    await invoke(HandlerTestId.BINDABLE, update, context)
+
+    called.assert_awaited_once()
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_admin_only_callback_query_dropped_for_non_admin_still_answers(update: Update, app: StubMitupApp):
+    """A forged/stale callback from a non-admin is dropped, but the auto-answer still fires so the
+    Telegram client spinner clears."""
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, admin_only=True)
+    async def callback_query_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    context = non_admin_context(update, app)
+    result = await invoke(HandlerTestId.BINDABLE, update, context)
+
+    called.assert_not_awaited()
+    assert result is None
+    assert update.callback_query is not None
+    context.bot.answer_callback_query.assert_awaited_once_with(update.callback_query.id)
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
+async def test_admin_only_dropped_when_no_effective_user(update: Update, app: StubMitupApp):
+    """No effective user means no admin identity, so the gate drops the update even when the
+    allowlist is non-empty."""
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_message(HandlerTestId.BINDABLE, filters=TEXT, admin_only=True)
+    async def message_admin(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    # Allowlist is non-empty, but the update carries no effective user.
+    app.bot_data[BOT_CONFIG_KEY] = create_bot_config([DEFAULT_USER_ID])
+    result = await invoke(HandlerTestId.BINDABLE, update, build_context(update, app))
+
+    called.assert_not_awaited()
+    assert result is None
+    ClearableRegistry.clear()

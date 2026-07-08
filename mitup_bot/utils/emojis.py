@@ -33,6 +33,7 @@ class Emojis(Enum):
     PAST = "💾"
     JOINED = "👥"
     SETTINGS = "⚙️"
+    TOOLS = "🛠️"
     HELP = "❓"
     HEART = "♥"
     DONATE = "💶"

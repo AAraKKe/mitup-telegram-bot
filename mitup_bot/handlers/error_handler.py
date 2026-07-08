@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.error import BadRequest
 
-from mitup_bot import db
+from mitup_bot import db, guards
 from mitup_bot.config import Env
 from mitup_bot.exceptions import GuardError, InactiveUserInteraction
 from mitup_bot.models import User
@@ -61,7 +61,13 @@ async def resolve_lang(session: AsyncSession, update: Update | None) -> str:
 
 
 async def send_guard_notification(context: TMitupContext, update: Update, lang: str):
-    view = factory.main_menu_view(lang=lang, message=CommonMessages.UNEXPECTED_ERROR.get(lang=lang))
+    # This runs in the best-effort guard-error path (wrapped in try/except upstream), and both
+    # update and context are available here, so an admin keeps seeing the Admin row on the redirect.
+    view = factory.main_menu_view(
+        lang=lang,
+        message=CommonMessages.UNEXPECTED_ERROR.get(lang=lang),
+        is_admin=guards.is_admin(update, context),
+    )
     if update.callback_query is not None:
         await context.api.answer_callback_query(update=update, text="", show_alert=False)
     await context.api.send_message(update=update, view=view)

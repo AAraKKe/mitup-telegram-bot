@@ -56,6 +56,7 @@ async def callback_query_show_meetings(session: AsyncSession, update: Update, co
     else:
         view = factory.main_menu_view(
             lang=user.lang,
+            is_admin=guards.is_admin(update, context),
             message=MeetingListMessages.ACTIVE_EMPTY.get(
                 lang=user.settings.language,
                 new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user.settings.language),

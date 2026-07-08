@@ -4,7 +4,7 @@ import pytest
 
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages
+from mitup_bot.utils.messages import AdminMessages, ButtonMessages
 from mitup_bot.views import ButtonConfig, MitupView, factory
 
 
@@ -126,6 +126,48 @@ def test_edit_meeting_date_view_end_date_back_button_names_end_hub(lang: str):
         text=ButtonMessages.END_DATE_TIME.back(lang=lang),
         callback_data=cb.EDIT_MEETING_END_DATE_TIME.with_id(meeting_id),
     )
+
+
+def test_main_menu_view_hides_admin_button_by_default(lang: str):
+    view = factory.main_menu_view(lang=lang)
+
+    admin_button = ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)
+    all_buttons = [button for row in view.keyboard for button in row]
+    assert admin_button not in all_buttons
+
+
+def test_main_menu_view_default_keyboard_matches_non_admin(lang: str):
+    # The is_admin default must render exactly today's keyboard, unchanged.
+    assert factory.main_menu_view(lang=lang) == factory.main_menu_view(lang=lang, is_admin=False)
+
+
+def test_main_menu_view_appends_admin_button_for_admins(lang: str):
+    view = factory.main_menu_view(lang=lang, is_admin=True)
+
+    # The admin entry is a full-width row appended at the very bottom.
+    assert view.keyboard[-1] == [
+        ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)
+    ]
+    # Everything above the admin row is identical to the non-admin keyboard.
+    assert view.keyboard[:-1] == factory.main_menu_view(lang=lang).keyboard
+
+
+def test_admin_menu_view(lang: str):
+    view = factory.admin_menu_view(lang=lang)
+
+    expected_view = MitupView(
+        AdminMessages.MENU_DESCRIPTION.get(lang=lang),
+        keyboard=[
+            [
+                ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get(lang=lang), callback_data=cb.BROADCAST),
+            ],
+            [
+                ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU),
+            ],
+        ],
+    )
+
+    assert expected_view == view
 
 
 @pytest.mark.parametrize("option", [True, False])

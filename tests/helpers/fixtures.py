@@ -10,7 +10,7 @@ from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import BotConfig, PatreonConfig
-from mitup_bot.custom_context import MitupContext, MitupUserData
+from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.models import (
     Broadcast,
     JoinedUsers,
@@ -329,7 +329,12 @@ def create_test_app() -> Application:
     bot.defaults = None
     builder.bot(bot)
     builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
-    return builder.build()
+    app = builder.build()
+    # Mirror MitupRuntime: stash a BotConfig so `context.bot_config` (used by `guards.is_admin`)
+    # always resolves. The default allowlist is empty, so `is_admin` is False unless a test stashes
+    # a config naming the acting user as an admin.
+    app.bot_data[BOT_CONFIG_KEY] = create_bot_config([])
+    return app
 
 
 def create_update(

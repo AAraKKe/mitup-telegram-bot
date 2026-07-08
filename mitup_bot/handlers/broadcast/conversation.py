@@ -4,7 +4,7 @@ from .enums import BroadcastHandlerId, ConversationBroadcastState
 
 HandlersRegistry.register_conversation_handler(
     BroadcastHandlerId.BROADCAST_CONVERSATION,
-    entry_points_handler_names=[BroadcastHandlerId.BROADCAST_COMMAND],
+    entry_points_handler_names=[BroadcastHandlerId.BROADCAST_OPEN_CALLBACK],
     states={
         ConversationBroadcastState.AWAITING_CONTENT: [
             BroadcastHandlerId.BROADCAST_CONTENT_MESSAGE,
@@ -15,8 +15,8 @@ HandlersRegistry.register_conversation_handler(
             BroadcastHandlerId.BROADCAST_INVALID_CONTENT_MESSAGE,
         ],
     },
-    # No fallbacks: there is no /cancel command (the Cancel button on the preview handles
-    # discarding). Stray commands fall through to the bot's global handlers, and /broadcast
+    # No fallbacks: there is no /cancel command (the Cancel button handles discarding). Stray
+    # commands fall through to the bot's global handlers, and the Broadcast admin-menu button
     # re-enters via allow_reentry.
     fallbacks=[],
 )

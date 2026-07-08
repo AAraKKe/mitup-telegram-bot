@@ -17,7 +17,6 @@ from mitup_bot.callback_data import (
     ValidMeetingCallbackData,
     ValidPaginatedCallbackData,
 )
-from mitup_bot.config import BotConfig
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     EffectiveChatNotSet,
@@ -60,16 +59,14 @@ async def member_user(update: Update, session: AsyncSession) -> User | None:
     return (await session.exec(statement)).first()
 
 
-async def broadcast_admin(update: Update, session: AsyncSession, config: BotConfig) -> User | None:
-    """Return the effective user only when they are a reachable member on the broadcast allowlist.
+def is_admin(update: Update, context: TMitupContext) -> bool:
+    """Return whether the effective user is a bot admin.
 
-    Gates the `/broadcast` entry point. Non-members, unregistered users, and members whose
-    `tg_user_id` is absent from `config.admin_tg_ids` all get None so the handler bails silently,
-    never revealing the feature. An empty allowlist keeps the whole feature dormant.
+    The single admin predicate for the whole bot: pure and synchronous (no DB), True iff there is
+    an effective user whose Telegram id is on the `admin_tg_ids` allowlist from `context.bot_config`.
+    An empty allowlist keeps every admin-gated surface dormant.
     """
-    if user := await member_user(update, session):
-        return user if user.tg_user_id in config.admin_tg_ids else None
-    return None
+    return update.effective_user is not None and update.effective_user.id in context.bot_config.admin_tg_ids
 
 
 async def current_user(update: Update, session: AsyncSession) -> User:
@@ -216,7 +213,9 @@ async def user_owns_meeting(
         )
         log.warning(message)
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
-        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(
+            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=is_admin(update, context))
+        )
     return None
 
 

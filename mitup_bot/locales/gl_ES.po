@@ -963,3 +963,12 @@ msgstr "<b>☕️ Agora o teu nivel é Brewer</b>\n\nA túa insignia de Brewer s
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Agora o teu nivel é Gamemaster</b>\n\nA túa insignia de Gamemaster está activa e aplícanse os teus límites de Gamemaster: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha. Grazas por apoiar Mitup."
+
+msgid "AdminMessages.MENU_DESCRIPTION"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_ADMIN"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_BROADCAST"
+msgstr ""

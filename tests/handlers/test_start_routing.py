@@ -17,7 +17,7 @@ from sqlmodel import select
 from telegram import Update
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ConversationHandler, ExtBot
 
-from mitup_bot.custom_context import MitupContext, MitupUserData
+from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
@@ -29,7 +29,7 @@ from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import RegistrationMessages
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
-from tests.helpers import MockApi, UpdateRequest, create_user, make_test_metrics_client
+from tests.helpers import MockApi, UpdateRequest, create_bot_config, create_user, make_test_metrics_client
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_TG_USER_PARAMS
 from tests.helpers.stub_db import MockDbSession
 
@@ -80,6 +80,9 @@ async def routing_app() -> AsyncGenerator[Application]:
     builder.bot(bot)
     builder.context_types(ContextTypes(context=RecordingContext, user_data=MitupUserData))
     app = builder.build()
+    # Mirror create_test_app / MitupRuntime: stash a BotConfig so `context.bot_config`
+    # (used by guards.is_admin) resolves. Empty allowlist keeps the acting user a non-admin.
+    app.bot_data[BOT_CONFIG_KEY] = create_bot_config([])
 
     HandlersRegistry.bind(app)
     await app.initialize()

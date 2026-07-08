@@ -95,6 +95,32 @@ def callback_with_metrics(
     return inner_callback
 
 
+def guard_admin_only(handler_id: HandlerId, callback: HandlerCallback) -> HandlerCallback:
+    """Wrap `callback` so it only runs when the effective user is a bot admin.
+
+    PTB filters cannot express this uniformly: `CallbackQueryHandler` accepts no filters, and the
+    check needs the admin allowlist that lives on `context` (via `context.bot_config`), which
+    filters never see — so the gate runs here, as part of the measured callback. When a non-admin
+    reaches a gated handler the update is dropped and the wrapper returns `None`, which is safe
+    inside a `ConversationHandler` (None never changes or creates conversation state). Because the
+    admin UI is invisible to non-admins, any drop is a forged or stale interaction, logged as a
+    warning with the offending Telegram user id.
+    """
+
+    async def inner(update: Update, context: TMitupContext):
+        if not guards.is_admin(update, context):
+            tg_user_id = update.effective_user.id if update.effective_user else None
+            log.warning(
+                "Dropped update for admin-only handler from non-admin user",
+                handler=handler_id,
+                tg_user_id=tg_user_id,
+            )
+            return None
+        return await callback(update, context)
+
+    return inner
+
+
 def handler_log_context(handler_id: HandlerId, handler_type: str, update: Update) -> dict[str, object]:
     """Build the contextvar fields to bind for a handler call, omitting any the update lacks
     (some updates carry no effective_user/chat)."""
@@ -155,11 +181,15 @@ class HandlersRegistry:
         filters: BaseFilter | None = None,
         block: bool = True,
         has_args: bool | int | None = None,
+        admin_only: bool = False,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a CommandHandler.
 
         Every argument provided is the same as those that can be provided to a CommandHandler
+
+        Set ``admin_only`` to drop updates from non-admins before the callback runs (see
+        ``guard_admin_only``).
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.commandhandler.html
         """  # noqa: E501
@@ -179,10 +209,12 @@ class HandlersRegistry:
             if handler_id in cls.handlers:
                 raise HandlerRegisteredError(handler_id)
 
+            guarded = guard_admin_only(handler_id, callback) if admin_only else callback
+
             cls.handlers[handler_id] = HandlerWrapper(
                 handler=CommandHandler(
                     command_name,
-                    callback=callback_with_metrics(handler_id, "Command", callback, cls.env),
+                    callback=callback_with_metrics(handler_id, "Command", guarded, cls.env),
                     filters=filters,
                     block=block,
                     has_args=has_args,
@@ -202,11 +234,15 @@ class HandlersRegistry:
         bindable: bool = True,
         group: int = 0,
         block: bool = True,
+        admin_only: bool = False,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a MessageHandler.
 
         Every argument provided is the same as those that can be provided to a MessageHandler
+
+        Set ``admin_only`` to drop updates from non-admins before the callback runs (see
+        ``guard_admin_only``).
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.messagehandler.html
         """  # noqa: E501
@@ -217,10 +253,12 @@ class HandlersRegistry:
             if handler_id in cls.handlers:
                 raise HandlerRegisteredError(handler_id)
 
+            guarded = guard_admin_only(handler_id, callback) if admin_only else callback
+
             cls.handlers[handler_id] = HandlerWrapper(
                 handler=MessageHandler(
                     filters=filters,
-                    callback=callback_with_metrics(handler_id, "Message", callback, cls.env),
+                    callback=callback_with_metrics(handler_id, "Message", guarded, cls.env),
                     block=block,
                 ),
                 bindable=bindable,
@@ -239,11 +277,16 @@ class HandlersRegistry:
         group: int = 0,
         callback_data: CallbackData | None = None,
         block: bool = True,
+        admin_only: bool = False,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a CallbackQueryHandler. Set auto_answer to False if you want to answer
         the callback query from the callback itself. Otherwise, a dummy answer will be sent to Telegram once the
         callback finishes to make sure the Telegram client knows that the callback has been processed.
+
+        Set ``admin_only`` to drop callback queries from non-admins before the callback runs (see
+        ``guard_admin_only``). The gate sits inside the auto-answer wrapper, so a dropped query is
+        still answered and the client spinner clears.
 
         Every argument provided is the same as those that can be provided to a CallbackQueryHandler
 
@@ -256,8 +299,10 @@ class HandlersRegistry:
             if handler_id in cls.handlers:
                 raise HandlerRegisteredError(handler_id)
 
+            guarded = guard_admin_only(handler_id, callback) if admin_only else callback
+
             async def inner_wrapper(update: Update, context: TMitupContext):
-                result = await callback(update, context)
+                result = await guarded(update, context)
                 if auto_answer:
                     assert update.callback_query is not None
                     with suppress(TelegramError):

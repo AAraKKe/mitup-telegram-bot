@@ -931,3 +931,12 @@ msgstr "<b>☕️ Il tuo livello è ora Brewer</b>\n\nIl tuo badge da Brewer res
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Il tuo livello è ora Gamemaster</b>\n\nIl tuo badge da Gamemaster è attivo e valgono i tuoi limiti da Gamemaster: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno. Grazie per sostenere Mitup."
+
+msgid "AdminMessages.MENU_DESCRIPTION"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_ADMIN"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_BROADCAST"
+msgstr ""

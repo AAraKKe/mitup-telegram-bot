@@ -1012,3 +1012,12 @@ class BroadcastOperatorMessages(MessageBase):
         "<b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\n"
         "Check the logs for details."
     )
+
+
+# --- Admin (operator-only) ---
+# Operator-facing strings for the admin menu. English-only is acceptable: only allowlisted
+# admins ever see them, and any missing locale falls back to English.
+class AdminMessages(MessageBase):
+    MENU_DESCRIPTION = "<b>Admin</b>\n\nOperator actions for running the bot."
+    BUTTON_ADMIN = f"{Emojis.TOOLS} Admin"
+    BUTTON_BROADCAST = f"{Emojis.SHARE} Broadcast"

@@ -616,7 +616,7 @@ async def test_non_member_is_silently_ignored(
     handler_context: HandlerContext,
 ):
     """load_operator resolves via member_user; with no MEMBER row it returns None and the handler
-    bails silently (the entry point is already gated by broadcast_admin)."""
+    bails silently (the handler is already admin-gated by the registry)."""
     # Deliberately register no member row, so member_user resolves to None.
     context, state = await call_handler(handler_id, handler_context=handler_context)
 

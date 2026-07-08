@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from mitup_bot.callback_data import CallbackData, DateCallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import (
+    AdminMessages,
     ButtonMessages,
     Emojis,
     Languages,
@@ -34,32 +35,51 @@ LANGUAGE_BUTTONS = {
 }
 
 
-def main_menu_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
+def main_menu_view(*, lang: str, message: str | FormattedText | None = None, is_admin: bool = False) -> MitupView:
+    keyboard = [
+        [
+            ButtonConfig(text=ButtonMessages.NEW_MEETING.get(lang=lang), callback_data=cb.CREATE_MEETING),
+        ],
+        [
+            ButtonConfig(
+                text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
+            ),
+        ],
+        [
+            ButtonConfig(text=ButtonMessages.PAST_MEETINGS.get(lang=lang), callback_data=cb.PAST_MEETINGS),
+        ],
+        [
+            ButtonConfig(
+                text=ButtonMessages.JOINED_MEETINGS.get(lang=lang),
+                callback_data=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1),
+            ),
+            ButtonConfig(text=ButtonMessages.SETTINGS.get(lang=lang), callback_data=cb.SETTINGS),
+        ],
+        [
+            ButtonConfig(text=ButtonMessages.HELP.get(lang=lang), callback_data=cb.HELP),
+            ButtonConfig(text=ButtonMessages.COLLABORATE.get(lang=lang), callback_data=cb.COLLABORATE),
+        ],
+    ]
+
+    if is_admin:
+        keyboard.append([ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)])
+
+    return MitupView(message or MainMenuMessages.DESCRIPTION.get(lang=lang), keyboard=keyboard)
+
+
+def admin_menu_view(*, lang: str) -> MitupView:
     return MitupView(
-        message or MainMenuMessages.DESCRIPTION.get(lang=lang),
-        keyboard=[
+        AdminMessages.MENU_DESCRIPTION.get(lang=lang),
+        [
             [
-                ButtonConfig(text=ButtonMessages.NEW_MEETING.get(lang=lang), callback_data=cb.CREATE_MEETING),
+                ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get(lang=lang), callback_data=cb.BROADCAST),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
-                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
-                ),
-            ],
-            [
-                ButtonConfig(text=ButtonMessages.PAST_MEETINGS.get(lang=lang), callback_data=cb.PAST_MEETINGS),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.JOINED_MEETINGS.get(lang=lang),
-                    callback_data=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1),
-                ),
-                ButtonConfig(text=ButtonMessages.SETTINGS.get(lang=lang), callback_data=cb.SETTINGS),
-            ],
-            [
-                ButtonConfig(text=ButtonMessages.HELP.get(lang=lang), callback_data=cb.HELP),
-                ButtonConfig(text=ButtonMessages.COLLABORATE.get(lang=lang), callback_data=cb.COLLABORATE),
+                    text=ButtonMessages.MAIN_MENU.back(lang=lang),
+                    callback_data=cb.MAIN_MENU,
+                )
             ],
         ],
     )

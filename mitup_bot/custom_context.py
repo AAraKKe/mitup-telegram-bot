@@ -11,6 +11,7 @@ from telegram.ext import Application, CallbackContext, ExtBot
 
 from mitup_bot.api_wrapper import TelegramApi, TelegramApiWrapper
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.config import BotConfig
 from mitup_bot.exceptions import (
     ContextPropertyConversionError,
     ContextPropertyNotSetError,
@@ -26,6 +27,10 @@ from mitup_bot.monitoring.backend import EmfBackend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.utils.entities import FormattedText
+
+# Key under which the runtime stashes BotConfig in `application.bot_data` at startup (see
+# MitupRuntime), so handlers can reach it via `context.bot_config` without a module singleton.
+BOT_CONFIG_KEY = "bot_config"
 
 
 class ContextId(CamelCaseStrEnum):
@@ -160,6 +165,17 @@ class MitupContext(
         chat_id, update_id, ...) are injected from contextvars by the logging pipeline, not by this
         accessor — it returns a plain module logger."""
         return structlog.get_logger("mitup_bot")
+
+    @property
+    def bot_config(self) -> BotConfig:
+        """The `BotConfig` stashed in `bot_data` at startup (see MitupRuntime).
+
+        Handlers reach runtime bot configuration (e.g. the admin allowlist) through this
+        property instead of a module singleton.
+        """
+        config = self.bot_data.get(BOT_CONFIG_KEY)
+        assert isinstance(config, BotConfig), "BotConfig must be stashed in bot_data at startup"
+        return config
 
     def get_update(self) -> Update:
         return self.__update

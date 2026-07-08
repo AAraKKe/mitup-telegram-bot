@@ -10,6 +10,14 @@ from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallb
 EMPTY = CallbackData(action="empty", entity="empty", id=0)
 
 # ----------------------------------------
+# Admin callbacks
+# Operator-only actions reached from the admin menu. Every handler bound to these must be
+# registered with `admin_only=True` so forged callback data from non-admins is dropped.
+# ----------------------------------------
+ADMIN_MENU = CallbackData(action="show", entity="admin")
+BROADCAST = CallbackData(action="start", entity="broadcast")
+
+# ----------------------------------------
 # Meeting callbacks
 # These are callbacks for the meeting and edit meeting views
 # ----------------------------------------

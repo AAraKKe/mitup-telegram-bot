@@ -963,3 +963,12 @@ msgstr "<b>🎲 Deine Stufe ist jetzt Gamemaster</b>\n\nDein Gamemaster-Abzeiche
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 Du bist ein Commissioner</b>\n\nDanke, dass du Mitup unterstützt. Dein Commissioner-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."
+
+msgid "AdminMessages.MENU_DESCRIPTION"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_ADMIN"
+msgstr ""
+
+msgid "AdminMessages.BUTTON_BROADCAST"
+msgstr ""

@@ -43,6 +43,7 @@ async def show_past_meetings_page(user: User, page_number: int, update: Update, 
         view = factory.main_menu_view(
             lang=user.lang,
             message=MeetingListMessages.PAST_EMPTY.get(lang=user.lang),
+            is_admin=guards.is_admin(update, context),
         )
 
     await context.api.edit_message(update=update, view=view)

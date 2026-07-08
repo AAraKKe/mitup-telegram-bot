@@ -173,7 +173,9 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(
+            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+        )
         return ConversationHandler.END
 
     meeting.location.name = update.effective_message.text
@@ -204,7 +206,9 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(
+            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+        )
         return ConversationHandler.END
 
     tg_location = update.effective_message.location
@@ -244,7 +248,9 @@ async def edit_coordinates_without_location(session: AsyncSession, update: Updat
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(update=update, view=factory.main_menu_view(lang=user.lang))
+        await context.api.edit_message(
+            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+        )
         return ConversationHandler.END
 
     await context.api.send_message(update=update, view=view)

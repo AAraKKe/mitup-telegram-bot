@@ -2,20 +2,31 @@ from typing import TYPE_CHECKING
 
 import pytest
 from telegram import Update
+from telegram.ext import ConversationHandler
 
+from mitup_bot.handlers.broadcast.entry import upload_prompt_view
 from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId, ConversationBroadcastState
 from mitup_bot.models import User
-from mitup_bot.utils.messages import BroadcastOperatorMessages
-from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler, create_bot_config
+from mitup_bot.utils import callbacks as cb
+from tests.helpers import (
+    HandlerContext,
+    MockDbSession,
+    UpdateRequest,
+    call_handler,
+    create_bot_config,
+    create_broadcast,
+)
 
 if TYPE_CHECKING:
-    from tests.helpers.types import RegisterMember, StashBotConfig
+    from tests.helpers.types import RegisterAuthorDrafts, RegisterMember, StashBotConfig
 
 ADMIN_TG_ID = 123  # matches the default update sender (DEFAULT_USER_ID)
 
+BROADCAST_UPDATE = pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.BROADCAST)], indirect=True)
 
-@pytest.mark.parametrize("update", [UpdateRequest(command="broadcast")], indirect=True)
-async def test_broadcast_command_admin_opens_flow(
+
+@BROADCAST_UPDATE
+async def test_broadcast_button_admin_opens_flow(
     update: Update,
     handler_context: HandlerContext,
     user_with_settings: User,
@@ -25,45 +36,68 @@ async def test_broadcast_command_admin_opens_flow(
     stash_bot_config(create_bot_config([ADMIN_TG_ID]))
     register_member(user_with_settings)
 
-    context, state = await call_handler(BroadcastHandlerId.BROADCAST_COMMAND, handler_context=handler_context)
+    context, state = await call_handler(BroadcastHandlerId.BROADCAST_OPEN_CALLBACK, handler_context=handler_context)
 
     assert state == ConversationBroadcastState.AWAITING_CONTENT
-    context.api.assert_send_message_called(
-        update, BroadcastOperatorMessages.UPLOAD_PROMPT.get(lang=user_with_settings.lang)
-    )
+    # Edits the admin-menu message in place (rather than sending a new one) into the upload prompt.
+    context.api.assert_edit_message_called(update, upload_prompt_view(user_with_settings.lang))
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(command="broadcast")], indirect=True)
-async def test_broadcast_command_non_admin_is_silent(
+@BROADCAST_UPDATE
+async def test_broadcast_button_discards_existing_drafts(
     update: Update,
     handler_context: HandlerContext,
     user_with_settings: User,
+    mock_session: MockDbSession,
     stash_bot_config: StashBotConfig,
     register_member: RegisterMember,
+    register_author_drafts: RegisterAuthorDrafts,
 ):
-    """A member who is not on the allowlist gets no reply and the conversation never starts."""
-    stash_bot_config(create_bot_config([999]))
+    stash_bot_config(create_bot_config([ADMIN_TG_ID]))
     register_member(user_with_settings)
+    prior_draft = create_broadcast(id=77, name="old", author_tg_id=ADMIN_TG_ID)
+    register_author_drafts(ADMIN_TG_ID, (prior_draft,))
 
-    context, state = await call_handler(BroadcastHandlerId.BROADCAST_COMMAND, handler_context=handler_context)
+    await call_handler(BroadcastHandlerId.BROADCAST_OPEN_CALLBACK, handler_context=handler_context)
 
-    assert state == -1  # ConversationHandler.END
-    context.api.assert_send_message_not_called()
+    mock_session.assert_deleted(prior_draft)
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(command="broadcast")], indirect=True)
-async def test_broadcast_command_non_member_is_silent(
-    mock_session: MockDbSession,
+@BROADCAST_UPDATE
+async def test_broadcast_button_non_admin_is_dropped(
     update: Update,
     handler_context: HandlerContext,
     stash_bot_config: StashBotConfig,
 ):
-    """A non-member (no MEMBER row) is on the allowlist by id but still gets nothing — the guard
-    requires an actual reachable member row before the feature reveals itself."""
+    """A forged callback from a non-admin never runs the entry: the feature stays invisible."""
+    stash_bot_config(create_bot_config([999]))
+
+    context, state = await call_handler(BroadcastHandlerId.BROADCAST_OPEN_CALLBACK, handler_context=handler_context)
+
+    assert state is None
+    context.api.assert_edit_message_not_called()
+
+
+@BROADCAST_UPDATE
+async def test_broadcast_button_admin_without_member_row_ends_silently(
+    update: Update,
+    handler_context: HandlerContext,
+    mock_session: MockDbSession,
+    stash_bot_config: StashBotConfig,
+):
+    """An admin id that resolves to no reachable member row ends the flow without a reply, rather
+    than letting the operator load crash."""
     stash_bot_config(create_bot_config([ADMIN_TG_ID]))
     # Deliberately do NOT register a member row.
 
-    context, state = await call_handler(BroadcastHandlerId.BROADCAST_COMMAND, handler_context=handler_context)
+    context, state = await call_handler(BroadcastHandlerId.BROADCAST_OPEN_CALLBACK, handler_context=handler_context)
 
-    assert state == -1  # ConversationHandler.END
-    context.api.assert_send_message_not_called()
+    assert state == ConversationHandler.END
+    context.api.assert_edit_message_not_called()
+
+
+def test_upload_prompt_view_has_cancel_button():
+    view = upload_prompt_view("en")
+
+    buttons = [button for row in view.keyboard for button in row]
+    assert any(button.callback_data == cb.CANCEL_BROADCAST for button in buttons)

@@ -14,8 +14,9 @@ from typing import Final
 import pytest
 from telegram import Location, MessageEntity, Update
 
-from mitup_bot.custom_context import ContextId
+from mitup_bot.custom_context import BOT_CONFIG_KEY, ContextId
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.handlers.admin.enums import AdminHandlerId
 from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.handlers.command_enums import CommandsId
@@ -31,7 +32,8 @@ from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
-from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_bot_config, create_meetup
+from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -66,6 +68,10 @@ class Context:
     update_request: UpdateRequest
     id: str
     error_modes: set[ErrorMode]
+    # Admin-gated handlers are dropped by the registry gate for non-admins before any guard runs;
+    # the failure-mode tests stash a config making the acting user an admin so the guard under the
+    # gate is actually reached.
+    admin_only: bool = False
     user_fixture: str = "user_with_settings"
     exception: Exception | None = None
     fault_count: int = 0  # This is the value of the fault metric (both with and without prefix)
@@ -82,6 +88,13 @@ class Context:
     extra_metrics_not_found: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
     # Override extra_metrics for the non-owner inactive meeting test.
     extra_metrics_non_owner_inactive: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
+
+
+def make_admin_if_gated(handler_context: HandlerContext, test_context: Context):
+    """Stash a config making the acting user an admin when the context's handler is admin-gated,
+    so the registry gate lets the update through to the guard being exercised."""
+    if test_context.admin_only:
+        handler_context.app.bot_data[BOT_CONFIG_KEY] = create_bot_config([DEFAULT_USER_ID])
 
 
 CONTEXTS = [
@@ -1088,34 +1101,42 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_max_participants_wrong_message",
     ),
+    # --- Admin menu handler ---
+    # Admin-gated; stashes an admin config to reach guards.current_user under the gate.
+    Context(
+        handler_id=AdminHandlerId.ADMIN_MENU_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.ADMIN_MENU),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        admin_only=True,
+        id="admin_menu",
+    ),
     # --- Broadcast authoring handlers ---
-    # Only the confirm/cancel callbacks belong here. command_broadcast gates on
-    # guards.broadcast_admin (returns None, silent END), and the content/invalid-content handlers
-    # gate on guards.member_user via load_operator (returns None → silent AWAITING_CONTENT); none
-    # of those raise UserNotFound, so they are covered by their own handler tests instead.
+    # All broadcast handlers are admin-gated (admin_only=True), so these contexts stash an admin
+    # config to reach the guard under the gate. The content/invalid-content handlers gate on
+    # guards.member_user via load_operator (returns None → silent AWAITING_CONTENT), so they never
+    # raise UserNotFound and are covered by their own handler tests. The cancel handler tolerates a
+    # missing callback id by design (the entry-prompt Cancel button carries none), so it has no
+    # MalformedCallbackData mode.
     Context(
         handler_id=BroadcastHandlerId.BROADCAST_CONFIRM_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.CONFIRM_BROADCAST.with_id(1)),
         error_modes={ErrorMode.USER_NOT_FOUND},
+        admin_only=True,
         id="broadcast_confirm",
     ),
     Context(
         handler_id=BroadcastHandlerId.BROADCAST_CONFIRM_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.CONFIRM_BROADCAST),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        admin_only=True,
         id="broadcast_confirm_malformed",
     ),
     Context(
         handler_id=BroadcastHandlerId.BROADCAST_CANCEL_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.CANCEL_BROADCAST.with_id(1)),
         error_modes={ErrorMode.USER_NOT_FOUND},
+        admin_only=True,
         id="broadcast_cancel",
-    ),
-    Context(
-        handler_id=BroadcastHandlerId.BROADCAST_CANCEL_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_BROADCAST),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="broadcast_cancel_malformed",
     ),
 ]
 
@@ -1256,6 +1277,7 @@ async def test_callback_fails_with_malformed_callback_data(
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
+    make_admin_if_gated(handler_context, test_context)
     context, _ = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
@@ -1280,6 +1302,7 @@ async def test_callback_fails_when_user_is_not_found(
     metrics: MetricAssertions,
 ):
     # Do not register the user in the db and call the handler
+    make_admin_if_gated(handler_context, test_context)
     context, _ = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )

@@ -33,6 +33,6 @@ async def filter_messages_without_text(session: AsyncSession, update: Update, co
         return None
 
     context.clean_all_user_data()
-    view = factory.main_menu_view(lang=user.lang)
+    view = factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
     await context.api.send_message(update=update, view=view)
     return ConversationHandler.END

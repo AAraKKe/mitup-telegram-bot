@@ -2,19 +2,13 @@ from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mitup_bot.config import BotConfig
 from mitup_bot.models import Broadcast, Settings, User
 from mitup_bot.models.broadcasts import BroadcastStatus
 from mitup_bot.models.users import UserStatus
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import Languages
-from mitup_bot.utils.mitup_types import TMitupContext
 
 from .validation import strip_html
-
-# Key under which the runtime stashes BotConfig in `application.bot_data` at startup (see
-# MitupRuntime), so handlers can reach the broadcast allowlist without a module singleton.
-BOT_CONFIG_KEY = "bot_config"
 
 BROADCAST_NAME_MAX_LENGTH = 40
 
@@ -27,12 +21,6 @@ LANGUAGE_NAMES: dict[str, Languages] = {
     "pt_BR": Languages.PORTUGUESE,
     "it_IT": Languages.ITALIAN,
 }
-
-
-def bot_config(context: TMitupContext) -> BotConfig:
-    config = context.bot_data.get(BOT_CONFIG_KEY)
-    assert isinstance(config, BotConfig), "BotConfig must be stashed in bot_data at startup"
-    return config
 
 
 async def count_members_by_language(session: AsyncSession) -> dict[str, int]:
