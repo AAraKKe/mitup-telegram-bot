@@ -27,6 +27,7 @@ from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import RegistrationMessages
+from mitup_bot.views import RenderContext
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
     HandlerContext,
@@ -183,7 +184,7 @@ async def test_commands_to_show_main_menu(
 
     result = await command(update, context)
 
-    expected_view = main_menu_view(lang=user_with_settings.lang)
+    expected_view = main_menu_view(RenderContext(lang=user_with_settings.lang))
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationHandler.END
 
@@ -206,6 +207,6 @@ async def test_start_inline_deep_link_sends_create_meeting_view(
 
     context, result = await call_handler(CommandsId.START_WITH_EXISTING_USER, handler_context=handler_context)
 
-    expected_view = create_meeting_view(lang=user_with_settings.lang)
+    expected_view = create_meeting_view(RenderContext(lang=user_with_settings.lang))
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationMeetingState.TITLE

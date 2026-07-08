@@ -6,7 +6,7 @@ from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, Ed
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CommonMessages, SettingsMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -26,7 +26,7 @@ async def test_callback_query_timeout(
     context, result = await call_handler(EditSettingsHandlerId.TIMEOUT_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.change_settings_element_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEOUT_PROMPT.get(
             lang=user_with_settings.lang, timeout=user_with_settings.settings.timeout
         ),
@@ -47,7 +47,7 @@ async def test_settings_timeout_text_message_handler(
     )
 
     expected_view = factory.settings_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEOUT_SUCCESS.get(lang=user_with_settings.lang, timeout=10),
     )
 
@@ -97,7 +97,7 @@ async def test_settings_timeout_invalid_input_handler(
     context, _ = await call_handler(EditSettingsHandlerId.TIMEOUT_CONVERSATION, handler_context=handler_context)
 
     expected_view = factory.change_settings_element_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user_with_settings.lang),
     )
 

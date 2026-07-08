@@ -9,7 +9,7 @@ from mitup_bot.handlers.main_menu.show_active_meetings import callback_query_sho
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
@@ -136,7 +136,7 @@ async def test_show_meetings_without_meetings_to_show_works(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingListMessages.ACTIVE_EMPTY.get(
             lang=user_with_settings.lang,
             new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang),
@@ -224,7 +224,7 @@ async def test_show_meetings_falls_back_to_no_meetings_view_when_all_titles_are_
     context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingListMessages.ACTIVE_EMPTY.get(
             lang=user_with_settings.lang,
             new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang),

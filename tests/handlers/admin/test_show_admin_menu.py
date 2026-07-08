@@ -6,7 +6,7 @@ from mitup_bot.handlers.admin.enums import AdminHandlerId
 from mitup_bot.handlers.admin.show_admin_menu import callback_query_show_admin_menu
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_bot_config
 from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.stub_db import MockDbSession
@@ -19,7 +19,7 @@ async def test_admin_menu_edits_to_admin_view(
 
     await callback_query_show_admin_menu(update, context)
 
-    context.api.assert_edit_message_called(update, factory.admin_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.admin_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 async def test_admin_menu_clears_user_data(
@@ -46,7 +46,7 @@ async def test_admin_menu_shown_for_admin_through_registry(
 
     context, _ = await call_handler(AdminHandlerId.ADMIN_MENU_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_edit_message_called(update, factory.admin_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.admin_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.ADMIN_MENU)], indirect=True)

@@ -39,6 +39,7 @@ async def existing_user_start(
     # Entry path only reads `user.lang` for the create-meeting / main-menu views; it never traverses
     # the meetups/joined_links collections, so skip loading them.
     user = await guards.current_user(update, session, load_collections=False)
+    ctx = guards.render_context(user, update, context)
 
     if context.args and context.args[0] == "inline":
         # Local import to avoid circular dependency at load time: commands.py must be fully
@@ -46,11 +47,11 @@ async def existing_user_start(
         # CommandsId.START_WITH_EXISTING_USER as an entry point.
         from mitup_bot.handlers.meeting.enums import ConversationMeetingState
 
-        view = views.factory.create_meeting_view(lang=user.lang)
+        view = views.factory.create_meeting_view(ctx)
         await context.api.send_message(update=update, view=view)
         return ConversationMeetingState.TITLE
 
-    view = views.factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+    view = views.factory.main_menu_view(ctx)
     await context.api.send_message(update=update, view=view)
     return ConversationHandler.END
 

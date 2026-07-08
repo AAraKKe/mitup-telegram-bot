@@ -17,7 +17,7 @@ from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
@@ -29,7 +29,7 @@ async def test_callback_query_settings_is_called_with_settings_view(
 
     await callback_query_settings(update, context)
 
-    context.api.assert_edit_message_called(update, factory.settings_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.settings_view(RenderContext(lang=user_with_settings.lang)))
 
 
 async def test_callback_query_timezone_with_correct_view(
@@ -43,7 +43,7 @@ async def test_callback_query_timezone_with_correct_view(
     result = await callback_query_timezone(update, context)
 
     view = factory.change_settings_element_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEZONE_PROMPT.get(
             lang=user_with_settings.lang, timezone=user_with_settings.settings.timezone
         ),
@@ -97,7 +97,7 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
     result = await settings_timezone_text_message_handler(update, context)
 
     view = factory.settings_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEZONE_SUCCESS.get(
             lang=user_with_settings.lang, timezone=update.effective_message.text
         ),
@@ -161,7 +161,7 @@ async def test_edit_timezone_with_location_update_correctly(
     result = await settings_timezone_location_message_handler(update, context)
 
     view = factory.settings_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEZONE_SUCCESS.get(lang=user_with_settings.lang, timezone="Europe/Madrid"),
     )
 

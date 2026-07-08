@@ -153,7 +153,7 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(
-            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
         )
         return ConversationHandler.END
 
@@ -200,7 +200,7 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)
         await context.api.edit_message(
-            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
         )
         return ConversationHandler.END
 

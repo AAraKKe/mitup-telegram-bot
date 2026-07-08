@@ -17,7 +17,7 @@ from mitup_bot.handlers.meeting.create_meeting import (
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import StubMitupContext
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -30,7 +30,7 @@ async def test_settings_is_called_with_settings_view(
 
     await callback_query_settings(update, context)
 
-    context.api.assert_edit_message_called(update, factory.settings_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.settings_view(RenderContext(lang=user_with_settings.lang)))
 
 
 async def test_show_main_menu(
@@ -40,7 +40,7 @@ async def test_show_main_menu(
 
     await callback_query_main_menu(update, context)
 
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
@@ -59,7 +59,7 @@ async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
     await callback_query_cancel_meeting(update, context)
     await context.flush_metrics()
 
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     metrics.assert_emitted(
         name="Cancel",
         value=1,
@@ -73,7 +73,7 @@ async def test_cancel_setting_calls_to_settings_view(
     mock_session.add_object(user_with_settings, "tg_user_id")
     await callback_query_cancel_settings(update, context)
 
-    context.api.assert_edit_message_called(update, factory.settings_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.settings_view(RenderContext(lang=user_with_settings.lang)))
 
 
 async def test_cancel_setting_edits_prompt_in_place_without_posting_new_message(
@@ -107,7 +107,8 @@ async def test_create_meeting_calls_to_create_meeting_view(
     await callback_query_create_meeting(update, context)
 
     context.api.assert_edit_message_called(
-        update, factory.create_meeting_view(lang=user_with_settings.lang, datetime_link=build_datetime_link())
+        update,
+        factory.create_meeting_view(RenderContext(lang=user_with_settings.lang), datetime_link=build_datetime_link()),
     )
 
 

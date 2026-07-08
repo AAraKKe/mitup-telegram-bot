@@ -9,7 +9,7 @@ from mitup_bot.handlers.main_menu.show_past_meetings import callback_query_show_
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
 from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
@@ -187,7 +187,7 @@ async def test_show_past_meetings_without_past_meetings_shows_main_menu(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_view = factory.main_menu_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingListMessages.PAST_EMPTY.get(lang=user_with_settings.lang),
     )
     context.api.assert_edit_message_called(update, expected_view)

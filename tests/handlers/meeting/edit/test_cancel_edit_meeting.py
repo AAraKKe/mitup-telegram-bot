@@ -9,7 +9,7 @@ from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
@@ -52,7 +52,7 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
     assert result is ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(999))]), indirect=True)
@@ -75,4 +75,4 @@ async def test_cancel_edit_meeting_returns_end_when_user_does_not_own_meeting(
 
     assert result is ConversationHandler.END
     # The guard (user_owns_meeting) calls edit_message to redirect to main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

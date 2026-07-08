@@ -6,7 +6,7 @@ from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, Ed
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -105,7 +105,7 @@ async def test_callback_query_set_notification_time(
     context, result = await call_handler(EditSettingsHandlerId.SET_NOTIFICATION_TIME, handler_context=handler_context)
 
     expected_view = factory.change_settings_element_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user_with_settings.lang),
         callback_data=cb.EDIT_NOTIFICATIONS,
     )
@@ -175,7 +175,7 @@ async def test_settings_notification_time_invalid_input_handler(
 
     # Check we have sent the proper message
     expected_view = factory.change_settings_element_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user_with_settings.lang),
         callback_data=cb.EDIT_NOTIFICATIONS,
     )

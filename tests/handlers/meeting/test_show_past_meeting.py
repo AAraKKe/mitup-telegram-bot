@@ -5,7 +5,7 @@ from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -67,7 +67,7 @@ async def test_delete_past_meeting_shows_confirmation(
     context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID),
@@ -141,7 +141,7 @@ async def test_delete_past_meeting_threads_page_into_confirmation(
     context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_page(MEETING_ID, 3),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_page(MEETING_ID, 3),

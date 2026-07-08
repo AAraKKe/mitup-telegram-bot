@@ -22,6 +22,31 @@ When building a new screen, check the **factory catalogue** below *first* — re
 
 Button-label sourcing (never hardcode, always `ButtonMessages.get(lang=...)` / `.back(lang=...)`) is owned by the `user-facing-text` skill — see there for the full rule and examples.
 
+## `RenderContext`
+
+Cross-cutting user/session display state — the acting user's language and whether they are an admin — is carried in a single frozen `RenderContext` (`mitup_bot/views/context.py`, re-exported from `mitup_bot.views`). It is built once per handler from the acting user (the handler-side builder in `guards` constructs it) and passed as the **first positional argument** to every view factory:
+
+```python
+view = factory.settings_view(ctx, message=...)
+```
+
+The division of responsibility is the rule to follow when adding or changing a factory:
+
+- **Cross-cutting display state belongs in `RenderContext`.** A concern that would otherwise have to be threaded through many factories and their call sites (language, admin visibility, and future additions of the same kind) is added as a field on `RenderContext` rather than as a new per-factory parameter. This is what keeps a new display concern from churning ~20 call sites.
+- **Entity data stays as explicit parameters.** Anything specific to the screen — a meeting, ids, callback data, the message body, dates — remains a named keyword argument on the factory. It never goes on the context.
+
+Button helpers that build a single `ButtonConfig` rather than a full view (e.g. `options_button`, `user_button`) do not take a context.
+
+### Rendering in another language
+
+`RenderContext` is frozen. The rare call sites that must render a screen in a language *other* than the acting user's — showing a meeting in the meeting's own language, or echoing back a language the user just selected — use `ctx.with_lang(other_lang)`, which returns a copy with the language replaced:
+
+```python
+view = factory.edit_meeting_property_view(ctx.with_lang(meeting.lang), message=..., meeting_id=meeting.db_id)
+```
+
+Everywhere else, pass the context straight through unchanged.
+
 ## Core types
 
 ### `MitupView`
@@ -86,7 +111,7 @@ The snapshot below describes the factories that exist at the time of writing. **
 | `user_button()` | Button representing a user (for kick-out, invitation lists) |
 | `reactivation_prompt_view()` | Prompt shown to meeting owner when their inactive meeting is accessed |
 
-All factory functions are stateless and take keyword arguments. Inspect the signature in `factory.py` for the exact parameters — they vary by screen type.
+Every view factory is stateless and takes a `RenderContext` as its first positional argument (see the `RenderContext` section above); the remaining, screen-specific parameters are keyword-only. Inspect the signature in `factory.py` for the exact parameters — they vary by screen type.
 
 ### Example
 
@@ -96,10 +121,10 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingMessages
 
 view = factory.confirmation_view(
-    lang=user.lang,
-    message=MeetingMessages.CONFIRM_DELETE.get(lang=user.lang),
-    confirm_callback=cb.CONFIRM_DELETE_MEETING.with_id(meeting_id),
-    decline_callback=cb.DECLINE_DELETE_MEETING.with_id(meeting_id),
+    ctx,
+    message=MeetingMessages.CONFIRM_DELETE.get(lang=ctx.lang),
+    confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(meeting_id),
+    decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(meeting_id),
 )
 ```
 

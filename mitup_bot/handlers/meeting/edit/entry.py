@@ -51,7 +51,7 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
         cleanup_states(context)
         log.error("Malformed callback data while cancelling meeting edit", exc_info=exc)
         await context.api.edit_message(
-            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
         )
         return ConversationHandler.END
 

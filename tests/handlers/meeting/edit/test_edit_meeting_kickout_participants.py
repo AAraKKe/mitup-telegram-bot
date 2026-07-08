@@ -6,6 +6,7 @@ from mitup_bot.handlers.meeting.edit.views import edit_participants_view, kick_o
 from mitup_bot.models.users import User
 from mitup_bot.utils import ButtonMessages, MeetingEditParticipantsMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import RenderContext
 from mitup_bot.views.factory import confirmation_view
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
@@ -190,7 +191,7 @@ async def test_edit_meeting_kickout_given_participant(
     context.api.assert_edit_message_called(
         update,
         confirmation_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION.get(
                 lang=user_with_settings.lang, participant="joined_user_15", meeting_title="Test Meeting 1"
             ),

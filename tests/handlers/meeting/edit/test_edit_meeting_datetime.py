@@ -26,7 +26,7 @@ from mitup_bot.utils.messages import (
     MeetingEditDateTimeMessages,
     SupporterMessages,
 )
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -144,7 +144,7 @@ async def test_edit_meeting_date_callback(
     context.api.assert_edit_message_called(
         update,
         factory.edit_meeting_date_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             meeting_id=10,
             anchor_date=anchor_date,
             current_date=current_date,
@@ -768,7 +768,7 @@ async def test_date_time_entity_message_meeting_not_owned(
 
     assert response == ConversationHandler.END
 
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize(

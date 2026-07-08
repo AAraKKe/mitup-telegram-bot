@@ -16,6 +16,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils import MeetingCreationMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
     ConversationStep,
@@ -97,7 +98,7 @@ async def test_meeting_creation_cancelled(
     cancel_step = result.get_step(1)
     cancel_step.context.api.assert_edit_message_called(
         cancel_step.context.get_update(),
-        views_factory.main_menu_view(lang=user_with_settings.lang),
+        views_factory.main_menu_view(RenderContext(lang=user_with_settings.lang)),
         times=1,
     )
 
@@ -297,7 +298,7 @@ async def test_invalid_title_fires_fallback_handler(
     assert state == ConversationMeetingState.TITLE
     # Error view sent to the user
     error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user_with_settings.lang)
-    error_view = views_factory.create_meeting_view(lang=user_with_settings.lang, message=error_msg)
+    error_view = views_factory.create_meeting_view(RenderContext(lang=user_with_settings.lang), message=error_msg)
     context.api.assert_send_message_called(bad_update, error_view)
 
 

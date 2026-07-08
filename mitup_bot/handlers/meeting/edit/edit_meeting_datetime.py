@@ -223,7 +223,7 @@ async def callback_query_edit_meeting_date(
     await context.api.edit_message(
         update=update,
         view=factory.edit_meeting_date_view(
-            lang=user.lang,
+            guards.render_context(user, update, context),
             meeting_id=callback_data.id,
             anchor_date=anchor_date,
             current_date=current_date,

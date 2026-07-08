@@ -10,7 +10,7 @@ from mitup_bot.models import Settings, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -63,7 +63,7 @@ async def test_delete_meeting_works(
     context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
@@ -106,7 +106,9 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
         assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
         assert "Meeting id: 999, user id: 1" in caplog.text
 
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
 
 
 @pytest.mark.parametrize(
@@ -151,7 +153,9 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
         assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
         assert "Meeting id: 111, user id: 1" in caplog.text
 
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)

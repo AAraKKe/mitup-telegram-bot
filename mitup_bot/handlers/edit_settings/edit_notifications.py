@@ -79,7 +79,7 @@ async def callback_query_set_notification_time(session: AsyncSession, update: Up
     message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(
-        lang=user.lang, message=message, callback_data=cb.EDIT_NOTIFICATIONS
+        guards.render_context(user, update, context), message=message, callback_data=cb.EDIT_NOTIFICATIONS
     )
 
     await context.api.edit_message(update=update, view=view)
@@ -123,7 +123,7 @@ async def settings_notification_time_invalid_input_handler(
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(
-        lang=user.lang, message=message, callback_data=cb.EDIT_NOTIFICATIONS
+        guards.render_context(user, update, context), message=message, callback_data=cb.EDIT_NOTIFICATIONS
     )
 
     await context.api.send_message(update=update, view=view)

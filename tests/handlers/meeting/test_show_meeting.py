@@ -13,7 +13,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -97,7 +97,9 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     await callback_query_show_meeting(update, context)
 
     # Ensure that the only message sent was the edit for the main menu to avoid information flow
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang), times=1)
+    context.api.assert_edit_message_called(
+        update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)), times=1
+    )
     context.api.assert_send_message_not_called()
     assert (
         "User tried 'Show meeting' with a meeting that does not belong to them. "

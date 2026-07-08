@@ -34,7 +34,7 @@ async def callback_query_delete_meeting(session: AsyncSession, update: Update, c
     await context.api.edit_message(
         update=update,
         view=factory.confirmation_view(
-            lang=user.lang,
+            guards.render_context(user, update, context),
             message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(callback_data.id),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(callback_data.id),

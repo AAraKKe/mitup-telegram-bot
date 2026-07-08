@@ -16,7 +16,7 @@ from mitup_bot.handlers.registration_process.enums import (
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import RegistrationMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import StubMitupContext, UpdateRequest, call_handler, claimed_state
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions
@@ -43,7 +43,7 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     )
 
     message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=cast(Message, update.effective_message).text)
-    view = factory.main_menu_view(lang=user_with_settings.lang).with_context(message)
+    view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(message)
 
     mock_session.assert_added(user_with_settings)
     mock_session.assert_flushed()
@@ -105,7 +105,7 @@ async def test_registration_timezone_with_location_update_correctly(
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Dublin")
-    view = factory.main_menu_view(lang=user_with_settings.lang).with_context(message)
+    view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(message)
 
     mock_session.assert_added(user_with_settings)
     mock_session.assert_flushed()

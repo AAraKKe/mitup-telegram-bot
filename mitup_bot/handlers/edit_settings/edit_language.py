@@ -19,7 +19,7 @@ async def callback_query_timezone(session: AsyncSession, update: Update, context
     # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
     user = await guards.current_user(update, session, load_collections=False)
 
-    view = views.factory.settings_set_language_view(lang=user.lang)
+    view = views.factory.settings_set_language_view(guards.render_context(user, update, context))
 
     await context.api.edit_message(update=update, view=view)
 
@@ -40,8 +40,8 @@ async def callback_query_set_timezone(session: AsyncSession, update: Update, con
     user.settings.language = new_language
     await session.flush()
 
-    view = views.factory.settings_set_language_view(lang=new_language).with_context(
-        SettingsMessages.LANGUAGE_SUCCESS.get(lang=new_language)
-    )
+    view = views.factory.settings_set_language_view(
+        guards.render_context(user, update, context).with_lang(new_language)
+    ).with_context(SettingsMessages.LANGUAGE_SUCCESS.get(lang=new_language))
 
     await context.api.edit_message(update=update, view=view)

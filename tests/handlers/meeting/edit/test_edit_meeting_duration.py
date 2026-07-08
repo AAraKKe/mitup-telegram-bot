@@ -13,7 +13,7 @@ from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -624,7 +624,7 @@ async def test_duration_end_date_nav_shows_calendar(
     context.api.assert_edit_message_called(
         update,
         factory.edit_meeting_date_view(
-            lang=meeting.lang,
+            RenderContext(lang=meeting.lang),
             meeting_id=1,
             anchor_date=anchor_date,
             current_date=today,

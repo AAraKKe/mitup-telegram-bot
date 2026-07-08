@@ -13,7 +13,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import CommonMessages
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 
 console = Console()
 
@@ -64,9 +64,8 @@ async def send_guard_notification(context: TMitupContext, update: Update, lang: 
     # This runs in the best-effort guard-error path (wrapped in try/except upstream), and both
     # update and context are available here, so an admin keeps seeing the Admin row on the redirect.
     view = factory.main_menu_view(
-        lang=lang,
+        RenderContext(lang=lang, is_admin=guards.is_admin(update, context)),
         message=CommonMessages.UNEXPECTED_ERROR.get(lang=lang),
-        is_admin=guards.is_admin(update, context),
     )
     if update.callback_query is not None:
         await context.api.answer_callback_query(update=update, text="", show_alert=False)

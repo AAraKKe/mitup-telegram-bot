@@ -108,7 +108,7 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
     await context.api.edit_message(
         update=update,
         view=factory.confirmation_view(
-            lang=current_user.lang,
+            guards.render_context(current_user, update, context),
             message=confirmation_message,
             confirm_callback_data=confirmation_callback_data,
             # Cancel goes back to the list of participants to kick out

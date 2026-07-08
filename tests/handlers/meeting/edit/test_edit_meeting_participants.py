@@ -16,7 +16,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages, SupporterMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -92,7 +92,9 @@ async def test_edit_meeting_participants_meeting_not_owned(
         context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, handler_context=handler_context)
 
         assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
@@ -206,7 +208,9 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
 
         assert result is ConversationHandler.END
         assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
 
         assert not context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
@@ -349,7 +353,9 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
 
         assert result is ConversationHandler.END
         assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
@@ -551,7 +557,7 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize(
@@ -603,7 +609,7 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     assert meeting.max_members is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 # ---------------------------------------------------------------------------
@@ -631,7 +637,7 @@ async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
 
     assert state == ConversationHandler.END
     # Meeting not owned — redirected to main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 # ---------------------------------------------------------------------------
@@ -659,7 +665,7 @@ async def test_edit_wrong_max_participants_returns_end_when_meeting_not_owned(
 
     assert state == ConversationHandler.END
     # Meeting not owned — redirected to main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 def test_edit_meeting_participants_view_without_participants():
@@ -732,7 +738,7 @@ async def test_edit_meeting_max_participants_message_edits_to_main_menu_when_con
         assert "meeting_id" in caplog.text
 
     assert state == ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user.lang)))
 
 
 # ---------------------------------------------------------------------------
@@ -767,4 +773,4 @@ async def test_edit_meeting_wrong_max_participants_message_edits_to_main_menu_wh
         assert "meeting_id" in caplog.text
 
     assert state == ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user.lang)))

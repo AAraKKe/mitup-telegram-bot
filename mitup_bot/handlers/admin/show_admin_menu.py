@@ -19,6 +19,6 @@ async def callback_query_show_admin_menu(session: AsyncSession, update: Update, 
 
     # Admin menu reads only `user.lang`; it never traverses the meetups/joined_links collections.
     user = await guards.current_user(update, session, load_collections=False)
-    view = views.factory.admin_menu_view(lang=user.lang)
+    view = views.factory.admin_menu_view(guards.render_context(user, update, context))
 
     await context.api.edit_message(update=update, view=view)

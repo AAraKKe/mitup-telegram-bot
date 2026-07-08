@@ -35,7 +35,7 @@ async def callback_query_timezone(session: AsyncSession, update: Update, context
         cb.CANCEL_SETTINGS,
     )
 
-    view = views.factory.change_settings_element_view(lang=user.lang, message=message)
+    view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 
     await context.api.edit_message(update=update, view=view)
 
@@ -73,7 +73,7 @@ async def settings_timezone_text_message_handler(session: AsyncSession, update: 
     await session.flush()
 
     message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
-    view = factory.settings_view(lang=user.lang, message=message)
+    view = factory.settings_view(guards.render_context(user, update, context), message=message)
 
     await context.api.send_message(update=update, view=view)
 
@@ -111,7 +111,7 @@ async def settings_timezone_location_message_handler(session: AsyncSession, upda
     await session.flush()
 
     message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
-    view = factory.settings_view(lang=user.lang, message=message)
+    view = factory.settings_view(guards.render_context(user, update, context), message=message)
 
     await context.api.send_message(update=update, view=view)
 

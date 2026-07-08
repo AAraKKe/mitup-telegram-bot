@@ -7,7 +7,7 @@ from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditWhenMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -97,7 +97,7 @@ async def test_clear_times_shows_confirmation(
     context.api.assert_edit_message_called(
         update,
         factory.confirmation_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=MeetingEditWhenMessages.CLEAR_CONFIRMATION.get(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING_TIMES.with_id(1),

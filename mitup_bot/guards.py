@@ -36,7 +36,7 @@ from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase, MessageParams
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 
 log = structlog.get_logger(__name__)
@@ -67,6 +67,17 @@ def is_admin(update: Update, context: TMitupContext) -> bool:
     An empty allowlist keeps every admin-gated surface dormant.
     """
     return update.effective_user is not None and update.effective_user.id in context.bot_config.admin_tg_ids
+
+
+def render_context(user: User, update: Update, context: TMitupContext) -> RenderContext:
+    """Build the `RenderContext` for the acting user from the current update.
+
+    The one place handlers turn PTB objects into the display context every view factory takes:
+    the user's language plus whether they are a bot admin (via `is_admin`). Build it once per
+    handler and pass it to each factory call; use `RenderContext.with_lang` for the rare screen
+    that must render in a language other than the acting user's.
+    """
+    return RenderContext(lang=user.lang, is_admin=is_admin(update, context))
 
 
 async def current_user(update: Update, session: AsyncSession, *, load_collections: bool = True) -> User:
@@ -222,7 +233,7 @@ async def user_owns_meeting(
         log.warning(message)
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
         await context.api.edit_message(
-            update=update, view=factory.main_menu_view(lang=user.lang, is_admin=is_admin(update, context))
+            update=update, view=factory.main_menu_view(render_context(user, update, context))
         )
     return None
 
@@ -238,7 +249,7 @@ async def show_reactivation_prompt(
     await context.api.edit_message(
         update=update,
         view=factory.reactivation_prompt_view(
-            lang=user.settings.language,
+            render_context(user, update, context),
             meeting_id=meeting_id,
             back_rows=custom_keyboard,
         ),

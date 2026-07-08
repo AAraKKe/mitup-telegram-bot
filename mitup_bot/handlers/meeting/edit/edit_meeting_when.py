@@ -42,7 +42,7 @@ async def callback_query_clear_times(session: AsyncSession, update: Update, cont
         return
 
     view = factory.confirmation_view(
-        lang=user.lang,
+        guards.render_context(user, update, context),
         message=MeetingEditWhenMessages.CLEAR_CONFIRMATION.get(lang=user.lang),
         confirm_callback_data=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(callback_data.id),
         decline_callback_data=cb.DECLINE_DELETE_MEETING_TIMES.with_id(callback_data.id),

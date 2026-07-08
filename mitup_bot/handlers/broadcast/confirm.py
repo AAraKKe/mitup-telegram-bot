@@ -64,7 +64,7 @@ async def callback_query_cancel_broadcast(session: AsyncSession, update: Update,
     # or not a draft had been persisted yet, the operator did abandon a broadcast flow.
     await context.api.edit_message(
         update=update,
-        view=views.factory.admin_menu_view(lang=operator.lang).with_context(
+        view=views.factory.admin_menu_view(guards.render_context(operator, update, context)).with_context(
             BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=operator.lang)
         ),
     )

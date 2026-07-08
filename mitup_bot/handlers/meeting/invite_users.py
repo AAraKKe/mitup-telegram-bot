@@ -40,7 +40,7 @@ async def send_request_for_invite_name(context: TMitupContext, user: User, meeti
     Send a message to the user asking for their name to complete the invite process.
     """
     view = views.factory.request_information_with_cancel_view(
-        lang=user.lang,
+        views.RenderContext(lang=user.lang),
         message=MeetingInviteMessages.PROMPT.get(lang=user.lang),
         callback_data=cb.CANCEL_INVITE_USER.with_id(meeting_id),
     )
@@ -153,7 +153,7 @@ async def abort_invitation(
     if meeting is not None and user.own_meeting(meeting_id):
         view = meeting.view_for(user).with_context(message=message)
     else:
-        view = main_menu_view(lang=user.lang, message=message, is_admin=guards.is_admin(update, context))
+        view = main_menu_view(guards.render_context(user, update, context), message=message)
 
     await context.api.edit_message(update, view)
     return ConversationHandler.END
@@ -192,7 +192,7 @@ async def invite_users_name_message_handler(
             # If the user cannot continue mid conversation, go back to the main menu
             await context.api.edit_message(
                 update=update,
-                view=main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context)),
+                view=main_menu_view(guards.render_context(user, update, context)),
             )
             return ConversationHandler.END
 
@@ -202,7 +202,7 @@ async def invite_users_name_message_handler(
         )
 
         view = confirmation_view(
-            lang=user.lang,
+            guards.render_context(user, update, context),
             message=message,
             confirm_callback_data=cb.CONFIRM_INVITE_USER.with_id(meeting.db_id),
             decline_callback_data=cb.CANCEL_INVITE_USER.with_id(meeting.db_id),
@@ -232,7 +232,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             # If the user cannot continue mid conversation, go back to the main menu
             await context.api.edit_message(
                 update=update,
-                view=main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context)),
+                view=main_menu_view(guards.render_context(user, update, context)),
             )
             return ConversationHandler.END
 
@@ -285,7 +285,7 @@ async def callback_query_fallback_invite_user(session: AsyncSession, update: Upd
     context.clean_user_data([ContextId.INVITE_USERS])
 
     message = MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user.lang)
-    view = main_menu_view(lang=user.lang, message=message, is_admin=guards.is_admin(update, context))
+    view = main_menu_view(guards.render_context(user, update, context), message=message)
 
     await context.api.send_message_to_user(user, view)
 

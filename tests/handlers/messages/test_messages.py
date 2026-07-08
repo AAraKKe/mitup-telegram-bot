@@ -10,7 +10,7 @@ from mitup_bot.handlers.messages import filter_messages_without_text
 from mitup_bot.models import User
 from mitup_bot.utils import MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
@@ -22,7 +22,7 @@ async def test_filter_messages_without_text_handler_with_correct_view(
 
     result = await filter_messages_without_text(update, context)
 
-    context.api.assert_send_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     assert result == -1
 
 
@@ -108,7 +108,7 @@ async def test_filter_messages_without_text_shows_on_exit_prompt_when_active_con
     context.api.assert_send_message_called(
         update,
         factory.conversation_interrupted_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=on_exit_message,
             cancel_callback=cancel_callback,
         ),

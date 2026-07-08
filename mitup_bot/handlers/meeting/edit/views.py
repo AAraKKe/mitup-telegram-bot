@@ -2,7 +2,7 @@ from mitup_bot.callback_data import MeetingCallbackData
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditLocationMessages, MeetingEditParticipantsMessages
-from mitup_bot.views import ButtonConfig, MitupView, PaginatedMitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, PaginatedMitupView, RenderContext, factory
 
 
 def edit_location_view(meeting: Meetup) -> MitupView:
@@ -20,7 +20,7 @@ def edit_location_view(meeting: Meetup) -> MitupView:
     ]
 
     return factory.edit_meeting_property_view(
-        lang=meeting.lang,
+        RenderContext(lang=meeting.lang),
         message=MeetingEditLocationMessages.DESCRIPTION.get(lang=meeting.lang),
         meeting_id=meeting.db_id,
         extra_buttons=extra_options,
@@ -47,7 +47,7 @@ def edit_participants_view(meeting: Meetup) -> MitupView:
         )
 
     return factory.edit_meeting_property_view(
-        lang=meeting.lang,
+        RenderContext(lang=meeting.lang),
         message=MeetingEditParticipantsMessages.DESCRIPTION.get(lang=meeting.owner.lang),
         meeting_id=meeting.db_id,
         extra_buttons=[buttons],

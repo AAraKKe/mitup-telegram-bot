@@ -26,6 +26,7 @@ from mitup_bot.guards import (
     meeting_accessible,
     meeting_viewable,
     message,
+    render_context,
     supporter_required,
     user_language,
     user_owns_meeting,
@@ -42,7 +43,7 @@ from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, SupporterMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
 from tests.helpers import (
     StubMitupContext,
@@ -85,6 +86,24 @@ def test_is_admin_false_without_effective_user(context: StubMitupContext, update
     set_admin_ids(context, [DEFAULT_USER_ID])
 
     assert is_admin(update, context) is False
+
+
+def test_render_context_carries_user_lang_and_admin_flag(
+    context: StubMitupContext, update: Update, user_with_settings: User
+):
+    set_admin_ids(context, [DEFAULT_USER_ID])
+
+    assert render_context(user_with_settings, update, context) == RenderContext(
+        lang=user_with_settings.lang, is_admin=True
+    )
+
+
+def test_render_context_marks_non_admin_users(context: StubMitupContext, update: Update, user_with_settings: User):
+    set_admin_ids(context, [])
+
+    assert render_context(user_with_settings, update, context) == RenderContext(
+        lang=user_with_settings.lang, is_admin=False
+    )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(user=False)], indirect=True)
@@ -253,7 +272,9 @@ async def test_meeting_accessible_fails_with_meeting_that_does_not_belong_to_use
         assert "Meeting id: 999, user id: 1" in caplog.text
         assert result is None
 
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
 
 
@@ -316,7 +337,9 @@ async def test_meeting_viewable_redirects_when_meeting_neither_owned_nor_joined(
 
         assert result is None
         assert "User tried 'Show meeting' with a meeting that does not belong to them. " in caplog.text
-        context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+        context.api.assert_edit_message_called(
+            update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+        )
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
 
 
@@ -360,7 +383,7 @@ async def test_meeting_viewable_shows_reactivation_prompt_for_inactive_meeting_o
     context.api.assert_edit_message_called(
         update,
         factory.reactivation_prompt_view(
-            lang=user_with_settings.lang, meeting_id=5, back_rows=keyboard(user_with_settings.lang)
+            RenderContext(lang=user_with_settings.lang), meeting_id=5, back_rows=keyboard(user_with_settings.lang)
         ),
     )
 
@@ -382,7 +405,7 @@ async def test_meeting_viewable_redirects_non_owner_of_inactive_meeting(
     await context.flush_metrics()
 
     assert result is None
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
 
 
@@ -555,7 +578,7 @@ async def test_user_owns_meeting_redirect_logs_and_emits_metric_and_edits_main_m
     assert any(r.levelno == logging.WARNING for r in caplog.records)
     assert "999" in caplog.text  # meeting id
     assert "1" in caplog.text  # user id
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
 
 

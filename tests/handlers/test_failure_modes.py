@@ -31,7 +31,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages
-from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
+from mitup_bot.views import ButtonConfig, Keyboard, MitupView, RenderContext, factory
 from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_bot_config, create_meetup
 from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.monitoring import MetricAssertions
@@ -1212,7 +1212,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize(
@@ -1378,7 +1378,7 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
     context.api.assert_edit_message_called(
         update,
         factory.reactivation_prompt_view(
-            lang=user_with_settings.lang, meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
+            RenderContext(lang=user_with_settings.lang), meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
         ),
     )
 
@@ -1415,4 +1415,4 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
-    context.api.assert_edit_message_called(update, factory.main_menu_view(lang=user_with_settings.lang))
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

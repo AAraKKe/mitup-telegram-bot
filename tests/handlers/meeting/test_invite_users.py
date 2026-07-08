@@ -12,6 +12,7 @@ from mitup_bot.monitoring import Feature, MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
 from tests.helpers import (
     AnyFloat,
@@ -67,7 +68,7 @@ async def test_invite_users_by_registered_user(
     context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_CONVERSATION, handler_context=handler_context)
 
     expected_view = views.factory.request_information_with_cancel_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingInviteMessages.PROMPT.get(lang=user_with_settings.lang),
         callback_data=cb.CANCEL_INVITE_USER.with_id(MEETING_ID),
     )
@@ -156,7 +157,7 @@ async def test_invite_users_ask_for_name(
 
     # User has been asked to confirm the name
     expected_view = views_factory.confirmation_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingInviteMessages.CONFIRMATION.get(
             lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
         ),
@@ -216,7 +217,7 @@ async def test_cancel_name_request(
     if owner_id == 123:
         expected_view = meeting.view_for(user_with_settings).with_context(message)
     else:
-        expected_view = views.factory.main_menu_view(lang=user_with_settings.lang, message=message)
+        expected_view = views.factory.main_menu_view(RenderContext(lang=user_with_settings.lang), message=message)
 
     cancel_step.context.api.assert_edit_message_called(
         update=cancel_step.context.get_update(),
@@ -391,7 +392,7 @@ async def test_invite_user_decline_confirmation(
         expected_view = meeting.view_for(user_with_settings).with_context(message)
     else:
         expected_view = views.factory.main_menu_view(
-            lang=user_with_settings.lang,
+            RenderContext(lang=user_with_settings.lang),
             message=message,
         )
 
@@ -551,7 +552,7 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 
     # In all these cases the user should have been sent to the main menu with the expected message
     final_context = result.last_context
-    expected_view = views.factory.main_menu_view(lang=user_with_settings.lang)
+    expected_view = views.factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
 
     final_context.api.assert_answer_callback_query_called(
         update=final_context.get_update(),
@@ -664,7 +665,7 @@ async def test_abort_invitation_when_meeting_no_longer_allows_invitations(
     context, _ = await call_handler(handler_id, handler_context=handler_context)
 
     expected_view = views_factory.main_menu_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang),
     )
     context.api.assert_edit_message_called(handler_context.update, expected_view)
@@ -694,7 +695,7 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
 
     # Main menu should have been sent with the unexpected-updates message
     expected_view = views_factory.main_menu_view(
-        lang=user_with_settings.lang,
+        RenderContext(lang=user_with_settings.lang),
         message=MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user_with_settings.lang),
     )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)

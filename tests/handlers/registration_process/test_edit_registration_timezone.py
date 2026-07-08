@@ -15,7 +15,7 @@ from mitup_bot.handlers.registration_process.enums import ConversationRegistrati
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import RegistrationMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import StubMitupContext, UpdateRequest, claimed_state, create_user
 from tests.helpers.stub_db import MockDbSession
 
@@ -71,7 +71,7 @@ async def test_registration_timezone_text_message_handler_sets_timezone_and_ends
 
     result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
-    view = factory.main_menu_view(lang=user_with_settings.lang).with_context(
+    view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
         RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=update.effective_message.text)
     )
     mock_session.assert_flushed()
@@ -112,7 +112,7 @@ async def test_registration_timezone_location_message_handler_sets_timezone_and_
 
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
-    view = factory.main_menu_view(lang=user_with_settings.lang).with_context(
+    view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
         RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Madrid")
     )
     mock_session.assert_flushed()

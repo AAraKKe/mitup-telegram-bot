@@ -51,7 +51,9 @@ async def callback_query_create_meeting(
     if await active_meetings_cap_reached(user, update, context):
         return ConversationHandler.END
 
-    view = views.factory.create_meeting_view(lang=user.lang, datetime_link=build_datetime_link())
+    view = views.factory.create_meeting_view(
+        guards.render_context(user, update, context), datetime_link=build_datetime_link()
+    )
 
     context.store_on_exit(
         ContextId.CREATE_MEETING,
@@ -131,7 +133,7 @@ async def create_meeting_invalid_title_message_handler(
 ) -> ConversationMeetingState:
     user = await guards.current_user(update, session)
     error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user.lang)
-    view = views.factory.create_meeting_view(lang=user.lang, message=error_msg)
+    view = views.factory.create_meeting_view(guards.render_context(user, update, context), message=error_msg)
     await context.api.send_message(update=update, view=view)
     return ConversationMeetingState.TITLE
 

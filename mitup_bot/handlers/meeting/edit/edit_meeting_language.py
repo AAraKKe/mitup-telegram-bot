@@ -30,7 +30,7 @@ async def callback_edit_meeting_language(session: AsyncSession, update: Update, 
 
     await context.api.edit_message(
         update=update,
-        view=views.factory.meeting_set_language_view(meeting=meeting),
+        view=views.factory.meeting_set_language_view(guards.render_context(user, update, context), meeting=meeting),
     )
 
 
@@ -60,9 +60,9 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
 
     await context.api.edit_message(
         update=update,
-        view=views.factory.meeting_set_language_view(meeting=meeting).with_context(
-            MeetingEditLanguageMessages.SUCCESS.get(lang=meeting.user_language)
-        ),
+        view=views.factory.meeting_set_language_view(
+            guards.render_context(user, update, context), meeting=meeting
+        ).with_context(MeetingEditLanguageMessages.SUCCESS.get(lang=meeting.user_language)),
     )
 
     # Since the language has changed, we need to update the messages of the meeting

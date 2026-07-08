@@ -5,14 +5,14 @@ import pytest
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import AdminMessages, ButtonMessages
-from mitup_bot.views import ButtonConfig, MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 
 
 def test_edit_meeting_property_view_without_extra_options(lang: str):
     message = "Test message"
     meeting_id = 1
 
-    view = factory.edit_meeting_property_view(lang=lang, message=message, meeting_id=meeting_id)
+    view = factory.edit_meeting_property_view(RenderContext(lang=lang), message=message, meeting_id=meeting_id)
     expected_view = MitupView(
         description=message,
         keyboard=[
@@ -41,7 +41,7 @@ def test_edit_meeting_property_view_with_extra_buttons(lang: str):
     ]
 
     view = factory.edit_meeting_property_view(
-        lang=lang, message=message, meeting_id=meeting_id, extra_buttons=extra_buttons
+        RenderContext(lang=lang), message=message, meeting_id=meeting_id, extra_buttons=extra_buttons
     )
     expected_view = MitupView(
         description=message,
@@ -70,7 +70,7 @@ def test_edit_meeting_property_view_with_custom_back_button(lang: str):
     custom_back = ButtonConfig(text="Custom back", callback_data="custom_back")
 
     view = factory.edit_meeting_property_view(
-        lang=lang, message=message, meeting_id=meeting_id, back_button=custom_back
+        RenderContext(lang=lang), message=message, meeting_id=meeting_id, back_button=custom_back
     )
     expected_view = MitupView(
         description=message,
@@ -91,7 +91,7 @@ def test_edit_meeting_date_view_defaults_back_button_to_date_time_hub(lang: str)
     # label must name that real destination — DATE_TIME — not EDIT.
     meeting_id = 7
     view = factory.edit_meeting_date_view(
-        lang=lang,
+        RenderContext(lang=lang),
         meeting_id=meeting_id,
         anchor_date=dt.date(2024, 11, 15),
         current_date=dt.date(2024, 11, 15),
@@ -110,7 +110,7 @@ def test_edit_meeting_date_view_end_date_back_button_names_end_hub(lang: str):
     # End Date & Time hub. The back button label must follow with END_DATE_TIME, not "Edit".
     meeting_id = 7
     view = factory.edit_meeting_date_view(
-        lang=lang,
+        RenderContext(lang=lang),
         meeting_id=meeting_id,
         anchor_date=dt.date(2024, 11, 15),
         current_date=dt.date(2024, 11, 15),
@@ -129,7 +129,7 @@ def test_edit_meeting_date_view_end_date_back_button_names_end_hub(lang: str):
 
 
 def test_main_menu_view_hides_admin_button_by_default(lang: str):
-    view = factory.main_menu_view(lang=lang)
+    view = factory.main_menu_view(RenderContext(lang=lang))
 
     admin_button = ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)
     all_buttons = [button for row in view.keyboard for button in row]
@@ -138,22 +138,24 @@ def test_main_menu_view_hides_admin_button_by_default(lang: str):
 
 def test_main_menu_view_default_keyboard_matches_non_admin(lang: str):
     # The is_admin default must render exactly today's keyboard, unchanged.
-    assert factory.main_menu_view(lang=lang) == factory.main_menu_view(lang=lang, is_admin=False)
+    assert factory.main_menu_view(RenderContext(lang=lang)) == factory.main_menu_view(
+        RenderContext(lang=lang, is_admin=False)
+    )
 
 
 def test_main_menu_view_appends_admin_button_for_admins(lang: str):
-    view = factory.main_menu_view(lang=lang, is_admin=True)
+    view = factory.main_menu_view(RenderContext(lang=lang, is_admin=True))
 
     # The admin entry is a full-width row appended at the very bottom.
     assert view.keyboard[-1] == [
         ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)
     ]
     # Everything above the admin row is identical to the non-admin keyboard.
-    assert view.keyboard[:-1] == factory.main_menu_view(lang=lang).keyboard
+    assert view.keyboard[:-1] == factory.main_menu_view(RenderContext(lang=lang)).keyboard
 
 
 def test_admin_menu_view(lang: str):
-    view = factory.admin_menu_view(lang=lang)
+    view = factory.admin_menu_view(RenderContext(lang=lang))
 
     expected_view = MitupView(
         AdminMessages.MENU_DESCRIPTION.get(lang=lang),

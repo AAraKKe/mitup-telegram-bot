@@ -56,7 +56,7 @@ async def callback_query_delete_past_meeting(session: AsyncSession, update: Upda
     await context.api.edit_message(
         update=update,
         view=factory.confirmation_view(
-            lang=user.lang,
+            guards.render_context(user, update, context),
             message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_page(callback_data.id, callback_data.page),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_page(callback_data.id, callback_data.page),

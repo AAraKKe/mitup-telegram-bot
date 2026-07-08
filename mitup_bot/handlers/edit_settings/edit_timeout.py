@@ -23,7 +23,7 @@ async def callback_query_timeout(session: AsyncSession, update: Update, context:
     user = await guards.current_user(update, session, load_collections=False)
     message = SettingsMessages.TIMEOUT_PROMPT.get(lang=user.lang, timeout=user.settings.timeout)
 
-    view = views.factory.change_settings_element_view(lang=user.lang, message=message)
+    view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 
     await context.api.edit_message(update=update, view=view)
 
@@ -44,7 +44,7 @@ async def settings_timeout_text_message_handler(session: AsyncSession, update: U
     await session.flush()
 
     message = SettingsMessages.TIMEOUT_SUCCESS.get(lang=user.lang, timeout=user.settings.timeout)
-    view = views.factory.settings_view(lang=user.lang, message=message)
+    view = views.factory.settings_view(guards.render_context(user, update, context), message=message)
 
     await context.api.send_message(update=update, view=view)
 
@@ -57,7 +57,7 @@ async def settings_timeout_invalid_input_handler(session: AsyncSession, update: 
     user = await guards.current_user(update, session, load_collections=False)
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
-    view = views.factory.change_settings_element_view(lang=user.lang, message=message)
+    view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 
     await context.api.send_message(update=update, view=view)
 

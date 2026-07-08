@@ -23,7 +23,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import CommonMessages
-from mitup_bot.views import factory
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     MockDbSession,
     StubMitupApp,
@@ -179,7 +179,9 @@ async def test_guard_error_emits_fault_metrics_and_notifies_user(
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
 
     fallback = TranslationEngine.FALLBACK_LANG
-    expected_view = factory.main_menu_view(lang=fallback, message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback))
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback)
+    )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
 
@@ -194,7 +196,9 @@ async def test_guard_error_uses_resolved_user_language(
     await error_handler.handler(context, EffectiveMessageNotSet(context.telegram_update), Env.PROD)
     await context.metrics.flush()
 
-    expected_view = factory.main_menu_view(lang="es", message=CommonMessages.UNEXPECTED_ERROR.get(lang="es"))
+    expected_view = factory.main_menu_view(
+        RenderContext(lang="es"), message=CommonMessages.UNEXPECTED_ERROR.get(lang="es")
+    )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
 
@@ -252,7 +256,9 @@ async def test_notify_guard_error_callback_query_answers_then_sends(app: StubMit
     # No user registered -> the notification falls back to the project default language.
     fallback = TranslationEngine.FALLBACK_LANG
     context.api.assert_answer_callback_query_called(update, text="", show_alert=False)
-    expected_view = factory.main_menu_view(lang=fallback, message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback))
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback)
+    )
     context.api.assert_send_message_called(update, expected_view)
 
 

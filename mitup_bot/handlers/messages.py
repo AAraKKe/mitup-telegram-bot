@@ -24,10 +24,11 @@ async def filter_messages_without_text(session: AsyncSession, update: Update, co
     # Reads only `user.lang` for the interrupted/main-menu views; never traverses the
     # meetups/joined_links collections.
     user = await guards.current_user(update, session, load_collections=False)
+    ctx = guards.render_context(user, update, context)
 
     if on_exit := context.get_active_on_exit():
         view = factory.conversation_interrupted_view(
-            lang=user.lang,
+            ctx,
             message=on_exit.message,
             cancel_callback=on_exit.cancel_callback,
         )
@@ -35,6 +36,6 @@ async def filter_messages_without_text(session: AsyncSession, update: Update, co
         return None
 
     context.clean_all_user_data()
-    view = factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
+    view = factory.main_menu_view(ctx)
     await context.api.send_message(update=update, view=view)
     return ConversationHandler.END
