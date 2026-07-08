@@ -125,6 +125,7 @@ def handler_log_context(handler_id: HandlerId, handler_type: str, update: Update
     """Build the contextvar fields to bind for a handler call, omitting any the update lacks
     (some updates carry no effective_user/chat)."""
     fields: dict[str, object] = {
+        "flow": handler_id.flow,
         "handler": handler_id.dimension,
         "handler_type": handler_type,
         "update_id": update.update_id,

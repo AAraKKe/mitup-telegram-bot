@@ -1,3 +1,4 @@
+import pytest
 import structlog
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
@@ -5,6 +6,10 @@ from telegram import Update
 
 from mitup_bot.config import Env
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.handlers.admin.enums import AdminHandlerId
+from mitup_bot.handlers.command_enums import CommandsId
+from mitup_bot.handlers.inline_query.enums import InlineQueryId
+from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.registry import callback_with_metrics, handler_log_context
 from tests.helpers import StubMitupApp, StubMitupContext, build_context
 
@@ -17,11 +22,27 @@ class LoggingTestId(HandlerId):
     SOME_HANDLER = "logging_test_handler"
 
 
+@pytest.mark.parametrize(
+    ("handler_id", "expected_flow"),
+    [
+        (EditMeetingHandlerId.EDIT, "edit_meeting"),
+        (AdminHandlerId.ADMIN_MENU_CALLBACK, "admin"),
+        (InlineQueryId.INLINE_VIEW, "inline_query"),
+        (CommandsId.MAIN_MENU, "commands"),
+        (LoggingTestId.SOME_HANDLER, "logging_test"),
+    ],
+)
+def test_handler_id_flow_derivation(handler_id: HandlerId, expected_flow: str):
+    """HandlerId.flow strips the HandlerId/Id suffix and snake-cases the subclass name."""
+    assert handler_id.flow == expected_flow
+
+
 def test_handler_log_context_includes_request_fields(update: Update):
-    """handler_log_context binds handler/handler_type/update_id plus user_id/chat_id when present."""
+    """handler_log_context binds flow/handler/handler_type/update_id plus user_id/chat_id when present."""
     fields = handler_log_context(LoggingTestId.SOME_HANDLER, "Command", update)
 
     assert fields == {
+        "flow": LoggingTestId.SOME_HANDLER.flow,
         "handler": LoggingTestId.SOME_HANDLER.dimension,
         "handler_type": "Command",
         "update_id": DEFAULT_ID,
@@ -38,6 +59,7 @@ def test_handler_log_context_omits_missing_user_and_chat():
     fields = handler_log_context(LoggingTestId.SOME_HANDLER, "Callback", update)
 
     assert fields == {
+        "flow": LoggingTestId.SOME_HANDLER.flow,
         "handler": LoggingTestId.SOME_HANDLER.dimension,
         "handler_type": "Callback",
         "update_id": 999,
@@ -64,6 +86,7 @@ async def test_log_inside_callback_carries_request_contextvars(update: Update, a
     handler_logs = [log for log in logs if log["event"] == "inside handler"]
     assert len(handler_logs) == 1
     entry = handler_logs[0]
+    assert entry["flow"] == LoggingTestId.SOME_HANDLER.flow
     assert entry["handler"] == LoggingTestId.SOME_HANDLER.dimension
     assert entry["handler_type"] == "Command"
     assert entry["user_id"] == DEFAULT_ID
@@ -91,7 +114,7 @@ async def test_request_contextvars_cleared_after_callback_returns(
     after_logs = [log for log in logs if log["event"] == "after handler"]
     assert len(after_logs) == 1
     entry = after_logs[0]
-    for field in ("handler", "handler_type", "user_id", "chat_id", "update_id"):
+    for field in ("flow", "handler", "handler_type", "user_id", "chat_id", "update_id"):
         assert field not in entry
 
 

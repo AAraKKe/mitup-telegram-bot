@@ -34,7 +34,7 @@ def run_migrations(event: dict[str, Any], context: Any) -> int:
     event_object = MigrationEvent.model_validate(event)
 
     ctx_fields: dict[str, object] = {
-        "lambda": "migrations",
+        "flow": "migrations",
         "action": event_object.action,
         "revision": event_object.revision,
     }
@@ -42,7 +42,7 @@ def run_migrations(event: dict[str, Any], context: Any) -> int:
         ctx_fields["aws_request_id"] = context.aws_request_id
 
     with structlog.contextvars.bound_contextvars(**ctx_fields):
-        log.info("migration.start")
+        log.info("Migration started")
 
         # File directly available in the lambda root directory
         config = Config("alembic.ini")
@@ -53,6 +53,6 @@ def run_migrations(event: dict[str, Any], context: Any) -> int:
         if event_object.action is AlembicActions.DOWNGRADE:
             command.downgrade(config, event_object.revision)
 
-        log.info("migration.done")
+        log.info("Migration completed")
 
     return 0

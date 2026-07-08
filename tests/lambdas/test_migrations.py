@@ -104,8 +104,9 @@ def test_wrong_event_fails():
 
 
 def test_binds_invocation_contextvars_during_handler_body():
-    """run_migrations binds lambda/action/revision for the duration of the handler so the
-    migration.start / migration.done logs (and any alembic logging) carry the invocation context."""
+    """run_migrations binds flow/action/revision for the duration of the handler so the
+    "Migration started" / "Migration completed" logs (and any alembic logging) carry the
+    invocation context."""
     event = {"action": "upgrade", "revision": "abc123"}
 
     with capture_logs(processors=[merge_contextvars]) as logs:
@@ -113,10 +114,11 @@ def test_binds_invocation_contextvars_during_handler_body():
             with mock.patch("mitup_bot.lambdas.migrations.Config"):
                 run_migrations(event, None)
 
-    start_logs = [log for log in logs if log["event"] == "migration.start"]
+    start_logs = [log for log in logs if log["event"] == "Migration started"]
     assert len(start_logs) == 1
     entry = start_logs[0]
-    assert entry["lambda"] == "migrations"
+    assert entry["flow"] == "migrations"
+    assert "lambda" not in entry
     assert entry["action"] == AlembicActions.UPGRADE  # bound as the enum, str-equals "upgrade"
     assert entry["revision"] == "abc123"
 
@@ -130,7 +132,7 @@ def test_includes_aws_request_id_when_context_has_it():
             with mock.patch("mitup_bot.lambdas.migrations.Config"):
                 run_migrations({"action": "upgrade", "revision": "abc123"}, context)
 
-    start_logs = [log for log in logs if log["event"] == "migration.start"]
+    start_logs = [log for log in logs if log["event"] == "Migration started"]
     assert len(start_logs) == 1
     assert start_logs[0]["aws_request_id"] == "req-123"
 
@@ -142,7 +144,7 @@ def test_omits_aws_request_id_when_context_lacks_it():
             with mock.patch("mitup_bot.lambdas.migrations.Config"):
                 run_migrations({"action": "upgrade", "revision": "abc123"}, None)
 
-    start_logs = [log for log in logs if log["event"] == "migration.start"]
+    start_logs = [log for log in logs if log["event"] == "Migration started"]
     assert len(start_logs) == 1
     assert "aws_request_id" not in start_logs[0]
 
@@ -159,5 +161,5 @@ def test_clears_invocation_contextvars_after_return():
     after_logs = [log for log in logs if log["event"] == "after migration"]
     assert len(after_logs) == 1
     entry = after_logs[0]
-    for field in ("lambda", "action", "revision", "aws_request_id"):
+    for field in ("flow", "action", "revision", "aws_request_id"):
         assert field not in entry

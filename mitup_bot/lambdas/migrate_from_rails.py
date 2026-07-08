@@ -37,7 +37,7 @@ def handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
     archive_uri = event.get("archive_s3_uri") or os.environ.get("MIGRATE_ARCHIVE_S3_URI")
 
     ctx_fields: dict[str, object] = {
-        "lambda": "migrate_from_rails",
+        "flow": "migrate_from_rails",
         "dry_run": dry_run,
         "phases": phases,
     }

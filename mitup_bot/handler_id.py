@@ -2,6 +2,8 @@ from enum import Enum
 from functools import cached_property, reduce
 from typing import override
 
+from pydantic.alias_generators import to_snake
+
 
 class HandlerId(Enum):
     """
@@ -37,3 +39,13 @@ class HandlerId(Enum):
         # Order matters here
         to_remove = ["CallbackId", "InlineQueryId", "CallbackQueryId", "HandlerId", "Handler", "CommandsId", "_"]
         return reduce(lambda a, b: a.replace(b, ""), to_remove, camel_case)
+
+    @cached_property
+    def flow(self) -> str:
+        """The business unit this handler belongs to, as a snake_case string.
+
+        Derived from the subclass name: EditMeetingHandlerId -> edit_meeting,
+        CommandsId -> commands, InlineQueryId -> inline_query.
+        """
+        base = type(self).__name__.removesuffix("HandlerId").removesuffix("Id")
+        return to_snake(base)

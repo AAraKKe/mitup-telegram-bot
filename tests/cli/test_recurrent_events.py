@@ -131,8 +131,8 @@ async def test_launch_event_sync(event_type: EventType, module_path: str):
 
 
 async def test_launch_event_binds_event_contextvars():
-    """A log emitted while an event runs carries event_type (the dispatched EventType.value) and a
-    run_id, bound by launch_event for the duration of the dispatched run()."""
+    """A log emitted while an event runs carries flow/event_type (both the dispatched EventType.value)
+    and a run_id, bound by launch_event for the duration of the dispatched run()."""
     api = MockApi()
     client = make_test_metrics_client()
 
@@ -146,6 +146,7 @@ async def test_launch_event_binds_event_contextvars():
     event_logs = [log for log in logs if log["event"] == "event running"]
     assert len(event_logs) == 1
     entry = event_logs[0]
+    assert entry["flow"] == EventType.USER_CLEANUP.value  # "UserCleanup"
     assert entry["event_type"] == EventType.USER_CLEANUP.value  # "UserCleanup"
     # run_id is a uuid4().hex — present and a 32-char hex string, but its exact value is random.
     run_id = entry["run_id"]
@@ -154,8 +155,8 @@ async def test_launch_event_binds_event_contextvars():
 
 
 async def test_launch_event_clears_contextvars_between_events():
-    """bound_contextvars auto-clears on exit, so event_type/run_id must not leak from one event into
-    a log emitted after launch_event returns (events run back-to-back in run_periodic)."""
+    """bound_contextvars auto-clears on exit, so flow/event_type/run_id must not leak from one event
+    into a log emitted after launch_event returns (events run back-to-back in run_periodic)."""
     api = MockApi()
     client = make_test_metrics_client()
 
@@ -168,6 +169,7 @@ async def test_launch_event_clears_contextvars_between_events():
     after_logs = [log for log in logs if log["event"] == "between events"]
     assert len(after_logs) == 1
     entry = after_logs[0]
+    assert "flow" not in entry
     assert "event_type" not in entry
     assert "run_id" not in entry
 

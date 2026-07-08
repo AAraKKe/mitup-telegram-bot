@@ -199,14 +199,14 @@ def test_request_error_propagates(
     mock_fetch_credentials: mock.MagicMock,
     mock_post: mock.MagicMock,
 ):
-    """A transport-level failure logs alarm_action.request_error and re-raises the httpx.RequestError."""
+    """A transport-level failure logs "GitLab request failed" and re-raises the httpx.RequestError."""
     mock_post.side_effect = httpx.RequestError("network error", request=mock.Mock())
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with pytest.raises(httpx.RequestError):
             handler(metric_alarm_event(), None)
 
-    request_error_logs = [log for log in logs if log["event"] == "alarm_action.request_error"]
+    request_error_logs = [log for log in logs if log["event"] == "GitLab request failed"]
     assert len(request_error_logs) == 1
 
 
@@ -232,7 +232,7 @@ def test_invalid_event_raises_and_logs(
         with pytest.raises(ValidationError):
             handler(event, None)
 
-    invalid_logs = [log for log in logs if log["event"] == "alarm_action.invalid_event"]
+    invalid_logs = [log for log in logs if log["event"] == "Invalid alarm event"]
     assert len(invalid_logs) == 1
     mock_post.assert_not_called()
 
@@ -246,10 +246,11 @@ def test_binds_invocation_contextvars_during_handler_body(
     with capture_logs(processors=[merge_contextvars]) as logs:
         handler(metric_alarm_event(), None)
 
-    posting = [log for log in logs if log["event"] == "alarm_action.posting"]
+    posting = [log for log in logs if log["event"] == "Posting alert to GitLab"]
     assert len(posting) == 1
     entry = posting[0]
-    assert entry["lambda"] == "alarm_action"
+    assert entry["flow"] == "alarm_action"
+    assert "lambda" not in entry
     assert entry["alarm_name"] == "bot-errors"
     assert entry["alarm_arn"] == "arn:aws:cloudwatch:eu-west-1:123456789012:alarm:bot-errors"
     assert entry["region"] == "eu-west-1"
@@ -266,7 +267,7 @@ def test_includes_aws_request_id_when_context_has_it(
     with capture_logs(processors=[merge_contextvars]) as logs:
         handler(metric_alarm_event(), context)
 
-    entry = next(log for log in logs if log["event"] == "alarm_action.posting")
+    entry = next(log for log in logs if log["event"] == "Posting alert to GitLab")
     assert entry["aws_request_id"] == "req-abc"
 
 
@@ -278,7 +279,7 @@ def test_omits_aws_request_id_when_context_lacks_it(
     with capture_logs(processors=[merge_contextvars]) as logs:
         handler(metric_alarm_event(), None)
 
-    entry = next(log for log in logs if log["event"] == "alarm_action.posting")
+    entry = next(log for log in logs if log["event"] == "Posting alert to GitLab")
     assert "aws_request_id" not in entry
 
 
@@ -293,7 +294,7 @@ def test_clears_invocation_contextvars_after_return(
         structlog.get_logger("mitup_bot").info("after handler")
 
     entry = next(log for log in logs if log["event"] == "after handler")
-    for field in ("lambda", "alarm_name", "alarm_arn", "region", "new_state", "aws_request_id"):
+    for field in ("flow", "alarm_name", "alarm_arn", "region", "new_state", "aws_request_id"):
         assert field not in entry
 
 

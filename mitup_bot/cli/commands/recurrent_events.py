@@ -127,7 +127,9 @@ async def dispatch_event(
 
 
 async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient, admin_tg_ids: list[int]):
-    with structlog.contextvars.bound_contextvars(event_type=event_type.value, run_id=uuid4().hex):
+    with structlog.contextvars.bound_contextvars(
+        flow=event_type.value, event_type=event_type.value, run_id=uuid4().hex
+    ):
         await dispatch_event(event_type, api, client, admin_tg_ids)
 
 

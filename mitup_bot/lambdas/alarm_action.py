@@ -223,11 +223,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     try:
         alarm = AlarmEvent.model_validate(event)
     except Exception:
-        log.exception("alarm_action.invalid_event", raw_event=event)
+        log.exception("Invalid alarm event", raw_event=event)
         raise
 
     ctx_fields: dict[str, object] = {
-        "lambda": "alarm_action",
+        "flow": "alarm_action",
         "alarm_name": alarm.alarm_data.alarm_name,
         "alarm_arn": alarm.alarm_arn,
         "region": alarm.region,
@@ -241,7 +241,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         credentials = fetch_gitlab_credentials(param_name)
 
         payload = build_gitlab_payload(alarm)
-        log.info("alarm_action.posting", webhook_url=credentials.webhook_url)
+        log.info("Posting alert to GitLab", webhook_url=credentials.webhook_url)
 
         try:
             response = httpx.post(
@@ -255,7 +255,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             )
         except httpx.RequestError:
             log.exception(
-                "alarm_action.request_error",
+                "GitLab request failed",
                 webhook_url=credentials.webhook_url,
                 alarm_name=alarm.alarm_data.alarm_name,
             )
@@ -263,12 +263,12 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         if not response.is_success:
             log.error(
-                "alarm_action.post_failed",
+                "GitLab alert post failed",
                 status_code=response.status_code,
                 response_body=response.text,
             )
             response.raise_for_status()
 
-        log.info("alarm_action.done", alarm_name=alarm.alarm_data.alarm_name)
+        log.info("Alarm action completed", alarm_name=alarm.alarm_data.alarm_name)
 
     return {"status": "ok", "alarm": alarm.alarm_data.alarm_name}
