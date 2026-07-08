@@ -16,7 +16,9 @@ from .utils import build_collaborate_view, subscription_for_user, tapped_message
 @HandlersRegistry.register_callback_query(CollaborateHandlerId.SHOW, callback_data=cb.COLLABORATE, bindable=True)
 @with_session
 async def callback_query_collaborate(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # `build_collaborate_view` reads `user.lang`/`user.id`/`user.tg_user_id`/`user.supporter_level`
+    # only (never the meetups/joined_links collections), so skip loading them.
+    user = await guards.current_user(update, session, load_collections=False)
     # The tapped message is edited in place below; carry its id through the OAuth state so the web
     # callback can refresh this same message into the linked view after linking.
     view = await build_collaborate_view(session, user, tapped_message_id(update))
@@ -26,7 +28,10 @@ async def callback_query_collaborate(session: AsyncSession, update: Update, cont
 @HandlersRegistry.register_callback_query(CollaborateHandlerId.UNLINK, callback_data=cb.UNLINK_PATREON, bindable=True)
 @with_session
 async def callback_query_unlink_patreon(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # Reads/writes `user.supporter_level` and passes the user to `subscription_for_user`/
+    # `build_collaborate_view`, both of which touch only scalar columns — never the
+    # meetups/joined_links collections, so skip loading them.
+    user = await guards.current_user(update, session, load_collections=False)
 
     subscription = await subscription_for_user(session, user)
     if subscription is not None:

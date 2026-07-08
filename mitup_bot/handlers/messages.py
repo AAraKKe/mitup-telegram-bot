@@ -21,7 +21,9 @@ class MessagesId(HandlerId):
 @HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT | filters.COMMAND, bindable=False)
 @with_session
 async def filter_messages_without_text(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # Reads only `user.lang` for the interrupted/main-menu views; never traverses the
+    # meetups/joined_links collections.
+    user = await guards.current_user(update, session, load_collections=False)
 
     if on_exit := context.get_active_on_exit():
         view = factory.conversation_interrupted_view(

@@ -19,7 +19,8 @@ from .enums import ConversationSettingsState, EditSettingsHandlerId
 )
 @with_session
 async def callback_query_timeout(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
+    user = await guards.current_user(update, session, load_collections=False)
     message = SettingsMessages.TIMEOUT_PROMPT.get(lang=user.lang, timeout=user.settings.timeout)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)
@@ -34,7 +35,7 @@ async def callback_query_timeout(session: AsyncSession, update: Update, context:
 )
 @with_session
 async def settings_timeout_text_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     timeout_str = cast(str, guards.message(update).text)
 
     timeout = int(timeout_str)
@@ -53,7 +54,7 @@ async def settings_timeout_text_message_handler(session: AsyncSession, update: U
 @HandlersRegistry.register_message(EditSettingsHandlerId.TIMEOUT_INVALID_INPUT, filters=filters.ALL, bindable=False)
 @with_session
 async def settings_timeout_invalid_input_handler(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(lang=user.lang, message=message)

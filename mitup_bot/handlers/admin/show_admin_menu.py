@@ -17,7 +17,8 @@ from .enums import AdminHandlerId
 async def callback_query_show_admin_menu(session: AsyncSession, update: Update, context: TMitupContext):
     context.clean_all_user_data()
 
-    user = await guards.current_user(update, session)
+    # Admin menu reads only `user.lang`; it never traverses the meetups/joined_links collections.
+    user = await guards.current_user(update, session, load_collections=False)
     view = views.factory.admin_menu_view(lang=user.lang)
 
     await context.api.edit_message(update=update, view=view)

@@ -49,7 +49,9 @@ def edit_notification_view(user: User) -> MitupView:
 )
 @with_session
 async def callback_query_notifications(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # Settings-only: `edit_notification_view` reads `user.lang`/`user.settings` and never the
+    # meetups/joined_links collections, so skip loading them.
+    user = await guards.current_user(update, session, load_collections=False)
 
     await context.api.edit_message(update=update, view=edit_notification_view(user))
 
@@ -60,7 +62,7 @@ async def callback_query_notifications(session: AsyncSession, update: Update, co
 )
 @with_session
 async def callback_query_toggle_notifications(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
 
     user.settings.notification = not user.settings.notification
     await session.flush()
@@ -73,7 +75,7 @@ async def callback_query_toggle_notifications(session: AsyncSession, update: Upd
 )
 @with_session
 async def callback_query_set_notification_time(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(
@@ -92,7 +94,7 @@ async def callback_query_set_notification_time(session: AsyncSession, update: Up
 async def settings_notification_time_text_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     notification_time_str = cast(str, guards.message(update).text)
 
     notification_time = int(notification_time_str)
@@ -117,7 +119,7 @@ async def settings_notification_time_text_message_handler(
 async def settings_notification_time_invalid_input_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(

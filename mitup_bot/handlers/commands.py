@@ -36,7 +36,9 @@ async def command_start_with_existing_user(
 async def existing_user_start(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    user = await guards.current_user(update, session)
+    # Entry path only reads `user.lang` for the create-meeting / main-menu views; it never traverses
+    # the meetups/joined_links collections, so skip loading them.
+    user = await guards.current_user(update, session, load_collections=False)
 
     if context.args and context.args[0] == "inline":
         # Local import to avoid circular dependency at load time: commands.py must be fully

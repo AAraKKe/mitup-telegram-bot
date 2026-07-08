@@ -25,7 +25,8 @@ log = structlog.get_logger(__name__)
 )
 @with_session
 async def callback_query_timezone(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
+    user = await guards.current_user(update, session, load_collections=False)
     message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
 
     context.store_on_exit(
@@ -46,7 +47,7 @@ async def callback_query_timezone(session: AsyncSession, update: Update, context
 )
 @with_session
 async def settings_timezone_text_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     address = cast(str, guards.message(update).text)
 
     if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
@@ -84,7 +85,7 @@ async def settings_timezone_text_message_handler(session: AsyncSession, update: 
 )
 @with_session
 async def settings_timezone_location_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    user = await guards.current_user(update, session, load_collections=False)
     location = cast(Location, guards.message(update).location)
 
     if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:

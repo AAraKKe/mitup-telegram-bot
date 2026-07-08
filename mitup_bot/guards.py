@@ -69,12 +69,16 @@ def is_admin(update: Update, context: TMitupContext) -> bool:
     return update.effective_user is not None and update.effective_user.id in context.bot_config.admin_tg_ids
 
 
-async def current_user(update: Update, session: AsyncSession) -> User:
+async def current_user(update: Update, session: AsyncSession, *, load_collections: bool = True) -> User:
+    # `load_collections` forwards to `User.by_tg_user_id`: handlers that never traverse the user's
+    # meetups/joined_links (settings-only screens, the Collaborate menu, etc.) pass False at their
+    # entry point to skip the two selectin queries. It stays True by default so opting out is always
+    # a deliberate, audited per-call-site decision.
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
 
     # If we have an effective user, get the user from DB
-    if user := await User.by_tg_user_id(session, update.effective_user.id):
+    if user := await User.by_tg_user_id(session, update.effective_user.id, load_collections=load_collections):
         return user
     else:
         raise UserNotFound(update.effective_user.id)
@@ -82,7 +86,11 @@ async def current_user(update: Update, session: AsyncSession) -> User:
 
 async def user_language(update: Update, session: AsyncSession) -> str:
     """Return the preferred language for the effective user, or the fallback language if unregistered."""
-    if (tg_user := update.effective_user) and (user := await User.by_tg_user_id(session, tg_user.id)):
+    # Reads only `user.lang` (a Settings-backed column), never the meetups/joined_links collections,
+    # so skip loading them: this guard runs on every inline-query keystroke.
+    if (tg_user := update.effective_user) and (
+        user := await User.by_tg_user_id(session, tg_user.id, load_collections=False)
+    ):
         return user.lang
     return TranslationEngine.FALLBACK_LANG
 
@@ -371,14 +379,22 @@ async def supporter_required(
 
 
 async def user_registered(
-    update: Update, session: AsyncSession, context: TMitupContext, alert_message: MessageBase
+    update: Update,
+    session: AsyncSession,
+    context: TMitupContext,
+    alert_message: MessageBase,
+    *,
+    load_collections: bool = True,
 ) -> User | None:
     """
     Context manager that yields the current user if they are subscribed to the bot.
     If the user is not subscribed, the callback query is answered with an allert showing the `alert_message`.
+
+    `load_collections` forwards to `current_user`; leave it True unless the caller has verified it
+    never traverses the user's meetups/joined_links (see `current_user`).
     """
     try:
-        return await current_user(update, session)
+        return await current_user(update, session, load_collections=load_collections)
     except UserNotFound as e:
         user = cast(TgUser, update.effective_user)  # We know the user exists here
         if update.callback_query is None:

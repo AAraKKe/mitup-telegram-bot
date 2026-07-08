@@ -17,7 +17,9 @@ from .enums import MainMenuHandlerId
 async def callback_query_main_menu(session: AsyncSession, update: Update, context: TMitupContext):
     context.clean_all_user_data()
 
-    user = await guards.current_user(update, session)
+    # The main menu renders only `user.lang` and the admin flag; it never traverses the
+    # meetups/joined_links collections, so skip loading them.
+    user = await guards.current_user(update, session, load_collections=False)
     view = views.factory.main_menu_view(lang=user.lang, is_admin=guards.is_admin(update, context))
 
     await context.api.edit_message(update=update, view=view)
