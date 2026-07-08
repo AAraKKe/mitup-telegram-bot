@@ -147,7 +147,7 @@ async def test_launch_event_send_broadcasts():
     client = make_test_metrics_client()
     admin_tg_ids = [111, 222]
 
-    with patch("mitup_bot.cli.commands.recurrent_events.send_broadcasts.run", new_callable=AsyncMock) as mock_run:
+    with patch("mitup_bot.cli.commands.recurrent_events.broadcast.run", new_callable=AsyncMock) as mock_run:
         await launch_event(EventType.SEND_BROADCASTS, api, client, admin_tg_ids)
         mock_run.assert_awaited_once_with(api, client, admin_tg_ids)
 

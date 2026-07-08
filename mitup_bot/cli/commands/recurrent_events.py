@@ -13,12 +13,12 @@ from telegram.ext import AIORateLimiter, ExtBot
 from mitup_bot import db, patreon
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.cli import (
+    broadcast,
     generate_stats,
     inactive_meetings,
     meetups_cleanup,
     notify_meetings,
     notify_meetings_started,
-    send_broadcasts,
     supporter_check,
     user_cleanup,
 )
@@ -142,7 +142,7 @@ async def dispatch_event(
         case EventType.MEETUPS_CLEANUP:
             await meetups_cleanup.run(api, client)
         case EventType.SEND_BROADCASTS:
-            await send_broadcasts.run(api, client, admin_tg_ids)
+            await broadcast.run(api, client, admin_tg_ids)
         case EventType.SUPPORTER_CHECK:
             await supporter_check.run(api, client)
         case never:  # pragma: no cover
