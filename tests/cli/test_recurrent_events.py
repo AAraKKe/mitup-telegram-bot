@@ -18,11 +18,13 @@ from mitup_bot.cli.commands.recurrent_events import (
     EventType,
     IntervalsConfiguration,
     build_bot,
+    build_broadcast_bot,
     cli,
     handle_maintainance,
     launch_event,
     run_all_tasks,
     run_periodic,
+    select_bot,
 )
 from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, NullBackend
@@ -74,6 +76,40 @@ def test_build_bot(mock_ext_bot: MagicMock):
     assert call_kwargs["token"] == "test-token"
     assert call_kwargs["rate_limiter"] is not None
     assert "defaults" not in call_kwargs
+
+
+@patch("mitup_bot.cli.commands.recurrent_events.AIORateLimiter")
+@patch("mitup_bot.cli.commands.recurrent_events.ExtBot")
+def test_build_broadcast_bot_applies_configured_rate(mock_ext_bot: MagicMock, mock_rate_limiter: MagicMock):
+    bot_config = MagicMock()
+    bot_config.token.get_secret_value.return_value = "test-token"
+    bot_config.retries_on_throttle = 3
+    bot_config.broadcast_max_rate = 7
+
+    build_broadcast_bot(bot_config)
+
+    # The broadcast bot caps its send rate at broadcast_max_rate per second while sharing the
+    # retry budget with the main bot.
+    mock_rate_limiter.assert_called_once_with(overall_max_rate=7, overall_time_period=1, max_retries=3)
+    mock_ext_bot.assert_called_once()
+    call_kwargs = mock_ext_bot.call_args.kwargs
+    assert call_kwargs["token"] == "test-token"
+    assert call_kwargs["rate_limiter"] is mock_rate_limiter.return_value
+
+
+@pytest.mark.parametrize(
+    "event_type", [event for event in EventType if event is not EventType.SEND_BROADCASTS], ids=lambda e: e.name
+)
+def test_select_bot_uses_shared_bot_for_non_broadcast_events(event_type: EventType):
+    bot, broadcast_bot = MagicMock(), MagicMock()
+
+    assert select_bot(event_type, bot, broadcast_bot) is bot
+
+
+def test_select_bot_uses_broadcast_bot_for_send_broadcasts():
+    bot, broadcast_bot = MagicMock(), MagicMock()
+
+    assert select_bot(EventType.SEND_BROADCASTS, bot, broadcast_bot) is broadcast_bot
 
 
 # Async event types use `await module.run(...)`, sync ones call directly.
@@ -445,6 +481,7 @@ async def test_run_periodic_default_jitter():
 
 async def test_run_all_tasks_creates_all_tasks():
     bot = MagicMock()
+    broadcast_bot = MagicMock()
     intervals = IntervalsConfiguration(
         user_cleanup=10,
         notify_start_meeting=20,
@@ -458,23 +495,28 @@ async def test_run_all_tasks_creates_all_tasks():
 
     created_tasks: list[EventType] = []
     propagated_start_times: list[float | None] = []
+    bots_by_event: dict[EventType, object] = {}
     start_time = 42.0
 
     async def fake_run_periodic(
         interval: int,
         event_type: EventType,
-        bot,
+        bot: object,
         admin_tg_ids: list[int],
         time_before_start: float | None = None,
     ):
         created_tasks.append(event_type)
         propagated_start_times.append(time_before_start)
+        bots_by_event[event_type] = bot
 
     with patch("mitup_bot.cli.commands.recurrent_events.run_periodic", side_effect=fake_run_periodic):
-        await run_all_tasks(intervals, bot, [], start_time=start_time)
+        await run_all_tasks(intervals, bot, broadcast_bot, [], start_time=start_time)
 
     assert set(created_tasks) == set(EventType)
     assert propagated_start_times == [start_time] * len(EventType)
+    # Only SEND_BROADCASTS runs on the rate-capped broadcast bot; every other event on the shared one.
+    assert bots_by_event[EventType.SEND_BROADCASTS] is broadcast_bot
+    assert all(bots_by_event[event] is bot for event in EventType if event is not EventType.SEND_BROADCASTS)
 
 
 def test_cli_invokes_with_defaults():
@@ -485,6 +527,7 @@ def test_cli_invokes_with_defaults():
         patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
         patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend") as mock_configure_emf,
         patch("mitup_bot.cli.commands.recurrent_events.build_bot") as mock_build_bot,
+        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot") as mock_build_broadcast_bot,
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
     ):
@@ -500,6 +543,7 @@ def test_cli_invokes_with_defaults():
         # Flag off: the events pool stays uninstrumented — no metrics client passed to the db.
         mock_db.configure_db.assert_called_once_with(mock_config.db, metrics_client=None)
         mock_configure_emf.assert_called_once_with(mock_config.metrics)
+        mock_build_broadcast_bot.assert_called_once_with(mock_config.bot)
         mock_build_bot.assert_called_once_with(mock_config.bot)
         mock_async_run.assert_called_once()
 
@@ -512,6 +556,7 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
         patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
         patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
     ):
@@ -537,6 +582,7 @@ def test_cli_passes_custom_intervals():
         patch("mitup_bot.cli.commands.recurrent_events.db"),
         patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.run_all_tasks", new_callable=AsyncMock) as mock_run_all_tasks,
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
@@ -572,7 +618,7 @@ def test_cli_passes_custom_intervals():
 
         # Verify the IntervalsConfiguration passed to run_all_tasks has the correct values
         mock_run_all_tasks.assert_called_once()
-        intervals_arg, _, _, start_time_arg = mock_run_all_tasks.call_args.args
+        intervals_arg, _bot, _broadcast_bot, _admin_tg_ids, start_time_arg = mock_run_all_tasks.call_args.args
         assert intervals_arg.user_cleanup == 111
         assert intervals_arg.notify_start_meeting == 222
         assert intervals_arg.generate_stats == 333
@@ -607,6 +653,7 @@ def test_cli_configures_patreon_when_section_present(restore_patreon_state: None
         patch("mitup_bot.cli.commands.recurrent_events.db"),
         patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
     ):
@@ -630,6 +677,7 @@ def test_cli_env_option():
         patch("mitup_bot.cli.commands.recurrent_events.db"),
         patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
         patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
+        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
         patch("mitup_bot.cli.commands.recurrent_events.build_api"),
         patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
     ):

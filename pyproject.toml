@@ -61,6 +61,9 @@ filterwarnings = [
     'ignore:.*is deprecated and will only be accessible via `ChatFullInfo`.*:DeprecationWarning:telegram.*',
     # AsyncMock coroutines GC'd across xdist workers trigger spurious "coroutine was never awaited" warnings
     'ignore:coroutine .* was never awaited:RuntimeWarning',
+    # Accessing RetryAfter.retry_after warns until the PTB_TIMEDELTA opt-in; flood_control_backoff
+    # already handles both the int and timedelta forms, so the type migration is a no-op here.
+    'ignore:.*attribute `retry_after` will be of type `datetime.timedelta`.*:telegram.warnings.PTBDeprecationWarning',
 ]
 asyncio_default_fixture_loop_scope = "function"
 markers = [

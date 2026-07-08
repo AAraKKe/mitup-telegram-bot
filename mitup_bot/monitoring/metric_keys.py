@@ -141,6 +141,8 @@ class MetricKey(CamelCaseStrEnum):
     BROADCAST_MESSAGES_SKIPPED = auto()
     """Number of broadcast deliveries left claimed but unresolved by a worker crash (aggregated at finalization)"""
     BROADCAST_MESSAGES_ORPHANED = auto()
+    """Number of broadcast deliveries re-claimed for a transient-failure retry this run (attempt > 1)"""
+    BROADCAST_MESSAGES_RETRIED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

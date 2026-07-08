@@ -20,13 +20,33 @@ whatever remains (or nothing). No two workers can ever fetch, let alone send, th
 
 The claim flips rows to IN_PROGRESS — an honest "claimed, outcome unknown yet" state, not a
 guess at the real outcome — and `record_batch_outcomes` resolves each claimed row to its real
-terminal status (SENT, SKIPPED_INACTIVE, or FAILED) once the send completes. A crash between
-claiming a batch and recording its outcomes leaves the claimed rows stuck IN_PROGRESS forever:
-they are never resent (only PENDING rows are ever claimable) and never silently counted as a
-terminal outcome. `finalize_broadcast` counts any IN_PROGRESS rows still present at finalization
-as orphans — genuinely unknown outcomes, kept separate from FAILED so a future retry mechanism
-keyed off FAILED can't be misled into re-sending or skipping them. No recipient is ever messaged
-twice, whether the threat is a crash or a second live worker.
+status once the send completes: SENT / SKIPPED_INACTIVE / FAILED (terminal), or RETRY_PENDING for
+a transient failure. A crash between claiming a batch and recording its outcomes leaves the
+claimed rows stuck IN_PROGRESS forever: they are never resent (only PENDING and due RETRY_PENDING
+rows are ever claimable) and never silently counted as a terminal outcome. `finalize_broadcast`
+counts any IN_PROGRESS rows still present at finalization as orphans — genuinely unknown outcomes,
+kept separate from FAILED and never retried. No recipient is ever messaged twice, whether the
+threat is a crash or a second live worker.
+
+Transient-failure retries — a FAILED delivery means the Telegram call genuinely errored (the
+message was NOT delivered), so retrying it is double-send-safe; retrying an IN_PROGRESS orphan is
+NOT, because its outcome is unknown and possibly a success. That is why only PENDING and due
+RETRY_PENDING rows are ever re-claimed, never IN_PROGRESS. A retryable failure (flood control, or
+an unexpected error) parks the delivery in RETRY_PENDING with a `next_attempt_time`; the claim
+re-selects it once that time passes, bumping `attempt_count` atomically, until it succeeds or
+crosses `MAX_DELIVERY_ATTEMPTS` and lands FAILED. FAILED is strictly permanent (a genuine
+per-recipient error or the exhausted retry cap). The sender's traffic runs through a dedicated bot
+instance with a low proactive per-second rate cap (`bot.broadcast_max_rate`, wired in
+`recurrent_events.build_broadcast_bot`) so broadcasts never crowd time-sensitive events off the
+shared limiter — which makes a reactive `RetryAfter` a last-resort signal rather than routine.
+Flood control (`RetryAfter`) is special: it halts
+the batch the instant it fires — the triggering row keeps its incremented attempt (a real call
+happened), but the untried remainder of the batch is released back to RETRY_PENDING with its claim
+increment undone (no attempt was spent) and `next_attempt_time` set to the flood backoff, and the
+run's drain loop stops so the next tick resumes after the window. While any delivery is still
+PENDING/RETRY_PENDING the broadcast is NOT finalized and its `Broadcast.attempts` counter is reset
+to 0 — that counter guards only against a worker crash-loop (a crashing worker never reaches the
+clean-exit reset), not against a broadcast legitimately waiting out backoff across many ticks.
 
 Because two workers can each drain a disjoint slice of the same broadcast's deliveries, both can
 independently observe "no PENDING rows left" and reach finalization for the same `broadcast_id`.
@@ -44,15 +64,15 @@ aggregating the delivery table, never from in-memory accumulators (which reset a
 import datetime as dt
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 import structlog
 from sqlalchemy import Row
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlmodel import and_, case, col, delete, func, literal, select, update
+from sqlmodel import and_, case, col, delete, func, literal, or_, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram.error import BadRequest, NetworkError
+from telegram.error import BadRequest, NetworkError, RetryAfter
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
@@ -72,6 +92,12 @@ log = structlog.get_logger(__name__)
 MAX_BROADCAST_ATTEMPTS = 5
 # Recipients handled per PENDING-query page; also the crash re-send window under immediate mode.
 BROADCAST_BATCH_SIZE = 50
+# Times a single delivery is sent before a transient failure at this attempt is failed permanently.
+MAX_DELIVERY_ATTEMPTS = 3
+# Base backoff for an unexpected send error; doubles with each attempt.
+RETRY_BACKOFF_BASE_SECONDS = 60
+# Added to Telegram's requested flood-control wait so the retry lands past the window's edge.
+RETRY_AFTER_MARGIN_SECONDS = 5
 # The anonymous-invitee sentinel is never a reachable recipient.
 ANONYMOUS_INVITEE_TG_ID = -1
 FALLBACK_LANG = TranslationEngine.FALLBACK_LANG
@@ -89,6 +115,21 @@ class PendingDelivery:
     delivery_id: int
     user: User
     language_sent: str
+    attempt_count: int
+
+
+@dataclass
+class DeliveryClassification:
+    """How `deliver_one` classified a single send, before the per-delivery attempt cap is applied.
+
+    A RETRY_PENDING status means the send failed transiently and was not delivered; `retry_delay`
+    carries the backoff and `flood_control` marks a Telegram `RetryAfter` (which halts the run).
+    """
+
+    status: BroadcastDeliveryStatus
+    error: str | None
+    retry_delay: dt.timedelta | None = None
+    flood_control: bool = False
 
 
 @dataclass
@@ -96,6 +137,20 @@ class DeliveryOutcome:
     delivery_id: int
     user_id: int
     status: BroadcastDeliveryStatus
+    next_attempt_time: dt.datetime | None = None
+
+
+@dataclass
+class BatchResult:
+    """The resolved outcomes of one delivered batch. `flood_control` tells `send_all_pending` to
+    stop claiming further batches this run. When flood control halts the batch mid-way,
+    `unattempted` carries the still-IN_PROGRESS rows the loop never sent, to be released back to
+    RETRY_PENDING after `flood_backoff` with their claim increment undone."""
+
+    outcomes: list[DeliveryOutcome]
+    flood_control: bool
+    unattempted: list[PendingDelivery] = field(default_factory=list)
+    flood_backoff: dt.timedelta | None = None
 
 
 @dataclass
@@ -185,7 +240,46 @@ async def process_claimed_broadcast(
         metrics.emit(MetricKey.BROADCAST_MESSAGES_TO_SEND, total, MetricUnit.COUNT)
 
     await send_all_pending(api, metrics, claimed.broadcast_id, bodies)
+    if await defer_for_pending_retries(claimed.broadcast_id):
+        return
     await finalize_and_report(api, metrics, admin_tg_ids, claimed.broadcast_id, BroadcastStatus.DONE)
+
+
+async def defer_for_pending_retries(broadcast_id: int) -> bool:
+    """Hold finalization while any delivery is still PENDING or RETRY_PENDING (due or not).
+
+    Resets `Broadcast.attempts` to 0 so a broadcast waiting out retry backoff across ticks never
+    creeps toward `MAX_BROADCAST_ATTEMPTS` — that counter guards against a worker crash-loop, not
+    against legitimate backoff. The broadcast stays SENDING and the next tick re-claims it.
+    """
+    unfinished = await count_unfinished_deliveries(broadcast_id)
+    if not unfinished:
+        return False
+    log.info("Broadcast deferred for pending retries", broadcast_id=broadcast_id, pending=unfinished)
+    await reset_broadcast_attempts(broadcast_id)
+    return True
+
+
+@db.with_session
+async def count_unfinished_deliveries(session: AsyncSession, broadcast_id: int) -> int:
+    statement = (
+        select(func.count())
+        .select_from(BroadcastDelivery)
+        .where(
+            and_(
+                col(BroadcastDelivery.broadcast_id) == broadcast_id,
+                col(BroadcastDelivery.status).in_(
+                    [BroadcastDeliveryStatus.PENDING, BroadcastDeliveryStatus.RETRY_PENDING]
+                ),
+            )
+        )
+    )
+    return (await session.exec(statement)).one()
+
+
+@db.with_session
+async def reset_broadcast_attempts(session: AsyncSession, broadcast_id: int):
+    await session.exec(update(Broadcast).where(col(Broadcast.id) == broadcast_id).values(attempts=0))
 
 
 @db.with_session
@@ -247,29 +341,49 @@ async def count_deliveries(session: AsyncSession, broadcast_id: int) -> int:
 
 
 async def send_all_pending(api: TelegramApiWrapper, metrics: MetricsClient, broadcast_id: int, bodies: dict[str, str]):
-    """Drain every PENDING delivery, one atomically-claimed `BROADCAST_BATCH_SIZE` page at a
-    time, until no claim returns any rows."""
+    """Drain every due delivery, one atomically-claimed `BROADCAST_BATCH_SIZE` page at a time,
+    until no claim returns any rows — or until Telegram flood control fires, which stops the run
+    so the next tick resumes after the backoff. Re-claimed retry deliveries (attempt > 1) are
+    counted and emitted once per run."""
+    retried = 0
     while batch := await claim_pending_batch(broadcast_id):
-        outcomes = await deliver_batch(api, broadcast_id, batch, bodies)
-        await record_batch_outcomes(outcomes, metrics)
+        result = await deliver_batch(api, broadcast_id, batch, bodies)
+        await record_batch_outcomes(result, metrics)
+        # Only rows we actually attempted count as retries; the released remainder gets its claim
+        # increment undone and is counted if and when it is genuinely re-claimed on a later run.
+        unattempted_ids = {pending.delivery_id for pending in result.unattempted}
+        retried += sum(pending.attempt_count > 1 for pending in batch if pending.delivery_id not in unattempted_ids)
+        if result.flood_control:
+            log.warning("Broadcast paused batch draining after flood control", broadcast_id=broadcast_id)
+            break
+    if retried:
+        metrics.emit(MetricKey.BROADCAST_MESSAGES_RETRIED, retried, MetricUnit.COUNT)
 
 
 @db.with_session
 async def claim_pending_batch(session: AsyncSession, broadcast_id: int) -> list[PendingDelivery]:
-    """Atomically claim up to `BROADCAST_BATCH_SIZE` PENDING deliveries for this worker alone.
+    """Atomically claim up to `BROADCAST_BATCH_SIZE` due deliveries for this worker alone.
 
-    See the module docstring: the `FOR UPDATE SKIP LOCKED` subquery and the status flip happen in
-    one statement, so a concurrent worker's claim can never match a row this one already took —
-    it just skips locked rows and claims whatever is left. Claimed rows land on IN_PROGRESS until
-    `record_batch_outcomes` resolves them to their real terminal outcome; a crash before that
-    leaves them IN_PROGRESS and they are counted as orphans at finalization.
+    Eligible rows are PENDING, or RETRY_PENDING whose `next_attempt_time` has passed. See the
+    module docstring: the `FOR UPDATE SKIP LOCKED` subquery, the status flip and the
+    `attempt_count` bump all happen in one statement, so a concurrent worker's claim can never
+    match a row this one already took — it just skips locked rows and claims whatever is left.
+    Claimed rows land on IN_PROGRESS until `record_batch_outcomes` resolves them; a crash before
+    that leaves them IN_PROGRESS and they are counted as orphans at finalization.
     """
+    now = dt.datetime.now(dt.UTC)
     claim_ids = (
         select(col(BroadcastDelivery.id))
         .where(
             and_(
                 col(BroadcastDelivery.broadcast_id) == broadcast_id,
-                col(BroadcastDelivery.status) == BroadcastDeliveryStatus.PENDING,
+                or_(
+                    col(BroadcastDelivery.status) == BroadcastDeliveryStatus.PENDING,
+                    and_(
+                        col(BroadcastDelivery.status) == BroadcastDeliveryStatus.RETRY_PENDING,
+                        col(BroadcastDelivery.next_attempt_time) <= now,
+                    ),
+                ),
             )
         )
         .order_by(col(BroadcastDelivery.id))
@@ -279,8 +393,17 @@ async def claim_pending_batch(session: AsyncSession, broadcast_id: int) -> list[
     claim_statement = (
         update(BroadcastDelivery)
         .where(col(BroadcastDelivery.id).in_(claim_ids))
-        .values(status=BroadcastDeliveryStatus.IN_PROGRESS)
-        .returning(col(BroadcastDelivery.id), col(BroadcastDelivery.user_id), col(BroadcastDelivery.language_sent))
+        .values(
+            status=BroadcastDeliveryStatus.IN_PROGRESS,
+            attempt_count=col(BroadcastDelivery.attempt_count) + 1,
+            next_attempt_time=None,
+        )
+        .returning(
+            col(BroadcastDelivery.id),
+            col(BroadcastDelivery.user_id),
+            col(BroadcastDelivery.language_sent),
+            col(BroadcastDelivery.attempt_count),
+        )
     )
     claimed = (await session.exec(claim_statement)).all()
     if not claimed:
@@ -292,8 +415,16 @@ async def claim_pending_batch(session: AsyncSession, broadcast_id: int) -> list[
 async def resolve_claimed_recipients(session: AsyncSession, claimed: Sequence[Row[Any]]) -> list[PendingDelivery]:
     """Load the full `User` row for each just-claimed delivery — `send_message_to_user` sends
     through the ORM object, not a bare tg id. Read-only: no lock is needed, the claim already
-    secured exclusive ownership of the delivery rows themselves."""
-    user_ids = [cast(int, user_id) for _, user_id, _ in claimed]
+    secured exclusive ownership of the delivery rows themselves.
+
+    Postgres does not preserve the claim subquery's `ORDER BY id` in the UPDATE's RETURNING output
+    (RETURNING follows the update's scan order, which is unspecified), so the rows are re-sorted by
+    delivery id here. Batch send order must follow delivery id: it keeps the lowest-id row the
+    flood trigger so its attempt count grows monotonically, and makes a flood halt release the
+    highest-id remainder deterministically.
+    """
+    claimed = sorted(claimed, key=lambda row: cast(int, row[0]))
+    user_ids = [cast(int, user_id) for _, user_id, _, _ in claimed]
     users_by_id = {
         user.db_id: user for user in (await session.exec(select(User).where(col(User.id).in_(user_ids)))).all()
     }
@@ -302,77 +433,155 @@ async def resolve_claimed_recipients(session: AsyncSession, claimed: Sequence[Ro
             delivery_id=cast(int, delivery_id),
             user=users_by_id[cast(int, user_id)],
             language_sent=language,
+            attempt_count=cast(int, attempt_count),
         )
-        for delivery_id, user_id, language in claimed
+        for delivery_id, user_id, language, attempt_count in claimed
     ]
 
 
 async def deliver_batch(
     api: TelegramApiWrapper, broadcast_id: int, batch: list[PendingDelivery], bodies: dict[str, str]
-) -> list[DeliveryOutcome]:
+) -> BatchResult:
+    """Deliver the batch in order, stopping the moment Telegram flood control fires. The
+    triggering row's outcome is kept (a real API call happened, so its incremented attempt
+    stands); the untried remainder is carried out for release, since hammering more sends into a
+    known flood window would burn their capped attempts on non-attempts."""
     outcomes: list[DeliveryOutcome] = []
-    for pending in batch:
-        status, error = await deliver_one(api, pending.user, bodies[pending.language_sent])
-        log_delivery(broadcast_id, pending, status, error)
-        outcomes.append(DeliveryOutcome(delivery_id=pending.delivery_id, user_id=pending.user.db_id, status=status))
-    return outcomes
+    for index, pending in enumerate(batch):
+        classification = await deliver_one(api, pending.user, bodies[pending.language_sent], pending.attempt_count)
+        outcome = resolve_delivery_outcome(pending, classification)
+        log_delivery(broadcast_id, pending, outcome, classification)
+        outcomes.append(outcome)
+        if classification.flood_control:
+            return BatchResult(
+                outcomes=outcomes,
+                flood_control=True,
+                unattempted=batch[index + 1 :],
+                flood_backoff=classification.retry_delay,
+            )
+    return BatchResult(outcomes=outcomes, flood_control=False)
 
 
 async def deliver_one(
-    api: TelegramApiWrapper, user: User, body_html: str
-) -> tuple[BroadcastDeliveryStatus, str | None]:
+    api: TelegramApiWrapper, user: User, body_html: str, attempt_count: int
+) -> DeliveryClassification:
     """Send one body and classify the outcome.
 
     The stored `body_html` is converted to a `FormattedText` via `parse_format_tags` — the same
     rendering the preview uses, so preview and delivery are guaranteed to match — and sent
     through `send_message_to_user`, which preserves the parsed entities and already classifies a
-    blocked/deleted recipient as `InactiveUserInteraction`. A `NetworkError` is systemic and
-    re-raised to abort the run; every other Telegram error is a per-recipient outcome, never a
-    reason to stop the fan-out.
+    blocked/deleted recipient as `InactiveUserInteraction`. Flood control (`RetryAfter`) and any
+    unexpected error are transient and retryable (RETRY_PENDING with a backoff); a `BadRequest` is
+    a permanent per-recipient failure; a `NetworkError` is systemic and re-raised to abort the run
+    (a `TimedOut` may actually have delivered, so it can never be a retry — it stays orphan
+    territory). None of these, except `NetworkError`, stops the fan-out.
     """
     formatted_body = parse_format_tags(body_html, {})
     try:
         await api.send_message_to_user(user, formatted_body)
     except InactiveUserInteraction:
-        return BroadcastDeliveryStatus.SKIPPED_INACTIVE, "bot blocked by user"
+        return DeliveryClassification(BroadcastDeliveryStatus.SKIPPED_INACTIVE, "bot blocked by user")
+    except RetryAfter as error:
+        delay = flood_control_backoff(error.retry_after)
+        return DeliveryClassification(
+            BroadcastDeliveryStatus.RETRY_PENDING, error.message, retry_delay=delay, flood_control=True
+        )
     except BadRequest as error:
-        return BroadcastDeliveryStatus.FAILED, error.message
+        return DeliveryClassification(BroadcastDeliveryStatus.FAILED, error.message)
     except NetworkError:
         raise
     except Exception as error:
-        return BroadcastDeliveryStatus.FAILED, str(error)
-    return BroadcastDeliveryStatus.SENT, None
+        delay = dt.timedelta(seconds=RETRY_BACKOFF_BASE_SECONDS * 2 ** (attempt_count - 1))
+        return DeliveryClassification(BroadcastDeliveryStatus.RETRY_PENDING, str(error), retry_delay=delay)
+    return DeliveryClassification(BroadcastDeliveryStatus.SENT, None)
 
 
-def log_delivery(broadcast_id: int, pending: PendingDelivery, status: BroadcastDeliveryStatus, error: str | None):
-    emit = log.info if status is BroadcastDeliveryStatus.SENT else log.warning
+def flood_control_backoff(retry_after: int | dt.timedelta) -> dt.timedelta:
+    """Telegram's requested flood-control wait plus a margin so the retry lands past the window.
+    `RetryAfter.retry_after` is seconds or a timedelta depending on PTB's configuration."""
+    window = retry_after if isinstance(retry_after, dt.timedelta) else dt.timedelta(seconds=retry_after)
+    return window + dt.timedelta(seconds=RETRY_AFTER_MARGIN_SECONDS)
+
+
+def resolve_delivery_outcome(pending: PendingDelivery, classification: DeliveryClassification) -> DeliveryOutcome:
+    """Apply the per-delivery attempt cap: a transient failure at or past `MAX_DELIVERY_ATTEMPTS`
+    becomes a permanent FAILED, otherwise it is scheduled for retry after its backoff."""
+    if classification.status is not BroadcastDeliveryStatus.RETRY_PENDING:
+        return DeliveryOutcome(pending.delivery_id, pending.user.db_id, classification.status)
+    if pending.attempt_count >= MAX_DELIVERY_ATTEMPTS:
+        return DeliveryOutcome(pending.delivery_id, pending.user.db_id, BroadcastDeliveryStatus.FAILED)
+    assert classification.retry_delay is not None, "A RETRY_PENDING classification always carries a backoff"
+    next_attempt_time = dt.datetime.now(dt.UTC) + classification.retry_delay
+    return DeliveryOutcome(
+        pending.delivery_id, pending.user.db_id, BroadcastDeliveryStatus.RETRY_PENDING, next_attempt_time
+    )
+
+
+def log_delivery(
+    broadcast_id: int, pending: PendingDelivery, outcome: DeliveryOutcome, classification: DeliveryClassification
+):
+    emit = log.info if outcome.status is BroadcastDeliveryStatus.SENT else log.warning
+    retry_in = None
+    if outcome.status is BroadcastDeliveryStatus.RETRY_PENDING and classification.retry_delay is not None:
+        retry_in = round(classification.retry_delay.total_seconds())
     emit(
         "broadcast_delivery",
         broadcast_id=broadcast_id,
         tg_user_id=pending.user.tg_user_id,
         lang=pending.language_sent,
-        outcome=status.value,
-        error=error,
+        outcome=outcome.status.value,
+        attempt=pending.attempt_count,
+        retry_in=retry_in,
+        error=classification.error,
     )
 
 
 @db.with_session
-async def record_batch_outcomes(session: AsyncSession, outcomes: list[DeliveryOutcome], metrics: MetricsClient):
-    """Resolve each claimed (IN_PROGRESS) delivery to its real terminal outcome.
+async def record_batch_outcomes(session: AsyncSession, result: BatchResult, metrics: MetricsClient):
+    """Resolve each claimed (IN_PROGRESS) delivery to its recorded outcome, and — when flood
+    control halted the batch — release the untried remainder in the same transaction.
 
-    A skipped recipient is also flipped to LEFT.
+    Terminal outcomes (SENT, FAILED, SKIPPED_INACTIVE) are written in bulk; a RETRY_PENDING
+    outcome is re-parked with its own `next_attempt_time`. A skipped recipient is also flipped to
+    LEFT.
     """
     by_status: dict[BroadcastDeliveryStatus, list[DeliveryOutcome]] = defaultdict(list)
-    for outcome in outcomes:
+    for outcome in result.outcomes:
         by_status[outcome.status].append(outcome)
 
     if sent := by_status[BroadcastDeliveryStatus.SENT]:
         await mark_deliveries(session, sent, BroadcastDeliveryStatus.SENT, sent_time=dt.datetime.now(dt.UTC))
     if failed := by_status[BroadcastDeliveryStatus.FAILED]:
         await mark_deliveries(session, failed, BroadcastDeliveryStatus.FAILED)
+    if retry_pending := by_status[BroadcastDeliveryStatus.RETRY_PENDING]:
+        await schedule_retries(session, retry_pending)
     if skipped := by_status[BroadcastDeliveryStatus.SKIPPED_INACTIVE]:
         await mark_deliveries(session, skipped, BroadcastDeliveryStatus.SKIPPED_INACTIVE)
         await deactivate_skipped_users(session, skipped, metrics)
+    if result.unattempted:
+        assert result.flood_backoff is not None, "Unattempted rows are only carried out under flood control"
+        await release_unattempted(session, result.unattempted, result.flood_backoff)
+
+
+async def release_unattempted(session: AsyncSession, unattempted: list[PendingDelivery], flood_backoff: dt.timedelta):
+    """Return the flood-halted, still-IN_PROGRESS rows to RETRY_PENDING in one bulk UPDATE.
+
+    The claim already bumped their `attempt_count`, but no send happened, so it is decremented
+    back — their attempt budget must not be spent on a non-attempt. `next_attempt_time` is set from
+    the triggering row's flood backoff. These rows are owned by this worker, so the update is
+    race-free.
+    """
+    next_attempt_time = dt.datetime.now(dt.UTC) + flood_backoff
+    delivery_ids = [pending.delivery_id for pending in unattempted]
+    await session.exec(
+        update(BroadcastDelivery)
+        .where(col(BroadcastDelivery.id).in_(delivery_ids))
+        .values(
+            status=BroadcastDeliveryStatus.RETRY_PENDING,
+            next_attempt_time=next_attempt_time,
+            attempt_count=col(BroadcastDelivery.attempt_count) - 1,
+        )
+    )
 
 
 async def mark_deliveries(
@@ -386,6 +595,17 @@ async def mark_deliveries(
         values["sent_time"] = sent_time
     delivery_ids = [outcome.delivery_id for outcome in outcomes]
     await session.exec(update(BroadcastDelivery).where(col(BroadcastDelivery.id).in_(delivery_ids)).values(**values))
+
+
+async def schedule_retries(session: AsyncSession, outcomes: list[DeliveryOutcome]):
+    """Park each retryable delivery back on RETRY_PENDING with its own `next_attempt_time`. Rows
+    carry distinct backoffs, so each is written on its own — retries are the exceptional path."""
+    for outcome in outcomes:
+        await session.exec(
+            update(BroadcastDelivery)
+            .where(col(BroadcastDelivery.id) == outcome.delivery_id)
+            .values(status=BroadcastDeliveryStatus.RETRY_PENDING, next_attempt_time=outcome.next_attempt_time)
+        )
 
 
 async def deactivate_skipped_users(session: AsyncSession, skipped: list[DeliveryOutcome], metrics: MetricsClient):
@@ -437,11 +657,11 @@ async def finalize_broadcast(
 ) -> tuple[BroadcastSummary, bool]:
     """Roll the delivery table up into per-language and total counts, then close the broadcast.
 
-    Any delivery still PENDING at this point never got attempted — a no-op on the normal drained
-    path, and on the terminal-failure path (max attempts exceeded, no draining) it correctly
-    records never-attempted recipients as genuine non-deliveries. It is marked FAILED before
-    aggregation. Rows left IN_PROGRESS are a different case entirely — claimed by a worker that
-    crashed before recording an outcome — and are counted separately as orphans, never as FAILED.
+    Any delivery still PENDING or RETRY_PENDING at this point is marked FAILED before aggregation
+    (see `fail_unattempted_deliveries`) — a no-op on the normal drained path, and on the
+    terminal-failure path it records never-completed recipients as genuine non-deliveries. Rows
+    left IN_PROGRESS are a different case entirely — claimed by a worker that crashed before
+    recording an outcome — and are counted separately as orphans, never as FAILED.
 
     Counts come exclusively from aggregating `broadcast_deliveries` (grouped by language and
     status), never from in-memory accumulators, so a broadcast resumed across several runs still
@@ -476,12 +696,20 @@ async def finalize_broadcast(
 
 
 async def fail_unattempted_deliveries(session: AsyncSession, broadcast_id: int):
+    """Flip every still-PENDING or awaiting-RETRY_PENDING delivery to FAILED before aggregation.
+
+    A no-op on the normal drained path (the finalize gate only lets finalization run once none
+    remain); on the terminal-failure path it records these never-completed recipients as genuine
+    non-deliveries. IN_PROGRESS orphans are deliberately left untouched — their outcome is unknown.
+    """
     await session.exec(
         update(BroadcastDelivery)
         .where(
             and_(
                 col(BroadcastDelivery.broadcast_id) == broadcast_id,
-                col(BroadcastDelivery.status) == BroadcastDeliveryStatus.PENDING,
+                col(BroadcastDelivery.status).in_(
+                    [BroadcastDeliveryStatus.PENDING, BroadcastDeliveryStatus.RETRY_PENDING]
+                ),
             )
         )
         .values(status=BroadcastDeliveryStatus.FAILED)

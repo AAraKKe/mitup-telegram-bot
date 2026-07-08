@@ -1,7 +1,7 @@
 import datetime as dt
 from enum import StrEnum
 
-from sqlalchemy import Column, DateTime, Enum, FetchedValue, UniqueConstraint
+from sqlalchemy import Column, DateTime, Enum, FetchedValue, Integer, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from .base_model import BaseModel
@@ -26,14 +26,19 @@ class BroadcastStatus(StrEnum):
 class BroadcastDeliveryStatus(StrEnum):
     """Per-recipient delivery state, resolved as the sender fans a broadcast out.
 
-    PENDING rows are the not-yet-attempted work queue; IN_PROGRESS is a batch claimed by a worker
-    whose real outcome is not yet known (crashing here orphans the row — see the sender module
-    docstring); SENT, SKIPPED_INACTIVE (recipient unreachable) and FAILED are terminal outcomes
-    rolled up into the parent counts at finalization.
+    PENDING rows are the not-yet-attempted work queue; RETRY_PENDING is a delivery that failed
+    transiently (Telegram flood control or an unexpected send error) and was NOT delivered — it
+    becomes claimable again once its `next_attempt_time` passes, until it either succeeds or hits
+    the per-delivery attempt cap; IN_PROGRESS is a batch claimed by a worker whose real outcome is
+    not yet known (crashing here orphans the row — see the sender module docstring); SENT,
+    SKIPPED_INACTIVE (recipient unreachable) and FAILED are terminal outcomes rolled up into the
+    parent counts at finalization. FAILED is strictly permanent — a delivery there was genuinely
+    attempted (or hit the cap) and is never retried.
     """
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
+    RETRY_PENDING = "retry_pending"
     SENT = "sent"
     SKIPPED_INACTIVE = "skipped_inactive"
     FAILED = "failed"
@@ -145,6 +150,12 @@ class BroadcastDelivery(BaseModel, SQLModel, table=True):
             server_default=BroadcastDeliveryStatus.PENDING.value,
         ),
     )
+    # Incremented atomically by the claim (attempt 1 = first send); caps how many times a
+    # transiently-failed delivery is retried before it is failed permanently. server_default keeps
+    # the bulk audience insert (which omits this column) valid.
+    attempt_count: int = Field(default=0, sa_column=Column(Integer, nullable=False, server_default="0"))
+    # When a RETRY_PENDING delivery becomes claimable again; NULL for every other status.
+    next_attempt_time: dt.datetime | None = None
     sent_time: dt.datetime | None = None
 
     def __hash__(self) -> int:

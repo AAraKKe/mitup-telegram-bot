@@ -10,6 +10,7 @@ seeds are invisible to them, and every test that provisions data does so in a co
 """
 
 import contextlib
+import datetime as dt
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import cast
@@ -19,13 +20,13 @@ from sqlalchemy import text
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import MessageEntity
-from telegram.error import BadRequest, Forbidden, NetworkError
+from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter
 from telegram.ext import ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import BotAdapter, TelegramApi
 from mitup_bot.cli import send_broadcasts
-from mitup_bot.cli.send_broadcasts import MAX_BROADCAST_ATTEMPTS
+from mitup_bot.cli.send_broadcasts import MAX_BROADCAST_ATTEMPTS, MAX_DELIVERY_ATTEMPTS
 from mitup_bot.models import Broadcast, BroadcastDelivery, BroadcastMessage, Settings, User
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus, BroadcastStatus
 from mitup_bot.models.users import UserStatus
@@ -54,12 +55,14 @@ class RecordingBot:
         not_found: set[int] | None = None,
         generic_error: set[int] | None = None,
         network_error: set[int] | None = None,
+        flood: set[int] | None = None,
     ):
         self.sent: list[SentMessage] = []
         self.forbidden = forbidden or set()
         self.not_found = not_found or set()
         self.generic_error = generic_error or set()
         self.network_error = network_error or set()
+        self.flood = flood or set()
 
     async def send_message(
         self, *, chat_id: int, text: str, entities: list[MessageEntity] | None = None, **kwargs: object
@@ -70,6 +73,8 @@ class RecordingBot:
             raise BadRequest("Chat not found")
         if chat_id in self.network_error:
             raise NetworkError("Bad Gateway")
+        if chat_id in self.flood:
+            raise RetryAfter(20)
         if chat_id in self.generic_error:
             raise RuntimeError("unexpected serialization failure")
         self.sent.append(SentMessage(chat_id=chat_id, text=text, entities=tuple(entities or ())))
@@ -105,6 +110,8 @@ class SeedDelivery:
     tg_user_id: int
     status: BroadcastDeliveryStatus
     language_sent: str = "en"
+    attempt_count: int = 0
+    next_attempt_time: dt.datetime | None = None
 
 
 @dataclass
@@ -142,6 +149,8 @@ async def provisioned_broadcast(
             await session.flush()
             user_ids[seed.tg_user_id] = user.db_id
 
+        # Flush each delivery on its own so ids are assigned in seed order — the claim reads
+        # ORDER BY id, so tests that depend on delivery ordering need it to match the seed list.
         for delivery in deliveries or []:
             session.add(
                 BroadcastDelivery(
@@ -149,9 +158,11 @@ async def provisioned_broadcast(
                     user_id=user_ids[delivery.tg_user_id],
                     language_sent=delivery.language_sent,
                     status=delivery.status,
+                    attempt_count=delivery.attempt_count,
+                    next_attempt_time=delivery.next_attempt_time,
                 )
             )
-        await session.flush()
+            await session.flush()
         provisioned = Provisioned(broadcast_id=broadcast.db_id, user_ids=dict(user_ids))
 
     try:
@@ -212,6 +223,18 @@ async def create_committed_user(tg_user_id: int, language: str, status: UserStat
         user.settings = Settings(language=language)
         session.add(user)
         await session.flush()
+
+
+async def backdate_retry_deliveries(broadcast_id: int):
+    """Pull every RETRY_PENDING row's next_attempt_time into the past so the next claim is due —
+    simulating the flood window elapsing without a real sleep."""
+    async with db.begin() as session:
+        await session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text(
+                "UPDATE broadcast_deliveries SET next_attempt_time = now() - interval '1 minute' "
+                "WHERE broadcast_id = :bid AND status = 'retry_pending'"
+            ).bindparams(bid=broadcast_id)
+        )
 
 
 # --- Tests ---
@@ -409,16 +432,26 @@ async def test_summary_dm_reaches_operators_with_a_user(db_session: AsyncSession
         assert operator_without_user not in bot.sent_chat_ids
 
 
-async def test_generic_send_error_fails_delivery_but_broadcast_still_completes(db_session: AsyncSession):
+async def test_capped_generic_error_fails_delivery_permanently_but_broadcast_still_completes(
+    db_session: AsyncSession,
+):
     tg_base = 997_580
     failing, reachable = tg_base, tg_base + 1
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
     async with provisioned_broadcast(
         tg_base,
         status=BroadcastStatus.SENDING,
         messages={"en": "hi"},
         seed_users=[SeedUser(failing, "en"), SeedUser(reachable, "en")],
         deliveries=[
-            SeedDelivery(failing, BroadcastDeliveryStatus.PENDING),
+            # Already on its final retry: the claim bumps it to the cap, so a transient error here
+            # is now permanent — pinning that a genuinely FAILED delivery still lets the run finish.
+            SeedDelivery(
+                failing,
+                BroadcastDeliveryStatus.RETRY_PENDING,
+                attempt_count=MAX_DELIVERY_ATTEMPTS - 1,
+                next_attempt_time=past,
+            ),
             SeedDelivery(reachable, BroadcastDeliveryStatus.PENDING),
         ],
     ) as data:
@@ -427,8 +460,8 @@ async def test_generic_send_error_fails_delivery_but_broadcast_still_completes(d
 
         await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, {"en": "hi"})
 
-        # The claim leaves both rows IN_PROGRESS; record_batch_outcomes resolves the failing one
-        # to FAILED explicitly, and the other one to SENT.
+        # The claim bumps the failing row to MAX_DELIVERY_ATTEMPTS, so its generic error resolves to
+        # a permanent FAILED (not another retry); the reachable one resolves to SENT.
         statuses = {d.user_id: d.status for d in await fetch_deliveries(data.broadcast_id)}
         assert statuses[data.user_ids[failing]] is BroadcastDeliveryStatus.FAILED
         assert statuses[data.user_ids[reachable]] is BroadcastDeliveryStatus.SENT
@@ -599,3 +632,162 @@ async def test_delivery_renders_body_as_the_same_formatted_text_the_preview_uses
         ]
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
         assert broadcast.status is BroadcastStatus.DONE
+
+
+async def test_claim_reclaims_pending_and_due_retry_but_skips_future_dated_retry(db_session: AsyncSession):
+    tg_base = 997_800
+    pending_tg, due_tg, future_tg = tg_base, tg_base + 1, tg_base + 2
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
+    future = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
+    async with provisioned_broadcast(
+        tg_base,
+        status=BroadcastStatus.SENDING,
+        messages={"en": "hi"},
+        seed_users=[SeedUser(pending_tg, "en"), SeedUser(due_tg, "en"), SeedUser(future_tg, "en")],
+        deliveries=[
+            SeedDelivery(pending_tg, BroadcastDeliveryStatus.PENDING),
+            SeedDelivery(due_tg, BroadcastDeliveryStatus.RETRY_PENDING, attempt_count=1, next_attempt_time=past),
+            SeedDelivery(future_tg, BroadcastDeliveryStatus.RETRY_PENDING, attempt_count=1, next_attempt_time=future),
+        ],
+    ) as data:
+        batch = await send_broadcasts.claim_pending_batch(data.broadcast_id)
+
+        # Only the PENDING and the due RETRY_PENDING rows are claimed; the future-dated one is not.
+        claimed_attempts = {pending.user.db_id: pending.attempt_count for pending in batch}
+        assert claimed_attempts == {data.user_ids[pending_tg]: 1, data.user_ids[due_tg]: 2}
+
+        statuses = {
+            delivery.user_id: (delivery.status, delivery.attempt_count)
+            for delivery in await fetch_deliveries(data.broadcast_id)
+        }
+        # Claimed rows are IN_PROGRESS with an atomically bumped attempt_count.
+        assert statuses[data.user_ids[pending_tg]] == (BroadcastDeliveryStatus.IN_PROGRESS, 1)
+        assert statuses[data.user_ids[due_tg]] == (BroadcastDeliveryStatus.IN_PROGRESS, 2)
+        # The future-dated retry was untouched.
+        assert statuses[data.user_ids[future_tg]] == (BroadcastDeliveryStatus.RETRY_PENDING, 1)
+
+
+async def test_transient_failure_parks_delivery_and_defers_finalization(db_session: AsyncSession):
+    tg_base = 997_810
+    failing = tg_base
+    async with provisioned_broadcast(
+        tg_base,
+        status=BroadcastStatus.SENDING,
+        attempts=3,  # a nonzero counter to prove the deferral reset
+        messages={"en": "hi"},
+        seed_users=[SeedUser(failing, "en")],
+        deliveries=[SeedDelivery(failing, BroadcastDeliveryStatus.PENDING)],
+    ) as data:
+        bot = RecordingBot(generic_error={failing})
+
+        await send_broadcasts.run(make_api(bot), make_test_metrics_client(), [])
+
+        broadcast, _ = await fetch_broadcast(data.broadcast_id)
+        # The generic error is transient: the delivery is parked RETRY_PENDING, the broadcast is
+        # NOT finalized (stays SENDING), and its attempt counter is reset for the next tick.
+        assert broadcast.status is BroadcastStatus.SENDING
+        assert broadcast.attempts == 0
+        deliveries = await fetch_deliveries(data.broadcast_id)
+        assert [d.status for d in deliveries] == [BroadcastDeliveryStatus.RETRY_PENDING]
+        assert deliveries[0].attempt_count == 1
+        assert deliveries[0].next_attempt_time is not None
+
+
+async def test_due_retry_is_resent_and_broadcast_finalizes(db_session: AsyncSession):
+    tg_base = 997_820
+    recipient = tg_base
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
+    async with provisioned_broadcast(
+        tg_base,
+        status=BroadcastStatus.SENDING,
+        messages={"en": "hi"},
+        seed_users=[SeedUser(recipient, "en")],
+        deliveries=[
+            SeedDelivery(recipient, BroadcastDeliveryStatus.RETRY_PENDING, attempt_count=1, next_attempt_time=past)
+        ],
+    ) as data:
+        bot = RecordingBot()
+
+        await send_broadcasts.run(make_api(bot), make_test_metrics_client(), [])
+
+        # The due retry was re-sent and the broadcast drove itself to a clean DONE.
+        assert bot.sent_chat_ids == {recipient}
+        broadcast, _ = await fetch_broadcast(data.broadcast_id)
+        assert broadcast.status is BroadcastStatus.DONE
+        assert broadcast.sent_count == 1
+        assert await fetch_deliveries(data.broadcast_id) == []
+
+
+async def test_transient_failure_at_the_attempt_cap_fails_permanently(db_session: AsyncSession):
+    tg_base = 997_830
+    failing = tg_base
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
+    async with provisioned_broadcast(
+        tg_base,
+        status=BroadcastStatus.SENDING,
+        messages={"en": "hi"},
+        seed_users=[SeedUser(failing, "en")],
+        deliveries=[
+            SeedDelivery(
+                failing,
+                BroadcastDeliveryStatus.RETRY_PENDING,
+                attempt_count=MAX_DELIVERY_ATTEMPTS - 1,
+                next_attempt_time=past,
+            )
+        ],
+    ) as data:
+        bot = RecordingBot(generic_error={failing})
+
+        await send_broadcasts.send_all_pending(
+            make_api(bot), make_test_metrics_client(), data.broadcast_id, {"en": "hi"}
+        )
+
+        # The claim bumps attempt_count to the cap; a transient failure there is now permanent.
+        deliveries = await fetch_deliveries(data.broadcast_id)
+        assert [(d.status, d.attempt_count) for d in deliveries] == [
+            (BroadcastDeliveryStatus.FAILED, MAX_DELIVERY_ATTEMPTS)
+        ]
+
+
+async def test_flood_control_halts_mid_batch_releases_remainder_and_reclaims_after_window(db_session: AsyncSession):
+    tg_base = 997_840
+    sent_first, flooded, released = tg_base, tg_base + 1, tg_base + 2
+    async with provisioned_broadcast(
+        tg_base,
+        status=BroadcastStatus.SENDING,
+        attempts=2,  # a nonzero counter to prove the deferral reset
+        messages={"en": "hi"},
+        seed_users=[SeedUser(sent_first, "en"), SeedUser(flooded, "en"), SeedUser(released, "en")],
+        deliveries=[
+            SeedDelivery(sent_first, BroadcastDeliveryStatus.PENDING),
+            SeedDelivery(flooded, BroadcastDeliveryStatus.PENDING),
+            SeedDelivery(released, BroadcastDeliveryStatus.PENDING),
+        ],
+    ) as data:
+        flooding_bot = RecordingBot(flood={flooded})
+
+        await send_broadcasts.run(make_api(flooding_bot), make_test_metrics_client(), [])
+
+        # Only the first recipient was contacted; flood control stopped the batch before the third.
+        assert flooding_bot.sent_chat_ids == {sent_first}
+        statuses = {d.user_id: (d.status, d.attempt_count) for d in await fetch_deliveries(data.broadcast_id)}
+        assert statuses[data.user_ids[sent_first]] == (BroadcastDeliveryStatus.SENT, 1)
+        # The flood-triggering row keeps its incremented attempt — a real API call happened.
+        assert statuses[data.user_ids[flooded]] == (BroadcastDeliveryStatus.RETRY_PENDING, 1)
+        # The untried row is released with its claim increment undone: attempt budget restored to 0.
+        assert statuses[data.user_ids[released]] == (BroadcastDeliveryStatus.RETRY_PENDING, 0)
+        # The broadcast is not finalized; it stays SENDING with its attempt counter reset.
+        broadcast, _ = await fetch_broadcast(data.broadcast_id)
+        assert broadcast.status is BroadcastStatus.SENDING
+        assert broadcast.attempts == 0
+
+        # After the flood window passes, a healthy run re-claims both retry rows and completes.
+        await backdate_retry_deliveries(data.broadcast_id)
+        healthy_bot = RecordingBot()
+
+        await send_broadcasts.run(make_api(healthy_bot), make_test_metrics_client(), [])
+
+        assert healthy_bot.sent_chat_ids == {flooded, released}
+        broadcast, _ = await fetch_broadcast(data.broadcast_id)
+        assert broadcast.status is BroadcastStatus.DONE
+        assert await fetch_deliveries(data.broadcast_id) == []

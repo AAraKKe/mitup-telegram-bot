@@ -176,6 +176,11 @@ class BotConfig(BaseModel):
     secret_token: SecretStr | None = None
     max_connections: int = 100
     retries_on_throttle: int = 3
+    # Proactive per-second send cap for the dedicated broadcast bot instance. Broadcasts are the
+    # highest-rate, least time-sensitive traffic; a low cap keeps their fan-out from competing with
+    # time-sensitive events (e.g. meeting reminders) for the shared limiter budget and makes a
+    # reactive Telegram RetryAfter a last resort. Tunable via MITUPBOT__BOT__BROADCAST_MAX_RATE.
+    broadcast_max_rate: int = 5
     # Cap on updates the PTB application processes concurrently. 1 keeps update handling
     # strictly sequential; raising it is the deliberate concurrency flip, done via
     # env var override at rollout time so the revert stays config-only.

@@ -6,14 +6,19 @@ from unittest import mock
 import pytest
 from sqlalchemy import Row
 from structlog.testing import capture_logs
-from telegram.error import BadRequest, NetworkError
+from telegram.error import BadRequest, NetworkError, RetryAfter
 
 from mitup_bot.cli import send_broadcasts
 from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.cli.send_broadcasts import (
     MAX_BROADCAST_ATTEMPTS,
+    MAX_DELIVERY_ATTEMPTS,
+    RETRY_AFTER_MARGIN_SECONDS,
+    RETRY_BACKOFF_BASE_SECONDS,
+    BatchResult,
     BroadcastSummary,
     ClaimedBroadcast,
+    DeliveryClassification,
     DeliveryOutcome,
     LanguageBreakdown,
     PendingDelivery,
@@ -32,6 +37,7 @@ SENT = BroadcastDeliveryStatus.SENT
 FAILED = BroadcastDeliveryStatus.FAILED
 SKIPPED = BroadcastDeliveryStatus.SKIPPED_INACTIVE
 IN_PROGRESS = BroadcastDeliveryStatus.IN_PROGRESS
+RETRY_PENDING = BroadcastDeliveryStatus.RETRY_PENDING
 
 
 @pytest.fixture(autouse=True)
@@ -87,33 +93,62 @@ def script_exec(mock_session: MockDbSession, *results: Result):
     mock_session.exec = mock.AsyncMock(side_effect=list(results))
 
 
+def batch_of(*outcomes: DeliveryOutcome) -> BatchResult:
+    """Wrap resolved outcomes as a non-flood BatchResult — the shape record_batch_outcomes takes."""
+    return BatchResult(outcomes=list(outcomes), flood_control=False)
+
+
 # ---------------------------------------------------------------------------
 # deliver_one — the five per-recipient outcome branches
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "side_effect, expected_status, expected_error",
+    "side_effect, expected_status, expected_error, expected_flood",
     [
-        (None, SENT, None),
-        (InactiveUserInteraction(10, private=True), SKIPPED, "bot blocked by user"),
-        (BadRequest("bad payload"), FAILED, "bad payload"),
-        (RuntimeError("boom"), FAILED, "boom"),
+        (None, SENT, None, False),
+        (InactiveUserInteraction(10, private=True), SKIPPED, "bot blocked by user", False),
+        (BadRequest("bad payload"), FAILED, "bad payload", False),
+        (RuntimeError("boom"), RETRY_PENDING, "boom", False),
+        (RetryAfter(30), RETRY_PENDING, "Flood control exceeded. Retry in 30 seconds", True),
     ],
-    ids=["sent", "inactive", "bad_request", "generic"],
+    ids=["sent", "inactive", "bad_request", "generic_retryable", "flood_control"],
 )
 async def test_deliver_one_classifies_outcome(
-    api: MockApi, side_effect: object, expected_status: BroadcastDeliveryStatus, expected_error: str | None
+    api: MockApi,
+    side_effect: object,
+    expected_status: BroadcastDeliveryStatus,
+    expected_error: str | None,
+    expected_flood: bool,
 ):
     user = create_member(1, 10)
     if side_effect is not None:
         api.mock_method("send_message_to_user").side_effect = side_effect
 
-    status, error = await send_broadcasts.deliver_one(api, user, "<b>hi</b>")
+    classification = await send_broadcasts.deliver_one(api, user, "<b>hi</b>", attempt_count=1)
 
-    assert status is expected_status
-    assert error == expected_error
+    assert classification.status is expected_status
+    assert classification.error == expected_error
+    assert classification.flood_control is expected_flood
     api.assert_send_message_to_user_called(user=user, view=parse_format_tags("<b>hi</b>", {}))
+
+
+async def test_deliver_one_flood_control_backoff_honors_retry_after_plus_margin(api: MockApi):
+    api.mock_method("send_message_to_user").side_effect = RetryAfter(30)
+
+    classification = await send_broadcasts.deliver_one(api, create_member(1, 10), "hi", attempt_count=1)
+
+    assert classification.retry_delay == dt.timedelta(seconds=30 + RETRY_AFTER_MARGIN_SECONDS)
+
+
+@pytest.mark.parametrize("attempt_count", [1, 2, 3], ids=["attempt_1", "attempt_2", "attempt_3"])
+async def test_deliver_one_unknown_error_backoff_doubles_per_attempt(api: MockApi, attempt_count: int):
+    api.mock_method("send_message_to_user").side_effect = RuntimeError("boom")
+
+    classification = await send_broadcasts.deliver_one(api, create_member(1, 10), "hi", attempt_count=attempt_count)
+
+    expected = dt.timedelta(seconds=RETRY_BACKOFF_BASE_SECONDS * 2 ** (attempt_count - 1))
+    assert classification.retry_delay == expected
 
 
 async def test_deliver_one_reraises_network_error(api: MockApi):
@@ -121,7 +156,35 @@ async def test_deliver_one_reraises_network_error(api: MockApi):
     api.mock_method("send_message_to_user").side_effect = NetworkError("gateway down")
 
     with pytest.raises(NetworkError):
-        await send_broadcasts.deliver_one(api, user, "hi")
+        await send_broadcasts.deliver_one(api, user, "hi", attempt_count=1)
+
+
+# ---------------------------------------------------------------------------
+# resolve_delivery_outcome — the per-delivery attempt cap
+# ---------------------------------------------------------------------------
+
+
+async def test_resolve_delivery_outcome_schedules_retry_under_cap():
+    pending = PendingDelivery(101, create_member(1, 10), "en", attempt_count=MAX_DELIVERY_ATTEMPTS - 1)
+    classification = DeliveryClassification(RETRY_PENDING, "boom", retry_delay=dt.timedelta(seconds=60))
+
+    before = dt.datetime.now(dt.UTC)
+    outcome = send_broadcasts.resolve_delivery_outcome(pending, classification)
+    after = dt.datetime.now(dt.UTC)
+
+    assert outcome.status is RETRY_PENDING
+    assert outcome.next_attempt_time is not None
+    assert before + dt.timedelta(seconds=60) <= outcome.next_attempt_time <= after + dt.timedelta(seconds=60)
+
+
+async def test_resolve_delivery_outcome_fails_permanently_at_cap():
+    pending = PendingDelivery(101, create_member(1, 10), "en", attempt_count=MAX_DELIVERY_ATTEMPTS)
+    classification = DeliveryClassification(RETRY_PENDING, "boom", retry_delay=dt.timedelta(seconds=60))
+
+    outcome = send_broadcasts.resolve_delivery_outcome(pending, classification)
+
+    assert outcome.status is FAILED
+    assert outcome.next_attempt_time is None
 
 
 # ---------------------------------------------------------------------------
@@ -132,16 +195,40 @@ async def test_deliver_one_reraises_network_error(api: MockApi):
 async def test_deliver_batch_collects_outcomes_in_order(api: MockApi):
     first = create_member(1, 11, "en")
     second = create_member(2, 12, "es_ES")
-    batch = [PendingDelivery(101, first, "en"), PendingDelivery(102, second, "es_ES")]
+    batch = [PendingDelivery(101, first, "en", 1), PendingDelivery(102, second, "es_ES", 1)]
     api.mock_method("send_message_to_user").side_effect = [None, BadRequest("nope")]
 
-    outcomes = await send_broadcasts.deliver_batch(api, 7, batch, {"en": "hi", "es_ES": "hola"})
+    result = await send_broadcasts.deliver_batch(api, 7, batch, {"en": "hi", "es_ES": "hola"})
 
-    assert [(outcome.delivery_id, outcome.user_id, outcome.status) for outcome in outcomes] == [
+    assert [(outcome.delivery_id, outcome.user_id, outcome.status) for outcome in result.outcomes] == [
         (101, 1, SENT),
         (102, 2, FAILED),
     ]
+    assert result.flood_control is False
     assert api.mock_method("send_message_to_user").await_count == 2
+
+
+async def test_deliver_batch_halts_mid_batch_on_flood_control_and_carries_out_remainder(api: MockApi):
+    first = create_member(1, 11, "en")
+    second = create_member(2, 12, "en")
+    third = create_member(3, 13, "en")
+    batch = [
+        PendingDelivery(101, first, "en", 1),
+        PendingDelivery(102, second, "en", 1),
+        PendingDelivery(103, third, "en", 2),
+    ]
+    # First send succeeds, the second hits flood control; the third must never be attempted.
+    api.mock_method("send_message_to_user").side_effect = [None, RetryAfter(20)]
+
+    result = await send_broadcasts.deliver_batch(api, 7, batch, {"en": "hi"})
+
+    assert result.flood_control is True
+    # Only the first two rows were sent; the loop stopped at the flood hit.
+    assert api.mock_method("send_message_to_user").await_count == 2
+    assert [(outcome.delivery_id, outcome.status) for outcome in result.outcomes] == [(101, SENT), (102, RETRY_PENDING)]
+    # The untried remainder is carried out for release, with the triggering row's backoff.
+    assert [pending.delivery_id for pending in result.unattempted] == [103]
+    assert result.flood_backoff == dt.timedelta(seconds=20 + RETRY_AFTER_MARGIN_SECONDS)
 
 
 @pytest.mark.parametrize(
@@ -151,9 +238,11 @@ async def test_deliver_batch_collects_outcomes_in_order(api: MockApi):
 )
 def test_log_delivery_level_matches_outcome(status: BroadcastDeliveryStatus, expected_level: str):
     user = create_member(1, 55, "en")
+    outcome = DeliveryOutcome(1, user.db_id, status)
+    classification = DeliveryClassification(status, "reason" if status is FAILED else None)
 
     with capture_logs() as logs:
-        send_broadcasts.log_delivery(9, PendingDelivery(1, user, "en"), status, "reason" if status is FAILED else None)
+        send_broadcasts.log_delivery(9, PendingDelivery(1, user, "en", 2), outcome, classification)
 
     entry = logs[0]
     assert entry["event"] == "broadcast_delivery"
@@ -161,6 +250,20 @@ def test_log_delivery_level_matches_outcome(status: BroadcastDeliveryStatus, exp
     assert entry["broadcast_id"] == 9
     assert entry["tg_user_id"] == 55
     assert entry["outcome"] == status.value
+    assert entry["attempt"] == 2
+    assert entry["retry_in"] is None
+
+
+def test_log_delivery_records_retry_in_for_scheduled_retry():
+    user = create_member(1, 55, "en")
+    outcome = DeliveryOutcome(1, user.db_id, RETRY_PENDING, dt.datetime.now(dt.UTC))
+    classification = DeliveryClassification(RETRY_PENDING, "boom", retry_delay=dt.timedelta(seconds=65))
+
+    with capture_logs() as logs:
+        send_broadcasts.log_delivery(9, PendingDelivery(1, user, "en", 1), outcome, classification)
+
+    assert logs[0]["retry_in"] == 65
+    assert logs[0]["outcome"] == RETRY_PENDING.value
 
 
 # ---------------------------------------------------------------------------
@@ -198,13 +301,33 @@ async def test_resolve_claimed_recipients_pairs_users_to_deliveries(mock_session
     second = create_member(2, 12, "es_ES")
     script_exec(mock_session, Result(results=(first, second)))
 
-    claimed = cast(Sequence[Row[Any]], [(101, 1, "en"), (102, 2, "es_ES")])
+    claimed = cast(Sequence[Row[Any]], [(101, 1, "en", 1), (102, 2, "es_ES", 3)])
     pending = await send_broadcasts.resolve_claimed_recipients(mock_session, claimed)
 
-    assert [(item.delivery_id, item.user.db_id, item.language_sent) for item in pending] == [
-        (101, 1, "en"),
-        (102, 2, "es_ES"),
+    assert [(item.delivery_id, item.user.db_id, item.language_sent, item.attempt_count) for item in pending] == [
+        (101, 1, "en", 1),
+        (102, 2, "es_ES", 3),
     ]
+
+
+async def test_resolve_claimed_recipients_orders_batch_by_delivery_id_even_when_shuffled(
+    mock_session: MockDbSession,
+):
+    """Postgres RETURNING does not preserve the claim subquery's ORDER BY, so the batch must be
+    re-sorted by delivery id — this is load-bearing for the flood-halt semantics (lowest id is the
+    flood trigger; the released remainder is the highest ids)."""
+    first = create_member(1, 11, "en")
+    second = create_member(2, 12, "en")
+    third = create_member(3, 13, "en")
+    script_exec(mock_session, Result(results=(first, second, third)))
+
+    # RETURNING hands them back out of id order, as real Postgres may.
+    claimed = cast(Sequence[Row[Any]], [(103, 3, "en", 1), (101, 1, "en", 2), (102, 2, "en", 3)])
+    pending = await send_broadcasts.resolve_claimed_recipients(mock_session, claimed)
+
+    assert [item.delivery_id for item in pending] == [101, 102, 103]
+    assert [item.user.db_id for item in pending] == [1, 2, 3]
+    assert [item.attempt_count for item in pending] == [2, 3, 1]
 
 
 async def test_deactivate_skipped_users_marks_members_left(
@@ -443,14 +566,22 @@ async def test_materialize_audience_is_idempotent_when_already_snapshotted(mock_
 
 async def test_claim_pending_batch_resolves_claimed_rows(mock_session: MockDbSession):
     member = create_member(1, 11, "en")
-    script_exec(mock_session, Result(results=((101, 1, "en"),)), Result(results=(member,)))
+    script_exec(mock_session, Result(results=((101, 1, "en", 2),)), Result(results=(member,)))
 
     batch = await send_broadcasts.claim_pending_batch(5)
 
-    assert [(item.delivery_id, item.user.db_id, item.language_sent) for item in batch] == [(101, 1, "en")]
+    assert [(item.delivery_id, item.user.db_id, item.language_sent, item.attempt_count) for item in batch] == [
+        (101, 1, "en", 2)
+    ]
+    claim_query = mock_session.queries_executed[0]
     # The claim flips rows to IN_PROGRESS, not a terminal outcome — record_batch_outcomes resolves them later.
-    assert "'in_progress'" in mock_session.queries_executed[0]
-    assert "'pending'" in mock_session.queries_executed[0]
+    assert "'in_progress'" in claim_query
+    # Both PENDING and due RETRY_PENDING rows are eligible, and the claim bumps attempt_count atomically.
+    assert "'pending'" in claim_query
+    assert "'retry_pending'" in claim_query
+    assert "attempt_count=(broadcast_deliveries.attempt_count + 1)" in claim_query
+    # The claim also clears any stale retry timestamp so a re-claimed row that succeeds keeps no NULL-only field set.
+    assert "next_attempt_time=NULL" in claim_query
 
 
 async def test_claim_pending_batch_returns_empty_when_nothing_claimed(mock_session: MockDbSession):
@@ -472,7 +603,7 @@ async def test_record_batch_outcomes_marks_sent_and_deactivates_skipped(
     # mark(sent) update, mark(skipped) update, deactivate select
     script_exec(mock_session, Result(), Result(), Result(results=(skipped_member,)))
 
-    await send_broadcasts.record_batch_outcomes(outcomes, metrics_client)
+    await send_broadcasts.record_batch_outcomes(batch_of(*outcomes), metrics_client)
     await metrics_client.flush()
 
     assert skipped_member.status is UserStatus.LEFT
@@ -486,7 +617,7 @@ async def test_record_batch_outcomes_skipped_only_deactivates_without_marking_se
     # No SENT outcomes: only the skipped mark update and the deactivate select run.
     script_exec(mock_session, Result(), Result(results=(skipped_member,)))
 
-    await send_broadcasts.record_batch_outcomes([DeliveryOutcome(102, 2, SKIPPED)], metrics_client)
+    await send_broadcasts.record_batch_outcomes(batch_of(DeliveryOutcome(102, 2, SKIPPED)), metrics_client)
     await metrics_client.flush()
 
     assert skipped_member.status is UserStatus.LEFT
@@ -498,7 +629,7 @@ async def test_record_batch_outcomes_sent_only_touches_no_users(
 ):
     script_exec(mock_session, Result())
 
-    await send_broadcasts.record_batch_outcomes([DeliveryOutcome(101, 1, SENT)], metrics_client)
+    await send_broadcasts.record_batch_outcomes(batch_of(DeliveryOutcome(101, 1, SENT)), metrics_client)
     await metrics_client.flush()
 
     assert mock_session.exec.await_count == 1
@@ -511,12 +642,85 @@ async def test_record_batch_outcomes_failed_only_marks_failed_without_deactivati
     """The claim no longer pre-sets FAILED, so a FAILED outcome now needs its own explicit write."""
     script_exec(mock_session, Result())
 
-    await send_broadcasts.record_batch_outcomes([DeliveryOutcome(101, 1, FAILED)], metrics_client)
+    await send_broadcasts.record_batch_outcomes(batch_of(DeliveryOutcome(101, 1, FAILED)), metrics_client)
     await metrics_client.flush()
 
     assert mock_session.exec.await_count == 1
     assert "'failed'" in mock_session.queries_executed[0]
     metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
+
+
+async def test_record_batch_outcomes_schedules_retry_pending_rows(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    next_attempt = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=60)
+    script_exec(mock_session, Result())
+
+    await send_broadcasts.record_batch_outcomes(
+        batch_of(DeliveryOutcome(101, 1, RETRY_PENDING, next_attempt)), metrics_client
+    )
+    await metrics_client.flush()
+
+    assert mock_session.exec.await_count == 1
+    query = mock_session.queries_executed[0]
+    assert "'retry_pending'" in query
+    assert "next_attempt_time" in query
+    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
+
+
+async def test_schedule_retries_writes_each_row_with_its_own_next_attempt_time(mock_session: MockDbSession):
+    first_attempt = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=60)
+    second_attempt = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=125)
+    script_exec(mock_session, Result(), Result())
+
+    await send_broadcasts.schedule_retries(
+        mock_session,
+        [DeliveryOutcome(101, 1, RETRY_PENDING, first_attempt), DeliveryOutcome(102, 2, RETRY_PENDING, second_attempt)],
+    )
+
+    assert mock_session.exec.await_count == 2
+    assert all("'retry_pending'" in query for query in mock_session.queries_executed)
+
+
+async def test_release_unattempted_reparks_and_restores_attempt_budget(mock_session: MockDbSession):
+    script_exec(mock_session, Result())
+    unattempted = [
+        PendingDelivery(201, create_member(1, 11, "en"), "en", 2),
+        PendingDelivery(202, create_member(2, 12, "en"), "en", 2),
+    ]
+
+    await send_broadcasts.release_unattempted(mock_session, unattempted, dt.timedelta(seconds=25))
+
+    # One bulk UPDATE flips the rows back to RETRY_PENDING, sets next_attempt_time, and undoes the
+    # claim's increment so their attempt budget is not spent on a non-attempt.
+    assert mock_session.exec.await_count == 1
+    query = mock_session.queries_executed[0]
+    assert "UPDATE broadcast_deliveries" in query
+    assert "'retry_pending'" in query
+    assert "next_attempt_time" in query
+    assert "attempt_count=(broadcast_deliveries.attempt_count - 1)" in query
+
+
+async def test_record_batch_outcomes_releases_unattempted_rows_under_flood_control(
+    mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    # schedule_retries writes the flood-triggering row, then release_unattempted bulk-releases the
+    # untried remainder in the same transaction.
+    script_exec(mock_session, Result(), Result())
+    result = BatchResult(
+        outcomes=[DeliveryOutcome(101, 1, RETRY_PENDING, dt.datetime.now(dt.UTC))],
+        flood_control=True,
+        unattempted=[PendingDelivery(102, create_member(2, 12, "en"), "en", 1)],
+        flood_backoff=dt.timedelta(seconds=25),
+    )
+
+    await send_broadcasts.record_batch_outcomes(result, metrics_client)
+    await metrics_client.flush()
+
+    assert mock_session.exec.await_count == 2
+    release_query = mock_session.queries_executed[1]
+    assert "attempt_count=(broadcast_deliveries.attempt_count - 1)" in release_query
+    assert "'retry_pending'" in release_query
 
 
 async def test_record_batch_outcomes_writes_all_three_terminal_groups_for_a_mixed_batch(
@@ -531,7 +735,7 @@ async def test_record_batch_outcomes_writes_all_three_terminal_groups_for_a_mixe
     # mark(sent), mark(failed), mark(skipped), then the deactivate-skipped-users select.
     script_exec(mock_session, Result(), Result(), Result(), Result(results=(skipped_member,)))
 
-    await send_broadcasts.record_batch_outcomes(outcomes, metrics_client)
+    await send_broadcasts.record_batch_outcomes(batch_of(*outcomes), metrics_client)
     await metrics_client.flush()
 
     assert mock_session.exec.await_count == 4
@@ -559,6 +763,7 @@ async def test_fail_unattempted_deliveries_marks_pending_rows_failed_scoped_to_b
     query = mock_session.queries_executed[0]
     assert "UPDATE broadcast_deliveries" in query
     assert "'pending'" in query
+    assert "'retry_pending'" in query
     assert "'failed'" in query
     assert "broadcast_id = 5" in query
 
@@ -718,6 +923,7 @@ async def test_process_claimed_broadcast_normal_path(
     monkeypatch.setattr(send_broadcasts, "materialize_audience", mock.AsyncMock(return_value=(4, freshly_materialized)))
     send_all = mock.AsyncMock()
     monkeypatch.setattr(send_broadcasts, "send_all_pending", send_all)
+    monkeypatch.setattr(send_broadcasts, "defer_for_pending_retries", mock.AsyncMock(return_value=False))
     finalize = mock.AsyncMock()
     monkeypatch.setattr(send_broadcasts, "finalize_and_report", finalize)
     claimed = ClaimedBroadcast(broadcast_id=5, attempts=1, terminal_failure=False)
@@ -733,22 +939,122 @@ async def test_process_claimed_broadcast_normal_path(
         metrics.assert_not_emitted(name=MetricKey.BROADCAST_MESSAGES_TO_SEND)
 
 
-async def test_send_all_pending_drains_until_no_batch(
+async def test_process_claimed_broadcast_defers_finalization_when_retries_pending(
     api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
 ):
-    batch = [PendingDelivery(1, create_member(1, 11, "en"), "en")]
+    monkeypatch.setattr(send_broadcasts, "load_broadcast_bodies", mock.AsyncMock(return_value={"en": "hi"}))
+    monkeypatch.setattr(send_broadcasts, "materialize_audience", mock.AsyncMock(return_value=(4, False)))
+    monkeypatch.setattr(send_broadcasts, "send_all_pending", mock.AsyncMock())
+    monkeypatch.setattr(send_broadcasts, "defer_for_pending_retries", mock.AsyncMock(return_value=True))
+    finalize = mock.AsyncMock()
+    monkeypatch.setattr(send_broadcasts, "finalize_and_report", finalize)
+    claimed = ClaimedBroadcast(broadcast_id=5, attempts=1, terminal_failure=False)
+
+    await send_broadcasts.process_claimed_broadcast(api, metrics_client, [1], claimed)
+
+    # Deliveries still await retry, so the broadcast is left SENDING for the next tick — no finalize.
+    finalize.assert_not_awaited()
+
+
+@pytest.mark.parametrize("unfinished, expected", [(0, False), (3, True)], ids=["all_done", "retries_pending"])
+async def test_defer_for_pending_retries_resets_attempts_only_when_unfinished(
+    monkeypatch: pytest.MonkeyPatch, unfinished: int, expected: bool
+):
+    monkeypatch.setattr(send_broadcasts, "count_unfinished_deliveries", mock.AsyncMock(return_value=unfinished))
+    reset = mock.AsyncMock()
+    monkeypatch.setattr(send_broadcasts, "reset_broadcast_attempts", reset)
+
+    deferred = await send_broadcasts.defer_for_pending_retries(5)
+
+    assert deferred is expected
+    if expected:
+        reset.assert_awaited_once_with(5)
+    else:
+        reset.assert_not_awaited()
+
+
+async def test_count_unfinished_deliveries_counts_pending_and_retry_pending(mock_session: MockDbSession):
+    script_exec(mock_session, Result(results=(4,)))
+
+    assert await send_broadcasts.count_unfinished_deliveries(5) == 4
+    query = mock_session.queries_executed[0]
+    assert "'pending'" in query
+    assert "'retry_pending'" in query
+    assert "broadcast_id = 5" in query
+
+
+async def test_reset_broadcast_attempts_issues_update(mock_session: MockDbSession):
+    script_exec(mock_session, Result())
+
+    await send_broadcasts.reset_broadcast_attempts(5)
+
+    assert mock_session.exec.await_count == 1
+    query = mock_session.queries_executed[0]
+    assert "UPDATE broadcasts" in query
+    assert "attempts=0" in query.replace(" ", "")
+
+
+async def test_send_all_pending_drains_until_no_batch(
+    api: MockApi, metrics_client: MetricsClient, metrics: MetricAssertions, monkeypatch: pytest.MonkeyPatch
+):
+    batch = [PendingDelivery(1, create_member(1, 11, "en"), "en", 1)]
     claim = mock.AsyncMock(side_effect=[batch, []])
     monkeypatch.setattr(send_broadcasts, "claim_pending_batch", claim)
-    deliver = mock.AsyncMock(return_value=[DeliveryOutcome(1, 1, SENT)])
+    deliver = mock.AsyncMock(return_value=BatchResult(outcomes=[DeliveryOutcome(1, 1, SENT)], flood_control=False))
     monkeypatch.setattr(send_broadcasts, "deliver_batch", deliver)
     record = mock.AsyncMock()
     monkeypatch.setattr(send_broadcasts, "record_batch_outcomes", record)
 
     await send_broadcasts.send_all_pending(api, metrics_client, 5, {"en": "hi"})
+    await metrics_client.flush()
 
     assert claim.await_count == 2
     deliver.assert_awaited_once()
     record.assert_awaited_once()
+    # Nothing was a re-claimed retry (attempt_count 1), so the retried metric is not emitted.
+    metrics.assert_not_emitted(name=MetricKey.BROADCAST_MESSAGES_RETRIED)
+
+
+async def test_send_all_pending_stops_claiming_after_flood_control(
+    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    batch = [PendingDelivery(1, create_member(1, 11, "en"), "en", 1)]
+    claim = mock.AsyncMock(side_effect=[batch, batch, []])
+    monkeypatch.setattr(send_broadcasts, "claim_pending_batch", claim)
+    deliver = mock.AsyncMock(
+        return_value=BatchResult(
+            outcomes=[DeliveryOutcome(1, 1, RETRY_PENDING, dt.datetime.now(dt.UTC))], flood_control=True
+        )
+    )
+    monkeypatch.setattr(send_broadcasts, "deliver_batch", deliver)
+    monkeypatch.setattr(send_broadcasts, "record_batch_outcomes", mock.AsyncMock())
+
+    await send_broadcasts.send_all_pending(api, metrics_client, 5, {"en": "hi"})
+
+    # The first batch tripped flood control, so the drain loop breaks — no second claim.
+    assert claim.await_count == 1
+    deliver.assert_awaited_once()
+
+
+async def test_send_all_pending_emits_retried_metric_for_reclaimed_deliveries(
+    api: MockApi, metrics_client: MetricsClient, metrics: MetricAssertions, monkeypatch: pytest.MonkeyPatch
+):
+    reclaimed = [
+        PendingDelivery(1, create_member(1, 11, "en"), "en", 2),
+        PendingDelivery(2, create_member(2, 12, "en"), "en", 3),
+    ]
+    monkeypatch.setattr(send_broadcasts, "claim_pending_batch", mock.AsyncMock(side_effect=[reclaimed, []]))
+    monkeypatch.setattr(
+        send_broadcasts,
+        "deliver_batch",
+        mock.AsyncMock(return_value=BatchResult(outcomes=[DeliveryOutcome(1, 1, SENT)], flood_control=False)),
+    )
+    monkeypatch.setattr(send_broadcasts, "record_batch_outcomes", mock.AsyncMock())
+
+    await send_broadcasts.send_all_pending(api, metrics_client, 5, {"en": "hi"})
+    await metrics_client.flush()
+
+    metrics.assert_emitted(name=MetricKey.BROADCAST_MESSAGES_RETRIED, value=2)
 
 
 @pytest.mark.parametrize("won_transition", [True, False], ids=["won", "lost"])

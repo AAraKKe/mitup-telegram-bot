@@ -193,6 +193,26 @@ def test_bot_config_concurrent_updates_must_be_positive():
     assert exc_info.value.errors()[0]["loc"] == ("concurrent_updates",)
 
 
+def test_bot_config_broadcast_max_rate_defaults_to_five():
+    config = BotConfig(token=SecretStr("fake-bot-token"))
+
+    assert config.broadcast_max_rate == 5
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        pytest.param(12, 12, id="native_int"),
+        pytest.param("9", 9, id="numeric_string_from_env"),
+    ],
+)
+def test_bot_config_broadcast_max_rate_override_parses(raw: object, expected: int):
+    # The env provider delivers overrides as ints or numeric strings; both must land as int.
+    config = BotConfig(token=SecretStr("fake-bot-token"), broadcast_max_rate=cast(int, raw))
+
+    assert config.broadcast_max_rate == expected
+
+
 def test_bot_config_admin_tg_ids_defaults_to_empty():
     config = BotConfig(token=SecretStr("fake-bot-token"))
 

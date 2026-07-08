@@ -102,6 +102,29 @@ def build_bot(config: BotConfig) -> ExtBot:
     )
 
 
+def build_broadcast_bot(config: BotConfig) -> ExtBot:
+    """A separate bot instance for broadcast fan-out with a low proactive per-second cap.
+
+    Broadcasts are the highest-rate, least time-sensitive traffic; giving them their own limiter
+    keeps their volume from competing with time-sensitive events (meeting reminders) for the shared
+    bot's rate budget. `AIORateLimiter` needs no lifecycle setup — its limiters are built in
+    `__init__` and its `initialize`/`shutdown` are no-ops.
+    """
+    return ExtBot(
+        token=config.token.get_secret_value(),
+        rate_limiter=AIORateLimiter(
+            overall_max_rate=config.broadcast_max_rate,
+            overall_time_period=1,
+            max_retries=config.retries_on_throttle,
+        ),
+    )
+
+
+def select_bot(event_type: EventType, bot: ExtBot, broadcast_bot: ExtBot) -> ExtBot:
+    """SEND_BROADCASTS runs on the rate-capped broadcast bot; every other event on the shared one."""
+    return broadcast_bot if event_type is EventType.SEND_BROADCASTS else bot
+
+
 async def dispatch_event(
     event_type: EventType, api: TelegramApiWrapper, client: MetricsClient, admin_tg_ids: list[int]
 ):
@@ -174,7 +197,13 @@ async def run_periodic(
         await asyncio.sleep(interval)
 
 
-async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, admin_tg_ids: list[int], start_time: float):
+async def run_all_tasks(
+    intervals: IntervalsConfiguration,
+    bot: ExtBot,
+    broadcast_bot: ExtBot,
+    admin_tg_ids: list[int],
+    start_time: float,
+):
     async with asyncio.TaskGroup() as tg:
         for event_type in EventType:
             tg.create_task(
@@ -182,7 +211,7 @@ async def run_all_tasks(intervals: IntervalsConfiguration, bot: ExtBot, admin_tg
                     intervals.get(event_type),
                     time_before_start=start_time,
                     event_type=event_type,
-                    bot=bot,
+                    bot=select_bot(event_type, bot, broadcast_bot),
                     admin_tg_ids=admin_tg_ids,
                 )
             )
@@ -275,6 +304,7 @@ def cli(
     configure_patreon(config)
 
     bot = build_bot(config.bot)
+    broadcast_bot = build_broadcast_bot(config.bot)
 
     intervals = IntervalsConfiguration(
         user_cleanup=user_cleanup_interval,
@@ -286,4 +316,4 @@ def cli(
         send_broadcasts=send_broadcasts_interval,
         supporter_check=supporter_check_interval,
     )
-    asyncio.run(run_all_tasks(intervals, bot, config.bot.admin_tg_ids, start_time))
+    asyncio.run(run_all_tasks(intervals, bot, broadcast_bot, config.bot.admin_tg_ids, start_time))

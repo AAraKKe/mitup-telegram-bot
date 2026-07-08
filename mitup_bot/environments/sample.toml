@@ -24,6 +24,10 @@ concurrent_updates = 1
 # MITUPBOT__BOT__ADMIN_TG_IDS (accepts "123456789", "123,456", or a JSON array "[123, 456]").
 # Optional; defaults to an empty list when omitted.
 admin_tg_ids = [123456789]
+# Per-second send cap for the dedicated broadcast bot instance, keeping the least time-sensitive,
+# highest-rate traffic from crowding out time-sensitive events on the shared limiter.
+# Optional; defaults to 5 when omitted. Tune at rollout via MITUPBOT__BOT__BROADCAST_MAX_RATE.
+broadcast_max_rate = 5
 
 [db]
 # Database connection configuration
