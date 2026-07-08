@@ -30,7 +30,7 @@ dependencies = [
     "aws-embedded-metrics==3.5.0",
     "pyyaml==6.0.3",
     "fastapi==0.139.0",
-    "uvicorn[standard]==0.50.2",
+    "uvicorn[standard]==0.51.0",
     "cryptography==49.0.0",
     "httpx==0.28.1",
 ]
@@ -193,7 +193,7 @@ dependencies = [
     "pytest-xdist~=3.8.0",
     "pytest-dotenv~=0.5.2",
     "pytest-json-report~=1.5.0",
-    "ty==0.0.56",
+    "ty==0.0.57",
     "freezegun~=1.5.5",
     "ruff==0.15.0",
     "boto3~=1.34",
