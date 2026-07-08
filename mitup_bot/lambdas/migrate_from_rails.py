@@ -22,13 +22,13 @@ import structlog
 
 from mitup_bot.cli.commands.migrate_from_rails import ALL_PHASES, invoke_from_lambda
 from mitup_bot.config import Env
-from mitup_bot.logging_config import configure_logging
+from mitup_bot.logging_config import Component, configure_logging
 
 log = structlog.get_logger(__name__)
 
 
 def handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
-    configure_logging(Env.PROD, os.environ.get("LOG_LEVEL", "INFO"))
+    configure_logging(Env.PROD, Component.LAMBDA, os.environ.get("LOG_LEVEL", "INFO"))
 
     # dry_run defaults to True here for Lambda safety.
     dry_run = bool(event.get("dry_run", True))

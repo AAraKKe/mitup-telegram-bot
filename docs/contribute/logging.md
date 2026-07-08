@@ -57,19 +57,55 @@ with structlog.contextvars.bound_contextvars(meeting_id=meeting.id, run_id=run_i
     await send_reminders(meeting)
 ```
 
-## Entry points and what they bind
+## Reserved keys
 
-Every process entry point must call `configure_logging(env, level)` once before any logging happens, then bind its own invocation context.
+Every log line carries a small set of reserved keys so CloudWatch queries filter and group on structured fields instead of parsing the event string. The keys fall into three layers by how long each one lives.
 
-| Entry point | Binding site | Fields bound |
-|---|---|---|
-| Bot handlers | `handlers/registry.py` `callback_with_metrics` | `handler`, `handler_type`, `update_id`, `user_id`*, `chat_id`* |
-| Recurrent events (CLI) | `cli/commands/recurrent_events.py` `launch_event` | `event_type`, `run_id` |
-| Lambda handlers | each handler function | `lambda`, `aws_request_id`* |
+Every process entry point calls `configure_logging(env, component, level)` once before any logging happens, then binds its own invocation context.
 
-\* bound only when present on the update or Lambda context.
+### Layer 1: `component`
 
-The `update_id` field also appears as a global property in the EMF metrics payload (`MitupContext`). This lets a CloudWatch metric alarm cross-link to the exact log lines from the same request.
+`component` names the process that produced the line. A processor stamps it for the whole lifetime of the process, so it survives the asyncio task and thread boundaries that reset contextvars. One of:
+
+* `bot`: the ECS bot service, covering both PTB handlers and the FastAPI web layer.
+* `events`: the ECS recurrent-events runner.
+* `lambda`: every AWS Lambda function.
+* `cli`: one-off operator commands.
+
+### Layer 2: `flow`
+
+`flow` names the business unit handling one invocation. It is bound through contextvars for the lifetime of that invocation and clears on exit. Its value depends on the component:
+
+| Component | `flow` value |
+|---|---|
+| `bot` | the `HandlerId` subclass, e.g. `edit_meeting` or `commands` |
+| `bot` (Patreon web) | the existing Patreon flow name |
+| `events` | the `EventType` value, kept alongside the `event_type` key |
+| `lambda` | `migrations`, `alarm_action`, or `migrate_from_rails` |
+
+`handler` and `handler_type` stay bound on bot lines as the fine-grained drill-down beneath `flow`.
+
+### Layer 3: correlation and identity keys
+
+These pin a line to a single request, run, or user. Each is bound only when it applies.
+
+| Key | Meaning |
+|---|---|
+| `update_id` | the Telegram update being processed, also an EMF global property |
+| `run_id` | one recurrent-event run |
+| `aws_request_id` | one Lambda invocation |
+| `request_id` | one inbound HTTP request |
+| `tg_user_id` | a Telegram user id |
+| `user_id` | the internal DB primary key, never a Telegram id |
+| `chat_id` | a Telegram chat id |
+
+Because `update_id` is also a global property in the EMF metrics payload (`MitupContext`), a CloudWatch metric alarm can cross-link to the exact log lines from the same request.
+
+Event strings stay human prose. Filtering and aggregation read the reserved keys above, never the message text.
+
+!!! note "Landing across three changes"
+
+    `component` is bound today. `flow`, and the split of `tg_user_id` from `user_id`, arrive in the two companion changes that follow this one.
 
 ## `MitupContext.log`
 

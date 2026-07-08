@@ -10,6 +10,7 @@ from structlog.testing import capture_logs
 
 from mitup_bot.config import Env
 from mitup_bot.lambdas.migrations import AlembicActions, run_migrations
+from mitup_bot.logging_config import Component
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +59,7 @@ def test_configures_logging_with_default_level_when_env_unset(
         with mock.patch("mitup_bot.lambdas.migrations.Config"):
             run_migrations({"action": "upgrade", "revision": "myRevision"}, None)
 
-    mock_configure_logging.assert_called_once_with(Env.PROD, "INFO")
+    mock_configure_logging.assert_called_once_with(Env.PROD, Component.LAMBDA, "INFO")
 
 
 def test_configures_logging_with_log_level_env(
@@ -70,7 +71,7 @@ def test_configures_logging_with_log_level_env(
         with mock.patch("mitup_bot.lambdas.migrations.Config"):
             run_migrations({"action": "upgrade", "revision": "myRevision"}, None)
 
-    mock_configure_logging.assert_called_once_with(Env.PROD, "DEBUG")
+    mock_configure_logging.assert_called_once_with(Env.PROD, Component.LAMBDA, "DEBUG")
 
 
 def test_configures_logging_before_migration_work(

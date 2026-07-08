@@ -1,11 +1,14 @@
+import io
+import json
 import logging
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from typing import cast
 
 import pytest
 import structlog
 
 from mitup_bot.config import Env
-from mitup_bot.logging_config import configure_logging
+from mitup_bot.logging_config import Component, configure_logging
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +43,7 @@ def final_renderer(handler: logging.Handler) -> structlog.typing.Processor:
 
 
 def test_applies_requested_level_to_root():
-    configure_logging(Env.PROD, "DEBUG")
+    configure_logging(Env.PROD, Component.BOT, "DEBUG")
 
     assert logging.getLogger().level == logging.DEBUG  # 10
 
@@ -53,7 +56,7 @@ def test_force_overrides_preexisting_root_handler():
     root.handlers[:] = [dummy_handler]
     root.setLevel(logging.CRITICAL)  # 50
 
-    configure_logging(Env.PROD, "DEBUG")
+    configure_logging(Env.PROD, Component.BOT, "DEBUG")
 
     assert root.level == logging.DEBUG  # 10, not 50
     assert dummy_handler not in root.handlers
@@ -62,7 +65,7 @@ def test_force_overrides_preexisting_root_handler():
 def test_installs_single_stream_handler_with_processor_formatter():
     """Regardless of env, configure_logging installs exactly one StreamHandler on the root whose
     formatter is a structlog ProcessorFormatter (replaces the old RichHandler/basicConfig setup)."""
-    configure_logging(Env.DEV, "INFO")
+    configure_logging(Env.DEV, Component.BOT, "INFO")
 
     handlers = logging.getLogger().handlers
     assert len(handlers) == 1
@@ -84,20 +87,20 @@ def test_final_renderer_depends_on_env(
     env: Env, expected_renderer: type[structlog.dev.ConsoleRenderer] | type[structlog.processors.JSONRenderer]
 ):
     """Dev gets the human-friendly ConsoleRenderer; every other env ships structured JSON."""
-    configure_logging(env, "INFO")
+    configure_logging(env, Component.BOT, "INFO")
 
     renderer = final_renderer(logging.getLogger().handlers[0])
     assert isinstance(renderer, expected_renderer)
 
 
 def test_unknown_level_falls_back_to_info():
-    configure_logging(Env.PROD, "bogus")
+    configure_logging(Env.PROD, Component.BOT, "bogus")
 
     assert logging.getLogger().level == logging.INFO  # 20
 
 
 def test_httpx_logger_set_to_warning():
-    configure_logging(Env.DEV, "DEBUG")
+    configure_logging(Env.DEV, Component.BOT, "DEBUG")
 
     assert logging.getLogger("httpx").level == logging.WARNING  # 30
 
@@ -110,6 +113,33 @@ def test_httpx_logger_set_to_warning():
     ],
 )
 def test_extbot_logger_level_depends_on_env(env: Env, expected_level: int):
-    configure_logging(env, "INFO")
+    configure_logging(env, Component.BOT, "INFO")
 
     assert logging.getLogger("telegram.ext.ExtBot").level == expected_level
+
+
+def render_one_line(component: Component, emit: Callable[[], None]) -> dict[str, object]:
+    """Configure prod (JSON) logging with `component`, run `emit`, and return the single rendered
+    line parsed back from JSON. Redirects the installed handler at a buffer so the assertion reads
+    exactly what the processor chain produced."""
+    configure_logging(Env.PROD, component)
+    handler = cast("logging.StreamHandler[io.StringIO]", logging.getLogger().handlers[0])
+    buffer = io.StringIO()
+    handler.setStream(buffer)
+    emit()
+    handler.flush()
+    return json.loads(buffer.getvalue())
+
+
+def test_component_stamped_on_structlog_native_record():
+    record = render_one_line(Component.BOT, lambda: structlog.get_logger("native.probe").info("probe"))
+
+    assert record["component"] == "bot"
+
+
+def test_component_stamped_on_foreign_stdlib_record():
+    """The foreign_pre_chain path renders records from stdlib/third-party loggers and is the one that
+    silently regresses, so assert `component` lands on it independently of the native path."""
+    record = render_one_line(Component.EVENTS, lambda: logging.getLogger("foreign.probe").warning("probe"))
+
+    assert record["component"] == "events"

@@ -32,7 +32,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from mitup_bot.config import Env
-from mitup_bot.logging_config import configure_logging
+from mitup_bot.logging_config import Component, configure_logging
 
 log = structlog.get_logger(__name__)
 
@@ -218,7 +218,7 @@ def build_gitlab_payload(alarm: AlarmEvent) -> dict[str, Any]:
 
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    configure_logging(Env.PROD, os.environ.get("LOG_LEVEL", "INFO"))
+    configure_logging(Env.PROD, Component.LAMBDA, os.environ.get("LOG_LEVEL", "INFO"))
 
     try:
         alarm = AlarmEvent.model_validate(event)

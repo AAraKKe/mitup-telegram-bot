@@ -8,7 +8,7 @@ from alembic.config import Config
 from pydantic import BaseModel
 
 from mitup_bot.config import Env
-from mitup_bot.logging_config import configure_logging
+from mitup_bot.logging_config import Component, configure_logging
 
 log = structlog.get_logger(__name__)
 
@@ -29,7 +29,7 @@ def run_migrations(event: dict[str, Any], context: Any) -> int:
     Invokes Alembic programmatically — equivalent to the CLI but usable from a Lambda handler.
     See: https://alembic.sqlalchemy.org/en/latest/api/commands.html
     """
-    configure_logging(Env.PROD, os.environ.get("LOG_LEVEL", "INFO"))
+    configure_logging(Env.PROD, Component.LAMBDA, os.environ.get("LOG_LEVEL", "INFO"))
 
     event_object = MigrationEvent.model_validate(event)
 

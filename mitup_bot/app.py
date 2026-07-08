@@ -8,7 +8,7 @@ from mitup_bot import db, patreon, supporter, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.logging_config import configure_logging
+from mitup_bot.logging_config import Component, configure_logging
 from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
@@ -38,7 +38,7 @@ class MitupRuntime:
             EnvVariablesConfigProvider(),
             TomlConfigProvider(env=env),
         )
-        configure_logging(self.env, self.config.app.log_level)
+        configure_logging(self.env, Component.BOT, self.config.app.log_level)
         # Adopt the merged free-tier limits so the supporter-tier policy resolves caps against the
         # deployed values.
         supporter.configure(self.config.limits)

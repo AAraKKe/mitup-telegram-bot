@@ -23,7 +23,7 @@ from mitup_bot.cli import (
     user_cleanup,
 )
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
-from mitup_bot.logging_config import configure_logging
+from mitup_bot.logging_config import Component, configure_logging
 from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, configure_emf_backend
 
@@ -268,7 +268,7 @@ def cli(
 
     pool_metrics_client = MetricsClient(EmfBackend()) if config.db.pool_metrics_enabled else None
     db.configure_db(config.db, metrics_client=pool_metrics_client)
-    configure_logging(env, config.app.log_level)
+    configure_logging(env, Component.EVENTS, config.app.log_level)
     configure_emf_backend(config.metrics)
     configure_patreon(config)
 
