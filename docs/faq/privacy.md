@@ -233,7 +233,7 @@ If you joined a meeting via someone else's group message without ever opening th
 
 **Rectification.** Edit your display name, language, or timezone directly in the bot's settings menu. For other corrections, email us.
 
-**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your user record, every meeting you own, every RSVP you've made, and your Patreon link are removed permanently within seconds. You can also request deletion by email.
+**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your account is marked for deletion and stops working right away, and within a day your user record, every meeting you own, every RSVP you've made, and your Patreon link are permanently removed. You get one final message confirming it's done. If you ever want to use Mitup again, send the `/start` command in your chat with the bot and it sets you up from scratch, with no memory of your old account. You can also request deletion by email.
 
 **Portability.** Email `privacy@mitup.social` and we'll send your data as JSON, formatted for import into another system if you wish.
 
