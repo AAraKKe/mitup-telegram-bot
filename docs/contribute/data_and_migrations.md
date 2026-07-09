@@ -4,7 +4,7 @@ icon: material/database-outline
 
 # Data and migrations
 
-The data layer is the part of Mitup most likely to surprise you. It looks like ordinary SQLModel, but four rules bend the code in ways that only make sense once someone points them out. This page points them out. When you need the full detail, follow the links to the [database skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/database/SKILL.md), which is the authority.
+The data layer is the part of Mitup most likely to surprise you. It looks like ordinary SQLModel, but four rules bend the code in ways that only make sense once someone points them out. This page points them out. When you need the full detail, follow the links to the [database skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/database/SKILL.md), which is the authority.
 
 Everything here lives in [`mitup_bot/db.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/db.py) and the models under [`mitup_bot/models/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/mitup_bot/models).
 
@@ -34,7 +34,7 @@ So inside a write-mode handler your code reads top to bottom like normal, but th
 
 !!! note "One escape hatch"
 
-    `context.api.immediate.X(...)` runs a call before the commit, so its failure aborts the transaction. Keep those rare and easy to grep for. The rules for when to reach for it live in the [database skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/database/SKILL.md).
+    `context.api.immediate.X(...)` runs a call before the commit, so its failure aborts the transaction. Keep those rare and easy to grep for. The rules for when to reach for it live in the [database skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/database/SKILL.md).
 
 ## No lazy loading
 
@@ -68,4 +68,4 @@ hatch run dev:migrations-downgrade  # roll back one migration
 hatch run dev:validate-migrations   # check the migration graph
 ```
 
-When a model change needs a migration, run the `/new-migration` skill. It scaffolds the revision, walks you through writing both directions by hand, and flags the things that bite: a missing `server_default` on a new non-nullable column, the trigger-managed `created_time` and `updated_time` columns that application code never sets, and a `downgrade()` that has to reverse everything `upgrade()` did. The [new-migration skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/new-migration/SKILL.md) owns that walkthrough.
+When a model change needs a migration, run the `/new-migration` skill. It scaffolds the revision, walks you through writing both directions by hand, and flags the things that bite: a missing `server_default` on a new non-nullable column, the trigger-managed `created_time` and `updated_time` columns that application code never sets, and a `downgrade()` that has to reverse everything `upgrade()` did. The [new-migration skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/new-migration/SKILL.md) owns that walkthrough.

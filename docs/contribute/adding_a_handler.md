@@ -69,7 +69,7 @@ async def callback_query_show_reminders(
     ...
 ```
 
-A handler that mutates state and then fans out over Telegram (it takes the per-meeting row lock, refreshes meeting messages, or notifies participants) uses `@with_session(write=True)` instead. The [`database`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/database/SKILL.md) skill covers when and why.
+A handler that mutates state and then fans out over Telegram (it takes the per-meeting row lock, refreshes meeting messages, or notifies participants) uses `@with_session(write=True)` instead. The [`database`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/database/SKILL.md) skill covers when and why.
 
 ## Validate the input with guards
 
@@ -95,7 +95,7 @@ view = MitupView(
 )
 ```
 
-If your reply needs a string that does not exist yet, add it to the right `MessageBase` subclass, run `hatch run dev:update-locales`, and hand the new keys to the translator. The [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/user-facing-text/SKILL.md) skill owns the wording and the `MessageBase` API.
+If your reply needs a string that does not exist yet, add it to the right `MessageBase` subclass, run `hatch run dev:update-locales`, and hand the new keys to the translator. The [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/user-facing-text/SKILL.md) skill owns the wording and the `MessageBase` API.
 
 ## Wire it into the package
 
@@ -126,5 +126,5 @@ hatch run dev:validate
 
 This page is the map. Two skills hold the detail:
 
-* [`handler-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/handler-conventions/SKILL.md) for the full rules on registration, conversation state machines, filters, callback-data formats, and the add/remove checklists.
-* [`new-handler`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/new-handler/SKILL.md) for scaffolding a fresh package with the files already in the right shape.
+* [`handler-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/handler-conventions/SKILL.md) for the full rules on registration, conversation state machines, filters, callback-data formats, and the add/remove checklists.
+* [`new-handler`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/new-handler/SKILL.md) for scaffolding a fresh package with the files already in the right shape.

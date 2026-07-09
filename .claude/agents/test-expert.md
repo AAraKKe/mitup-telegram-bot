@@ -29,7 +29,7 @@ How you learn what to test depends on whether you're part of a team or working a
 
 ### Team mode
 
-When spawned as part of a team (e.g., by `/em`), handler-expert sends you a **test brief** describing: behaviors to cover, edge cases, guard conditions, state transitions, callback data shapes, and data setup notes. This brief is your source of truth for what needs coverage.
+When spawned as part of a team (alongside other specialists on a multi-phase task), handler-expert sends you a **test brief** describing: behaviors to cover, edge cases, guard conditions, state transitions, callback data shapes, and data setup notes. This brief is your source of truth for what needs coverage.
 
 - Do NOT independently read handler source — trust the brief.
 - If the brief is unclear or seems incomplete, DM handler-expert with targeted questions. Don't guess.

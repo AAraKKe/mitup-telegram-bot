@@ -72,9 +72,5 @@ bin/test_data.yaml
 test.sh
 report.json
 
-# /em skill eval workspace and eval definitions (local dev only)
-.claude/skills/em/em-workspace/
-.claude/skills/em/evals/
-
 # Claude Code Stop-hook subagent counters (session runtime state)
 .claude/agents_running/

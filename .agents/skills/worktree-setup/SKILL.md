@@ -1,6 +1,6 @@
 ---
 name: worktree-setup
-description: Bootstrap a fresh git worktree so its environment matches the main checkout. The skill copies the uncommitted `.env` (and `.envrc` if present) from the main checkout — these files aren't tracked by git, so `git worktree add` doesn't bring them along, and without them `hatch run dev:*` commands pick up the wrong config. It also tells you what else is needed (dependencies, migrations, a running database) without taking those actions itself — so it can't hang on an unavailable Docker daemon or a missing Postgres. Invoke whenever a fresh worktree was just created (manually with `git worktree add` or automatically by `em`'s `EnterWorktree`), or when someone reports "the bot won't start in this worktree".
+description: Bootstrap a fresh git worktree so its environment matches the main checkout. The skill copies the uncommitted `.env` (and `.envrc` if present) from the main checkout — these files aren't tracked by git, so `git worktree add` doesn't bring them along, and without them `hatch run dev:*` commands pick up the wrong config. It also tells you what else is needed (dependencies, migrations, a running database) without taking those actions itself — so it can't hang on an unavailable Docker daemon or a missing Postgres. Invoke whenever a fresh worktree was just created (manually with `git worktree add` or automatically by a workflow), or when someone reports "the bot won't start in this worktree".
 user-invocable: true
 argument-hint: "[no args needed — operates on the current worktree]"
 allowed-tools: Bash, Read
@@ -66,8 +66,8 @@ These steps need external services or durable state — running them automatical
 
 - **Fetch / refresh secrets.** `.env` is copied verbatim from the main checkout. If those secrets are stale, refresh them in the main checkout first, then re-run this skill so the update flows into the worktree.
 
-## When `em` invokes this skill
+## When a workflow invokes this skill
 
-`em`'s Step 6 runs this skill immediately after `EnterWorktree`. Because the skill only copies files and never waits on a service, that invocation is safe even when Docker or the local database is offline — the user can bring the database up whenever they're ready and run the migration command themselves.
+Because the skill only copies files and never waits on a service, invoking it from an automated workflow is safe even when Docker or the local database is offline — the user can bring the database up whenever they're ready and run the migration command themselves.
 
-If you're writing a new workflow that creates worktrees, do the same: invoke this skill right after the worktree is created, so the env files are in place, and surface the "next steps" list to the user without blocking on them.
+If you're writing a workflow that creates worktrees, invoke this skill right after the worktree is created, so the env files are in place, and surface the "next steps" list to the user without blocking on them.

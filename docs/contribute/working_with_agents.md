@@ -8,16 +8,16 @@ This repository is built to be worked on with [Claude Code](https://claude.com/c
 
 ## Skills hold the conventions
 
-Domain knowledge lives in [`.claude/skills/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/.claude/skills). Each skill is a folder with a `SKILL.md` that captures how one area of the codebase works and why. There is a skill for handlers, one for the view layer, one for user-facing text, one for tests, one for these docs, and more.
+Domain knowledge lives in [`.agents/skills/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/.agents/skills). Each skill is a folder with a `SKILL.md` that captures how one area of the codebase works and why. There is a skill for handlers, one for the view layer, one for user-facing text, one for tests, one for these docs, and more.
 
 Before you change code in an area, read the skill that governs it. The `SKILL.md` files are plain Markdown, so you can read them straight from GitLab without any tooling. A few to start with:
 
-* [`handler-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/handler-conventions/SKILL.md) for bot logic under `mitup_bot/handlers/`.
-* [`views`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/views/SKILL.md) for screens and keyboards under `mitup_bot/views/`.
-* [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/user-facing-text/SKILL.md) for message and button copy.
-* [`test-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/test-conventions/SKILL.md) for the test suite.
+* [`handler-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/handler-conventions/SKILL.md) for bot logic under `mitup_bot/handlers/`.
+* [`views`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/views/SKILL.md) for screens and keyboards under `mitup_bot/views/`.
+* [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/user-facing-text/SKILL.md) for message and button copy.
+* [`test-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/test-conventions/SKILL.md) for the test suite.
 
-The [skills directory](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/.claude/skills) is the full list. It grows over time, so browse it rather than trusting a fixed set of names.
+The [skills directory](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/.agents/skills) is the full list. It grows over time, so browse it rather than trusting a fixed set of names.
 
 ## Specialists own each area
 

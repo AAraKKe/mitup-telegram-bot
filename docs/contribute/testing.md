@@ -47,4 +47,4 @@ Mitup ships in several languages, and CI runs the full test suite once for each 
 
 ## Going deeper
 
-The conventions for fixtures, `MockApi`, metrics assertions, conversation flows, and the failure-modes matrix live in the [`test-conventions` skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/test-conventions/SKILL.md). Read the reference that matches what you are testing, then read the closest existing test in the same directory before writing your own.
+The conventions for fixtures, `MockApi`, metrics assertions, conversation flows, and the failure-modes matrix live in the [`test-conventions` skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/test-conventions/SKILL.md). Read the reference that matches what you are testing, then read the closest existing test in the same directory before writing your own.

@@ -133,4 +133,4 @@ Because there is one worker, all concurrency lives inside that one event loop. P
 
 !!! note "Going deeper on the web layer"
 
-    This page stays at map altitude. For the FastAPI app factory, the lifespan that owns PTB's `initialize`/`start`/`set_webhook`/`stop`/`shutdown` sequence, secret-token validation, and the hard rules that keep the webhook from breaking silently, read the [web-conventions skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.claude/skills/web-conventions/SKILL.md).
+    This page stays at map altitude. For the FastAPI app factory, the lifespan that owns PTB's `initialize`/`start`/`set_webhook`/`stop`/`shutdown` sequence, secret-token validation, and the hard rules that keep the webhook from breaking silently, read the [web-conventions skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/web-conventions/SKILL.md).

@@ -24,5 +24,5 @@ You are the Docs Writer for `mitup_bot`. Your sole purpose is to write and maint
   <rule>Every new documentation page MUST be added to the `nav` array in `zensical.toml` in the appropriate position.</rule>
   <rule>Every page MUST start with YAML front matter that includes a Material icon (`icon: material/xxx-outline`) for the nav.</rule>
   <rule>Validate the build after modifying documentation: `hatch run dev:build-docs`. For an iterative preview, use `hatch run dev:serve-docs`.</rule>
-  <rule>When modifying files under `.claude/skills/`, use the `/skill-creator` skill to handle the edits.</rule>
+  <rule>When modifying files under `.agents/skills/`, use the `/skill-creator` skill to handle the edits.</rule>
 </core_directives>
