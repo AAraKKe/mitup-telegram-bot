@@ -62,14 +62,14 @@ Now let's run the validations. This command will trigger the creation of the `de
 hatch run dev:validate
 ```
 
-!!! info "If you use VSCode"
-    If you use VSCode, a setup script is included in the repo. This script provides the necessary VSCode configuration needed to run type checking and formatting correctly. Run:
+!!! info "VS Code and forks"
+    A setup script is included in the repo. It writes a standard `.vscode/settings.json` with the configuration needed to run type checking and formatting correctly, which VS Code and forks like Cursor read the same way. Run:
     ```
-    hatch run dev:setup-vscode
+    hatch run dev:python bin/setup_vscode.py
     ```
 
-    !!! tip
-        For better IDE experience with type hints, you can use the `ide` environment (`hatch shell ide`) which includes boto3-stubs for enhanced autocompletion and type checking.
+    !!! tip "Type hints in your editor"
+        For a better IDE experience with type hints, point your editor at the `dev` environment's interpreter (`hatch env find dev` prints its location). It includes boto3-stubs for enhanced autocompletion and type checking.
 
 ### Configure your development bot
 
@@ -96,7 +96,7 @@ For local execution, we rely on a Docker instance of PostgreSQL. First, run all 
 docker compose run migrations-upgrade
 ```
 
-This command spins up a PostgreSQL database with a local volume in `./postgres_data` that persists data between executions, and then runs the necessary migrations.
+This command spins up a PostgreSQL database with a local volume in `./postgres-data` that persists data between executions, and then runs the necessary migrations.
 
 ## Launch Mitup
 

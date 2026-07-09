@@ -23,7 +23,7 @@ Where things live in `mitup_bot/`, what each part does, and who to ask when you 
 
 !!! tip "Golden rules"
 
-    * Never run `python` directly. The system interpreter has none of the project's dependencies. Use `hatch run dev:python python <args>`.
+    * Never run `python` directly. The system interpreter has none of the project's dependencies. Use `hatch run dev:python <args>`.
     * No hardcoded user-facing strings. Every label and message lives in `utils/messages.py` and gets translated. Adding a string means adding it there.
     * Delegate by area. Each part of the tree has a specialist agent and a skill that carry its conventions. Reach for the matching one instead of editing blind.
     * Run `hatch run dev:validate` before you push. CI runs the same format, lint, type-check, and test gate and rejects merge requests that fail it.

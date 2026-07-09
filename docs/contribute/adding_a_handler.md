@@ -110,7 +110,7 @@ When two modules need each other's enums, pull the shared enum into a standalone
 
 ## Add a test
 
-Every handler gets a test at `tests/handlers/<package>/test_<module>.py`. If the handler calls any `guards.*` function, also register its context in `tests/test_failure_modes.py`; that matrix exercises each guard's failure path and turns red if a new guard call is left out. Run the ones you touched as you go:
+Every handler gets a test at `tests/handlers/<package>/test_<module>.py`. If the handler calls any `guards.*` function, also register its context in `tests/handlers/test_failure_modes.py`; that matrix exercises each guard's failure path and turns red if a new guard call is left out. Run the ones you touched as you go:
 
 ```bash
 hatch run dev:test-hook tests/handlers/reminders/

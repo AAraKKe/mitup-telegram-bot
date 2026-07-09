@@ -13,7 +13,7 @@ When you commit, the pre-commit hook automatically:
 * Recognizes your commit type (case-insensitive: `feat`, `Feat`, or `FEAT` all work)
 * Replaces the type prefix with an emoji from the configuration
 * Capitalizes the first letter of your description
-* Preserves scopes and breaking change indicators
+* Preserves scopes
 
 ### Example transformations
 
@@ -21,7 +21,6 @@ When you commit, the pre-commit hook automatically:
 feat: add user authentication        → ✨ Add user authentication
 fix(api): correct validation         → 🐛(api) Correct validation
 docs: update installation guide      → 📚 Update installation guide
-refactor(handlers)!: change callback → 🧹(handlers)! Change callback
 ```
 
 ## Writing commit messages
@@ -31,7 +30,7 @@ refactor(handlers)!: change callback → 🧹(handlers)! Change callback
 Write your commits using the conventional commits format:
 
 ```
-Type[(scope)][!]: description
+Type[(scope)]: description
 
 [optional body]
 
@@ -51,11 +50,6 @@ Type[(scope)][!]: description
 * Enclosed in parentheses: `(api)`, `(handlers)`, `(cli)`
 * Should be lowercase
 * Can contain alphanumerics, hyphens, underscores, slashes, commas, and spaces
-
-**Breaking change indicator** (optional):
-
-* Add `!` after type or scope to indicate breaking changes
-* Example: `feat!:` or `feat(api)!:`
 
 **Description** (required):
 
@@ -84,7 +78,6 @@ Feat: add user authentication
 FEAT: add user authentication
 fix(api): correct endpoint validation
 docs(readme): update installation guide
-refactor(handlers)!: change callback structure
 test: add unit tests for api module
 chore: update dependencies
 ```
@@ -109,16 +102,14 @@ The allowed types are defined in [`commits_check_config.yaml`](https://gitlab.co
 | **Feat** | ✨ | Introduce new features |
 | **Fix** | 🐛 | Fix a bug |
 | **Docs** | 📚 | Add or update documentation |
-| **Style** | 💎 | Improve code style without affecting functionality |
 | **Refactor** | 🧹 | Refactor code without changing functionality |
-| **Perf** | 🚀 | Improve performance |
 | **Test** | 🧪 | Add or update tests |
 | **Infra** | 🏗️ | Infrastructure changes |
 | **CI** | 👷 | Continuous Integration changes |
-| **Chore** | ♻️ | Other changes that don't modify src or test files |
+| **Chore** | ⚙️ | Other changes that don't modify src or test files |
 | **Revert** | ⏪ | Revert changes |
 | **Merge** | 🔀 | Merge branches |
-| **Update** | 🚀 | Update dependencies or other changes |
+| **Update** | ⬆️ | Update dependencies or other changes |
 | **Monitoring** | 📈 | Add or update monitoring |
 | **WIP** | 🚧 | Work in progress |
 | **Translations** | 🗣️ | Translations updates |
@@ -157,16 +148,6 @@ cat /tmp/test_commit.txt
 ```
 
 </details>
-
-### Run the test suite
-
-Run the formatter's tests through Hatch:
-
-```bash
-hatch run dev:python bin/test_commit_checker.py
-```
-
-The suite covers case-insensitive type matching, scope handling, breaking change indicators, description capitalization, and invalid format detection.
 
 ## Technical details
 

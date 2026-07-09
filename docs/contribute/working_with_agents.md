@@ -4,7 +4,7 @@ icon: material/robot-outline
 
 # Working with agents
 
-This repository is built to be worked on with [Claude Code](https://claude.com/claude-code), and its conventions live in two directories under `.claude/`. You do not need Claude Code to contribute, but knowing how the two directories fit together tells you where the real rules are written down.
+This repository is built to be worked on with [Claude Code](https://claude.com/claude-code), and its conventions live in two directories: `.agents/skills/` for the domain knowledge and `.claude/agents/` for the specialist agents. You do not need Claude Code to contribute, but knowing how the two directories fit together tells you where the real rules are written down.
 
 ## Skills hold the conventions
 

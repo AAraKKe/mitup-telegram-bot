@@ -10,7 +10,7 @@ Mitup runs its checks through [Hatch](https://hatch.pypa.io/latest/). Every scri
 
 There are two entry points, and they answer different questions.
 
-* `hatch run dev:test-hook <paths or pytest args>` runs the tests you point it at, in parallel, with no coverage and short tracebacks. It is the fast loop you use while writing code. Pass it a file, a directory, or a `-k` expression: `hatch run dev:test-hook tests/handlers -k reminder`.
+* `hatch run dev:test-hook <paths or pytest args>` runs the tests you point it at, in parallel, with no coverage and short tracebacks. It is the fast loop you use while writing code. Pass it a file, a directory, or a `-k` expression: `hatch run dev:test-hook tests/handlers -k broadcast`.
 * `hatch run dev:validate` is the full gate. It runs `format-check`, `lint`, `type-check`, and the whole test suite with coverage, in that order. Run it before you push and before you open a merge request. CI runs the same checks and rejects merge requests that fail them.
 
 The steps inside `validate` keep going even when one fails, so a single run reports every problem at once instead of stopping at the first.
@@ -18,7 +18,7 @@ The steps inside `validate` keep going even when one fails, so a single run repo
 ## What each check does
 
 * `hatch run dev:format` rewrites your code with Ruff's formatter. `hatch run dev:format-check` reports formatting drift without touching files.
-* `hatch run dev:lint` runs the Ruff linter and shows a diff of what it would change. `hatch run dev:fix-lint` applies the safe fixes. `hatch run dev:fix` does both format and lint fixes in one go.
+* `hatch run dev:lint` runs the Ruff linter and shows a diff of what it would change. `hatch run dev:fix-lint` applies those fixes, including Ruff's unsafe ones, so review the resulting diff. `hatch run dev:fix` does both format and lint fixes in one go.
 * `hatch run dev:type-check` runs [ty](https://github.com/astral-sh/ty), the project's type checker.
 * `hatch run dev:test` runs the full suite with coverage. `hatch run dev:test-hook` is the same suite without coverage, for speed.
 
@@ -36,8 +36,10 @@ Most tests run against a mock session. The tests under [`tests/models/db_behavio
 
 ```bash
 hatch run dev:test-db
-hatch run dev:test-db -- -k "cascade_delete" -v
+hatch run dev:test-db -- tests/models/db_behavior/ -k "cascades" -v
 ```
+
+Anything you pass after `--` replaces the default `tests/models/db_behavior/` path, so restate that path when you add pytest flags or the run collects the whole suite.
 
 These tests are skipped during a normal `hatch run dev:test` run and only execute under the `--db-tests` flag that `test-db` passes for you.
 

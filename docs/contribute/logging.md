@@ -61,7 +61,7 @@ with structlog.contextvars.bound_contextvars(meeting_id=meeting.id, run_id=run_i
 
 Every log line carries a small set of reserved keys so CloudWatch queries filter and group on structured fields instead of parsing the event string. The keys fall into three layers by how long each one lives.
 
-Every process entry point calls `configure_logging(env, component, level)` once before any logging happens, then binds its own invocation context.
+The bot service, the recurrent-events runner, and each Lambda call `configure_logging(env, component, level)` once before any logging happens, then bind their own invocation context. One-off CLI commands currently sit outside this pipeline: the legacy Rails migration tool applies its own plain-stdlib log setup, and the other operator commands configure no logging at all.
 
 ### Layer 1: `component`
 
@@ -70,7 +70,7 @@ Every process entry point calls `configure_logging(env, component, level)` once 
 * `bot`: the ECS bot service, covering both PTB handlers and the FastAPI web layer.
 * `events`: the ECS recurrent-events runner.
 * `lambda`: every AWS Lambda function.
-* `cli`: one-off operator commands.
+* `cli`: reserved for one-off operator commands. Nothing emits it yet; new operator commands that log through the pipeline should pass `Component.CLI`.
 
 ### Layer 2: `flow`
 

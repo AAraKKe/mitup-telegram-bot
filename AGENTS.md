@@ -15,7 +15,7 @@ Domain knowledge lives in skills under `.agents/skills/` (one directory per skil
 ## Important rules
 
 - **Validation is explicit — run it when it earns its cost.** There are no automatic validation hooks. During work, use targeted runs: `hatch run dev:test-hook <paths or pytest args>` for the tests you're touching (fast, no coverage; script definitions live in `pyproject.toml` under `[tool.hatch.envs.dev.scripts]`), `hatch run dev:fix` after finishing a coherent batch of edits (not after every file). Before declaring a task done or opening/updating an MR, run the full gate: `hatch run dev:validate` (format + lint + type-check + tests). Never hand work back as finished without that full run having passed — CI is the backstop, not the first line.
-- **Never run `python` directly.** The system Python has no project dependencies. Use `hatch run dev:python python <args>` to execute Python in the project's managed environment.
+- **Never run `python` directly.** The system Python has no project dependencies. Use `hatch run dev:python <args>` to execute Python in the project's managed environment.
 - **Prefer scripts for bulk edits.** When the same change needs to land across many files, write a small script rather than editing each one by hand — it's faster and saves the conversation context for actual reasoning.
 
 ## Maintaining these instructions
@@ -35,8 +35,8 @@ When editing any instruction file, follow these rules:
   - **Exceptions**: do not use the `glab` cli to post comments or replies to merge request discussion threads. Use the `comment-mr` skill instead.
 - **Creating issues**: use the `create-issue` skill. It prompts for the issue type, fills in the correct template, and creates the issue via `glab`. Never invent labels — each template already embeds the correct `/label` quick-action lines.
 - **Merge request template** is at `.gitlab/merge_request_templates/Default.md`. When asked to produce an MR description, follow that template and output plain Markdown the user can copy-paste directly.
-- **Commit message format** — Every commit message must be prepended with an emoji that matches the commit type. The mapping is defined in `commits_check_config.yaml`. See `docs/collaborate/commit_message_format.md` for full rules.
-  - **With pre-commit hooks installed** (local dev): Write commits in conventional format (`Type[(scope)][!]: description`). The hook replaces the type with the emoji automatically.
+- **Commit message format** — Every commit message must be prepended with an emoji that matches the commit type. The mapping is defined in `commits_check_config.yaml`. See `docs/contribute/commit_message_format.md` for full rules.
+  - **With pre-commit hooks installed** (local dev): Write commits in conventional format (`Type[(scope)]: description`). The hook replaces the type with the emoji automatically.
   - **Without pre-commit hooks** (CI agents, etc.): Use the emoji directly (e.g., `✨ Add user authentication`).
 
 ## External documentation
