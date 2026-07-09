@@ -76,4 +76,8 @@ For what each option does, see [Meeting settings](meeting_settings.md).
 
 ## Privacy
 
-Tap *🛡️ Privacy*{.button-like} to open the [privacy policy](../faq/privacy.md) in your browser. It describes exactly what Mitup stores about you and the rights you have over it.
+Tap *🛡️ Privacy*{.button-like} to manage the data Mitup keeps about you:
+
+* *🛡️ Privacy policy*{.button-like} opens the [privacy policy](../faq/privacy.md) in your browser. It describes exactly what Mitup stores and the rights you have over it.
+* *📦 Export my data*{.button-like} sends you a JSON file with a copy of everything Mitup stores about you.
+* *🗑️ Delete my data*{.button-like} permanently deletes your account and everything linked to it, after a double confirmation. See [Erasure](../faq/privacy.md#your-rights-and-how-to-exercise-them) before you tap it. There is no undo.

@@ -74,6 +74,9 @@ msgstr "🛡️ Privacidade"
 msgid "ButtonMessages.PRIVACY_POLICY"
 msgstr "🛡️ Política de privacidade"
 
+msgid "ButtonMessages.EXPORT_MY_DATA"
+msgstr "📦 Exportar meus dados"
+
 msgid "ButtonMessages.DELETE_MY_DATA"
 msgstr "🗑️ Excluir meus dados"
 
@@ -264,7 +267,10 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Desativado ❌"
 
 msgid "PrivacyMessages.DESCRIPTION"
-msgstr "<b>Privacidade</b>\n\nSeus dados pertencem a você. Leia a política de privacidade para ver o que o Mitup armazena e por quê, ou solicite a exclusão permanente de tudo o que o Mitup sabe sobre você."
+msgstr "<b>Privacidade</b>\n\nSeus dados pertencem a você. Leia a política de privacidade para ver o que o Mitup armazena e por quê, baixe uma cópia dos seus dados ou solicite a exclusão permanente de tudo o que o Mitup sabe sobre você."
+
+msgid "PrivacyMessages.EXPORT_CAPTION"
+msgstr "Aqui está uma cópia de tudo o que o Mitup armazena sobre você. As outras pessoas dos seus eventos aparecem apenas pelo nome de exibição."
 
 msgid "PrivacyMessages.DELETE_WARNING"
 msgstr "<b>Excluir todos os seus dados?</b>\n\nIsso removerá permanentemente tudo o que está vinculado à sua conta:\n\n- Os eventos que você criou desaparecerão para todos que os aceitaram, não só para você.\n- Você será removido de todos os eventos que aceitou.\n- Suas configurações e seu vínculo com o Patreon serão excluídos.\n\n<b>Não é possível desfazer.</b> Dados excluídos não podem ser recuperados."

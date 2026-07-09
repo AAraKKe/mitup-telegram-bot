@@ -125,6 +125,7 @@ def privacy_view(ctx: RenderContext) -> MitupView:
         PrivacyMessages.DESCRIPTION.get(lang=lang),
         [
             [ButtonConfig(text=ButtonMessages.PRIVACY_POLICY.get(lang=lang), url=docs_links.privacy_url())],
+            [ButtonConfig(text=ButtonMessages.EXPORT_MY_DATA.get(lang=lang), callback_data=cb.EXPORT_USER_DATA)],
             [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get(lang=lang), callback_data=cb.DELETE_USER_DATA)],
         ],
     ).with_back_button(ButtonMessages.SETTINGS, lang, cb.SETTINGS)

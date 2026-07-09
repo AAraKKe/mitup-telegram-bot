@@ -4,7 +4,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from telegram import Message, Update
+from telegram import Message, MessageEntity, Update
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
 
@@ -29,6 +29,7 @@ from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
@@ -130,6 +131,59 @@ async def test_send_message_with_mitup_view(telegram_api: TelegramApi, bot: Asyn
         chat_id=99, text="view text", entities=None, reply_markup=view.markup, disable_web_page_preview=True
     )
     assert result is sentinel
+
+
+# ---------------------------------------------------------------------------
+# send_document
+# ---------------------------------------------------------------------------
+
+
+async def test_send_document_sends_bytes_with_filename(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    sentinel = MagicMock(spec=Message)
+    bot.send_document.return_value = sentinel
+
+    result = await telegram_api.send_document(update, document=b"{}", filename="export.json", caption="a caption")
+
+    bot.send_document.assert_awaited_once_with(
+        chat_id=42, document=b"{}", filename="export.json", caption="a caption", caption_entities=None
+    )
+    assert result is sentinel
+
+
+async def test_send_document_with_formatted_caption(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    caption_entity = MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)
+    caption = FormattedText("bold caption", entities=[caption_entity])
+
+    await telegram_api.send_document(update, document=b"{}", filename="export.json", caption=caption)
+
+    bot.send_document.assert_awaited_once_with(
+        chat_id=42,
+        document=b"{}",
+        filename="export.json",
+        caption="bold caption",
+        caption_entities=[caption_entity],
+    )
+
+
+async def test_send_document_is_queued_under_capture(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+
+    outbox = telegram_api.begin_capture()
+    assert await telegram_api.send_document(update, document=b"{}", filename="export.json") is None
+    telegram_api.end_capture()
+
+    bot.send_document.assert_not_called()
+
+    await telegram_api.execute_queued(outbox)
+
+    bot.send_document.assert_awaited_once_with(
+        chat_id=42, document=b"{}", filename="export.json", caption=None, caption_entities=None
+    )
 
 
 # ---------------------------------------------------------------------------

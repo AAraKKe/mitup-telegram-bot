@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-09 21:28\n"
+"PO-Revision-Date: 2026-07-09 23:10\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -76,6 +76,9 @@ msgstr "🛡️ Privacy"
 
 msgid "ButtonMessages.PRIVACY_POLICY"
 msgstr "🛡️ Privacy policy"
+
+msgid "ButtonMessages.EXPORT_MY_DATA"
+msgstr "📦 Export my data"
 
 msgid "ButtonMessages.DELETE_MY_DATA"
 msgstr "🗑️ Delete my data"
@@ -333,7 +336,10 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Disabled ❌"
 
 msgid "PrivacyMessages.DESCRIPTION"
-msgstr "<b>Privacy</b>\n\nYour data belongs to you. Read the privacy policy to see what Mitup stores and why, or request the permanent deletion of everything Mitup knows about you."
+msgstr "<b>Privacy</b>\n\nYour data belongs to you. Read the privacy policy to see what Mitup stores and why, download a copy of your data, or request the permanent deletion of everything Mitup knows about you."
+
+msgid "PrivacyMessages.EXPORT_CAPTION"
+msgstr "Here is a copy of everything Mitup stores about you. Other people in your meetings appear by display name only."
 
 msgid "PrivacyMessages.DELETE_WARNING"
 msgstr "<b>Delete all your data?</b>\n\nThis will permanently remove everything linked to your account:\n\n- Meetings you created will disappear for everyone who joined them, not just for you.\n- You will be removed from every meeting you joined.\n- Your settings and your Patreon link will be erased.\n\n<b>There is no undo.</b> Deleted data cannot be recovered."

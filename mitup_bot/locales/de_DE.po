@@ -74,6 +74,9 @@ msgstr "🛡️ Datenschutz"
 msgid "ButtonMessages.PRIVACY_POLICY"
 msgstr "🛡️ Datenschutzrichtlinie"
 
+msgid "ButtonMessages.EXPORT_MY_DATA"
+msgstr "📦 Meine Daten exportieren"
+
 msgid "ButtonMessages.DELETE_MY_DATA"
 msgstr "🗑️ Meine Daten löschen"
 
@@ -258,7 +261,10 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Deaktiviert ❌"
 
 msgid "PrivacyMessages.DESCRIPTION"
-msgstr "<b>Datenschutz</b>\n\nDeine Daten gehören dir. Lies die Datenschutzrichtlinie, um zu sehen, was Mitup speichert und warum, oder beantrage die endgültige Löschung von allem, was Mitup über dich weiß."
+msgstr "<b>Datenschutz</b>\n\nDeine Daten gehören dir. Lies die Datenschutzrichtlinie, um zu sehen, was Mitup speichert und warum, lade eine Kopie deiner Daten herunter oder beantrage die endgültige Löschung von allem, was Mitup über dich weiß."
+
+msgid "PrivacyMessages.EXPORT_CAPTION"
+msgstr "Hier ist eine Kopie von allem, was Mitup über dich speichert. Andere Personen in deinen Treffen erscheinen nur mit ihrem Anzeigenamen."
 
 msgid "PrivacyMessages.DELETE_WARNING"
 msgstr "<b>Alle deine Daten löschen?</b>\n\nDadurch wird alles, was mit deinem Konto verknüpft ist, endgültig entfernt:\n\n- Treffen, die du erstellt hast, verschwinden für alle Teilnehmer, nicht nur für dich.\n- Du wirst aus jedem Treffen entfernt, an dem du teilnimmst.\n- Deine Einstellungen und deine Patreon-Verknüpfung werden gelöscht.\n\n<b>Es gibt kein Zurück.</b> Gelöschte Daten können nicht wiederhergestellt werden."

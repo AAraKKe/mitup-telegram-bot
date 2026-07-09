@@ -57,6 +57,7 @@ class Emojis(Enum):
     FRIEND = "😄"
     GLASSES = "🕶"
     CLIP = "📎"
+    PACKAGE = "📦"
     PHONE = "📱"
     THINK = "🤔"
     UFO = "🛸"

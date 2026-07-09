@@ -894,6 +894,12 @@ CONTEXTS = [
         id="privacy_show",
     ),
     Context(
+        handler_id=PrivacyHandlerId.EXPORT_DATA,
+        update_request=UpdateRequest(callback_query=cb.EXPORT_USER_DATA),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="privacy_export_data",
+    ),
+    Context(
         handler_id=PrivacyHandlerId.DELETE_DATA,
         update_request=UpdateRequest(callback_query=cb.DELETE_USER_DATA),
         error_modes={ErrorMode.USER_NOT_FOUND},

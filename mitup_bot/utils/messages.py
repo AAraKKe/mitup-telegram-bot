@@ -78,6 +78,7 @@ class ButtonMessages(MessageBase):
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
     PRIVACY = f"{Emojis.SHIELD} Privacy"
     PRIVACY_POLICY = f"{Emojis.SHIELD} Privacy policy"
+    EXPORT_MY_DATA = f"{Emojis.PACKAGE} Export my data"
     DELETE_MY_DATA = f"{Emojis.DELETE} Delete my data"
     WAITING_LIST = "Waiting list"
     PUBLIC = "Public"
@@ -311,7 +312,13 @@ class PrivacyMessages(MessageBase):
     DESCRIPTION = (
         "<b>Privacy</b>\n\n"
         "Your data belongs to you. Read the privacy policy to see what Mitup stores and why, "
-        "or request the permanent deletion of everything Mitup knows about you."
+        "download a copy of your data, or request the permanent deletion of everything Mitup "
+        "knows about you."
+    )
+    # Sent as the caption of the exported JSON document.
+    EXPORT_CAPTION = (
+        "Here is a copy of everything Mitup stores about you. "
+        "Other people in your meetings appear by display name only."
     )
     DELETE_WARNING = (
         "<b>Delete all your data?</b>\n\n"

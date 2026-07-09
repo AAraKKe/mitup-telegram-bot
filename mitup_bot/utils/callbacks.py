@@ -123,6 +123,7 @@ UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
 # ----------------------------------------
 CANCEL_SETTINGS = CallbackData(action="cancel", entity="settings")
 EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
+EXPORT_USER_DATA = CallbackData(action="export", entity="user_data")
 # Data-deletion flow: two confirmation steps, both declining back to the privacy screen through
 # the single DECLINE callback.
 DELETE_USER_DATA = CallbackData(action="delete", entity="user_data")

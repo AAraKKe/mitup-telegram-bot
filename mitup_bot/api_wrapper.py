@@ -194,6 +194,9 @@ class TelegramApiWrapper(Protocol):
     def end_capture(self): ...
     async def execute_queued(self, outbox: ApiOutbox): ...
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None: ...
+    async def send_document(
+        self, update: Update, *, document: bytes, filename: str, caption: FormattedText | str | None = None
+    ) -> Message | None: ...
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_messages_to_users(
         self,
@@ -368,6 +371,31 @@ class TelegramApi:
                 entities=view.description.entities or None,
                 reply_markup=view.markup,
                 disable_web_page_preview=True,
+            )
+
+    async def send_document(
+        self, update: Update, *, document: bytes, filename: str, caption: FormattedText | str | None = None
+    ) -> Message | None:
+        """Send an in-memory document to the chat from the update, with an explicit filename."""
+        from mitup_bot import guards
+
+        chat_id = guards.chat(update).id
+        return await self._call_or_enqueue(
+            "send_document", partial(self._send_document_now, chat_id, document, filename, caption), None
+        )
+
+    async def _send_document_now(
+        self, chat_id: int, document: bytes, filename: str, caption: FormattedText | str | None
+    ) -> Message | None:
+        caption_text = caption.text if isinstance(caption, FormattedText) else caption
+        caption_entities = (caption.entities or None) if isinstance(caption, FormattedText) else None
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            return await self.adapter.bot.send_document(
+                chat_id=chat_id,
+                document=document,
+                filename=filename,
+                caption=caption_text,
+                caption_entities=caption_entities,
             )
 
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:

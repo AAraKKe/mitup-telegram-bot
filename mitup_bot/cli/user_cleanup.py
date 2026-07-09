@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel import and_, col, delete, select
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -8,6 +9,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView
+
+log = structlog.get_logger(__name__)
 
 INACTIVE_USERS_SELECT_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
     and_(User.status == UserStatus.LEFT, User.tg_user_id != -1)
@@ -49,4 +52,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         await session.exec(delete(User).where(col(User.id).in_(user_ids)))
 
     metrics.emit(MetricKey.INACTIVE_USERS_DELETED, len(inactive_user_ids), MetricUnit.COUNT)
-    metrics.emit(MetricKey.DELETION_REQUESTED_USERS_PURGED, len(marked_users), MetricUnit.COUNT)
+    # Privacy purges are far too sparse for a useful CloudWatch series; the searchable log
+    # carries the same information.
+    log.info("Deletion-requested users purged", count=len(marked_users))

@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -5,13 +6,15 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import Feature
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
 
+from . import data_export
 from .enums import PrivacyHandlerId
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(PrivacyHandlerId.SHOW, callback_data=cb.EDIT_PRIVACY)
@@ -22,6 +25,25 @@ async def callback_query_show_privacy(session: AsyncSession, update: Update, con
     await context.api.edit_message(
         update=update, view=factory.privacy_view(guards.render_context(user, update, context))
     )
+
+
+@HandlersRegistry.register_callback_query(PrivacyHandlerId.EXPORT_DATA, callback_data=cb.EXPORT_USER_DATA)
+@with_session
+async def callback_query_export_user_data(session: AsyncSession, update: Update, context: TMitupContext):
+    # The export builder loads every traversal itself; only the user's own columns are read here.
+    user = await guards.current_user(update, session, load_collections=False)
+    export = await data_export.build_user_export(session, user)
+    document, filename = data_export.export_document(export)
+    # The document arrives as a new message, so the privacy screen above keeps its buttons.
+    await context.api.send_document(
+        update=update,
+        document=document,
+        filename=filename,
+        caption=PrivacyMessages.EXPORT_CAPTION.get(lang=user.lang),
+    )
+    # Privacy events are far too sparse for a useful CloudWatch series; the searchable log
+    # carries the same information.
+    log.info("User data export sent", user_id=user.db_id)
 
 
 @HandlersRegistry.register_callback_query(PrivacyHandlerId.DELETE_DATA, callback_data=cb.DELETE_USER_DATA)
@@ -59,7 +81,7 @@ async def callback_query_confirm_delete_user_data(session: AsyncSession, update:
 async def callback_query_confirm_delete_user_data_final(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session, load_collections=False)
     user.status = UserStatus.DELETION_REQUESTED
-    context.put_feature_metric(Feature.DATA_DELETION_REQUESTED)
+    log.info("Data deletion request confirmed", user_id=user.db_id)
     # No buttons: the account has stopped working, so there is no screen left to navigate to.
     view = MitupView(description=PrivacyMessages.DELETION_MARKED.get(lang=user.lang), keyboard=[])
     await context.api.edit_message(update=update, view=view)

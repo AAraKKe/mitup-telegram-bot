@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from sqlalchemy.dialects import postgresql
 
@@ -25,9 +27,21 @@ def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
 
 
+def purged_count(caplog: pytest.LogCaptureFixture) -> int:
+    """The count field of the purge log line; INFO capture also picks up unrelated framework
+    lines, so the lookup filters by the structlog event string (the LogRecord message)."""
+    record = next(record for record in caplog.records if record.message == "Deletion-requested users purged")
+    return record.__dict__["count"]
+
+
 async def test_no_users_to_purge(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    api: MockApi,
+    caplog: pytest.LogCaptureFixture,
 ):
+    caplog.set_level(logging.INFO)
     # No users registered — both selects return empty results (default behavior)
     await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
@@ -40,12 +54,17 @@ async def test_no_users_to_purge(
 
     api.assert_method_just_called("send_message_to_user", times=0)
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=MetricKey.DELETION_REQUESTED_USERS_PURGED, value=0, unit=MetricUnit.COUNT)
+    assert purged_count(caplog) == 0
 
 
 async def test_inactive_users_deleted_silently(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    api: MockApi,
+    caplog: pytest.LogCaptureFixture,
 ):
+    caplog.set_level(logging.INFO)
     inactive_1 = create_user(id=10, tg_user_id=10, status=UserStatus.LEFT)
     inactive_2 = create_user(id=11, tg_user_id=11, status=UserStatus.LEFT)
 
@@ -61,12 +80,18 @@ async def test_inactive_users_deleted_silently(
     # LEFT users blocked the bot — no farewell is attempted for them
     api.assert_method_just_called("send_message_to_user", times=0)
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=2, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=MetricKey.DELETION_REQUESTED_USERS_PURGED, value=0, unit=MetricUnit.COUNT)
+    assert purged_count(caplog) == 0
 
 
 async def test_deletion_requested_users_purged_with_farewell(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    api: MockApi,
+    lang: str,
+    caplog: pytest.LogCaptureFixture,
 ):
+    caplog.set_level(logging.INFO)
     marked = create_member(id=30, tg_user_id=30, language=lang, status=UserStatus.DELETION_REQUESTED)
 
     mock_session.add_objects_with_statement(DELETION_REQUESTED_USERS_SELECT_STATEMENT, (marked,))
@@ -80,12 +105,17 @@ async def test_deletion_requested_users_purged_with_farewell(
     api.assert_send_message_to_user_called(user=marked, view=farewell)
 
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=MetricKey.DELETION_REQUESTED_USERS_PURGED, value=1, unit=MetricUnit.COUNT)
+    assert purged_count(caplog) == 1
 
 
 async def test_left_and_marked_users_purged_together(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    api: MockApi,
+    caplog: pytest.LogCaptureFixture,
 ):
+    caplog.set_level(logging.INFO)
     inactive = create_user(id=10, tg_user_id=10, status=UserStatus.LEFT)
     marked = create_member(id=30, tg_user_id=30, status=UserStatus.DELETION_REQUESTED)
 
@@ -103,7 +133,7 @@ async def test_left_and_marked_users_purged_together(
     api.assert_send_message_to_user_called(user=marked, view=farewell)
 
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=MetricKey.DELETION_REQUESTED_USERS_PURGED, value=1, unit=MetricUnit.COUNT)
+    assert purged_count(caplog) == 1
 
 
 async def test_select_query_filters_correctly(mock_session: MockDbSession, api: MockApi):

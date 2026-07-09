@@ -74,6 +74,9 @@ msgstr "🛡️ Privacidade"
 msgid "ButtonMessages.PRIVACY_POLICY"
 msgstr "🛡️ Política de privacidade"
 
+msgid "ButtonMessages.EXPORT_MY_DATA"
+msgstr "📦 Exportar os meus datos"
+
 msgid "ButtonMessages.DELETE_MY_DATA"
 msgstr "🗑️ Borrar os meus datos"
 
@@ -264,7 +267,10 @@ msgid "SettingsMessages.DISABLED"
 msgstr "Deshabilitado ❌"
 
 msgid "PrivacyMessages.DESCRIPTION"
-msgstr "<b>Privacidade</b>\n\nOs teus datos son teus. Le a política de privacidade para ver que garda Mitup e por que, ou solicita a eliminación permanente de todo o que Mitup sabe de ti."
+msgstr "<b>Privacidade</b>\n\nOs teus datos son teus. Le a política de privacidade para ver que garda Mitup e por que, descarga unha copia dos teus datos ou solicita a eliminación permanente de todo o que Mitup sabe de ti."
+
+msgid "PrivacyMessages.EXPORT_CAPTION"
+msgstr "Aquí tes unha copia de todo o que Mitup garda sobre ti. As outras persoas das túas quedadas aparecen só co seu nome visible."
 
 msgid "PrivacyMessages.DELETE_WARNING"
 msgstr "<b>Borrar todos os teus datos?</b>\n\nIsto eliminará permanentemente todo o que está ligado á túa conta:\n\n- As quedadas que creaches desaparecerán para todas as persoas que se uniron a elas, non só para ti.\n- Eliminarémoste de todas as quedadas ás que te uniches.\n- Os teus axustes e a túa ligazón con Patreon borraranse.\n\n<b>Non hai volta atrás.</b> Os datos borrados non se poden recuperar."

@@ -229,13 +229,13 @@ If you joined a meeting via someone else's group message without ever opening th
 
 ## Your rights and how to exercise them
 
-**Access and export.** Email `privacy@mitup.social` and we'll send you a JSON export of all your data: your user record, every meeting you own, and every RSVP you've made.
+**Access and export.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}, then *📦 Export my data*{.button-like}. The bot replies with a JSON file containing everything Mitup stores about you: your user record, your settings, every meeting you own, every meeting you've joined, and your Patreon link if you have one. Other people in your meetings appear by their display name only. If you've blocked the bot, unblock it and the button works again. If something else is in the way, email `privacy@mitup.social` and we'll figure it out together.
 
 **Rectification.** Edit your display name, language, or timezone directly in the bot's settings menu. For other corrections, email us.
 
-**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your account is marked for deletion and stops working right away, and within a day your user record, every meeting you own, every RSVP you've made, and your Patreon link are permanently removed. You get one final message confirming it's done. If you ever want to use Mitup again, send the `/start` command in your chat with the bot and it sets you up from scratch, with no memory of your old account. You can also request deletion by email.
+**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}, then *🗑️ Delete my data*{.button-like}, and confirm twice. Once confirmed, your account is marked for deletion and stops working right away, and within a day your user record, every meeting you own, every RSVP you've made, and your Patreon link are permanently removed. You get one final message confirming it's done. If you ever want to use Mitup again, send the `/start` command in your chat with the bot and it sets you up from scratch, with no memory of your old account.
 
-**Portability.** Email `privacy@mitup.social` and we'll send your data as JSON, formatted for import into another system if you wish.
+**Portability.** The export is plain JSON, formatted for import into another system if you wish.
 
 **Right to object.** If you believe Mitup is processing your data unfairly, email us.
 

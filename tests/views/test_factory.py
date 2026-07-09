@@ -189,6 +189,7 @@ def test_privacy_view(lang: str, monkeypatch: pytest.MonkeyPatch):
                     text=ButtonMessages.PRIVACY_POLICY.get(lang=lang), url="https://staging.mitup.social/faq/privacy/"
                 )
             ],
+            [ButtonConfig(text=ButtonMessages.EXPORT_MY_DATA.get(lang=lang), callback_data=cb.EXPORT_USER_DATA)],
             [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get(lang=lang), callback_data=cb.DELETE_USER_DATA)],
             [ButtonConfig(text=ButtonMessages.SETTINGS.back(lang=lang), callback_data=cb.SETTINGS)],
         ],

@@ -1,16 +1,25 @@
+import datetime as dt
+import json
+import logging
+
 import pytest
 from telegram import Update
 
+from mitup_bot.handlers.privacy import data_export
 from mitup_bot.handlers.privacy.enums import PrivacyHandlerId
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import HandlerContext, UpdateRequest, call_handler
-from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
+
+
+def privacy_log_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogRecord:
+    """The captured record for `event`; INFO capture also picks up unrelated framework lines,
+    so the lookup filters by the structlog event string (the LogRecord message)."""
+    return next(record for record in caplog.records if record.message == event)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_PRIVACY)], indirect=True)
@@ -25,6 +34,36 @@ async def test_show_privacy_renders_the_privacy_screen(
     context, _ = await call_handler(PrivacyHandlerId.SHOW, handler_context=handler_context)
 
     context.api.assert_edit_message_called(update, factory.privacy_view(RenderContext(lang=user_with_settings.lang)))
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EXPORT_USER_DATA)], indirect=True)
+async def test_export_sends_the_user_data_as_a_json_document(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.INFO)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_objects_with_statement(
+        data_export.owned_meetings_statement(user_with_settings), tuple(user_with_settings.meetups)
+    )
+
+    context, _ = await call_handler(PrivacyHandlerId.EXPORT_DATA, handler_context=handler_context)
+
+    sent = context.api.call_args("send_document").kwargs
+    assert sent["update"] is update
+    assert sent["filename"] == f"mitup-export-{dt.datetime.now(dt.UTC):%Y-%m-%d}.json"
+    assert sent["caption"] == PrivacyMessages.EXPORT_CAPTION.get(lang=user_with_settings.lang)
+    export = json.loads(sent["document"])
+    assert export["user"]["telegram_user_id"] == user_with_settings.tg_user_id
+    assert [meeting["title"] for meeting in export["meetings"]] == ["Test Meeting 1", "Test Meeting 2"]
+    # The document is a new message: the privacy screen above keeps its buttons untouched.
+    context.api.assert_edit_message_not_called()
+    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
+    export_record = privacy_log_record(caplog, "User data export sent")
+    assert export_record.__dict__["user_id"] == user_with_settings.db_id
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_USER_DATA)], indirect=True)
@@ -76,8 +115,9 @@ async def test_final_confirmation_marks_the_user_for_deletion(
     update: Update,
     handler_context: HandlerContext,
     user_with_settings: User,
-    metrics: MetricAssertions,
+    caplog: pytest.LogCaptureFixture,
 ):
+    caplog.set_level(logging.INFO)
     mock_session.add_object(user_with_settings, "tg_user_id")
     assert user_with_settings.status is UserStatus.MEMBER
 
@@ -88,7 +128,8 @@ async def test_final_confirmation_marks_the_user_for_deletion(
         description=PrivacyMessages.DELETION_MARKED.get(lang=user_with_settings.lang), keyboard=[]
     )
     context.api.assert_edit_message_called(update, expected_view)
-    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.DATA_DELETION_REQUESTED)})
+    deletion_record = privacy_log_record(caplog, "Data deletion request confirmed")
+    assert deletion_record.__dict__["user_id"] == user_with_settings.db_id
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_USER_DATA)], indirect=True)
