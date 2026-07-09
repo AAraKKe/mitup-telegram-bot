@@ -841,6 +841,12 @@ CONTEXTS = [
         id="main_menu",
     ),
     Context(
+        handler_id=MainMenuHandlerId.SEND_MAIN_MENU_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SEND_MAIN_MENU),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="send_main_menu",
+    ),
+    Context(
         handler_id=MainMenuHandlerId.SHOW_MEETINGS_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1)),
         error_modes={ErrorMode.USER_NOT_FOUND},

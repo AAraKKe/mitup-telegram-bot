@@ -13,7 +13,7 @@ from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId, ConversationB
 from mitup_bot.models import Broadcast, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText, parse_format_tags, utf16_len
-from mitup_bot.utils.messages import BroadcastOperatorMessages
+from mitup_bot.utils.messages import BroadcastOperatorMessages, ButtonMessages
 from mitup_bot.views import ButtonConfig, MitupView
 from tests.helpers import (
     HandlerContext,
@@ -83,13 +83,22 @@ def expected_language_label(lang: str, code: str) -> FormattedText:
     return BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL.get(lang=lang, language=display)
 
 
+def recipient_keyboard(lang: str) -> list[list[ButtonConfig]]:
+    """The single Main Menu button row every recipient gets, in that recipient's own language."""
+    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
+
+
 def assert_previews(context: StubMitupContext, operator: User, lang: str, previews: list[tuple[str, str]]):
-    """Previews are a header, then per language a bold label followed by the rendered FormattedText."""
+    """Previews are a header, then per language a bold label followed by the rendered preview.
+
+    Each preview carries the recipient's own Main Menu button row (in the preview's language), so the
+    operator sees exactly what will be delivered.
+    """
     calls = context.api.call_args_list("send_message_to_user")
-    expected_views: list[FormattedText] = [BroadcastOperatorMessages.PREVIEW_HEADER.get(lang=lang)]
+    expected_views: list[FormattedText | MitupView] = [BroadcastOperatorMessages.PREVIEW_HEADER.get(lang=lang)]
     for code, body in previews:
         expected_views.append(expected_language_label(lang, code))
-        expected_views.append(parse_format_tags(body, {}))
+        expected_views.append(MitupView(parse_format_tags(body, {}), recipient_keyboard(code)))
     assert len(calls) == len(expected_views)
     for call, view in zip(calls, expected_views, strict=True):
         assert call.kwargs["user"] is operator
@@ -97,8 +106,8 @@ def assert_previews(context: StubMitupContext, operator: User, lang: str, previe
 
 
 def rendered_preview(context: StubMitupContext) -> FormattedText:
-    """The last preview message: the rendered body for the single language under test."""
-    return context.api.call_args_list("send_message_to_user")[-1].kwargs["view"]
+    """The rendered body of the last preview message for the single language under test."""
+    return context.api.call_args_list("send_message_to_user")[-1].kwargs["view"].description
 
 
 def added_broadcast(mock_session: MockDbSession) -> Broadcast:
@@ -171,6 +180,32 @@ async def test_valid_yaml_text_renders_preview(
         skipped=[],
     )
     context.api.assert_send_message_called(update, MitupView(summary, confirmation_keyboard(lang, draft.db_id)))
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text=PLAIN_YAML)], indirect=True)
+async def test_preview_carries_the_recipient_main_menu_button(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    register_member: RegisterMember,
+):
+    """Each preview carries the same single Main Menu button recipients get, in the preview's own
+    language: plain label (no « back decoration) wired to SEND_MAIN_MENU."""
+    register_member(user_with_settings)
+
+    with patch_member_counts({"en": 1, "es_ES": 1}):
+        context, _ = await call_handler(BroadcastHandlerId.BROADCAST_CONTENT_MESSAGE, handler_context=handler_context)
+
+    # Preview messages are the header, then (label, body) per language; the bodies are the views
+    # carrying keyboards. Slice off the header and pick every second view starting at the first body.
+    preview_bodies = context.api.call_args_list("send_message_to_user")[2::2]
+    keyboards = [call.kwargs["view"].keyboard for call in preview_bodies]
+    assert keyboards == [recipient_keyboard("en"), recipient_keyboard("es_ES")]
+    # The Spanish preview's button label is the Spanish Main Menu string, not the operator's language.
+    es_button = keyboards[1][0][0]
+    assert es_button.callback_data == cb.SEND_MAIN_MENU
+    assert es_button.text == ButtonMessages.MAIN_MENU.get(lang="es_ES")
 
 
 @pytest.mark.parametrize(

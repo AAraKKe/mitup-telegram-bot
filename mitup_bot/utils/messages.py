@@ -984,14 +984,17 @@ class BroadcastOperatorMessages(MessageBase):
     BUTTON_CANCEL = f"{Emojis.CANCEL} Cancel"
 
     # Outcomes.
-    QUEUED_CONFIRMATION = f"{Emojis.CHECK} Broadcast <b>${{name}}</b> is queued. It will start sending shortly."
+    QUEUED_CONFIRMATION = (
+        f"{Emojis.CHECK} Broadcast <b>${{name}}</b> (<code>#${{broadcast_id}}</code>) is queued. "
+        "It will start sending shortly."
+    )
     CANCELLED_CONFIRMATION = f"{Emojis.CANCEL} Broadcast discarded. Nothing was sent."
     DRAFT_NOT_FOUND = f"{Emojis.THINK} This draft is no longer available. Send /broadcast to start again."
 
     # Sender finalization DMs. Referenced by the sender phase, which does not edit this file.
     SENDER_COMPLETE_SUMMARY = (
         f"{Emojis.CHECK} "
-        "Broadcast <b>${name}</b> finished.\n\n"
+        "Broadcast <b>${name}</b> (<code>#${broadcast_id}</code>) finished.\n\n"
         "<b>Total:</b> ${total} · <b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · "
         "<b>Skipped:</b> ${skipped}\n\n${breakdown}"
     )
@@ -1008,7 +1011,7 @@ class BroadcastOperatorMessages(MessageBase):
     )
     SENDER_FAILED = (
         f"{Emojis.PROHIB} "
-        "Broadcast <b>${name}</b> failed after ${attempts} attempts.\n\n"
+        "Broadcast <b>${name}</b> (<code>#${broadcast_id}</code>) failed after ${attempts} attempts.\n\n"
         "<b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\n"
         "Check the logs for details."
     )

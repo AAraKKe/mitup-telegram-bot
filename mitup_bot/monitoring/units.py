@@ -6,4 +6,5 @@ class MetricUnit(StrEnum):
     MILLISECONDS = "Milliseconds"
     BYTES = "Bytes"
     SECONDS = "Seconds"
+    PERCENT = "Percent"
     NONE = "None"

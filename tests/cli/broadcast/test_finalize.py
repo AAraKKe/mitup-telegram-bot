@@ -55,10 +55,12 @@ async def test_build_language_breakdown_maps_counts_onto_messages():
 async def test_fail_unattempted_deliveries_marks_pending_rows_failed_scoped_to_broadcast(
     mock_session: MockDbSession,
 ):
-    script_exec(mock_session, Result())
+    script_exec(mock_session, Result(rowcount=2))
 
-    await finalize.fail_unattempted_deliveries(mock_session, 5)
+    flipped = await finalize.fail_unattempted_deliveries(mock_session, 5)
 
+    # Returns how many rows it flipped so the caller can emit their delivery metric post-commit.
+    assert flipped == 2
     assert mock_session.exec.await_count == 1
     query = mock_session.queries_executed[0]
     assert "UPDATE broadcast_deliveries" in query
@@ -74,22 +76,25 @@ async def test_finalize_broadcast_rolls_up_counts(mock_session: MockDbSession, r
     broadcast.total_recipients = 4
     broadcast.messages = [BroadcastMessage(language="en", body_html="hi")]
     mock_session.get = mock.AsyncMock(return_value=broadcast)
-    # fail-unattempted UPDATE (a no-op here — nothing left PENDING), aggregate rows, then the
-    # compare-and-swap UPDATE.
+    # fail-unattempted UPDATE (a no-op here — nothing left PENDING, 0 rows), aggregate rows, then
+    # the compare-and-swap UPDATE.
     script_exec(
         mock_session,
-        Result(),
+        Result(rowcount=0),
         Result(results=(("en", SENT, 3), ("en", FAILED, 1))),
         Result(rowcount=rowcount),
     )
 
-    summary, won_transition = await finalize.finalize_broadcast(5, BroadcastStatus.DONE)
+    summary, won_transition, bulk_failed = await finalize.finalize_broadcast(5, BroadcastStatus.DONE)
 
     assert won_transition is won
+    # Nothing was left PENDING on the drained path, so no rows were bulk-failed.
+    assert bulk_failed == 0
     assert (summary.sent, summary.failed, summary.skipped, summary.orphaned) == (3, 1, 0, 0)
     assert summary.total == 4
     assert summary.total == summary.sent + summary.failed + summary.skipped + summary.orphaned
     assert summary.name == "Camp"
+    assert summary.broadcast_id == 5
     assert broadcast.sent_count == 3
     assert broadcast.orphan_count == 0
     assert broadcast.messages[0].sent_count == 3
@@ -104,12 +109,12 @@ async def test_finalize_broadcast_rolls_in_progress_rows_into_orphans(mock_sessi
     mock_session.get = mock.AsyncMock(return_value=broadcast)
     script_exec(
         mock_session,
-        Result(),
+        Result(rowcount=0),
         Result(results=(("en", SENT, 2), ("en", FAILED, 1), ("en", IN_PROGRESS, 2))),
         Result(rowcount=1),
     )
 
-    summary, _ = await finalize.finalize_broadcast(6, BroadcastStatus.DONE)
+    summary, _, _ = await finalize.finalize_broadcast(6, BroadcastStatus.DONE)
 
     assert (summary.sent, summary.failed, summary.orphaned) == (2, 1, 2)
     assert summary.total == summary.sent + summary.failed + summary.skipped + summary.orphaned
@@ -127,19 +132,21 @@ async def test_finalize_broadcast_terminal_failure_counts_never_attempted_delive
     broadcast.total_recipients = 3
     broadcast.messages = [BroadcastMessage(language="en", body_html="hi")]
     mock_session.get = mock.AsyncMock(return_value=broadcast)
-    # fail-unattempted UPDATE (converts the never-attempted PENDING rows), then the aggregate
+    # fail-unattempted UPDATE (converts the 3 never-attempted PENDING rows), then the aggregate
     # reflecting that conversion, then the compare-and-swap UPDATE.
     script_exec(
         mock_session,
-        Result(),
+        Result(rowcount=3),
         Result(results=(("en", FAILED, 3),)),
         Result(rowcount=1),
     )
 
-    summary, _ = await finalize.finalize_broadcast(7, BroadcastStatus.FAILED)
+    summary, _, bulk_failed = await finalize.finalize_broadcast(7, BroadcastStatus.FAILED)
 
     assert (summary.sent, summary.failed, summary.skipped, summary.orphaned) == (0, 3, 0, 0)
     assert summary.total == summary.sent + summary.failed + summary.skipped + summary.orphaned
+    # The 3 bulk-failed rows are surfaced so the caller can emit their delivery metric post-commit.
+    assert bulk_failed == 3
     # fail_unattempted_deliveries ran before the aggregate — first exec call in the sequence.
     assert "'pending'" in mock_session.queries_executed[0]
     assert "'failed'" in mock_session.queries_executed[0]
@@ -155,51 +162,81 @@ async def test_purge_deliveries_issues_delete(mock_session: MockDbSession):
 
 
 @pytest.mark.parametrize("won_transition", [True, False], ids=["won", "lost"])
-async def test_finalize_and_report_emits_counts_and_gates_notification(
+async def test_finalize_and_report_gates_notification_on_won_transition(
     api: MockApi,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     monkeypatch: pytest.MonkeyPatch,
     won_transition: bool,
 ):
+    """Per-delivery telemetry is live during the drain, so finalization purges unconditionally and
+    notifies only the call that won the terminal transition (no bulk-failed rows on this path)."""
     summary = make_summary(status=BroadcastStatus.DONE, sent=3, failed=1, skipped=2)
-    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, won_transition)))
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, won_transition, 0)))
     purge = mock.AsyncMock()
     monkeypatch.setattr(finalize, "purge_deliveries", purge)
     notify = mock.AsyncMock()
     monkeypatch.setattr(finalize, "notify_operators", notify)
 
-    await finalize.finalize_and_report(api, metrics_client, [1], 5, BroadcastStatus.DONE)
-    await metrics_client.flush()
+    await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.DONE)
 
-    metrics.assert_emitted(name=MetricKey.BROADCAST_MESSAGES_SENT, value=3)
-    metrics.assert_emitted(name=MetricKey.BROADCAST_MESSAGES_FAILED, value=1)
-    metrics.assert_emitted(name=MetricKey.BROADCAST_MESSAGES_SKIPPED, value=2)
-    metrics.assert_emitted(name=MetricKey.BROADCAST_MESSAGES_ORPHANED, value=0)
     purge.assert_awaited_once_with(5)
     if won_transition:
-        notify.assert_awaited_once_with(api, [1], summary)
+        # The author id is passed through so the summary DM can prefer the author over the admins.
+        notify.assert_awaited_once_with(api, [1], 42, summary)
     else:
         notify.assert_not_awaited()
 
 
-@pytest.mark.parametrize("orphaned", [0, 2], ids=["no_orphans", "with_orphans"])
-async def test_finalize_and_report_emits_orphan_metric_and_warns_only_when_present(
+async def test_finalize_and_report_emits_bulk_failed_delivery_metric(
     api: MockApi,
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
     monkeypatch: pytest.MonkeyPatch,
+):
+    """On the terminal-failure path the bulk-failed rows never pass through the drain, so finalize
+    emits their FAILED metric — count-valued (not one-hot), since there is no per-row outcome."""
+    summary = make_summary(status=BroadcastStatus.FAILED, sent=0, failed=3, skipped=0)
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, True, 3)))
+    monkeypatch.setattr(finalize, "purge_deliveries", mock.AsyncMock())
+    monkeypatch.setattr(finalize, "notify_operators", mock.AsyncMock())
+
+    await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.FAILED)
+    await metrics_client.flush()
+
+    metrics.assert_emitted(name=MetricKey.BROADCAST_DELIVERY_FAILED, value=3, properties={"broadcast_id": 5})
+
+
+async def test_finalize_and_report_skips_bulk_failed_metric_when_none(
+    api: MockApi,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    summary = make_summary(status=BroadcastStatus.DONE, sent=3, failed=1, skipped=2)
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, True, 0)))
+    monkeypatch.setattr(finalize, "purge_deliveries", mock.AsyncMock())
+    monkeypatch.setattr(finalize, "notify_operators", mock.AsyncMock())
+
+    await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.DONE)
+    await metrics_client.flush()
+
+    metrics.assert_not_emitted(name=MetricKey.BROADCAST_DELIVERY_FAILED)
+
+
+@pytest.mark.parametrize("orphaned", [0, 2], ids=["no_orphans", "with_orphans"])
+async def test_finalize_and_report_warns_only_when_orphans_present(
+    api: MockApi,
+    metrics_client: MetricsClient,
+    monkeypatch: pytest.MonkeyPatch,
     orphaned: int,
 ):
     summary = make_summary(status=BroadcastStatus.DONE, sent=3, failed=1, skipped=2, orphaned=orphaned)
-    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, True)))
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, True, 0)))
     monkeypatch.setattr(finalize, "purge_deliveries", mock.AsyncMock())
     monkeypatch.setattr(finalize, "notify_operators", mock.AsyncMock())
 
     with capture_logs() as logs:
-        await finalize.finalize_and_report(api, metrics_client, [1], 5, BroadcastStatus.DONE)
-        await metrics_client.flush()
+        await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.DONE)
 
-    metrics.assert_emitted(name=MetricKey.BROADCAST_MESSAGES_ORPHANED, value=orphaned)
     warnings = [entry for entry in logs if entry["event"] == "Broadcast finalized with orphaned deliveries"]
     assert len(warnings) == (1 if orphaned else 0)

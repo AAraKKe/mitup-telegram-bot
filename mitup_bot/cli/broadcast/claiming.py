@@ -57,6 +57,7 @@ async def claim_next_broadcast(session: AsyncSession) -> ClaimedBroadcast | None
 
     return ClaimedBroadcast(
         broadcast_id=broadcast.db_id,
+        author_tg_id=broadcast.author_tg_id,
         attempts=broadcast.attempts,
         terminal_failure=broadcast.attempts > MAX_BROADCAST_ATTEMPTS,
     )
@@ -93,19 +94,16 @@ async def load_broadcast_bodies(session: AsyncSession, broadcast_id: int) -> dic
 
 
 @db.with_session
-async def materialize_audience(
-    session: AsyncSession, broadcast_id: int, message_languages: list[str]
-) -> tuple[int, bool]:
-    """Insert one PENDING delivery per reachable MEMBER, resolving each recipient's language.
+async def materialize_audience(session: AsyncSession, broadcast_id: int, message_languages: list[str]) -> int:
+    """Insert one PENDING delivery per reachable MEMBER, resolving each recipient's language, and
+    return the total recipient count.
 
-    Idempotent and resume-safe: if the snapshot already exists the recipient set is frozen and
-    the recorded total is returned unchanged, with the second element `False` so the caller
-    knows not to re-emit `BROADCAST_MESSAGES_TO_SEND` on every resumed attempt — only the run
-    that actually materializes the audience should count it. The insert uses ON CONFLICT DO
-    NOTHING on (broadcast_id, user_id) so a crash-and-resume can never duplicate a recipient's row.
+    Idempotent and resume-safe: if the snapshot already exists the recipient set is frozen and the
+    recorded total is returned unchanged. The insert uses ON CONFLICT DO NOTHING on
+    (broadcast_id, user_id) so a crash-and-resume can never duplicate a recipient's row.
     """
     if existing := await count_deliveries(session, broadcast_id):
-        return existing, False
+        return existing
 
     language_sent = case(
         (col(Settings.language).in_(message_languages), col(Settings.language)),
@@ -132,7 +130,7 @@ async def materialize_audience(
     broadcast = await session.get(Broadcast, broadcast_id)
     assert broadcast is not None, "The claimed broadcast row must still exist"
     broadcast.total_recipients = total
-    return total, True
+    return total
 
 
 async def count_deliveries(session: AsyncSession, broadcast_id: int) -> int:

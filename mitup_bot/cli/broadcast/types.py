@@ -26,6 +26,7 @@ FALLBACK_LANG = TranslationEngine.FALLBACK_LANG
 @dataclass
 class ClaimedBroadcast:
     broadcast_id: int
+    author_tg_id: int
     attempts: int
     terminal_failure: bool
 
@@ -84,6 +85,7 @@ class LanguageBreakdown:
 
 @dataclass
 class BroadcastSummary:
+    broadcast_id: int
     name: str
     status: BroadcastStatus
     attempts: int

@@ -8,6 +8,7 @@ from tests.helpers import MockDbSession, Result
 def make_summary(
     *,
     status: BroadcastStatus,
+    broadcast_id: int = 5,
     name: str = "Campaign",
     attempts: int = 1,
     total: int = 4,
@@ -18,6 +19,7 @@ def make_summary(
     breakdown: list[LanguageBreakdown] | None = None,
 ) -> BroadcastSummary:
     return BroadcastSummary(
+        broadcast_id=broadcast_id,
         name=name,
         status=status,
         attempts=attempts,

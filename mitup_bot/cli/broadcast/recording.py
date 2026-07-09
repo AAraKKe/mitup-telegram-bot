@@ -17,20 +17,35 @@ from .types import BatchResult, DeliveryOutcome, PendingDelivery
 
 log = structlog.get_logger(__name__)
 
+# Each recorded delivery's final status maps to the one-hot metric that reads 1 for that status;
+# every other member of this map is emitted as 0 for the same delivery, so each status has a
+# complete, gap-free time series to alarm and graph on regardless of which outcomes a batch saw.
+DELIVERY_METRIC_BY_STATUS: dict[BroadcastDeliveryStatus, MetricKey] = {
+    BroadcastDeliveryStatus.SENT: MetricKey.BROADCAST_DELIVERY_SENT,
+    BroadcastDeliveryStatus.FAILED: MetricKey.BROADCAST_DELIVERY_FAILED,
+    BroadcastDeliveryStatus.RETRY_PENDING: MetricKey.BROADCAST_DELIVERY_RETRY_PENDING,
+    BroadcastDeliveryStatus.SKIPPED_INACTIVE: MetricKey.BROADCAST_DELIVERY_SKIPPED_INACTIVE,
+}
+
 
 @db.with_session
-async def record_batch_outcomes(session: AsyncSession, result: BatchResult, metrics: MetricsClient):
+async def record_batch_outcomes(session: AsyncSession, result: BatchResult) -> int:
     """Resolve each claimed (IN_PROGRESS) delivery to its recorded outcome, and — when flood
-    control halted the batch — release the untried remainder in the same transaction.
+    control halted the batch — release the untried remainder in the same transaction. Returns how
+    many unreachable recipients were flipped to LEFT (0 if none).
 
     Terminal outcomes (SENT, FAILED, SKIPPED_INACTIVE) are written in bulk; a RETRY_PENDING
     outcome is re-parked with its own `next_attempt_time`. A skipped recipient is also flipped to
-    LEFT.
+    LEFT. No metrics are emitted here: both the per-delivery telemetry (`emit_delivery_outcomes`)
+    and the INACTIVE_USER_SET count must fire only after this transaction commits, so the caller
+    emits them once this returns — otherwise a failed commit would leave rows IN_PROGRESS (or
+    MEMBERs un-flipped) while the metrics already claimed the outcome happened.
     """
     by_status: dict[BroadcastDeliveryStatus, list[DeliveryOutcome]] = defaultdict(list)
     for outcome in result.outcomes:
         by_status[outcome.status].append(outcome)
 
+    deactivated = 0
     if sent := by_status[BroadcastDeliveryStatus.SENT]:
         await mark_deliveries(session, sent, BroadcastDeliveryStatus.SENT, sent_time=dt.datetime.now(dt.UTC))
     if failed := by_status[BroadcastDeliveryStatus.FAILED]:
@@ -39,10 +54,30 @@ async def record_batch_outcomes(session: AsyncSession, result: BatchResult, metr
         await schedule_retries(session, retry_pending)
     if skipped := by_status[BroadcastDeliveryStatus.SKIPPED_INACTIVE]:
         await mark_deliveries(session, skipped, BroadcastDeliveryStatus.SKIPPED_INACTIVE)
-        await deactivate_skipped_users(session, skipped, metrics)
+        deactivated = await deactivate_skipped_users(session, skipped)
     if result.unattempted:
         assert result.flood_backoff is not None, "Unattempted rows are only carried out under flood control"
         await release_unattempted(session, result.unattempted, result.flood_backoff)
+
+    return deactivated
+
+
+def emit_delivery_outcomes(metrics: MetricsClient, outcomes: list[DeliveryOutcome], broadcast_id: int):
+    """Emit the one-hot `BroadcastDelivery*` telemetry for every recorded outcome: the matching
+    status metric reads 1 and the other three read 0, so each series stays gap-free.
+
+    Must be called post-commit (see `record_batch_outcomes`). Properties may only carry
+    run-constant facets: the shared EMF logger buffers these emissions into one document per flush
+    and `set_property` is last-writer-wins, so a per-delivery-varying property (e.g. attempt) would
+    be clobbered and misattributed across the batch. Only `broadcast_id` (run-constant) rides here;
+    per-delivery attempt investigation lives on the `broadcast_delivery` log line. Emitted as EMF
+    properties, never dimensions, per the monitoring rules.
+    """
+    for outcome in outcomes:
+        matched = DELIVERY_METRIC_BY_STATUS[outcome.status]
+        properties = {"broadcast_id": broadcast_id}
+        for key in DELIVERY_METRIC_BY_STATUS.values():
+            metrics.emit(key, 1 if key is matched else 0, MetricUnit.COUNT, properties=properties)
 
 
 async def release_unattempted(session: AsyncSession, unattempted: list[PendingDelivery], flood_backoff: dt.timedelta):
@@ -90,11 +125,15 @@ async def schedule_retries(session: AsyncSession, outcomes: list[DeliveryOutcome
         )
 
 
-async def deactivate_skipped_users(session: AsyncSession, skipped: list[DeliveryOutcome], metrics: MetricsClient):
-    """Flip unreachable MEMBERs to LEFT via `User.mark_inactive`."""
+async def deactivate_skipped_users(session: AsyncSession, skipped: list[DeliveryOutcome]) -> int:
+    """Flip unreachable MEMBERs to LEFT via `User.mark_inactive`; return how many transitioned.
+
+    The INACTIVE_USER_SET metric is emitted by the caller post-commit (see `record_batch_outcomes`),
+    not here — a rolled-back flip must not report users as deactivated.
+    """
     user_ids = [outcome.user_id for outcome in skipped]
     users = (await session.exec(select(User).where(col(User.id).in_(user_ids)))).all()
     left = sum(user.mark_inactive() for user in users)
     if left:
         log.info("Broadcast marked unreachable recipients inactive", count=left)
-        metrics.emit(MetricKey.INACTIVE_USER_SET, left, MetricUnit.COUNT)
+    return left

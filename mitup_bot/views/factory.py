@@ -18,7 +18,7 @@ from mitup_bot.utils import (
     SettingsMessages,
 )
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.entities import FormattedText, parse_format_tags
 from mitup_bot.views import ButtonConfig, CalendarKeyboard, GridMitupView, Keyboard, MitupView, RenderContext
 
 if TYPE_CHECKING:
@@ -264,6 +264,25 @@ def options_button(callback_data: CallbackData, text: str | FormattedText, optio
 
 def user_button(user: User, callback_data: CallbackData) -> ButtonConfig:
     return ButtonConfig(text=user.inline_name, callback_data=callback_data)
+
+
+def broadcast_recipient_keyboard(lang: str) -> Keyboard:
+    """The single-button row every recipient gets, in that recipient's own language.
+
+    Previews carry it too so the operator sees exactly what will be sent. Plain "Main Menu" label
+    (no « decoration) since this is navigation from a standalone message, not a back button.
+    """
+    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
+
+
+def broadcast_recipient_view(body_html: str, lang: str) -> MitupView:
+    """The exact view every broadcast recipient receives: the stored body rendered with
+    `parse_format_tags` plus `broadcast_recipient_keyboard`, in the recipient's own language.
+
+    Single source of truth so the operator preview and the sender's delivery build an identical
+    view — "preview equals delivery" is a guarantee, not two constructions kept in sync by hand.
+    """
+    return MitupView(parse_format_tags(body_html, {}), broadcast_recipient_keyboard(lang))
 
 
 def confirmation_view(

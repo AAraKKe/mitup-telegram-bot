@@ -24,6 +24,7 @@ async def finalize_and_report(
     api: TelegramApiWrapper,
     metrics: MetricsClient,
     admin_tg_ids: list[int],
+    author_tg_id: int,
     broadcast_id: int,
     final_status: BroadcastStatus,
 ):
@@ -34,12 +35,21 @@ async def finalize_and_report(
     purge are idempotent (recomputed/deleted from the same table state either way), but the
     operator DM must fire once: `finalize_broadcast`'s compare-and-swap on `status still SENDING`
     reports which call actually performed the terminal transition, and only that one notifies.
+
+    Per-delivery telemetry is emitted live during the drain (see `record_batch_outcomes`). The one
+    exception is the bulk-failed rows on the terminal-failure path: they are flipped to FAILED here
+    (`fail_unattempted_deliveries`) without ever passing through the drain, so this is their only
+    delivery metric — emitted count-valued (not one-hot 1/0 per row) since there is no per-row
+    outcome to one-hot. Orphans stay visible via the warning log below and the summary DM.
     """
-    summary, won_transition = await finalize_broadcast(broadcast_id, final_status)
-    metrics.emit(MetricKey.BROADCAST_MESSAGES_SENT, summary.sent, MetricUnit.COUNT)
-    metrics.emit(MetricKey.BROADCAST_MESSAGES_FAILED, summary.failed, MetricUnit.COUNT)
-    metrics.emit(MetricKey.BROADCAST_MESSAGES_SKIPPED, summary.skipped, MetricUnit.COUNT)
-    metrics.emit(MetricKey.BROADCAST_MESSAGES_ORPHANED, summary.orphaned, MetricUnit.COUNT)
+    summary, won_transition, bulk_failed = await finalize_broadcast(broadcast_id, final_status)
+    if bulk_failed:
+        metrics.emit(
+            MetricKey.BROADCAST_DELIVERY_FAILED,
+            bulk_failed,
+            MetricUnit.COUNT,
+            properties={"broadcast_id": broadcast_id},
+        )
     if summary.orphaned:
         log.warning(
             "Broadcast finalized with orphaned deliveries", broadcast_id=broadcast_id, orphaned=summary.orphaned
@@ -50,13 +60,13 @@ async def finalize_and_report(
     # a failed summary send must never leak the delivery rows.
     await purge_deliveries(broadcast_id)
     if won_transition:
-        await notify_operators(api, admin_tg_ids, summary)
+        await notify_operators(api, admin_tg_ids, author_tg_id, summary)
 
 
 @db.with_session
 async def finalize_broadcast(
     session: AsyncSession, broadcast_id: int, final_status: BroadcastStatus
-) -> tuple[BroadcastSummary, bool]:
+) -> tuple[BroadcastSummary, bool, int]:
     """Roll the delivery table up into per-language and total counts, then close the broadcast.
 
     Any delivery still PENDING or RETRY_PENDING at this point is marked FAILED before aggregation
@@ -67,10 +77,11 @@ async def finalize_broadcast(
 
     Counts come exclusively from aggregating `broadcast_deliveries` (grouped by language and
     status), never from in-memory accumulators, so a broadcast resumed across several runs still
-    finalizes with the true totals. Returns whether this call performed the SENDING -> terminal
-    transition (see `transition_to_terminal`).
+    finalizes with the true totals. Returns the summary, whether this call performed the
+    SENDING -> terminal transition (see `transition_to_terminal`), and how many rows the bulk-fail
+    flipped (so the caller can emit their delivery metric post-commit).
     """
-    await fail_unattempted_deliveries(session, broadcast_id)
+    bulk_failed = await fail_unattempted_deliveries(session, broadcast_id)
     counts = await aggregate_delivery_counts(session, broadcast_id)
     broadcast = await session.get(Broadcast, broadcast_id)
     assert broadcast is not None, "The claimed broadcast row must still exist"
@@ -84,6 +95,7 @@ async def finalize_broadcast(
     won_transition = await transition_to_terminal(session, broadcast_id, final_status)
 
     summary = BroadcastSummary(
+        broadcast_id=broadcast_id,
         name=broadcast.name,
         status=final_status,
         attempts=broadcast.attempts,
@@ -94,17 +106,19 @@ async def finalize_broadcast(
         orphaned=broadcast.orphan_count,
         breakdown=breakdown,
     )
-    return summary, won_transition
+    return summary, won_transition, bulk_failed
 
 
-async def fail_unattempted_deliveries(session: AsyncSession, broadcast_id: int):
-    """Flip every still-PENDING or awaiting-RETRY_PENDING delivery to FAILED before aggregation.
+async def fail_unattempted_deliveries(session: AsyncSession, broadcast_id: int) -> int:
+    """Flip every still-PENDING or awaiting-RETRY_PENDING delivery to FAILED before aggregation and
+    return how many rows were flipped.
 
-    A no-op on the normal drained path (the finalize gate only lets finalization run once none
-    remain); on the terminal-failure path it records these never-completed recipients as genuine
-    non-deliveries. IN_PROGRESS orphans are deliberately left untouched — their outcome is unknown.
+    A no-op (0 rows) on the normal drained path (the finalize gate only lets finalization run once
+    none remain); on the terminal-failure path it records these never-completed recipients as
+    genuine non-deliveries. IN_PROGRESS orphans are deliberately left untouched — their outcome is
+    unknown.
     """
-    await session.exec(
+    result = await session.exec(
         update(BroadcastDelivery)
         .where(
             and_(
@@ -116,6 +130,8 @@ async def fail_unattempted_deliveries(session: AsyncSession, broadcast_id: int):
         )
         .values(status=BroadcastDeliveryStatus.FAILED)
     )
+    # `rowcount` can be None on some drivers; the annotation promises an int.
+    return result.rowcount or 0
 
 
 def build_language_breakdown(

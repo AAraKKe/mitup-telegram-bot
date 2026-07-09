@@ -10,7 +10,8 @@ from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.models import User
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus
-from mitup_bot.utils.entities import parse_format_tags
+from mitup_bot.views import MitupView
+from mitup_bot.views.factory import broadcast_recipient_view
 
 from .types import (
     MAX_DELIVERY_ATTEMPTS,
@@ -25,8 +26,19 @@ from .types import (
 log = structlog.get_logger(__name__)
 
 
+def build_recipient_views(bodies: dict[str, str]) -> dict[str, MitupView]:
+    """Render each language's recipient view once, keyed by language, for the whole run.
+
+    The delivered view depends only on `(body, language)`, so a broadcast to thousands of
+    recipients would otherwise re-parse the HTML and re-run the gettext lookup once per recipient.
+    Precomputing here collapses that to one build per language. Uses the shared
+    `broadcast_recipient_view` so delivery stays identical to the operator preview.
+    """
+    return {language: broadcast_recipient_view(body_html, language) for language, body_html in bodies.items()}
+
+
 async def deliver_batch(
-    api: TelegramApiWrapper, broadcast_id: int, batch: list[PendingDelivery], bodies: dict[str, str]
+    api: TelegramApiWrapper, broadcast_id: int, batch: list[PendingDelivery], views: dict[str, MitupView]
 ) -> BatchResult:
     """Deliver the batch in order, stopping the moment Telegram flood control fires. The
     triggering row's outcome is kept (a real API call happened, so its incremented attempt
@@ -34,7 +46,7 @@ async def deliver_batch(
     known flood window would burn their capped attempts on non-attempts."""
     outcomes: list[DeliveryOutcome] = []
     for index, pending in enumerate(batch):
-        classification = await deliver_one(api, pending.user, bodies[pending.language_sent], pending.attempt_count)
+        classification = await deliver_one(api, pending.user, views[pending.language_sent], pending.attempt_count)
         outcome = resolve_delivery_outcome(pending, classification)
         log_delivery(broadcast_id, pending, outcome, classification)
         outcomes.append(outcome)
@@ -49,22 +61,21 @@ async def deliver_batch(
 
 
 async def deliver_one(
-    api: TelegramApiWrapper, user: User, body_html: str, attempt_count: int
+    api: TelegramApiWrapper, user: User, view: MitupView, attempt_count: int
 ) -> DeliveryClassification:
-    """Send one body and classify the outcome.
+    """Send one prebuilt recipient view and classify the outcome.
 
-    The stored `body_html` is converted to a `FormattedText` via `parse_format_tags` — the same
-    rendering the preview uses, so preview and delivery are guaranteed to match — and sent
-    through `send_message_to_user`, which preserves the parsed entities and already classifies a
-    blocked/deleted recipient as `InactiveUserInteraction`. Flood control (`RetryAfter`) and any
-    unexpected error are transient and retryable (RETRY_PENDING with a backoff); a `BadRequest` is
-    a permanent per-recipient failure; a `NetworkError` is systemic and re-raised to abort the run
-    (a `TimedOut` may actually have delivered, so it can never be a retry — it stays orphan
-    territory). None of these, except `NetworkError`, stops the fan-out.
+    The view is the shared `broadcast_recipient_view` (see `build_recipient_views`), so preview and
+    delivery are guaranteed to match. It is sent through `send_message_to_user`, which preserves the
+    parsed entities and already classifies a blocked/deleted recipient as `InactiveUserInteraction`.
+    Flood control (`RetryAfter`) and any unexpected error are transient and retryable (RETRY_PENDING
+    with a backoff); a `BadRequest` is a permanent per-recipient failure; a `NetworkError` is
+    systemic and re-raised to abort the run (a `TimedOut` may actually have delivered, so it can
+    never be a retry — it stays orphan territory). None of these, except `NetworkError`, stops the
+    fan-out.
     """
-    formatted_body = parse_format_tags(body_html, {})
     try:
-        await api.send_message_to_user(user, formatted_body)
+        await api.send_message_to_user(user, view)
     except InactiveUserInteraction:
         return DeliveryClassification(BroadcastDeliveryStatus.SKIPPED_INACTIVE, "bot blocked by user")
     except RetryAfter as error:

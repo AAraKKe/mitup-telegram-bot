@@ -43,8 +43,12 @@ async def test_confirm_queues_the_draft(
     assert broadcast.status is BroadcastStatus.QUEUED
     context.api.assert_edit_message_called(
         update,
-        BroadcastOperatorMessages.QUEUED_CONFIRMATION.get(lang=user_with_settings.lang, name=BROADCAST_NAME),
+        BroadcastOperatorMessages.QUEUED_CONFIRMATION.get(
+            lang=user_with_settings.lang, name=BROADCAST_NAME, broadcast_id=BROADCAST_ID
+        ),
     )
+    # The operator needs the numeric id to correlate the run with its log lines.
+    assert f"#{BROADCAST_ID}" in str(context.api.call_args("edit_message").kwargs["view"])
     mock_session.assert_not_deleted()
 
 

@@ -15,7 +15,7 @@ from mitup_bot.cli.broadcast.types import (
 )
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus
-from mitup_bot.utils.entities import parse_format_tags
+from mitup_bot.views.factory import broadcast_recipient_view
 from tests.helpers import MockApi, create_member
 
 SENT = BroadcastDeliveryStatus.SENT
@@ -43,21 +43,25 @@ async def test_deliver_one_classifies_outcome(
     expected_flood: bool,
 ):
     user = create_member(1, 10)
+    view = broadcast_recipient_view("<b>hi</b>", "en")
     if side_effect is not None:
         api.mock_method("send_message_to_user").side_effect = side_effect
 
-    classification = await delivery.deliver_one(api, user, "<b>hi</b>", attempt_count=1)
+    classification = await delivery.deliver_one(api, user, view, attempt_count=1)
 
     assert classification.status is expected_status
     assert classification.error == expected_error
     assert classification.flood_control is expected_flood
-    api.assert_send_message_to_user_called(user=user, view=parse_format_tags("<b>hi</b>", {}))
+    # The prebuilt view is sent through unchanged.
+    api.assert_send_message_to_user_called(user=user, view=view)
 
 
 async def test_deliver_one_flood_control_backoff_honors_retry_after_plus_margin(api: MockApi):
     api.mock_method("send_message_to_user").side_effect = RetryAfter(30)
 
-    classification = await delivery.deliver_one(api, create_member(1, 10), "hi", attempt_count=1)
+    classification = await delivery.deliver_one(
+        api, create_member(1, 10), broadcast_recipient_view("hi", "en"), attempt_count=1
+    )
 
     assert classification.retry_delay == dt.timedelta(seconds=30 + RETRY_AFTER_MARGIN_SECONDS)
 
@@ -66,7 +70,9 @@ async def test_deliver_one_flood_control_backoff_honors_retry_after_plus_margin(
 async def test_deliver_one_unknown_error_backoff_doubles_per_attempt(api: MockApi, attempt_count: int):
     api.mock_method("send_message_to_user").side_effect = RuntimeError("boom")
 
-    classification = await delivery.deliver_one(api, create_member(1, 10), "hi", attempt_count=attempt_count)
+    classification = await delivery.deliver_one(
+        api, create_member(1, 10), broadcast_recipient_view("hi", "en"), attempt_count=attempt_count
+    )
 
     expected = dt.timedelta(seconds=RETRY_BACKOFF_BASE_SECONDS * 2 ** (attempt_count - 1))
     assert classification.retry_delay == expected
@@ -77,7 +83,7 @@ async def test_deliver_one_reraises_network_error(api: MockApi):
     api.mock_method("send_message_to_user").side_effect = NetworkError("gateway down")
 
     with pytest.raises(NetworkError):
-        await delivery.deliver_one(api, user, "hi", attempt_count=1)
+        await delivery.deliver_one(api, user, broadcast_recipient_view("hi", "en"), attempt_count=1)
 
 
 async def test_resolve_delivery_outcome_schedules_retry_under_cap():
@@ -103,13 +109,23 @@ async def test_resolve_delivery_outcome_fails_permanently_at_cap():
     assert outcome.next_attempt_time is None
 
 
+def test_build_recipient_views_precomputes_one_view_per_language():
+    views = delivery.build_recipient_views({"en": "<b>hi</b>", "es_ES": "hola"})
+
+    # One prebuilt view per language, each identical to the shared factory view (so it equals the
+    # operator preview) — built once here rather than per recipient.
+    assert set(views) == {"en", "es_ES"}
+    assert views["en"] == broadcast_recipient_view("<b>hi</b>", "en")
+    assert views["es_ES"] == broadcast_recipient_view("hola", "es_ES")
+
+
 async def test_deliver_batch_collects_outcomes_in_order(api: MockApi):
     first = create_member(1, 11, "en")
     second = create_member(2, 12, "es_ES")
     batch = [PendingDelivery(101, first, "en", 1), PendingDelivery(102, second, "es_ES", 1)]
     api.mock_method("send_message_to_user").side_effect = [None, BadRequest("nope")]
 
-    result = await delivery.deliver_batch(api, 7, batch, {"en": "hi", "es_ES": "hola"})
+    result = await delivery.deliver_batch(api, 7, batch, delivery.build_recipient_views({"en": "hi", "es_ES": "hola"}))
 
     assert [(outcome.delivery_id, outcome.user_id, outcome.status) for outcome in result.outcomes] == [
         (101, 1, SENT),
@@ -131,7 +147,7 @@ async def test_deliver_batch_halts_mid_batch_on_flood_control_and_carries_out_re
     # First send succeeds, the second hits flood control; the third must never be attempted.
     api.mock_method("send_message_to_user").side_effect = [None, RetryAfter(20)]
 
-    result = await delivery.deliver_batch(api, 7, batch, {"en": "hi"})
+    result = await delivery.deliver_batch(api, 7, batch, delivery.build_recipient_views({"en": "hi"}))
 
     assert result.flood_control is True
     # Only the first two rows were sent; the loop stopped at the flood hit.

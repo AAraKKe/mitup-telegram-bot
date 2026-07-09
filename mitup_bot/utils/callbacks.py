@@ -109,6 +109,10 @@ EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 # These are callbacks for the main menu actions
 # ----------------------------------------
 MAIN_MENU = CallbackData(entity="main_menu")
+# SEND_MAIN_MENU sends the main menu as a NEW message instead of editing the tapped one, so a
+# standalone message (e.g. a broadcast) stays in the chat while the user still gets a way back to
+# the menu. Distinct action keeps its pattern from colliding with MAIN_MENU, whose handler edits.
+SEND_MAIN_MENU = CallbackData(action="send", entity="main_menu")
 PAST_MEETINGS = CallbackData(entity="past_meetings")
 SETTINGS = CallbackData(entity="settings")
 HELP = CallbackData(entity="help")

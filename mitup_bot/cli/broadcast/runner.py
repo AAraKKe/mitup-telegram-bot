@@ -4,7 +4,7 @@ through claim, deliver, record, and finalize. See the package docstring in `__in
 import structlog
 
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.models.broadcasts import BroadcastStatus
+from mitup_bot.models.broadcasts import BroadcastDeliveryStatus, BroadcastStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 from .claiming import (
@@ -15,10 +15,10 @@ from .claiming import (
     materialize_audience,
     reset_broadcast_attempts,
 )
-from .delivery import deliver_batch
+from .delivery import build_recipient_views, deliver_batch
 from .finalize import finalize_and_report
-from .recording import record_batch_outcomes
-from .types import ClaimedBroadcast
+from .recording import emit_delivery_outcomes, record_batch_outcomes
+from .types import BatchResult, ClaimedBroadcast
 
 log = structlog.get_logger(__name__)
 
@@ -43,18 +43,26 @@ async def process_claimed_broadcast(
 ):
     if claimed.terminal_failure:
         log.warning("Broadcast exceeded the attempt threshold, failing it", attempts=claimed.attempts)
-        await finalize_and_report(api, metrics, admin_tg_ids, claimed.broadcast_id, BroadcastStatus.FAILED)
+        await finalize_and_report(
+            api, metrics, admin_tg_ids, claimed.author_tg_id, claimed.broadcast_id, BroadcastStatus.FAILED
+        )
         return
 
     bodies = await load_broadcast_bodies(claimed.broadcast_id)
-    total, freshly_materialized = await materialize_audience(claimed.broadcast_id, list(bodies))
-    if freshly_materialized:
-        metrics.emit(MetricKey.BROADCAST_MESSAGES_TO_SEND, total, MetricUnit.COUNT)
+    total = await materialize_audience(claimed.broadcast_id, list(bodies))
+    # An initial progress datapoint doubles as the "broadcast started/resumed" marker that dropping
+    # BROADCAST_MESSAGES_TO_SEND removed: on a resumed broadcast it reads the true current percent,
+    # and it is the only progress signal on a tick where no delivery is due yet. No explicit flush —
+    # the first batch's flush (or the run-end flush) carries it.
+    if total:
+        await emit_progress(metrics, claimed.broadcast_id, total)
 
-    await send_all_pending(api, metrics, claimed.broadcast_id, bodies)
+    await send_all_pending(api, metrics, claimed.broadcast_id, total, bodies)
     if await defer_for_pending_retries(claimed.broadcast_id):
         return
-    await finalize_and_report(api, metrics, admin_tg_ids, claimed.broadcast_id, BroadcastStatus.DONE)
+    await finalize_and_report(
+        api, metrics, admin_tg_ids, claimed.author_tg_id, claimed.broadcast_id, BroadcastStatus.DONE
+    )
 
 
 async def defer_for_pending_retries(broadcast_id: int) -> bool:
@@ -72,21 +80,82 @@ async def defer_for_pending_retries(broadcast_id: int) -> bool:
     return True
 
 
-async def send_all_pending(api: TelegramApiWrapper, metrics: MetricsClient, broadcast_id: int, bodies: dict[str, str]):
+async def send_all_pending(
+    api: TelegramApiWrapper, metrics: MetricsClient, broadcast_id: int, total: int, bodies: dict[str, str]
+):
     """Drain every due delivery, one atomically-claimed `BROADCAST_BATCH_SIZE` page at a time,
     until no claim returns any rows — or until Telegram flood control fires, which stops the run
-    so the next tick resumes after the backoff. Re-claimed retry deliveries (attempt > 1) are
-    counted and emitted once per run."""
-    retried = 0
+    so the next tick resumes after the backoff.
+
+    The recipient view is precomputed once per language (see `build_recipient_views`) rather than
+    rebuilt per recipient. Per batch: outcomes are recorded and committed first, THEN the
+    per-delivery telemetry is emitted (post-commit — a rolled-back batch must not claim outcomes),
+    then live progress, then a flush. Flushing per batch is what makes the telemetry live: one EMF
+    document per batch gives each key its own timestamp so the dashboard shows a real progression
+    (nothing reaches CloudWatch until a flush, and the only other flush is once at run end). It also
+    bounds each one-hot delivery key to at most `BROADCAST_BATCH_SIZE` (50) array values per EMF
+    document, comfortably under EMF's 100-value-per-metric limit.
+    """
+    views = build_recipient_views(bodies)
     while batch := await claim_pending_batch(broadcast_id):
-        result = await deliver_batch(api, broadcast_id, batch, bodies)
-        await record_batch_outcomes(result, metrics)
-        # Only rows we actually attempted count as retries; the released remainder gets its claim
-        # increment undone and is counted if and when it is genuinely re-claimed on a later run.
-        unattempted_ids = {pending.delivery_id for pending in result.unattempted}
-        retried += sum(pending.attempt_count > 1 for pending in batch if pending.delivery_id not in unattempted_ids)
+        result = await deliver_batch(api, broadcast_id, batch, views)
+        deactivated = await record_batch_outcomes(result)
+        # Both post-commit (see record_batch_outcomes): the per-delivery one-hot telemetry, and the
+        # count of MEMBERs this batch flipped to LEFT (only when > 0, matching the historic emit).
+        emit_delivery_outcomes(metrics, result.outcomes, broadcast_id)
+        if deactivated:
+            metrics.emit(MetricKey.INACTIVE_USER_SET, deactivated, MetricUnit.COUNT)
+        await emit_batch_progress(metrics, broadcast_id, total, result)
+        await metrics.flush()
         if result.flood_control:
             log.warning("Broadcast paused batch draining after flood control", broadcast_id=broadcast_id)
             break
-    if retried:
-        metrics.emit(MetricKey.BROADCAST_MESSAGES_RETRIED, retried, MetricUnit.COUNT)
+
+
+async def emit_progress(metrics: MetricsClient, broadcast_id: int, total: int) -> tuple[float | None, int]:
+    """Emit the live 0-100 `BroadcastProgressPercent` reading, computed straight from the delivery
+    table — never an in-memory accumulator — so it stays correct across the runs a long broadcast
+    resumes over, and monotonic-ish because a retried row stays in the unfinished count until it
+    truly lands. Returns `(percent, remaining)`.
+
+    `total`/`remaining` ride as properties, which is safe only because this metric is emitted once
+    per flush window (each batch flushes immediately); the shared EMF logger is last-writer-wins on
+    properties, so a metric emitted multiple times per window could not carry per-emission context.
+    The percent series is skipped when `total` is 0 (unknown recipient count). A row still
+    IN_PROGRESS reads as "done" in this math (it is not in `remaining`) — its outcome is unknown and
+    never retried, so it is deliberately not held against completion; the finalize orphan warning
+    and the summary DM carry those.
+    """
+    remaining = await count_unfinished_deliveries(broadcast_id)
+    percent = round((total - remaining) / total * 100, 1) if total else None
+    if percent is not None:
+        metrics.emit(
+            MetricKey.BROADCAST_PROGRESS_PERCENT,
+            percent,
+            MetricUnit.PERCENT,
+            properties={"broadcast_id": broadcast_id, "total": total, "remaining": remaining},
+        )
+    return percent, remaining
+
+
+async def emit_batch_progress(metrics: MetricsClient, broadcast_id: int, total: int, result: BatchResult):
+    """Emit per-batch throughput (`BroadcastBatchMessagesSent`) plus the live progress reading, and
+    log the per-batch line the infra queries key on."""
+    sent = sum(outcome.status is BroadcastDeliveryStatus.SENT for outcome in result.outcomes)
+    failed = sum(outcome.status is BroadcastDeliveryStatus.FAILED for outcome in result.outcomes)
+    retry = sum(outcome.status is BroadcastDeliveryStatus.RETRY_PENDING for outcome in result.outcomes)
+    skipped = sum(outcome.status is BroadcastDeliveryStatus.SKIPPED_INACTIVE for outcome in result.outcomes)
+
+    metrics.emit(
+        MetricKey.BROADCAST_BATCH_MESSAGES_SENT, sent, MetricUnit.COUNT, properties={"broadcast_id": broadcast_id}
+    )
+    percent, remaining = await emit_progress(metrics, broadcast_id, total)
+    log.info(
+        "Broadcast batch recorded",
+        sent=sent,
+        failed=failed,
+        retry=retry,
+        skipped=skipped,
+        percent=percent,
+        remaining=remaining,
+    )

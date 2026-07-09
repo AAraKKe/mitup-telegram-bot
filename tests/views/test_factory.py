@@ -4,6 +4,7 @@ import pytest
 
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import parse_format_tags
 from mitup_bot.utils.messages import AdminMessages, ButtonMessages
 from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 
@@ -170,6 +171,20 @@ def test_admin_menu_view(lang: str):
     )
 
     assert expected_view == view
+
+
+def test_broadcast_recipient_keyboard(lang: str):
+    keyboard = factory.broadcast_recipient_keyboard(lang)
+
+    # A single row with a plain "Main Menu" button (no « back decoration) wired to SEND_MAIN_MENU.
+    assert keyboard == [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
+
+
+def test_broadcast_recipient_view_pairs_the_rendered_body_with_the_recipient_keyboard(lang: str):
+    view = factory.broadcast_recipient_view("<b>hi</b>", lang)
+
+    assert view.description == parse_format_tags("<b>hi</b>", {})
+    assert view.keyboard == factory.broadcast_recipient_keyboard(lang)
 
 
 @pytest.mark.parametrize("option", [True, False])

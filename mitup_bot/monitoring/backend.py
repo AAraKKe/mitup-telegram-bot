@@ -92,6 +92,7 @@ UNIT_MAPPING: dict[MetricUnit, Unit] = {
     MetricUnit.MILLISECONDS: Unit.MILLISECONDS,
     MetricUnit.BYTES: Unit.BYTES,
     MetricUnit.SECONDS: Unit.SECONDS,
+    MetricUnit.PERCENT: Unit.PERCENT,
     MetricUnit.NONE: Unit.NONE,
 }
 

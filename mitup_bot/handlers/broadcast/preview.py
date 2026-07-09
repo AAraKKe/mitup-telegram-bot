@@ -4,10 +4,10 @@ from telegram import Update
 from mitup_bot.db import with_session
 from mitup_bot.models import Broadcast, BroadcastMessage, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText, parse_format_tags
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import BroadcastOperatorMessages
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig, Keyboard, MitupView
+from mitup_bot.views import ButtonConfig, Keyboard, MitupView, factory
 
 from . import utils
 from .enums import ConversationBroadcastState
@@ -34,13 +34,15 @@ async def present_preview(
 async def render_language_previews(context: TMitupContext, operator: User, validated: ValidatedBroadcast):
     """Show a header, then for each language a bold label followed by the exact recipient preview.
 
-    Each preview is its own message built with the same `parse_format_tags` conversion the sender
-    uses, so the preview equals the actual send and renders exactly.
+    Each preview is its own message built with `factory.broadcast_recipient_view` — the same view
+    the sender delivers — so the preview equals the actual send exactly.
     """
     await context.api.send_message_to_user(operator, BroadcastOperatorMessages.PREVIEW_HEADER.get(lang=operator.lang))
     for content in validated.messages:
         await context.api.send_message_to_user(operator, language_label(operator.lang, content.language))
-        await context.api.send_message_to_user(operator, parse_format_tags(content.body_html, {}))
+        await context.api.send_message_to_user(
+            operator, factory.broadcast_recipient_view(content.body_html, content.language)
+        )
 
 
 def language_label(lang: str, code: str) -> FormattedText:

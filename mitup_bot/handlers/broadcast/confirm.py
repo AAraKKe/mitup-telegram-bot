@@ -35,7 +35,10 @@ async def callback_query_confirm_broadcast(session: AsyncSession, update: Update
 
     broadcast.status = BroadcastStatus.QUEUED
     await context.api.edit_message(
-        update=update, view=BroadcastOperatorMessages.QUEUED_CONFIRMATION.get(lang=operator.lang, name=broadcast.name)
+        update=update,
+        view=BroadcastOperatorMessages.QUEUED_CONFIRMATION.get(
+            lang=operator.lang, name=broadcast.name, broadcast_id=broadcast.db_id
+        ),
     )
     return ConversationHandler.END
 

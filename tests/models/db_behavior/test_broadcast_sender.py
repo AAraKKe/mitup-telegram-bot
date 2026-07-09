@@ -254,7 +254,7 @@ async def test_resume_never_double_sends_already_sent_deliveries(db_session: Asy
         bot = RecordingBot()
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, {"en": "<b>Hello</b>"})
+        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, 2, {"en": "<b>Hello</b>"})
 
         # Only the PENDING recipient was contacted; the already-SENT one was never re-sent.
         assert bot.sent_chat_ids == {pending}
@@ -276,7 +276,7 @@ async def test_unreachable_recipient_is_skipped_and_marked_left(db_session: Asyn
         bot = RecordingBot(forbidden={blocked})
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, {"en": "hi"})
+        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, 1, {"en": "hi"})
 
         deliveries = await fetch_deliveries(data.broadcast_id)
         assert [d.status for d in deliveries] == [BroadcastDeliveryStatus.SKIPPED_INACTIVE]
@@ -292,16 +292,15 @@ async def test_language_without_message_falls_back_to_english(db_session: AsyncS
         messages={"en": "English body"},
         seed_users=[SeedUser(recipient, "de_DE")],  # no de_DE message provided
     ) as data:
-        total, freshly_materialized = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
+        total = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
         assert total == 1
-        assert freshly_materialized is True
 
         deliveries = await fetch_deliveries(data.broadcast_id)
         assert [d.language_sent for d in deliveries] == ["en"]
 
         bot = RecordingBot()
         await send_broadcasts.send_all_pending(
-            make_api(bot), make_test_metrics_client(), data.broadcast_id, {"en": "English body"}
+            make_api(bot), make_test_metrics_client(), data.broadcast_id, total, {"en": "English body"}
         )
         assert bot.texts_to(recipient) == ["English body"]
 
@@ -314,7 +313,7 @@ async def test_anonymous_invitee_never_receives_a_delivery(db_session: AsyncSess
         messages={"en": "hi"},
         seed_users=[SeedUser(real, "en"), SeedUser(send_broadcasts.ANONYMOUS_INVITEE_TG_ID, "en")],
     ) as data:
-        total, _ = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
+        total = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
 
         # Only the real member is enrolled; the -1 sentinel is excluded.
         assert total == 1
@@ -331,17 +330,15 @@ async def test_audience_materialization_is_idempotent(db_session: AsyncSession):
         messages={"en": "hi"},
         seed_users=[SeedUser(tg_base, "en"), SeedUser(tg_base + 1, "en")],
     ) as data:
-        first_total, first_fresh = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
+        first_total = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
         first_ids = {d.user_id for d in await fetch_deliveries(data.broadcast_id)}
 
-        second_total, second_fresh = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
+        second_total = await send_broadcasts.materialize_audience(data.broadcast_id, ["en"])
         second_ids = {d.user_id for d in await fetch_deliveries(data.broadcast_id)}
 
+        # The resumed call reports the frozen snapshot's total without re-inserting recipients.
         assert first_total == second_total == 2
         assert first_ids == second_ids
-        # Only the first call materializes; the resumed call reports the frozen snapshot.
-        assert first_fresh is True
-        assert second_fresh is False
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
         assert broadcast.total_recipients == 2
 
@@ -366,58 +363,69 @@ async def test_finalization_purges_deliveries_and_lands_counts(db_session: Async
         assert broadcast.sent_count == 2
         assert broadcast.total_recipients == 2
         assert {m.language: m.sent_count for m in broadcast_messages} == {"en": 2}
-        MetricAssertions(metrics).assert_emitted(name=MetricKey.BROADCAST_MESSAGES_SENT, value=2, unit=MetricUnit.COUNT)
+        # Delivery telemetry is now live per-delivery during the drain: both recipients emit a
+        # one-hot SENT=1, and the single batch reports its throughput.
+        assertions = MetricAssertions(metrics)
+        assertions.assert_emitted(name=MetricKey.BROADCAST_DELIVERY_SENT, value=1, unit=MetricUnit.COUNT, times=2)
+        assertions.assert_emitted(name=MetricKey.BROADCAST_BATCH_MESSAGES_SENT, value=2, unit=MetricUnit.COUNT)
+        assertions.assert_emitted(name=MetricKey.BROADCAST_PROGRESS_PERCENT, value=100.0, unit=MetricUnit.PERCENT)
 
 
 async def test_broadcast_beyond_attempt_threshold_is_failed(db_session: AsyncSession):
     tg_base = 997_750
-    operator = tg_base + 50
-    await create_committed_user(operator, "en", UserStatus.LEFT)  # reachable operator, not in the audience
+    admin = tg_base + 50
+    await create_committed_user(admin, "en", UserStatus.LEFT)  # reachable admin, not in the audience
     async with provisioned_broadcast(
-        tg_base,
+        tg_base,  # provisioned_broadcast makes tg_base the author
         status=BroadcastStatus.SENDING,
         attempts=MAX_BROADCAST_ATTEMPTS,  # this run bumps it over the threshold
         messages={"en": "hi"},
-        seed_users=[SeedUser(tg_base, "en")],
+        seed_users=[SeedUser(tg_base, "en")],  # the author is a reachable member
     ) as data:
         bot = RecordingBot()
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.run(make_api(bot), metrics, [operator])
+        await send_broadcasts.run(make_api(bot), metrics, [admin])
 
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
         assert broadcast.status is BroadcastStatus.FAILED
-        # The operator is told the broadcast failed, and no recipient was contacted.
-        assert bot.texts_to(tg_base) == []
+        # The failure summary goes to the author (author-first); no recipient was contacted, and the
+        # admin fallback is never reached because the author was.
         expected = BroadcastOperatorMessages.SENDER_FAILED.get(
             lang="en",
+            broadcast_id=data.broadcast_id,
             name=broadcast.name,
             attempts=MAX_BROADCAST_ATTEMPTS + 1,
             sent=0,
             failed=0,
             skipped=0,
         )
-        assert bot.texts_to(operator) == [expected.text]
+        assert bot.texts_to(tg_base) == [expected.text]
+        assert admin not in bot.sent_chat_ids
 
 
-async def test_summary_dm_reaches_operators_with_a_user(db_session: AsyncSession):
+async def test_summary_dm_reaches_the_author(db_session: AsyncSession):
     tg_base = 997_760
-    operator_with_user = tg_base + 50
-    operator_without_user = tg_base + 51
-    await create_committed_user(operator_with_user, "en", UserStatus.LEFT)
+    author = tg_base
+    recipient = tg_base + 1
+    admin = tg_base + 50
+    await create_committed_user(admin, "en", UserStatus.LEFT)
     async with provisioned_broadcast(
-        tg_base,
+        tg_base,  # provisioned_broadcast makes tg_base the author
         messages={"en": "hi"},
-        seed_users=[SeedUser(tg_base, "en")],
+        # The author has a user row but is LEFT, so they are not in the audience — keeping the body
+        # and the summary cleanly separated. A distinct member is the sole recipient.
+        seed_users=[SeedUser(author, "en", status=UserStatus.LEFT), SeedUser(recipient, "en")],
     ) as data:
         bot = RecordingBot()
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.run(make_api(bot), metrics, [operator_with_user, operator_without_user])
+        await send_broadcasts.run(make_api(bot), metrics, [admin])
 
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
         summary = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
             lang="en",
+            broadcast_id=data.broadcast_id,
             name=broadcast.name,
             total=1,
             sent=1,
@@ -427,9 +435,43 @@ async def test_summary_dm_reaches_operators_with_a_user(db_session: AsyncSession
                 lang="en", language="en", sent=1, failed=0, skipped=0
             ),
         )
-        assert bot.texts_to(operator_with_user) == [summary.text]
-        # The admin id with no user row is silently skipped — nothing is sent to it.
-        assert operator_without_user not in bot.sent_chat_ids
+        # The author gets the summary; the recipient gets only the body; the admin gets nothing.
+        assert bot.texts_to(author) == [summary.text]
+        assert bot.texts_to(recipient) == ["hi"]
+        assert admin not in bot.sent_chat_ids
+
+
+async def test_summary_dm_falls_back_to_admins_when_the_author_has_no_user_row(db_session: AsyncSession):
+    tg_base = 997_770
+    recipient = tg_base + 1
+    admin = tg_base + 50
+    await create_committed_user(admin, "en", UserStatus.LEFT)
+    async with provisioned_broadcast(
+        tg_base,  # tg_base is the author but is deliberately never seeded a user row
+        messages={"en": "hi"},
+        seed_users=[SeedUser(recipient, "en")],
+    ) as data:
+        bot = RecordingBot()
+        metrics = make_test_metrics_client()
+
+        await send_broadcasts.run(make_api(bot), metrics, [admin])
+
+        broadcast, _ = await fetch_broadcast(data.broadcast_id)
+        summary = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
+            lang="en",
+            broadcast_id=data.broadcast_id,
+            name=broadcast.name,
+            total=1,
+            sent=1,
+            failed=0,
+            skipped=0,
+            breakdown=BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(
+                lang="en", language="en", sent=1, failed=0, skipped=0
+            ),
+        )
+        # The author has no user row, so the summary falls back to the admin list.
+        assert bot.texts_to(admin) == [summary.text]
+        assert tg_base not in bot.sent_chat_ids
 
 
 async def test_capped_generic_error_fails_delivery_permanently_but_broadcast_still_completes(
@@ -458,7 +500,7 @@ async def test_capped_generic_error_fails_delivery_permanently_but_broadcast_sti
         bot = RecordingBot(generic_error={failing})
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, {"en": "hi"})
+        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, 2, {"en": "hi"})
 
         # The claim bumps the failing row to MAX_DELIVERY_ATTEMPTS, so its generic error resolves to
         # a permanent FAILED (not another retry); the reachable one resolves to SENT.
@@ -466,8 +508,17 @@ async def test_capped_generic_error_fails_delivery_permanently_but_broadcast_sti
         assert statuses[data.user_ids[failing]] is BroadcastDeliveryStatus.FAILED
         assert statuses[data.user_ids[reachable]] is BroadcastDeliveryStatus.SENT
         assert bot.sent_chat_ids == {reachable}
+        # The permanent failure surfaces as a live one-hot FAILED=1 during the drain (not at
+        # finalization, which no longer emits aggregate metrics).
+        MetricAssertions(metrics).assert_emitted(
+            name=MetricKey.BROADCAST_DELIVERY_FAILED, value=1, unit=MetricUnit.COUNT
+        )
 
-        await send_broadcasts.finalize_and_report(make_api(bot), metrics, [], data.broadcast_id, BroadcastStatus.DONE)
+        # No author DM here: the empty admin list is the fallback, and this synthetic author id has
+        # no user row, so finalization just rolls up counts and purges.
+        await send_broadcasts.finalize_and_report(
+            make_api(bot), metrics, [], tg_base, data.broadcast_id, BroadcastStatus.DONE
+        )
 
         broadcast, broadcast_messages = await fetch_broadcast(data.broadcast_id)
         assert broadcast.status is BroadcastStatus.DONE
@@ -475,9 +526,6 @@ async def test_capped_generic_error_fails_delivery_permanently_but_broadcast_sti
         assert broadcast.failed_count == 1
         assert {m.language: (m.sent_count, m.failed_count) for m in broadcast_messages} == {"en": (1, 1)}
         assert await fetch_deliveries(data.broadcast_id) == []
-        MetricAssertions(metrics).assert_emitted(
-            name=MetricKey.BROADCAST_MESSAGES_FAILED, value=1, unit=MetricUnit.COUNT
-        )
 
 
 async def test_not_found_recipient_is_skipped_and_marked_left(db_session: AsyncSession):
@@ -493,7 +541,7 @@ async def test_not_found_recipient_is_skipped_and_marked_left(db_session: AsyncS
         bot = RecordingBot(not_found={gone})
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, {"en": "hi"})
+        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, 1, {"en": "hi"})
 
         # BadRequest "not found" is a deleted account: skipped like a block, and the member is left.
         deliveries = await fetch_deliveries(data.broadcast_id)
@@ -531,7 +579,10 @@ async def test_network_error_leaves_broadcast_sending_for_the_next_run_to_finish
 
 async def test_recipient_receives_their_own_language_body(db_session: AsyncSession):
     tg_base = 997_710
-    spanish, english = tg_base, tg_base + 1
+    # tg_base is the (unseeded) author, so the finalization summary falls back to the empty admin
+    # list — no DM lands in the capture and the recipients' streams stay body-only. Recipients are
+    # distinct ids.
+    spanish, english = tg_base + 1, tg_base + 2
     async with provisioned_broadcast(
         tg_base,
         messages={"en": "EN body", "es_ES": "ES body"},
@@ -544,6 +595,7 @@ async def test_recipient_receives_their_own_language_body(db_session: AsyncSessi
         # Each recipient gets the body for their own language, not the English fallback.
         assert bot.texts_to(spanish) == ["ES body"]
         assert bot.texts_to(english) == ["EN body"]
+        assert tg_base not in bot.sent_chat_ids
         broadcast, broadcast_messages = await fetch_broadcast(data.broadcast_id)
         assert broadcast.status is BroadcastStatus.DONE
         assert {m.language: m.sent_count for m in broadcast_messages} == {"en": 1, "es_ES": 1}
@@ -567,11 +619,11 @@ async def test_orphaned_deliveries_from_a_crashed_claim_are_counted_separately(d
         bot = RecordingBot()
         metrics = make_test_metrics_client()
 
-        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, {"en": "hi"})
+        await send_broadcasts.send_all_pending(make_api(bot), metrics, data.broadcast_id, 2, {"en": "hi"})
         # The IN_PROGRESS row is never claimable again — only the still-PENDING one gets sent.
         assert bot.sent_chat_ids == {sent_tg}
 
-        summary, _ = await send_broadcasts.finalize_broadcast(data.broadcast_id, BroadcastStatus.DONE)
+        summary, _, _ = await send_broadcasts.finalize_broadcast(data.broadcast_id, BroadcastStatus.DONE)
 
         assert summary.sent == 1
         assert summary.orphaned == 1
@@ -594,7 +646,7 @@ async def test_terminal_failure_marks_never_attempted_pending_deliveries_as_fail
     ) as data:
         # No send_all_pending call — mirrors the terminal-failure path, which skips draining
         # entirely and goes straight to finalization.
-        summary, _ = await send_broadcasts.finalize_broadcast(data.broadcast_id, BroadcastStatus.FAILED)
+        summary, _, _ = await send_broadcasts.finalize_broadcast(data.broadcast_id, BroadcastStatus.FAILED)
 
         assert summary.failed == 1
         assert summary.sent == 0
@@ -610,7 +662,10 @@ async def test_delivery_renders_body_as_the_same_formatted_text_the_preview_uses
     """Preview/delivery parity: the sender delivers `parse_format_tags(body_html, {})` — the exact
     FormattedText the preview builds — so an operator `<a href>` link arrives as a text_link entity."""
     tg_base = 997_720
-    recipient = tg_base
+    # tg_base is the (unseeded) author, so no summary DM lands in the recipient's capture. RecordingBot
+    # records only text + entities (not the reply markup), so the Main Menu button does not affect
+    # the preview-parity comparison below.
+    recipient = tg_base + 1
     link_body = '<a href="https://mitup.social">join us</a>'
     async with provisioned_broadcast(
         tg_base,
@@ -739,7 +794,7 @@ async def test_transient_failure_at_the_attempt_cap_fails_permanently(db_session
         bot = RecordingBot(generic_error={failing})
 
         await send_broadcasts.send_all_pending(
-            make_api(bot), make_test_metrics_client(), data.broadcast_id, {"en": "hi"}
+            make_api(bot), make_test_metrics_client(), data.broadcast_id, 1, {"en": "hi"}
         )
 
         # The claim bumps attempt_count to the cap; a transient failure there is now permanent.
@@ -751,7 +806,10 @@ async def test_transient_failure_at_the_attempt_cap_fails_permanently(db_session
 
 async def test_flood_control_halts_mid_batch_releases_remainder_and_reclaims_after_window(db_session: AsyncSession):
     tg_base = 997_840
-    sent_first, flooded, released = tg_base, tg_base + 1, tg_base + 2
+    # tg_base is the (unseeded) author, so the finalization summary on the second run falls back to
+    # the empty admin list — no DM in the capture, keeping sent_chat_ids body-only. Recipients are
+    # distinct ids.
+    sent_first, flooded, released = tg_base + 1, tg_base + 2, tg_base + 3
     async with provisioned_broadcast(
         tg_base,
         status=BroadcastStatus.SENDING,

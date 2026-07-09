@@ -58,7 +58,7 @@ async def test_claim_next_broadcast_starts_queued(mock_session: MockDbSession):
 
     claimed = await claiming.claim_next_broadcast()
 
-    assert claimed == ClaimedBroadcast(broadcast_id=1, attempts=1, terminal_failure=False)
+    assert claimed == ClaimedBroadcast(broadcast_id=1, author_tg_id=999, attempts=1, terminal_failure=False)
     assert broadcast.status is BroadcastStatus.SENDING
     assert broadcast.sending_started_time is not None
 
@@ -69,7 +69,7 @@ async def test_claim_next_broadcast_resumes_sending_without_restamping(mock_sess
 
     claimed = await claiming.claim_next_broadcast()
 
-    assert claimed == ClaimedBroadcast(broadcast_id=2, attempts=2, terminal_failure=False)
+    assert claimed == ClaimedBroadcast(broadcast_id=2, author_tg_id=999, attempts=2, terminal_failure=False)
     assert broadcast.status is BroadcastStatus.SENDING
     assert broadcast.sending_started_time is None
 
@@ -104,18 +104,19 @@ async def test_materialize_audience_inserts_and_records_total(mock_session: Mock
     # count(before)=0 -> insert -> count(after)=4
     script_exec(mock_session, Result(results=(0,)), Result(), Result(results=(4,)))
 
-    total, freshly_materialized = await claiming.materialize_audience(5, ["en"])
+    total = await claiming.materialize_audience(5, ["en"])
 
-    assert (total, freshly_materialized) == (4, True)
+    assert total == 4
     assert broadcast.total_recipients == 4
 
 
 async def test_materialize_audience_is_idempotent_when_already_snapshotted(mock_session: MockDbSession):
     script_exec(mock_session, Result(results=(9,)))
 
-    total, freshly_materialized = await claiming.materialize_audience(5, ["en"])
+    total = await claiming.materialize_audience(5, ["en"])
 
-    assert (total, freshly_materialized) == (9, False)
+    # The frozen snapshot's total is returned unchanged, without re-inserting.
+    assert total == 9
 
 
 async def test_claim_pending_batch_resolves_claimed_rows(mock_session: MockDbSession):
