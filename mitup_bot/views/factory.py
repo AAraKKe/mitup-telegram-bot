@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import TYPE_CHECKING
 
+from mitup_bot import docs_links
 from mitup_bot.callback_data import CallbackData, DateCallbackData
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import (
@@ -60,7 +61,7 @@ def main_menu_view(ctx: RenderContext, *, message: str | FormattedText | None = 
         [
             ButtonConfig(
                 text=ButtonMessages.HELP.get(lang=lang),
-                url="https://mitup.social/user-guide/getting_started/",
+                url=docs_links.user_guide_url(),
             ),
             ButtonConfig(text=ButtonMessages.COLLABORATE.get(lang=lang), callback_data=cb.COLLABORATE),
         ],
@@ -105,7 +106,7 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
             ],
             [
                 ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS),
-                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), url="https://mitup.social/faq/privacy/"),
+                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), url=docs_links.privacy_url()),
             ],
             [
                 ButtonConfig(

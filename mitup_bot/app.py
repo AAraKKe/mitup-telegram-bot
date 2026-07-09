@@ -4,7 +4,7 @@ import structlog
 import uvicorn
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
-from mitup_bot import db, patreon, supporter, timezone_api
+from mitup_bot import db, docs_links, patreon, supporter, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
@@ -42,6 +42,8 @@ class MitupRuntime:
         # Adopt the merged free-tier limits so the supporter-tier policy resolves caps against the
         # deployed values.
         supporter.configure(self.config.limits)
+        # Point docs-site links at this environment's docs host, derived from the bot domain.
+        docs_links.configure(self.config.bot.domain)
         self.app = self.__build_application()
         # Metrics before db: the pool-metrics client emits through the process-global EMF
         # configuration, which must be in place before the db layer starts using it.

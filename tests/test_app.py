@@ -69,6 +69,7 @@ class RuntimeDeps:
     builder_instance: mock.MagicMock
     db: mock.MagicMock
     tz: mock.MagicMock
+    docs: mock.MagicMock
     metrics: mock.MagicMock
     registry: mock.MagicMock
 
@@ -95,6 +96,7 @@ def patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps]
         mock.patch("mitup_bot.app.Application.builder") as mock_builder,
         mock.patch("mitup_bot.app.db.configure_db") as mock_db,
         mock.patch("mitup_bot.app.timezone_api.configure") as mock_tz,
+        mock.patch("mitup_bot.app.docs_links.configure") as mock_docs,
         mock.patch("mitup_bot.app.configure_emf_backend") as mock_metrics,
         mock.patch("mitup_bot.app.HandlersRegistry") as mock_registry,
         mock.patch("mitup_bot.app.configure_logging") if stub_logging else contextlib.nullcontext(),
@@ -113,6 +115,7 @@ def patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps]
             builder_instance=builder_instance,
             db=mock_db,
             tz=mock_tz,
+            docs=mock_docs,
             metrics=mock_metrics,
             registry=mock_registry,
         )
@@ -174,6 +177,22 @@ def test_init_configures_timezone_api(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 
     patch_runtime_deps.tz.assert_called_once_with(runtime.config.google_api)
+
+
+def test_init_configures_docs_links_with_the_bot_domain(patch_runtime_deps: RuntimeDeps):
+    config = build_config(domain="bot.staging.mitup.social")
+
+    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+        MitupRuntime(Env.DEV)
+
+    patch_runtime_deps.docs.assert_called_once_with("bot.staging.mitup.social")
+
+
+def test_init_configures_docs_links_with_none_when_no_domain(patch_runtime_deps: RuntimeDeps):
+    # build_config defaults domain to None (polling mode), so the docs holder keeps its default.
+    MitupRuntime(Env.DEV)
+
+    patch_runtime_deps.docs.assert_called_once_with(None)
 
 
 def test_init_configures_metrics(patch_runtime_deps: RuntimeDeps):

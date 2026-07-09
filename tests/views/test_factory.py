@@ -2,6 +2,7 @@ import datetime as dt
 
 import pytest
 
+from mitup_bot import docs_links
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import parse_format_tags
@@ -153,6 +154,30 @@ def test_main_menu_view_appends_admin_button_for_admins(lang: str):
     ]
     # Everything above the admin row is identical to the non-admin keyboard.
     assert view.keyboard[:-1] == factory.main_menu_view(RenderContext(lang=lang)).keyboard
+
+
+def test_main_menu_view_help_button_links_to_the_configured_docs_site(lang: str, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(docs_links.DocsState, "base_url", "https://staging.mitup.social")
+
+    view = factory.main_menu_view(RenderContext(lang=lang))
+
+    help_button = ButtonConfig(
+        text=ButtonMessages.HELP.get(lang=lang), url="https://staging.mitup.social/user-guide/getting_started/"
+    )
+    all_buttons = [button for row in view.keyboard for button in row]
+    assert help_button in all_buttons
+
+
+def test_settings_view_privacy_button_links_to_the_configured_docs_site(lang: str, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(docs_links.DocsState, "base_url", "https://staging.mitup.social")
+
+    view = factory.settings_view(RenderContext(lang=lang))
+
+    privacy_button = ButtonConfig(
+        text=ButtonMessages.PRIVACY.get(lang=lang), url="https://staging.mitup.social/faq/privacy/"
+    )
+    all_buttons = [button for row in view.keyboard for button in row]
+    assert privacy_button in all_buttons
 
 
 def test_admin_menu_view(lang: str):
