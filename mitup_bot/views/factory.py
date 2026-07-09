@@ -58,7 +58,10 @@ def main_menu_view(ctx: RenderContext, *, message: str | FormattedText | None = 
             ButtonConfig(text=ButtonMessages.SETTINGS.get(lang=lang), callback_data=cb.SETTINGS),
         ],
         [
-            ButtonConfig(text=ButtonMessages.HELP.get(lang=lang), callback_data=cb.HELP),
+            ButtonConfig(
+                text=ButtonMessages.HELP.get(lang=lang),
+                url="https://mitup.social/user-guide/getting_started/",
+            ),
             ButtonConfig(text=ButtonMessages.COLLABORATE.get(lang=lang), callback_data=cb.COLLABORATE),
         ],
     ]
@@ -102,7 +105,7 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
             ],
             [
                 ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS),
-                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY),
+                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), url="https://mitup.social/faq/privacy/"),
             ],
             [
                 ButtonConfig(

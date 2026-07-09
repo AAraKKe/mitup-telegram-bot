@@ -46,13 +46,13 @@ The buttons represent all actions you can take in Mitup. There are no slash comm
 
 Available actions:
 
-* *➕ New meeting*{.button-like}: Create a new meeting, configure it, and share. See [Create a meeting](create_meeting.md).
+* *➕ New meeting*{.button-like}: Create a new meeting, configure it, and share. See [Create a meeting](create_a_meeting.md).
 * *📂 Your active meetings*{.button-like}: Meetings you've created that are still active. Meetings become inactive a set time after they happen.
 * *💾 Your past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
-* *👥 Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find an event you were sent but can't locate the original message. You can view these but not edit them.
-* *⚙️ Settings*{.button-like}: Configure Mitup. See [Configure Mitup](configuration.md).
-* *❓ Help*{.button-like}: Links within the bot and support access.
-* *♥ Collaborate*{.button-like}: Support Mitup financially, contribute code, or translate. See [Support Mitup](../collaborate/supporter.md).
+* *👥 Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find a meeting you were sent but can't locate the original message. You can view these but not edit them.
+* *⚙️ Settings*{.button-like}: Configure Mitup. See [Settings](settings.md).
+* *❓ Help*{.button-like}: Opens the [user guide](getting_started.md) on this site in your browser.
+* *♥ Collaborate*{.button-like}: Support Mitup on Patreon and link your Patreon account, which switches on your Host badge and higher limits. See [supporting Mitup](../collaborate/donation.md) and [limits and Host perks](limits.md).
 
 !!! info "Meeting lifecycle"
 

@@ -78,11 +78,11 @@ Each section is one kind of relationship the bot has with your data: from "we ho
     <div class="tldr-rows">
       <div class="tldr-row">
         <div class="tldr-row__label">Meetings you've created</div>
-        <div class="tldr-row__why">The events you've made, with their title, time, options, and RSVP list.</div>
+        <div class="tldr-row__why">The meetings you've made, with their title, time, options, and RSVP list.</div>
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Meetings you've joined</div>
-        <div class="tldr-row__why">The events others invited you to and whether you accepted, declined, or are on the waiting list.</div>
+        <div class="tldr-row__why">The meetings others invited you to and whether you accepted, declined, or are on the waiting list.</div>
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Meeting locations</div>
@@ -94,7 +94,31 @@ Each section is one kind of relationship the bot has with your data: from "we ho
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Who invited you</div>
-        <div class="tldr-row__why">Record of which member invited you to a meeting.</div>
+        <div class="tldr-row__why">Record of which participant invited you to a meeting.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tldr-card tldr--stored">
+    <header class="tldr-card__head">
+      <div>
+        <h3>If you link Patreon</h3>
+        <p>Only exists when you link your Patreon account through the bot's Collaborate screen, to back Mitup as a Host. Unlinking removes it immediately.</p>
+      </div>
+      <span class="tldr-pill"><span class="dot"></span>Stored</span>
+    </header>
+    <div class="tldr-rows">
+      <div class="tldr-row">
+        <div class="tldr-row__label">Patreon account ID</div>
+        <div class="tldr-row__why">Matches your Telegram account to your Patreon membership. Just the numeric ID, nothing else from your Patreon profile.</div>
+      </div>
+      <div class="tldr-row">
+        <div class="tldr-row__label">Host tier</div>
+        <div class="tldr-row__why">Which supporter tier you're on, so your badge and limits are right.</div>
+      </div>
+      <div class="tldr-row">
+        <div class="tldr-row__label">Support end date</div>
+        <div class="tldr-row__why">When your current membership period runs out, so your perks switch off at the right time.</div>
       </div>
     </div>
   </section>
@@ -111,6 +135,10 @@ Each section is one kind of relationship the bot has with your data: from "we ho
       <div class="tldr-row">
         <div class="tldr-row__label">Location pin<span class="tldr-row__sub">timezone setup only</span></div>
         <div class="tldr-row__why">Sent to Google for a timezone lookup, then thrown away. Never stored.</div>
+      </div>
+      <div class="tldr-row">
+        <div class="tldr-row__label">Patreon sign-in tokens<span class="tldr-row__sub">linking only</span></div>
+        <div class="tldr-row__why">Used once during linking to confirm which Patreon account is yours, then discarded. Never stored.</div>
       </div>
     </div>
   </section>
@@ -149,7 +177,7 @@ Each section is one kind of relationship the bot has with your data: from "we ho
 
 ## How location handling works
 
-When you set up your timezone, you can type a city name or send a Telegram location pin. We use the Google Maps APIs to look up your timezone from either the text or the coordinates. Here's exactly what happens in each case:
+When you set up your timezone, you can type a city name or send a Telegram location pin. We use the Google Maps APIs to look up your timezone from either the text or the location pin's coordinates (its latitude and longitude). Here's exactly what happens in each case:
 
 !!! note "Setting timezone from a pin"
     1. Coordinates arrive over Telegram's API.
@@ -169,19 +197,35 @@ When you set up your timezone, you can type a city name or send a Telegram locat
 
 In both cases, the Google Maps lookups are stateless queries that cannot be tied back to you by us. We send only the city name or coordinates needed for the lookup. We never send your Telegram ID, name, or any other profile information.
 
+## How Patreon linking works
+
+Backing Mitup on Patreon is optional, and so is telling the bot about it. If you want your Host badge and higher limits, you link your Patreon account through *♥ Collaborate*{.button-like} in the main menu:
+
+1. The bot sends you to Patreon, where you approve the connection on Patreon's own page.
+2. Patreon hands the bot a one-time sign-in token. The bot uses it once, to ask Patreon "which account is this, and are they a member of the Mitup campaign?", then discards it.
+3. The bot saves your numeric Patreon account ID, your tier, and when your current membership period ends. That is the whole record.
+
+We never see your payment details, your card, your address, or your Patreon email. Payment stays entirely between you and Patreon. Unlinking from the same Collaborate screen deletes the link record immediately and returns your account to the free limits.
+
+## Why we're allowed to process this
+
+For the GDPR-minded, the legal bases are the boring ones:
+
+* **Performing the service you asked for** covers everything in the tables above: your Telegram identity, your preferences, your meetings and RSVPs, and the Patreon link you set up yourself.
+* **Legitimate interest** covers operational logs and keeping the bot safe and running.
+* Nothing is processed for advertising, profiling, or sale. There is no basis to look for because the processing doesn't exist.
+
 ## How long we keep your data
 
 **Your user record** persists while you're an active Mitup user. If you were once a member and then block the bot (or if a message we send to you fails), we set a flag on your account. A cleanup job runs periodically and deletes all flagged users, which cascades to your settings, owned meetings, and RSVPs.
 
 If you joined a meeting via someone else's group message without ever opening the bot directly, your record exists only for the lifetime of those meetings and is removed when they end.
 
-**Meetings you own:** once a meeting's end time plus your configured timeout has passed, the meeting is marked inactive. (If a meeting has no datetime set, it's marked inactive one year after creation.) When a meeting goes inactive, invited-only users (people who were added to the meeting but don't have a Mitup account themselves) are deleted, and so are the meeting's messages.
-
-After 173 days of inactivity, you'll receive a notification that the meeting will be permanently deleted in 7 days. You can reactivate it at any point during the 180-day window to reset the clock. After 180 days of inactivity, the meeting is permanently deleted automatically (including all RSVPs).
-
 **Meetings you're invited to** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed.
 
-**Explicit deletion:** if you delete a meeting directly, it's removed immediately with no grace period.
+**Meetings you own:** when a meeting becomes inactive, how long it's kept afterward, and when it's permanently deleted are covered on the [Meeting lifecycle](../user-guide/meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page.
+
+**Your Patreon link** exists only while you keep it. Unlink from the Collaborate screen and the record is deleted on the spot. Deleting your user record removes it too.
 
 ## Your rights and how to exercise them
 
@@ -189,19 +233,21 @@ After 173 days of inactivity, you'll receive a notification that the meeting wil
 
 **Rectification.** Edit your display name, language, or timezone directly in the bot's settings menu. For other corrections, email us.
 
-**Erasure.** Tap *🛡️ Privacy*{.button-like} from the main menu. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your user record, every meeting you own, and every RSVP you've made are removed permanently within seconds.
+**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}. You'll see a "Delete my data" button. Tap it and confirm twice. Once confirmed, your user record, every meeting you own, every RSVP you've made, and your Patreon link are removed permanently within seconds. You can also request deletion by email.
 
 **Portability.** Email `privacy@mitup.social` and we'll send your data as JSON, formatted for import into another system if you wish.
 
 **Right to object.** If you believe Mitup is processing your data unfairly, email us.
 
-**No legal entity.** Mitup is maintained by individuals, not a registered company. There is no formal data controller structure. If you have concerns the maintainers don't resolve, you can raise a complaint via email or by opening an issue in the [GitLab repository](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues).
+**Complaints.** If you believe your rights have been infringed, you can also lodge a complaint with your local data protection supervisory authority. In the EU, that's the authority of the country you live in.
+
+**Who the controller is.** Mitup is maintained by individuals, not a registered company. The maintainers decide what data is collected and why, which makes them the data controller in GDPR terms. If you have concerns the maintainers don't resolve, you can raise them via email or by opening an issue in the [GitLab repository](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues).
 
 ## Security
 
 **In transit.** All communication between your client and Mitup's servers uses TLS encryption.
 
-**At rest.** Mitup's database is a managed PostgreSQL instance on AWS. Storage is encrypted at rest with an AWS-managed key. Database backups are retained for 7 days. A final snapshot is taken if the instance is ever destroyed. There is no cross-region replication.
+**At rest.** Mitup's database is a managed PostgreSQL instance on AWS, in the Ireland region (eu-west-1), inside the EU. Storage is encrypted at rest with an AWS-managed key. Database backups are retained for 7 days. A final snapshot is taken if the instance is ever destroyed. There is no cross-region replication.
 
 **Secrets management.** API keys and database credentials live in AWS Systems Manager Parameter Store (SecureString), not in code. Access is gated by IAM.
 
@@ -213,7 +259,8 @@ Mitup shares your data only with:
 
 * **Telegram.** The bot sends messages to your account and receives messages from you via Telegram's infrastructure.
 * **Google (Google Maps Platform).** When you set up your timezone or attach a location to a meeting, we use the Google Maps Time Zone API to resolve coordinates into an IANA timezone string. When you type an address rather than sending a pin, we also use the Google Maps Geocoding API to resolve that address into coordinates. We send only the address text or the coordinates themselves. We never send your Telegram ID, your name, or any other piece of your profile. Google receives a one-off lookup query that cannot be tied back to you by us.
-* **AWS.** Your data lives on managed AWS services (ECS where the bot runs, RDS for the Postgres database, Lambda for migrations, SSM Parameter Store for secrets, CloudWatch for operational logs, S3 and CloudFront for this documentation site). AWS is an infrastructure provider, not a data processor in the GDPR sense. We control what data is stored and how it's used.
+* **Patreon.** Only if you link your Patreon account. The bot asks Patreon for your account ID and your membership status in the Mitup campaign, nothing more. Your pledge, payment method, and billing details live on Patreon and never reach the bot. See [how Patreon linking works](#how-patreon-linking-works).
+* **AWS.** Your data lives on managed AWS services in the EU (ECS where the bot runs, RDS for the Postgres database, Lambda for migrations, SSM Parameter Store for secrets, CloudWatch for operational logs, S3 and CloudFront for this documentation site). AWS processes that data on our behalf as an infrastructure provider, under AWS's standard GDPR data processing addendum. We decide what is stored and how it's used.
 
 No analytics firms, ad networks, or third-party tracking services have access to your data.
 
@@ -235,7 +282,7 @@ Material changes to this policy will be announced via a notice in the bot's main
 
 ---
 
-**Last revised:** May 24, 2026
+**Last revised:** July 9, 2026
 
 ---
 

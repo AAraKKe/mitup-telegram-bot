@@ -4,88 +4,86 @@ icon: material/gift-outline
 
 # Supporting Mitup financially
 
-Your contribution keeps the bot online. It pays for hosting, domains, the email infrastructure that sends reminders, and the occasional pizza for whoever's debugging migrations at 1am.
+Your contribution keeps the bot online. It pays for the servers, the database, the domain, and the occasional pizza for whoever's debugging migrations at 1am.
 
-## Become a Patreon member
+## Become a Host on Patreon
 
-Mitup is funded by a community of monthly members on Patreon. Every member, regardless of tier, gets credited in the changelog (opt-out available) and joins the patrons-only community channel.
+Mitup is funded by monthly members on Patreon. We call them Hosts. Every Host gets a badge next to their name in Mitup and a seat in the members-only Telegram group, and the two bigger tiers raise the [limits](../user-guide/limits.md) on your account.
+
+[:fontawesome-brands-patreon: Become a Host on Patreon](https://www.patreon.com/cw/MitupBot/membership){.md-button .md-button--primary}
+
+!!! warning "Pledging alone doesn't switch your perks on"
+
+    Patreon doesn't tell the bot who you are. After you join, link your Patreon account through
+    *♥ Collaborate*{.button-like} in the bot. Your badge and limits only turn on once the two
+    accounts are linked. [How the perks turn on](#how-the-perks-turn-on) walks through it.
 
 <div class="patreon-tiers" markdown>
 
 <div class="patreon-tier" markdown>
-<div class="tier-name">Friend</div>
+<div class="tier-name">Brewer</div>
 <div class="tier-amt">€3<span class="per">/ month</span></div>
-<div class="tier-tag">Covers a day of hosting</div>
+<div class="tier-tag">Casual catch-ups and coffee dates</div>
 </div>
 
 <div class="patreon-tier featured" markdown>
-<div class="tier-name">Supporter · most picked</div>
-<div class="tier-amt">€7<span class="per">/ month</span></div>
-<div class="tier-tag">A meaningful chunk of hosting</div>
+<div class="tier-name">Gamemaster</div>
+<div class="tier-amt">€5<span class="per">/ month</span></div>
+<div class="tier-tag">Recurring game nights</div>
 </div>
 
 <div class="patreon-tier" markdown>
-<div class="tier-name">Patron</div>
-<div class="tier-amt">€15<span class="per">/ month</span></div>
-<div class="tier-tag">Funds a feature ship</div>
+<div class="tier-name">Commissioner</div>
+<div class="tier-amt">€10<span class="per">/ month</span></div>
+<div class="tier-tag">The whole neighborhood league</div>
 </div>
 
 </div>
-
-[:fontawesome-solid-heart: Open Mitup on Patreon](#){.md-button .md-button--primary} <!-- TODO: replace # with the live Patreon URL -->
 
 ### What each tier includes
 
-**Friend (€3/mo)**
+**Brewer (€3/mo)**
 
-* Credit in the changelog
-* Patrons-only Telegram channel
+* A Brewer badge next to your name in Mitup
+* The members-only Telegram group
 * The warm fuzzies, monthly
 
-**Supporter (€7/mo)**: everything in Friend, plus:
+The Brewer tier keeps the same [limits](../user-guide/limits.md) as a free account. It's for backing the bot, not for unlocking it.
 
-* Vote on the public roadmap
-* Early access to new features
-* Quarterly maintainer Q&A
+**Gamemaster (€5/mo)**: everything in Brewer, with a Gamemaster badge and room to run a regular series:
 
-**Patron (€15/mo)**: everything in Supporter, plus:
+* Up to 50 active meetings at once, instead of 5
+* Schedule up to a year ahead, instead of 90 days
+* No participant cap on your meetings, instead of 20
 
-* Your name on the contributors page
-* Direct line to the maintainer
-* Quarterly behind-the-scenes letter
+**Commissioner (€10/mo)**: everything in Gamemaster, with a Commissioner badge and the limits gone entirely:
 
-Want to pledge an amount that isn't on this list? Patreon lets you customise. Pick any tier and adjust upward.
+* Unlimited active meetings, scheduled as far ahead as you like
+* Propose and vote on new features
+
+Patreon also lets you pledge a custom amount. You get the highest tier your pledge reaches.
+
+## How the perks turn on
+
+1. Pick a tier on [the Mitup Patreon page](https://www.patreon.com/cw/MitupBot/membership).
+2. Open [@mitupbot](https://t.me/mitupbot) and tap *♥ Collaborate*{.button-like} in the main menu.
+3. Tap the button to link your Patreon account. Patreon asks you to confirm, then sends you back.
+4. That's the whole setup. Your badge and limits follow your Patreon membership automatically: pledge and they turn on, and it works in either order, so you can link first and become a member later.
+
+You can unlink your Patreon account from the same screen whenever you want. Unlinking removes the connection right away and your account goes back to the free limits.
 
 ## Where your money goes
 
-| | What for |
-|---|---|
-| **~62%** | Servers, managed Postgres, and the email infrastructure for reminders |
-| **~18%** | Domains, monitoring, backups, and SSL |
-| **~15%** | Translator stipends and Crowdin subscription |
-| **~5%**  | Patreon fees + payment processing |
+Everything goes into running the bot. Nobody draws a salary. The bill is mostly:
 
-100% goes back into the project. No salaries, no marketing budgets.
-
-## Other ways to give
-
-If a recurring Patreon pledge isn't your thing, there are other paths:
-
-### Telegram Stars
-
-The simplest one-off way to support: tap *♥ Collaborate*{.button-like} from the main menu inside the bot and choose a Stars amount.
-
-### Telegram Payments
-
-Donate directly via the bot using Telegram's built-in payment system. Same menu, same flow.
-
-### PayPal (one-off)
-
-For one-time PayPal donations, [visit our PayPal page](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=3HJ8U8SZ9BAXE).
+* The server the bot runs on
+* The managed Postgres database that holds every meeting and RSVP
+* Monitoring and alerting, so someone finds out before you do when the bot misbehaves
+* The mitup.social domain and this site
 
 ## Not into giving money?
 
-That's totally fine. There are other ways to help that matter just as much:
+That's fine. There are other ways to help that matter just as much:
 
 * [**Translate**](translator.md) Mitup into your language on Crowdin
 * [**Contribute code**](code_contributor.md) via GitLab

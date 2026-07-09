@@ -13,7 +13,7 @@ Help bring Mitup to people in your language. Language shouldn't be a barrier to 
 3. Select your language.
 4. Start translating strings that need help.
 
-No translation experience required. Just fluency in your target language and basic English.
+No translation experience required. Fluency in your target language and basic English is enough.
 
 ## Guidelines
 
@@ -26,6 +26,6 @@ When translating:
 
 ## Why it matters
 
-Every new language makes Mitup accessible to millions more people. Your work directly grows the Mitup community and makes it more inclusive.
+Every new language lets another group of friends use Mitup in the words they already speak. Your work is what grows the community beyond the languages it covers today.
 
 Have questions? Join the [community chat](https://t.me/mitup_community).

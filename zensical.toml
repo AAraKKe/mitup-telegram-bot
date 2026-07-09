@@ -9,32 +9,41 @@ extra_css = [
 ]
 
 nav = [
-  { "MitupBot" = "index.md" },
-  { "User Guide" = [
-    { "Getting Started" = "user-guide/getting_started.md" },
-    { "Main Menu" = "user-guide/main_menu.md" },
-    { "Mitup Configuration" = "user-guide/configuration.md" },
-    { "Create a Meeting" = "user-guide/create_meeting.md" },
-    { "Configure a Meeting" = "user-guide/configure_meeting.md" },
-    { "Meeting Lifecycle" = "user-guide/meeting_lifecycle.md" },
+  { "Home" = "index.md" },
+  { "User guide" = [
+    { "Getting started" = "user-guide/getting_started.md" },
+    { "The main menu" = "user-guide/main_menu.md" },
+    { "Create a meeting" = "user-guide/create_a_meeting.md" },
+    { "Meeting settings" = "user-guide/meeting_settings.md" },
+    { "Sharing and joining" = "user-guide/sharing_and_joining.md" },
+    { "Meeting lifecycle" = "user-guide/meeting_lifecycle.md" },
+    { "Your settings" = "user-guide/settings.md" },
+    { "Limits and Host perks" = "user-guide/limits.md" },
   ] },
   { "FAQ" = [
     { "Privacy" = "faq/privacy.md" },
+    { "Troubleshooting" = "faq/troubleshooting.md" },
     { "About us" = "faq/about.md" },
   ] },
   { "Contribute" = [
-    { "Being a supporter" = "collaborate/supporter.md" },
-    { "Donation" = "collaborate/donation.md" },
-    { "Become a Translator" = "collaborate/translator.md" },
-    { "Code contributor" = [
-      { "Overview" = "collaborate/code_contributor.md" },
-      { "Setup" = "contribute/setup.md" },
-      { "Making Contributions" = "contribute/making_contributions.md" },
-      { "Local Validation" = "contribute/local_validation.md" },
-      { "Commit Message Format" = "contribute/commit_message_format.md" },
-      { "Logging" = "contribute/logging.md" },
+    { "Help out" = [
+      { "Ways to support" = "collaborate/donation.md" },
+      { "Translate Mitup" = "collaborate/translator.md" },
+      { "Code of conduct" = "collaborate/code_of_conduct.md" },
     ] },
-    { "Code of Conduct" = "collaborate/code_of_conduct.md" },
+    { "Developer handbook" = [
+      { "Overview" = "collaborate/code_contributor.md" },
+      { "Architecture" = "contribute/architecture.md" },
+      { "Where things live" = "contribute/project_layout.md" },
+      { "Setup" = "contribute/setup.md" },
+      { "Adding a handler" = "contribute/adding_a_handler.md" },
+      { "Data and migrations" = "contribute/data_and_migrations.md" },
+      { "Testing and validation" = "contribute/testing.md" },
+      { "Making contributions" = "contribute/making_contributions.md" },
+      { "Working with agents" = "contribute/working_with_agents.md" },
+      { "Logging" = "contribute/logging.md" },
+      { "Commit format" = "contribute/commit_message_format.md" },
+    ] },
   ] },
 ]
 

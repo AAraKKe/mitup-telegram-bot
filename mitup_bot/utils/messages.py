@@ -103,7 +103,6 @@ class ButtonMessages(MessageBase):
     DELETE = f"{Emojis.DELETE} Delete"
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
-    CHAT = f"{Emojis.CHAT} Chat"
     MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
     MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"
     MEETING_MAX_PARTICIPANTS = "Max participants"
@@ -274,9 +273,6 @@ class SettingsMessages(MessageBase):
         "even if those friends are not in Telegram.\n\n"
         "<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
         "Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-        "<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. "
-        "If you don't need this information displayed on the meeting message you can disable it here. "
-        "This will also disable the <i>Timezone</i> button shown when the meeting is shared.\n\n"
         "<b>Lock on start</b>: when enabled and a meeting has a duration set, "
         "participants cannot join or leave once the meeting starts. "
         "When disabled, participants can still join or leave freely."
@@ -378,7 +374,7 @@ class MeetingJoinMessages(MessageBase):
     JOIN_FULL_WAITING_LIST = "The meeting is full. You have been added to the waiting list."
     JOIN_UNREGISTERED = (
         "You have joined the meeting, ${user}! "
-        "It seems you have never used Mitup before, open a chat with @mitupbot to be "
+        "It seems you have never used Mitup before, open a chat with @mitupbot to "
         "receive notifications and create new meetings!"
     )
     LEAVE_SUCCESS = "You have left the meeting"
@@ -550,10 +546,7 @@ class MeetingEditSettingsMessages(MessageBase):
         "<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends "
         "even if those friends are not in Telegram.\n\n"
         "<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
-        "Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-        "<b>Show timezone</b>: meetings usually include the timezone the date and time refers of the meeting to. "
-        "If you don't need this information displayed on the meeting message you can disable it here. "
-        "This will also disable the <i>Timezone</i> button shown when the meeting is shared."
+        "Only the number of participants will be shown. You will still be able to see the participants."
     )
 
 

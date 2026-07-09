@@ -2,77 +2,29 @@
 icon: material/account-group-outline
 ---
 
-# About us
+# About Mitup
 
-## Founders
+Mitup is a Telegram bot for organising meetups with friends. You create a meeting, share one message, and the bot keeps track of who's coming. No group spreadsheet, no third bot in the chat, no "can everyone confirm by Friday" thread.
 
-<!-- TODO: replace with real portraits. Drop JPGs at docs/assets/images/maintainers/. -->
+## Why it exists
 
-<div class="grid" markdown>
+Sorting out a brunch, a climbing trip, or a board-game night in a group chat is noisy. The message with the details scrolls away, half the replies are reactions, and nobody's sure who actually said yes.
 
-![Founder portrait placeholder](assets/images/maintainers/founder-1.jpg)
+Mitup moves that part into a private chat between you and the bot. You set the title, the time, and the options, and Mitup posts a card your friends can join with a tap. RSVPs, the waiting list, reminders, and timezones are handled for you, so the group chat stays a group chat.
 
-**[Founder Name 1]**
+## How it's built
 
-[Tagline about role / what they bring]
+Mitup lives inside Telegram and runs as a private DM with each person. It never joins your group, and it only sees the commands and replies sent straight to it. The [privacy page](privacy.md) spells out exactly what that means for your data.
 
----
+The bot is open source under the MIT license, written in Python, and developed in the open on GitLab. If you want to see how any of it works, the code is at [gitlab.com/meetupbot/mitup-telegram-bot](https://gitlab.com/meetupbot/mitup-telegram-bot).
 
-![Founder portrait placeholder](assets/images/maintainers/founder-2.jpg)
-
-**[Founder Name 2]**
-
-[Tagline about role / what they bring]
-
-</div>
-
-## Our story
-
-[How the project started: the year, the problem you set out to solve]
-
-[Why Telegram and not something else]
-
-[What changed once people started using it]
-
-[Where the project is today and where it's headed]
-
-## Maintainers
-
-The Mitup project is maintained by a small group of people who care about keeping the bot reliable and the community thriving.
-
-<!-- TODO: populate via GitLab Members API. Until then, listed manually. -->
-
-<div class="grid cards" markdown>
-
-* Avatar or initials
-
-    ---
-    **[Maintainer Name 1]**
-
-    [GitLab handle / role]
-
-* Avatar or initials
-
-    ---
-    **[Maintainer Name 2]**
-
-    [GitLab handle / role]
-
-* Avatar or initials
-
-    ---
-    **[Maintainer Name 3]**
-
-    [GitLab handle / role]
-
-</div>
+Mitup is free to use, with no ads. It's maintained by a small group of volunteers, and it stays online thanks to the people who back it on Patreon; backing it also raises the [limits](../user-guide/limits.md) on your account. If you'd like to help cover hosting, the [supporting Mitup](../collaborate/donation.md) page has the details.
 
 ## Get involved
 
-Mitup is a community-driven project. Whether you code, translate, report bugs, or spread the word, you're helping.
+Mitup is a community project. Whether you write code, translate, or report bugs, there's a place to help.
 
-[**Contribute code →**](../collaborate/code_contributor.md) Start with the contributor guide.
+* [Contribute code](../collaborate/code_contributor.md): the project is Python and Postgres, with good-first-issues tagged on GitLab.
+* [Translate Mitup](../collaborate/translator.md): help bring the bot to your language on Crowdin.
 
-[**Translate →**](../collaborate/translator.md) Help bring Mitup to your language on Crowdin.
-
-We also follow a [Code of Conduct](../collaborate/code_of_conduct.md) that all contributors agree to uphold.
+Everyone who takes part agrees to the [code of conduct](../collaborate/code_of_conduct.md).

@@ -6,7 +6,7 @@ icon: material/source-commit
 
 Please review our [Code of Conduct](../collaborate/code_of_conduct.md) before participating.
 
-While this page details the process for code submissions, you can find other ways to help in the [Being a Supporter guide](../collaborate/supporter.md).
+While this page details the process for code submissions, you can find other ways to help on the [supporting Mitup page](../collaborate/donation.md).
 
 To contribute changes to this project, please follow these steps:
 
@@ -31,7 +31,7 @@ Fork the repository to your own namespace and clone it locally to begin developm
 
 Create a new branch for your changes. Name the branch starting with the issue number followed by a descriptive name (e.g., `123-fix-validation-logic`). This helps automatically link the branch and subsequent merge request to the issue in GitLab.
 
-Before committing your changes, ensure you have completed the [Setup steps](setup.md) and that `pre-commit` hooks are installed and running correctly. This step performs local validation checks (like linting and formatting) automatically when you commit, simplifying the review process. We also recommend running the full set of [Local Validation checks](local_validation.md) before opening a Merge Request.
+Before committing your changes, ensure you have completed the [Setup steps](setup.md) and that `pre-commit` hooks are installed and running correctly. This step performs local validation checks (like linting and formatting) automatically when you commit, simplifying the review process. We also recommend running the full set of [testing and validation checks](testing.md) before opening a Merge Request.
 
 Implement the required changes in your local repository. Commit your work with clear, concise messages that follow the [Conventional Commits standard](https://www.conventionalcommits.org/en/v1.0.0/). This repository uses a custom commit message formatter that automatically transforms your commits into an emoji-based format. See the [Commit Message Format guide](commit_message_format.md) for detailed information on how to write commits and what transformations are applied. The formatter is enforced by a `pre-commit` hook defined in the [`.pre-commit-config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.pre-commit-config.yaml) file, and the specific types supported are configured in the [`commits_check_config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/commits_check_config.yaml) file.
 

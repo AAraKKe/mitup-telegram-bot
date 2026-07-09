@@ -137,9 +137,6 @@ msgstr "✏️ Editar"
 msgid "ButtonMessages.SHARE"
 msgstr "📨 Compartilhar"
 
-msgid "ButtonMessages.CHAT"
-msgstr "💬 Conversa"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Nome"
 
@@ -230,7 +227,6 @@ msgstr "Aqui você pode configurar as opções padrão usadas ao criar um evento
 "<b>Público</b>: ative isso para permitir que todos que recebam o evento o compartilhem novamente. Perfeito para alcançar mais pessoas.\n\n"
 "<b>Convites abertos</b>: ative essa opção para permitir que os usuários que se juntaram ao evento adicionem amigos mesmo que não estejam no Telegram.\n\n"
 "<b>Incógnito</b>: um evento com incógnito ativado não mostrará as pessoas que se juntaram ao evento quando compartilhado. Apenas o número de participantes será mostrado. Você ainda poderá ver os participantes.\n\n"
-"<b>Mostrar fuso horário</b>: os eventos geralmente incluem o fuso horário ao qual a data e a hora se referem. Se não precisar dessa informação exibida na mensagem do evento, poderá desativá-la aqui. Isso também desativará o botão <i>Fuso horário</i> mostrado quando o evento é compartilhado.\n\n"
 "<b>Bloquear ao iniciar</b>: quando ativado e um evento tem uma duração definida, os participantes não podem entrar ou sair assim que o evento começa. Quando desativado, os participantes ainda podem entrar ou sair livremente."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
@@ -534,8 +530,7 @@ msgstr "Você pode configurar diferentes aspectos do seu evento:\n\n"
 "<b>Lista de espera</b>: permite que usuários se juntem ao evento mesmo quando está cheio. Os usuários que se juntarem quando está cheio serão adicionados a uma lista de espera e adicionados à lista de participantes assim que um espaço ficar disponível na ordem em que se juntaram.\n\n"
 "<b>Público</b>: ative isso para permitir que todos que recebam o evento o compartilhem novamente. Perfeito para alcançar mais pessoas.\n\n"
 "<b>Convites abertos</b>: ative essa opção para permitir que os usuários que se juntaram ao evento adicionem amigos mesmo que não estejam no Telegram.\n\n"
-"<b>Incógnito</b>: um evento com incógnito ativado não mostrará as pessoas que se juntaram ao evento quando compartilhado. Apenas o número de participantes será mostrado. Você ainda poderá ver os participantes.\n\n"
-"<b>Mostrar fuso horário</b>: os eventos geralmente incluem o fuso horário ao qual a data e a hora se referem. Se não precisar dessa informação exibida na mensagem do evento, poderá desativá-la aqui. Isso também desativará o botão <i>Fuso horário</i> mostrado quando o evento é compartilhado."
+"<b>Incógnito</b>: um evento com incógnito ativado não mostrará as pessoas que se juntaram ao evento quando compartilhado. Apenas o número de participantes será mostrado. Você ainda poderá ver os participantes."
 
 msgid "MeetingListMessages.ACTIVE_EMPTY"
 msgstr "Você ainda não tem nenhum evento.\n\n"

@@ -46,12 +46,12 @@ class ButtonConfig(BaseModel):
     @model_validator(mode="after")
     def validate_exactly_one_action(self) -> Self:
         action_count = sum(
-            f is not None
-            for f in [
+            action_field is not None
+            for action_field in [
                 self.callback_data,
+                self.url,
                 self.switch_inline_query,
                 self.switch_inline_query_current_chat,
-                self.url,
             ]
         )
         if action_count != 1:

@@ -4,7 +4,7 @@ icon: material/format-text
 
 # Commit message format
 
-Mitup uses a custom commit message formatter that automatically transforms your commits into a consistent, emoji-based format for a more readable history.
+Mitup rewrites your commit messages into a consistent, emoji-prefixed format so the history stays easy to scan.
 
 ## How it works
 
@@ -42,7 +42,7 @@ Type[(scope)][!]: description
 
 **Type** (required):
 
-* Case-insensitive (use `feat`, `Feat`, or `FEAT` - all work)
+* Case-insensitive: `feat`, `Feat`, and `FEAT` all work
 * Will be replaced with the corresponding emoji
 * Must be one of the [allowed types](#allowed-commit-types)
 
@@ -52,7 +52,7 @@ Type[(scope)][!]: description
 * Should be lowercase
 * Can contain alphanumerics, hyphens, underscores, slashes, commas, and spaces
 
-**Breaking Change Indicator** (optional):
+**Breaking change indicator** (optional):
 
 * Add `!` after type or scope to indicate breaking changes
 * Example: `feat!:` or `feat(api)!:`
@@ -150,7 +150,7 @@ Before committing, test how your message will be formatted:
 echo "feat: add new feature" > /tmp/test_commit.txt
 
 # Run the formatter
-./bin/check_commit_message.py /tmp/test_commit.txt
+hatch run dev:python bin/check_commit_message.py /tmp/test_commit.txt
 
 # View the result
 cat /tmp/test_commit.txt
@@ -160,19 +160,13 @@ cat /tmp/test_commit.txt
 
 ### Run the test suite
 
-The repository includes a comprehensive test suite:
+Run the formatter's tests through Hatch:
 
 ```bash
-python bin/test_commit_checker.py
+hatch run dev:python bin/test_commit_checker.py
 ```
 
-This runs 18 test cases covering various scenarios including:
-
-* Case-insensitive type matching
-* Scope handling
-* Breaking change indicators
-* Description capitalization
-* Invalid format detection
+The suite covers case-insensitive type matching, scope handling, breaking change indicators, description capitalization, and invalid format detection.
 
 ## Technical details
 
@@ -191,18 +185,7 @@ Unlike traditional validators that only check format, this tool:
 
 ### Customizing validation
 
-If you need to modify the validation rules, edit `bin/check_commit_message.py`:
-
-<details>
-<summary>Key customization points</summary>
-
-* **Line 20-27**: Regex pattern for commit format
-* **Line 57-118**: Formatting logic
-* **Line 120-177**: Error message formatting
-
-For example, to change how descriptions are capitalized, modify the logic around line 95-97.
-
-</details>
+To change the validation rules, edit [`bin/check_commit_message.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/bin/check_commit_message.py). The regex that parses the commit format, the formatting logic, and the error messages all live in that file.
 
 ## Troubleshooting
 
@@ -217,17 +200,10 @@ pre-commit install --hook-type commit-msg
 
 ### Import errors
 
-The formatter requires PyYAML. If you get import errors:
+The formatter needs PyYAML, which ships with the dev environment. If you get import errors, run the script through Hatch instead of your system Python:
 
 ```bash
-# Install PyYAML in your environment
-pip install pyyaml
-```
-
-Or if using hatch:
-
-```bash
-hatch run dev:pip install pyyaml
+hatch run dev:python bin/check_commit_message.py /tmp/test_commit.txt
 ```
 
 ### Commit rejected
@@ -243,5 +219,5 @@ If your commit is rejected:
 
 * [Conventional Commits Specification](https://www.conventionalcommits.org/)
 * [Making contributions](making_contributions.md)
-* [Local validation](local_validation.md)
+* [Testing and validation](testing.md)
 * [Setup development environment](setup.md)

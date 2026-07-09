@@ -143,9 +143,6 @@ msgstr "✏️ Editar"
 msgid "ButtonMessages.SHARE"
 msgstr "📨 Compartir"
 
-msgid "ButtonMessages.CHAT"
-msgstr "💬 Chat"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Nombre"
 
@@ -245,7 +242,6 @@ msgstr "Aquí puedes configurar las opciones predeterminadas cuando creas una nu
 "<b>Pública</b>: activa esta opción para permitir reenviar tus quedadas a todos aquellos que la reciban. Una opción perfecta para llegar a más personas.\n\n"
 "<b>Con invitación</b>: activa esta opción para que aquellos participantes en una quedada puedan añadir otros miembros, incluso si no tienen Telegram.\n\n"
 "<b>Incógnito</b>: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú sí podrás ver los participantes de la quedada.\n\n"
-"<b>Mostrar zona horaria</b>: normalmente, cuando una quedada se comparte, incluye la zona horaria en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón <i>Zona horaria</i> no aparezca cuando compartes la quedada.\n\n"
 "<b>Bloquear al iniciar</b>: cuando está habilitado y una quedada tiene una duración establecida, los participantes no pueden unirse o abandonar la quedada una vez que ha comenzado. Cuando está deshabilitado, los participantes aún pueden unirse o abandonar libremente."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
@@ -547,8 +543,7 @@ msgstr "Puedes configurar diferentes opciones en tu quedada:\n\n"
 "<b>Lista de espera</b>: permite a tus contactos unirse a la quedada aunque esté llena. Los usuarios que se unan a la quedada una vez llena se añadirán a una lista de espera y serán aceptados como participantes en cuanto haya un hueco libre en el orden en el que se unieron.\n\n"
 "<b>Pública</b>: activa esta opción para permitir reenviar tus quedadas a todos aquellos que la reciban. Una opción perfecta para llegar a más personas.\n\n"
 "<b>Con invitación</b>: activa esta opción para que aquellos participantes en una quedada puedan añadir otros miembros, incluso si no tienen Telegram.\n\n"
-"<b>Incógnito</b>: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú sí podrás ver los participantes de la quedada.\n\n"
-"<b>Mostrar zona horaria</b>: normalmente, cuando una quedada se comparte, incluye la zona horaria en la que la fecha y hora han sido configuradas. Si no necesitas que aparezca esta información en la quedada puedes desactivarlo aquí. Desactivarlo también hará que el botón <i>Zona horaria</i> no aparezca cuando compartes la quedada."
+"<b>Incógnito</b>: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú sí podrás ver los participantes de la quedada."
 
 msgid "MeetingAttachMessages.FOOTNOTE_INACTIVE"
 msgstr "🔍 Haz que esta quedada sea buscable en este chat."

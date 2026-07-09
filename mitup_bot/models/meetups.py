@@ -493,7 +493,6 @@ class Meetup(BaseModel, SQLModel, table=True):
                         text=ButtonMessages.EDIT.get(lang=self.user_language),
                         callback_data=cb.EDIT_MEETING.with_id(self.db_id),
                     ),
-                    ButtonConfig(text=ButtonMessages.CHAT.get(lang=self.user_language), callback_data=cb.CHAT),
                     ButtonConfig(
                         text=ButtonMessages.DELETE.get(lang=self.user_language),
                         callback_data=cb.DELETE_MEETING.with_id(self.db_id),

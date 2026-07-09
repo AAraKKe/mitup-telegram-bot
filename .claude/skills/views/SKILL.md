@@ -82,6 +82,7 @@ PaginatedMitupView(
 A Pydantic model wrapping `text` + one action field. Supported action fields (mutually exclusive):
 
 - `callback_data` — triggers a callback query when pressed.
+- `url` — opens a web URL when pressed (e.g. linking out to the docs site). Not subject to the 64-byte callback limit.
 - `switch_inline_query` — prompts the user to select a chat and opens inline mode.
 - `switch_inline_query_current_chat` — opens inline mode in the current chat.
 

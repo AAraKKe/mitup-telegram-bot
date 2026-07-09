@@ -90,7 +90,7 @@ Words that almost always signal AI padding: `powerful`, `seamless`, `amazing`, `
 `just`, `simply`, `easily`, `really`, `actually`. Almost always cuttable.
 
 * **Don't:** `Just head to @mitupbot and start a conversation`, `simply install postgresql`, `you can easily change the title anytime`
-* **Do:** `Open @mitupbot and start a conversation`, `install postgresql with Homebrew`, `change the title anytime`
+* **Do:** `Open [@mitupbot](https://t.me/mitupbot) and start a conversation`, `install postgresql with Homebrew`, `change the title anytime`
 
 ### 9. Repeated `**How to X:**` scaffolding
 
@@ -114,6 +114,40 @@ Every mention of a bot button in body text uses the `.button-like` inline chip (
 * **Do:** `Tap *➕ New meeting*{.button-like}.`
 
 This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must be the **raw Unicode glyph** copied verbatim from the matching `ButtonMessages` entry in `mitup_bot/utils/messages.py` (which sources `mitup_bot/locales/<lang>.po`). Don't use Twemoji shortcodes like `:heavy_plus_sign:` — shortcodes can render differently from the real button (e.g. `:heart:` renders as `❤️` but the bot button is `♥`), so they break the "this is what's on your phone" promise of `.button-like`.
+
+### 13. Developer language on user-facing pages
+
+User-facing pages (`docs/index.md`, `docs/user-guide/*.md`, `docs/faq/*.md`, `docs/collaborate/*.md`) are written for ordinary people who know Telegram, not the codebase. The reader is learning how the bot works today, from their side of the screen. Never leak the implementation.
+
+* **No code identifiers or internal names.** Never write a variable, field, or setting name from the source (`notification_time`, `allow_invitation`, `lock_on_start`, `is_in_progress`, `timeout`). Describe the thing the way the user meets it: "the reminder before it starts", "the Open invitations option", "a few minutes after it finishes".
+* **No invented UI jargon.** Don't coin names the bot never shows the user (`sub-hub`, `config panel`). Name screens by what the button or heading actually says: "the When menu", "the menu", "Settings".
+* **Say what the user does, in their words.** The user sends a *location*, never *coordinates*. They *type a title*, they don't *submit input*.
+* **Don't** `Set your notification_time under Notifications.`, `Turn on lock_on_start in the When sub-hub.`, `The bot reads your coordinates.`
+* **Do** `Choose how long before the start you get your reminder under *⏰ Notifications*{.button-like}.`, `Turn on lock on start in the When menu.`, `The bot reads the location you send.`
+
+The one exception is the developer handbook under `docs/contribute/`. It is written for contributors, so source identifiers, config keys, and internal terms are expected there. This anti-pattern is about the user-facing pages only.
+
+### 14. Development-history leaks
+
+Describe what the bot *is* today, not how it got there. A reader learning the bot doesn't want its change log, and "used to be" phrasing dates the page the moment it ships.
+
+* **Don't:** `This lives in the When menu now, not in Settings.`, `Lock on start was moved out of the options screen.`, `This used to clear the time, but now it keeps it.`
+* **Do:** `Lock on start lives in the When menu.`, `The date and time are kept.`
+
+State the current behaviour plainly. If two things are easy to confuse, contrast them by where they *are* ("Lock on start lives in the When menu, the other four options live in Settings"), never by where they *were*.
+
+## Product terminology
+
+Match the words the bot itself uses. These apply to the user-facing pages (see anti-pattern 13); the `docs/contribute/` handbook follows the codebase's terms instead.
+
+* **Meeting state is "active" or "inactive".** That mirrors what the bot says (it marks a finished meeting as inactive / deactivated). A meeting that has finished is *inactive*, not "past" and not "gone by".
+  * **Don't:** `Once a meeting goes past, its buttons disappear.`, `Past meetings are read-only.`
+  * **Do:** `Once a meeting becomes inactive, its buttons disappear.`, `Inactive meetings are read-only.`
+  * The one exception is the literal button label *💾 Your past meetings*{.button-like}, which uses the word "past". It's the real button name, so refer to the button by its name, but describe the underlying state as inactive: "Your inactive meetings live under *💾 Your past meetings*{.button-like}." Always confirm the exact glyph and text in `ButtonMessages` before writing the chip.
+* **Link the bot handle every time.** Every `@mitupbot` in prose is a link to `https://t.me/mitupbot`, so a reader can tap straight through. A bare `@mitupbot` with no link is a bug.
+  * **Don't:** `Open @mitupbot and start a conversation.`
+  * **Do:** `Open [@mitupbot](https://t.me/mitupbot) and start a conversation.`
+  * This is separate from the `mitupbot` alias used inside chat showcases (see the chat-showcase rules), which is a plain header label, not a link.
 
 ## Headings
 

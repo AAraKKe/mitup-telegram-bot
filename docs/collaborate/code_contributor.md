@@ -2,15 +2,15 @@
 icon: material/code-tags
 ---
 
-# Code Contributor
+# Code contributor
 
-Mitup started as a small side project back in 2014 to solve a simple problem: organizing events in a busy Telegram group. Over the years, as the bot grew and thousands of users relied on it daily, we kept getting the same question:
+Mitup started in 2014 as a side project to solve one problem: organizing meetings in a busy Telegram group. As the bot grew and more people came to rely on it, the same question kept landing in the inbox:
 
 > _"Can I help build this?"_
 
-After years of hearing that question, we made Mitup fully open source. The codebase is now public, and we welcome contributions from anyone who wants to help shape the future of event coordination in Telegram.
+So Mitup is now open source. The codebase is public, and contributions are welcome from anyone who wants to work on it.
 
-Whether you want to fix a bug, add a feature, improve documentation, or translate the bot into your language, there is a place for you.
+Fix a bug, add a feature, improve the docs, or translate the bot into your language. There's a place for each of those.
 
 <div class="grid cards" markdown>
 

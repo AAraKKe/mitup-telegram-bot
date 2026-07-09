@@ -294,18 +294,23 @@
    pointing to the parts the prose talks about.
    ───────────────────────────────────────────────────────────── */
 .mitup-annotated {
+  --gutter: 70px;
   position: relative;
   max-width: 340px;
   margin: 0 auto;
-  padding: 0 70px;
+  padding: 0 var(--gutter);
   box-sizing: content-box;
 }
 
 @media (max-width: 480px) {
   .mitup-annotated {
-    padding: 0 16px;
+    --gutter: 16px;
+    padding: 0 var(--gutter);
     box-sizing: border-box;
   }
+  /* The gutter is too narrow for side labels on phones — hide them; the
+     mockup still reads on its own and the prose explains each part. */
+  .mitup-annotated .mitup-annotation { display: none; }
 }
 .mitup-annotated__chat {
   background: var(--mitup-tg-bg);
@@ -335,6 +340,7 @@
    the gutter outside the chat on either the left or right. */
 .mitup-annotation {
   position: absolute;
+  transform: translateY(-50%); /* so `top` sets the connector's vertical centre, aligned to the target row */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -345,11 +351,20 @@
   color: var(--mitup-blue-deep);
   font-weight: 600;
 }
-.mitup-annotation--right { left: 100%; padding-left: 10px; }
-.mitup-annotation--left  { right: 100%; padding-right: 10px; }
+/* Anchor each annotation to the CHAT edge (not the padded container edge) so its
+   connector line spans the gutter and actually touches the mockup. The label sits
+   outboard in/beyond the gutter; the line always reaches the chat. */
+.mitup-annotation--right {
+  left: calc(100% - var(--gutter));
+  flex-direction: row-reverse; /* DOM is [label][line] -> render line first so it touches the chat on the left */
+}
+.mitup-annotation--left {
+  right: calc(100% - var(--gutter)); /* line touches the chat on the right */
+}
 .mitup-annotation__line {
-  width: 24px;
+  width: calc(var(--gutter) - 12px);
   height: 1px;
+  flex: none;
   background: var(--mitup-blue);
 }
 .mitup-annotation__label {

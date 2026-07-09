@@ -19,9 +19,9 @@ A friendly bot that lives in your DMs, not in your group chat. Create a meeting,
 
 <div class="hero-meta" markdown>
 <div><strong>2014</strong>Online since</div>
-<div><strong>10+ languages</strong>Community translated</div>
+<div><strong>6 languages</strong>Community translated</div>
 <div><strong>MIT</strong>Open source</div>
-<div><strong>$0</strong>Free, forever</div>
+<div><strong>No ads</strong>Kept going by supporters</div>
 </div>
 
 </section>
@@ -40,49 +40,42 @@ A friendly bot that lives in your DMs, not in your group chat. Create a meeting,
 
 </section>
 
-## Built your way
+## What makes it good
 
-With Mitup, you're in control:
+<style>
+.md-typeset .grid.cards.strengths-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 480px) { .md-typeset .grid.cards.strengths-grid { grid-template-columns: 1fr; } }
+</style>
 
-<div class="grid cards" markdown>
+<div class="grid cards strengths-grid" markdown>
 
-- :fontawesome-solid-language: **10+ Languages**
-
-    ---
-    Translated by the community, with new ones added regularly.
-
-- :fontawesome-solid-bell: **Smart reminders**
+- :fontawesome-solid-comment: **Lives in your DMs**
 
     ---
-    Get alerts in your own timezone before the event starts.
+    Mitup runs in your own private chat with the bot. No bot joins your group, no trackers, no ads.
 
-- :fontawesome-solid-earth-americas: **Timezones, handled**
-
-    ---
-    Share events across the world without confusion.
-
-- :fontawesome-solid-sliders: **Custom events**
+- :fontawesome-solid-language: **Speaks your language**
 
     ---
-    Tailor every meeting with flexible options and limits.
+    Six languages, translated by the community: English, Spanish, German, Galician, Brazilian Portuguese, and Italian.
 
-- :fontawesome-solid-shield-halved: **Privacy first**
-
-    ---
-    Only you see your attendee lists. We don't read your chats.
-
-- :fontawesome-solid-heart: **Free, forever**
+- :fontawesome-solid-sliders: **Configurable meetings**
 
     ---
-    No ads, no premium, no surprises.
+    Turn options on and off for each meeting: a waiting list, public sharing, open invitations, and more.
+
+- :fontawesome-solid-bell: **Reminders in your timezone**
+
+    ---
+    A reminder before the start, in your own timezone. Choose how far ahead, or turn it off.
 
 </div>
 
 <div class="privacy-strip" markdown>
 
-## Built privacy-first.
+## Your data stays yours
 
-Mitup runs as a private DM with each user. No one in your group sees the bot. Your attendee lists are visible only to the people who joined. No analytics SDKs, no advertising IDs, no third-party trackers.
+Mitup lives in your DMs, not in your group. It doesn't sell your data or run analytics SDKs, advertising IDs, or third-party trackers. When you share a meeting, you decide where the card goes.
 
 [Read the full policy →](faq/privacy.md){.md-button}
 
@@ -96,27 +89,27 @@ Mitup runs as a private DM with each user. No one in your group sees the bot. Yo
 
 ## Help keep Mitup alive.
 
-Mitup is free, and it stays that way thanks to a community of monthly members. Pick a tier and back the bot for the long run.
+Mitup runs without ads, kept going by a community of monthly members. Pick a tier, then link your Patreon account in the bot to switch on your [Host perks](collaborate/donation.md).
 
-[Become a member →](collaborate/donation.md){.md-button .md-button--primary}
+[Become a member →](https://www.patreon.com/cw/MitupBot/membership){.md-button .md-button--primary}
 
 </div>
 
 <div class="patreon-tiers" markdown>
 <div class="patreon-tier">
-<div class="tier-name">Friend</div>
+<div class="tier-name">Brewer</div>
 <div class="tier-amt">€3<span class="per">/mo</span></div>
 <div class="tier-tag">A coffee a month</div>
 </div>
 <div class="patreon-tier featured">
-<div class="tier-name">Supporter</div>
-<div class="tier-amt">€7<span class="per">/mo</span></div>
-<div class="tier-tag">Most picked</div>
+<div class="tier-name">Gamemaster</div>
+<div class="tier-amt">€5<span class="per">/mo</span></div>
+<div class="tier-tag">Raises your limits</div>
 </div>
 <div class="patreon-tier">
-<div class="tier-name">Patron</div>
-<div class="tier-amt">€15<span class="per">/mo</span></div>
-<div class="tier-tag">Funds a feature</div>
+<div class="tier-name">Commissioner</div>
+<div class="tier-amt">€10<span class="per">/mo</span></div>
+<div class="tier-tag">No limits at all</div>
 </div>
 </div>
 

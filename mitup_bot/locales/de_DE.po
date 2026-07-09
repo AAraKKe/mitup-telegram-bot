@@ -143,9 +143,6 @@ msgstr "✏️ Bearbeiten"
 msgid "ButtonMessages.SHARE"
 msgstr "📨 Teilen"
 
-msgid "ButtonMessages.CHAT"
-msgstr "💬 Chat"
-
 msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Name"
 
@@ -224,7 +221,6 @@ msgstr "Hier kannst du die Standardoptionen konfigurieren, die beim Erstellen ei
 "<b>Öffentlich</b>: Aktiviere dies, um jedem, der das Treffen erhält, zu erlauben, es erneut zu teilen. Perfekt, um mehr Menschen zu erreichen.\n\n"
 "<b>Offene Einladungen</b>: Aktiviere diese Option, um Benutzern, die dem Treffen beigetreten sind, zu erlauben, Freunde hinzuzufügen, auch wenn diese nicht in Telegram sind.\n\n"
 "<b>Anonym</b>: Bei einem Treffen mit aktivierter Anonymität werden die Personen, die dem Treffen beigetreten sind, bei der gemeinsamen Nutzung nicht angezeigt. Nur die Anzahl der Teilnehmer wird angezeigt. Du kannst die Teilnehmer immer noch sehen.\n\n"
-"<b>Zeitzone anzeigen</b>: Treffen enthalten normalerweise die Zeitzone, auf die sich das Datum und die Uhrzeit des Treffens beziehen. Wenn diese Information in der Treffenachricht nicht angezeigt werden soll, kannst du sie hier deaktivieren. Dies deaktiviert auch die Schaltfläche <i>Zeitzone</i>, die beim Teilen des Treffens angezeigt wird.\n\n"
 "<b>Bei Start sperren</b>: Wenn aktiviert und ein Treffen eine festgelegte Dauer hat, können die Teilnehmer nicht beitreten oder das Treffen verlassen, sobald es beginnt. Wenn deaktiviert, können die Teilnehmer frei beitreten oder gehen."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
@@ -441,8 +437,7 @@ msgstr "Du kannst verschiedene Aspekte deines Treffens konfigurieren:\n\n"
 "<b>Warteliste</b>: Erlaube Benutzern, dem Treffen beizutreten, auch wenn es voll ist. Benutzer, die beitreten, wenn es voll ist, werden auf eine Warteliste gesetzt und zur Teilnehmerliste hinzugefügt, sobald ein Platz verfügbar ist, in der Reihenfolge, in der sie beigetreten sind.\n\n"
 "<b>Öffentlich</b>: Aktiviere dies, um jedem, der das Treffen erhält, zu erlauben, es erneut zu teilen. Perfekt, um mehr Menschen zu erreichen.\n\n"
 "<b>Offene Einladungen</b>: Aktiviere diese Option, um Benutzern, die dem Treffen beigetreten sind, zu erlauben, Freunde hinzuzufügen, auch wenn diese nicht in Telegram sind.\n\n"
-"<b>Anonym</b>: Bei einem Treffen mit aktivierter Anonymität werden die Personen, die dem Treffen beigetreten sind, bei der gemeinsamen Nutzung nicht angezeigt. Nur die Anzahl der Teilnehmer wird angezeigt. Du kannst die Teilnehmer immer noch sehen.\n\n"
-"<b>Zeitzone anzeigen</b>: Treffen enthalten normalerweise die Zeitzone, auf die sich das Datum und die Uhrzeit des Treffens beziehen. Wenn diese Information in der Treffenachricht nicht angezeigt werden soll, kannst du sie hier deaktivieren. Dies deaktiviert auch die Schaltfläche <i>Zeitzone</i>, die beim Teilen des Treffens angezeigt wird."
+"<b>Anonym</b>: Bei einem Treffen mit aktivierter Anonymität werden die Personen, die dem Treffen beigetreten sind, bei der gemeinsamen Nutzung nicht angezeigt. Nur die Anzahl der Teilnehmer wird angezeigt. Du kannst die Teilnehmer immer noch sehen."
 
 msgid "MeetingListMessages.ACTIVE_EMPTY"
 msgstr "Du hast noch keine Treffen.\n\n"
