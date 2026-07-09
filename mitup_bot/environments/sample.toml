@@ -8,6 +8,7 @@
 # IMPORTANT: copy this file to `mitup_bot/environments/dev.toml` before modifying values in it.
 #            You can keep the `dev.toml` file locally with any configuration you need and is
 #            ignored by git.
+#            Alternatively, `hatch run dev:set-local-bot <token>` generates `dev.toml` for you.
 
 [bot]
 # Telegram bot configuration related with API configuration as well as internal configuration
@@ -34,7 +35,10 @@ broadcast_max_rate = 5
 username = "mitupbot"
 database = "mitup"
 password = "12345pass"
-port = "5432"
+# "postgres" works when the bot runs inside docker compose. To run the bot on the host instead,
+# use url = "localhost" and port = 5444 (docker-compose.yaml maps host port 5444 to the
+# container's 5432).
+port = 5432
 url = "postgres"
 # Connection pool sizing for the bot engine.
 # Optional; the values below are the defaults when omitted.

@@ -86,7 +86,7 @@ Next, run the following command:
 hatch run dev:set-local-bot <token>
 ```
 
-This creates a `dev.toml` configuration file used by Mitup when running the bot locally via Docker.
+This creates a `dev.toml` configuration file used by Mitup when running the bot locally via Docker. If `dev.toml` already exists, the command asks before overwriting it; pass `--force` to skip the prompt. To try broadcast features, add one or more `--admin-id <telegram-user-id>` options to pre-fill `admin_tg_ids` in the generated file.
 
 ### Set up your database
 
