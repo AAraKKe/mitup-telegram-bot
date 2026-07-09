@@ -5,6 +5,7 @@ from mitup_bot.db import with_session
 from mitup_bot.guards import current_user, shareable_meeting_id
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import ButtonMessages, InlineQueryMessages
@@ -25,6 +26,10 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
     If the user is registered, their preferred language is used; otherwise the fallback language is applied.
     """
     user = await User.by_tg_user_id(session, update.effective_user.id) if update.effective_user else None
+    if user is not None and user.status is UserStatus.DELETION_REQUESTED:
+        # A user marked for deletion must not surface their meetings for sharing; treat them as
+        # unregistered so this view offers nothing tied to the dying account.
+        user = None
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
 
     button_text = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON

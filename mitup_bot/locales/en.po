@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-08 23:28\n"
+"PO-Revision-Date: 2026-07-09 21:28\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -73,6 +73,12 @@ msgstr "👥 Default Options"
 
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacy"
+
+msgid "ButtonMessages.PRIVACY_POLICY"
+msgstr "🛡️ Privacy policy"
+
+msgid "ButtonMessages.DELETE_MY_DATA"
+msgstr "🗑️ Delete my data"
 
 msgid "ButtonMessages.WAITING_LIST"
 msgstr "Waiting list"
@@ -325,6 +331,24 @@ msgstr "Enabled ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Disabled ❌"
+
+msgid "PrivacyMessages.DESCRIPTION"
+msgstr "<b>Privacy</b>\n\nYour data belongs to you. Read the privacy policy to see what Mitup stores and why, or request the permanent deletion of everything Mitup knows about you."
+
+msgid "PrivacyMessages.DELETE_WARNING"
+msgstr "<b>Delete all your data?</b>\n\nThis will permanently remove everything linked to your account:\n\n- Meetings you created will disappear for everyone who joined them, not just for you.\n- You will be removed from every meeting you joined.\n- Your settings and your Patreon link will be erased.\n\n<b>There is no undo.</b> Deleted data cannot be recovered."
+
+msgid "PrivacyMessages.DELETE_LAST_CHANCE"
+msgstr "<b>Last chance</b>\n\nIf you confirm now, your account stops working immediately and the deletion cannot be stopped.\n\nDo you really want to permanently delete all your data?"
+
+msgid "PrivacyMessages.DELETION_MARKED"
+msgstr "Your deletion request is confirmed and your account has stopped working.\n\nEverything will be permanently removed within a day, and you will receive one final message confirming the deletion. To use Mitup again after that, send the /start command."
+
+msgid "PrivacyMessages.PENDING_DELETION_ALERT"
+msgstr "Your account is scheduled for deletion and no longer works. You will receive one final confirmation message. To use Mitup again after that, send the /start command."
+
+msgid "PrivacyMessages.DELETION_COMPLETE"
+msgstr "<b>Your data is deleted</b>\n\nEverything linked to your account is permanently gone: the meetings you created, your spot in the meetings you joined, and your settings. Buttons on older messages in this chat no longer do anything.\n\nTo use Mitup again, send the /start command. Mitup has no memory of you now and will set you up from scratch."
 
 msgid "MeetingCreationMessages.PROMPT"
 msgstr "Lets create a meeting. What is the title?\n\n<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"

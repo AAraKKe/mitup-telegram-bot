@@ -7,6 +7,7 @@ from telegram import Update
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
 from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
@@ -107,6 +108,31 @@ async def test_inline_view_falls_back_to_default_language_for_unknown_user(
     handler_context: HandlerContext,
 ):
     """When the user does not have a mitup profile, inline view should fall back to the default language."""
+    default_lang = TranslationEngine.FALLBACK_LANG
+
+    context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)
+
+    context.api.assert_answer_inline_query_called(
+        update=update,
+        results=[chat_card(default_lang)],
+        button=explore_button(default_lang),
+        cache_time=0,
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)
+async def test_inline_view_treats_pending_deletion_user_as_unregistered(
+    update: Update,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """A user marked for deletion must not surface their meetings for sharing: the default inline
+    view renders exactly as for an unregistered user."""
+    meeting = create_meetup(10, "Meeting A")
+    marked_user = create_user(
+        id=1, tg_user_id=123, first_name="Test", status=UserStatus.DELETION_REQUESTED, owned_meetings=[meeting]
+    )
+    mock_session.add_user(marked_user)
     default_lang = TranslationEngine.FALLBACK_LANG
 
     context, _ = await call_handler(InlineQueryId.INLINE_VIEW, handler_context=handler_context)

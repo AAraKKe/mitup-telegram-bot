@@ -25,12 +25,15 @@ class UserStatus(StrEnum):
 
     MEMBER users have engaged via DM and are reachable; JOINED_ONLY users joined a
     meeting via inline button and are not reachable until they `/start`; LEFT users
-    were MEMBERs who blocked or deleted the bot.
+    were MEMBERs who blocked or deleted the bot; DELETION_REQUESTED users asked for
+    their data to be wiped and every interaction is rejected until the cleanup run
+    purges the row.
     """
 
     MEMBER = "member"
     JOINED_ONLY = "joined_only"
     LEFT = "left"
+    DELETION_REQUESTED = "deletion_requested"
 
 
 class User(BaseModel, SQLModel, table=True):
@@ -45,13 +48,13 @@ class User(BaseModel, SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
     )
-    # native_enum=False keeps the column a plain VARCHAR(16) while coercing loaded rows back to
+    # native_enum=False keeps the column a plain VARCHAR(32) while coercing loaded rows back to
     # UserStatus: a bare String column returns plain strs, silently failing `status is UserStatus.X`
     # checks everywhere a User is loaded from the database.
     status: UserStatus = Field(
         default=UserStatus.MEMBER,
         sa_column=Column(
-            Enum(UserStatus, native_enum=False, length=16, values_callable=lambda enum: [m.value for m in enum]),
+            Enum(UserStatus, native_enum=False, length=32, values_callable=lambda enum: [m.value for m in enum]),
             nullable=False,
             server_default=UserStatus.MEMBER.value,
         ),

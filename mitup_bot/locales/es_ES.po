@@ -71,6 +71,12 @@ msgstr "👥 Opciones Predefinidas"
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacidad"
 
+msgid "ButtonMessages.PRIVACY_POLICY"
+msgstr "🛡️ Política de privacidad"
+
+msgid "ButtonMessages.DELETE_MY_DATA"
+msgstr "🗑️ Borrar mis datos"
+
 msgid "ButtonMessages.WAITING_LIST"
 msgstr "Lista de espera"
 
@@ -269,6 +275,24 @@ msgstr "Activado ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Desactivado ❌"
+
+msgid "PrivacyMessages.DESCRIPTION"
+msgstr "<b>Privacidad</b>\n\nTus datos te pertenecen. Lee la política de privacidad para ver qué guarda Mitup y por qué, o solicita el borrado permanente de todo lo que Mitup sabe de ti."
+
+msgid "PrivacyMessages.DELETE_WARNING"
+msgstr "<b>¿Borrar todos tus datos?</b>\n\nEsto eliminará permanentemente todo lo vinculado a tu cuenta:\n\n- Las quedadas que creaste desaparecerán para todas las personas que se unieron, no solo para ti.\n- Saldrás de todas las quedadas a las que te uniste.\n- Tus ajustes y tu vínculo con Patreon se borrarán.\n\n<b>No hay vuelta atrás.</b> Los datos borrados no se pueden recuperar."
+
+msgid "PrivacyMessages.DELETE_LAST_CHANCE"
+msgstr "<b>Última oportunidad</b>\n\nSi confirmas ahora, tu cuenta dejará de funcionar inmediatamente y el borrado no se podrá detener.\n\n¿De verdad quieres borrar permanentemente todos tus datos?"
+
+msgid "PrivacyMessages.DELETION_MARKED"
+msgstr "Tu solicitud de borrado está confirmada y tu cuenta ha dejado de funcionar.\n\nTodo se eliminará permanentemente en el plazo de un día y recibirás un último mensaje confirmando el borrado. Para volver a usar Mitup después, envía el comando /start."
+
+msgid "PrivacyMessages.PENDING_DELETION_ALERT"
+msgstr "Tu cuenta está programada para borrarse y ya no funciona. Recibirás un último mensaje de confirmación. Para volver a usar Mitup después, envía el comando /start."
+
+msgid "PrivacyMessages.DELETION_COMPLETE"
+msgstr "<b>Tus datos están borrados</b>\n\nTodo lo vinculado a tu cuenta ha desaparecido permanentemente: las quedadas que creaste, tu plaza en las quedadas a las que te uniste y tus ajustes. Los botones de los mensajes antiguos de este chat ya no hacen nada.\n\nPara volver a usar Mitup, envía el comando /start. Mitup ya no tiene ningún recuerdo de ti y te configurará desde cero."
 
 msgid "MeetingCreationMessages.PROMPT"
 msgstr "Vamos a crear una quedada. Dime cual será el título\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"

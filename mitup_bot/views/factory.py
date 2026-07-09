@@ -16,6 +16,7 @@ from mitup_bot.utils import (
     MeetingEditDateTimeMessages,
     MeetingEditLanguageMessages,
     MeetingLifecycleMessages,
+    PrivacyMessages,
     SettingsMessages,
 )
 from mitup_bot.utils import callbacks as cb
@@ -106,7 +107,7 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
             ],
             [
                 ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS),
-                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), url=docs_links.privacy_url()),
+                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY),
             ],
             [
                 ButtonConfig(
@@ -116,6 +117,17 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
             ],
         ],
     )
+
+
+def privacy_view(ctx: RenderContext) -> MitupView:
+    lang = ctx.lang
+    return MitupView(
+        PrivacyMessages.DESCRIPTION.get(lang=lang),
+        [
+            [ButtonConfig(text=ButtonMessages.PRIVACY_POLICY.get(lang=lang), url=docs_links.privacy_url())],
+            [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get(lang=lang), callback_data=cb.DELETE_USER_DATA)],
+        ],
+    ).with_back_button(ButtonMessages.SETTINGS, lang, cb.SETTINGS)
 
 
 def create_meeting_view(

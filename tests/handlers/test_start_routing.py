@@ -27,7 +27,7 @@ from mitup_bot.handlers.registration_process.enums import (
 )
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.utils import RegistrationMessages
+from mitup_bot.utils import PrivacyMessages, RegistrationMessages
 from mitup_bot.views import RenderContext
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import MockApi, UpdateRequest, create_bot_config, create_user, make_test_metrics_client
@@ -161,6 +161,27 @@ async def test_non_member_start_is_claimed_by_reonboarding(
     registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) == ConversationRegistrationProcessState.TIMEZONE
     # The existing row is reused; no new User row is created for re-onboarding.
+    mock_session.assert_not_added()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(command="start")], indirect=True)
+async def test_pending_deletion_start_is_rejected_without_reonboarding(
+    routing_app: Application,
+    update: Update,
+    mock_session: MockDbSession,
+):
+    """A /start during the deletion window gets the pending-deletion notice: the row is not reused
+    or promoted (no undo), no conversation starts, and the group-0 /start handler never runs."""
+    marked_user = create_user(id=1, tg_user_id=123, status=UserStatus.DELETION_REQUESTED)
+    mock_session.add_object(marked_user, "tg_user_id")
+
+    api = await process_update(routing_app, update)
+
+    # times=1: the notice was the only message — no timezone prompt and no main menu.
+    api.assert_send_message_called(update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=marked_user.lang))
+    registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
+    assert registration._conversations.get(CONVERSATION_KEY) is None
+    assert marked_user.status is UserStatus.DELETION_REQUESTED
     mock_session.assert_not_added()
 
 

@@ -37,6 +37,7 @@ from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
 from mitup_bot.models import SupporterSubscription, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.patreon import PatreonClient, oauth, webhooks
@@ -76,6 +77,7 @@ class LinkOutcome(Enum):
     LINKED_NO_PATRON = auto()
     UNKNOWN_USER = auto()
     ALREADY_LINKED_ELSEWHERE = auto()
+    PENDING_DELETION = auto()
 
 
 class PatreonCallbackParams(BaseModel):
@@ -459,6 +461,18 @@ async def link_patreon_account(
             )
             return LinkOutcome.UNKNOWN_USER
 
+        # A previously-minted OAuth URL can be completed during the mark-to-purge window; the
+        # dying account must not gain a subscription row or a supporter level.
+        if user.status is UserStatus.DELETION_REQUESTED:
+            log.warning(
+                "Patreon callback for a user pending deletion",
+                flow=OAUTH_FLOW,
+                stage="persist",
+                outcome=LinkOutcome.PENDING_DELETION.name.lower(),
+                tg_user_id=tg_user_id,
+            )
+            return LinkOutcome.PENDING_DELETION
+
         claimed_elsewhere = (
             await session.exec(
                 select(SupporterSubscription).where(SupporterSubscription.patreon_user_id == patreon_user_id)
@@ -603,6 +617,15 @@ def result_page_for(outcome: LinkOutcome, bot_username: str | None) -> HTMLRespo
                 "you, please reach out and we'll help sort it out.",
                 bot_username,
                 status_code=409,
+            )
+        case LinkOutcome.PENDING_DELETION:
+            # link_patreon_account already logged this with the tg_user_id, so just render.
+            return render_result_page(
+                "This Mitup account is being deleted",
+                "Your Mitup account is scheduled for deletion, so nothing was connected. Once the "
+                "deletion completes you can start fresh by sending the /start command to the bot.",
+                bot_username,
+                status_code=403,
             )
         case _ as unreachable:
             assert_never(unreachable)

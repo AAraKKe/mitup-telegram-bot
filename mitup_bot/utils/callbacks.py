@@ -122,6 +122,13 @@ UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
 # These are callbacks for the user settings actions
 # ----------------------------------------
 CANCEL_SETTINGS = CallbackData(action="cancel", entity="settings")
+EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
+# Data-deletion flow: two confirmation steps, both declining back to the privacy screen through
+# the single DECLINE callback.
+DELETE_USER_DATA = CallbackData(action="delete", entity="user_data")
+CONFIRM_DELETE_USER_DATA = CallbackData(action="confirm_delete", entity="user_data")
+CONFIRM_DELETE_USER_DATA_FINAL = CallbackData(action="confirm_delete", entity="user_data_final")
+DECLINE_DELETE_USER_DATA = CallbackData(action="decline_delete", entity="user_data")
 EDIT_LANGUAGE = CallbackData(action="edit", entity="lang")
 SET_LANGUAGE = CallbackData(action="set", entity="lang")
 EDIT_TIMEOUT = CallbackData(action="edit", entity="timeout")

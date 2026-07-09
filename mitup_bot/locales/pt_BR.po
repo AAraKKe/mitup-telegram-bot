@@ -71,6 +71,12 @@ msgstr "👥 Opções Padrão"
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacidade"
 
+msgid "ButtonMessages.PRIVACY_POLICY"
+msgstr "🛡️ Política de privacidade"
+
+msgid "ButtonMessages.DELETE_MY_DATA"
+msgstr "🗑️ Excluir meus dados"
+
 msgid "ButtonMessages.WAITING_LIST"
 msgstr "Lista de espera"
 
@@ -256,6 +262,24 @@ msgstr "Ativado ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Desativado ❌"
+
+msgid "PrivacyMessages.DESCRIPTION"
+msgstr "<b>Privacidade</b>\n\nSeus dados pertencem a você. Leia a política de privacidade para ver o que o Mitup armazena e por quê, ou solicite a exclusão permanente de tudo o que o Mitup sabe sobre você."
+
+msgid "PrivacyMessages.DELETE_WARNING"
+msgstr "<b>Excluir todos os seus dados?</b>\n\nIsso removerá permanentemente tudo o que está vinculado à sua conta:\n\n- Os eventos que você criou desaparecerão para todos que os aceitaram, não só para você.\n- Você será removido de todos os eventos que aceitou.\n- Suas configurações e seu vínculo com o Patreon serão excluídos.\n\n<b>Não é possível desfazer.</b> Dados excluídos não podem ser recuperados."
+
+msgid "PrivacyMessages.DELETE_LAST_CHANCE"
+msgstr "<b>Última chance</b>\n\nSe você confirmar agora, sua conta deixará de funcionar imediatamente e a exclusão não poderá ser interrompida.\n\nVocê realmente quer excluir permanentemente todos os seus dados?"
+
+msgid "PrivacyMessages.DELETION_MARKED"
+msgstr "Sua solicitação de exclusão foi confirmada e sua conta deixou de funcionar.\n\nTudo será removido permanentemente em até um dia, e você receberá uma última mensagem confirmando a exclusão. Para usar o Mitup novamente depois disso, envie o comando /start."
+
+msgid "PrivacyMessages.PENDING_DELETION_ALERT"
+msgstr "Sua conta está marcada para exclusão e não funciona mais. Você receberá uma última mensagem de confirmação. Para usar o Mitup novamente depois disso, envie o comando /start."
+
+msgid "PrivacyMessages.DELETION_COMPLETE"
+msgstr "<b>Seus dados foram excluídos</b>\n\nTudo o que estava vinculado à sua conta foi removido permanentemente: os eventos que você criou, sua vaga nos eventos que aceitou e suas configurações. Os botões em mensagens antigas neste chat não funcionam mais.\n\nPara usar o Mitup novamente, envie o comando /start. O Mitup não se lembra mais de você e vai configurar tudo do zero."
 
 msgid "MeetingCreationMessages.PROMPT"
 msgstr "Vamos criar um evento. Qual o título?\n\n<i>Dica: você também pode usar ${datetime_link} para incluir uma data e hora diretamente.</i>"

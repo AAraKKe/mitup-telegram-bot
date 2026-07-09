@@ -71,6 +71,12 @@ msgstr "👥 Opzioni predefinite"
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacy"
 
+msgid "ButtonMessages.PRIVACY_POLICY"
+msgstr "🛡️ Informativa privacy"
+
+msgid "ButtonMessages.DELETE_MY_DATA"
+msgstr "🗑️ Elimina i miei dati"
+
 msgid "ButtonMessages.WAITING_LIST"
 msgstr "Lista d'attesa"
 
@@ -247,6 +253,24 @@ msgstr "Abilitato ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Disabilitato ❌"
+
+msgid "PrivacyMessages.DESCRIPTION"
+msgstr "<b>Privacy</b>\n\nI tuoi dati sono tuoi. Leggi l'informativa privacy per vedere cosa Mitup memorizza e perché, oppure richiedi l'eliminazione definitiva di tutto ciò che Mitup sa di te."
+
+msgid "PrivacyMessages.DELETE_WARNING"
+msgstr "<b>Eliminare tutti i tuoi dati?</b>\n\nQuesta operazione rimuoverà definitivamente tutto ciò che è collegato al tuo account:\n\n- Gli incontri che hai creato spariranno per tutti i partecipanti, non solo per te.\n- Verrai rimosso da tutti gli incontri a cui partecipi.\n- Le tue impostazioni e il tuo collegamento a Patreon verranno cancellati.\n\n<b>Non si può annullare.</b> I dati eliminati non possono essere recuperati."
+
+msgid "PrivacyMessages.DELETE_LAST_CHANCE"
+msgstr "<b>Ultima possibilità</b>\n\nSe confermi ora, il tuo account smette subito di funzionare e l'eliminazione non può essere fermata.\n\nVuoi davvero eliminare definitivamente tutti i tuoi dati?"
+
+msgid "PrivacyMessages.DELETION_MARKED"
+msgstr "La tua richiesta di eliminazione è confermata e il tuo account ha smesso di funzionare.\n\nTutto verrà rimosso definitivamente entro un giorno e riceverai un ultimo messaggio di conferma dell'eliminazione. Per usare di nuovo Mitup in seguito, invia il comando /start."
+
+msgid "PrivacyMessages.PENDING_DELETION_ALERT"
+msgstr "Il tuo account è in attesa di eliminazione e non funziona più. Riceverai un ultimo messaggio di conferma. Per usare di nuovo Mitup in seguito, invia il comando /start."
+
+msgid "PrivacyMessages.DELETION_COMPLETE"
+msgstr "<b>I tuoi dati sono stati eliminati</b>\n\nTutto ciò che era collegato al tuo account è sparito definitivamente: gli incontri che hai creato, il tuo posto negli incontri a cui partecipavi e le tue impostazioni. I pulsanti dei messaggi più vecchi in questa chat non fanno più nulla.\n\nPer usare di nuovo Mitup, invia il comando /start. Mitup ora non ha alcun ricordo di te e ti configurerà da zero."
 
 msgid "MeetingCreationMessages.PROMPT"
 msgstr "Creiamo un incontro. Qual è il titolo?\n\n<i>Suggerimento: puoi anche usare ${datetime_link} per includere una data e un'ora direttamente.</i>"

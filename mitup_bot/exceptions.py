@@ -162,6 +162,22 @@ class InactiveUserInteraction(RuntimeError):
         super().__init__(f"The user {tg_user_id} is inactive and interacted with the bot")
 
 
+class UserPendingDeletion(RuntimeError):
+    """A user whose data deletion is pending interacted with the bot.
+
+    Deliberately NOT a ``GuardError``: a pending deletion is an expected business state, not an
+    internal fault, so the error handler answers the interaction with a dedicated alert instead of
+    emitting fault metrics and rebuilding a main menu for a dying account.
+
+    Carries the user's language so the alert renders without another DB round-trip.
+    """
+
+    def __init__(self, tg_user_id: int, lang: str):
+        self.tg_user_id = tg_user_id
+        self.lang = lang
+        super().__init__(f"The user {tg_user_id} has a pending deletion request and interacted with the bot")
+
+
 class CallbackQueryTextTooLong(ValueError):
     def __init__(self, text: str):
         length = len(text)

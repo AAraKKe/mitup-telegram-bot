@@ -25,14 +25,24 @@ from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.privacy.enums import PrivacyHandlerId
 from mitup_bot.handlers.registration_process.enums import RegistrationProcessHandlerId
 from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, PrivacyMessages
 from mitup_bot.views import ButtonConfig, Keyboard, MitupView, RenderContext, factory
-from tests.helpers import AnyFloat, HandlerContext, UpdateRequest, call_handler, create_bot_config, create_meetup
+from tests.helpers import (
+    AnyFloat,
+    HandlerContext,
+    UpdateRequest,
+    call_handler,
+    create_bot_config,
+    create_meetup,
+    create_user,
+)
 from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -60,6 +70,10 @@ class ErrorMode(Enum):
     MALFORMED_CALLBACK_DATA = "MalformedCallbackData"
     MISSING_USER_DATA = "MissingUserData"
     MEETING_INACTIVE_OWNER = "MeetingInactiveOwner"
+    # Only declared explicitly for handlers that catch UserNotFound themselves (join/leave):
+    # every USER_NOT_FOUND context already gets the pending-deletion test automatically, since
+    # guards.current_user raises both exceptions from the same call site.
+    USER_PENDING_DELETION = "UserPendingDeletion"
 
 
 @dataclass
@@ -795,7 +809,8 @@ CONTEXTS = [
     #     test_commands.py.
     #   - MeetingHandlerId.JOIN / MeetingHandlerId.LEAVE: catch UserNotFound themselves and
     #     register a default JOINED_ONLY user instead — an unregistered user pressing the button
-    #     is a valid case, covered in tests/handlers/meeting/test_join_leave_meeting.py.
+    #     is a valid case, covered in tests/handlers/meeting/test_join_leave_meeting.py. They DO
+    #     declare USER_PENDING_DELETION below: the rejection escapes their UserNotFound catch.
     #   - MeetingHandlerId.INVITE_USERS_CALLBACK: uses guards.user_registered, which answers the
     #     callback query with an alert instead of raising when the user is unregistered.
     #
@@ -870,6 +885,51 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.UNLINK_PATREON),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="collaborate_unlink",
+    ),
+    # --- Privacy handlers ---
+    Context(
+        handler_id=PrivacyHandlerId.SHOW,
+        update_request=UpdateRequest(callback_query=cb.EDIT_PRIVACY),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="privacy_show",
+    ),
+    Context(
+        handler_id=PrivacyHandlerId.DELETE_DATA,
+        update_request=UpdateRequest(callback_query=cb.DELETE_USER_DATA),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="privacy_delete_data",
+    ),
+    Context(
+        handler_id=PrivacyHandlerId.CONFIRM_DELETE_DATA,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_USER_DATA),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="privacy_confirm_delete_data",
+    ),
+    Context(
+        handler_id=PrivacyHandlerId.CONFIRM_DELETE_DATA_FINAL,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_USER_DATA_FINAL),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="privacy_confirm_delete_data_final",
+    ),
+    Context(
+        handler_id=PrivacyHandlerId.DECLINE_DELETE_DATA,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_USER_DATA),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="privacy_decline_delete_data",
+    ),
+    # Join/leave catch UserNotFound (unregistered users are a valid case) but the pending-deletion
+    # rejection escapes that catch, so they declare the mode explicitly.
+    Context(
+        handler_id=MeetingHandlerId.JOIN,
+        update_request=UpdateRequest(callback_query=cb.JOIN.with_id(1)),
+        error_modes={ErrorMode.USER_PENDING_DELETION},
+        id="join_meeting_pending_deletion",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.LEAVE,
+        update_request=UpdateRequest(callback_query=cb.LEAVE.with_id(1)),
+        error_modes={ErrorMode.USER_PENDING_DELETION},
+        id="leave_meeting_pending_deletion",
     ),
     # --- Settings handlers ---
     Context(
@@ -1162,6 +1222,20 @@ def handler_stops_when_meeting_not_found() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_NOT_FOUND in context.error_modes]
 
 
+def handler_rejects_user_pending_deletion() -> list[Context]:
+    """Every USER_NOT_FOUND context plus the explicit USER_PENDING_DELETION ones.
+
+    UserPendingDeletion is raised by the same `guards.current_user` call that raises UserNotFound,
+    so USER_NOT_FOUND membership automatically implies pending-deletion coverage; the explicit mode
+    exists for handlers that catch UserNotFound themselves but let the rejection escape.
+    """
+    return [
+        context
+        for context in CONTEXTS
+        if context.error_modes & {ErrorMode.USER_NOT_FOUND, ErrorMode.USER_PENDING_DELETION}
+    ]
+
+
 def handler_stops_due_to_missing_user_data() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MISSING_USER_DATA in context.error_modes]
 
@@ -1317,6 +1391,44 @@ async def test_callback_fails_when_user_is_not_found(
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+
+
+@pytest.mark.parametrize(
+    "test_context, update",
+    [
+        pytest.param(context, context.update_request, id=context.id)
+        for context in handler_rejects_user_pending_deletion()
+    ],
+    indirect=["update"],
+)
+async def test_handler_rejects_user_pending_deletion(
+    mock_session: MockDbSession,
+    test_context: Context,
+    update: Update,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A user marked for deletion is rejected with the standardized alert and no fault is emitted."""
+    marked_user = create_user(id=1, tg_user_id=DEFAULT_USER_ID, status=UserStatus.DELETION_REQUESTED)
+    mock_session.add_object(marked_user, "tg_user_id")
+    make_admin_if_gated(handler_context, test_context)
+
+    context, _ = await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
+    )
+
+    # An expected business state, not a fault: the dedicated error-handler branch answers the
+    # interaction before any fault metric is emitted.
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    if update.callback_query is not None:
+        context.api.assert_answer_callback_query_called(
+            update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=marked_user.lang), show_alert=True
+        )
+        context.api.assert_send_message_not_called()
+    else:
+        context.api.assert_send_message_called(
+            update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=marked_user.lang)
+        )
 
 
 @pytest.mark.parametrize(

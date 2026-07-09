@@ -7,11 +7,11 @@ from telegram.error import BadRequest
 
 from mitup_bot import db, guards
 from mitup_bot.config import Env
-from mitup_bot.exceptions import GuardError, InactiveUserInteraction
+from mitup_bot.exceptions import GuardError, InactiveUserInteraction, UserPendingDeletion
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import CommonMessages
+from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import RenderContext, factory
 
@@ -36,6 +36,31 @@ async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg
         user := (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
     ) and user.mark_inactive():
         context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)
+
+
+async def handle_pending_deletion_user(context: TMitupContext, error: UserPendingDeletion):
+    """Answer the interaction with the pending-deletion alert and do nothing else.
+
+    The account is about to be purged, so no screen is rebuilt and no state is touched. Delivery is
+    best-effort like ``notify_guard_error``: a failure here must not escape as a second fault.
+    """
+    update = context.telegram_update
+    if update is None:
+        return
+
+    try:
+        if update.callback_query is not None:
+            await context.api.answer_callback_query(
+                update=update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=error.lang), show_alert=True
+            )
+        elif update.inline_query is not None:
+            await context.api.answer_inline_query(update=update, results=[], cache_time=0)
+        else:
+            await context.api.send_message(
+                update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=error.lang)
+            )
+    except Exception:
+        log.debug("Failed to deliver the pending-deletion notice to the user.", exc_info=True)
 
 
 def should_ignore_error(error: Exception) -> bool:
@@ -99,6 +124,12 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
 
     if isinstance(error, InactiveUserInteraction) and error.private:
         await handle_inactive_user(context, error.tg_user_id)
+        return
+
+    # An expected business state, not a fault: answer with the standardized alert and stop before
+    # the fault metrics below.
+    if isinstance(error, UserPendingDeletion):
+        await handle_pending_deletion_user(context, error)
         return
 
     # Emit an error-class-specific fault metric plus the general aggregate FAULT. Both are

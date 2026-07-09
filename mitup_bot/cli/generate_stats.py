@@ -15,12 +15,13 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
     member_users = func.sum(cast(User.status == UserStatus.MEMBER, Integer))
     left_users = func.sum(cast(User.status == UserStatus.LEFT, Integer))
     joined_only_users = func.sum(cast(and_(User.status == UserStatus.JOINED_ONLY, User.tg_user_id != -1), Integer))
+    deletion_requested_users = func.sum(cast(User.status == UserStatus.DELETION_REQUESTED, Integer))
     total_users = func.count()
     invited_users = func.sum(cast(User.tg_user_id == -1, Integer))
     result = (
         await session.exec(
             select(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1333
-                member_users, left_users, joined_only_users, total_users, invited_users
+                member_users, left_users, joined_only_users, deletion_requested_users, total_users, invited_users
             )
         )
     ).first()
@@ -32,7 +33,8 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
     metrics.emit(MetricKey.ACTIVE_USERS, result[0], MetricUnit.COUNT)
     metrics.emit(MetricKey.INACTIVE_USERS, result[1], MetricUnit.COUNT)
     metrics.emit(MetricKey.JOINED_ONLY_USERS, result[2], MetricUnit.COUNT)
-    metrics.emit(MetricKey.INVITED_USERS, result[4], MetricUnit.COUNT)
+    metrics.emit(MetricKey.DELETION_REQUESTED_USERS, result[3], MetricUnit.COUNT)
+    metrics.emit(MetricKey.INVITED_USERS, result[5], MetricUnit.COUNT)
     metrics.emit(MetricKey.FAULT.with_prefix(EMPTY_USERS_TABLE_ERROR), 0, MetricUnit.COUNT)
 
     # Get user language stats

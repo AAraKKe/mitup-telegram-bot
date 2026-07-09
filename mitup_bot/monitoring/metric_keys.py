@@ -35,6 +35,11 @@ class MetricKey(CamelCaseStrEnum):
     INACTIVE_USER_SET = auto()
     """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
     INACTIVE_USERS_DELETED = auto()
+    """Number of deletion-requested users purged by the user cleanup, each farewell enqueued in the
+    committed transaction (post-commit delivery failures surface as Fault metrics, not here)"""
+    DELETION_REQUESTED_USERS_PURGED = auto()
+    """Gauge for users with status DELETION_REQUESTED (marked for erasure, awaiting the next cleanup purge)"""
+    DELETION_REQUESTED_USERS = auto()
     """Number of joined links whose starting-soon write lifecycle raised (rolled back
     pre-commit, or aborted mid-drain by a systemic network error after the flag committed)"""
     NOTIFICATIONS_FAILED = auto()
@@ -162,3 +167,4 @@ class Feature(CamelCaseStrEnum):
     INVITE_USERS = auto()
     ATTACH_TO_CHAT = auto()
     SEARCH_CHAT_MEETINGS = auto()
+    DATA_DELETION_REQUESTED = auto()

@@ -71,6 +71,12 @@ msgstr "👥 Standardoptionen"
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Datenschutz"
 
+msgid "ButtonMessages.PRIVACY_POLICY"
+msgstr "🛡️ Datenschutzrichtlinie"
+
+msgid "ButtonMessages.DELETE_MY_DATA"
+msgstr "🗑️ Meine Daten löschen"
+
 msgid "ButtonMessages.WAITING_LIST"
 msgstr "Warteliste"
 
@@ -250,6 +256,24 @@ msgstr "Aktiviert ✅"
 
 msgid "SettingsMessages.DISABLED"
 msgstr "Deaktiviert ❌"
+
+msgid "PrivacyMessages.DESCRIPTION"
+msgstr "<b>Datenschutz</b>\n\nDeine Daten gehören dir. Lies die Datenschutzrichtlinie, um zu sehen, was Mitup speichert und warum, oder beantrage die endgültige Löschung von allem, was Mitup über dich weiß."
+
+msgid "PrivacyMessages.DELETE_WARNING"
+msgstr "<b>Alle deine Daten löschen?</b>\n\nDadurch wird alles, was mit deinem Konto verknüpft ist, endgültig entfernt:\n\n- Treffen, die du erstellt hast, verschwinden für alle Teilnehmer, nicht nur für dich.\n- Du wirst aus jedem Treffen entfernt, an dem du teilnimmst.\n- Deine Einstellungen und deine Patreon-Verknüpfung werden gelöscht.\n\n<b>Es gibt kein Zurück.</b> Gelöschte Daten können nicht wiederhergestellt werden."
+
+msgid "PrivacyMessages.DELETE_LAST_CHANCE"
+msgstr "<b>Letzte Chance</b>\n\nWenn du jetzt bestätigst, funktioniert dein Konto sofort nicht mehr und die Löschung kann nicht mehr gestoppt werden.\n\nMöchtest du wirklich alle deine Daten endgültig löschen?"
+
+msgid "PrivacyMessages.DELETION_MARKED"
+msgstr "Deine Löschanfrage ist bestätigt und dein Konto funktioniert nicht mehr.\n\nInnerhalb eines Tages wird alles endgültig entfernt, und du erhältst eine letzte Nachricht zur Bestätigung der Löschung. Um Mitup danach wieder zu nutzen, sende den Befehl /start."
+
+msgid "PrivacyMessages.PENDING_DELETION_ALERT"
+msgstr "Dein Konto ist zur Löschung vorgemerkt und funktioniert nicht mehr. Du erhältst eine letzte Bestätigungsnachricht. Um Mitup danach wieder zu nutzen, sende den Befehl /start."
+
+msgid "PrivacyMessages.DELETION_COMPLETE"
+msgstr "<b>Deine Daten sind gelöscht</b>\n\nAlles, was mit deinem Konto verknüpft war, ist endgültig weg: die Treffen, die du erstellt hast, dein Platz in den Treffen, an denen du teilgenommen hast, und deine Einstellungen. Buttons auf älteren Nachrichten in diesem Chat funktionieren nicht mehr.\n\nUm Mitup wieder zu nutzen, sende den Befehl /start. Mitup weiß jetzt nichts mehr über dich und richtet dich neu ein."
 
 msgid "MeetingCreationMessages.PROMPT"
 msgstr "Lass uns ein Treffen erstellen. Wie lautet der Titel?\n\n<i>Tipp: du kannst auch ${datetime_link} verwenden, um Datum und Uhrzeit direkt einzufügen.</i>"

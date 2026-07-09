@@ -7,7 +7,7 @@ pytestmark = pytest.mark.db_test
 
 
 async def test_users_has_status_column(db_session: AsyncSession):
-    """The `status` column must exist on `users`, NOT NULL, with a 16-char VARCHAR backing."""
+    """The `status` column must exist on `users`, NOT NULL, with a 32-char VARCHAR backing."""
     result = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(
@@ -20,13 +20,13 @@ async def test_users_has_status_column(db_session: AsyncSession):
     column_name, is_nullable, data_type, max_length = result
     assert column_name == "status"
     assert is_nullable == "NO"
-    # SQLAlchemy String(16) renders as character varying with length 16 on Postgres.
+    # SQLAlchemy String(32) renders as character varying with length 32 on Postgres.
     assert data_type == "character varying"
-    assert max_length == 16
+    assert max_length == 32
 
 
 async def test_users_status_check_constraint_exists(db_session: AsyncSession):
-    """The `users_status_valid` CHECK constraint must be present and enforce the 3 enum values."""
+    """The `users_status_valid` CHECK constraint must be present and enforce the 4 enum values."""
     constraint = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(
@@ -37,17 +37,17 @@ async def test_users_status_check_constraint_exists(db_session: AsyncSession):
             )
         )
     ).scalar_one()
-    # Phase 1 migration uses the literal `status IN ('member','joined_only','left')`.
     assert "'member'" in constraint
     assert "'joined_only'" in constraint
     assert "'left'" in constraint
+    assert "'deletion_requested'" in constraint
 
 
-@pytest.mark.parametrize("status_value", ["member", "joined_only", "left"])
+@pytest.mark.parametrize("status_value", ["member", "joined_only", "left", "deletion_requested"])
 async def test_users_status_accepts_valid_values(db_session: AsyncSession, status_value: str):
     """Each enum value defined in `UserStatus` must satisfy the CHECK constraint."""
     # Use the 998 throwaway range to avoid colliding with session-scoped seed users.
-    tg_user_id = 998_100 + ["member", "joined_only", "left"].index(status_value)
+    tg_user_id = 998_100 + ["member", "joined_only", "left", "deletion_requested"].index(status_value)
     # Savepoint isolates the insert from the session-scoped outer transaction.
     savepoint = await db_session.begin_nested()
     try:

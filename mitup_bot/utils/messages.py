@@ -77,6 +77,8 @@ class ButtonMessages(MessageBase):
     TIMEZONE = f"{Emojis.TIME} Timezone"
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
     PRIVACY = f"{Emojis.SHIELD} Privacy"
+    PRIVACY_POLICY = f"{Emojis.SHIELD} Privacy policy"
+    DELETE_MY_DATA = f"{Emojis.DELETE} Delete my data"
     WAITING_LIST = "Waiting list"
     PUBLIC = "Public"
     OPEN_INVITATION = "Open invitations"
@@ -303,6 +305,45 @@ class SettingsMessages(MessageBase):
     # Generic status labels used in notifications settings
     ENABLED = f"Enabled {Emojis.CHECK}"
     DISABLED = f"Disabled {Emojis.CANCEL}"
+
+
+class PrivacyMessages(MessageBase):
+    DESCRIPTION = (
+        "<b>Privacy</b>\n\n"
+        "Your data belongs to you. Read the privacy policy to see what Mitup stores and why, "
+        "or request the permanent deletion of everything Mitup knows about you."
+    )
+    DELETE_WARNING = (
+        "<b>Delete all your data?</b>\n\n"
+        "This will permanently remove everything linked to your account:\n\n"
+        "- Meetings you created will disappear for everyone who joined them, not just for you.\n"
+        "- You will be removed from every meeting you joined.\n"
+        "- Your settings and your Patreon link will be erased.\n\n"
+        "<b>There is no undo.</b> Deleted data cannot be recovered."
+    )
+    DELETE_LAST_CHANCE = (
+        "<b>Last chance</b>\n\n"
+        "If you confirm now, your account stops working immediately and the deletion cannot be stopped.\n\n"
+        "Do you really want to permanently delete all your data?"
+    )
+    DELETION_MARKED = (
+        "Your deletion request is confirmed and your account has stopped working.\n\n"
+        "Everything will be permanently removed within a day, and you will receive one final message "
+        "confirming the deletion. To use Mitup again after that, send the /start command."
+    )
+    # Shown as a plain callback-query alert (max 200 characters), so it must stay entity-free.
+    PENDING_DELETION_ALERT = (
+        "Your account is scheduled for deletion and no longer works. You will receive one final "
+        "confirmation message. To use Mitup again after that, send the /start command."
+    )
+    DELETION_COMPLETE = (
+        "<b>Your data is deleted</b>\n\n"
+        "Everything linked to your account is permanently gone: the meetings you created, "
+        "your spot in the meetings you joined, and your settings. Buttons on older messages "
+        "in this chat no longer do anything.\n\n"
+        "To use Mitup again, send the /start command. Mitup has no memory of you now and "
+        "will set you up from scratch."
+    )
 
 
 # --- Meeting core: creation and display ---

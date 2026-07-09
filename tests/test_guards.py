@@ -17,6 +17,7 @@ from mitup_bot.exceptions import (
     InlineQueryNotSetError,
     MalformedCallbackData,
     UserNotFound,
+    UserPendingDeletion,
 )
 from mitup_bot.guards import (
     callback_query,
@@ -38,6 +39,7 @@ from mitup_bot.guards import (
 )
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
 from mitup_bot.models import User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
@@ -121,6 +123,17 @@ async def test_current_user_succeeds(mock_session: MockDbSession, update: Update
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     assert user_with_settings == await current_user(update, mock_session)
+
+
+async def test_current_user_rejects_user_pending_deletion(mock_session: MockDbSession, update: Update):
+    marked_user = create_user(id=1, tg_user_id=DEFAULT_USER_ID, status=UserStatus.DELETION_REQUESTED)
+    mock_session.add_object(marked_user, "tg_user_id")
+
+    with pytest.raises(UserPendingDeletion) as raised:
+        await current_user(update, mock_session)
+
+    assert raised.value.tg_user_id == marked_user.tg_user_id
+    assert raised.value.lang == marked_user.lang
 
 
 async def test_user_language_returns_user_lang(mock_session: MockDbSession, update: Update, user_with_settings: User):

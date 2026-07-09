@@ -6,7 +6,7 @@ from mitup_bot import docs_links
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import parse_format_tags
-from mitup_bot.utils.messages import AdminMessages, ButtonMessages
+from mitup_bot.utils.messages import AdminMessages, ButtonMessages, PrivacyMessages
 from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 
 
@@ -168,16 +168,33 @@ def test_main_menu_view_help_button_links_to_the_configured_docs_site(lang: str,
     assert help_button in all_buttons
 
 
-def test_settings_view_privacy_button_links_to_the_configured_docs_site(lang: str, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(docs_links.DocsState, "base_url", "https://staging.mitup.social")
-
+def test_settings_view_privacy_button_opens_the_privacy_screen(lang: str):
     view = factory.settings_view(RenderContext(lang=lang))
 
-    privacy_button = ButtonConfig(
-        text=ButtonMessages.PRIVACY.get(lang=lang), url="https://staging.mitup.social/faq/privacy/"
-    )
+    privacy_button = ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY)
     all_buttons = [button for row in view.keyboard for button in row]
     assert privacy_button in all_buttons
+
+
+def test_privacy_view(lang: str, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(docs_links.DocsState, "base_url", "https://staging.mitup.social")
+
+    view = factory.privacy_view(RenderContext(lang=lang))
+
+    expected_view = MitupView(
+        PrivacyMessages.DESCRIPTION.get(lang=lang),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.PRIVACY_POLICY.get(lang=lang), url="https://staging.mitup.social/faq/privacy/"
+                )
+            ],
+            [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get(lang=lang), callback_data=cb.DELETE_USER_DATA)],
+            [ButtonConfig(text=ButtonMessages.SETTINGS.back(lang=lang), callback_data=cb.SETTINGS)],
+        ],
+    )
+
+    assert expected_view == view
 
 
 def test_admin_menu_view(lang: str):

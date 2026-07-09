@@ -28,7 +28,7 @@ from telegram.ext import ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import BotAdapter, TelegramApi
-from mitup_bot.cli import inactive_meetings, notify_meetings_started
+from mitup_bot.cli import inactive_meetings, notify_meetings_started, user_cleanup
 from mitup_bot.models import Meetup, Message, Settings, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.backend import NullBackend
@@ -178,3 +178,58 @@ async def test_deactivation_releases_row_lock_before_the_drain(db_session: Async
         # the drain and saw the COMMITTED deactivation: begin_write released the row lock
         # at commit, before any Telegram call ran.
         assert probe.active_seen_under_lock is False
+
+
+@contextlib.asynccontextmanager
+async def provisioned_marked_user(tg_user_id: int) -> AsyncIterator[None]:
+    """Provision a committed DELETION_REQUESTED user (with a Settings row) and tear down
+    whatever the purge under test may have left behind."""
+    async with db.begin() as session:
+        session.add(
+            User(first_name="Marked", tg_user_id=tg_user_id, status=UserStatus.DELETION_REQUESTED, settings=Settings())
+        )
+    try:
+        yield
+    finally:
+        async with db.begin() as session:
+            await session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+                text("DELETE FROM users WHERE tg_user_id = :uid").bindparams(uid=tg_user_id)
+            )
+
+
+class ErasureProbeBot:
+    """Stands in for ExtBot during the farewell drain: reads the committed user row concurrently."""
+
+    def __init__(self, tg_user_id: int):
+        self.tg_user_id = tg_user_id
+        self.row_present_during_drain: bool | None = None
+
+    async def send_message(self, **kwargs: object):
+        # A fresh transaction only sees committed state: an absent row here proves the purge
+        # committed before the farewell executed — the deletion is never announced early.
+        async with db.begin() as contender:
+            user = (await contender.exec(select(User).where(User.tg_user_id == self.tg_user_id))).first()
+            self.row_present_during_drain = user is not None
+
+
+async def test_user_cleanup_commits_the_purge_before_the_farewell(db_session: AsyncSession):
+    tg_user_id = 997_430
+    async with provisioned_marked_user(tg_user_id):
+        probe = ErasureProbeBot(tg_user_id)
+
+        async with asyncio.timeout(RACE_TIMEOUT):
+            await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        assert probe.row_present_during_drain is False
+
+
+async def test_user_cleanup_deletion_stands_when_the_farewell_fails(db_session: AsyncSession):
+    tg_user_id = 997_440
+    async with provisioned_marked_user(tg_user_id):
+        # The blocked farewell surfaces at drain time, is swallowed by the lifecycle (the
+        # reconcile finds no row to mark inactive), and the run completes without raising.
+        await user_cleanup.run(make_probe_api(BlockedBot()), MetricsClient(NullBackend()))
+
+        async with db.begin() as session:
+            purged = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
+            assert purged is None

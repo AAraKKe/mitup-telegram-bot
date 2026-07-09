@@ -13,6 +13,7 @@ __all__ = (
     "admin",
     "broadcast",
     "collaborate",
+    "privacy",
     "chat_member",
     "stale_cancel",
 )
@@ -25,7 +26,17 @@ from . import commands, messages
 from .personal_filters import PositiveNumberFilter
 
 # Then subpackages with different handlers registered
-from . import registration_process, edit_settings, inline_query, meeting, main_menu, admin, broadcast, collaborate
+from . import (
+    registration_process,
+    edit_settings,
+    inline_query,
+    meeting,
+    main_menu,
+    admin,
+    broadcast,
+    collaborate,
+    privacy,
+)
 
 # Flat handler modules registered directly on the registry
 from . import chat_member

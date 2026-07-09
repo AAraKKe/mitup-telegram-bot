@@ -7,7 +7,7 @@ from mitup_bot.models import JoinedUsers, Settings, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
-from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingJoinMessages
+from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingJoinMessages, PrivacyMessages
 from mitup_bot.views import MitupView
 from tests.helpers import (
     AnyFloat,
@@ -276,6 +276,61 @@ async def test_non_existent_user_joins_meeting(
         text=MeetingJoinMessages.JOIN_UNREGISTERED.get(),
         show_alert=True,
     )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
+async def test_pending_deletion_user_cannot_join(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A marked user tapping Join is rejected with the pending-deletion alert: no membership row
+    is created, no second user row is registered, and no meeting message is refreshed."""
+    user_with_settings.status = UserStatus.DELETION_REQUESTED
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
+
+    assert len(meeting.joined_links) == 0
+    mock_session.assert_not_added()
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=user_with_settings.lang),
+        show_alert=True,
+    )
+    context.api.assert_update_meeting_messages_not_called()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1))], indirect=True)
+async def test_pending_deletion_user_cannot_leave(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A marked user tapping Leave gets the same rejection; their membership rows stay untouched
+    for the cleanup run to remove."""
+    user_with_settings.status = UserStatus.DELETION_REQUESTED
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+    JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert meeting.has_participant(user_with_settings.db_id)
+    mock_session.assert_not_added()
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=user_with_settings.lang),
+        show_alert=True,
+    )
+    context.api.assert_update_meeting_messages_not_called()
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1))], indirect=True)

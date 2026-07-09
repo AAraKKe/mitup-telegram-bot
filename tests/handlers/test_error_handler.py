@@ -13,6 +13,7 @@ from mitup_bot.exceptions import (
     InlineQueryNotSetError,
     MalformedCallbackData,
     UserNotFound,
+    UserPendingDeletion,
 )
 from mitup_bot.handlers import error_handler
 from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS
@@ -22,7 +23,7 @@ from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import CommonMessages
+from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
 from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     MockDbSession,
@@ -111,6 +112,91 @@ async def test_handle_inactive_user_left_is_noop(
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 
+# --- Pending deletion handling ---
+
+
+async def test_pending_deletion_answers_callback_query_with_alert(
+    app: StubMitupApp, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A callback query from a marked user is answered with the alert and nothing else happens."""
+    context = build_callback_context(app)
+
+    await error_handler.handler(context, UserPendingDeletion(123, "es"), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang="es"), show_alert=True
+    )
+    context.api.assert_send_message_not_called()
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_pending_deletion_replies_to_message_updates(
+    app: StubMitupApp, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A message update has no callback query to answer, so the alert is sent as a plain message."""
+    context = build_message_context(app)
+
+    await error_handler.handler(context, UserPendingDeletion(123, "en"), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_send_message_called(
+        context.telegram_update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang="en")
+    )
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_pending_deletion_answers_inline_queries_with_no_results(
+    app: StubMitupApp, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """An inline query from a marked user is answered empty so the client spinner clears."""
+    context = build_inline_context(app)
+
+    await error_handler.handler(context, UserPendingDeletion(123, "en"), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_answer_inline_query_called(context.telegram_update, results=[], cache_time=0)
+    context.api.assert_send_message_not_called()
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_pending_deletion_does_not_change_user_status(
+    context: StubMitupContext, user: User, mock_session: MockDbSession
+):
+    """Unlike InactiveUserInteraction, the pending-deletion branch must not touch the user row:
+    the DELETION_REQUESTED status is what the cleanup run keys on."""
+    user.status = UserStatus.DELETION_REQUESTED
+    mock_session.add_object(user, query_field="tg_user_id")
+
+    await error_handler.handler(context, UserPendingDeletion(user.tg_user_id, "en"), Env.PROD)
+
+    assert user.status is UserStatus.DELETION_REQUESTED
+
+
+async def test_pending_deletion_suppresses_delivery_failures(app: StubMitupApp, mock_session: MockDbSession):
+    """Delivery is best-effort: a failing answer must not escape as a second fault."""
+    context = build_callback_context(app)
+    context.api.mock_method("answer_callback_query").side_effect = TelegramError("answer failed")
+
+    # Must not raise a second exception.
+    await error_handler.handler(context, UserPendingDeletion(123, "en"), Env.PROD)
+
+
+async def test_pending_deletion_returns_early_when_no_update(app: StubMitupApp, mock_session: MockDbSession):
+    """When the context has no telegram update, the branch is a no-op (no send, no raise)."""
+    context = build_message_context(app)
+    # telegram_update is typed Update, but production reads it as Update | None and short-circuits on
+    # None. Forcing None here is the only way to exercise that branch; it is an intentional test-only
+    # violation, not a ty false positive, so it is exempted from requiring a tracking issue.
+    context.telegram_update = None  # ty: ignore[invalid-assignment]  # nolink: intentional — exercising the None short-circuit branch
+
+    await error_handler.handler(context, UserPendingDeletion(123, "en"), Env.PROD)
+
+    context.api.assert_method_just_called("send_message", times=0)
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
 async def test_handle_error_for_uncaght_exception(context: StubMitupContext, metrics: MetricAssertions):
     context.prepare_handler_metrics({"Handler": "SomeHandler", "HandlerType": "Callback"})
 
@@ -162,6 +248,11 @@ def build_callback_context(app: StubMitupApp) -> StubMitupContext:
 
 def build_message_context(app: StubMitupApp) -> StubMitupContext:
     update = create_update(UpdateRequest(message=True))
+    return build_context(update, app)
+
+
+def build_inline_context(app: StubMitupApp) -> StubMitupContext:
+    update = create_update(UpdateRequest(message=False, inline_query="123"))
     return build_context(update, app)
 
 

@@ -25,6 +25,7 @@ from mitup_bot.exceptions import (
     InlineQueryNotSetError,
     MalformedCallbackData,
     UserNotFound,
+    UserPendingDeletion,
 )
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.models import Meetup, User
@@ -90,6 +91,10 @@ async def current_user(update: Update, session: AsyncSession, *, load_collection
 
     # If we have an effective user, get the user from DB
     if user := await User.by_tg_user_id(session, update.effective_user.id, load_collections=load_collections):
+        # A user marked for deletion is rejected everywhere until the cleanup run purges the row;
+        # the error handler answers the interaction with the standardized pending-deletion alert.
+        if user.status is UserStatus.DELETION_REQUESTED:
+            raise UserPendingDeletion(user.tg_user_id, user.lang)
         return user
     else:
         raise UserNotFound(update.effective_user.id)

@@ -10,7 +10,7 @@ from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.utils import RegistrationMessages
+from mitup_bot.utils import PrivacyMessages, RegistrationMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
@@ -41,12 +41,21 @@ async def command_start_with_new_user(
 @with_session
 async def start_onboarding(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationRegistrationProcessState | None:
-    """Prompt for a timezone and enter the conversation, or None when the user is a MEMBER."""
+) -> ConversationRegistrationProcessState | int | None:
+    """Prompt for a timezone and enter the conversation, or None when the user is a MEMBER.
+
+    A user marked for deletion falls through `guards.member_user` (not a MEMBER) into this entry,
+    so the no-undo check lives here: their row must not be reused or promoted, they get the
+    pending-deletion notice, and the update is claimed with END so group 0 never sees it.
+    """
     if await guards.member_user(update, session) is not None:
         return None
 
     user = await get_or_create_onboarding_user(session, update)
+    if user.status is UserStatus.DELETION_REQUESTED:
+        await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user.lang))
+        return ConversationHandler.END
+
     message = RegistrationMessages.TIMEZONE_PROMPT.get(first_name=user.first_name)
 
     await context.api.send_message(update=update, view=message)

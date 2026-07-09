@@ -15,6 +15,7 @@ from mitup_bot import patreon, supporter
 from mitup_bot.config import LimitsConfig, PatreonConfig, RunModes
 from mitup_bot.exceptions import PatreonApiError
 from mitup_bot.models import SupporterSubscription
+from mitup_bot.models.users import UserStatus
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
 from mitup_bot.patreon.models import IdentityData, IdentityResponse
 from mitup_bot.supporter import SupporterLevel
@@ -256,6 +257,7 @@ async def test_callback_patreon_error_renders_retry(
         (LinkOutcome.LINKED_NO_PATRON, 200, "connected"),
         (LinkOutcome.UNKNOWN_USER, 400, "couldn't find your mitup account"),
         (LinkOutcome.ALREADY_LINKED_ELSEWHERE, 409, "already linked"),
+        (LinkOutcome.PENDING_DELETION, 403, "scheduled for deletion"),
     ],
 )
 async def test_callback_outcome_pages_render_expected_content(
@@ -730,6 +732,36 @@ async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: C
     assert warning["flow"] == "patreon_oauth_callback"
     assert warning["stage"] == "persist"
     assert warning["outcome"] == "already_linked_elsewhere"
+
+
+async def test_link_rejected_when_user_pending_deletion(patch_begin_write: Callable[[MockDbSession], None]):
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_660, status=UserStatus.DELETION_REQUESTED)
+    session.add_object(user, "tg_user_id")
+    # The user already had a link before requesting deletion; completing an old OAuth URL during
+    # the mark-to-purge window must not refresh it either.
+    existing = create_supporter_subscription(user_id=user.db_id, patreon_user_id="p-old")
+    session.add_object(existing, "user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        outcome = await link_patreon_account(
+            api, 997_660, patreon_user_id="p-660", supporter_level=SupporterLevel.HOST_2
+        )
+
+    assert outcome is LinkOutcome.PENDING_DELETION
+    assert user.supporter_level is SupporterLevel.NONE
+    assert existing.patreon_user_id == "p-old"
+    assert not session.objects_added
+    api.assert_method_just_called("send_message_to_user", times=0)
+    api.assert_method_just_called("edit_message_for_user", times=0)
+
+    warning = one_log(logs, "Patreon callback for a user pending deletion")
+    assert warning["flow"] == "patreon_oauth_callback"
+    assert warning["stage"] == "persist"
+    assert warning["outcome"] == "pending_deletion"
+    assert warning["tg_user_id"] == 997_660
 
 
 async def test_upsert_creates_subscription_when_absent():
