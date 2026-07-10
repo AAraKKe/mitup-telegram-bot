@@ -25,7 +25,6 @@ class Emojis(Enum):
     CANCEL = "❌"
     DELETE = "🗑️"
     EDIT = "✏️"
-    CHAT = "💬"
     SHARE = "📨"
     RED_CIRCLE = "🔴"
     NEW_MEETING = "➕"
