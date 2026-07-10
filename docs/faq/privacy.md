@@ -10,6 +10,8 @@ This page describes exactly what data Mitup stores, what it does with that data,
 
 Each section is one kind of relationship the bot has with your data: from "we hold this so the product works" all the way down to "we never see it".
 
+Everything in the stored cards got there through something you did yourself: starting the bot, joining a meeting, creating one, changing a setting. If a meeting is shared into a chat you're in, or someone adds your name to a guest list, the bot stores nothing about your Telegram account.
+
 <div class="tldr-stack">
   <section class="tldr-card tldr--stored">
     <header class="tldr-card__head">
@@ -82,7 +84,7 @@ Each section is one kind of relationship the bot has with your data: from "we ho
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Meetings you've joined</div>
-        <div class="tldr-row__why">The meetings others invited you to and whether you accepted, declined, or are on the waiting list.</div>
+        <div class="tldr-row__why">The meetings you've joined yourself from a shared card, and whether you're a confirmed participant or on the waiting list.</div>
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Meeting locations</div>
@@ -93,8 +95,8 @@ Each section is one kind of relationship the bot has with your data: from "we ho
         <div class="tldr-row__why">Chat and message IDs for bot-sent messages, never the message text itself, so the bot can edit or delete them when something changes.</div>
       </div>
       <div class="tldr-row">
-        <div class="tldr-row__label">Who invited you</div>
-        <div class="tldr-row__why">Record of which participant invited you to a meeting.</div>
+        <div class="tldr-row__label">Guests you've invited</div>
+        <div class="tldr-row__why">The name you typed when adding a friend to a meeting, plus a note that you added them, so the card can show who invited whom. That entry holds a spot on the list and is never linked to any Telegram account.</div>
       </div>
     </div>
   </section>
@@ -155,6 +157,10 @@ Each section is one kind of relationship the bot has with your data: from "we ho
       <div class="tldr-row">
         <div class="tldr-row__label">Group chat content</div>
         <div class="tldr-row__why">The bot runs with Telegram's Privacy Mode on. It only sees commands and direct replies.</div>
+      </div>
+      <div class="tldr-row">
+        <div class="tldr-row__label">People who see a shared card</div>
+        <div class="tldr-row__why">A meeting card landing in your group stores nothing about anyone there. The bot first learns you exist when you start it or join a meeting yourself.</div>
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Analytics SDKs</div>
@@ -221,7 +227,7 @@ For the GDPR-minded, the legal bases are the boring ones:
 
 If you joined a meeting via someone else's group message without ever opening the bot directly, your record exists only for the lifetime of those meetings and is removed when they end.
 
-**Meetings you're invited to** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed.
+**Meetings you've joined** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed. A guest someone added by name is a placeholder entry on the meeting, not a user record, and disappears with the meeting.
 
 **Meetings you own:** when a meeting becomes inactive, how long it's kept afterward, and when it's permanently deleted are covered on the [Meeting lifecycle](../user-guide/meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page.
 
