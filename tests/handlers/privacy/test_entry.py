@@ -10,8 +10,8 @@ from mitup_bot.handlers.privacy.enums import PrivacyHandlerId
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import PrivacyMessages
-from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.utils.messages import ButtonMessages, PrivacyMessages
+from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
 from tests.helpers import HandlerContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
 
@@ -54,16 +54,39 @@ async def test_export_sends_the_user_data_as_a_json_document(
 
     sent = context.api.call_args("send_document").kwargs
     assert sent["update"] is update
-    assert sent["filename"] == f"mitup-export-{dt.datetime.now(dt.UTC):%Y-%m-%d}.json"
-    assert sent["caption"] == PrivacyMessages.EXPORT_CAPTION.get(lang=user_with_settings.lang)
-    export = json.loads(sent["document"])
+    view = sent["view"]
+    assert view.description == PrivacyMessages.EXPORT_CAPTION.get(lang=user_with_settings.lang)
+    assert view.document is not None
+    assert view.document.filename == f"mitup-export-{dt.datetime.now(dt.UTC):%Y-%m-%d}.json"
+    export = json.loads(view.document.content)
     assert export["user"]["telegram_user_id"] == user_with_settings.tg_user_id
     assert [meeting["title"] for meeting in export["meetings"]] == ["Test Meeting 1", "Test Meeting 2"]
+    # The document carries a Privacy button so it is not a dead end (plain label, no « decoration).
+    assert view.keyboard == [
+        [ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=user_with_settings.lang), callback_data=cb.SEND_PRIVACY)]
+    ]
     # The document is a new message: the privacy screen above keeps its buttons untouched.
     context.api.assert_edit_message_not_called()
     # structlog event string is the LogRecord message; user_id rides along as a record attribute.
     export_record = privacy_log_record(caplog, "User data export sent")
     assert export_record.__dict__["user_id"] == user_with_settings.db_id
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SEND_PRIVACY)], indirect=True)
+async def test_send_privacy_sends_a_new_privacy_message(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    # The button lives on the export document, which must stay in the chat with its button intact,
+    # so the handler posts a fresh privacy screen instead of editing the tapped message.
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(PrivacyHandlerId.SEND_PRIVACY, handler_context=handler_context)
+
+    context.api.assert_send_message_called(update, factory.privacy_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_edit_message_not_called()
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_USER_DATA)], indirect=True)

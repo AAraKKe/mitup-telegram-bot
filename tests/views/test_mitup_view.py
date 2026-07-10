@@ -2,7 +2,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.utils.entities import FormattedText
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import ButtonConfig, MitupView, ViewDocument
 from mitup_bot.views.mitup_view import MitupInlineView, PaginatedMitupView, PaginatedViewPosition
 
 
@@ -74,6 +74,18 @@ def test_mitup_view_repr_contains_description():
     # repr must identify the class and include the description text
     assert "MitupView" in r
     assert "hello world" in r
+
+
+def test_mitup_view_eq_compares_the_document():
+    document = ViewDocument(content=b"{}", filename="export.json")
+
+    assert MitupView("hello", keyboard=[], document=document) == MitupView("hello", keyboard=[], document=document)
+    assert MitupView("hello", keyboard=[], document=document) != MitupView("hello", keyboard=[])
+
+
+def test_mitup_view_repr_contains_the_document():
+    view = MitupView("hello", keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
+    assert "export.json" in repr(view)
 
 
 def test_mitup_inline_view_eq_returns_not_implemented_for_non_inline_view():

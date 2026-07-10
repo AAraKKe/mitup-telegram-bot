@@ -36,15 +36,8 @@ class MockApi(TelegramApi):
     def send_message(self, update: Update, view: MitupView | FormattedText | str):
         return self.call_mock("send_message", update=update, view=view)
 
-    def send_document(
-        self,
-        update: Update,
-        *,
-        document: bytes,
-        filename: str,
-        caption: FormattedText | str | None = DEFAULT_NONE,  # type: ignore
-    ):
-        return self.call_mock("send_document", update=update, document=document, filename=filename, caption=caption)
+    def send_document(self, update: Update, view: MitupView):
+        return self.call_mock("send_document", update=update, view=view)
 
     def edit_message(self, update: Update, view: MitupView | FormattedText | str):
         return self.call_mock("edit_message", update=update, view=view)

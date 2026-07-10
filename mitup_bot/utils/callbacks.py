@@ -123,6 +123,11 @@ UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
 # ----------------------------------------
 CANCEL_SETTINGS = CallbackData(action="cancel", entity="settings")
 EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
+# SEND_PRIVACY sends the privacy screen as a NEW message instead of editing the tapped one, so a
+# standalone message (the data-export document) stays in the chat while the user still gets a way
+# back into the flow. Distinct action keeps its pattern from colliding with EDIT_PRIVACY, whose
+# handler edits.
+SEND_PRIVACY = CallbackData(action="send", entity="privacy")
 EXPORT_USER_DATA = CallbackData(action="export", entity="user_data")
 # Data-deletion flow: two confirmation steps, both declining back to the privacy screen through
 # the single DECLINE callback.

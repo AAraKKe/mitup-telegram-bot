@@ -81,12 +81,23 @@ ButtonRow = list[ButtonConfig]
 Keyboard = list[ButtonRow]
 
 
+@dataclass(frozen=True)
+class ViewDocument:
+    """An in-memory file attached to a view, sent as a Telegram document with the view's
+    description as its caption. Content and filename travel as one unit so they can never
+    arrive separately."""
+
+    content: bytes
+    filename: str
+
+
 class MitupView:
-    def __init__(self, description: str | FormattedText, keyboard: Keyboard):
+    def __init__(self, description: str | FormattedText, keyboard: Keyboard, document: ViewDocument | None = None):
         self.description: FormattedText = (
             description if isinstance(description, FormattedText) else FormattedText(description)
         )
         self.keyboard = keyboard
+        self.document = document
 
     @property
     def markup(self) -> InlineKeyboardMarkup | None:
@@ -117,10 +128,17 @@ class MitupView:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return self.description == other.description and self.keyboard == other.keyboard
+        return (
+            self.description == other.description
+            and self.keyboard == other.keyboard
+            and self.document == other.document
+        )
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(description={self.description!r}, keyboard={self.keyboard!r})"
+        return (
+            f"{self.__class__.__name__}(description={self.description!r}, keyboard={self.keyboard!r}, "
+            f"document={self.document!r})"
+        )
 
     @staticmethod
     def keyboard_to_markup(keyboard: Keyboard) -> InlineKeyboardMarkup:

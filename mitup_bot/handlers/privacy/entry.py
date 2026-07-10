@@ -7,9 +7,9 @@ from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import PrivacyMessages
+from mitup_bot.utils.messages import ButtonMessages, PrivacyMessages
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import MitupView, factory
+from mitup_bot.views import ButtonConfig, MitupView, ViewDocument, factory
 
 from . import data_export
 from .enums import PrivacyHandlerId
@@ -35,15 +35,28 @@ async def callback_query_export_user_data(session: AsyncSession, update: Update,
     export = await data_export.build_user_export(session, user)
     document, filename = data_export.export_document(export)
     # The document arrives as a new message, so the privacy screen above keeps its buttons.
-    await context.api.send_document(
-        update=update,
-        document=document,
-        filename=filename,
-        caption=PrivacyMessages.EXPORT_CAPTION.get(lang=user.lang),
+    # Its own button sends a fresh privacy screen so the document is not a dead end. Plain label
+    # (no « decoration) since this is navigation from a standalone message, not a back button.
+    view = MitupView(
+        description=PrivacyMessages.EXPORT_CAPTION.get(lang=user.lang),
+        keyboard=[[ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=user.lang), callback_data=cb.SEND_PRIVACY)]],
+        document=ViewDocument(content=document, filename=filename),
     )
+    await context.api.send_document(update=update, view=view)
     # Privacy events are far too sparse for a useful CloudWatch series; the searchable log
     # carries the same information.
     log.info("User data export sent", user_id=user.db_id)
+
+
+@HandlersRegistry.register_callback_query(PrivacyHandlerId.SEND_PRIVACY, callback_data=cb.SEND_PRIVACY, bindable=True)
+@with_session
+async def callback_query_send_privacy(session: AsyncSession, update: Update, context: TMitupContext):
+    # Navigation-only entry point for standalone messages (the export document): send the privacy
+    # screen as a NEW message so the tapped message stays in the chat with its button intact.
+    user = await guards.current_user(update, session, load_collections=False)
+    await context.api.send_message(
+        update=update, view=factory.privacy_view(guards.render_context(user, update, context))
+    )
 
 
 @HandlersRegistry.register_callback_query(PrivacyHandlerId.DELETE_DATA, callback_data=cb.DELETE_USER_DATA)

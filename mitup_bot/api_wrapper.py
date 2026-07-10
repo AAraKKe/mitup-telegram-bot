@@ -24,6 +24,7 @@ from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
     InactiveUserInteraction,
+    NoDocumentAvailable,
     NoMessageAvailable,
 )
 from mitup_bot.models import Meetup, User
@@ -194,9 +195,7 @@ class TelegramApiWrapper(Protocol):
     def end_capture(self): ...
     async def execute_queued(self, outbox: ApiOutbox): ...
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None: ...
-    async def send_document(
-        self, update: Update, *, document: bytes, filename: str, caption: FormattedText | str | None = None
-    ) -> Message | None: ...
+    async def send_document(self, update: Update, view: MitupView) -> Message | None: ...
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None: ...
     async def send_messages_to_users(
         self,
@@ -373,19 +372,35 @@ class TelegramApi:
                 disable_web_page_preview=True,
             )
 
-    async def send_document(
-        self, update: Update, *, document: bytes, filename: str, caption: FormattedText | str | None = None
-    ) -> Message | None:
-        """Send an in-memory document to the chat from the update, with an explicit filename."""
+    async def send_document(self, update: Update, view: MitupView) -> Message | None:
+        """Send the view's document to the chat from the update, with the view's description
+        as the caption and its keyboard as the reply markup."""
         from mitup_bot import guards
 
         chat_id = guards.chat(update).id
+        if view.document is None:
+            raise NoDocumentAvailable("Cannot send document, the view carries no document")
+        # Rendered at enqueue time so the queued call carries only plain data under capture.
         return await self._call_or_enqueue(
-            "send_document", partial(self._send_document_now, chat_id, document, filename, caption), None
+            "send_document",
+            partial(
+                self._send_document_now,
+                chat_id,
+                view.document.content,
+                view.document.filename,
+                view.description,
+                view.markup,
+            ),
+            None,
         )
 
     async def _send_document_now(
-        self, chat_id: int, document: bytes, filename: str, caption: FormattedText | str | None
+        self,
+        chat_id: int,
+        document: bytes,
+        filename: str,
+        caption: FormattedText | str | None,
+        reply_markup: InlineKeyboardMarkup | None,
     ) -> Message | None:
         caption_text = caption.text if isinstance(caption, FormattedText) else caption
         caption_entities = (caption.entities or None) if isinstance(caption, FormattedText) else None
@@ -396,6 +411,7 @@ class TelegramApi:
                 filename=filename,
                 caption=caption_text,
                 caption_entities=caption_entities,
+                reply_markup=reply_markup,
             )
 
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:

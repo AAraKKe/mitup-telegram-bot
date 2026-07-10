@@ -22,6 +22,7 @@ from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
     InactiveUserInteraction,
+    NoDocumentAvailable,
     NoMessageAvailable,
 )
 from mitup_bot.models import Meetup
@@ -30,7 +31,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils.entities import FormattedText
-from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
+from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView, MitupView, ViewDocument
 from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions
@@ -143,11 +144,17 @@ async def test_send_document_sends_bytes_with_filename(telegram_api: TelegramApi
     update.effective_chat.id = 42
     sentinel = MagicMock(spec=Message)
     bot.send_document.return_value = sentinel
+    view = MitupView("a caption", keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
 
-    result = await telegram_api.send_document(update, document=b"{}", filename="export.json", caption="a caption")
+    result = await telegram_api.send_document(update, view)
 
     bot.send_document.assert_awaited_once_with(
-        chat_id=42, document=b"{}", filename="export.json", caption="a caption", caption_entities=None
+        chat_id=42,
+        document=b"{}",
+        filename="export.json",
+        caption="a caption",
+        caption_entities=None,
+        reply_markup=None,
     )
     assert result is sentinel
 
@@ -157,8 +164,9 @@ async def test_send_document_with_formatted_caption(telegram_api: TelegramApi, b
     update.effective_chat.id = 42
     caption_entity = MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)
     caption = FormattedText("bold caption", entities=[caption_entity])
+    view = MitupView(caption, keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
 
-    await telegram_api.send_document(update, document=b"{}", filename="export.json", caption=caption)
+    await telegram_api.send_document(update, view)
 
     bot.send_document.assert_awaited_once_with(
         chat_id=42,
@@ -166,15 +174,45 @@ async def test_send_document_with_formatted_caption(telegram_api: TelegramApi, b
         filename="export.json",
         caption="bold caption",
         caption_entities=[caption_entity],
+        reply_markup=None,
     )
+
+
+async def test_send_document_with_keyboard(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    keyboard = [[ButtonConfig(text="Privacy", callback_data="send;privacy")]]
+    view = MitupView("a caption", keyboard=keyboard, document=ViewDocument(content=b"{}", filename="export.json"))
+
+    await telegram_api.send_document(update, view)
+
+    bot.send_document.assert_awaited_once_with(
+        chat_id=42,
+        document=b"{}",
+        filename="export.json",
+        caption="a caption",
+        caption_entities=None,
+        reply_markup=MitupView.keyboard_to_markup(keyboard),
+    )
+
+
+async def test_send_document_raises_when_the_view_carries_no_document(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+
+    with pytest.raises(NoDocumentAvailable):
+        await telegram_api.send_document(update, MitupView("a caption", keyboard=[]))
+
+    bot.send_document.assert_not_called()
 
 
 async def test_send_document_is_queued_under_capture(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42
+    view = MitupView("a caption", keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
 
     outbox = telegram_api.begin_capture()
-    assert await telegram_api.send_document(update, document=b"{}", filename="export.json") is None
+    assert await telegram_api.send_document(update, view) is None
     telegram_api.end_capture()
 
     bot.send_document.assert_not_called()
@@ -182,7 +220,38 @@ async def test_send_document_is_queued_under_capture(telegram_api: TelegramApi, 
     await telegram_api.execute_queued(outbox)
 
     bot.send_document.assert_awaited_once_with(
-        chat_id=42, document=b"{}", filename="export.json", caption=None, caption_entities=None
+        chat_id=42,
+        document=b"{}",
+        filename="export.json",
+        caption="a caption",
+        caption_entities=None,
+        reply_markup=None,
+    )
+
+
+async def test_send_document_keyboard_is_preserved_under_capture(telegram_api: TelegramApi, bot: AsyncMock):
+    # The markup is rendered at enqueue time and carried by the queued call as plain data,
+    # so the replay after commit sends the exact keyboard the handler attached.
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    keyboard = [[ButtonConfig(text="Privacy", callback_data="send;privacy")]]
+    view = MitupView("a caption", keyboard=keyboard, document=ViewDocument(content=b"{}", filename="export.json"))
+
+    outbox = telegram_api.begin_capture()
+    assert await telegram_api.send_document(update, view) is None
+    telegram_api.end_capture()
+
+    bot.send_document.assert_not_called()
+
+    await telegram_api.execute_queued(outbox)
+
+    bot.send_document.assert_awaited_once_with(
+        chat_id=42,
+        document=b"{}",
+        filename="export.json",
+        caption="a caption",
+        caption_entities=None,
+        reply_markup=MitupView.keyboard_to_markup(keyboard),
     )
 
 

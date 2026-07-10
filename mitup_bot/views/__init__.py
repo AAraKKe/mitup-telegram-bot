@@ -10,6 +10,7 @@ __all__ = (
     "MitupInlineView",
     "PaginatedMitupView",
     "RenderContext",
+    "ViewDocument",
 )
 
 from .mitup_view import (
@@ -21,6 +22,7 @@ from .mitup_view import (
     PaginatedMitupView,
     Keyboard,
     ButtonRow,
+    ViewDocument,
 )
 from .calendar import CalendarKeyboard
 from .context import RenderContext
