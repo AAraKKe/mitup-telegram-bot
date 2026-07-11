@@ -7,11 +7,12 @@ from telegram import Update
 
 from mitup_bot.handlers.privacy import data_export
 from mitup_bot.handlers.privacy.enums import PrivacyHandlerId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, PrivacyMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import HandlerContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
 

@@ -2,10 +2,11 @@ import pytest
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import SEARCH_QUERY_PREFIX, InlineQueryId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 

@@ -1,8 +1,9 @@
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages
-from mitup_bot.views.mitup_view import ButtonConfig, MitupView
+from mitup_bot.views.mitup_view import MitupView
 
 
 def link_confirmation_view(text: str | FormattedText, lang: str) -> MitupView:

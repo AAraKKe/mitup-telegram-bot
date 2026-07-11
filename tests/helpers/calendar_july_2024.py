@@ -29,9 +29,9 @@ Mo Tu We Th Fr Sa Su
 import datetime as dt
 
 from mitup_bot.callback_data import DateCallbackData
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils import ButtonMessages, MonthList, Weekday
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig
 
 
 def calendar_markup(lang: str) -> list[list[ButtonConfig]]:

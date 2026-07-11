@@ -4,81 +4,24 @@ from itertools import batched
 from math import ceil
 from typing import Self, assert_never
 
-from pydantic import BaseModel, field_serializer, field_validator, model_validator
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.keyboards import ButtonConfig, ButtonRow, Keyboard
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
 
 
-class ButtonConfig(BaseModel):
-    text: str | FormattedText
-    callback_data: CallbackData | str | None = None
-    switch_inline_query: str | None = None
-    switch_inline_query_current_chat: str | None = None
-    # An https:// or tg:// deep link. Used by buttons that open an external page (e.g. the Patreon
-    # OAuth consent screen), which produce no callback query and so carry no callback_data.
-    url: str | None = None
-
-    model_config = {
-        "arbitrary_types_allowed": True,
-    }
-
-    @field_validator("callback_data")
-    @classmethod
-    def validate_callback_data(cls, value: CallbackData | str | None) -> CallbackData | str | None:
-        str_value = str(value)
-        if len(str_value.encode("utf-8")) > 64:
-            raise ValueError(f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram")
-        return value
-
-    @field_validator("text")
-    @classmethod
-    def validate_text(cls, value: str | FormattedText) -> str | FormattedText:
-        if isinstance(value, FormattedText):
-            if value.entities:
-                raise ValueError("ButtonConfig text should not contain entities")
-            return value
-        return value
-
-    @model_validator(mode="after")
-    def validate_exactly_one_action(self) -> Self:
-        action_count = sum(
-            action_field is not None
-            for action_field in [
-                self.callback_data,
-                self.url,
-                self.switch_inline_query,
-                self.switch_inline_query_current_chat,
-            ]
-        )
-        if action_count != 1:
-            raise ValueError(
-                "Exactly one of callback_data, switch_inline_query, switch_inline_query_current_chat, "
-                "or url must be set"
-            )
-        return self
-
-    @field_serializer("text")
-    def serialize_text(self, value: str | FormattedText) -> str:
-        return value if isinstance(value, str) else value.text
-
-    @property
-    def button(self) -> InlineKeyboardButton:
-        text = self.text if isinstance(self.text, str) else self.text.text
-        return InlineKeyboardButton(
-            text=text,
-            callback_data=str(self.callback_data) if self.callback_data else None,
-            switch_inline_query=self.switch_inline_query,
-            switch_inline_query_current_chat=self.switch_inline_query_current_chat,
-            url=self.url,
-        )
-
-
-ButtonRow = list[ButtonConfig]
-Keyboard = list[ButtonRow]
+def to_inline_keyboard_button(config: ButtonConfig) -> InlineKeyboardButton:
+    text = config.text if isinstance(config.text, str) else config.text.text
+    return InlineKeyboardButton(
+        text=text,
+        callback_data=str(config.callback_data) if config.callback_data else None,
+        switch_inline_query=config.switch_inline_query,
+        switch_inline_query_current_chat=config.switch_inline_query_current_chat,
+        url=config.url,
+    )
 
 
 @dataclass(frozen=True)
@@ -142,7 +85,7 @@ class MitupView:
 
     @staticmethod
     def keyboard_to_markup(keyboard: Keyboard) -> InlineKeyboardMarkup:
-        inline_keyboard = [[button_config.button for button_config in row] for row in keyboard]
+        inline_keyboard = [[to_inline_keyboard_button(button_config) for button_config in row] for row in keyboard]
         return InlineKeyboardMarkup(inline_keyboard)
 
 

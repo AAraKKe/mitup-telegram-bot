@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from typing import Literal, assert_never
 
 from mitup_bot.callback_data import CallbackData, DateCallbackData
+from mitup_bot.keyboards import ButtonConfig, ButtonRow, Keyboard
 from mitup_bot.utils import ButtonMessages, Emojis, MonthList, Weekday
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
-
-from .mitup_view import ButtonConfig, ButtonRow, Keyboard
 
 
 @dataclass

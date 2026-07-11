@@ -25,13 +25,14 @@ from mitup_bot.exceptions import (
     NoDocumentAvailable,
     NoMessageAvailable,
 )
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils.entities import FormattedText
-from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView, MitupView, ViewDocument
+from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView, ViewDocument
 from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions

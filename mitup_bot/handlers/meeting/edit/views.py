@@ -1,8 +1,9 @@
 from mitup_bot.callback_data import MeetingCallbackData
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditLocationMessages, MeetingEditParticipantsMessages
-from mitup_bot.views import ButtonConfig, MitupView, PaginatedMitupView, RenderContext, factory
+from mitup_bot.views import MitupView, PaginatedMitupView, RenderContext, factory
 
 
 def edit_location_view(meeting: Meetup) -> MitupView:

@@ -1,8 +1,9 @@
 import pytest
 
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from tests.helpers import create_meetup, create_user
 
 # --- Invite button visibility in main_view and external_view ---

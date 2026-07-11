@@ -5,11 +5,12 @@ from telegram import Update
 from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, PrivacyMessages
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig, MitupView, ViewDocument, factory
+from mitup_bot.views import MitupView, ViewDocument, factory
 
 from . import data_export
 from .enums import PrivacyHandlerId

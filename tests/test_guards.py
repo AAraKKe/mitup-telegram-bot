@@ -38,6 +38,7 @@ from mitup_bot.guards import (
     valid_paginated_callback_data,
 )
 from mitup_bot.handlers.main_menu import MainMenuHandlerId
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
@@ -46,7 +47,7 @@ from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, SupporterMessages
 from mitup_bot.views import RenderContext, factory
-from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
+from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
     StubMitupContext,
     UpdateRequest,

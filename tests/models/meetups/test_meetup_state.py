@@ -3,11 +3,12 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from tests.helpers import create_meetup, create_user
 
 

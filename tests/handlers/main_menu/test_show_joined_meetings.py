@@ -6,13 +6,14 @@ from telegram import Update
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.main_menu.show_joined_meetings import callback_query_show_joined_meetings
+from mitup_bot.keyboards import ButtonConfig
 
 # Updated imports for handlers and enums:
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
-from mitup_bot.views.mitup_view import ButtonConfig, PaginatedMitupView
+from mitup_bot.views.mitup_view import PaginatedMitupView
 from tests.helpers import (
     HandlerContext,
     StubMitupContext,

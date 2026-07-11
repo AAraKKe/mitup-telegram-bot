@@ -2,9 +2,9 @@ import pytest
 from telegram import MessageEntity
 
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
-from mitup_bot.views.mitup_view import ButtonConfig
 
 
 @pytest.fixture

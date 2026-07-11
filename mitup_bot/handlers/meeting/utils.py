@@ -5,12 +5,12 @@ from telegram import Update
 
 from mitup_bot import guards, limits, supporter
 from mitup_bot.callback_data import MeetingListSource
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import ButtonMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig
 
 
 def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:

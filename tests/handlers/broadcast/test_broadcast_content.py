@@ -10,11 +10,12 @@ from telegram import User as TgUser
 from mitup_bot.handlers.broadcast import utils
 from mitup_bot.handlers.broadcast.content import MAX_DOCUMENT_BYTES
 from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId, ConversationBroadcastState
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Broadcast, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText, parse_format_tags, utf16_len
 from mitup_bot.utils.messages import BroadcastOperatorMessages, ButtonMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from tests.helpers import (
     HandlerContext,
     MockDbSession,

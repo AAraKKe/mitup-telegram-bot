@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from mitup_bot import docs_links
 from mitup_bot.callback_data import CallbackData, DateCallbackData
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import (
     AdminMessages,
@@ -21,7 +22,7 @@ from mitup_bot.utils import (
 )
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText, parse_format_tags
-from mitup_bot.views import ButtonConfig, CalendarKeyboard, GridMitupView, Keyboard, MitupView, RenderContext
+from mitup_bot.views import CalendarKeyboard, GridMitupView, MitupView, RenderContext
 
 if TYPE_CHECKING:
     from mitup_bot.models import Meetup, User

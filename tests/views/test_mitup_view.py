@@ -1,8 +1,8 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 import mitup_bot.utils.callbacks as cb
-from mitup_bot.utils.entities import FormattedText
-from mitup_bot.views import ButtonConfig, MitupView, ViewDocument
+from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.views import MitupView, ViewDocument
 from mitup_bot.views.mitup_view import MitupInlineView, PaginatedMitupView, PaginatedViewPosition
 
 
@@ -39,26 +39,6 @@ def test_mitup_view_markup():
     )
 
     assert expected_keyboard == view.markup
-
-
-def test_button_config_validate_text_passes_formatted_text_without_entities_through():
-    # A FormattedText with no entities should be returned as-is (line 42 branch in validate_text)
-    ft = FormattedText("plain text")
-    btn = ButtonConfig(text=ft, callback_data=cb.SHOW_MEETING.with_id(1))
-    # The validated value stored on the model must be the same FormattedText object
-    assert btn.text == ft
-
-
-def test_button_config_validate_text_raises_when_formatted_text_has_entities():
-    import pytest
-    from pydantic import ValidationError
-    from telegram import MessageEntity
-
-    # A FormattedText with at least one entity must be rejected by the validator
-    ft = FormattedText("bold", [MessageEntity(type="bold", offset=0, length=4)])
-
-    with pytest.raises(ValidationError, match="ButtonConfig text should not contain entities"):
-        ButtonConfig(text=ft, callback_data=cb.SHOW_MEETING.with_id(1))
 
 
 def test_mitup_view_eq_returns_not_implemented_for_non_view():

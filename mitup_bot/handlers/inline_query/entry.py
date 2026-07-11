@@ -4,6 +4,7 @@ from telegram import Update
 from mitup_bot.db import with_session
 from mitup_bot.guards import current_user, shareable_meeting_id
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
@@ -11,7 +12,7 @@ from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import ButtonMessages, InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
+from mitup_bot.views import InlineResultsButton, MitupInlineView
 
 from .enums import InlineQueryId
 from .utils import meeting_unavailable_view, sort_meetings

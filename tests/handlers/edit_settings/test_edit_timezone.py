@@ -14,10 +14,11 @@ from mitup_bot.handlers.edit_settings.edit_timezone import (
 )
 from mitup_bot.handlers.edit_settings.entry import callback_query_settings
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 

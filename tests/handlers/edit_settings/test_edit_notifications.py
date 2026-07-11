@@ -3,10 +3,11 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,

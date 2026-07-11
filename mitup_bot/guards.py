@@ -28,6 +28,7 @@ from mitup_bot.exceptions import (
     UserPendingDeletion,
 )
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
@@ -38,7 +39,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase, MessageParams
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import RenderContext, factory
-from mitup_bot.views.mitup_view import ButtonConfig, Keyboard, MitupView
+from mitup_bot.views.mitup_view import MitupView
 
 log = structlog.get_logger(__name__)
 

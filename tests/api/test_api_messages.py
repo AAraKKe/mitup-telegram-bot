@@ -12,9 +12,10 @@ from mitup_bot.api_wrapper import (
     TelegramApi,
 )
 from mitup_bot.exceptions import NoMessageAvailable
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from tests.helpers import AnyFloat, StubMitupContext, create_meetup
 from tests.helpers.context import build_context
 from tests.helpers.monitoring import MetricAssertions

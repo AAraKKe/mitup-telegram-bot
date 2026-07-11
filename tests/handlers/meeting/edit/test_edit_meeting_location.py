@@ -9,11 +9,12 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_location_view
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditLocationMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,

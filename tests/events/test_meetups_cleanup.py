@@ -6,11 +6,12 @@ from mitup_bot.events import meetups_cleanup
 from mitup_bot.events.meetups_cleanup import MEETUPS_DELETION_FAILED
 from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from tests.helpers import (
     MockApi,
     MockDbSession,

@@ -28,12 +28,13 @@ from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.privacy.enums import PrivacyHandlerId
 from mitup_bot.handlers.registration_process.enums import RegistrationProcessHandlerId
 from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, PrivacyMessages
-from mitup_bot.views import ButtonConfig, Keyboard, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,

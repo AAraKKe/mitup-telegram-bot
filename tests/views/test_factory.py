@@ -3,11 +3,12 @@ import datetime as dt
 import pytest
 
 from mitup_bot import docs_links
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import parse_format_tags
 from mitup_bot.utils.messages import AdminMessages, ButtonMessages, PrivacyMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 
 
 def test_edit_meeting_property_view_without_extra_options(lang: str):

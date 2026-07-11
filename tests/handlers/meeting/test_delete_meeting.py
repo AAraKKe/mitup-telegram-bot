@@ -6,11 +6,12 @@ from telegram import Update
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting import MeetingHandlerId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Settings, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,

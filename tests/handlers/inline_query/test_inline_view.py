@@ -6,11 +6,12 @@ from telegram import Update
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
-from mitup_bot.views import ButtonConfig, InlineResultsButton, MitupInlineView
+from mitup_bot.views import InlineResultsButton, MitupInlineView
 from tests.helpers import HandlerContext, create_meetup, create_user
 from tests.helpers.context import call_handler
 from tests.helpers.fixtures import UpdateRequest

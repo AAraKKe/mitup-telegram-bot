@@ -7,7 +7,7 @@ from sqlmodel import Field, Relationship, SQLModel
 from telegram import Update
 
 from mitup_bot.exceptions import NoMessageAvailable
-from mitup_bot.views import Keyboard
+from mitup_bot.keyboards import Keyboard
 
 from .base_model import BaseModel
 from .mutable_model import MutableModel

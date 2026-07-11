@@ -7,12 +7,13 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
 from mitup_bot.utils.mitup_types import TMitupContext
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId
 

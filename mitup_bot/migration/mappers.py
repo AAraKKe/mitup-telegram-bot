@@ -3,9 +3,9 @@ from typing import Any, cast
 
 import yaml
 
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import MeetupLocation, MessageButtons
 from mitup_bot.models.users import UserStatus
-from mitup_bot.views.mitup_view import ButtonConfig
 
 
 class RowMappingError(ValueError): ...

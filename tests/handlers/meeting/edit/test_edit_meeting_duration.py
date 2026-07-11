@@ -9,11 +9,12 @@ from telegram.ext import ConversationHandler
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.utils import safe_anchor_date
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,

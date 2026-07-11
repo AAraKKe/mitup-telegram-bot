@@ -2,8 +2,9 @@ import pytest
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 import mitup_bot.utils.callbacks as cb
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils import ButtonMessages
-from mitup_bot.views import ButtonConfig, PaginatedMitupView
+from mitup_bot.views import PaginatedMitupView
 
 PAGINATED_VIEW_UNIQUE = PaginatedMitupView(
     description="unique",

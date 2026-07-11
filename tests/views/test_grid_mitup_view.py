@@ -2,7 +2,8 @@ import pytest
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 import mitup_bot.utils.callbacks as cb
-from mitup_bot.views import ButtonConfig, GridMitupView
+from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.views import GridMitupView
 from mitup_bot.views.mitup_view import arrange_in_grid
 
 

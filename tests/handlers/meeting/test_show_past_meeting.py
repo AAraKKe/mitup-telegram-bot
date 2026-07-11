@@ -2,10 +2,11 @@ import pytest
 from telegram import Update
 
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,

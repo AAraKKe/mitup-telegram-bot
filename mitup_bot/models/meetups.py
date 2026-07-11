@@ -11,6 +11,7 @@ from telegram import Update
 
 from mitup_bot import limits
 from mitup_bot.exceptions import MeetupNotFound
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import Message
 from mitup_bot.utils import (
     ButtonMessages,
@@ -25,7 +26,6 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import Bold, EntityDateTime, FormattedText, render
 from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
-from mitup_bot.views.mitup_view import ButtonConfig, Keyboard
 
 from .base_model import BaseModel
 from .mutable_model import MutableModel

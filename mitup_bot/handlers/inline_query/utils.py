@@ -1,9 +1,10 @@
 import datetime as dt
 from typing import cast
 
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.utils import ButtonMessages, InlineQueryMessages
-from mitup_bot.views import ButtonConfig, MitupInlineView
+from mitup_bot.views import MitupInlineView
 
 from .enums import SEARCH_QUERY_PREFIX
 

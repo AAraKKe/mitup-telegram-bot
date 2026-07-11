@@ -8,10 +8,11 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.meeting.edit.edit_meeting_title import callback_query_edit_meeting_title
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditContentMessages
-from mitup_bot.views.mitup_view import ButtonConfig, MitupView
+from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import StubMitupContext, create_meetup
 from tests.helpers.stub_db import MockDbSession
 

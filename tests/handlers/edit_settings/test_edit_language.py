@@ -2,12 +2,13 @@ import pytest
 from telegram import Update
 
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
-from mitup_bot.views import ButtonConfig, GridMitupView, factory
+from mitup_bot.views import GridMitupView, factory
 from tests.helpers import AnyFloat, HandlerContext, MockDbSession, UpdateRequest, call_handler
 from tests.helpers.monitoring import MetricAssertions
 

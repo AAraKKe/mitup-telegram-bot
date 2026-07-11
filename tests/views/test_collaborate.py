@@ -1,9 +1,10 @@
 import pytest
 
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages
-from mitup_bot.views import ButtonConfig, MitupView
+from mitup_bot.views import MitupView
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,

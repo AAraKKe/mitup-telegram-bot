@@ -12,6 +12,7 @@ from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as build_entry_view
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
 from mitup_bot.monitoring import MetricKey, MetricUnit
@@ -26,7 +27,7 @@ from mitup_bot.utils.messages import (
     MeetingEditDateTimeMessages,
     SupporterMessages,
 )
-from mitup_bot.views import ButtonConfig, MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,

@@ -10,6 +10,7 @@ from mitup_bot import supporter
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import LimitsConfig
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, MessageButtons, Settings, User
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
@@ -24,7 +25,7 @@ from mitup_bot.utils.messages import (
     MeetingEditParticipantsMessages,
     MeetingEditSettingsMessages,
 )
-from mitup_bot.views import ButtonConfig, Keyboard, MitupInlineView, MitupView
+from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
 from tests.helpers import UpdateRequest, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
