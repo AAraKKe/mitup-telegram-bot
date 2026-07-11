@@ -146,7 +146,7 @@
       "matchStrings": [
         "requires-python = \">=(?<currentValue>[0-9]+\\.[0-9]+)\"",
         "Programming Language :: Python :: (?<currentValue>[0-9]+\\.[0-9]+)",
-        "FROM python:(?<currentValue>[0-9]+\\.[0-9]+)-slim-bookworm",
+        "FROM python:(?<currentValue>[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)-slim-bookworm",
         "FROM public\\.ecr\\.aws/lambda/python:(?<currentValue>[0-9]+\\.[0-9]+)",
         "image: python:(?<currentValue>[0-9]+\\.[0-9]+)-bookworm"
       ],

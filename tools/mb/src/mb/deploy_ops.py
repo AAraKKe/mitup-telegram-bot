@@ -240,7 +240,14 @@ def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, servic
         time.sleep(DEPLOYMENT_POLL_INTERVAL_SECONDS)
 
 
-def deploy(migrations_image: str, bot_image: str, alarm_action_image: str):
+def deploy_ecs_service(ecs_client: ECSClient, service: str, image: str):
+    """Roll one ECS service (which runs in a cluster named after itself) onto a new image."""
+    task_definition_arn = register_task_definition(ecs_client, service, image)
+    update_ecs_service(ecs_client, task_definition_arn, service=service, cluster=service)
+    waiting_for_deployment_to_finish(ecs_client, cluster=service, service=service)
+
+
+def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, events_image: str):
     lambda_client = boto3.client("lambda", region_name="eu-west-1")
     ecs_client = boto3.client("ecs", region_name="eu-west-1")
 
@@ -248,8 +255,7 @@ def deploy(migrations_image: str, bot_image: str, alarm_action_image: str):
     invoke_lambda(lambda_client, "MitupMigrationsLambda")
     update_lambda_code(lambda_client, "MitupAlarmActionLambda", alarm_action_image)
 
-    # Both services run in a cluster named after themselves, off the same bot image
-    for service in ("mitup", "mitup-recurrent-events"):
-        task_definition_arn = register_task_definition(ecs_client, service, bot_image)
-        update_ecs_service(ecs_client, task_definition_arn, service=service, cluster=service)
-        waiting_for_deployment_to_finish(ecs_client, cluster=service, service=service)
+    # Each ECS service rolls onto its own image. The recurrent-events service takes the events image,
+    # never the bot image: the slim bot image no longer carries the `mitup recurrent-events` command.
+    deploy_ecs_service(ecs_client, "mitup", bot_image)
+    deploy_ecs_service(ecs_client, "mitup-recurrent-events", events_image)

@@ -36,7 +36,7 @@
 
       docker buildx build \
         --platform linux/amd64 \
-        --file "${CI_PROJECT_DIR}/dev/docker/${DOCKERFILE}" \
+        --file "${CI_PROJECT_DIR}/${DOCKERFILE}" \
         --tag "${COMMIT_DESTINATION}" \
         --tag "${LATEST_TAG}" \
         --cache-from "type=registry,ref=${CACHE_TAG}" \
@@ -48,6 +48,17 @@
   after_script:
     - docker buildx rm builder
 
+# These push jobs stay grouped rather than per-path: a deploy resolves every image by the current
+# commit sha (see deploy-config.yml), so each :ci-<sha> tag must exist whenever a deploy runs. The
+# registry build-cache makes the unchanged images near-instant to re-push. Strict per-path gating
+# (build only the changed app's image) lives on the MR-only validate-docker-build jobs, where there
+# is no deploy to satisfy.
+#
+# The events image is a first-class deployable alongside bot/migrations/alarm: validated on MRs
+# (validate-docker-events), pushed here, and deployed by `mb deploy --events-image` (deploy.yml).
+# HARD PREREQUISITE: the `events` ECR repo (created by mitup-infra !43) must be merged and applied
+# before this MR merges, so the push destination resolves (see deploy-config.yml).
+
 ## -------------- Push to staging ---------------
 push-bot-tagged-staging:
   extends: .push-ecr
@@ -58,7 +69,7 @@ push-bot-tagged-staging:
     - build-translations
     - config-staging
   variables:
-    DOCKERFILE: Dockerfile
+    DOCKERFILE: apps/bot/Dockerfile
     PUSH_DESTINATION: $BOT_IMAGE_TAG
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
@@ -74,15 +85,22 @@ push-migrations-lambda-staging:
   extends: push-bot-tagged-staging
   resource_group: migrations-tagged-staging
   variables:
-    DOCKERFILE: Dockerfile.migrations
+    DOCKERFILE: apps/lambda-migrations/Dockerfile
     PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
 
 push-alarm-action-lambda-staging:
   extends: push-bot-tagged-staging
   resource_group: alarm-action-tagged-staging
   variables:
-    DOCKERFILE: Dockerfile.alarm-action
+    DOCKERFILE: apps/lambda-alarm/Dockerfile
     PUSH_DESTINATION: $ALARM_ACTION_IMAGE_TAG
+
+push-events-tagged-staging:
+  extends: push-bot-tagged-staging
+  resource_group: events-tagged-staging
+  variables:
+    DOCKERFILE: apps/events/Dockerfile
+    PUSH_DESTINATION: $EVENTS_IMAGE_TAG
 
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
@@ -103,12 +121,19 @@ push-migrations-lambda-prod:
   extends: push-bot-tagged-prod
   resource_group: migrations-tagged-prod
   variables:
-    DOCKERFILE: Dockerfile.migrations
+    DOCKERFILE: apps/lambda-migrations/Dockerfile
     PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
 
 push-alarm-action-lambda-prod:
   extends: push-bot-tagged-prod
   resource_group: alarm-action-tagged-prod
   variables:
-    DOCKERFILE: Dockerfile.alarm-action
+    DOCKERFILE: apps/lambda-alarm/Dockerfile
     PUSH_DESTINATION: $ALARM_ACTION_IMAGE_TAG
+
+push-events-tagged-prod:
+  extends: push-bot-tagged-prod
+  resource_group: events-tagged-prod
+  variables:
+    DOCKERFILE: apps/events/Dockerfile
+    PUSH_DESTINATION: $EVENTS_IMAGE_TAG

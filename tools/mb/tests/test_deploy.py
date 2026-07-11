@@ -622,6 +622,7 @@ def test_waiting_for_deployment_polls_through_rollback_and_aborts_on_final_outco
 
 
 def test_command_deploys_each_service_with_its_registered_task_definition():
+    # The recurrent-events service rolls onto its own events image, never the bot image.
     with (
         mock.patch("mb.deploy_ops.update_lambda_code") as update_lambda_code,
         mock.patch("mb.deploy_ops.invoke_lambda") as invoke_lambda,
@@ -649,6 +650,8 @@ def test_command_deploys_each_service_with_its_registered_task_definition():
                     "bot_image:latest",
                     "--alarm-action-image",
                     "alarm_action_image:latest",
+                    "--events-image",
+                    "events_image:latest",
                 ],
             )
 
@@ -660,7 +663,7 @@ def test_command_deploys_each_service_with_its_registered_task_definition():
             mock.call.register_task_definition(ecs, "mitup", "bot_image:latest"),
             mock.call.update_ecs_service(ecs, "MitupTaskArn", service="mitup", cluster="mitup"),
             mock.call.waiting_for_deployment_to_finish(ecs, cluster="mitup", service="mitup"),
-            mock.call.register_task_definition(ecs, "mitup-recurrent-events", "bot_image:latest"),
+            mock.call.register_task_definition(ecs, "mitup-recurrent-events", "events_image:latest"),
             mock.call.update_ecs_service(
                 ecs, "RecurrentEventsTaskArn", service="mitup-recurrent-events", cluster="mitup-recurrent-events"
             ),
@@ -722,6 +725,9 @@ def test_command_chain_is_not_broken(
                     "bot_image:latest",
                     "--alarm-action-image",
                     "alarm_action_image:latest",
+                    # Supply an events image so the abort chain covers both ECS services.
+                    "--events-image",
+                    "events_image:latest",
                 ],
             )
 

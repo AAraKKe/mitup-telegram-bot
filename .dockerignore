@@ -1,0 +1,18 @@
+# Keep the build context small: every prod image builds from the repo root, so the daemon
+# would otherwise upload the local virtualenv, VCS history and caches on every build.
+.git
+.venv
+**/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.docker_uv
+dist
+site
+htmlcov
+.coverage
+coverage.xml
+# Local-only scratch and migration rehearsal data that never belongs in an image.
+dev/migration

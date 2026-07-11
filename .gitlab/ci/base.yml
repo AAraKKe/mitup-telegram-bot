@@ -40,11 +40,13 @@ include:
 # Centralized list of files that trigger deployment when changed
 # Use !reference [.deployment-files] in rules to keep triggers consistent
 .deployment-files: &deployment-files
+  # Each app owns its Dockerfile under apps/X/Dockerfile, so apps/**/* already covers every
+  # per-app image (bot, events, both lambdas). libs/**/* covers the shared libraries baked into
+  # them. The CI image Dockerfile stays listed because the push/deploy jobs run on it.
   - apps/**/*
   - libs/**/*
-  - dev/docker/Dockerfile
   - dev/docker/Dockerfile.ci
-  - dev/docker/Dockerfile.migrations
+  - .dockerignore
   # Runtime dependencies now live in the member pyprojects (apps/** + libs/**) and the resolved
   # lock rather than a root [project], so a lock change alone can alter every deployed image.
   - uv.lock

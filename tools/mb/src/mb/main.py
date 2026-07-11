@@ -73,9 +73,16 @@ def deploy(
     alarm_action_image: Annotated[
         str, typer.Option("--alarm-action-image", help="Uri of the alarm action lambda image.")
     ],
+    events_image: Annotated[
+        str,
+        typer.Option(
+            "--events-image",
+            help="Uri of the recurrent-events image — the only image carrying the `mitup recurrent-events` command.",
+        ),
+    ],
 ):
     """Deploy the bot: update the lambdas and roll out the ECS services."""
-    deploy_ops.deploy(migrations_image, bot_image, alarm_action_image)
+    deploy_ops.deploy(migrations_image, bot_image, alarm_action_image, events_image)
 
 
 if __name__ == "__main__":
