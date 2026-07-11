@@ -50,12 +50,12 @@
 
 # These push jobs stay grouped rather than per-path: a deploy resolves every image by the current
 # commit sha (see deploy-config.yml), so each :ci-<sha> tag must exist whenever a deploy runs. The
-# registry build-cache makes the unchanged images near-instant to re-push. Strict per-path gating
-# (build only the changed app's image) lives on the MR-only validate-docker-build jobs, where there
-# is no deploy to satisfy.
+# registry build-cache makes the unchanged images near-instant to re-push. Build validation lives
+# on the MR-only validate-docker-build jobs, where there is no deploy to satisfy.
 #
 # The events image is a first-class deployable alongside bot/migrations/alarm: validated on MRs
-# (validate-docker-events), pushed here, and deployed by `mb deploy --events-image` (deploy.yml).
+# (validate-docker, DOCKERFILE_NAME: events), pushed here, and deployed by `mb deploy --events-image`
+# (deploy.yml).
 # HARD PREREQUISITE: the `events` ECR repo (created by mitup-infra !43) must be merged and applied
 # before this MR merges, so the push destination resolves (see deploy-config.yml).
 

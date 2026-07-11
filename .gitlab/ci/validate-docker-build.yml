@@ -1,14 +1,12 @@
 # Merge-request gate: prove every deployable image still builds before it can reach main and be
 # pushed/deployed. These jobs never push — they only build.
 #
-# Per-path gates (the issue's core win: a handlers-only MR must not rebuild the Lambda images):
-#   - a change to libs/**, uv.lock or the root pyproject can alter every image  -> build all four
-#   - a change to apps/X/** (its sources or its Dockerfile) is local to X        -> build only X
-# The shared paths are repeated per job on purpose: `changes:` must be a flat list of globs, so a
-# `!reference` to a shared list cannot be spliced in as one item (it would nest a list and fail
-# pipeline creation). The bot/events images additionally need the compiled locale catalogs, so they
-# pull the build-translations artifact; the Lambda images do not localize anything.
-
+# `validate-docker` is a single matrixed job covering all four deployable images (bot, events,
+# lambda-migrations, lambda-alarm), gated by one broad path trigger: any change under apps/**,
+# libs/**, the lock, or the root pyproject can affect these images. A path-curated trigger risks
+# silently skipping validation on a shared-path change (a green pipeline with an unvalidated
+# build); the shared runners are free, so breadth costs nothing. All four matrix entries always
+# run together on a match.
 .docker-build-template: &docker-build-template
   stage: test
   image: docker:29-cli
@@ -22,71 +20,32 @@
     - docker build -f $DOCKERFILE_PATH -t mitup-$DOCKERFILE_NAME:test .
 
 # ---- Deployable app images ----------------------------------------------------------------
-validate-docker-bot:
+validate-docker:
   <<: *docker-build-template
+  # Applies to the whole matrix: the bot/events entries need the compiled locale catalogs baked
+  # into their images; the lambda entries ignore the artifact since they don't localize anything.
   dependencies:
     - build-translations
   needs: [build-translations]
-  variables:
-    DOCKERFILE_PATH: apps/bot/Dockerfile
-    DOCKERFILE_NAME: bot
+  parallel:
+    matrix:
+      - DOCKERFILE_NAME: bot
+        DOCKERFILE_PATH: apps/bot/Dockerfile
+      - DOCKERFILE_NAME: events
+        DOCKERFILE_PATH: apps/events/Dockerfile
+      - DOCKERFILE_NAME: migrations
+        DOCKERFILE_PATH: apps/lambda-migrations/Dockerfile
+      - DOCKERFILE_NAME: alarm
+        DOCKERFILE_PATH: apps/lambda-alarm/Dockerfile
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
+        - "apps/**/*"
         - "libs/**/*"
         - uv.lock
         - pyproject.toml
         - .dockerignore
         - .gitlab/ci/validate-docker-build.yml
-        - "apps/bot/**/*"
-
-validate-docker-events:
-  <<: *docker-build-template
-  dependencies:
-    - build-translations
-  needs: [build-translations]
-  variables:
-    DOCKERFILE_PATH: apps/events/Dockerfile
-    DOCKERFILE_NAME: events
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        - "libs/**/*"
-        - uv.lock
-        - pyproject.toml
-        - .dockerignore
-        - .gitlab/ci/validate-docker-build.yml
-        - "apps/events/**/*"
-
-validate-docker-migrations:
-  <<: *docker-build-template
-  variables:
-    DOCKERFILE_PATH: apps/lambda-migrations/Dockerfile
-    DOCKERFILE_NAME: migrations
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        - "libs/**/*"
-        - uv.lock
-        - pyproject.toml
-        - .dockerignore
-        - .gitlab/ci/validate-docker-build.yml
-        - "apps/lambda-migrations/**/*"
-
-validate-docker-alarm:
-  <<: *docker-build-template
-  variables:
-    DOCKERFILE_PATH: apps/lambda-alarm/Dockerfile
-    DOCKERFILE_NAME: alarm
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        - "libs/**/*"
-        - uv.lock
-        - pyproject.toml
-        - .dockerignore
-        - .gitlab/ci/validate-docker-build.yml
-        - "apps/lambda-alarm/**/*"
 
 # ---- Non-deployed images (dev tooling) ----------------------------------------------------
 validate-docker-ci:
