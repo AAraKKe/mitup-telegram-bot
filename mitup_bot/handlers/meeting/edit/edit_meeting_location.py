@@ -85,7 +85,7 @@ async def callback_edit_meeting_location_name(session: AsyncSession, update: Upd
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CANCEL.get(lang=user.lang),
+                        text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                         callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
                     )
                 ]
@@ -148,7 +148,7 @@ async def callback_edit_meeting_location_coordinates(session: AsyncSession, upda
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CANCEL.get(lang=user.lang),
+                        text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                         callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
                     )
                 ]
@@ -240,7 +240,7 @@ async def edit_coordinates_without_location(session: AsyncSession, update: Updat
                 keyboard=[
                     [
                         ButtonConfig(
-                            text=ButtonMessages.CANCEL.get(lang=user.lang),
+                            text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                             callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
                         )
                     ]

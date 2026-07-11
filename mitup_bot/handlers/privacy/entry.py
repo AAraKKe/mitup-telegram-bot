@@ -40,7 +40,7 @@ async def callback_query_export_user_data(session: AsyncSession, update: Update,
     # (no « decoration) since this is navigation from a standalone message, not a back button.
     view = MitupView(
         description=PrivacyMessages.EXPORT_CAPTION.get(lang=user.lang),
-        keyboard=[[ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=user.lang), callback_data=cb.SEND_PRIVACY)]],
+        keyboard=[[ButtonConfig(text=ButtonMessages.PRIVACY.get_text(lang=user.lang), callback_data=cb.SEND_PRIVACY)]],
         document=ViewDocument(content=document, filename=filename),
     )
     await context.api.send_document(update=update, view=view)

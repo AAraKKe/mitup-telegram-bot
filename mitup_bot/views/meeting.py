@@ -15,6 +15,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, render
 from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
+from mitup_bot.views.meeting_text import inline_message, inline_query_message, meeting_message
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -24,9 +25,11 @@ if TYPE_CHECKING:
 
 def join_leave_row(meeting: Meetup, lang: str) -> list[ButtonConfig]:
     """Return the [JOIN, (INVITE,) LEAVE] row, inserting INVITE only when allow_invitation is True."""
-    join = ButtonConfig(text=ButtonMessages.JOIN.get(lang=lang), callback_data=cb.JOIN.with_id(meeting.db_id))
-    invite = ButtonConfig(text=ButtonMessages.INVITE.get(lang=lang), callback_data=cb.INVITE.with_id(meeting.db_id))
-    leave = ButtonConfig(text=ButtonMessages.LEAVE.get(lang=lang), callback_data=cb.LEAVE.with_id(meeting.db_id))
+    join = ButtonConfig(text=ButtonMessages.JOIN.get_text(lang=lang), callback_data=cb.JOIN.with_id(meeting.db_id))
+    invite = ButtonConfig(
+        text=ButtonMessages.INVITE.get_text(lang=lang), callback_data=cb.INVITE.with_id(meeting.db_id)
+    )
+    leave = ButtonConfig(text=ButtonMessages.LEAVE.get_text(lang=lang), callback_data=cb.LEAVE.with_id(meeting.db_id))
     return [join, invite, leave] if meeting.allow_invitation else [join, leave]
 
 
@@ -50,24 +53,24 @@ def main_view(meeting: Meetup, back_button: ButtonConfig | None = None) -> Mitup
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.EDIT.get(lang=meeting.user_language),
+                    text=ButtonMessages.EDIT.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.DELETE.get(lang=meeting.user_language),
+                    text=ButtonMessages.DELETE.get_text(lang=meeting.user_language),
                     callback_data=cb.DELETE_MEETING.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.SHARE.get(lang=meeting.user_language),
+                    text=ButtonMessages.SHARE.get_text(lang=meeting.user_language),
                     switch_inline_query=str(meeting.db_id),
                 ),
             ],
             [back_button or main_menu_back_button(meeting)],
         ]
     )
-    view = MitupView(meeting.message, keyboard)
+    view = MitupView(meeting_message(meeting), keyboard)
     if meeting.is_in_progress:
         view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=meeting.user_language))
     return view
@@ -83,7 +86,7 @@ def external_view(meeting: Meetup, back_button: ButtonConfig | None = None) -> M
     if not (meeting.lock_on_start and meeting.is_in_progress):
         keyboard.append(join_leave_row(meeting, meeting.user_language))
     keyboard.append([back_button or main_menu_back_button(meeting)])
-    view = MitupView(meeting.inline_message, keyboard)
+    view = MitupView(inline_message(meeting), keyboard)
     if meeting.is_in_progress:
         view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=meeting.user_language))
     return view
@@ -101,17 +104,17 @@ def edit_view(meeting: Meetup) -> MitupView:
     keyboard: Keyboard = [
         [
             ButtonConfig(
-                text=ButtonMessages.TITLE.get(lang=meeting.user_language),
+                text=ButtonMessages.TITLE.get_text(lang=meeting.user_language),
                 callback_data=cb.EDIT_MEETING_TITLE.with_id(meeting.db_id),
             ),
             ButtonConfig(
-                text=ButtonMessages.DESCRIPTION.get(lang=meeting.user_language),
+                text=ButtonMessages.DESCRIPTION.get_text(lang=meeting.user_language),
                 callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(meeting.db_id),
             ),
         ],
         [
             ButtonConfig(
-                text=ButtonMessages.WHEN.get(lang=meeting.user_language),
+                text=ButtonMessages.WHEN.get_text(lang=meeting.user_language),
                 callback_data=cb.EDIT_MEETING_WHEN.with_id(meeting.db_id),
             ),
         ],
@@ -120,27 +123,27 @@ def edit_view(meeting: Meetup) -> MitupView:
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.PARTICIPANTS.get(lang=meeting.user_language),
+                    text=ButtonMessages.PARTICIPANTS.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.LOCATION.get(lang=meeting.user_language),
+                    text=ButtonMessages.LOCATION.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.LANGUAGE.get(lang=meeting.user_language),
+                    text=ButtonMessages.LANGUAGE.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.SETTINGS.get(lang=meeting.user_language),
+                    text=ButtonMessages.SETTINGS.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_SETTINGS.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.DONE.get(lang=meeting.user_language),
+                    text=ButtonMessages.DONE.get_text(lang=meeting.user_language),
                     callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
                 ),
             ],
@@ -152,7 +155,7 @@ def edit_view(meeting: Meetup) -> MitupView:
             ],
         ]
     )
-    return MitupView(meeting.message, keyboard)
+    return MitupView(meeting_message(meeting), keyboard)
 
 
 def settings_view(meeting: Meetup) -> MitupView:
@@ -194,11 +197,11 @@ def when_view_with_start(meeting: Meetup) -> tuple[str | FormattedText, Keyboard
         MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), cast(dt.datetime, meeting.datetime), "DT"
     )
     set_start_button = ButtonConfig(
-        text=ButtonMessages.SET_START_TIME.get(lang=meeting.user_language),
+        text=ButtonMessages.SET_START_TIME.get_text(lang=meeting.user_language),
         callback_data=cb.SET_MEETING_START_TIME.with_id(meeting.db_id),
     )
     set_end_button = ButtonConfig(
-        text=ButtonMessages.SET_END_TIME.get(lang=meeting.user_language),
+        text=ButtonMessages.SET_END_TIME.get_text(lang=meeting.user_language),
         callback_data=cb.SET_MEETING_END_TIME.with_id(meeting.db_id),
     )
     lock_toggle = options_button(
@@ -207,7 +210,7 @@ def when_view_with_start(meeting: Meetup) -> tuple[str | FormattedText, Keyboard
         meeting.lock_on_start,
     )
     clear_button = ButtonConfig(
-        text=ButtonMessages.CLEAR_TIMES.get(lang=meeting.user_language),
+        text=ButtonMessages.CLEAR_TIMES.get_text(lang=meeting.user_language),
         callback_data=cb.DELETE_MEETING_TIMES.with_id(meeting.db_id),
     )
 
@@ -240,7 +243,7 @@ def when_view(meeting: Meetup) -> MitupView:
         keyboard: Keyboard = [
             [
                 ButtonConfig(
-                    text=ButtonMessages.SET_START_TIME.get(lang=meeting.user_language),
+                    text=ButtonMessages.SET_START_TIME.get_text(lang=meeting.user_language),
                     callback_data=cb.SET_MEETING_START_TIME.with_id(meeting.db_id),
                 ),
             ],
@@ -261,7 +264,7 @@ def inline_view(meeting: Meetup, *, chat_instance: str | None = None) -> MitupIn
         else MeetingAttachMessages.FOOTNOTE_INACTIVE.get(lang=meeting.lang)
     )
     view = MitupInlineView(
-        description=meeting.inline_message,
+        description=inline_message(meeting),
         keyboard=build_inline_keyboard(
             meeting,
             is_searchable=is_searchable,
@@ -269,7 +272,7 @@ def inline_view(meeting: Meetup, *, chat_instance: str | None = None) -> MitupIn
         ),
         id=str(meeting.db_id),
         title=str(meeting.title),
-        inline_description=meeting.inline_query_message,
+        inline_description=inline_query_message(meeting),
     )
     if meeting.is_in_progress:
         view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=meeting.lang))
@@ -287,7 +290,9 @@ def build_inline_keyboard(
     if meeting.public:
         keyboard.append(
             [
-                ButtonConfig(text=ButtonMessages.SHARE.get(lang=meeting.lang), switch_inline_query=str(meeting.db_id)),
+                ButtonConfig(
+                    text=ButtonMessages.SHARE.get_text(lang=meeting.lang), switch_inline_query=str(meeting.db_id)
+                ),
             ]
         )
 
@@ -295,7 +300,7 @@ def build_inline_keyboard(
         keyboard.append(
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAKE_SEARCHABLE.get(lang=meeting.lang),
+                    text=ButtonMessages.MAKE_SEARCHABLE.get_text(lang=meeting.lang),
                     callback_data=cb.ATTACH_TO_CHAT.with_id(meeting.db_id),
                 ),
             ]

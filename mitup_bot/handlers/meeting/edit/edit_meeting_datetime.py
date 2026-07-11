@@ -87,7 +87,7 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=lang),
                     callback_data=cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
                 )
             ]
@@ -143,11 +143,11 @@ def build_edit_datetime_entry_view(meeting: Meetup, lang: str, today: dt.date) -
     keyboard: list[list[ButtonConfig]] = [
         [
             ButtonConfig(
-                text=ButtonMessages.DATE.get(lang=lang),
+                text=ButtonMessages.DATE.get_text(lang=lang),
                 callback_data=cb.EDIT_MEETING_DATE.with_id(meeting_id).with_date(today),
             ),
             ButtonConfig(
-                text=ButtonMessages.TIME.get(lang=lang),
+                text=ButtonMessages.TIME.get_text(lang=lang),
                 callback_data=cb.EDIT_MEETING_TIME.with_id(meeting_id),
             ),
         ],
@@ -295,7 +295,7 @@ async def handle_first_datetime_set(
         cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
     )
     done_button = ButtonConfig(
-        text=ButtonMessages.DONE.get(lang=lang),
+        text=ButtonMessages.DONE.get_text(lang=lang),
         callback_data=cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
     )
     assert meeting.datetime is not None

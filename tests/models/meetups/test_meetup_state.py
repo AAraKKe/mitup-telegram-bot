@@ -3,13 +3,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from mitup_bot.emojis import Emojis
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import datetime_section, inline_message, meeting_message, plain_datetime
 from tests.helpers import create_meetup, create_user
 
 
@@ -18,19 +19,19 @@ def test_external_view():
     meeting = create_meetup(id=1, owner=owner, invitation=True)
 
     expected_view = MitupView(
-        meeting.inline_message,
+        inline_message(meeting),
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.JOIN.get(lang=meeting.user_language),
+                    text=ButtonMessages.JOIN.get_text(lang=meeting.user_language),
                     callback_data=cb.JOIN.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.INVITE.get(lang=meeting.user_language),
+                    text=ButtonMessages.INVITE.get_text(lang=meeting.user_language),
                     callback_data=cb.INVITE.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.LEAVE.get(lang=meeting.user_language),
+                    text=ButtonMessages.LEAVE.get_text(lang=meeting.user_language),
                     callback_data=cb.LEAVE.with_id(meeting.db_id),
                 ),
             ],
@@ -51,47 +52,47 @@ def test_edit_view(user_with_settings: User):
 
     # Row 2 is [When → EDIT_MEETING_WHEN] — a single button replaces "Date & Time" + "Duration".
     expected_view = MitupView(
-        meeting.message,
+        meeting_message(meeting),
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.TITLE.get(lang=meeting.user_language),
+                    text=ButtonMessages.TITLE.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_TITLE.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.DESCRIPTION.get(lang=meeting.user_language),
+                    text=ButtonMessages.DESCRIPTION.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.WHEN.get(lang=meeting.user_language),
+                    text=ButtonMessages.WHEN.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_WHEN.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.PARTICIPANTS.get(lang=meeting.user_language),
+                    text=ButtonMessages.PARTICIPANTS.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.LOCATION.get(lang=meeting.user_language),
+                    text=ButtonMessages.LOCATION.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.LANGUAGE.get(lang=meeting.user_language),
+                    text=ButtonMessages.LANGUAGE.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.SETTINGS.get(lang=meeting.user_language),
+                    text=ButtonMessages.SETTINGS.get_text(lang=meeting.user_language),
                     callback_data=cb.EDIT_MEETING_SETTINGS.with_id(meeting.db_id),
                 ),
             ],
             [
                 ButtonConfig(
-                    text=ButtonMessages.DONE.get(lang=meeting.user_language),
+                    text=ButtonMessages.DONE.get_text(lang=meeting.user_language),
                     callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
                 ),
             ],
@@ -108,7 +109,7 @@ def test_edit_view(user_with_settings: User):
 
 
 # ---------------------------------------------------------------------------
-# _datetime_section: single clock line vs start/stop lines
+# datetime_section: single clock line vs start/stop lines
 # ---------------------------------------------------------------------------
 
 
@@ -119,7 +120,7 @@ def test_datetime_section_no_datetime_shows_single_clock_line(user_with_settings
     meeting.datetime = None
     meeting.end_datetime = None
 
-    text = render(meeting._datetime_section).text
+    text = render(datetime_section(meeting)).text
 
     # A single "--- CLOCK <not set>" line followed by \n
     assert text.startswith(f"--- {Emojis.CLOCK.value} ")
@@ -135,7 +136,7 @@ def test_datetime_section_with_datetime_no_duration_shows_single_clock_line(user
     meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
     meeting.end_datetime = None
 
-    text = render(meeting._datetime_section).text
+    text = render(datetime_section(meeting)).text
 
     # Single clock line: "--- CLOCK Meeting time\n"
     assert text.startswith(f"--- {Emojis.CLOCK.value} ")
@@ -151,7 +152,7 @@ def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user
     meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
     meeting.end_datetime = datetime(2024, 6, 15, 11, 0, tzinfo=UTC)  # 60 minutes later
 
-    text = render(meeting._datetime_section).text
+    text = render(datetime_section(meeting)).text
 
     # Two lines: start line and stop line; no plain clock
     assert Emojis.CLOCK.value not in text
@@ -164,15 +165,15 @@ def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user
     assert stop_label in text
 
 
-# --- _plain_datetime fallback branch ---
+# --- plain_datetime fallback branch ---
 
 
 def test_plain_datetime_fallback_when_no_datetime_set(user_with_settings: User):
-    """_plain_datetime must return the DATE_NOT_SET message when meeting.datetime is None."""
+    """plain_datetime must return the DATE_NOT_SET message when meeting.datetime is None."""
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.datetime = None
 
-    result = meeting._plain_datetime
+    result = plain_datetime(meeting)
 
     # Line 251: the else-branch returning the localised "date not set" string
     expected = MeetingDisplayMessages.DATE_NOT_SET.get_text(lang=meeting.lang)
@@ -180,11 +181,11 @@ def test_plain_datetime_fallback_when_no_datetime_set(user_with_settings: User):
 
 
 def test_plain_datetime_formatted_when_datetime_set(user_with_settings: User):
-    """_plain_datetime must return a UTC-formatted string when meeting.datetime is set."""
+    """plain_datetime must return a UTC-formatted string when meeting.datetime is set."""
     meeting = create_meetup(id=1, owner=user_with_settings)
     meeting.datetime = datetime(2024, 1, 12, 12, 30, tzinfo=UTC)
 
-    result = meeting._plain_datetime
+    result = plain_datetime(meeting)
 
     assert result == "2024-01-12 12:30"  # f"{self.datetime:%Y-%m-%d %H:%M}"
 

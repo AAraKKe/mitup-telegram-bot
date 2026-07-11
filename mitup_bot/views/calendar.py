@@ -59,13 +59,13 @@ class CalendarKeyboard:
     def __weekdays_row(self) -> ButtonRow:
         """Generates the row with the weekdays in the calendar."""
         return [
-            ButtonConfig(text=Weekday.MONDAY.get(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.TUESDAY.get(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.WEDNESDAY.get(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.THURSDAY.get(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.FRIDAY.get(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.SATURDAY.get(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.SUNDAY.get(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.MONDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.TUESDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.WEDNESDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.THURSDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.FRIDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.SATURDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.SUNDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
         ]
 
     def __month_rows(self) -> Keyboard:
@@ -103,7 +103,7 @@ class CalendarKeyboard:
 
         date_back = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
-            text=ButtonMessages.GO_BACK.get(),
+            text=ButtonMessages.GO_BACK.get_text(),
             callback_data=self.navigation_callback_data.with_date(date_back),
         )
 
@@ -125,7 +125,7 @@ class CalendarKeyboard:
 
         date_forward = dt.date(year, month, self.__navigation_day(year, month))
         return ButtonConfig(
-            text=ButtonMessages.GO_FORWARD.get(),
+            text=ButtonMessages.GO_FORWARD.get_text(),
             callback_data=self.navigation_callback_data.with_date(date_forward),
         )
 
@@ -145,7 +145,9 @@ class CalendarKeyboard:
 
         # We can always go forward. We add the current label and the navigation forward buttons.
         current_label = (
-            str(self.current_date.year) if by == "year" else MonthList[self.current_date.month - 1].get(lang=self.lang)
+            str(self.current_date.year)
+            if by == "year"
+            else MonthList[self.current_date.month - 1].get_text(lang=self.lang)
         )
         row.extend(
             (

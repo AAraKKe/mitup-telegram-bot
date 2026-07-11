@@ -6,7 +6,6 @@ from sqlalchemy import Column, DateTime, Enum, FetchedValue
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram.ext import ExtBot
 
 from mitup_bot import supporter
 from mitup_bot.exceptions import UserNotFound
@@ -16,8 +15,6 @@ from . import JoinedUsers, Meetup
 from .base_model import BaseModel
 
 if TYPE_CHECKING:
-    from mitup_bot.views import MitupView
-
     from . import JoinedUsers, Meetup, Settings
 
 
@@ -200,11 +197,3 @@ class User(BaseModel, SQLModel, table=True):
 
     def now_in_tz(self) -> dt.datetime:
         return self.datetime_in_tz(dt.datetime.now(dt.UTC))
-
-    async def send_message(self, bot: ExtBot, view: MitupView):
-        await bot.send_message(
-            chat_id=self.tg_user_id,
-            text=view.description.text,
-            entities=view.description.entities or None,
-            reply_markup=view.markup,
-        )

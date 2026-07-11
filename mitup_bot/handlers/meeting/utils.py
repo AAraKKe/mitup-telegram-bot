@@ -108,10 +108,10 @@ def meeting_list_button(source: MeetingListSource | None, page: int, lang: str) 
     """
     if source is MeetingListSource.JOINED:
         return ButtonConfig(
-            text=ButtonMessages.JOINED_MEETINGS.get(lang=lang),
+            text=ButtonMessages.JOINED_MEETINGS.get_text(lang=lang),
             callback_data=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(page),
         )
     return ButtonConfig(
-        text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+        text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
         callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(page),
     )

@@ -10,11 +10,11 @@ def edit_location_view(meeting: Meetup) -> MitupView:
     extra_options = [
         [
             ButtonConfig(
-                text=ButtonMessages.MEETING_LOCATION_NAME.get(lang=meeting.lang),
+                text=ButtonMessages.MEETING_LOCATION_NAME.get_text(lang=meeting.lang),
                 callback_data=cb.EDIT_MEETING_LOCATION_NAME.with_id(meeting.db_id),
             ),
             ButtonConfig(
-                text=ButtonMessages.MEETING_LOCATION_COORDINATES.get(lang=meeting.lang),
+                text=ButtonMessages.MEETING_LOCATION_COORDINATES.get_text(lang=meeting.lang),
                 callback_data=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(meeting.db_id),
             ),
         ]
@@ -31,7 +31,7 @@ def edit_location_view(meeting: Meetup) -> MitupView:
 def edit_participants_view(meeting: Meetup) -> MitupView:
     buttons = [
         ButtonConfig(
-            text=ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=meeting.owner.lang),
+            text=ButtonMessages.MEETING_MAX_PARTICIPANTS.get_text(lang=meeting.owner.lang),
             callback_data=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(meeting.db_id),
         )
     ]
@@ -42,7 +42,7 @@ def edit_participants_view(meeting: Meetup) -> MitupView:
     if participants_to_kick_out:
         buttons.append(
             ButtonConfig(
-                text=ButtonMessages.MEETING_KICK_OUT.get(lang=meeting.owner.lang),
+                text=ButtonMessages.MEETING_KICK_OUT.get_text(lang=meeting.owner.lang),
                 callback_data=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=meeting.db_id, id=1),
             )
         )
@@ -65,11 +65,11 @@ def edit_max_participants_view(meeting: Meetup, fail: bool = False) -> MitupView
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get(lang=meeting.lang),
+                    text=ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get_text(lang=meeting.lang),
                     callback_data=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=meeting.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=meeting.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(meeting.db_id),
                 ),
             ]

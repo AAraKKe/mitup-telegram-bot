@@ -64,7 +64,11 @@ async def test_export_sends_the_user_data_as_a_json_document(
     assert [meeting["title"] for meeting in export["meetings"]] == ["Test Meeting 1", "Test Meeting 2"]
     # The document carries a Privacy button so it is not a dead end (plain label, no « decoration).
     assert view.keyboard == [
-        [ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=user_with_settings.lang), callback_data=cb.SEND_PRIVACY)]
+        [
+            ButtonConfig(
+                text=ButtonMessages.PRIVACY.get_text(lang=user_with_settings.lang), callback_data=cb.SEND_PRIVACY
+            )
+        ]
     ]
     # The document is a new message: the privacy screen above keeps its buttons untouched.
     context.api.assert_edit_message_not_called()

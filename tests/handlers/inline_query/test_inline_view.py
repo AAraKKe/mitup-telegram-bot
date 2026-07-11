@@ -25,7 +25,7 @@ def chat_card(lang: str) -> MitupInlineView:
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang),
+                    text=ButtonMessages.LOAD_CHAT_MEETINGS.get_text(lang=lang),
                     callback_data=cb.LOAD_CHAT_MEETINGS,
                 )
             ],
@@ -79,7 +79,7 @@ async def test_inline_view_returns_results_and_button(
     assert len(keyboard) == 1
     load_button = keyboard[0][0]
     assert load_button.callback_data == cb.LOAD_CHAT_MEETINGS
-    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=user_with_settings.lang)
+    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.get_text(lang=user_with_settings.lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)

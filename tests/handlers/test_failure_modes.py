@@ -468,7 +468,7 @@ CONTEXTS = [
         reactivation_back_keyboard_factory=lambda lang: [
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
                     callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 )
             ]

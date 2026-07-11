@@ -68,11 +68,11 @@ def confirmation_keyboard(lang: str, broadcast_id: int) -> list[list[ButtonConfi
     return [
         [
             ButtonConfig(
-                text=BroadcastOperatorMessages.BUTTON_CONFIRM.get(lang=lang),
+                text=BroadcastOperatorMessages.BUTTON_CONFIRM.get_text(lang=lang),
                 callback_data=cb.CONFIRM_BROADCAST.with_id(broadcast_id),
             ),
             ButtonConfig(
-                text=BroadcastOperatorMessages.BUTTON_CANCEL.get(lang=lang),
+                text=BroadcastOperatorMessages.BUTTON_CANCEL.get_text(lang=lang),
                 callback_data=cb.CANCEL_BROADCAST.with_id(broadcast_id),
             ),
         ]
@@ -86,7 +86,7 @@ def expected_language_label(lang: str, code: str) -> FormattedText:
 
 def recipient_keyboard(lang: str) -> list[list[ButtonConfig]]:
     """The single Main Menu button row every recipient gets, in that recipient's own language."""
-    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
+    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get_text(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
 
 
 def assert_previews(context: StubMitupContext, operator: User, lang: str, previews: list[tuple[str, str]]):
@@ -206,7 +206,7 @@ async def test_preview_carries_the_recipient_main_menu_button(
     # The Spanish preview's button label is the Spanish Main Menu string, not the operator's language.
     es_button = keyboards[1][0][0]
     assert es_button.callback_data == cb.SEND_MAIN_MENU
-    assert es_button.text == ButtonMessages.MAIN_MENU.get(lang="es_ES")
+    assert es_button.text == ButtonMessages.MAIN_MENU.get_text(lang="es_ES")
 
 
 @pytest.mark.parametrize(

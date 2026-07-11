@@ -38,13 +38,13 @@ def calendar_markup(lang: str) -> list[list[ButtonConfig]]:
     # Weekdays
     return [
         [
-            ButtonConfig(text=Weekday.MONDAY.get(lang=lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.TUESDAY.get(lang=lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.WEDNESDAY.get(lang=lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.THURSDAY.get(lang=lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.FRIDAY.get(lang=lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.SATURDAY.get(lang=lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.SUNDAY.get(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.MONDAY.get_text(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.TUESDAY.get_text(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.WEDNESDAY.get_text(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.THURSDAY.get_text(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.FRIDAY.get_text(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.SATURDAY.get_text(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=Weekday.SUNDAY.get_text(lang=lang), callback_data=cb.EMPTY),
         ],
         # Actual calendar
         [
@@ -188,12 +188,12 @@ def calendar_markup(lang: str) -> list[list[ButtonConfig]]:
         # Month navigation buttons
         [
             ButtonConfig(
-                text=ButtonMessages.GO_BACK.get(),
+                text=ButtonMessages.GO_BACK.get_text(),
                 callback_data=DateCallbackData(entity="nav", action="go", id=1).with_date(dt.date(2024, 6, 16)),
             ),
-            ButtonConfig(text=MonthList[6].get(lang=lang), callback_data=cb.EMPTY),
+            ButtonConfig(text=MonthList[6].get_text(lang=lang), callback_data=cb.EMPTY),
             ButtonConfig(
-                text=ButtonMessages.GO_FORWARD.get(),
+                text=ButtonMessages.GO_FORWARD.get_text(),
                 callback_data=DateCallbackData(entity="nav", action="go", id=1).with_date(dt.date(2024, 8, 16)),
             ),
         ],
@@ -201,7 +201,7 @@ def calendar_markup(lang: str) -> list[list[ButtonConfig]]:
         [
             ButtonConfig(text=str(2024), callback_data=cb.EMPTY),
             ButtonConfig(
-                text=ButtonMessages.GO_FORWARD.get(),
+                text=ButtonMessages.GO_FORWARD.get_text(),
                 callback_data=DateCallbackData(entity="nav", action="go", id=1).with_date(dt.date(2025, 7, 16)),
             ),
         ],

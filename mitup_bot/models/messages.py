@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, Relationship, SQLModel
-from telegram import Update
 
 from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.keyboards import Keyboard
@@ -13,6 +12,8 @@ from .base_model import BaseModel
 from .mutable_model import MutableModel
 
 if TYPE_CHECKING:  # pragma: no cover
+    from telegram import Update
+
     from . import Meetup
 
 

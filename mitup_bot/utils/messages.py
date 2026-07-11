@@ -3,9 +3,9 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Protocol, assert_never
 
+from mitup_bot.emojis import Emojis
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils import Emojis
 from mitup_bot.utils.entities import FormattedText, parse_format_tags
 
 MessageParams = str | int | float | FormattedText | None

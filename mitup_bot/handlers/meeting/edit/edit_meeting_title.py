@@ -54,7 +54,7 @@ async def callback_query_edit_meeting_title(session: AsyncSession, update: Updat
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CANCEL.get(lang=user.lang),
+                        text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                         callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting_id),
                     )
                 ]

@@ -14,9 +14,8 @@ from mitup_bot.utils.entities import FormattedText
 
 
 def to_inline_keyboard_button(config: ButtonConfig) -> InlineKeyboardButton:
-    text = config.text if isinstance(config.text, str) else config.text.text
     return InlineKeyboardButton(
-        text=text,
+        text=config.text,
         callback_data=str(config.callback_data) if config.callback_data else None,
         switch_inline_query=config.switch_inline_query,
         switch_inline_query_current_chat=config.switch_inline_query_current_chat,

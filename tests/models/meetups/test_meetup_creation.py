@@ -9,6 +9,7 @@ from telegram import Message as TgMessage
 from mitup_bot import supporter
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import LimitsConfig
+from mitup_bot.emojis import Emojis
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, MessageButtons, Settings, User
@@ -16,7 +17,6 @@ from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
-from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import (
     ButtonMessages,
@@ -28,6 +28,15 @@ from mitup_bot.utils.messages import (
 from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.factory import options_button
+from mitup_bot.views.meeting_text import (
+    inline_message,
+    inline_query_message,
+    location_description,
+    meeting_message,
+    participants_badge,
+    participants_text,
+    participants_text_with_list,
+)
 from tests.helpers import UpdateRequest, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -212,7 +221,7 @@ def test_meetup_location_string_conversion(
 
     expected = expected_location_name(lang, expected_name, expected_coordinates)
 
-    assert expected == location.description(lang=lang)
+    assert expected == location_description(location, lang=lang)
 
 
 @pytest.mark.parametrize(
@@ -302,7 +311,7 @@ def test_meetup_message(
         invited_user,
     )
 
-    result: FormattedText = meeting.inline_message if is_inline else meeting.message
+    result: FormattedText = inline_message(meeting) if is_inline else meeting_message(meeting)
     assert result.text == expected_text
 
     # Entity structure: "Test Meeting" is always bold at offset=0, length=12.
@@ -327,8 +336,8 @@ def test_meeting_message_badges_patron_owner():
     JoinedUsers(user=owner, meetup=meeting)
 
     badged_owner = f"{Emojis.HOST_2} alice"
-    assert badged_owner in meeting.message.text
-    assert badged_owner in meeting.inline_message.text
+    assert badged_owner in meeting_message(meeting).text
+    assert badged_owner in inline_message(meeting).text
 
 
 def test_meeting_message_has_no_badge_for_free_owner():
@@ -336,8 +345,8 @@ def test_meeting_message_has_no_badge_for_free_owner():
     meeting = create_meetup(id=1, owner=owner, language="en")
     JoinedUsers(user=owner, meetup=meeting)
 
-    assert str(Emojis.HOST_2) not in meeting.message.text
-    assert str(Emojis.HOST_2) not in meeting.inline_message.text
+    assert str(Emojis.HOST_2) not in meeting_message(meeting).text
+    assert str(Emojis.HOST_2) not in inline_message(meeting).text
 
 
 def test_incognito_meeting_omits_supporter_participant_badge():
@@ -347,7 +356,7 @@ def test_incognito_meeting_omits_supporter_participant_badge():
     patron_member = create_user(id=2, username="alice", tg_user_id=997_723, supporter_level=SupporterLevel.HOST_2)
     meeting.create_joined_link(patron_member, is_waiting_list=False)
 
-    inline_text = meeting.inline_message.text
+    inline_text = inline_message(meeting).text
     assert "alice" not in inline_text
     assert str(Emojis.HOST_2) not in inline_text
 
@@ -403,7 +412,7 @@ def test_participants_badge(
         user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=user, meetup=meeting)
 
-    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == render(meeting.participants_badge).text
+    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == render(participants_badge(meeting)).text
 
 
 @pytest.mark.parametrize(
@@ -463,7 +472,7 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
     )
 
     expected = build_inline_message(user_with_settings.lang, meeting_datetime)
-    inline_query_text = meeting.inline_query_message.text
+    inline_query_text = inline_query_message(meeting).text
 
     assert expected == inline_query_text
     assert "A description that should not appear in the inline preview" not in inline_query_text
@@ -550,8 +559,8 @@ def test_participants_text(
         if incognito
         else expected(user_with_settings.lang).replace("|", "")
     )
-    participants_text = meeting.participants_text_with_list if with_list else meeting.participants_text
-    assert f"{expected_incognito}{expected_text}" == render(participants_text).text
+    rendered_participants = participants_text_with_list(meeting) if with_list else participants_text(meeting)
+    assert f"{expected_incognito}{expected_text}" == render(rendered_participants).text
 
 
 @pytest.mark.parametrize(
@@ -574,7 +583,7 @@ def test_participants_badge_patron_owner_stays_no_limit(
         joined = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=joined, meetup=meeting)
 
-    assert render(meeting.participants_badge).text == expected(user_with_settings.lang)
+    assert render(participants_badge(meeting)).text == expected(user_with_settings.lang)
 
 
 def test_participants_text_patron_owner_stays_no_limit(user_with_settings: User):
@@ -587,7 +596,7 @@ def test_participants_text_patron_owner_stays_no_limit(user_with_settings: User)
     label = MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=user_with_settings.lang).text
     no_limit = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user_with_settings.lang).text
     expected_text = f"1 {label} ({no_limit})\n  Joined_0"
-    assert render(meeting.participants_text_with_list).text == expected_text
+    assert render(participants_text_with_list(meeting)).text == expected_text
 
 
 @pytest.mark.parametrize(
@@ -741,11 +750,11 @@ def expected_inline_keyboard(language: str, *, chat_instance: str | None = None)
     expected_keyboard = [
         [
             ButtonConfig(
-                text=ButtonMessages.JOIN.get(lang=language),
+                text=ButtonMessages.JOIN.get_text(lang=language),
                 callback_data=cb.JOIN.with_id(123),
             ),
             ButtonConfig(
-                text=ButtonMessages.LEAVE.get(lang=language),
+                text=ButtonMessages.LEAVE.get_text(lang=language),
                 callback_data=cb.LEAVE.with_id(123),
             ),
         ]
@@ -755,7 +764,7 @@ def expected_inline_keyboard(language: str, *, chat_instance: str | None = None)
         expected_keyboard.append(
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAKE_SEARCHABLE.get(lang=language),
+                    text=ButtonMessages.MAKE_SEARCHABLE.get_text(lang=language),
                     callback_data=cb.ATTACH_TO_CHAT.with_id(123),
                 ),
             ],
@@ -777,11 +786,11 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None):
     view = meeting_views.inline_view(meeting)
 
     expected_view = MitupInlineView(
-        description=meeting.inline_message,
+        description=inline_message(meeting),
         keyboard=expected_inline_keyboard(language=used_language),
         id="123",
         title=meeting.title,
-        inline_description=meeting.inline_query_message,
+        inline_description=inline_query_message(meeting),
     ).with_footnote(MeetingAttachMessages.FOOTNOTE_INACTIVE.get(lang=used_language))
 
     assert expected_view == view
@@ -799,11 +808,11 @@ def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
     view = meeting_views.inline_view(meeting, chat_instance="some_chat_instance")
 
     expected_view = MitupInlineView(
-        description=meeting.inline_message,
+        description=inline_message(meeting),
         keyboard=expected_inline_keyboard(language=used_language, chat_instance="some_chat_instance"),
         id="123",
         title=meeting.title,
-        inline_description=meeting.inline_query_message,
+        inline_description=inline_query_message(meeting),
     ).with_footnote(MeetingAttachMessages.FOOTNOTE_ACTIVE.get(lang=used_language))
 
     assert expected_view == view

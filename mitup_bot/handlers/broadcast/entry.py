@@ -43,7 +43,7 @@ def upload_prompt_view(lang: str) -> MitupView:
         [
             [
                 ButtonConfig(
-                    text=BroadcastOperatorMessages.BUTTON_CANCEL.get(lang=lang),
+                    text=BroadcastOperatorMessages.BUTTON_CANCEL.get_text(lang=lang),
                     callback_data=cb.CANCEL_BROADCAST,
                 )
             ]

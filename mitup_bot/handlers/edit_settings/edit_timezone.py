@@ -59,7 +59,7 @@ async def settings_timezone_text_message_handler(session: AsyncSession, update: 
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.CANCEL.get(lang=user.lang),
+                        text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                         callback_data=cb.CANCEL_SETTINGS,
                     )
                 ]

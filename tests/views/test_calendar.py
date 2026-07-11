@@ -32,99 +32,99 @@ def test_full_calendar_markup(lang: str):
         (
             dt.date(2024, 4, 22),
             lambda lang: [
-                [Month.APRIL.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
-                ["2024", ButtonMessages.GO_FORWARD.get()],
+                [Month.APRIL.get_text(lang=lang), ButtonMessages.GO_FORWARD.get_text()],
+                ["2024", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2024, 4, 7),
             lambda lang: [
-                [Month.APRIL.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
-                ["2024", ButtonMessages.GO_FORWARD.get()],
+                [Month.APRIL.get_text(lang=lang), ButtonMessages.GO_FORWARD.get_text()],
+                ["2024", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2024, 7, 22),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.JULY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.JULY.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                ["2024", ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2024, 3, 12),
             lambda lang: [
-                [Month.MARCH.get(lang=lang), ButtonMessages.GO_FORWARD.get()],
-                ["2024", ButtonMessages.GO_FORWARD.get()],
+                [Month.MARCH.get_text(lang=lang), ButtonMessages.GO_FORWARD.get_text()],
+                ["2024", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2025, 5, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.MAY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.MAY.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
+                [ButtonMessages.GO_BACK.get_text(), "2025", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2025, 6, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.JUNE.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.JUNE.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
+                [ButtonMessages.GO_BACK.get_text(), "2025", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2025, 7, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.JULY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.JULY.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
+                [ButtonMessages.GO_BACK.get_text(), "2025", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2024, 12, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.DECEMBER.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.DECEMBER.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                ["2024", ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2025, 1, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.JANUARY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.JANUARY.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                [ButtonMessages.GO_BACK.get(), "2025", ButtonMessages.GO_FORWARD.get()],
+                [ButtonMessages.GO_BACK.get_text(), "2025", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
         (
             dt.date(2024, 7, 12),
             lambda lang: [
                 [
-                    ButtonMessages.GO_BACK.get(),
-                    Month.JULY.get(lang=lang),
-                    ButtonMessages.GO_FORWARD.get(),
+                    ButtonMessages.GO_BACK.get_text(),
+                    Month.JULY.get_text(lang=lang),
+                    ButtonMessages.GO_FORWARD.get_text(),
                 ],
-                ["2024", ButtonMessages.GO_FORWARD.get()],
+                ["2024", ButtonMessages.GO_FORWARD.get_text()],
             ],
         ),
     ],

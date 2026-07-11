@@ -42,35 +42,37 @@ def main_menu_view(ctx: RenderContext, *, message: str | FormattedText | None = 
     lang = ctx.lang
     keyboard = [
         [
-            ButtonConfig(text=ButtonMessages.NEW_MEETING.get(lang=lang), callback_data=cb.CREATE_MEETING),
+            ButtonConfig(text=ButtonMessages.NEW_MEETING.get_text(lang=lang), callback_data=cb.CREATE_MEETING),
         ],
         [
             ButtonConfig(
-                text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
                 callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
             ),
         ],
         [
-            ButtonConfig(text=ButtonMessages.PAST_MEETINGS.get(lang=lang), callback_data=cb.PAST_MEETINGS),
+            ButtonConfig(text=ButtonMessages.PAST_MEETINGS.get_text(lang=lang), callback_data=cb.PAST_MEETINGS),
         ],
         [
             ButtonConfig(
-                text=ButtonMessages.JOINED_MEETINGS.get(lang=lang),
+                text=ButtonMessages.JOINED_MEETINGS.get_text(lang=lang),
                 callback_data=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(1),
             ),
-            ButtonConfig(text=ButtonMessages.SETTINGS.get(lang=lang), callback_data=cb.SETTINGS),
+            ButtonConfig(text=ButtonMessages.SETTINGS.get_text(lang=lang), callback_data=cb.SETTINGS),
         ],
         [
             ButtonConfig(
-                text=ButtonMessages.HELP.get(lang=lang),
+                text=ButtonMessages.HELP.get_text(lang=lang),
                 url=docs_links.user_guide_url(),
             ),
-            ButtonConfig(text=ButtonMessages.COLLABORATE.get(lang=lang), callback_data=cb.COLLABORATE),
+            ButtonConfig(text=ButtonMessages.COLLABORATE.get_text(lang=lang), callback_data=cb.COLLABORATE),
         ],
     ]
 
     if ctx.is_admin:
-        keyboard.append([ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)])
+        keyboard.append(
+            [ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get_text(lang=lang), callback_data=cb.ADMIN_MENU)]
+        )
 
     return MitupView(message or MainMenuMessages.DESCRIPTION.get(lang=lang), keyboard=keyboard)
 
@@ -81,7 +83,7 @@ def admin_menu_view(ctx: RenderContext) -> MitupView:
         AdminMessages.MENU_DESCRIPTION.get(lang=lang),
         [
             [
-                ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get(lang=lang), callback_data=cb.BROADCAST),
+                ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get_text(lang=lang), callback_data=cb.BROADCAST),
             ],
             [
                 ButtonConfig(
@@ -99,16 +101,20 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
         message or SettingsMessages.DESCRIPTION.get(lang=lang),
         [
             [
-                ButtonConfig(text=ButtonMessages.LANGUAGE.get(lang=lang), callback_data=cb.EDIT_LANGUAGE),
-                ButtonConfig(text=ButtonMessages.TIMEOUT.get(lang=lang), callback_data=cb.EDIT_TIMEOUT),
+                ButtonConfig(text=ButtonMessages.LANGUAGE.get_text(lang=lang), callback_data=cb.EDIT_LANGUAGE),
+                ButtonConfig(text=ButtonMessages.TIMEOUT.get_text(lang=lang), callback_data=cb.EDIT_TIMEOUT),
             ],
             [
-                ButtonConfig(text=ButtonMessages.NOTIFICATIONS.get(lang=lang), callback_data=cb.EDIT_NOTIFICATIONS),
-                ButtonConfig(text=ButtonMessages.TIMEZONE.get(lang=lang), callback_data=cb.EDIT_TIEMZONE),
+                ButtonConfig(
+                    text=ButtonMessages.NOTIFICATIONS.get_text(lang=lang), callback_data=cb.EDIT_NOTIFICATIONS
+                ),
+                ButtonConfig(text=ButtonMessages.TIMEZONE.get_text(lang=lang), callback_data=cb.EDIT_TIEMZONE),
             ],
             [
-                ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS),
-                ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY),
+                ButtonConfig(
+                    text=ButtonMessages.DEFAULT_OPTIONS.get_text(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS
+                ),
+                ButtonConfig(text=ButtonMessages.PRIVACY.get_text(lang=lang), callback_data=cb.EDIT_PRIVACY),
             ],
             [
                 ButtonConfig(
@@ -125,9 +131,9 @@ def privacy_view(ctx: RenderContext) -> MitupView:
     return MitupView(
         PrivacyMessages.DESCRIPTION.get(lang=lang),
         [
-            [ButtonConfig(text=ButtonMessages.PRIVACY_POLICY.get(lang=lang), url=docs_links.privacy_url())],
-            [ButtonConfig(text=ButtonMessages.EXPORT_MY_DATA.get(lang=lang), callback_data=cb.EXPORT_USER_DATA)],
-            [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get(lang=lang), callback_data=cb.DELETE_USER_DATA)],
+            [ButtonConfig(text=ButtonMessages.PRIVACY_POLICY.get_text(lang=lang), url=docs_links.privacy_url())],
+            [ButtonConfig(text=ButtonMessages.EXPORT_MY_DATA.get_text(lang=lang), callback_data=cb.EXPORT_USER_DATA)],
+            [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get_text(lang=lang), callback_data=cb.DELETE_USER_DATA)],
         ],
     ).with_back_button(ButtonMessages.SETTINGS, lang, cb.SETTINGS)
 
@@ -145,7 +151,7 @@ def create_meeting_view(
         message,
         [
             [
-                ButtonConfig(text=ButtonMessages.CANCEL.get(lang=lang), callback_data=cb.CANCEL_CREATE_MEETING),
+                ButtonConfig(text=ButtonMessages.CANCEL.get_text(lang=lang), callback_data=cb.CANCEL_CREATE_MEETING),
             ],
         ],
     )
@@ -163,7 +169,7 @@ def request_information_with_cancel_view(
         message,
         [
             [
-                ButtonConfig(text=ButtonMessages.CANCEL.get(lang=ctx.lang), callback_data=callback_data),
+                ButtonConfig(text=ButtonMessages.CANCEL.get_text(lang=ctx.lang), callback_data=callback_data),
             ],
         ],
     )
@@ -200,7 +206,7 @@ def set_language_view(ctx: RenderContext, message: str | FormattedText, callback
     lang = ctx.lang
     n_columns = min(len(SUPPORTED_LANGUAGES), 3)
     buttons = [
-        ButtonConfig(text=LANGUAGE_BUTTONS[lang_code].get(lang=lang), callback_data=callback_data.with_id(idx))
+        ButtonConfig(text=LANGUAGE_BUTTONS[lang_code].get_text(lang=lang), callback_data=callback_data.with_id(idx))
         for idx, lang_code in enumerate(SUPPORTED_LANGUAGES)
     ]
 
@@ -290,7 +296,7 @@ def broadcast_recipient_keyboard(lang: str) -> Keyboard:
     Previews carry it too so the operator sees exactly what will be sent. Plain "Main Menu" label
     (no « decoration) since this is navigation from a standalone message, not a back button.
     """
-    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
+    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get_text(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
 
 
 def broadcast_recipient_view(body_html: str, lang: str) -> MitupView:
@@ -315,8 +321,8 @@ def confirmation_view(
         message,
         [
             [
-                ButtonConfig(text=ButtonMessages.CONFIRM.get(lang=lang), callback_data=confirm_callback_data),
-                ButtonConfig(text=ButtonMessages.DECLINE.get(lang=lang), callback_data=decline_callback_data),
+                ButtonConfig(text=ButtonMessages.CONFIRM.get_text(lang=lang), callback_data=confirm_callback_data),
+                ButtonConfig(text=ButtonMessages.DECLINE.get_text(lang=lang), callback_data=decline_callback_data),
             ],
         ],
     )
@@ -328,7 +334,7 @@ def conversation_interrupted_view(
     """Shown when a conversation is unexpectedly interrupted. Lets the user resume or cancel."""
     return MitupView(
         message,
-        [[ButtonConfig(text=ButtonMessages.CANCEL.get(lang=ctx.lang), callback_data=cancel_callback)]],
+        [[ButtonConfig(text=ButtonMessages.CANCEL.get_text(lang=ctx.lang), callback_data=cancel_callback)]],
     )
 
 
@@ -348,11 +354,11 @@ def reactivation_prompt_view(ctx: RenderContext, *, meeting_id: int, back_rows: 
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get(lang=lang),
+                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=lang),
                     callback_data=cb.REACTIVATE_MEETING.with_id(meeting_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.DELETE.get(lang=lang),
+                    text=ButtonMessages.DELETE.get_text(lang=lang),
                     callback_data=cb.DELETE_MEETING.with_id(meeting_id),
                 ),
             ],

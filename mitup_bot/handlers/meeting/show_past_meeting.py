@@ -9,6 +9,7 @@ from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
+from mitup_bot.views.meeting_text import meeting_message
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -17,15 +18,15 @@ from .enums import MeetingHandlerId
 def past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
     description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
     return MitupView(
-        meeting.message,
+        meeting_message(meeting),
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get(lang=user.lang),
+                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=user.lang),
                     callback_data=cb.REACTIVATE_MEETING.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.DELETE.get(lang=user.lang),
+                    text=ButtonMessages.DELETE.get_text(lang=user.lang),
                     callback_data=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page),
                 ),
             ],

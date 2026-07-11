@@ -1,9 +1,12 @@
-from telegram import Update
+from typing import TYPE_CHECKING
 
 from mitup_bot.exceptions import EffectiveUserNotSet
 
 from . import JoinedUsers, Meetup, Settings, User
 from .users import UserStatus
+
+if TYPE_CHECKING:  # pragma: no cover
+    from telegram import Update
 
 
 def user_from_update(update: Update, status: UserStatus = UserStatus.MEMBER) -> User:

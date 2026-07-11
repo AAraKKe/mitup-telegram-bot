@@ -46,7 +46,7 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
             keyboard=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.LOAD_CHAT_MEETINGS.get(lang=lang),
+                        text=ButtonMessages.LOAD_CHAT_MEETINGS.get_text(lang=lang),
                         callback_data=cb.LOAD_CHAT_MEETINGS,
                     )
                 ],

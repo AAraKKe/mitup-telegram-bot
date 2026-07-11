@@ -16,7 +16,7 @@ from enum import StrEnum
 from typing import Literal, assert_never, overload
 
 from mitup_bot.config import LimitsConfig, PatreonConfig
-from mitup_bot.utils.emojis import Emojis
+from mitup_bot.emojis import Emojis
 
 
 class SupporterLevel(StrEnum):

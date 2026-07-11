@@ -135,7 +135,7 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]
@@ -202,7 +202,7 @@ async def test_edit_timezone_location_log_excludes_coordinates(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]

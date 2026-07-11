@@ -1,14 +1,10 @@
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
+from mitup_bot.emojis import Emojis
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.emojis import Emojis
-from mitup_bot.utils.entities import FormattedText
-from mitup_bot.views import MitupView
 from tests.helpers import MockDbSession, create_meetup, create_user
 
 
@@ -28,26 +24,6 @@ async def test_user_exist(mock_session: MockDbSession, user_with_settings: User)
 async def test_by_tg_user_id_must_exist_raises_when_not_found(mock_session: MockDbSession):
     with pytest.raises(UserNotFound):
         await User.by_tg_user_id(mock_session, tg_user_id=999, must_exist=True)
-
-
-async def test_send_message_calls_bot_with_correct_args():
-    user = User(first_name="Alice", tg_user_id=42)
-    view = MitupView(
-        description=FormattedText("Hello"),
-        keyboard=[],
-    )
-
-    mock_bot = MagicMock()
-    mock_bot.send_message = AsyncMock()
-
-    await user.send_message(mock_bot, view)
-
-    mock_bot.send_message.assert_called_once_with(
-        chat_id=42,  # user.tg_user_id
-        text="Hello",
-        entities=None,  # no entities in plain FormattedText, entities list is empty → None
-        reply_markup=None,  # empty keyboard → markup is None
-    )
 
 
 def test_display_name_is_plain_inline_name_for_free_user():

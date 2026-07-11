@@ -44,7 +44,7 @@ __all__ = (
 )
 
 from . import callbacks
-from .emojis import Emojis
+from mitup_bot.emojis import Emojis
 from .entities import (
     Bold,
     BoldItalic,

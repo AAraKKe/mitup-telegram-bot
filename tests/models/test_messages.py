@@ -1,3 +1,5 @@
+from typing import cast
+
 from mitup_bot import db
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig
@@ -46,7 +48,9 @@ def test_buttons_serialize_to_stored_json():
 
 
 def test_formatted_text_serializes_as_plain_text():
-    buttons = MessageButtons(keyboard=[[ButtonConfig(text=FormattedText("Join"), callback_data="join;meeting:42")]])
+    # cast: deliberately passing a non-str to exercise the duck-typed before-validator.
+    join_label = cast("str", FormattedText("Join"))
+    buttons = MessageButtons(keyboard=[[ButtonConfig(text=join_label, callback_data="join;meeting:42")]])
 
     assert (
         buttons.model_dump_json() == '{"keyboard":[[{"text":"Join","callback_data":"join;meeting:42",'

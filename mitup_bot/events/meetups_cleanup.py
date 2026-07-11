@@ -68,7 +68,7 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
                 keyboard=[
                     [
                         ButtonConfig(
-                            text=ButtonMessages.REACTIVATE_MEETING.get(lang=meetup.user_language),
+                            text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=meetup.user_language),
                             callback_data=cb.REACTIVATE_MEETING.with_id(cast(int, meetup.id)),
                         ),
                         ButtonConfig(

@@ -71,7 +71,7 @@ async def test_notify_meeting_about_to_be_deleted(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get(lang=meeting.user_language),
+                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=meeting.user_language),
                     callback_data=cb.REACTIVATE_MEETING.with_id(cast(int, meeting.id)),
                 ),
                 ButtonConfig(

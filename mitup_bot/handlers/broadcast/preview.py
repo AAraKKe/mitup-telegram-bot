@@ -101,11 +101,11 @@ def confirmation_keyboard(lang: str, broadcast_id: int) -> Keyboard:
     return [
         [
             ButtonConfig(
-                text=BroadcastOperatorMessages.BUTTON_CONFIRM.get(lang=lang),
+                text=BroadcastOperatorMessages.BUTTON_CONFIRM.get_text(lang=lang),
                 callback_data=cb.CONFIRM_BROADCAST.with_id(broadcast_id),
             ),
             ButtonConfig(
-                text=BroadcastOperatorMessages.BUTTON_CANCEL.get(lang=lang),
+                text=BroadcastOperatorMessages.BUTTON_CANCEL.get_text(lang=lang),
                 callback_data=cb.CANCEL_BROADCAST.with_id(broadcast_id),
             ),
         ]

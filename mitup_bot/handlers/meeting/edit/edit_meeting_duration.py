@@ -148,11 +148,11 @@ async def show_end_datetime_entry(
     keyboard: list[list[ButtonConfig]] = [
         [
             ButtonConfig(
-                text=ButtonMessages.DATE.get(lang=lang),
+                text=ButtonMessages.DATE.get_text(lang=lang),
                 callback_data=cb.EDIT_MEETING_END_DATE.with_id(meeting_id).with_date(today),
             ),
             ButtonConfig(
-                text=ButtonMessages.TIME.get(lang=lang),
+                text=ButtonMessages.TIME.get_text(lang=lang),
                 callback_data=cb.EDIT_MEETING_END_TIME.with_id(meeting_id),
             ),
         ],
@@ -396,7 +396,7 @@ async def show_end_time_prompt(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.DONE.get(lang=lang),
+                    text=ButtonMessages.DONE.get_text(lang=lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_DURATION.with_id(meeting.db_id),
                 )
             ]
@@ -428,7 +428,7 @@ async def callback_query_duration_end_time(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_DURATION.with_id(meeting.db_id),
                 )
             ]

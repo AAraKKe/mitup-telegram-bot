@@ -6,26 +6,21 @@ is stored. They stay pure data — this module must not import views, models, or
 rendering to Telegram markup lives in the view layer.
 """
 
-from typing import Self
+from typing import Any, Self
 
-from pydantic import BaseModel, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.utils.entities import FormattedText
 
 
 class ButtonConfig(BaseModel):
-    text: str | FormattedText
+    text: str
     callback_data: CallbackData | str | None = None
     switch_inline_query: str | None = None
     switch_inline_query_current_chat: str | None = None
     # An https:// or tg:// deep link. Used by buttons that open an external page (e.g. the Patreon
     # OAuth consent screen), which produce no callback query and so carry no callback_data.
     url: str | None = None
-
-    model_config = {
-        "arbitrary_types_allowed": True,
-    }
 
     @field_validator("callback_data")
     @classmethod
@@ -35,13 +30,16 @@ class ButtonConfig(BaseModel):
             raise ValueError(f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram")
         return value
 
-    @field_validator("text")
+    @field_validator("text", mode="before")
     @classmethod
-    def validate_text(cls, value: str | FormattedText) -> str | FormattedText:
-        if isinstance(value, FormattedText):
+    def validate_text(cls, value: Any) -> Any:
+        # Accept FormattedText-shaped values duck-typed so this module never imports the
+        # entity rendering layer (which pulls in telegram): button labels are stored as
+        # plain strings, so an entity-free wrapper flattens to its text.
+        if hasattr(value, "text") and hasattr(value, "entities"):
             if value.entities:
                 raise ValueError("ButtonConfig text should not contain entities")
-            return value
+            return value.text
         return value
 
     @model_validator(mode="after")
@@ -61,10 +59,6 @@ class ButtonConfig(BaseModel):
                 "or url must be set"
             )
         return self
-
-    @field_serializer("text")
-    def serialize_text(self, value: str | FormattedText) -> str:
-        return value if isinstance(value, str) else value.text
 
 
 ButtonRow = list[ButtonConfig]

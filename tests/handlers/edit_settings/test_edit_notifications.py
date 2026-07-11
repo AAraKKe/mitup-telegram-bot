@@ -30,13 +30,13 @@ def expected_view(user: User, notifications_enabled: bool, notifications_time: i
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.DISABLE.get(lang=user.lang)
+                    text=ButtonMessages.DISABLE.get_text(lang=user.lang)
                     if notifications_enabled
-                    else ButtonMessages.ENABLE.get(lang=user.lang),
+                    else ButtonMessages.ENABLE.get_text(lang=user.lang),
                     callback_data=cb.TOGGLE_NOTIFICATIONS,
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.NOTIFICATIONS_TIME.get(lang=user.lang),
+                    text=ButtonMessages.NOTIFICATIONS_TIME.get_text(lang=user.lang),
                     callback_data=cb.SET_NOTIFICATION_TIME,
                 ),
             ],

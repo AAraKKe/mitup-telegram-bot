@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -40,16 +41,17 @@ def test_no_action_field_raises_validation_error():
         ButtonConfig(text="some text")
 
 
-def test_formatted_text_without_entities_is_kept():
-    text = FormattedText("plain text")
+def test_formatted_text_without_entities_is_flattened_to_str():
+    # cast: deliberately passing a non-str to exercise the duck-typed before-validator.
+    text = cast("str", FormattedText("plain text"))
 
     button = ButtonConfig(text=text, callback_data="show;meeting:1")
 
-    assert button.text == text
+    assert button.text == "plain text"
 
 
 def test_formatted_text_with_entities_raises():
-    text = FormattedText("bold", [MessageEntity(type="bold", offset=0, length=4)])
+    text = cast("str", FormattedText("bold", [MessageEntity(type="bold", offset=0, length=4)]))
 
     with pytest.raises(ValidationError, match="ButtonConfig text should not contain entities"):
         ButtonConfig(text=text, callback_data="show;meeting:1")

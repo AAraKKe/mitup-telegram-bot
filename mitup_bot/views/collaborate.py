@@ -31,7 +31,7 @@ def collaborate_not_linked_view(
         description=CollaborateMessages.NOT_LINKED.get(
             lang=lang, active_meetings=active_meetings, scheduling_days=scheduling_days
         ),
-        keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get(lang=lang), url=authorization_url)]],
+        keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get_text(lang=lang), url=authorization_url)]],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
 
@@ -44,8 +44,8 @@ def collaborate_linked_not_patron_view(
             lang=lang, active_meetings=active_meetings, scheduling_days=scheduling_days
         ),
         keyboard=[
-            [ButtonConfig(text=ButtonMessages.BECOME_PATRON.get(lang=lang), url=pledge_url)],
-            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get(lang=lang), callback_data=cb.UNLINK_PATREON)],
+            [ButtonConfig(text=ButtonMessages.BECOME_PATRON.get_text(lang=lang), url=pledge_url)],
+            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get_text(lang=lang), callback_data=cb.UNLINK_PATREON)],
         ],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
@@ -58,6 +58,6 @@ def collaborate_linked_patron_view(
     return MitupView(
         description=status_message.get(lang=lang, active_meetings=active_meetings, scheduling_days=scheduling_days),
         keyboard=[
-            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get(lang=lang), callback_data=cb.UNLINK_PATREON)],
+            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get_text(lang=lang), callback_data=cb.UNLINK_PATREON)],
         ],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)

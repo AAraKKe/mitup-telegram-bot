@@ -2,11 +2,12 @@ import datetime as dt
 
 import pytest
 
+from mitup_bot.emojis import Emojis
 from mitup_bot.models import JoinedUsers
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import participants_list_text
 from tests.helpers import create_meetup, create_user
 
 
@@ -409,7 +410,7 @@ def test_participants_list_text_includes_waiting_list_section():
         f"Dave"
     )
 
-    assert expected == meeting.participants_list_text.text
+    assert expected == participants_list_text(meeting).text
 
 
 def test_participants_list_text_without_waiting_list():
@@ -424,7 +425,7 @@ def test_participants_list_text_without_waiting_list():
 
     expected = "\n  Bob\n  Alice"
 
-    assert expected == meeting.participants_list_text.text
+    assert expected == participants_list_text(meeting).text
 
 
 def test_participants_list_text_badges_supporter_participant():
@@ -438,7 +439,7 @@ def test_participants_list_text_badges_supporter_participant():
 
     # Only the supporter carries the badge (their tier's emoji); the free participant is untouched.
     expected = f"\n  Bob\n  {Emojis.HOST_1} alice"
-    assert expected == meeting.participants_list_text.text
+    assert expected == participants_list_text(meeting).text
 
 
 def test_waiting_links_orders_by_created_time_then_id():

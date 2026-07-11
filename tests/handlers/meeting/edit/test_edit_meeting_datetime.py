@@ -57,7 +57,7 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: FormattedText) -> Mi
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.DONE.get(lang=lang),
+                    text=ButtonMessages.DONE.get_text(lang=lang),
                     callback_data=cb.CANCEL_EDIT_START_TIME.with_id(meeting_id),
                 ),
             ]
@@ -318,7 +318,7 @@ async def test_edit_meeting_time_callback(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=meeting.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=meeting.lang),
                     callback_data=cb.CANCEL_EDIT_START_TIME.with_id(10),
                 )
             ]
@@ -574,11 +574,11 @@ async def test_date_time_entry_callback(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.DATE.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.DATE.get_text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_DATE.with_id(10).with_date(today),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.TIME.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.TIME.get_text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_TIME.with_id(10),
                 ),
             ],
@@ -621,11 +621,11 @@ async def test_date_time_entry_callback_without_datetime(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.DATE.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.DATE.get_text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_DATE.with_id(10).with_date(today),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.TIME.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.TIME.get_text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_TIME.with_id(10),
                 ),
             ],
@@ -1588,7 +1588,7 @@ async def test_edit_meeting_time_prompt_without_datetime_shows_default_note(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=meeting.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=meeting.lang),
                     callback_data=cb.CANCEL_EDIT_START_TIME.with_id(10),
                 )
             ]

@@ -79,7 +79,7 @@ PaginatedMitupView(
 
 ### `ButtonConfig`
 
-A Pydantic model wrapping `text` + one action field. Supported action fields (mutually exclusive):
+A Pydantic model wrapping `text` + one action field. `text` is stored as a plain `str`; an entity-free `FormattedText` is accepted at construction and flattened to its text (entities on button labels are rejected — Telegram buttons cannot render them). Supported action fields (mutually exclusive):
 
 - `callback_data` — triggers a callback query when pressed.
 - `url` — opens a web URL when pressed (e.g. linking out to the docs site). Not subject to the 64-byte callback limit.
@@ -162,3 +162,5 @@ view = meeting_views.view_for(meeting, user, back_button=back_button)
 ```
 
 For a new meeting-related screen, add a function to `views/meeting.py` following this pattern. `views/meeting.py` also owns `keyboard_for_update`, which picks the keyboard to persist on a stored `Message` (owner vs participant vs inline) — callers pass its result to `Message.from_update` / `Meetup.add_message`.
+
+The rendered message *bodies* for those screens — the meeting detail/inline texts, the participants section, the date/time section, participant names — are plain-text/`FormattedText` builders in `views/meeting_text.py` (`meeting_message`, `inline_message`, `inline_query_message`, `participants_text*`, `participant_name`, …), following the same model-as-first-argument pattern. Models never render user-facing text: the entity rendering layer (`utils/entities.py`) imports telegram at runtime, and `mitup_bot.models` must stay importable without PTB (the migrations Lambda loads model metadata for alembic in a PTB-free image).

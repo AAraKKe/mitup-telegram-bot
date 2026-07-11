@@ -15,7 +15,9 @@ from tests.helpers.monitoring import MetricAssertions
 
 def language_buttons(lang: str) -> list[ButtonConfig]:
     return [
-        ButtonConfig(text=factory.LANGUAGE_BUTTONS[language].get(lang=lang), callback_data=cb.SET_LANGUAGE.with_id(idx))
+        ButtonConfig(
+            text=factory.LANGUAGE_BUTTONS[language].get_text(lang=lang), callback_data=cb.SET_LANGUAGE.with_id(idx)
+        )
         for idx, language in enumerate(SUPPORTED_LANGUAGES)
     ]
 

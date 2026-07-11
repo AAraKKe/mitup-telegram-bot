@@ -5,6 +5,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import participants_list_text
 from tests.helpers import create_meetup, create_user
 
 # --- Invite button visibility in main_view and external_view ---
@@ -48,7 +49,7 @@ def test_participants_list_text_preserves_entities_from_participant_name():
     inviter = create_user(id=3, first_name="Alice")
     meeting.create_joined_link(invited, is_waiting_list=False, invited_by=inviter)
 
-    result = meeting.participants_list_text
+    result = participants_list_text(meeting)
     # The text must include the participant name and the invited-by annotation.
     assert "Bob" in result.text
     assert "Alice" in result.text

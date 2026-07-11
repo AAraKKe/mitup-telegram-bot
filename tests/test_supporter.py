@@ -2,8 +2,8 @@ import pytest
 
 from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig, PatreonConfig
+from mitup_bot.emojis import Emojis
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import SupporterNotificationMessages
 from tests.helpers import create_patreon_config
 

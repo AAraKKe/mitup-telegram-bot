@@ -32,7 +32,7 @@ def search_chat_meetings_button(*, lang: str, chat_instance: str) -> ButtonConfi
     includes the zero-results message, which would otherwise be a dead end.
     """
     return ButtonConfig(
-        text=ButtonMessages.SEARCH_CHAT_MEETINGS.get(lang=lang),
+        text=ButtonMessages.SEARCH_CHAT_MEETINGS.get_text(lang=lang),
         switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}{chat_instance}",
     )
 

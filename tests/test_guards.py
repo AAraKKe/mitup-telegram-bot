@@ -213,7 +213,7 @@ async def test_meeting_accesible_works_with_a_meeting_that_belong_to_an_user(
         lambda lang: [
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
                     callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 ),
             ]
@@ -364,7 +364,7 @@ async def test_meeting_viewable_redirects_when_meeting_neither_owned_nor_joined(
         lambda lang: [
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
                     callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 ),
             ]
@@ -430,7 +430,7 @@ async def test_meeting_viewable_redirects_non_owner_of_inactive_meeting(
         lambda lang: [
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get(lang=lang),
+                    text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
                     callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 ),
             ]

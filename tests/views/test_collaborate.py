@@ -34,7 +34,7 @@ def test_not_linked_view_offers_link_button(lang: str):
         description=CollaborateMessages.NOT_LINKED.get(
             lang=lang, active_meetings=ACTIVE_MEETINGS, scheduling_days=SCHEDULING_DAYS
         ),
-        keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get(lang=lang), url=AUTH_URL)]],
+        keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get_text(lang=lang), url=AUTH_URL)]],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
     assert view == expected
@@ -55,8 +55,8 @@ def test_linked_not_patron_view_offers_pledge_and_unlink(lang: str):
             lang=lang, active_meetings=ACTIVE_MEETINGS, scheduling_days=SCHEDULING_DAYS
         ),
         keyboard=[
-            [ButtonConfig(text=ButtonMessages.BECOME_PATRON.get(lang=lang), url=PLEDGE_URL)],
-            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get(lang=lang), callback_data=cb.UNLINK_PATREON)],
+            [ButtonConfig(text=ButtonMessages.BECOME_PATRON.get_text(lang=lang), url=PLEDGE_URL)],
+            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get_text(lang=lang), callback_data=cb.UNLINK_PATREON)],
         ],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
@@ -86,7 +86,7 @@ def test_linked_patron_view_renders_tier_message_and_only_unlink(
     expected = MitupView(
         description=expected_message.get(lang=lang, active_meetings=ACTIVE_MEETINGS, scheduling_days=SCHEDULING_DAYS),
         keyboard=[
-            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get(lang=lang), callback_data=cb.UNLINK_PATREON)],
+            [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get_text(lang=lang), callback_data=cb.UNLINK_PATREON)],
         ],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 

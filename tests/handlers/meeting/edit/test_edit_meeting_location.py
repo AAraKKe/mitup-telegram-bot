@@ -60,11 +60,11 @@ def test_edit_location_view(meeting: Meetup, lang: str):
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MEETING_LOCATION_NAME.get(lang=lang),
+                    text=ButtonMessages.MEETING_LOCATION_NAME.get_text(lang=lang),
                     callback_data=cb.EDIT_MEETING_LOCATION_NAME.with_id(meeting_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.MEETING_LOCATION_COORDINATES.get(lang=lang),
+                    text=ButtonMessages.MEETING_LOCATION_COORDINATES.get_text(lang=lang),
                     callback_data=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(meeting_id),
                 ),
             ],
@@ -168,7 +168,7 @@ async def test_edit_location_name_works(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
@@ -264,7 +264,7 @@ async def test_edit_location_coordinates_works(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
@@ -468,7 +468,7 @@ async def test_edit_location_coordinates_message_with_wrong_message(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]

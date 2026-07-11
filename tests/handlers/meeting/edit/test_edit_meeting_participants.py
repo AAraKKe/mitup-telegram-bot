@@ -682,7 +682,7 @@ def test_edit_meeting_participants_view_without_participants():
     assert len(view.keyboard) == 2
     # The first row only has one
     assert len(view.keyboard[0]) == 1
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=owner.lang)
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get_text(lang=owner.lang)
 
     # And the owner is a participant
     assert owner in [participant.user for participant in meeting.participants]
@@ -702,8 +702,8 @@ def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
     assert len(view.keyboard) == 2
     # The first row now has 2 buttons
     assert len(view.keyboard[0]) == 2
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get(lang=owner.lang)
-    assert view.keyboard[0][1].text == ButtonMessages.MEETING_KICK_OUT.get(lang=owner.lang)
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get_text(lang=owner.lang)
+    assert view.keyboard[0][1].text == ButtonMessages.MEETING_KICK_OUT.get_text(lang=owner.lang)
 
 
 # ---------------------------------------------------------------------------

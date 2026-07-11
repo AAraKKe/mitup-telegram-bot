@@ -749,7 +749,7 @@ async def test_duration_end_time_callback_shows_time_prompt(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_DURATION.with_id(1),
                 )
             ]

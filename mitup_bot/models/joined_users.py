@@ -4,9 +4,6 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Column, DateTime, FetchedValue, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
-from mitup_bot.utils.entities import FormattedText, render
-from mitup_bot.utils.messages import MeetingDisplayMessages
-
 from .base_model import BaseModel
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -29,8 +26,9 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
     is_waiting_list: bool = False
     notification_sent: bool = False
 
-    # lazy="selectin" on all three: `participant_name` traverses user, invited_by and meetup in
-    # plain Python, and implicit lazy loads raise MissingGreenlet under the async engine.
+    # lazy="selectin" on all three: the participant-name rendering in the view layer traverses
+    # user, invited_by and meetup in plain Python, and implicit lazy loads raise MissingGreenlet
+    # under the async engine.
     meetup: Meetup = Relationship(back_populates="joined_links", sa_relationship_kwargs={"lazy": "selectin"})
     user: User = Relationship(
         back_populates="joined_links",
@@ -46,12 +44,3 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
 
     def __eq__(self, other: object) -> bool:
         return hash(self) == hash(other) if isinstance(other, JoinedUsers) else NotImplemented
-
-    @property
-    def participant_name(self) -> FormattedText:
-        name = self.user.display_name
-        if self.invited_by is not None:
-            language = self.meetup.lang
-            invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=language, user=self.invited_by.inline_name)
-            return render(t"{name} ({invited_by_text})")
-        return FormattedText(name)

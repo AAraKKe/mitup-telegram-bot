@@ -87,6 +87,8 @@ All SQLModel table models live in `mitup_bot/models/` and use SQLModel. Inspect 
 
 Key patterns:
 
+- **Models are PTB-free.** `import mitup_bot.models` must succeed without python-telegram-bot installed — the migrations Lambda loads model metadata for alembic in a PTB-free image. Never import `telegram` (or anything that transitively reaches it, e.g. `mitup_bot.utils.entities` / `mitup_bot.utils.messages` / the `mitup_bot.utils` package init) at runtime in `mitup_bot/models/`; annotation-only uses go under `TYPE_CHECKING`, and user-facing text rendering belongs in `views/` (see `views/meeting_text.py`).
+
 - All models inherit from `BaseModel` (in `base_model.py`) which provides the `db_id` property.
 - Models with JSON columns that need mutation tracking extend `MutableModel` (in `mutable_model.py`).
 - Pydantic models (e.g., `MeetupLocation`, `MessageButtons`) are used for structured JSON fields and are not SQLModel tables.

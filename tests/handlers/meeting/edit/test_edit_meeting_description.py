@@ -62,7 +62,7 @@ async def test_callback_query_edit_meeting_description_works(
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_CANCEL.with_id(cast(int, meeting_id)),
                 )
             ]

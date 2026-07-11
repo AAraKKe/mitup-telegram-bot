@@ -134,7 +134,7 @@ def test_edit_meeting_date_view_end_date_back_button_names_end_hub(lang: str):
 def test_main_menu_view_hides_admin_button_by_default(lang: str):
     view = factory.main_menu_view(RenderContext(lang=lang))
 
-    admin_button = ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)
+    admin_button = ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get_text(lang=lang), callback_data=cb.ADMIN_MENU)
     all_buttons = [button for row in view.keyboard for button in row]
     assert admin_button not in all_buttons
 
@@ -151,7 +151,7 @@ def test_main_menu_view_appends_admin_button_for_admins(lang: str):
 
     # The admin entry is a full-width row appended at the very bottom.
     assert view.keyboard[-1] == [
-        ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get(lang=lang), callback_data=cb.ADMIN_MENU)
+        ButtonConfig(text=AdminMessages.BUTTON_ADMIN.get_text(lang=lang), callback_data=cb.ADMIN_MENU)
     ]
     # Everything above the admin row is identical to the non-admin keyboard.
     assert view.keyboard[:-1] == factory.main_menu_view(RenderContext(lang=lang)).keyboard
@@ -163,7 +163,7 @@ def test_main_menu_view_help_button_links_to_the_configured_docs_site(lang: str,
     view = factory.main_menu_view(RenderContext(lang=lang))
 
     help_button = ButtonConfig(
-        text=ButtonMessages.HELP.get(lang=lang), url="https://staging.mitup.social/user-guide/getting_started/"
+        text=ButtonMessages.HELP.get_text(lang=lang), url="https://staging.mitup.social/user-guide/getting_started/"
     )
     all_buttons = [button for row in view.keyboard for button in row]
     assert help_button in all_buttons
@@ -172,7 +172,7 @@ def test_main_menu_view_help_button_links_to_the_configured_docs_site(lang: str,
 def test_settings_view_privacy_button_opens_the_privacy_screen(lang: str):
     view = factory.settings_view(RenderContext(lang=lang))
 
-    privacy_button = ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), callback_data=cb.EDIT_PRIVACY)
+    privacy_button = ButtonConfig(text=ButtonMessages.PRIVACY.get_text(lang=lang), callback_data=cb.EDIT_PRIVACY)
     all_buttons = [button for row in view.keyboard for button in row]
     assert privacy_button in all_buttons
 
@@ -187,11 +187,12 @@ def test_privacy_view(lang: str, monkeypatch: pytest.MonkeyPatch):
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.PRIVACY_POLICY.get(lang=lang), url="https://staging.mitup.social/faq/privacy/"
+                    text=ButtonMessages.PRIVACY_POLICY.get_text(lang=lang),
+                    url="https://staging.mitup.social/faq/privacy/",
                 )
             ],
-            [ButtonConfig(text=ButtonMessages.EXPORT_MY_DATA.get(lang=lang), callback_data=cb.EXPORT_USER_DATA)],
-            [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get(lang=lang), callback_data=cb.DELETE_USER_DATA)],
+            [ButtonConfig(text=ButtonMessages.EXPORT_MY_DATA.get_text(lang=lang), callback_data=cb.EXPORT_USER_DATA)],
+            [ButtonConfig(text=ButtonMessages.DELETE_MY_DATA.get_text(lang=lang), callback_data=cb.DELETE_USER_DATA)],
             [ButtonConfig(text=ButtonMessages.SETTINGS.back(lang=lang), callback_data=cb.SETTINGS)],
         ],
     )
@@ -206,7 +207,7 @@ def test_admin_menu_view(lang: str):
         AdminMessages.MENU_DESCRIPTION.get(lang=lang),
         keyboard=[
             [
-                ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get(lang=lang), callback_data=cb.BROADCAST),
+                ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get_text(lang=lang), callback_data=cb.BROADCAST),
             ],
             [
                 ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU),
@@ -221,7 +222,9 @@ def test_broadcast_recipient_keyboard(lang: str):
     keyboard = factory.broadcast_recipient_keyboard(lang)
 
     # A single row with a plain "Main Menu" button (no « back decoration) wired to SEND_MAIN_MENU.
-    assert keyboard == [[ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=lang), callback_data=cb.SEND_MAIN_MENU)]]
+    assert keyboard == [
+        [ButtonConfig(text=ButtonMessages.MAIN_MENU.get_text(lang=lang), callback_data=cb.SEND_MAIN_MENU)]
+    ]
 
 
 def test_broadcast_recipient_view_pairs_the_rendered_body_with_the_recipient_keyboard(lang: str):
