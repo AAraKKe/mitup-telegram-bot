@@ -8,6 +8,7 @@ app = typer.Typer(
     name="mb",
     no_args_is_help=True,
     help="Developer CLI for the mitup-telegram-bot repository.",
+    add_completion=False,
 )
 
 
