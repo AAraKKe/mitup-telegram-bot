@@ -2,13 +2,28 @@ from typing import Annotated
 
 import typer
 
-from . import checks, ci, db, docs, locales, runner, services, setup_env, testing, validate
+from . import checks, ci, console, db, docs, locales, runner, services, setup_env, testing, validate
 
 app = typer.Typer(
     name="mb",
     no_args_is_help=True,
     help="Developer CLI for the mitup-telegram-bot repository.",
 )
+
+
+@app.callback()
+def configure_output(
+    plain: Annotated[
+        bool | None,
+        typer.Option(
+            "--plain/--no-plain",
+            help="Kill all colors and animations (zero ANSI bytes; for file redirects). MB_PLAIN=1 is "
+            "equivalent. Animations are TTY-only anyway; color follows FORCE_COLOR/NO_COLOR.",
+        ),
+    ] = None,
+):
+    console.configure(plain=plain)
+
 
 app.command(
     "test",
@@ -54,7 +69,7 @@ def typecheck():
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def deploy(ctx: typer.Context):
     """Deploy the bot (extra args pass through)."""
-    raise typer.Exit(runner.run_command(runner.uv("mitup", "deploy", *ctx.args)))
+    raise typer.Exit(runner.uv("mitup", "deploy", *ctx.args))
 
 
 if __name__ == "__main__":

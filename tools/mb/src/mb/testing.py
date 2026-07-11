@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import locales, runner
+from . import console, locales, runner
 
 DEFAULT_ARGS = ["tests"]
 DEFAULT_DB_ARGS = ["tests/models/db_behavior/"]
@@ -33,7 +33,7 @@ def build_pytest_command(
             mode_args, default_args = COV_ARGS, DEFAULT_ARGS
         case (False, False):
             mode_args, default_args = FAST_ARGS, DEFAULT_ARGS
-    command = runner.uv("pytest", *mode_args)
+    command = runner.uv_argv("pytest", *mode_args)
     if lang:
         command.extend(["--lang", lang])
     command.extend(user_args or default_args)
@@ -45,7 +45,9 @@ def run_tests(user_args: list[str], *, cov: bool = False, db: bool = False, lang
     build_exit = locales.ensure_locales_built()
     if build_exit != 0:
         return build_exit
-    extra_env = {"FORCE_COLOR": "1"} if cov or db else None
+    # Long cov/db runs keep color when piped (CI logs render it) — unless the full
+    # kill-switch is on, in which case the subprocess must stay ANSI-free too.
+    extra_env = {"FORCE_COLOR": "1"} if (cov or db) and not console.plain_active else None
     return runner.run_command(command, extra_env=extra_env)
 
 
@@ -61,6 +63,6 @@ def test_command(
     try:
         exit_code = run_tests(user_args, cov=cov, db=db, lang=lang)
     except ValueError as error:
-        runner.console.print(f"[red]{error}[/red]")
+        console.error(str(error))
         raise typer.Exit(2) from error
     raise typer.Exit(exit_code)

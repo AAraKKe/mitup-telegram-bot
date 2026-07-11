@@ -18,7 +18,7 @@ from itertools import groupby
 from operator import attrgetter
 from pathlib import Path
 
-from . import runner
+from . import console
 
 # Directories to scan (relative to repo root)
 SCAN_DIRS = ("mitup_bot", "tests", "tools")
@@ -250,5 +250,5 @@ async def build_report(root: Path) -> CheckReport:
 
 def run_check(root: Path) -> int:
     report = asyncio.run(build_report(root))
-    runner.console.print(str(report), markup=False, highlight=False)
+    console.raw(str(report))
     return 1 if report.has_failures else 0

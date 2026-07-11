@@ -1,6 +1,6 @@
 import pytest
 from command_recording import CommandRecorder
-from mb import locales, testing
+from mb import console, locales, testing
 
 
 def test_default_is_fast_mode():
@@ -104,5 +104,16 @@ def test_fast_run_does_not_force_color(recorder: CommandRecorder, monkeypatch: p
     monkeypatch.setattr(locales, "locales_stale", lambda locales_dir: False)
 
     testing.run_tests([])
+
+    assert recorder.calls[0].extra_env is None
+
+
+def test_cov_run_in_plain_mode_does_not_force_subprocess_color(
+    recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(locales, "locales_stale", lambda locales_dir: False)
+    console.configure(plain=True)
+
+    testing.run_tests([], cov=True)
 
     assert recorder.calls[0].extra_env is None

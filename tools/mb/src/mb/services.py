@@ -29,8 +29,8 @@ def bot(
     if docker:
         service = "debug" if debug else "mitup"
         raise typer.Exit(runner.run_command(["docker", "compose", "up", service]))
-    command = runner.uv(*DEBUGPY_ARGS) if debug else runner.uv("mitup", "launch")
-    raise typer.Exit(runner.run_command(command))
+    exit_code = runner.uv(*DEBUGPY_ARGS) if debug else runner.uv("mitup", "launch")
+    raise typer.Exit(exit_code)
 
 
 @run_app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -41,7 +41,7 @@ def events(
     """Start the recurrent-events worker (extra args pass through)."""
     if docker:
         raise typer.Exit(runner.run_command(["docker", "compose", "up", "events"]))
-    raise typer.Exit(runner.run_command(runner.uv("mitup", "recurrent-events", *ctx.args)))
+    raise typer.Exit(runner.uv("mitup", "recurrent-events", *ctx.args))
 
 
 @docker_app.command()

@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from . import runner, vscode
+from . import console, runner, vscode
 
 LOCAL_ONLY_FILES = (".env", ".envrc")
 
@@ -44,15 +44,16 @@ def setup_command(
     """Bootstrap this checkout: local config files, dependencies, and git hooks. Idempotent."""
     current_root = runner.repo_root()
     for name in copy_local_only_files(main_checkout_root(), current_root):
-        runner.console.print(f"Copied {name} from the main checkout.")
-    sync_exit = runner.run_command(["uv", "sync"])
+        console.info(f"Copied {name} from the main checkout.")
+    sync_exit = runner.run_step("Installing dependencies (uv sync)", ["uv", "sync"])
     if sync_exit != 0:
         raise typer.Exit(sync_exit)
     if shutil.which("pre-commit"):
-        hooks_exit = runner.run_command(["pre-commit", "install"])
+        hooks_exit = runner.run_step("Installing git hooks (pre-commit)", ["pre-commit", "install"])
         if hooks_exit != 0:
             raise typer.Exit(hooks_exit)
     else:
-        runner.console.print("[yellow]pre-commit not found — skipping git hook installation.[/yellow]")
+        console.warn("pre-commit not found — skipping git hook installation.")
     if setup_vscode:
         raise typer.Exit(vscode.apply_vscode_settings())
+    console.success("Checkout ready.")

@@ -32,7 +32,7 @@ test:
   # report flags that the local-facing mb command deliberately leaves out.
   script:
     - uv run mb locales build
-    - FORCE_COLOR=1 uv run pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json tests --lang $LANG
+    - uv run pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json tests --lang $LANG
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   dependencies:
     - build-translations
@@ -122,7 +122,7 @@ test-db:
   # that the local-facing mb command deliberately leaves out.
   script:
     - uv run mb locales build
-    - FORCE_COLOR=1 uv run pytest --db-tests --dist no --junitxml=report.xml tests/models/db_behavior/
+    - uv run pytest --db-tests --dist no --junitxml=report.xml tests/models/db_behavior/
   needs: [preparation]
   artifacts:
     when: always

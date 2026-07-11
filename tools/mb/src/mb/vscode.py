@@ -3,7 +3,7 @@ from pathlib import Path
 
 from rich.prompt import Confirm
 
-from . import runner
+from . import console, runner
 
 TSettingType = int | str | bool | float
 TSettingValue = TSettingType | list[TSettingType] | dict[str, "TSettingValue"]
@@ -53,7 +53,7 @@ def settings_diff(current: dict[str, TSettingValue], proposed: dict[str, TSettin
 
 
 def print_compare(current: dict[str, TSettingValue], proposed: dict[str, TSettingValue], diff: dict[str, str]):
-    runner.console.print("The following updates will be applied to this workspace VSCode settings:")
+    console.info("The following updates will be applied to this workspace VSCode settings:")
     diff_str = "{\n"
     for name, value in current.items():
         if name not in diff:
@@ -68,28 +68,28 @@ def print_compare(current: dict[str, TSettingValue], proposed: dict[str, TSettin
             diff_str += f"  [bold green]+ {name!r}: {value!r}[/bold green],\n"
 
     diff_str += "}"
-    runner.console.print(diff_str)
+    console.show(diff_str)
 
 
 def apply_vscode_settings() -> int:
     """Merge the project settings template into .vscode/settings.json, after confirmation."""
     if current_settings := current_vscode_settings():
-        runner.console.print("Found existing settings in this workspace.")
+        console.info("Found existing settings in this workspace.")
     else:
-        runner.console.print("No previous settings have been found in this workspace.")
+        console.info("No previous settings have been found in this workspace.")
 
     proposed_settings = current_settings | SETTINGS_TEMPLATE
     diff = settings_diff(current_settings, proposed_settings)
 
     if not diff:
-        runner.console.print("Your current VSCode settings [bold green]are compatible[/bold green] with this project!")
+        console.success("Your current VSCode settings are compatible with this project!")
         return 0
 
     print_compare(current_settings, proposed_settings, diff)
     if not Confirm.ask("Do you want to apply these modifications?"):
-        runner.console.print("No changes will be applied to your workspace settings.")
+        console.info("No changes will be applied to your workspace settings.")
         return 0
 
     settings_path().write_text(json.dumps(proposed_settings, indent=4))
-    runner.console.print("[bold green]VSCode settings have been updated for this workspace![/bold green]")
+    console.success("VSCode settings have been updated for this workspace!")
     return 0

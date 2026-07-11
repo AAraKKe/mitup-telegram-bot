@@ -12,28 +12,29 @@ app.add_typer(migrate_app, name="migrate")
 @app.command()
 def up():
     """Start the local Postgres container and wait until it is healthy."""
-    raise typer.Exit(runner.run_command(["docker", "compose", "up", "-d", "--wait", "postgres"]))
+    start_command = ["docker", "compose", "up", "-d", "--wait", "postgres"]
+    raise typer.Exit(runner.run_step("Starting Postgres (docker compose)", start_command))
 
 
 @migrate_app.command("up")
 def migrate_up(revision: Annotated[str, typer.Argument(help="Target revision (default: head).")] = "head"):
     """Upgrade the database schema."""
-    raise typer.Exit(runner.run_command(runner.uv("alembic", "upgrade", revision)))
+    raise typer.Exit(runner.uv("alembic", "upgrade", revision))
 
 
 @migrate_app.command("down")
 def migrate_down(steps: Annotated[int, typer.Argument(min=1, help="Number of revisions to roll back.")] = 1):
     """Downgrade the database schema."""
-    raise typer.Exit(runner.run_command(runner.uv("alembic", "downgrade", f"-{steps}")))
+    raise typer.Exit(runner.uv("alembic", "downgrade", f"-{steps}"))
 
 
 @migrate_app.command("new")
 def migrate_new(name: Annotated[str, typer.Argument(help="Migration slug/description.")]):
     """Create an empty migration scaffold."""
-    raise typer.Exit(runner.run_command(runner.uv("alembic", "revision", "-m", name)))
+    raise typer.Exit(runner.uv("alembic", "revision", "-m", name))
 
 
 @migrate_app.command("validate")
 def migrate_validate():
     """Validate the migration graph (single head, clean upgrade path)."""
-    raise typer.Exit(runner.run_command(runner.uv("mitup", "validate-migrations")))
+    raise typer.Exit(runner.uv("mitup", "validate-migrations"))

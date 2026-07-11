@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from . import runner
+from . import console, runner
 
 LOCALES_RELATIVE_DIR = Path("mitup_bot/locales")
 
@@ -28,7 +28,7 @@ def locales_stale(locales_dir: Path) -> bool:
 
 
 def build_locales() -> int:
-    return runner.run_command(runner.uv("mitup", "translations", "build"))
+    return runner.run_step("Compiling locale catalogs", runner.uv_argv("mitup", "translations", "build"))
 
 
 def ensure_locales_built() -> int:
@@ -48,24 +48,27 @@ def build():
 def sync():
     """Update the source catalog, drop stale entries, rebuild, and validate."""
     steps = (
-        runner.uv("mitup", "translations", "update"),
-        runner.uv("mitup", "translations", "clean-locales"),
-        runner.uv("mitup", "translations", "build"),
-        runner.uv("mitup", "translations", "validate-locales"),
+        ("Updating source catalog", ("mitup", "translations", "update")),
+        ("Removing stale entries", ("mitup", "translations", "clean-locales")),
+        ("Compiling locale catalogs", ("mitup", "translations", "build")),
+        ("Validating locale catalogs", ("mitup", "translations", "validate-locales")),
     )
-    for step in steps:
-        exit_code = runner.run_command(step)
+    for index, (title, command_args) in enumerate(steps, start=1):
+        console.step(f"({index}/{len(steps)}) {title}")
+        exit_code = runner.uv(*command_args)
         if exit_code != 0:
+            console.error(f"{title} failed (exit code {exit_code}).")
             raise typer.Exit(exit_code)
+    console.success("Locales synced.")
 
 
 @app.command()
 def validate():
     """Validate that every locale catalog is complete and consistent."""
-    raise typer.Exit(runner.run_command(runner.uv("mitup", "translations", "validate-locales")))
+    raise typer.Exit(runner.uv("mitup", "translations", "validate-locales"))
 
 
 @app.command()
 def clean():
     """Remove stale msgid blocks from non-English catalogs."""
-    raise typer.Exit(runner.run_command(runner.uv("mitup", "translations", "clean-locales")))
+    raise typer.Exit(runner.uv("mitup", "translations", "clean-locales"))

@@ -1,4 +1,6 @@
+import pytest
 from command_recording import CommandRecorder
+from mb import console, runner
 from mb.main import app
 from typer.testing import CliRunner
 
@@ -126,3 +128,26 @@ def test_test_command_rejects_cov_with_db(recorder: CommandRecorder):
 
     assert result.exit_code == 2
     assert recorder.commands == []
+
+
+def test_run_step_reports_success_and_hides_output(recorder: CommandRecorder, capsys: pytest.CaptureFixture[str]):
+    console.configure(plain=True)
+    recorder.captured_outputs["good-cmd"] = "noisy tool output"
+
+    assert runner.run_step("Good step", ["good-cmd"]) == 0
+
+    captured = capsys.readouterr()
+    assert f"{console.GLYPH_PASS} Good step" in captured.out
+    assert "noisy tool output" not in captured.out
+
+
+def test_run_step_dumps_captured_output_on_failure(recorder: CommandRecorder, capsys: pytest.CaptureFixture[str]):
+    console.configure(plain=True)
+    recorder.exit_codes["bad-cmd"] = 3
+    recorder.captured_outputs["bad-cmd"] = "detailed failure log"
+
+    assert runner.run_step("Bad step", ["bad-cmd"]) == 3
+
+    captured = capsys.readouterr()
+    assert "detailed failure log" in captured.out
+    assert "Bad step failed (exit code 3)" in captured.err

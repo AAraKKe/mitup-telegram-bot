@@ -2,19 +2,26 @@ from . import runner
 
 
 def run_format(check: bool = False) -> int:
-    args = ["ruff", "format", "--check", "--diff", "."] if check else ["ruff", "format", "."]
-    return runner.run_command(runner.uv(*args))
+    if check:
+        return runner.uv("ruff", "format", "--check", "--diff", ".")
+    return runner.uv("ruff", "format", ".")
 
 
 def run_lint(fix: bool = False) -> int:
-    args = ["ruff", "check", "--fix", "--unsafe-fixes", "."] if fix else ["ruff", "check", "."]
-    return runner.run_command(runner.uv(*args))
+    if fix:
+        return runner.uv("ruff", "check", "--fix", "--unsafe-fixes", ".")
+    return runner.uv("ruff", "check", ".")
 
 
 def run_typecheck() -> int:
-    """Type-check the root project, then the mb tool itself (it has its own ty config)."""
-    root_exit = runner.run_command(runner.uv("ty", "check"))
-    mb_exit = runner.run_command(runner.uv("ty", "check"), cwd=runner.repo_root() / "tools/mb")
+    """Type-check the root project, then the mb tool.
+
+    tools/mb is deliberately outside the root [tool.ty.src] include: it is a standalone
+    package checked under its own config (tools/mb/pyproject.toml), so each run sees
+    exactly one package's first-party roots.
+    """
+    root_exit = runner.uv("ty", "check")
+    mb_exit = runner.uv("ty", "check", cwd=runner.repo_root() / "tools/mb")
     return root_exit or mb_exit
 
 

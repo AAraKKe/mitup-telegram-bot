@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from . import checks, runner, testing
+from . import checks, console, runner, testing
 
 Gate = tuple[str, Callable[[], int]]
 
@@ -22,7 +22,16 @@ class GateResult:
 
 def run_gates(gates: list[Gate]) -> list[GateResult]:
     """Run every gate even when earlier ones fail, so one broken check cannot mask another."""
-    return [GateResult(name, gate()) for name, gate in gates]
+    results: list[GateResult] = []
+    for index, (name, gate) in enumerate(gates, start=1):
+        console.step(f"({index}/{len(gates)}) {name}")
+        result = GateResult(name, gate())
+        if result.passed:
+            console.success(name)
+        else:
+            console.error(f"{name} failed (exit code {result.exit_code}).")
+        results.append(result)
+    return results
 
 
 def overall_exit_code(results: list[GateResult]) -> int:
@@ -30,13 +39,12 @@ def overall_exit_code(results: list[GateResult]) -> int:
 
 
 def summary_table(results: list[GateResult]) -> Table:
-    table = Table(title="Validation summary")
+    table = console.styled_table("Validation summary")
     table.add_column("Gate")
     table.add_column("Result")
     table.add_column("Exit code", justify="right")
     for result in results:
-        status = "[green]PASS[/green]" if result.passed else "[red]FAIL[/red]"
-        table.add_row(result.name, status, str(result.exit_code))
+        table.add_row(result.name, console.status_cell(result.passed), str(result.exit_code))
     return table
 
 
@@ -52,8 +60,8 @@ def standard_gates() -> list[Gate]:
 def extended_gates() -> list[Gate]:
     return [
         ("db tests", lambda: testing.run_tests([], db=True)),
-        ("locales", lambda: runner.run_command(runner.uv("mitup", "translations", "validate-locales"))),
-        ("migrations", lambda: runner.run_command(runner.uv("mitup", "validate-migrations"))),
+        ("locales", lambda: runner.uv("mitup", "translations", "validate-locales")),
+        ("migrations", lambda: runner.uv("mitup", "validate-migrations")),
     ]
 
 
@@ -63,5 +71,10 @@ def validate_command(
     """Run every quality gate without stopping at the first failure, then summarize."""
     gates = standard_gates() + (extended_gates() if run_all else [])
     results = run_gates(gates)
-    runner.console.print(summary_table(results))
+    console.show(summary_table(results))
+    failed = [result for result in results if not result.passed]
+    if failed:
+        console.error(f"{len(failed)} of {len(results)} gates failed: {', '.join(result.name for result in failed)}.")
+    else:
+        console.success("All gates passed.")
     raise typer.Exit(overall_exit_code(results))

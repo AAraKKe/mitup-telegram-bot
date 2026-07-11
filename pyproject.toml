@@ -71,7 +71,9 @@ markers = [
 env_files = [".env"]
 
 [tool.ty.src]
-include = ["mitup_bot", "tests", "tools"]
+# tools/mb is deliberately not included: it is a standalone package type-checked under its
+# own config (tools/mb/pyproject.toml); `mb typecheck` runs both checks.
+include = ["mitup_bot", "tests"]
 exclude = [
     "**/.vscode",
     "**/__pycache__",

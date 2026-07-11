@@ -9,7 +9,11 @@ app = typer.Typer(no_args_is_help=True, help="CI checks (normally run by the pip
 
 
 @app.command("check-commit")
-def check_commit(commit_msg_file: Annotated[Path, typer.Argument(help="Path to the commit message file.")]):
+def check_commit(
+    commit_msg_file: Annotated[
+        Path, typer.Argument(exists=True, dir_okay=False, help="Path to the commit message file.")
+    ],
+):
     """Validate commit message format and replace the type prefix with its emoji."""
     config_path = runner.repo_root() / "commits_check_config.yaml"
     raise typer.Exit(commit_check.check_commit_file(commit_msg_file, config_path))

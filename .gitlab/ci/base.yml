@@ -6,6 +6,9 @@ image: registry.gitlab.com/meetupbot/mitup-telegram-bot/ci-python:${CI_IMAGE_TAG
 variables:
   # Exclude paths for SAST analysis
   SAST_EXCLUDED_PATHS: "tests"
+  # GitLab renders ANSI colors in job logs; mb and pytest key their color output off this.
+  # Animations stay off in CI regardless (mb only animates on an interactive TTY).
+  FORCE_COLOR: "1"
   # Default CI image tag - can be overridden by workflow rules
   CI_IMAGE_TAG: "latest"
 

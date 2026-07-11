@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from . import runner
+from . import console
 
 # Regex pattern for conventional commit format (case-insensitive type)
 # Format: Type[(scope)]: description
@@ -85,31 +85,32 @@ class CommitMessageFormatter:
         try:
             message = commit_msg_file.read_text()
         except FileNotFoundError:
-            runner.console.print(f"❌ Commit message file not found: {commit_msg_file}", markup=False)
+            console.error(f"Commit message file not found: {commit_msg_file}")
             return 1
 
         error_message, formatted_message = self.format_commit_message(message)
 
         if formatted_message is None:
-            runner.console.print("❌ Commit message formatting failed!\n", markup=False)
-            runner.console.print(error_message, markup=False)
+            console.error("Commit message formatting failed!")
+            assert error_message is not None
+            console.raw(f"\n{error_message}")
             return 1
 
         try:
             commit_msg_file.write_text(formatted_message)
         except OSError as error:
-            runner.console.print(f"❌ Failed to write formatted message: {error}", markup=False)
+            console.error(f"Failed to write formatted message: {error}")
             return 1
 
         original_subject = message.split("\n")[0]
         formatted_subject = formatted_message.split("\n")[0]
 
         if original_subject != formatted_subject:
-            runner.console.print("✨ Commit message formatted!", markup=False)
-            runner.console.print(f"   Before: {original_subject}", markup=False)
-            runner.console.print(f"   After:  {formatted_subject}", markup=False)
+            console.success("Commit message formatted!")
+            console.raw(f"   Before: {original_subject}")
+            console.raw(f"   After:  {formatted_subject}")
         else:
-            runner.console.print("✅ Commit message is valid (no changes needed)", markup=False)
+            console.success("Commit message is valid (no changes needed).")
 
         return 0
 
@@ -155,6 +156,6 @@ def check_commit_file(commit_msg_file: Path, config_path: Path) -> int:
     try:
         formatter = CommitMessageFormatter(config_path)
     except CommitConfigError as error:
-        runner.console.print(f"❌ {error}", markup=False)
+        console.error(str(error))
         return 1
     return formatter.format_file(commit_msg_file)
