@@ -3,7 +3,7 @@ name = "mb"
 version = "0.1.0"
 description = "Developer CLI for the mitup-telegram-bot repository"
 requires-python = ">=3.14"
-dependencies = ["typer>=0.15"]
+dependencies = ["typer>=0.15", "pyyaml>=6", "rich>=13"]
 
 [project.scripts]
 mb = "mb.main:app"

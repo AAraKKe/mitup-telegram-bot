@@ -5,8 +5,8 @@ services:
       dockerfile: ./dev/docker/Dockerfile.dev
     volumes:
       - .:/bot
-      - ./.docker_hatch:/.docker_hatch
-    command: hatch run dev:test
+      - ./.docker_uv:/.docker_uv
+    command: uv run mb test
 
   migrations-upgrade:
     # Intended only for local migrations
@@ -19,24 +19,19 @@ services:
         condition: service_healthy
     volumes:
       - .:/bot
-      - ./.docker_hatch:/.docker_hatch
+      - ./.docker_uv:/.docker_uv
     environment:
       - MITUPBOT__DB__USERNAME=mitupbot
       - MITUPBOT__DB__PASSWORD=12345pass
       - MITUPBOT__DB__DATABASE=mitup
       - MITUPBOT__DB__URL=postgres
       - MITUPBOT__DB__PORT=5432
-    command: hatch run dev:migrations-upgrade
+    command: uv run mb db migrate up
 
   migrations-downgrade:
     # Intended only for local migrations
     <<: *migrations-service
-    command: hatch run dev:migrations-downgrade
-
-  populate-db:
-    # Populate database with test data from YAML
-    <<: *migrations-service
-    command: hatch run dev:populate-db
+    command: uv run mb db migrate down
 
   postgres:
     image: postgres:18.4
@@ -67,20 +62,20 @@ services:
       - MITUPBOT__METRICS__NAMESPACE=MitupDocker
     volumes:
       - .:/bot
-      - ./.docker_hatch:/.docker_hatch
-    command: bash -c "hatch run dev:update-locales && hatch run dev:launch"
+      - ./.docker_uv:/.docker_uv
+    command: bash -c "uv run mb locales sync && uv run mb run bot"
 
   debug:
     <<: *launch-bot
-    command: hatch run dev:debug
+    command: uv run mb run bot --debug
     ports:
       - 5678:5678
 
   events:
     <<: *launch-bot
     command: >
-      bash -c "hatch run dev:update-locales &&
-      hatch run dev:launch-events
+      bash -c "uv run mb locales sync &&
+      uv run mb run events
       --notify-meeting-interval 5
       --user-cleanup-interval 10
       --generate-stats-interval 5

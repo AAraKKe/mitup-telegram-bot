@@ -1,6 +1,6 @@
-# This Dockerfile builds an image that includes the Python:3.13 image
-# with Hatch to allow executing pipeline jobs.
-# The image is built by a manual job in any pipeline
+# This Dockerfile builds the image CI pipeline jobs run on: Python plus uv,
+# with every locked dependency pre-installed so jobs only sync the workspace sources.
+# The image is rebuilt automatically when dependency metadata changes (see .gitlab/ci/docker.yml)
 FROM python:3.14.0-slim-bookworm
 
 # Combine all installations into a single RUN command to reduce image layers
@@ -32,23 +32,25 @@ RUN apt-get update && \
     unzip /tmp/aws/awscliv2.zip -d /tmp/aws && \
     /tmp/aws/aws/install && \
     rm -rf /tmp/aws && \
-    # Install Hatch
-    pip install --no-cache-dir hatch && \
+    # Install uv
+    pip install --no-cache-dir uv && \
     # Clean up apt cache
     rm -rf /var/lib/apt/lists/*
 
-# Configure hatch to use a persistent directory for virtual environments
-RUN hatch config set dirs.env.virtual /opt/hatch-venvs
+# Keep the venv outside the checkout: GitLab cleans the project directory on every job,
+# which would wipe a .venv living inside it. UV_FROZEN makes every job-time `uv run` /
+# `uv sync` respect uv.lock instead of re-resolving.
+ENV UV_PROJECT_ENVIRONMENT=/opt/uv-venv \
+    UV_FROZEN=1
 
-# Use the same project path as the CI job to ensure hatch finds the environment
+# Use the same project path as the CI job so uv reuses the pre-built environment
 # The default GitLab CI checkout path is /builds/<group>/<project>
 ARG PROJECT_DIR="/builds/meetupbot/mitup-telegram-bot"
 RUN mkdir -p ${PROJECT_DIR}
 WORKDIR ${PROJECT_DIR}
 
-# Copy pyproject.toml to pre-install dependencies
-COPY pyproject.toml .
-COPY LICENSE .
+# Copy only dependency metadata to pre-install dependencies
+COPY pyproject.toml uv.lock LICENSE ./
 # The root pyproject declares tools/mb as a uv workspace member; uv refuses to resolve
 # when the member is missing, so its pyproject must exist too. Copying only the
 # pyproject (not the sources) keeps this layer's cache keyed on dependency metadata.
@@ -61,9 +63,9 @@ RUN mkdir -p mitup_bot && \
     mkdir -p tools/mb/src/mb && \
     touch tools/mb/src/mb/__init__.py tools/mb/src/mb/main.py
 
-# Pre-install dev environment with all dependencies
-# This caches all dependencies so CI jobs start faster
-RUN hatch env create dev
+# Pre-install every locked dependency so CI jobs start fast. `uv cache prune --ci`
+# keeps wheels built from source but drops downloaded ones, which the venv already holds.
+RUN uv sync --frozen && uv cache prune --ci
 
 # Clean up build files, leaving the empty project directory for the CI job to clone into.
-RUN rm -rf pyproject.toml LICENSE mitup_bot tools
+RUN rm -rf pyproject.toml uv.lock LICENSE mitup_bot tools

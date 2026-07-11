@@ -1,7 +1,7 @@
 build-docs:
   stage: prepare-deployment
   script:
-    - hatch run dev:build-docs
+    - uv run mb docs build
   artifacts:
     paths:
       - site
@@ -25,7 +25,7 @@ build-docs:
     # Authenticate with this job's own OIDC token: docs publish runs after the deploy, so it
     # must not reuse credentials issued to an earlier job.
     - !reference [.aws-prep]
-    - hatch run dev:push-docs
+    - uv run mb docs publish
 
 push-docs-staging:
   extends: .push-docs
@@ -65,9 +65,9 @@ publish_docs_manual:
     - !reference [.aws-prep]
   script:
     - echo "Building documentation before manual publish..."
-    - hatch run dev:build-docs # Run build step first
+    - uv run mb docs build # Run build step first
     - echo "Manually publishing documentation and invalidating entire cache..."
-    - hatch run dev:push-docs
+    - uv run mb docs publish
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH' # Use default branch variable
       when: manual

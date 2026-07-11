@@ -8,13 +8,13 @@ DB integration tests run against a real Postgres container via `testcontainers`.
 
 ```bash
 # Run all DB tests
-hatch run dev:test-db
+uv run mb test --db
 
 # Run a single test
-hatch run dev:test-db -- -k "test_name" -v
+uv run mb test --db -k "test_name" -v
 ```
 
-DB tests are skipped during normal `hatch run dev:test` runs via the `--db-tests` flag logic in `conftest.py`.
+DB tests are skipped during normal `uv run mb test` runs via the `--db-tests` flag logic in `conftest.py`.
 
 ## Fixtures
 

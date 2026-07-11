@@ -3,16 +3,15 @@ preparation:
   script:
     - echo "Using CI image tag ${CI_IMAGE_TAG}"
     - python --version
-    - pip --version
-    - hatch --version
-    - hatch run dev:uv tree
-    - hatch env find
+    - uv --version
+    - time uv sync --frozen
+    - uv tree
     - echo $PWD
 
 build-translations:
   stage: build
   script:
-    - hatch run dev:build-locales
+    - uv run mb locales build
   artifacts:
     when: on_success
     access: none
@@ -22,14 +21,18 @@ build-translations:
 
 validate-ci-languages:
   stage: build
-  script: hatch run dev:python bin/check_ci_languages.py
+  script: uv run mb ci check-languages
 
 test:
   stage: test
   parallel:
     matrix:
       - LANG: [en, es_ES, gl_ES, de_DE, pt_BR, it_IT]
-  script: hatch run dev:test-cov -- tests --lang $LANG
+  # Raw pytest instead of `mb test --cov`: this job needs the JUnit/Cobertura/JSON
+  # report flags that the local-facing mb command deliberately leaves out.
+  script:
+    - uv run mb locales build
+    - FORCE_COLOR=1 uv run pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json tests --lang $LANG
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   dependencies:
     - build-translations
@@ -48,12 +51,14 @@ test:
     - changes:
         - mitup_bot/**/*
         - pyproject.toml
+        - uv.lock
+        - tools/**/*
         - dev/**/*
         - tests/**/*
 
 format-check:
   stage: test
-  script: hatch run dev:format-check
+  script: uv run mb format --check
   needs: [preparation]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -62,7 +67,7 @@ format-check:
 
 linter:
   stage: test
-  script: hatch run dev:lint
+  script: uv run mb lint
   needs: [preparation]
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -72,14 +77,14 @@ linter:
 type-check:
   stage: test
   script: |
-    hatch run dev:ty version
-    hatch run dev:type-check
+    uv run ty version
+    uv run mb typecheck
   needs: [preparation]
 
 check-ty-ignores:
   stage: test
   script:
-    - hatch run dev:python bin/check_ty_ignores.py
+    - uv run mb ci check-ty-ignores
   needs: [preparation]
   allow_failure: true
   rules:
@@ -87,20 +92,20 @@ check-ty-ignores:
 
 validate-migrations:
   stage: test
-  script: hatch run dev:validate-migrations
+  script: uv run mb db migrate validate
   needs: [preparation]
 
 validate-ids:
   # Validates that all messages in code are present in the English translations file
   stage: test
   script:
-    - hatch run dev:validate-ids
+    - uv run mitup translations validate-ids
 
 validate-locales:
   # Validates that all non-English .po files contain the same msgids as English
   stage: test
   script:
-    - hatch run dev:validate-locales
+    - uv run mb locales validate
   dependencies:
     - build-translations
   needs: [preparation, build-translations]
@@ -113,8 +118,11 @@ test-db:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
+  # Raw pytest instead of `mb test --db`: this job needs the JUnit report flag
+  # that the local-facing mb command deliberately leaves out.
   script:
-    - hatch run dev:test-db
+    - uv run mb locales build
+    - FORCE_COLOR=1 uv run pytest --db-tests --dist no --junitxml=report.xml tests/models/db_behavior/
   needs: [preparation]
   artifacts:
     when: always
@@ -122,12 +130,18 @@ test-db:
       junit: report.xml
 
 validate-local-setup:
-  # This job validates the setup process for new contributors
+  # This job validates the fresh-contributor bootstrap on a clean image:
+  # install uv, sync the workspace, and prove the mb CLI answers.
   image: python:3.14-bookworm
   stage: test
   needs: [] # Run immediately without waiting for previous stages
   script:
-    - ./bin/local-setup.sh
+    - apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc gettext git
+    - pip install --no-cache-dir uv
+    - uv sync --frozen
+    - uv run mb --help
+    - 'echo "feat(ci) smoke-test the commit hook" > commit-msg.txt && ! uv run mb ci check-commit commit-msg.txt'
+    - 'echo "feat(ci): smoke-test the commit hook" > commit-msg.txt && uv run mb ci check-commit commit-msg.txt'
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true

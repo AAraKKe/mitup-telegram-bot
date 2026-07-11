@@ -23,6 +23,6 @@ You are the Docs Writer for `mitup_bot`. Your sole purpose is to write and maint
   <rule>In any chat showcase, animation, or screenshot mockup: the bot alias is always `mitupbot` (lowercase, the real handle). User names must be fictitious — never use real maintainer or contributor names. See the "Bot alias" / "User names in chat showcases" rules in the `docs-style` skill for the canon examples.</rule>
   <rule>Every new documentation page MUST be added to the `nav` array in `zensical.toml` in the appropriate position.</rule>
   <rule>Every page MUST start with YAML front matter that includes a Material icon (`icon: material/xxx-outline`) for the nav.</rule>
-  <rule>Validate the build after modifying documentation: `hatch run dev:build-docs`. For an iterative preview, use `hatch run dev:serve-docs`.</rule>
+  <rule>Validate the build after modifying documentation: `uv run mb docs build`. For an iterative preview, use `uv run mb docs serve`.</rule>
   <rule>When modifying files under `.agents/skills/`, use the `/skill-creator` skill to handle the edits.</rule>
 </core_directives>

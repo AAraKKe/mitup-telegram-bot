@@ -8,10 +8,10 @@ allowed-tools: Read, Edit, WebSearch, Bash, Grep
 
 # Type Checking
 
-This project uses [ty](https://github.com/astral-sh/ty) as its type checker. The pinned version is in `pyproject.toml` under `[tool.hatch.envs.dev] dependencies`. Run it via:
+This project uses [ty](https://github.com/astral-sh/ty) as its type checker. The pinned version is in `pyproject.toml` under `[dependency-groups]`. Run it via:
 
 ```bash
-hatch run dev:type-check
+uv run mb typecheck
 ```
 
 ## Suppressing false positives
@@ -19,7 +19,7 @@ hatch run dev:type-check
 `ty` is pre-stable and does not yet support all Python typing features. Suppress genuine false positives with a `# ty: ignore[rule-name]` comment.
 
 <critical_rules>
-Every `# ty: ignore` comment must include a GitHub issue URL on the same line. No exceptions, no grandfathering. Enforced by `bin/check_ty_ignores.py` in CI.
+Every `# ty: ignore` comment must include a GitHub issue URL on the same line. No exceptions, no grandfathering. Enforced by `uv run mb ci check-ty-ignores` in CI.
 </critical_rules>
 
 ```python
@@ -33,13 +33,13 @@ The CI job `check-ty-ignores` queries the GitHub API and warns when a referenced
 1. Confirm the error is a genuine false positive (not a real bug in your code).
 2. Search the [ty issue tracker](https://github.com/astral-sh/ty/issues) for an existing report. Open a new issue if none exists.
 3. Add the suppression with the rule name and issue URL on the same line.
-4. Run `hatch run dev:type-check` to verify the suppression clears the error.
+4. Run `uv run mb typecheck` to verify the suppression clears the error.
 
 ### Removing a suppression
 
 1. Remove the `# ty: ignore` comment.
-2. Run `hatch run dev:type-check`. If no error appears, the fix has landed — done.
-3. If the error reappears, verify the installed `ty` matches the version in `pyproject.toml`. If not, run `hatch env prune && hatch env create dev` to refresh the environment.
+2. Run `uv run mb typecheck`. If no error appears, the fix has landed — done.
+3. If the error reappears, verify the installed `ty` matches the version in `pyproject.toml`. If not, run `uv sync` to refresh the environment.
 4. If the version is correct and the error still appears, restore the comment — the fix has not fully landed yet.
 
 ## Interactive suppression workflow
@@ -50,7 +50,7 @@ Invoke this skill directly (via `/type-checking <rule-name> [file:line]`) when y
 2. Search <https://github.com/astral-sh/ty/issues> for an open issue covering the false positive. If a match exists, use its URL. If none exists, pause and tell the caller to open one before proceeding — the suppression cannot land without an issue link.
 3. Insert the comment on the flagged line in the exact format shown above (rule name in brackets, two spaces, full issue URL). If the caller passed `file:line`, go straight there; otherwise ask which location to modify.
 4. Warn the caller if the referenced issue is already **closed** — the `check-ty-ignores` CI job will flag the suppression as stale, and the fix may already be available in a newer `ty` version.
-5. Run `hatch run dev:type-check` to confirm the error clears.
+5. Run `uv run mb typecheck` to confirm the error clears.
 
 Before picking a fresh URL, check the "Known false positives" section below — many common suppressions already have a documented issue you can reuse.
 
@@ -72,7 +72,7 @@ This section documents active `ty` bugs that require suppressions in the codebas
 
 ## CI enforcement
 
-The `check-ty-ignores` job (defined in `.gitlab/ci/test.yml`) runs `bin/check_ty_ignores.py` on merge requests. It scans `mitup_bot/`, `tests/`, and `bin/` and:
+The `check-ty-ignores` job (defined in `.gitlab/ci/test.yml`) runs `uv run mb ci check-ty-ignores` on merge requests. It scans `mitup_bot/`, `tests/`, and `tools/` and:
 
 - Fails if any suppression is missing a GitHub issue URL (see [Suppressing false positives](#suppressing-false-positives)).
 - Queries the GitHub API and warns when a referenced issue is closed.

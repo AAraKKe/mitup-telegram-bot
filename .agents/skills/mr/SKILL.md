@@ -35,7 +35,7 @@ for a single scope to be meaningful.
 
 ## Workflow
 
-**Coverage gate (pre-flight).** Before opening the MR, verify coverage of the code this branch adds or changes — a green total can hide an undertested new module. Run `hatch run dev:test-cov` (the command CI runs) and read the `term-missing` line for each touched module, per the `test-conventions` skill's "Cover new and changed code" rule. For any new/changed module below the project's CI coverage baseline, either add tests first or justify the shortfall in the MR description (the usual valid case: logic covered only by db-gated tests, which don't feed the unit coverage total). Do this alongside the convention pre-flight in step 2.
+**Coverage gate (pre-flight).** Before opening the MR, verify coverage of the code this branch adds or changes — a green total can hide an undertested new module. Run `uv run mb test --cov` (the command CI runs) and read the `term-missing` line for each touched module, per the `test-conventions` skill's "Cover new and changed code" rule. For any new/changed module below the project's CI coverage baseline, either add tests first or justify the shortfall in the MR description (the usual valid case: logic covered only by db-gated tests, which don't feed the unit coverage total). Do this alongside the convention pre-flight in step 2.
 
 1. **Resolve the base ref and worktree root.** Don't hardcode either — compute them:
 

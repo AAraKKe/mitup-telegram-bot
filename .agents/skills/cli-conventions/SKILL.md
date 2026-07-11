@@ -12,7 +12,7 @@ The bot includes a CLI built with [Click](https://click.palletsprojects.com/). T
 
 <critical_rules>
   <rule>This CLI is for production-related commands only — commands that are part of the bot's operational lifecycle (launching, deploying, running migrations, managing translations, etc.). It is NOT a general-purpose tooling CLI.</rule>
-  <rule>Scripts for CI, development utilities, and one-off tooling belong in the `bin/` directory at the project root, not in `mitup_bot/cli/`.</rule>
+  <rule>Developer tooling belongs in `tools/` at the project root, not in `mitup_bot/cli/`: repeatable workflows go in the `mb` CLI (`tools/mb/`), standalone one-off scripts next to it in `tools/`.</rule>
 </critical_rules>
 
 ## The `launch` command
@@ -35,7 +35,7 @@ To add a new CLI command, create a file in `mitup_bot/cli/commands/`. It will be
 | `mitup_bot/cli/commands/` | Production CLI subcommands (auto-discovered) | `launch.py`, `deploy.py`, `translations.py` |
 | `mitup_bot/cli/` (top-level) | CLI infrastructure — the entry point and command discovery, not operational logic | `run.py`, `cli_commands.py`, `helpers.py` |
 | `mitup_bot/events/` | Recurrent-event job implementations + the periodic runner that schedules them | `notify_meetings.py`, `broadcast/`, `service.py` |
-| `bin/` (project root) | CI scripts, dev utilities, one-off tooling | `check_ty_ignores.py`, `local-setup.sh` |
+| `tools/` (project root) | The `mb` dev CLI and standalone helper scripts | `tools/mb/`, `gl_reply_thread.py` |
 
 **Keep subcommands thin.** A CLI command that only fronts a service must stay a thin entry point — parse options and delegate to the owning package, which holds the real logic and stays importable without dragging Click (or `boto3`, or `rich`) into a Lambda. The `recurrent-events` command delegates to `mitup_bot.events` (jobs + `service.run_events`), and `migrate-from-rails` delegates to `mitup_bot.migration` (`invoke_from_lambda`, the pipeline runner). Job implementations under `mitup_bot/events/` never import `mitup_bot.cli`.
 

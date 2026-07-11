@@ -16,7 +16,8 @@ def test_ci_group_is_still_invokable(recorder: CommandRecorder):
     result = cli.invoke(app, ["ci", "check-ty-ignores"])
 
     assert result.exit_code == 0
-    assert recorder.commands == [["uv", "run", "python", "bin/check_ty_ignores.py"]]
+    # The check runs natively (the recorder's tmp repo root has no sources to scan)
+    assert recorder.commands == []
 
 
 def test_lint_defaults_to_plain_ruff_check(recorder: CommandRecorder):

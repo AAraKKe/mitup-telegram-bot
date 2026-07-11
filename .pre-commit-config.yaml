@@ -32,19 +32,19 @@ repos:
     hooks:
       - id: check-commit-message
         name: Check conventional commit message
-        entry: hatch run dev:check-commit
+        entry: uv run mb ci check-commit
         language: system
         stages: [commit-msg]
       - id: build-docs
         name: Build documentation
-        entry: hatch run dev:build-docs
+        entry: uv run mb docs build
         language: system
         pass_filenames: false
-        files: ^(docs/|mkdocs.yml)$
+        files: ^(docs/|zensical\.toml$)
         stages: [pre-commit]
       - id: validate-locales
         name: Validate source language
-        entry: hatch run dev:validate-locales
+        entry: uv run mb locales validate
         pass_filenames: false
         language: system
         stages:

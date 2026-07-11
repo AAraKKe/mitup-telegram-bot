@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from . import runner
+from . import runner, vscode
 
 LOCAL_ONLY_FILES = (".env", ".envrc")
 
@@ -37,7 +37,9 @@ def copy_local_only_files(main_root: Path, current_root: Path) -> list[str]:
 
 
 def setup_command(
-    vscode: Annotated[bool, typer.Option("--vscode", help="Also generate the VS Code workspace settings.")] = False,
+    setup_vscode: Annotated[
+        bool, typer.Option("--vscode", help="Also generate the VS Code workspace settings.")
+    ] = False,
 ):
     """Bootstrap this checkout: local config files, dependencies, and git hooks. Idempotent."""
     current_root = runner.repo_root()
@@ -52,5 +54,5 @@ def setup_command(
             raise typer.Exit(hooks_exit)
     else:
         runner.console.print("[yellow]pre-commit not found — skipping git hook installation.[/yellow]")
-    if vscode:
-        raise typer.Exit(runner.run_command(runner.uv("python", "bin/setup_vscode.py")))
+    if setup_vscode:
+        raise typer.Exit(vscode.apply_vscode_settings())

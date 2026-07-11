@@ -35,13 +35,13 @@ The `user_with_settings` fixture consumes `lang` and sets `settings.language = l
 
 ```bash
 # Default: English only
-hatch run dev:test -- tests/path/to/test_file.py
+uv run mb test tests/path/to/test_file.py
 
 # Specific language
-hatch run dev:test -- tests/path/to/test_file.py --lang es
+uv run mb test tests/path/to/test_file.py --lang es
 
 # All supported languages (parametrizes each test per language)
-hatch run dev:test -- tests/path/to/test_file.py --lang all
+uv run mb test tests/path/to/test_file.py --lang all
 ```
 
 When writing tests that assert on user-facing text (views, messages, button labels), always derive the expected text from the user's language rather than hardcoding English:

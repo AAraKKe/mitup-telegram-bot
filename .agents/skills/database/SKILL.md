@@ -107,9 +107,9 @@ Database migrations use [Alembic](https://alembic.sqlalchemy.org/). Migration sc
 Day-to-day commands when running the bot locally:
 
 ```bash
-hatch run dev:migrations-upgrade    # Apply pending migrations
-hatch run dev:migrations-downgrade  # Roll back one migration
-hatch run dev:validate-migrations   # Validate migration graph integrity
+uv run mb db migrate up    # Apply pending migrations
+uv run mb db migrate down  # Roll back one migration
+uv run mb db migrate validate   # Validate migration graph integrity
 ```
 
 When a model change needs a new migration, invoke the `new-migration` skill — it walks through scaffolding the revision file, writing `upgrade()` / `downgrade()` by hand (autogenerate is disallowed), and validating that both paths apply cleanly. Don't repeat the walkthrough here; that skill owns it.

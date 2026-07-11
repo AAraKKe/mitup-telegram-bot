@@ -1,6 +1,6 @@
 ---
 name: translator
-description: Translate or fix message catalog strings for a **single target language**. Handles both missing msgid blocks and empty msgstr entries. Always spawn one instance per language — never ask one agent to handle multiple languages at once (the model is small and each language has its own dictionary rules). Use after running `hatch run dev:update-locales` to fill in empty msgstr entries, or standalone for targeted fixes.
+description: Translate or fix message catalog strings for a **single target language**. Handles both missing msgid blocks and empty msgstr entries. Always spawn one instance per language — never ask one agent to handle multiple languages at once (the model is small and each language has its own dictionary rules). Use after running `uv run mb locales sync` to fill in empty msgstr entries, or standalone for targeted fixes.
 tools: Read, Edit, Glob, Bash
 model: haiku
 skills:
@@ -18,13 +18,13 @@ You have Bash, Read, Edit, and Glob tools available. **Always use them directly*
 
 1. Run the translation status script to get a full picture of what needs work:
    ```bash
-   hatch run dev:python bin/translation_status.py <lang_code>
+   uv run python tools/translation_status.py <lang_code>
    ```
    This outputs all missing msgid blocks, empty msgstr entries, and stale entries — with the English source text for each. Use this output as your work list.
 
    If the caller mentions that English strings were updated or asks you to review existing translations, add the `--review` flag:
    ```bash
-   hatch run dev:python bin/translation_status.py <lang_code> --review [<git_ref>]
+   uv run python tools/translation_status.py <lang_code> --review [<git_ref>]
    ```
    This compares the current English text against a previous git ref (defaults to `main`) and shows entries where the English changed. For each changed entry it prints old English, new English, and the current translation so you can decide whether the translation needs updating.
 
@@ -54,7 +54,7 @@ NEVER overwrite correct existing translations.
 
 ## After translating
 
-Run `hatch run dev:build-locales` and report:
+Run `uv run mb locales build` and report:
 - How many missing msgid blocks were added
 - How many empty msgstr entries were filled
 - Whether the build succeeded

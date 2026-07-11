@@ -862,11 +862,17 @@ name = "mb"
 version = "0.1.0"
 source = { editable = "tools/mb" }
 dependencies = [
+    { name = "pyyaml" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typer", specifier = ">=0.15" }]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6" },
+    { name = "rich", specifier = ">=13" },
+    { name = "typer", specifier = ">=0.15" },
+]
 
 [[package]]
 name = "mdurl"

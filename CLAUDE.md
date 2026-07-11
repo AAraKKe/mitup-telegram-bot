@@ -33,7 +33,7 @@ The canonical reference for available agents is `.claude/agents/` (one file per 
 
 ## When validation fails
 
-When `hatch run dev:validate` (or CI) fails on work you didn't author the fix for, don't fix it yourself by default — the failure usually involves area-specific conventions a specialist already knows. The trivial-fix exception above applies here too, including on specialist-authored work: a mechanical failure with an obvious few-line fix (formatting, a missing annotation, a rename fallout) may be fixed directly **after loading the governing skill named in the table below**. When directly fixing a specialist's output, mention the fix in any later message that resumes that specialist, so its session model of the code stays accurate. Anything beyond trivial, delegate:
+When `uv run mb validate` (or CI) fails on work you didn't author the fix for, don't fix it yourself by default — the failure usually involves area-specific conventions a specialist already knows. The trivial-fix exception above applies here too, including on specialist-authored work: a mechanical failure with an obvious few-line fix (formatting, a missing annotation, a rename fallout) may be fixed directly **after loading the governing skill named in the table below**. When directly fixing a specialist's output, mention the fix in any later message that resumes that specialist, so its session model of the code stays accurate. Anything beyond trivial, delegate:
 
 **If the work was done by a specialist agent:** resume that agent's session with the error output. The resumed agent retains full context of every change it made.
 

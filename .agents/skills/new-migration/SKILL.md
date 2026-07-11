@@ -16,4 +16,4 @@ Steps:
    - PostgreSQL timestamp trigger columns (`created_time`, `updated_time`) — these are set by DB triggers, not application code
    - Nullable changes that may require data backfills
    - `downgrade()` must cleanly reverse everything `upgrade()` does
-6. Run: `hatch run dev:validate-migrations` to confirm it applies cleanly.
+6. Run: `uv run mb db migrate validate` to confirm it applies cleanly.

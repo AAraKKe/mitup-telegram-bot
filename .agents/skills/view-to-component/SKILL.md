@@ -272,4 +272,4 @@ Before saving the docs page, walk through:
 3. Header name is `mitupbot`; sender row inside the bubble is `mitupbot`.
 4. Any user name is from the fictitious canon, not a real contributor.
 5. Description HTML uses doc tags (`<strong>`, `<em>`, `<br/>`) — no `<b>` / `<i>` / raw `\n`.
-6. Build the docs to catch markup errors: `hatch run dev:build-docs`.
+6. Build the docs to catch markup errors: `uv run mb docs build`.

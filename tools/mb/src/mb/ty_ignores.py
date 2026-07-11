@@ -1,24 +1,14 @@
-#!/usr/bin/env python3
-"""
-Scan the codebase for `# ty: ignore` comments that reference GitHub issues,
+"""Scan the codebase for `# ty: ignore` comments that reference GitHub issues,
 and check whether those issues have been closed upstream.
 
 When a referenced issue is closed, the suppression is likely no longer needed
 and can be removed after verifying the type checker no longer reports the error.
-
 All unique issues are checked concurrently via asyncio TaskGroup.
-No external dependencies required (stdlib only).
-
-Exit codes:
-    0 – all referenced issues are still open (or no ty: ignore lines found)
-    1 – at least one referenced issue has been closed, or a suppression
-        is missing a tracking issue URL
 """
 
 import asyncio
 import json
 import re
-import sys
 import urllib.request
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -28,8 +18,10 @@ from itertools import groupby
 from operator import attrgetter
 from pathlib import Path
 
+from . import runner
+
 # Directories to scan (relative to repo root)
-SCAN_DIRS = ("mitup_bot", "tests", "bin")
+SCAN_DIRS = ("mitup_bot", "tests", "tools")
 
 # Matches any ty ignore directive (with or without an issue URL).
 TY_IGNORE_BARE = re.compile(r"#\s*ty:\s*ignore\[(?P<rule>[^\]]+)\]")
@@ -168,7 +160,7 @@ class CheckReport:
                 yield f"  {entry.file}:{entry.line}"
             yield ""
             yield (
-                "hint: Run `hatch run dev:type-check` after removing these comments "
+                "hint: Run `uv run mb typecheck` after removing these comments "
                 "to verify the issues are actually fixed in your version of ty."
             )
 
@@ -202,7 +194,7 @@ def scan_ty_ignores(root: Path) -> tuple[list[IgnoreEntry], list[UntrackedIgnore
                         )
                     )
                 elif TY_IGNORE_NOLINK.search(line):
-                    pass  # explicitly exempted — nolink: reason documents why no issue is needed
+                    ...  # explicitly exempted — nolink: reason documents why no issue is needed
                 elif bare_match := TY_IGNORE_BARE.search(line):
                     untracked.append(
                         UntrackedIgnore(
@@ -221,7 +213,7 @@ async def fetch_issue_state(issue: GitHubIssueRef) -> IssueCheckResult:
         headers={"Accept": "application/vnd.github.v3+json"},
     )
 
-    def _do_request() -> IssueCheckResult:
+    def do_request() -> IssueCheckResult:
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.loads(response.read())
@@ -231,23 +223,18 @@ async def fetch_issue_state(issue: GitHubIssueRef) -> IssueCheckResult:
         except Exception as exc:
             return IssueCheckResult(issue=issue, state=IssueState.ERROR, error_detail=str(exc))
 
-    return await asyncio.to_thread(_do_request)
+    return await asyncio.to_thread(do_request)
 
 
 async def check_all_issues(unique_issues: dict[str, GitHubIssueRef]) -> dict[str, IssueCheckResult]:
     """Check all unique issues concurrently using a TaskGroup."""
-    results: dict[str, IssueCheckResult] = {}
-
     async with asyncio.TaskGroup() as tg:
         tasks = {url: tg.create_task(fetch_issue_state(issue)) for url, issue in unique_issues.items()}
 
-    for url, task in tasks.items():
-        results[url] = task.result()
-
-    return results
+    return {url: task.result() for url, task in tasks.items()}
 
 
-async def run(root: Path) -> CheckReport:
+async def build_report(root: Path) -> CheckReport:
     report = CheckReport()
     report.entries, report.untracked = scan_ty_ignores(root)
 
@@ -261,14 +248,7 @@ async def run(root: Path) -> CheckReport:
     return report
 
 
-async def main() -> int:
-    root = Path(__file__).resolve().parent.parent
-    report = await run(root)
-
-    print(report)
-
+def run_check(root: Path) -> int:
+    report = asyncio.run(build_report(root))
+    runner.console.print(str(report), markup=False, highlight=False)
     return 1 if report.has_failures else 0
-
-
-if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))

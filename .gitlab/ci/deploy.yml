@@ -11,7 +11,7 @@
     # Authenticate with this job's own OIDC token: deploys can queue for a long time on the
     # resource group, so they must not reuse credentials issued to an earlier job.
     - !reference [.aws-prep]
-    - hatch run dev:deploy
+    - uv run mb deploy
       --migrations-image $MIGRATIONS_IMAGE_TAG
       --bot-image $BOT_IMAGE_TAG
       --alarm-action-image $ALARM_ACTION_IMAGE_TAG

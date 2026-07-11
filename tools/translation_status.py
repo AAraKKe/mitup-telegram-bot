@@ -11,13 +11,13 @@ Designed to be called by the translator agent so it gets all the
 information it needs in one shot, without needing grep/awk/etc.
 
 Usage:
-    hatch run dev:python bin/translation_status.py <lang_code>
-    hatch run dev:python bin/translation_status.py <lang_code> --review [<git_ref>]
+    uv run python tools/translation_status.py <lang_code>
+    uv run python tools/translation_status.py <lang_code> --review [<git_ref>]
 
 Examples:
-    hatch run dev:python bin/translation_status.py es_ES
-    hatch run dev:python bin/translation_status.py de_DE --review
-    hatch run dev:python bin/translation_status.py it_IT --review HEAD~5
+    uv run python tools/translation_status.py es_ES
+    uv run python tools/translation_status.py de_DE --review
+    uv run python tools/translation_status.py it_IT --review HEAD~5
 """
 
 from __future__ import annotations

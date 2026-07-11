@@ -14,8 +14,8 @@ Domain knowledge lives in skills under `.agents/skills/` (one directory per skil
 
 ## Important rules
 
-- **Validation is explicit — run it when it earns its cost.** There are no automatic validation hooks. During work, use targeted runs: `hatch run dev:test-hook <paths or pytest args>` for the tests you're touching (fast, no coverage; script definitions live in `pyproject.toml` under `[tool.hatch.envs.dev.scripts]`), `hatch run dev:fix` after finishing a coherent batch of edits (not after every file). Before declaring a task done or opening/updating an MR, run the full gate: `hatch run dev:validate` (format + lint + type-check + tests). Never hand work back as finished without that full run having passed — CI is the backstop, not the first line.
-- **Never run `python` directly.** The system Python has no project dependencies. Use `hatch run dev:python <args>` to execute Python in the project's managed environment.
+- **Validation is explicit — run it when it earns its cost.** There are no automatic validation hooks. During work, use targeted runs: `uv run mb test <paths or pytest args>` for the tests you're touching (fast, no coverage; run `uv run mb --help` for the full command surface, defined in `tools/mb/`), `uv run mb fix` after finishing a coherent batch of edits (not after every file). Before declaring a task done or opening/updating an MR, run the full gate: `uv run mb validate` (format + lint + type-check + tests). Never hand work back as finished without that full run having passed — CI is the backstop, not the first line.
+- **Never run `python` directly.** The system Python has no project dependencies. Use `uv run python <args>` to execute Python in the project's managed environment.
 - **Prefer scripts for bulk edits.** When the same change needs to land across many files, write a small script rather than editing each one by hand — it's faster and saves the conversation context for actual reasoning.
 
 ## Maintaining these instructions
@@ -58,8 +58,9 @@ Versions and pins are defined in `pyproject.toml`. Always check that file — do
 | Bot SDK | [python-telegram-bot](https://docs.python-telegram-bot.org/en/stable/index.html) (PTB) |
 | ORM | SQLModel (SQLAlchemy + Pydantic) |
 | Migrations | Alembic |
-| Build system | Hatch (with uv as installer) |
-| Type checker | [ty](https://github.com/astral-sh/ty) (version pinned in `[tool.hatch.envs.dev] dependencies`) |
+| Package/env manager | [uv](https://docs.astral.sh/uv/) (hatchling remains the wheel build backend) |
+| Dev CLI | `mb` (uv workspace member in `tools/mb/`; run `uv run mb --help`) |
+| Type checker | [ty](https://github.com/astral-sh/ty) (version pinned in `[dependency-groups]` in `pyproject.toml`) |
 | Linter / formatter | Ruff |
 | Testing | pytest + pytest-asyncio |
 | CI/CD | GitLab CI |
@@ -85,7 +86,7 @@ mitup_bot/              # Main package
 ├── utils/              # Shared utilities (callbacks, messages, emojis, types)
 └── views/              # View layer
 
-bin/                    # CI scripts and dev utilities (not shipped in the wheel)
+tools/                  # Dev tooling: the mb CLI (tools/mb/) and helper scripts (not shipped in the wheel)
 tests/                  # Test suite
 .agents/skills/         # Domain knowledge skills (cross-harness; .claude/skills symlinks here)
 .claude/agents/         # Claude Code specialist agents

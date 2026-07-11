@@ -8,7 +8,7 @@
 # IMPORTANT: copy this file to `mitup_bot/environments/dev.toml` before modifying values in it.
 #            You can keep the `dev.toml` file locally with any configuration you need and is
 #            ignored by git.
-#            Alternatively, `hatch run dev:set-local-bot <token>` generates `dev.toml` for you.
+#            Alternatively, `uv run mitup dev <token>` generates `dev.toml` for you.
 
 [bot]
 # Telegram bot configuration related with API configuration as well as internal configuration

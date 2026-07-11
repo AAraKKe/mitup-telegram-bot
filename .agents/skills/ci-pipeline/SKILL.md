@@ -20,26 +20,26 @@ Most development work interacts with the **build** and **test** stages.
 
 | Job | What it does | Runs on |
 |-----|-------------|---------|
-| `preparation` | Verifies Python, pip, hatch, and prints environment info | Always |
-| `build-translations` | Compiles locale `.mo` files | Always |
-| `test` | Runs `hatch run dev:test-cov` with coverage and JUnit reports | Master + changes to `mitup_bot/`, `tests/`, `pyproject.toml`, `dev/` |
-| `format-check` | `ruff format --check` | Always |
-| `linter` | `ruff check` | Always |
-| `type-check` | `ty check` (via `hatch run dev:type-check`) | Always |
-| `check-ty-ignores` | Scans for stale `ty: ignore` suppressions | Merge requests only (`allow_failure: true`) |
-| `validate-migrations` | Validates Alembic migration graph | Always |
-| `validate-locales` | Ensures all messages have locale entries | Always |
-| `validate-local-setup` | Tests the contributor setup script on a clean image | Always |
+| `preparation` | Verifies Python and uv, times `uv sync --frozen`, prints the dependency tree | Always |
+| `build-translations` | Compiles locale `.mo` files (`uv run mb locales build`) | Always |
+| `test` | Runs raw `uv run pytest` with the coverage/JUnit/JSON report flags the local `mb test` omits | Master + changes to `mitup_bot/`, `tests/`, `tools/`, `pyproject.toml`, `uv.lock`, `dev/` |
+| `format-check` | `uv run mb format --check` | Always |
+| `linter` | `uv run mb lint` | Always |
+| `type-check` | `uv run mb typecheck` (root project + `tools/mb`) | Always |
+| `check-ty-ignores` | `uv run mb ci check-ty-ignores` — scans for stale `ty: ignore` suppressions | Merge requests only (`allow_failure: true`) |
+| `validate-migrations` | Validates Alembic migration graph (`uv run mb db migrate validate`) | Always |
+| `validate-locales` | Ensures all messages have locale entries (`uv run mb locales validate`) | Always |
+| `validate-local-setup` | Proves the fresh-contributor bootstrap (install uv → `uv sync` → `mb` smoke tests) on a clean image | Always |
 
 ## Running validation locally
 
 Before pushing, run the full local validation suite:
 
 ```bash
-hatch run dev:validate
+uv run mb validate
 ```
 
-This runs formatting, linting, type checking, and tests sequentially. Individual commands are available — see `pyproject.toml` under `[tool.hatch.envs.dev.scripts]`.
+This runs formatting, linting, type checking, and tests, then prints a summary table. Individual commands are available — run `uv run mb --help` for the full surface (defined in `tools/mb/`).
 
 ## Issue and MR templates
 

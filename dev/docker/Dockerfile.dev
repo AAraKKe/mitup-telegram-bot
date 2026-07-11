@@ -13,9 +13,11 @@ RUN apt-get update && \
 # Set the working directory to /mitup-telegram-bot
 WORKDIR /bot
 
-# Install Hatch
-RUN pip install --no-cache-dir hatch
+# Install uv
+RUN pip install --no-cache-dir uv
 
-# Configure hatch to use a persistent cache directory
-# Dependencies will be installed on first run and cached in the .docker_hatch volume
-RUN hatch config set dirs.env.virtual /.docker_hatch
+# Keep the venv and download cache outside the bind-mounted project directory.
+# Both live under /.docker_uv, which docker-compose maps to a host folder so
+# dependencies are installed on first run and reused across container restarts.
+ENV UV_PROJECT_ENVIRONMENT=/.docker_uv/venv \
+    UV_CACHE_DIR=/.docker_uv/cache

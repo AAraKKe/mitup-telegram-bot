@@ -27,7 +27,7 @@ Commands:
   <mr_iid> <discussion_id>   (reply — body from stdin)
       Post a reply to the given thread. Read the body from stdin:
 
-        bin/gl_reply_thread.py 251 abc123def <<'EOF'
+        uv run python tools/gl_reply_thread.py 251 abc123def <<'EOF'
         **Answered by: Claude Code**
 
         Explanation here.
@@ -42,11 +42,11 @@ from typing import Any, cast
 
 USAGE = """\
 Usage:
-  bin/gl_reply_thread.py --list <mr_iid>
-  bin/gl_reply_thread.py --get <mr_iid> <discussion_id>
-  bin/gl_reply_thread.py --resolve <mr_iid> <discussion_id>
-  bin/gl_reply_thread.py --reply-batch <mr_iid> <json_file|->
-  bin/gl_reply_thread.py <mr_iid> <discussion_id>   (body from stdin)
+  uv run python tools/gl_reply_thread.py --list <mr_iid>
+  uv run python tools/gl_reply_thread.py --get <mr_iid> <discussion_id>
+  uv run python tools/gl_reply_thread.py --resolve <mr_iid> <discussion_id>
+  uv run python tools/gl_reply_thread.py --reply-batch <mr_iid> <json_file|->
+  uv run python tools/gl_reply_thread.py <mr_iid> <discussion_id>   (body from stdin)
 """
 
 

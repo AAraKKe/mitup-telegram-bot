@@ -57,23 +57,23 @@ Never run the full test suite. Always target only the file or test you are worki
 
 ```bash
 # Run a specific test file
-hatch run dev:test -- tests/path/to/test_file.py
+uv run mb test tests/path/to/test_file.py
 
 # Run a single test by name
-hatch run dev:test -- tests/path/to/test_file.py -k "test_name"
+uv run mb test tests/path/to/test_file.py -k "test_name"
 
 # Run a parametrized case
-hatch run dev:test -- tests/path/to/test_file.py -k "test_name[param_id]"
+uv run mb test tests/path/to/test_file.py -k "test_name[param_id]"
 ```
 
 Write or modify the test, run it, read failures, fix, re-run. Repeat until passing.
 
-**Never claim tests pass without having actually run them.** Before reporting "tests pass" or quoting a pass count in your summary, run `hatch run dev:test -- <files>` and copy the exact `N passed` line from the output into your summary. If you cannot run the tests (e.g. environment problem), say so explicitly — do not fabricate or estimate a count.
+**Never claim tests pass without having actually run them.** Before reporting "tests pass" or quoting a pass count in your summary, run `uv run mb test <files>` and copy the exact `N passed` line from the output into your summary. If you cannot run the tests (e.g. environment problem), say so explicitly — do not fabricate or estimate a count.
 
 To check whether the full suite is healthy (e.g., after broad changes):
 
 ```bash
-hatch run dev:test-hook -- --tb=no
+uv run mb test --tb=no
 ```
 
 ## Core rules

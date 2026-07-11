@@ -121,7 +121,7 @@ ButtonMessages.MAIN_MENU.back(lang=lang)  # → "← Main Menu"
 ## After adding or editing strings
 
 ```bash
-hatch run dev:update-locales   # update source language file + rebuild .mo files
+uv run mb locales sync   # update source language file + rebuild .mo files
 ```
 
 Then delegate translation of the new or changed strings to the `translator` agent. See the `translations` skill for the full locale / Crowdin workflow; this skill owns the strings themselves, not the translation pipeline.

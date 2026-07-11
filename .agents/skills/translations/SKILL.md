@@ -25,11 +25,11 @@ This skill owns the **locale workflow** — gettext, `.po`/`.mo` files, Crowdin,
 2. After adding or modifying a string, regenerate the source language file and the compiled locales:
 
 ```bash
-hatch run dev:update-source-language   # update .pot / en.po from code
-hatch run dev:build-locales             # compile .po → .mo
+uv run mitup translations update   # update .pot / en.po from code
+uv run mb locales build             # compile .po → .mo
 
 # or, equivalently, both in one step:
-hatch run dev:update-locales
+uv run mb locales sync
 ```
 
 ## Fixed brand terms — keep verbatim in every language
@@ -45,22 +45,22 @@ These are product identity and appear identically on Patreon; localizing them wo
 
 Two checks exist:
 
-- `hatch run dev:validate-ids` — ensures every Python message has an entry in `en.po` (English source vs code)
-- `hatch run dev:validate-locales` — ensures every non-English `.po` file contains the same msgids as `en.po`, reporting missing/extra entries per language
+- `uv run mitup translations validate-ids` — ensures every Python message has an entry in `en.po` (English source vs code)
+- `uv run mb locales validate` — ensures every non-English `.po` file contains the same msgids as `en.po`, reporting missing/extra entries per language
 
 ## Orchestrating translator agents
 
 Per-language vocabulary rules live at `.claude/agents/translations/<lang_code>.md` (e.g. `de_DE.md`). These are consumed by translator agents — the main agent does not need to read them, only reference their path when spawning agents.
 
 Workflow for adding/syncing translations:
-1. Run `hatch run dev:validate-locales` to identify which languages are out of sync and which msgids each one is missing.
-2. Spawn one translator agent per affected language (never combine languages in one agent). The translator agent has a helper script (`bin/translation_status.py`) that gives it all the information it needs — you don't need to pre-digest the work list. Just tell the agent the language code and what to do.
-3. After all agents complete, run `hatch run dev:validate-locales` again — must exit 0.
+1. Run `uv run mb locales validate` to identify which languages are out of sync and which msgids each one is missing.
+2. Spawn one translator agent per affected language (never combine languages in one agent). The translator agent has a helper script (`tools/translation_status.py`) that gives it all the information it needs — you don't need to pre-digest the work list. Just tell the agent the language code and what to do.
+3. After all agents complete, run `uv run mb locales validate` again — must exit 0.
 
 When English strings have been updated and translations need review, tell the translator agents to use `--review` mode. This compares English text against a git ref and shows what changed.
 
 ## CI enforcement
 
 Two CI jobs enforce translation correctness:
-- `validate-ids` — runs `hatch run dev:validate-ids`; ensures every message in code has a corresponding entry in `en.po`.
-- `validate-locales` — runs `hatch run dev:validate-locales`; ensures all non-English `.po` files are in sync with English. Depends on `build-translations`.
+- `validate-ids` — runs `uv run mitup translations validate-ids`; ensures every message in code has a corresponding entry in `en.po`.
+- `validate-locales` — runs `uv run mb locales validate`; ensures all non-English `.po` files are in sync with English. Depends on `build-translations`.

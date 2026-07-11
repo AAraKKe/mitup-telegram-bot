@@ -19,6 +19,8 @@ include:
 .ci-docker-files: &ci-docker-files
   - dev/docker/Dockerfile.ci
   - pyproject.toml
+  - uv.lock
+  - tools/mb/pyproject.toml
   - .gitlab-ci.yml
   - .gitlab/ci/docker.yml
 

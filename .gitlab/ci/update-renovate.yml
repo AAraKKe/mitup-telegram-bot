@@ -22,7 +22,7 @@ auto-format:
       fi
 
       # Otherwise, run the formatters
-      hatch run dev:fix
+      uv run mb fix
 
       # Only proceed if there are changes to commit
       if ! git diff --quiet; then

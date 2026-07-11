@@ -84,6 +84,6 @@ Sensitive values (`bot.token`, `db.password`, `google_api.*`) use Pydantic's `Se
 
 ## The `sample.toml` file
 
-`sample.toml` serves as the template for new contributors running `bin/local-setup.sh`. Keep it up to date whenever config fields are added or removed — a missing field in `sample.toml` will cause setup failures.
+`sample.toml` serves as the template for new contributors bootstrapping with `uv run mb setup`. Keep it up to date whenever config fields are added or removed — a missing field in `sample.toml` will cause setup failures.
 
 When using the `sample.toml` as a template, make sure to copy it before editing to a `dev.toml` that is not checked into version control. The `sample.toml` should never contain real secrets or environment-specific values.

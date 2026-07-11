@@ -10,11 +10,11 @@ coverage.xml
 cov.xml
 report.xml
 
-# Local .hatch folder
-.hatch
-
 # uv-managed virtual environment
 .venv/
+
+# uv venv + cache used by the docker-compose dev services
+.docker_uv/
 
 # Ignore some vscode files to allow setting it up
 # by the tool and allow any developer to tweak theirs
@@ -60,10 +60,6 @@ validate.po
 
 # Ignore planning folder with plans done by em
 .plans/
-
-# Local dev data and scripts not meant for the repo
-bin/populate_db.py
-bin/test_data.yaml
 
 # direnv local config
 .envrc

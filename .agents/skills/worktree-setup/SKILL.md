@@ -1,6 +1,6 @@
 ---
 name: worktree-setup
-description: Bootstrap a fresh git worktree so its environment matches the main checkout. The skill copies the uncommitted `.env` (and `.envrc` if present) from the main checkout — these files aren't tracked by git, so `git worktree add` doesn't bring them along, and without them `hatch run dev:*` commands pick up the wrong config. It also tells you what else is needed (dependencies, migrations, a running database) without taking those actions itself — so it can't hang on an unavailable Docker daemon or a missing Postgres. Invoke whenever a fresh worktree was just created (manually with `git worktree add` or automatically by a workflow), or when someone reports "the bot won't start in this worktree".
+description: Bootstrap a fresh git worktree so its environment matches the main checkout. The skill copies the uncommitted `.env` (and `.envrc` if present) from the main checkout — these files aren't tracked by git, so `git worktree add` doesn't bring them along, and without them `uv run` commands pick up the wrong config. It also tells you what else is needed (dependencies, migrations, a running database) without taking those actions itself — so it can't hang on an unavailable Docker daemon or a missing Postgres. Invoke whenever a fresh worktree was just created (manually with `git worktree add` or automatically by a workflow), or when someone reports "the bot won't start in this worktree".
 user-invocable: true
 argument-hint: "[no args needed — operates on the current worktree]"
 allowed-tools: Bash, Read
@@ -8,7 +8,7 @@ allowed-tools: Bash, Read
 
 # Worktree Setup
 
-`git worktree add` creates a parallel checkout that shares history with the main clone but gets its own working directory. What it does **not** copy is any file that git doesn't track — and this project's local-only configuration (`.env`, optionally `.envrc`) lives outside of git on purpose. Without those files, `hatch run dev:*` commands either pick up the wrong environment or fail outright.
+`git worktree add` creates a parallel checkout that shares history with the main clone but gets its own working directory. What it does **not** copy is any file that git doesn't track — and this project's local-only configuration (`.env`, optionally `.envrc`) lives outside of git on purpose. Without those files, `uv run` commands either pick up the wrong environment or fail outright.
 
 This skill closes that specific gap. It only performs **safe, fast, offline** actions — nothing that needs an external service running. Anything that requires Postgres, Docker, or a package install is documented below but left for the user to run explicitly, when they have the tooling up.
 
@@ -48,20 +48,20 @@ After it finishes, print a reminder of the non-automatic steps (below) so the us
 
 ## What the skill does **not** do, and how to do it
 
-These steps need external services or durable state — running them automatically from the skill creates a failure surface the skill can't recover from (Docker not running, Postgres not started, hatch env not yet built). The skill reports them as next steps and stops.
+These steps need external services or durable state — running them automatically from the skill creates a failure surface the skill can't recover from (Docker not running, Postgres not started, dependencies not yet synced). The skill reports them as next steps and stops.
 
-- **Install / build the hatch env.** Hatch creates its env on first use. Force it eagerly with:
+- **Install the dependencies.** uv creates the project venv on first use. Force it eagerly with:
 
   ```bash
-  hatch env create dev
+  uv sync
   ```
 
-- **Start the local database.** Typically a Docker container — refer to the project README for the exact command. The database host/credentials come from the just-copied `.env`.
+- **Start the local database.** Run `uv run mb db up` to start the Postgres container and wait for it to be healthy. The database host/credentials come from the just-copied `.env`.
 
 - **Apply pending migrations.** Once Postgres is reachable:
 
   ```bash
-  hatch run dev:migrations-upgrade
+  uv run mb db migrate up
   ```
 
 - **Fetch / refresh secrets.** `.env` is copied verbatim from the main checkout. If those secrets are stale, refresh them in the main checkout first, then re-run this skill so the update flows into the worktree.

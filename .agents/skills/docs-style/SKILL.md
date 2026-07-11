@@ -192,10 +192,10 @@ The repo uses three icon systems, each in its own slot. Don't mix them up.
 After modifying any documentation file, validate the build:
 
 ```bash
-hatch run dev:build-docs
+uv run mb docs build
 ```
 
-For an iterative preview, run `hatch run dev:serve-docs` (`zensical serve`) and open the URL it prints.
+For an iterative preview, run `uv run mb docs serve` (`zensical serve`) and open the URL it prints.
 
 ## Brand reference
 

@@ -11,7 +11,6 @@ authors = [
 classifiers = [
     "Development Status :: 1 - Planning",
     "Programming Language :: Python :: 3.14",
-    "Framework :: Hatch",
     "Topic :: Communications :: Chat",
 ]
 dependencies = [
@@ -72,7 +71,7 @@ markers = [
 env_files = [".env"]
 
 [tool.ty.src]
-include = ["mitup_bot", "tests", "bin"]
+include = ["mitup_bot", "tests", "tools"]
 exclude = [
     "**/.vscode",
     "**/__pycache__",
@@ -80,14 +79,16 @@ exclude = [
     "**/.git",
     "**/.mypy_cache",
     "**/.pytest_cache",
-    "**/.hatch",
-    "**/.docker_hatch",
+    "**/.venv",
+    "**/.docker_uv",
     "**/*.egg-info",
     "aws",
     "site",
     "test.py",
     "dist",
     "conftest.py",
+    # The mb workspace member carries its own ty configuration (checked by `mb typecheck`)
+    "tools/mb",
     # Ignore migrations since updates in type checker would force to update them
     "mitup_bot/migrations/versions",
 ]
@@ -97,14 +98,10 @@ branch = true
 
 [tool.coverage.report]
 omit = [
-    # Don't run coverage bon bin scripts. These are scripts that are not forced to be tested as they
-    # have no impact in production and mainly helper scripts
-    "bin",
     "__about__.py",
     # This does not impact the proper working of the bot
     "generate_stats.py",
     # No need to cover the local tooling CLI for coverage
-    "setup_vscode.py",
     "cli/commands/dev.py",
 ]
 exclude_also = [
@@ -123,7 +120,7 @@ exclude_also = [
 # Builds
 # --------------------------
 [tool.hatch.build.targets.wheel]
-exclude = [".gitlab-ci.yaml", ".gitlab", ".vscode", "bin", "tests"]
+exclude = [".gitlab-ci.yaml", ".gitlab", ".vscode", "tools", "tests"]
 packages = ["mitup_bot"]
 
 
@@ -131,7 +128,7 @@ packages = ["mitup_bot"]
 line-length = 120
 indent-width = 4
 exclude = [
-    ".hatch",
+    ".docker_uv",
     ".git",
     ".pytest_cache",
     ".mypy_cache",
@@ -187,8 +184,8 @@ keep-runtime-typing = true
 [tool.uv.workspace]
 members = ["tools/mb"]
 
-# The dev CLI is wired through its own dependency group: `uv sync` installs default groups,
-# and hatch never consumes this one (a workspace source would break its resolver).
+# The dev CLI is wired through its own dependency group: `uv sync` installs
+# the default groups, which brings `mb` onto every contributor's PATH.
 [tool.uv.sources]
 mb = { workspace = true }
 
@@ -215,58 +212,6 @@ dev = [
     "testcontainers[postgres]==4.14.2",
     "asgi-lifespan==2.1.0",
 ]
-
-[tool.hatch.envs.dev]
-description = """
-Environment to be used for bot testing
-"""
-installer = "uv"
-dependency-groups = ["dev"]
-
-[tool.hatch.envs.dev.scripts]
-test = [
-    "build-locales",
-    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered {args:tests}",
-]
-test-hook = [
-    "build-locales",
-    "pytest -n 4 --no-cov --tb=short -q {args:tests}",
-]
-test-db = [
-    "build-locales",
-    "FORCE_COLOR=1 pytest --db-tests --dist no --junitxml=report.xml {args:tests/models/db_behavior/}",
-]
-test-cov = [
-    "build-locales",
-    "FORCE_COLOR=1 pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json {args:tests}",
-]
-format = "ruff format  ."
-format-check = "ruff format --diff --check ."
-lint = "ruff check {args:} --diff --unsafe-fixes ."
-fix-lint = "ruff check --fix --unsafe-fixes ."
-fix = ["format", "fix-lint"]
-type-check = "ty check"
-validate = ["- format-check", "- lint", "- type-check", "- test"]
-check-commit = "python bin/check_commit_message.py {args:}"
-migrations-upgrade = "alembic upgrade head"
-migrations-downgrade = "alembic downgrade -1"
-launch-events = "python -m mitup_bot.cli.run recurrent-events {args:}"
-launch = "python -m mitup_bot.cli.run launch"
-debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678 --wait-for-client mitup_bot/cli/run.py launch"
-help = "python -m mitup_bot.cli.run launch --help"
-deploy = "python -m mitup_bot.cli.run deploy {args:}"
-validate-migrations = "python -m mitup_bot.cli.run validate-migrations"
-serve-docs = "zensical serve"
-build-docs = "zensical build"
-push-docs = "python -m mitup_bot.cli.run publish-docs {args:}"
-update-source-language = "python -m mitup_bot.cli.run translations update"
-validate-ids = "python -m mitup_bot.cli.run translations validate-ids"
-validate-locales = "python -m mitup_bot.cli.run translations validate-locales"
-build-locales = "python -m mitup_bot.cli.run translations build"
-clean-locales = "python -m mitup_bot.cli.run translations clean-locales"
-update-locales = ["update-source-language", "clean-locales", "build-locales", "validate-locales"]
-set-local-bot = "python -m mitup_bot.cli.run dev {args:}"
-populate-db = "python bin/populate_db.py {args:}"
 
 [build-system]
 requires = ["hatchling"]
