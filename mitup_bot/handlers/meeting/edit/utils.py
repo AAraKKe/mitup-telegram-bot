@@ -4,8 +4,8 @@ from telegram import Message, MessageEntity
 from telegram.ext import filters
 
 from mitup_bot.custom_context import ContextId
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
-from mitup_bot.utils.mitup_types import TMitupContext
 
 
 def to_utc(value: dt.datetime) -> dt.datetime:

@@ -60,7 +60,7 @@ def generate_translations(validate: bool):
     with open(po_path, "w") as f:
         f.write(METADATA)
 
-        f.write("\n\n#: mitup_bot/utils/messages.py\n")
+        f.write("\n\n#: libs/telegram/mitup_bot/utils/messages.py\n")
         for message_class in all_messages():
             for message in message_class:
                 msgstr = repr(message.value)[1:-1].replace('"', r"\"")

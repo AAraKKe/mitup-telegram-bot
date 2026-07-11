@@ -573,6 +573,31 @@ def test_cli_registers_the_outbox_reconciler():
         mock_reconcile.register_outbox_reconciler.assert_called_once_with()
 
 
+def test_cli_registers_the_update_guards():
+    runner = CliRunner()
+
+    with (
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db"),
+        patch("mitup_bot.events.service.api_guards") as mock_api_guards,
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
+    ):
+        mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = False
+        mock_config.patreon = None
+        mock_config_cls.return_value = mock_config
+
+        result = runner.invoke(cli, [])
+
+        assert result.exit_code == 0, result.output
+        # The api refuses to resolve a chat or query off an Update without the guards registered.
+        mock_api_guards.register_update_guards.assert_called_once_with()
+
+
 def test_cli_instruments_pool_when_pool_metrics_enabled():
     runner = CliRunner()
 

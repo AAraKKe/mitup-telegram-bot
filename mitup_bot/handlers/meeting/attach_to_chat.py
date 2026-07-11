@@ -3,11 +3,11 @@ from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.db import with_session
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, Message
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingAttachMessages, MeetingDisplayMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry

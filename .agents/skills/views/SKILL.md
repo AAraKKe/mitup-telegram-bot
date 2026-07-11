@@ -1,12 +1,12 @@
 ---
 name: views
-description: Everything about the view layer in `mitup_bot/views/` — the `MitupView` / `MitupInlineView` / `PaginatedMitupView` dataclasses, the `ButtonConfig` model, the `CalendarKeyboard` date picker, the `.with_context()` / `.with_context_menu()` / `.with_back_button()` / `.with_footnote()` builders, destructive-action callback naming, and the full catalogue of factory functions in `views/factory.py` (main_menu, settings, confirmation, pagination helpers, etc.). Use this skill whenever the work touches a screen, keyboard layout, inline keyboard, confirmation dialog, calendar picker, or any file under `mitup_bot/views/` — and use it *first* to check whether a factory function already fits the screen you're about to build, before writing a view by hand. Covers both the reusable building blocks and the rules that make a view correct.
+description: Everything about the view layer in `libs/telegram/mitup_bot/views/` — the `MitupView` / `MitupInlineView` / `PaginatedMitupView` dataclasses, the `ButtonConfig` model, the `CalendarKeyboard` date picker, the `.with_context()` / `.with_context_menu()` / `.with_back_button()` / `.with_footnote()` builders, destructive-action callback naming, and the full catalogue of factory functions in `views/factory.py` (main_menu, settings, confirmation, pagination helpers, etc.). Use this skill whenever the work touches a screen, keyboard layout, inline keyboard, confirmation dialog, calendar picker, or any file under `libs/telegram/mitup_bot/views/` — and use it *first* to check whether a factory function already fits the screen you're about to build, before writing a view by hand. Covers both the reusable building blocks and the rules that make a view correct.
 user-invocable: false
 ---
 
 # Views
 
-The view layer in `mitup_bot/views/` abstracts Telegram message presentation from handler logic. A view pairs a `FormattedText` description with inline keyboards, and the `.markup` property converts the keyboard to a PTB `InlineKeyboardMarkup` at render time.
+The view layer in `libs/telegram/mitup_bot/views/` abstracts Telegram message presentation from handler logic. A view pairs a `FormattedText` description with inline keyboards, and the `.markup` property converts the keyboard to a PTB `InlineKeyboardMarkup` at render time.
 
 When building a new screen, check the **factory catalogue** below *first* — reusing a factory keeps behaviour consistent and avoids re-implementing patterns the project has already standardised. Only drop to manual `MitupView` construction when no factory fits.
 
@@ -24,7 +24,7 @@ Button-label sourcing (never hardcode, always `ButtonMessages.get(lang=...)` / `
 
 ## `RenderContext`
 
-Cross-cutting user/session display state — the acting user's language and whether they are an admin — is carried in a single frozen `RenderContext` (`mitup_bot/views/context.py`, re-exported from `mitup_bot.views`). It is built once per handler from the acting user (the handler-side builder in `guards` constructs it) and passed as the **first positional argument** to every view factory:
+Cross-cutting user/session display state — the acting user's language and whether they are an admin — is carried in a single frozen `RenderContext` (`libs/telegram/mitup_bot/views/context.py`, re-exported from `mitup_bot.views`). It is built once per handler from the acting user (the handler-side builder in `guards` constructs it) and passed as the **first positional argument** to every view factory:
 
 ```python
 view = factory.settings_view(ctx, message=...)

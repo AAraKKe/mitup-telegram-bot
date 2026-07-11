@@ -1,0 +1,23 @@
+[project]
+name = "mitup-telegram"
+version = "0.0.1"
+description = "Telegram rendering layer for mitup-telegram-bot: the PTB api wrapper, the view layer, and the message/entity/callback utilities"
+requires-python = ">=3.14"
+dependencies = [
+    "python-telegram-bot[ext]==22.8",
+    "mitup-core",
+    "mitup-data",
+    "mitup-monitoring",
+]
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+mitup-data = { workspace = true }
+mitup-monitoring = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -8,10 +8,10 @@ from telegram.ext import ApplicationHandlerStop, ConversationHandler, filters
 from mitup_bot import guards, timezone_api
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import PrivacyMessages, RegistrationMessages
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
 
 from .enums import REGISTRATION_HANDLERS_GROUP, ConversationRegistrationProcessState, RegistrationProcessHandlerId

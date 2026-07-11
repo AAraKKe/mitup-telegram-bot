@@ -4,8 +4,8 @@ from telegram import Update
 from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import AdminHandlerId
 

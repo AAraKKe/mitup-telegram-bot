@@ -11,9 +11,9 @@ from mitup_bot.db import with_session
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId

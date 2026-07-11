@@ -13,7 +13,7 @@ Domain knowledge lives in [`.agents/skills/`](https://gitlab.com/meetupbot/mitup
 Before you change code in an area, read the skill that governs it. The `SKILL.md` files are plain Markdown, so you can read them straight from GitLab without any tooling. A few to start with:
 
 * [`handler-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/handler-conventions/SKILL.md) for bot logic under `mitup_bot/handlers/`.
-* [`views`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/views/SKILL.md) for screens and keyboards under `mitup_bot/views/`.
+* [`views`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/views/SKILL.md) for screens and keyboards under `libs/telegram/mitup_bot/views/`.
 * [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/user-facing-text/SKILL.md) for message and button copy.
 * [`test-conventions`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/test-conventions/SKILL.md) for the test suite.
 

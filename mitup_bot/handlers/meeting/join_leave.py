@@ -7,13 +7,13 @@ from mitup_bot import guards
 from mitup_bot.db import racy_flush, with_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, Message, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 

@@ -3,8 +3,8 @@ from googlemaps import Client
 from pydantic import BaseModel, ValidationError
 
 from mitup_bot.config import GoogleApiConfig
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.mitup_types import TMitupContext
 
 from .exceptions import (
     GeocodeClientAlreadyInitializedError,

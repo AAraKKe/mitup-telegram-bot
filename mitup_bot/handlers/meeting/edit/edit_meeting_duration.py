@@ -11,12 +11,12 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, build_datetime_link, render
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDurationMessages
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
 from mitup_bot.views import meeting as meeting_views
 

@@ -1,6 +1,6 @@
 ---
 name: user-facing-text
-description: How to write every user-facing string in mitup_bot — both the copy (tone, voice, anti-patterns, button-label wording) and the technical plumbing in `mitup_bot/utils/messages.py` (MessageBase subclasses like `ButtonMessages`, `Messages`, `MeetingMessages`, `NotificationMessages`; `.get()` / `.get_text()` / `.back()`; `${var}` template substitution; inline `<b>`/`<i>`/`<u>`/`<s>`/`<code>`/`<pre>`/`<spoiler>` formatting tags). Use this skill whenever the work touches *any* user-visible message, button label, alert text, callback-query answer, or notification — whether the request is about wording ("make this friendlier", "rewrite the error"), button text ("rename this button"), structure ("add a new menu string"), or implementation ("how do I substitute a name into this message"). If in doubt, load it — it is the single source of truth for bot copy and for the MessageBase API.
+description: How to write every user-facing string in mitup_bot — both the copy (tone, voice, anti-patterns, button-label wording) and the technical plumbing in `libs/telegram/mitup_bot/utils/messages.py` (MessageBase subclasses like `ButtonMessages`, `Messages`, `MeetingMessages`, `NotificationMessages`; `.get()` / `.get_text()` / `.back()`; `${var}` template substitution; inline `<b>`/`<i>`/`<u>`/`<s>`/`<code>`/`<pre>`/`<spoiler>` formatting tags). Use this skill whenever the work touches *any* user-visible message, button label, alert text, callback-query answer, or notification — whether the request is about wording ("make this friendlier", "rewrite the error"), button text ("rename this button"), structure ("add a new menu string"), or implementation ("how do I substitute a name into this message"). If in doubt, load it — it is the single source of truth for bot copy and for the MessageBase API.
 user-invocable: false
 ---
 
@@ -34,7 +34,7 @@ Keep the marketing name out of code identifiers. The internal tier enum members 
 
 ## Where strings live
 
-All user-facing strings are `StrEnum` members of `MessageBase` subclasses in `mitup_bot/utils/messages.py`.
+All user-facing strings are `StrEnum` members of `MessageBase` subclasses in `libs/telegram/mitup_bot/utils/messages.py`.
 
 | Class | Purpose |
 |-------|---------|

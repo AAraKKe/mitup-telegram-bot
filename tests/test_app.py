@@ -181,6 +181,14 @@ def test_init_registers_the_outbox_reconciler(patch_runtime_deps: RuntimeDeps):
     mock_register.assert_called_once_with()
 
 
+def test_init_registers_the_update_guards(patch_runtime_deps: RuntimeDeps):
+    with mock.patch("mitup_bot.app.api_guards.register_update_guards") as mock_register:
+        MitupRuntime(Env.DEV)
+
+    # The api refuses to resolve a chat or query off an Update without the guards registered.
+    mock_register.assert_called_once_with()
+
+
 def test_init_configures_timezone_api(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 

@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application
 
-from mitup_bot import db, reconcile
+from mitup_bot import api_guards, db, reconcile
 from mitup_bot.cli.cli_commands import MitupCliCommand
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.models import Meetup, MeetupLocation, Settings
@@ -143,6 +143,13 @@ def outbox_reconciler():
     """Mirror the startup wiring both process entry points perform: write-mode lifecycles
     refuse to run without the model-aware reconciler registered on the db layer."""
     reconcile.register_outbox_reconciler()
+
+
+@pytest.fixture(autouse=True)
+def update_guards():
+    """Mirror the startup wiring both process entry points perform: the api refuses to resolve
+    a chat or query off an Update without the guards-backed validators registered."""
+    api_guards.register_update_guards()
 
 
 @pytest.fixture

@@ -7,9 +7,9 @@ from telegram.constants import ChatMemberStatus
 
 from mitup_bot.db import with_session
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils.mitup_types import TMitupContext
 
 from .registry import HandlersRegistry
 

@@ -3,11 +3,11 @@ from telegram import Update
 
 from mitup_bot.db import with_session
 from mitup_bot.keyboards import ButtonConfig, Keyboard
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Broadcast, BroadcastMessage, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import BroadcastOperatorMessages
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
 
 from . import utils

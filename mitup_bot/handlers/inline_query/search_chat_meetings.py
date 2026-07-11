@@ -5,10 +5,10 @@ from telegram import Update
 from mitup_bot.db import with_session
 from mitup_bot.guards import user_language, valid_inline_query
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, Message
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import InlineQueryMessages
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView
 from mitup_bot.views import meeting as meeting_views
 

@@ -1,6 +1,6 @@
 ---
 name: view-to-component
-description: Translate a Telegram view from `mitup_bot/views/` into a docs chat showcase (`.mitup-phone` or `.mitup-annotated`). Use this skill whenever a docs page needs to mock up, illustrate, update, or fix a bot screen — whether you're writing a new user-guide section, adding a hero shot, refreshing an existing mockup so it matches the current keyboard, or fixing a button label inside an annotated walkthrough. Covers reading `MitupView` / `PaginatedMitupView` / factory functions, looking up the real button text from `ButtonMessages` in `mitup_bot/utils/messages.py`, mapping keyboard rows to `.mitup-bot-msg__row` / `--2` / `--3`, rendering descriptions inside `.mitup-bot-msg__text`, picking between the phone and annotated wrappers, and applying chat-showcase conventions (the `mitupbot` alias, fictitious user names, English text). Trigger as soon as a request mentions a chat bubble, phone mockup, screen, keyboard, or "show what the user sees in X view" — even if the user only names a view by its factory or handler (e.g. "show the settings screen").
+description: Translate a Telegram view from `libs/telegram/mitup_bot/views/` into a docs chat showcase (`.mitup-phone` or `.mitup-annotated`). Use this skill whenever a docs page needs to mock up, illustrate, update, or fix a bot screen — whether you're writing a new user-guide section, adding a hero shot, refreshing an existing mockup so it matches the current keyboard, or fixing a button label inside an annotated walkthrough. Covers reading `MitupView` / `PaginatedMitupView` / factory functions, looking up the real button text from `ButtonMessages` in `libs/telegram/mitup_bot/utils/messages.py`, mapping keyboard rows to `.mitup-bot-msg__row` / `--2` / `--3`, rendering descriptions inside `.mitup-bot-msg__text`, picking between the phone and annotated wrappers, and applying chat-showcase conventions (the `mitupbot` alias, fictitious user names, English text). Trigger as soon as a request mentions a chat bubble, phone mockup, screen, keyboard, or "show what the user sees in X view" — even if the user only names a view by its factory or handler (e.g. "show the settings screen").
 user-invocable: false
 ---
 
@@ -9,9 +9,9 @@ user-invocable: false
 Source-of-truth pipeline:
 
 ```
-mitup_bot/views/factory.py          ← which screen
-mitup_bot/utils/messages.py         ← exact button labels + description text
-mitup_bot/views/mitup_view.py       ← builder semantics (with_*, pagination)
+libs/telegram/mitup_bot/views/factory.py          ← which screen
+libs/telegram/mitup_bot/utils/messages.py         ← exact button labels + description text
+libs/telegram/mitup_bot/views/mitup_view.py       ← builder semantics (with_*, pagination)
    ↓ translate
 docs/assets/stylesheets/mitup-components.css   ← CSS contract
    ↓ render
@@ -46,7 +46,7 @@ Never write a chat mockup from scratch with custom HTML. If neither wrapper fits
 
 Look in this order:
 
-1. **Factory** — `grep '^def ' mitup_bot/views/factory.py` and find the one named after the screen (`settings_view`, `main_menu_view`, `create_meeting_view`, `confirmation_view`, …). Read its body in 20 seconds; that *is* the spec.
+1. **Factory** — `grep '^def ' libs/telegram/mitup_bot/views/factory.py` and find the one named after the screen (`settings_view`, `main_menu_view`, `create_meeting_view`, `confirmation_view`, …). Read its body in 20 seconds; that *is* the spec.
 2. **Inline `MitupView(`** — when no factory matches, grep the relevant handler under `mitup_bot/handlers/` for `MitupView(` or `PaginatedMitupView(`.
 3. **Builder chain** — note `.with_back_button(...)`, `.with_context(...)`, `.with_footnote(...)`, `.with_context_menu(...)` calls on the returned view; each one changes the rendered output (see §6).
 
@@ -56,9 +56,9 @@ If the user asks for a screen by feature name ("the language picker", "the kick-
 
 ## 3. Resolve the description
 
-The factory passes `Messages.X` / `MeetingMessages.X` / `SettingsMessages.X` / `NotificationMessages.X` (defined in `mitup_bot/utils/messages.py`) as the description. To render:
+The factory passes `Messages.X` / `MeetingMessages.X` / `SettingsMessages.X` / `NotificationMessages.X` (defined in `libs/telegram/mitup_bot/utils/messages.py`) as the description. To render:
 
-1. Open `mitup_bot/utils/messages.py` and copy the **English** value of the constant (the bot is multilingual; docs are English).
+1. Open `libs/telegram/mitup_bot/utils/messages.py` and copy the **English** value of the constant (the bot is multilingual; docs are English).
 2. Substitute `${var}` placeholders with realistic example values. For user names, use the fictitious canon: `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás`. Never use real maintainer names.
 3. Translate Telegram HTML to doc HTML inside `.mitup-bot-msg__text`:
 
@@ -77,7 +77,7 @@ If the description is a literal string in the factory (rare, but happens for `cr
 
 ## 4. Resolve each button label
 
-Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.get(lang=...)` in `mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
+Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.get(lang=...)` in `libs/telegram/mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
 
 ```python
 NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"      # → "➕ New meeting"
@@ -156,7 +156,7 @@ Every chat showcase MUST use:
 
 ## 9. Worked example: `settings_view()` → annotated showcase
 
-Source (`mitup_bot/views/factory.py`):
+Source (`libs/telegram/mitup_bot/views/factory.py`):
 
 ```python
 def settings_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:

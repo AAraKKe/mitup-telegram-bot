@@ -9,7 +9,10 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import structlog
 from telegram import (
+    CallbackQuery,
+    Chat,
     InlineKeyboardMarkup,
+    InlineQuery,
     InlineQueryResultArticle,
     InlineQueryResultsButton,
     InputTextMessageContent,
@@ -54,6 +57,42 @@ CALLBACK_QUERY_TEXT_LIMIT = 200
 
 if TYPE_CHECKING:
     ...
+
+
+@dataclass(frozen=True)
+class UpdateGuards:
+    """The Update-field validators the api resolves before sending: pull the chat, inline
+    query, or callback query off an incoming Update, raising the app's guard errors when a
+    field is missing. Injected at startup (`set_update_guards`) so this rendering layer stays
+    free of the guards/handlers layer, which lives in the root package."""
+
+    chat: Callable[[Update], Chat]
+    valid_inline_query: Callable[[Update], InlineQuery]
+    valid_callback_query: Callable[[Update], CallbackQuery]
+
+
+class UpdateGuardsNotRegisteredError(RuntimeError):
+    def __init__(self):
+        super().__init__(
+            "No update guards have been registered. See mitup_bot.api_wrapper.set_update_guards for information."
+        )
+
+
+__update_guards: UpdateGuards | None = None
+
+
+def set_update_guards(guards: UpdateGuards):
+    """Register the Update-field validators the api uses before sending. Every process entry
+    point that sends through the api wires this once at startup (see mitup_bot.api_guards),
+    mirroring the db reconciler registration in mitup_bot.reconcile."""
+    global __update_guards
+    __update_guards = guards
+
+
+def get_update_guards() -> UpdateGuards:
+    if __update_guards is None:
+        raise UpdateGuardsNotRegisteredError()
+    return __update_guards
 
 
 @dataclass
@@ -355,9 +394,7 @@ class TelegramApi:
     # -- Public api -------------------------------------------------------------------------
 
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None:
-        from mitup_bot import guards
-
-        chat_id = guards.chat(update).id
+        chat_id = get_update_guards().chat(update).id
         resolved = resolve_view(view)
         return await self._call_or_enqueue(
             "send_message", partial(self._send_chat_message_now, chat_id, resolved), None
@@ -376,9 +413,7 @@ class TelegramApi:
     async def send_document(self, update: Update, view: MitupView) -> Message | None:
         """Send the view's document to the chat from the update, with the view's description
         as the caption and its keyboard as the reply markup."""
-        from mitup_bot import guards
-
-        chat_id = guards.chat(update).id
+        chat_id = get_update_guards().chat(update).id
         if view.document is None:
             raise NoDocumentAvailable("Cannot send document, the view carries no document")
         # Rendered at enqueue time so the queued call carries only plain data under capture.
@@ -573,9 +608,7 @@ class TelegramApi:
         button: InlineResultsButton | None = None,
         cache_time: int = 60,
     ):
-        from mitup_bot import guards
-
-        query = guards.valid_inline_query(update)
+        query = get_update_guards().valid_inline_query(update)
         inline_results = [
             InlineQueryResultArticle(
                 id=view.id,
@@ -613,8 +646,6 @@ class TelegramApi:
         raise AnswerInlineQueryError(query_text)
 
     async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool):
-        from mitup_bot import guards
-
         if isinstance(text, FormattedText) and text.entities:
             raise ValueError("Callback query text should not contain entities")
 
@@ -622,7 +653,7 @@ class TelegramApi:
 
         if len(_text) > CALLBACK_QUERY_TEXT_LIMIT:
             raise CallbackQueryTextTooLong(_text)
-        query = guards.valid_callback_query(update)
+        query = get_update_guards().valid_callback_query(update)
         await self._call_or_enqueue(
             "answer_callback_query", partial(self._answer_callback_query_now, query.id, _text, show_alert), None
         )

@@ -8,11 +8,11 @@ from telegram.error import BadRequest
 from mitup_bot import db, guards
 from mitup_bot.config import Env
 from mitup_bot.exceptions import GuardError, InactiveUserInteraction, UserPendingDeletion
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import RenderContext, factory
 
 console = Console()

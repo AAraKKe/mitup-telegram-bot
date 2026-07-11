@@ -6,7 +6,7 @@ user-invocable: false
 
 # Telegram API Wrapper
 
-The API abstraction layer lives in `mitup_bot/api_wrapper.py`. It decouples handler logic from raw Telegram Bot API calls and provides a consistent interface for both handler and non-handler contexts.
+The API abstraction layer lives in `libs/telegram/mitup_bot/api_wrapper.py`. It decouples handler logic from raw Telegram Bot API calls and provides a consistent interface for both handler and non-handler contexts.
 
 ## Architecture
 
@@ -117,7 +117,7 @@ All edit operations route through the shared suppression logic (`handle_edit_err
 - **"Message is not modified"** — silently ignored (content unchanged, no-op)
 - **"Message to edit not found" / "Message_id_invalid"** — message deleted by user; `MESSAGE_DELETED` is emitted and the stale `Message` DB record is removed via the outbox reconcile transaction (write mode only — immediate mode just emits the metric)
 
-The suppressed patterns are compiled regexes defined inside `mitup_bot/api_wrapper.py` (grep for `_ERROR_PATTERNS` / `_ERRORS_TO_IGNORE_PATTERNS` to see the current list — the exact names and set of patterns change as Telegram's error strings evolve). Do not add custom try/except blocks for these cases — extend the regex list in that module instead.
+The suppressed patterns are compiled regexes defined inside `libs/telegram/mitup_bot/api_wrapper.py` (grep for `_ERROR_PATTERNS` / `_ERRORS_TO_IGNORE_PATTERNS` to see the current list — the exact names and set of patterns change as Telegram's error strings evolve). Do not add custom try/except blocks for these cases — extend the regex list in that module instead.
 
 ### Meeting message broadcast
 

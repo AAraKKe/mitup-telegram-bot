@@ -11,7 +11,7 @@ For single-domain tasks or targeted fixes, **delegate to the appropriate special
 | Work involves | Delegate to |
 |---|---|
 | Handler, model, and migration work (see `handler-expert` agent for full scope) | `handler-expert` |
-| Files in `mitup_bot/views/` | `view-expert` |
+| Files in `libs/telegram/mitup_bot/views/` | `view-expert` |
 | Files in `tests/` | `test-expert` |
 | Files in `mitup_bot/lambdas/` | `lambda-expert` |
 | Files in `mitup_bot/cli/` | `cli-expert` |

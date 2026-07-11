@@ -84,7 +84,7 @@ Each feature submodule typically contains:
 
 ## Callback data
 
-All button interactions use `CallbackData` — a Pydantic model defined in `libs/core/mitup_bot/callback_data.py`. Predefined instances for the whole bot live in `mitup_bot/utils/callbacks.py`. When adding a new handler that needs a button action, add its callback instance there.
+All button interactions use `CallbackData` — a Pydantic model defined in `libs/core/mitup_bot/callback_data.py`. Predefined instances for the whole bot live in `libs/telegram/mitup_bot/utils/callbacks.py`. When adding a new handler that needs a button action, add its callback instance there.
 
 ### Formats
 
@@ -97,7 +97,7 @@ All button interactions use `CallbackData` — a Pydantic model defined in `libs
 ### Defining a new callback
 
 ```python
-# In mitup_bot/utils/callbacks.py
+# In libs/telegram/mitup_bot/utils/callbacks.py
 from mitup_bot.callback_data import CallbackData
 
 MY_ACTION = CallbackData(action="my_action", entity="my_entity")

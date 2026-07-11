@@ -5,9 +5,9 @@ from telegram.ext import filters
 from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.utils.messages import BroadcastOperatorMessages
-from mitup_bot.utils.mitup_types import TMitupContext
 
 from .enums import BroadcastHandlerId, ConversationBroadcastState
 from .preview import present_preview

@@ -34,6 +34,7 @@ dependencies = [
     "mitup-core",
     "mitup-monitoring",
     "mitup-data",
+    "mitup-telegram",
 ]
 
 [project.urls]
@@ -78,7 +79,14 @@ env_files = [".env"]
 # The libs/* members share the mitup_bot namespace and are checked here as part of the root
 # project, where every runtime dependency (including PTB) is resolvable — they reference PTB
 # types only under TYPE_CHECKING, so they cannot be checked in isolation.
-include = ["mitup_bot", "libs/core/mitup_bot", "libs/monitoring/mitup_bot", "libs/data/mitup_bot", "tests"]
+include = [
+    "mitup_bot",
+    "libs/core/mitup_bot",
+    "libs/monitoring/mitup_bot",
+    "libs/data/mitup_bot",
+    "libs/telegram/mitup_bot",
+    "tests",
+]
 exclude = [
     "**/.vscode",
     "**/__pycache__",
@@ -187,7 +195,7 @@ keep-runtime-typing = true
 # Development/CI environment
 # --------------------------
 [tool.uv.workspace]
-members = ["tools/mb", "libs/core", "libs/monitoring", "libs/data"]
+members = ["tools/mb", "libs/core", "libs/monitoring", "libs/data", "libs/telegram"]
 
 # The dev CLI is wired through its own dependency group: `uv sync` installs
 # the default groups, which brings `mb` onto every contributor's PATH.
@@ -197,6 +205,7 @@ mb = { workspace = true }
 mitup-core = { workspace = true }
 mitup-monitoring = { workspace = true }
 mitup-data = { workspace = true }
+mitup-telegram = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev", "tools"]

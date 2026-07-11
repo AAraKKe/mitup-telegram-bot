@@ -3,9 +3,9 @@ from telegram import Update
 
 from mitup_bot.db import with_session
 from mitup_bot.guards import callback_query, user_language
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
 
 from ..registry import HandlersRegistry

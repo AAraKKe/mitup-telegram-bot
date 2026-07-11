@@ -4,7 +4,7 @@ import structlog
 import uvicorn
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
-from mitup_bot import db, docs_links, patreon, reconcile, supporter, timezone_api
+from mitup_bot import api_guards, db, docs_links, patreon, reconcile, supporter, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
@@ -45,6 +45,9 @@ class MitupRuntime:
         # Point docs-site links at this environment's docs host, derived from the bot domain.
         docs_links.configure(self.config.bot.domain)
         self.app = self.__build_application()
+        # The api rendering layer validates incoming Updates through an injected guards slot;
+        # wire the guards-backed validators before any update is processed.
+        api_guards.register_update_guards()
         # Metrics before db: the pool-metrics client emits through the process-global EMF
         # configuration, which must be in place before the db layer starts using it.
         self.__configure_metrics()

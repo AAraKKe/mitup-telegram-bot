@@ -51,7 +51,7 @@ The function name follows the registration type: `callback_query_<action>` for a
 )
 ```
 
-Button actions carry their own `CallbackData` instance, defined once in [`mitup_bot/utils/callbacks.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/utils/callbacks.py) and reused at every call site.
+Button actions carry their own `CallbackData` instance, defined once in [`libs/telegram/mitup_bot/utils/callbacks.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/utils/callbacks.py) and reused at every call site.
 
 ## Wrap database access
 
@@ -84,7 +84,7 @@ user = await guards.current_user(update, session)
 
 ## Build the view and the text
 
-The reply is a view, not a raw message. Check the factory catalogue in [`views/factory.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/views/factory.py) before building one by hand; something like `confirmation_view` or `main_menu_view` often already fits. Every factory takes a `RenderContext` as its first argument; build it in the handler with `guards.render_context(user, update, context)`. Button labels and the description come from `MessageBase` subclasses in [`mitup_bot/utils/messages.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/utils/messages.py), rendered with `.get(lang=user.lang)`.
+The reply is a view, not a raw message. Check the factory catalogue in [`views/factory.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/views/factory.py) before building one by hand; something like `confirmation_view` or `main_menu_view` often already fits. Every factory takes a `RenderContext` as its first argument; build it in the handler with `guards.render_context(user, update, context)`. Button labels and the description come from `MessageBase` subclasses in [`libs/telegram/mitup_bot/utils/messages.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/utils/messages.py), rendered with `.get(lang=user.lang)`.
 
 ```python
 view = MitupView(

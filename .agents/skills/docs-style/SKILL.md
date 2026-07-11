@@ -113,7 +113,7 @@ Every mention of a bot button in body text uses the `.button-like` inline chip (
 * **Don't:** `Tap **New meeting**.`, `Press the "New meeting" button.`, `` Tap `New meeting`. ``, `Tap New meeting (➕).`
 * **Do:** `Tap *➕ New meeting*{.button-like}.`
 
-This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must be the **raw Unicode glyph** copied verbatim from the matching `ButtonMessages` entry in `mitup_bot/utils/messages.py` (which sources `libs/core/mitup_bot/locales/<lang>.po`). Don't use Twemoji shortcodes like `:heavy_plus_sign:` — shortcodes can render differently from the real button (e.g. `:heart:` renders as `❤️` but the bot button is `♥`), so they break the "this is what's on your phone" promise of `.button-like`.
+This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must be the **raw Unicode glyph** copied verbatim from the matching `ButtonMessages` entry in `libs/telegram/mitup_bot/utils/messages.py` (which sources `libs/core/mitup_bot/locales/<lang>.po`). Don't use Twemoji shortcodes like `:heavy_plus_sign:` — shortcodes can render differently from the real button (e.g. `:heart:` renders as `❤️` but the bot button is `♥`), so they break the "this is what's on your phone" promise of `.button-like`.
 
 ### 13. Developer language on user-facing pages
 
@@ -288,7 +288,7 @@ Plain Markdown tables render as a rounded card with a header row and hover-tinte
 Recipe:
 
 1. Identify the button mentioned (e.g. "New meeting").
-2. Find the matching entry in `ButtonMessages` in `mitup_bot/utils/messages.py` to confirm the exact text and emoji. The actual string lives in `libs/core/mitup_bot/locales/en.po` under the corresponding `msgid`. Example: `ButtonMessages.NEW_MEETING` → `"➕ New meeting"`.
+2. Find the matching entry in `ButtonMessages` in `libs/telegram/mitup_bot/utils/messages.py` to confirm the exact text and emoji. The actual string lives in `libs/core/mitup_bot/locales/en.po` under the corresponding `msgid`. Example: `ButtonMessages.NEW_MEETING` → `"➕ New meeting"`.
 3. Copy the emoji glyph **verbatim**. Do **not** convert to a Twemoji shortcode. Shortcodes can render a different glyph from what the bot actually sends (e.g. `:heart:` → `❤️`, but the bot button is `♥`), and the whole point of `.button-like` is to mirror what the user sees on their phone.
 4. Format as `*<glyph> Button Text*{.button-like}`.
    * Example: `*➕ New meeting*{.button-like}`
