@@ -46,7 +46,7 @@ async def test_begin_emits_gauges_and_wait_time_on_real_checkout(
 async def test_instrumented_pool_reports_opens_and_in_use_levels(live_db_config: DbConfig):
     """Two overlapping checkouts on a fresh single-connection pool walk the in-use gauge
     1 → 2 → 1 → 0 and open exactly two physical connections (the second via overflow)."""
-    engine = create_async_engine(live_db_config.full_url, pool_size=1, max_overflow=1)
+    engine = create_async_engine(db.build_db_url(live_db_config), pool_size=1, max_overflow=1)
     recording_client = make_test_metrics_client()
     db.instrument_pool(engine, recording_client)
 

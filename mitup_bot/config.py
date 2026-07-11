@@ -13,7 +13,6 @@ from typing import Any, Protocol
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
-from sqlalchemy import URL
 
 from . import environments
 
@@ -135,18 +134,6 @@ class DbConfig(BaseModel):
     # the process that owns this engine. Off by default so CLI tools and tests keep an
     # uninstrumented pool; the bot and events services enable it via env-var override.
     pool_metrics_enabled: bool = False
-
-    @property
-    def full_url(self) -> URL:
-        secret_pass = self.password.get_secret_value()
-        return URL.create(
-            drivername=self.url_schema,
-            username=self.username,
-            password=secret_pass,
-            host=self.url,
-            port=self.port,
-            database=self.database,
-        )
 
 
 class AppConfig(BaseModel):

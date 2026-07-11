@@ -6,6 +6,7 @@ from cryptography.fernet import Fernet
 from pydantic import SecretStr, ValidationError
 from sqlalchemy import URL
 
+from mitup_bot import db
 from mitup_bot.config import (
     AppConfig,
     BotConfig,
@@ -124,7 +125,13 @@ def test_config_properly_setup(
     config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
     # Password from environment variable takes precedence as it is defined before Toml
-    expected_url = URL.create(
+    assert config.db.username == "username"
+    assert config.db.password.get_secret_value() == "1234abc"
+    assert config.db.url == "some.url.com"
+    assert config.db.port == 12
+    assert config.db.database == "mydb"
+    # End to end: the provider-merged DbConfig assembles the expected DSN through the engine layer.
+    assert db.build_db_url(config.db) == URL.create(
         drivername="postgresql+psycopg",
         username="username",
         password="1234abc",
@@ -132,7 +139,6 @@ def test_config_properly_setup(
         port=12,
         database="mydb",
     )
-    assert config.db.full_url == expected_url
     assert config.bot.token.get_secret_value() == "abcd12345"
     assert config.google_api.gmaps_geocode_key.get_secret_value() == "1a2b3c45d6e7f8g"
     assert config.google_api.gmaps_timezone_key.get_secret_value() == "9h0i1j2k3l4m5n6o"

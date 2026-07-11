@@ -4,6 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
+from mitup_bot.db import build_db_url
 from mitup_bot.models import users
 
 # this is the Alembic Config object, which provides
@@ -45,7 +46,7 @@ def run_migrations_offline():
 
     """
     context.configure(
-        url=mitup_config.db.full_url,
+        url=build_db_url(mitup_config.db),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -66,7 +67,7 @@ def run_migrations_online():
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        url=mitup_config.db.full_url,
+        url=build_db_url(mitup_config.db),
     )
 
     with connectable.connect() as connection:

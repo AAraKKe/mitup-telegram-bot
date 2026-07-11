@@ -5,6 +5,7 @@ from unittest import mock
 
 import pytest
 from pydantic import BaseModel
+from sqlalchemy import URL
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -47,6 +48,17 @@ def serializable_model(request: pytest.FixtureRequest):
     return request.param
 
 
+def test_build_db_url_assembles_dsn_from_plain_fields(db_config: DbConfig):
+    assert db.build_db_url(db_config) == URL.create(
+        drivername="postgresql+psycopg",
+        username="user",
+        password="password",
+        host="testhost",
+        port=5432,
+        database="db",
+    )
+
+
 def test_db_initilization(db_config: DbConfig):
     with (
         mock.patch("mitup_bot.db.async_sessionmaker") as mock_maker,
@@ -56,7 +68,7 @@ def test_db_initilization(db_config: DbConfig):
 
     mock_maker.assert_called_once()
     mock_engine.assert_called_once_with(
-        db_config.full_url,
+        db.build_db_url(db_config),
         echo=db_config.engine_echo,
         json_serializer=db.serialize_pydantic_model,
         json_deserializer=db.deserialize_pydantic_model,
@@ -78,7 +90,7 @@ def test_db_cannot_be_configured_twice(db_config: DbConfig):
 
     mock_maker.assert_called_once()
     mock_engine.assert_called_once_with(
-        db_config.full_url,
+        db.build_db_url(db_config),
         echo=db_config.engine_echo,
         json_serializer=db.serialize_pydantic_model,
         json_deserializer=db.deserialize_pydantic_model,

@@ -8,7 +8,7 @@ from typing import Any, Concatenate, Literal, Protocol, overload
 
 import structlog
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import Engine, event
+from sqlalchemy import URL, Engine, event
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.exc import IntegrityError
@@ -66,6 +66,22 @@ def get_open_connections(context: str) -> int:
     return __active_connections[context]
 
 
+def build_db_url(db_config: DbConfig) -> URL:
+    """Assemble the SQLAlchemy connection URL from the plain `DbConfig` fields.
+
+    `mitup_bot.config` must stay importable without SQLAlchemy installed, so URL construction
+    lives with the engine here rather than as a property on `DbConfig`.
+    """
+    return URL.create(
+        drivername=db_config.url_schema,
+        username=db_config.username,
+        password=db_config.password.get_secret_value(),
+        host=db_config.url,
+        port=db_config.port,
+        database=db_config.database,
+    )
+
+
 def configure_db(db_config: DbConfig, skip_if_initialized: bool = False, metrics_client: MetricsClient | None = None):
     """Configure the db module by creating the engine and the session factory.
 
@@ -79,7 +95,7 @@ def configure_db(db_config: DbConfig, skip_if_initialized: bool = False, metrics
         raise DbAlreadyInitializedError()
 
     engine = create_async_engine(
-        db_config.full_url,
+        build_db_url(db_config),
         echo=db_config.engine_echo,
         json_serializer=serialize_pydantic_model,
         json_deserializer=deserialize_pydantic_model,
