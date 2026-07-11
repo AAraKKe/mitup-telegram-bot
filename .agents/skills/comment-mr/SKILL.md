@@ -8,7 +8,7 @@ allowed-tools: Bash(uv run python tools/gl_reply_thread.py*)
 
 > **Always use this skill when replying to MR review threads.** Do not call `glab api` directly to post notes — go through `uv run python tools/gl_reply_thread.py` so that all interactions use the same entry point and the skill can be invoked consistently.
 
-> **Always invoke via `uv run python tools/gl_reply_thread.py`**, never with the system `python`. The script requires Python 3.14+ features (`match` statement), and only the uv-managed environment guarantees them.
+> **Always invoke via `uv run python tools/gl_reply_thread.py`**, never with the system `python`. The script targets this repo's pinned Python version (`requires-python` in pyproject.toml), and only the uv-managed environment guarantees it.
 
 Use `uv run python tools/gl_reply_thread.py` to reply to comment threads in a GitLab MR.
 The `$ARGUMENTS` value is the MR IID (e.g., `/comment-mr 251`).

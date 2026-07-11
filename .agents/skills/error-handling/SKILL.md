@@ -26,7 +26,7 @@ Raised by functions in `guards.py` when handler inputs are invalid. These are th
 | Exception | Guard | Meaning |
 |-----------|-------|---------|
 | `UserNotFound` | `current_user()` | Telegram user not in the database |
-| `MeetupNotFound` | `meeting_accessible()` | Meeting ID doesn't exist |
+| `MeetupNotFound` | `Meetup.by_id(must_exist=True)` | Meeting ID doesn't exist (raised directly in edit handlers, not from a guard) |
 | `MalformedCallbackData` | `valid_callback_data()`, `valid_meeting_callback_data()` | Callback data missing required `id` |
 | `EffectiveUserNotSet` | `current_user()` | Telegram update has no `effective_user` |
 | `EffectiveChatNotSet` | `chat()` | Telegram update has no `effective_chat` |
@@ -82,7 +82,7 @@ Never add try/except blocks in handlers for either case.
 
 ### Inactive user handling
 
-`InactiveUserInteraction` with `private=True` triggers `handle_inactive_user()`, which marks the user as `is_active = False` in the database and emits `INACTIVE_USER_SET`. This happens when:
+`InactiveUserInteraction` with `private=True` triggers `handle_inactive_user()`, which transitions the user's `status` from `MEMBER` to `LEFT` via `User.mark_inactive()` and emits `INACTIVE_USER_SET`. This happens when:
 - A user has blocked the bot (raises `Forbidden`)
 - A user's account is deleted (raises `BadRequest` with "not found")
 
@@ -101,13 +101,13 @@ For all other (unexpected) errors:
 `api_wrapper.py` provides `handle_edit_errors()` for safe message editing:
 
 ```python
-with handle_edit_errors(adapter=self.adapter, message=message, session=session):
+async with handle_edit_errors(adapter=self.adapter):
     await self.adapter.bot.edit_message_text(...)
 ```
 
 It handles two cases:
 - **Message not modified** (content unchanged) — silently ignored via `EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS`
-- **Message not found** (deleted by user) — deletes the `Message` record from the database and emits `MESSAGE_DELETED`
+- **Message not found** (deleted by user) — emits `MESSAGE_DELETED`
 
 All `edit_message` calls in `TelegramApi` already use this. Do not add custom try/except blocks for these errors.
 
@@ -117,4 +117,4 @@ All `edit_message` calls in `TelegramApi` already use this. Do not add custom tr
 2. Include contextual data (user IDs, handler IDs, callback data) in the constructor — this aids debugging.
 3. If the exception should be suppressed, add it to `SUPPRESSED_EXCEPTIONS` in the error handler.
 4. If the exception needs special handling (like `InactiveUserInteraction`), add a branch in `error_handler.handler()`.
-5. If guards raise the new exception, register affected handlers in `tests/test_failure_modes.py` (see `tests/CLAUDE.md`).
+5. If guards raise the new exception, register affected handlers in `tests/bot/handlers/test_failure_modes.py` (see the `test-conventions` skill's `references/failure-modes.md`).

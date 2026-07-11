@@ -33,7 +33,7 @@ Every parameter in a test or fixture signature must have a type annotation, incl
 
 ## Cover new and changed code before handing off
 
-CI measures coverage (the `test` job in `.gitlab/ci/test.yml` runs pytest with coverage and tracks the reported total), but a healthy *total* can still hide an undertested new module. Before declaring a testing task done or opening an MR, check coverage of the code this branch adds or changes — don't rely on the aggregate.
+CI measures coverage (the `test-suite` and `test-db` jobs in `.gitlab/ci/test.yml` run pytest with coverage; `coverage-report` combines them into the tracked total), but a healthy *total* can still hide an undertested new module. Before declaring a testing task done or opening an MR, check coverage of the code this branch adds or changes — don't rely on the aggregate.
 
 Run the same command CI runs; it prints a per-file `term-missing` table:
 

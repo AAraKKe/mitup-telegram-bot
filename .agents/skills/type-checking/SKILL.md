@@ -72,7 +72,7 @@ This section documents active `ty` bugs that require suppressions in the codebas
 
 ## CI enforcement
 
-The `check-ty-ignores` job (defined in `.gitlab/ci/test.yml`) runs `uv run mb ci check-ty-ignores` on merge requests. It scans `mitup_bot/`, `tests/`, and `tools/` and:
+The `check-ty-ignores` job (defined in `.gitlab/ci/test.yml`) runs `uv run mb ci check-ty-ignores` on merge requests. It scans `tests/` and `tools/` and:
 
 - Fails if any suppression is missing a GitHub issue URL (see [Suppressing false positives](#suppressing-false-positives)).
 - Queries the GitHub API and warns when a referenced issue is closed.

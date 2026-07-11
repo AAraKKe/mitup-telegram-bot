@@ -56,7 +56,7 @@ If the user asks for a screen by feature name ("the language picker", "the kick-
 
 ## 3. Resolve the description
 
-The factory passes `Messages.X` / `MeetingMessages.X` / `SettingsMessages.X` / `NotificationMessages.X` (defined in `libs/telegram/mitup_bot/utils/messages.py`) as the description. To render:
+The factory passes a `<Screen>Messages.X` constant (e.g. `SettingsMessages.DESCRIPTION`, `MainMenuMessages.DESCRIPTION`, `PrivacyMessages.DESCRIPTION`) — each screen has its own `MessageBase` subclass in `libs/telegram/mitup_bot/utils/messages.py` — as the description. To render:
 
 1. Open `libs/telegram/mitup_bot/utils/messages.py` and copy the **English** value of the constant (the bot is multilingual; docs are English).
 2. Substitute `${var}` placeholders with realistic example values. For user names, use the fictitious canon: `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás`. Never use real maintainer names.
@@ -77,7 +77,7 @@ If the description is a literal string in the factory (rare, but happens for `cr
 
 ## 4. Resolve each button label
 
-Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.get(lang=...)` in `libs/telegram/mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
+Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.get_text(lang=...)` in `libs/telegram/mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
 
 ```python
 NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"      # → "➕ New meeting"
@@ -159,9 +159,10 @@ Every chat showcase MUST use:
 Source (`libs/telegram/mitup_bot/views/factory.py`):
 
 ```python
-def settings_view(*, lang: str, message: str | FormattedText | None = None) -> MitupView:
+def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = None) -> MitupView:
+    lang = ctx.lang
     return MitupView(
-        message or Messages.DEFAULT_SETTINGS_DESCRIPTION.get(lang=lang),
+        message or SettingsMessages.DESCRIPTION.get(lang=lang),
         [
             [ButtonConfig(text=ButtonMessages.LANGUAGE.get(lang=lang), ...),
              ButtonConfig(text=ButtonMessages.TIMEOUT.get(lang=lang), ...)],
@@ -176,7 +177,7 @@ def settings_view(*, lang: str, message: str | FormattedText | None = None) -> M
 
 Look-ups:
 
-* `Messages.DEFAULT_SETTINGS_DESCRIPTION` = `"Configure MitUp."`
+* `SettingsMessages.DESCRIPTION` = `"Configure MitUp."`
 * `ButtonMessages.LANGUAGE` = `"🔣 Language"`, `TIMEOUT` = `"⌛ Timeout"`, `NOTIFICATIONS` = `"⏰ Notifications"`, `TIMEZONE` = `"🌐 Timezone"`, `DEFAULT_OPTIONS` = `"👥 Default Options"`, `PRIVACY` = `"🛡️ Privacy"`, `MAIN_MENU.back(...)` = `"≪ Main Menu"`.
 
 Rendered as an annotated showcase:
@@ -235,19 +236,19 @@ Note how four Python keyboard rows became four `.mitup-bot-msg__row` elements, t
 
 ## 10. Worked example: `PaginatedMitupView` — language picker, page 1 of 1
 
-`set_language_view` builds a `PaginatedMitupView` with one button per supported language, `column_size = min(n, 3)`, `row_size = ceil(n / cols)`. With 6 languages on page 1: position is `UNIQUE`, so no nav row.
+`set_language_view` builds a `GridMitupView` with one button per supported language and `column_size = min(n, 3)`. `GridMitupView` is never paginated — it arranges the flat button list into as many rows as the button count needs, with no nav row.
 
 ```html
 <div class="mitup-bot-msg__keyboard">
   <div class="mitup-bot-msg__row mitup-bot-msg__row--3">
     <div class="mitup-key">🇪🇸 Spanish</div>
-    <div class="mitup-key">🇬🇧 English</div>
+    <div class="mitup-key">🇺🇸 English</div>
     <div class="mitup-key">🇩🇪 German</div>
   </div>
   <div class="mitup-bot-msg__row mitup-bot-msg__row--3">
     <div class="mitup-key">🇧🇷 Portuguese</div>
     <div class="mitup-key">🇮🇹 Italian</div>
-    <div class="mitup-key">🟦 Galician</div>
+    <div class="mitup-key">🇪🇸 Galician</div>
   </div>
 </div>
 ```

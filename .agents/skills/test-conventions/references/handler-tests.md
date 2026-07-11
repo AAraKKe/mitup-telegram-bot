@@ -10,7 +10,7 @@ from tests.helpers import call_handler
 context, state = await call_handler(HandlerId, update=update, app=app)
 ```
 
-It builds the context (with `MockApi` and `StubMetricsEngine`), runs `check_update` to validate the update matches the handler, then executes the handler. Returns `(StubMitupContext, state)`.
+It builds the context (with `MockApi` and a test `MetricsClient` via `make_test_metrics_client`), runs `check_update` to validate the update matches the handler, then executes the handler. Returns `(StubMitupContext, state)`.
 
 ### Overloads
 

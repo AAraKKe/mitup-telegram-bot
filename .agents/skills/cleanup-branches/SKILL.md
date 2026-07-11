@@ -40,7 +40,7 @@ The output gives you each branch's upstream tracking state (`[gone]` means the r
 For each branch, determine which bucket it falls into. If `glab` is available, use it to resolve the merge status authoritatively; otherwise fall back to what git alone can tell you.
 
 ```bash
-glab mr list --source-branch "<branch>" --state merged --output json
+glab mr list --source-branch "<branch>" --merged --output json
 ```
 
 An empty result plus `upstream: gone` usually means the MR was merged and the remote branch deleted.

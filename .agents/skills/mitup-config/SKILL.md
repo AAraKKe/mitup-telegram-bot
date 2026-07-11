@@ -84,6 +84,6 @@ Sensitive values (`bot.token`, `db.password`, `google_api.*`) use Pydantic's `Se
 
 ## The `sample.toml` file
 
-`sample.toml` serves as the template for new contributors bootstrapping with `uv run mb setup`. Keep it up to date whenever config fields are added or removed — a missing field in `sample.toml` will cause setup failures.
+`sample.toml` documents the full catalogue of config options (linked from `mb setup`'s generated `dev.toml` and from `docs/contribute/setup.md`) and is the TOML loaded for `Env.SAMPLE`, used by Alembic migrations (`libs/data/mitup_bot/migrations/env.py`) and by some tests. `uv run mb setup --bot-token <token>` generates `dev.toml` from its own built-in template (`tools/mb/src/mb/setup_env.py`), not by reading `sample.toml` — keep both the built-in template and `sample.toml` in sync whenever fields are added or removed, since neither is generated from the other.
 
 When using the `sample.toml` as a template, make sure to copy it before editing to a `dev.toml` that is not checked into version control. The `sample.toml` should never contain real secrets or environment-specific values.

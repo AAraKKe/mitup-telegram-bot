@@ -114,7 +114,7 @@ The snapshot below describes the factories that exist at the time of writing. **
 | `user_button()` | Button representing a user (for kick-out, invitation lists) |
 | `reactivation_prompt_view()` | Prompt shown to meeting owner when their inactive meeting is accessed |
 
-Every view factory is stateless and takes a `RenderContext` as its first positional argument (see the `RenderContext` section above); the remaining, screen-specific parameters are keyword-only. Inspect the signature in `factory.py` for the exact parameters — they vary by screen type.
+Most view factories are stateless and take a `RenderContext` as their first positional argument (see the `RenderContext` section above); the remaining, screen-specific parameters are keyword-only. A few (e.g. `broadcast_recipient_view`) render directly from an explicit `lang` instead, similar to the model-driven views below, because they render in a recipient's language rather than the acting user's. Inspect the signature in `factory.py` for the exact parameters — they vary by screen type.
 
 ### Example
 

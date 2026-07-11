@@ -154,8 +154,8 @@ Name handler functions after their registration type and action:
 1. Define a `HandlerId` member in the appropriate `enums.py` (or create a new submodule).
 2. Write the handler function with the `@HandlersRegistry.register_*` decorator. Follow the naming convention above.
 3. Add `@with_session` if database access is needed.
-4. Register the handler in `tests/test_failure_modes.py` if it calls any `guards.*` function (e.g. `guards.current_user`, `guards.meeting_accessible`, `guards.meeting_viewable`, `guards.valid_callback_data`, `guards.valid_meeting_callback_data`).
-5. Create a dedicated test file at `tests/handlers/<package>/test_<module>.py`.
+4. Register the handler in `tests/bot/handlers/test_failure_modes.py` if it calls any `guards.*` function (e.g. `guards.current_user`, `guards.meeting_accessible`, `guards.meeting_viewable`, `guards.valid_callback_data`, `guards.valid_meeting_callback_data`).
+5. Create a dedicated test file at `tests/bot/handlers/<package>/test_<module>.py`.
 6. Import the handler module in `apps/bot/mitup_bot/handlers/__init__.py`.
 
 ## Removing a handler — checklist
@@ -164,7 +164,7 @@ When deleting a handler entirely:
 
 1. Remove its `HandlerId` member from `enums.py`.
 2. Delete the handler function and any callbacks/views it exclusively owns.
-3. **Remove its `Context` entries from `tests/test_failure_modes.py`** — every guard call registered there becomes stale and will cause test failures if left behind.
+3. **Remove its `Context` entries from `tests/bot/handlers/test_failure_modes.py`** — every guard call registered there becomes stale and will cause test failures if left behind.
 4. Remove its import from `apps/bot/mitup_bot/handlers/__init__.py` if the whole module is gone.
 
 ## Shared utilities

@@ -29,7 +29,7 @@ The dev workspace installs both apps into one shared venv, where a single `mitup
 
 ## Entry-module shape
 
-Each entry module defines a Click group named `cli` (its subcommands are the frozen command names) plus a `main()` that calls it, wired as the console script (`mitup = "mitup_bot.bot_cli:main"`). The bot's `launch` instantiates `MitupRuntime` and calls `run()`; the events `recurrent-events` command parses intervals and delegates to `service.run_events`.
+The bot and events entry modules each define a Click group named `cli` (its subcommands are the frozen command names); the rails-migration entry module defines `cli` as a single `@click.command()` since it has only one command. All three expose a `main()` that calls `cli()`, wired as the console script (`mitup = "mitup_bot.bot_cli:main"`). The bot's `launch` instantiates `MitupRuntime` and calls `run()`; the events `recurrent-events` command parses intervals and delegates to `service.run_events`.
 
 **Keep commands thin.** A command that only fronts a service must stay a thin entry point — parse options and delegate to the owning package, which holds the real logic and stays importable without dragging Click into a lambda. The `recurrent-events` command delegates to `mitup_bot.events` (jobs + `service.run_events`); the rails command delegates to `mitup_bot.migration` (the pipeline runner). Job implementations under `apps/events/mitup_bot/events/` never import a CLI entry module.
 

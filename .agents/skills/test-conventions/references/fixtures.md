@@ -205,7 +205,7 @@ Use the `user_with_settings` fixture for a fully-prepped user with settings and 
 
 | Type | Purpose |
 |---|---|
-| `StubMitupContext` | `MitupContext[StubBot, MockApi, StubMetricsEngine]` — test context type |
+| `StubMitupContext` | `MitupContext[StubBot, MockApi]` — test context type |
 | `StubMitupApp` | `Application[StubBot, StubMitupContext, ...]` — test app type |
 | `AnyFloat` | Float that equals any numeric value — use in metric value assertions |
 | `HandlerContext` | Bundles `update` + `app` for `call_handler`'s second overload |

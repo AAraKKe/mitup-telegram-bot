@@ -73,4 +73,4 @@ context.api.assert_edit_message_called(
 )
 ```
 
-For model-owned views (like meeting detail), use `meeting.main_view`.
+For model-owned views (like meeting detail), use `meeting_views.main_view(meeting)` from `mitup_bot.views.meeting`.

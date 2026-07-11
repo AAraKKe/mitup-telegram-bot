@@ -55,7 +55,8 @@ and pytest key their color output off it (animations stay off — `mb` only anim
 
 | Job | What it does | Notable rules |
 |-----|-------------|---------------|
-| `test` | `uv run mb test --cov --lang $LANG …` across a per-language `parallel:matrix`; `mb test` builds stale locales itself | Default branch always; otherwise only when the sources, tests, tooling, or lock change (see the job's `changes:` list) |
+| `test-suite` | The whole suite as one `parallel:matrix` job running `uv run mb test --member $TARGET --cov` per entry: every member runs once, and the language-rendering members (`apps/bot`, `libs/telegram`, `apps/events`) split into a `-m "not i18n"` run plus a `-m i18n` run per supported language. `mb test` builds stale locales itself | Default branch always; otherwise one deliberately broad `changes:` trigger (`apps/**`, `libs/**`, `tools/**`, `tests/**`, the lock, the root `pyproject.toml`, the job YAML) — no per-member path list to forget, so a new test is never silently skipped |
+| `coverage-report` | `uv run coverage combine .coverage.*` over the raw data files from every `test-suite` entry and `test-db`, then `coverage xml` + `coverage report`. The **only** job carrying the coverage regex and the Cobertura artifact: GitLab's headline number averages per-job percentages, so the matrix entries publish raw data files and never report their partial slices | Same trigger as `test-suite` |
 | `format-check` | `uv run mb format --check` | `allow_failure` on the default branch |
 | `linter` | `uv run mb lint` | `allow_failure` on the default branch |
 | `type-check` | `uv run mb typecheck` (project + `tools/mb`) | always |
@@ -64,17 +65,18 @@ and pytest key their color output off it (animations stay off — `mb` only anim
 | `check-import-isolation` | `uv run mb ci check-import-isolation` — each library imports with only its own declared deps | always |
 | `validate-ids` | `uv run mb locales validate-ids` — every message in code exists in the English catalog | always |
 | `validate-locales` | `uv run mb locales validate` — every non-English catalog carries the same msgids as English | always |
-| `test-db` | `uv run mb test --db tests/models/db_behavior/` against a `docker:dind` Postgres service | always |
+| `test-db` | `uv run mb test --db --cov tests/data/db_behavior/` against a `docker:dind` Postgres service — serial (shared Postgres), with its raw coverage file feeding `coverage-report` | Same trigger as `test-suite` |
 | `validate-local-setup` | On a clean `python:3.14-bookworm` image, proves the fresh-contributor bootstrap (install uv → `uv sync --frozen` → `mb --help`) and that the commit-message hook (`mb ci check-commit`) rejects/accepts/idempotently re-validates | `allow_failure` on the default branch |
 
-The per-app image builds are gated per path (`validate-docker-build.yml`): `validate-docker-bot`,
-`-events`, `-migrations`, `-alarm`, plus the non-deployed `-ci` and `-dev` images. Each builds only
-its own `apps/X/Dockerfile` (or `dev/docker/Dockerfile.{ci,dev}`) and runs **only on MRs** when that
-app's sources or Dockerfile change — or when a shared input changes (`libs/**`, `uv.lock`, the root
-`pyproject.toml`, `.dockerignore`, or the job's own YAML), since those can alter every image. These
-jobs never push; they only prove the image still builds before the change reaches `main`. The
-bot/events builds pull the `build-translations` artifact (they ship compiled catalogs); the Lambda
-images localize nothing.
+The deployable-image builds are one matrixed job (`validate-docker-build.yml`): `validate-docker`
+builds all four `apps/X/Dockerfile`s in a `parallel:matrix`, **only on MRs**, behind one broad
+trigger (`apps/**`, `libs/**`, `uv.lock`, the root `pyproject.toml`, `.dockerignore`, the job's own
+YAML) — any of those can affect any image, and a curated per-app list risks a green pipeline with an
+unvalidated build. The non-deployed `validate-docker-ci` / `validate-docker-dev` jobs keep their own
+single-file triggers (`dev/docker/Dockerfile.{ci,dev}`). These jobs never push; they only prove the
+image still builds before the change reaches `main`. All four matrix entries pull the
+`build-translations` artifact: the bot/events images bake in the compiled catalogs, and the Lambda
+entries just ignore it since they localize nothing.
 
 ## Deploy flow (`deploy-config.yml`, `ecr-push.yml`, `deploy.yml`)
 
@@ -89,15 +91,14 @@ Deployment runs on `main` (→ staging) and `release` (→ production). Four ima
 2. **`push-*-{staging,prod}`** (`push-ecr`) build each app's `apps/X/Dockerfile` and push the
    sha-tagged image plus `:latest` to ECR. These push jobs stay **grouped** (not per-path): a deploy
    resolves every image by the current commit sha, so each `:ci-<sha>` tag must exist whenever a
-   deploy runs. The registry build-cache makes unchanged images near-instant to re-push. (Strict
-   per-path gating lives on the MR-only `validate-docker-*` jobs, where there is no deploy to
-   satisfy.)
+   deploy runs. The registry build-cache makes unchanged images near-instant to re-push. (Path
+   gating lives on the MR-only `validate-docker` matrix job, where there is no deploy to satisfy.)
 3. **`deploy-{staging,production}`** (`deploy`) run `uv run mb deploy --migrations-image … --bot-image …
    --alarm-action-image … --events-image …`, which applies the Alembic migrations (migrations
    Lambda) and rolls out the ECS services.
 
-`config-staging` blocks on the quality gates via `needs:` (`test`, `type-check`, `validate-locales`,
-`validate-migrations`, `semgrep-sast`, `secret_detection`) — formatting/style jobs are deliberately
+`config-staging` blocks on the quality gates via `needs:` (`test-suite`, `test-db`, `type-check`,
+`validate-locales`, `validate-migrations`, `semgrep-sast`, `secret_detection`) — formatting/style jobs are deliberately
 excluded so they never block a deploy.
 
 ## Commit-title deploy switches

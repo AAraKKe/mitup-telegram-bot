@@ -57,7 +57,7 @@ These steps need external services or durable state — running them automatical
   uv sync
   ```
 
-- **Start the local database.** Run `uv run mb db up` to start the Postgres container and wait for it to be healthy. The database host/credentials come from the just-copied `.env`.
+- **Start the local database.** Run `uv run mb db up` to start the Postgres container and wait for it to be healthy. Credentials are hardcoded in `docker-compose.yaml` for the container, and in the just-copied `dev.toml` for host runs.
 
 - **Apply pending migrations.** Once Postgres is reachable:
 

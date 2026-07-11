@@ -44,19 +44,11 @@ for a single scope to be meaningful.
 
    If `git symbolic-ref` fails (the remote HEAD isn't set locally), run `git remote set-head origin --auto` once and retry.
 
-2. **Pre-flight convention review.** Spawn the `convention-reviewer` agent against the full branch diff before doing anything else:
-
-   ```
-   Agent({
-     subagent_type: "convention-reviewer",
-     description: "Pre-MR convention review",
-     prompt: "Review the diff `git diff <base>...HEAD` from <root> for project-convention compliance. Report findings as a punch list — pass/fail per file with specifics."
-   })
-   ```
+2. **Pre-flight convention review.** Review the full branch diff yourself before doing anything else: run `git diff <base>...HEAD` from `<root>`, run the full validation gate (`uv run mb validate`) plus plain `ruff check .`, and check the diff against the project's hard conventions (module-level names are public; comments state current facts only, never repo history).
 
    Substitute `<base>` and `<root>` with the values resolved in step 1.
 
-   - **Blocking violations** (broken conventions the reviewer flags as clear failures): stop. Report them to the user and ask whether to fix-then-MR or open the MR anyway with the violations called out in the description.
+   - **Blocking violations** (broken conventions, failing validation): stop. Report them to the user and ask whether to fix-then-MR or open the MR anyway with the violations called out in the description.
    - **Warnings / nits** (style preferences, pre-existing issues not introduced by this branch): surface them in the conversation and continue.
    - **All clear**: continue to step 3.
 

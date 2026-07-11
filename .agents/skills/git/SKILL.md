@@ -18,7 +18,7 @@ allowed-tools: Bash, Read, AskUserQuestion
 This project uses conventional commits with emoji prefixes. The format depends on
 whether pre-commit hooks are installed:
 
-**Check:** `test -x .git/hooks/commit-msg && echo installed || echo not-installed`
+**Check:** `test -x "$(git rev-parse --git-path hooks/commit-msg)" && echo installed || echo not-installed`
 
 - **Hooks installed** → write `Type[(scope)]: description` — the commit-msg hook rewrites the
   subject to `{emoji} description` in place and the commit completes in one `git commit`.
@@ -95,7 +95,7 @@ Review before staging — never blindly `git add .`:
      - Feature branch: ask for issue number and short name, suggest `NN-short-description`, run `git checkout -b <branch> origin/main`.
      - Direct to main: require explicit confirmation ("yes, commit to main"). Do not proceed until confirmed.
 2. If nothing is staged, offer to run the staging workflow above.
-3. Check if pre-commit hooks are installed: `test -x .git/hooks/commit-msg && echo installed || echo not-installed`
+3. Check if pre-commit hooks are installed: `test -x "$(git rev-parse --git-path hooks/commit-msg)" && echo installed || echo not-installed`
 4. Infer the commit type from the diff — consult `commits_check_config.yaml` for the list of valid types and their emoji.
 5. Ask for the commit description if not provided via `$ARGUMENTS`.
 6. Build the commit message based on hook status:

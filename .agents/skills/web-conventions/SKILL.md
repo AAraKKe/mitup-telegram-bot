@@ -25,7 +25,10 @@ Rather than maintaining a list that goes stale, inspect `apps/bot/mitup_bot/web/
 
 - `__init__.py` — re-exports `create_app` only.
 - `app.py` — the FastAPI factory `create_app(...)`, the webhook and polling lifespan builders, the `run_shutdown_step` helper that isolates each shutdown step's failure.
-- `telegram.py` — the `POST /telegram` router, the secret-token validator, the JSON-payload parser, and the three FastAPI DI getters (`get_ptb_application`, `get_webhook_secret`, `get_metrics_client`).
+- `dependencies.py` — the shared FastAPI DI getters (`get_ptb_application`, `get_webhook_secret`, `get_metrics_client`).
+- `telegram.py` — the `POST /telegram` router, the secret-token validator, and the JSON-payload parser.
+- `patreon.py` — the Patreon OAuth callback (`GET /patreon/callback`) and membership webhook (`POST /patreon/webhook`) routers.
+- `templates/` — HTML templates rendered by `patreon.py`'s browser-facing result pages.
 
 Anything new you see beyond this list is newer than this document — read the module docstring or its imports to understand purpose.
 
@@ -50,7 +53,7 @@ Processing failures are now handled out-of-request by PTB's error handler (`erro
 ## Hard rules — these will burn you if ignored
 
 - **`uvicorn` must run with `workers=1`.** PTB's `Application` holds in-process state (handlers, conversation tracking, rate limiter, JobQueue) that is not multi-process safe. A second worker would silently corrupt state.
-- **`uvicorn` must be invoked with `log_config=None`.** `MitupRuntime.__configure_logging` configures the root logger before uvicorn starts. Letting uvicorn install its default logging config overrides that and breaks the Rich handler in dev / the JSON formatter in prod.
+- **`uvicorn` must be invoked with `log_config=None`.** `mitup_bot.logging_config.configure_logging(...)`, called from `MitupRuntime.__init__`, configures the root logger before uvicorn starts. Letting uvicorn install its default logging config overrides that and breaks the Rich handler in dev / the JSON formatter in prod.
 - **The `/telegram` endpoint must NEVER return non-2xx for application errors.** Telegram retries on any non-2xx. Returning 5xx on a poison-pill update creates a retry storm and floods the bot. Wrap every parse step AND the `update_queue.put` call in `try/except`, log, and return 204 — enqueuing an unbounded queue shouldn't raise, but a broken event loop or app state could, and the always-2xx contract must hold in code, not just by assumption. Processing exceptions can no longer surface in the request (the update is dispatched off the queue, out of band) — they belong to PTB's error handler.
 - **The endpoint must enqueue, not process in-request.** Call `await ptb_app.update_queue.put(update)` and return 204 immediately; never `await ptb_app.process_update(update)` from the handler. The `concurrent_updates` semaphore is enforced only by the fetcher task draining the queue, and an immediate 204 prevents Telegram from timing out and re-delivering while a handler runs. See "Request flow" above for the full rationale.
 - **Secret-token validation must use `secrets.compare_digest`, not `==`.** Constant-time comparison prevents timing attacks. Never log the received token value on mismatch — log only `request.client.host`.
@@ -89,7 +92,7 @@ Why we use this instead of `request.app.state.X` inline:
 - **Type safety** — Starlette's `app.state` returns `Any`. `Depends(get_ptb_application)` narrows to `Application` at the parameter level.
 - **Test override hook** — FastAPI's `app.dependency_overrides[get_ptb_application] = lambda: fake_app` works without mutating `app.state`. We don't use it today (tests mutate state directly), but the door stays open.
 
-Where DI getters live: **alongside their single consumer** (currently in `telegram.py`). If a second router starts depending on the same getter, graduate them out to a shared module at that moment — don't create a dependencies module speculatively.
+Where DI getters live: **`dependencies.py`**. `telegram.py` and `patreon.py` both depend on `get_ptb_application` and `get_metrics_client`, so the getters live in a shared module rather than alongside a single consumer.
 
 ## Adding a new HTTP route
 
@@ -98,7 +101,7 @@ Where DI getters live: **alongside their single consumer** (currently in `telegr
 3. Add the endpoint with a typed signature, using `Annotated[T, Depends(...)]` for any per-request state you need.
 4. If the endpoint needs new state that isn't already on `app.state`, add it in `create_app(...)` in `app.py` AND provide a typed getter beside the endpoint.
 5. Register the router in `create_app(...)` with `app.include_router(foo.router)`.
-6. Add tests under `tests/web/` mirroring the structure of `test_telegram.py`: use `httpx.AsyncClient` with `ASGITransport`, mock `ptb_app` and any other state via `build_test_web_app(...)` helpers.
+6. Add tests under `tests/bot/web/` mirroring the structure of `test_telegram.py`: use `httpx.AsyncClient` with `ASGITransport`, mock `ptb_app` and any other state via `build_test_web_app(...)` helpers.
 
 ## Response codes
 

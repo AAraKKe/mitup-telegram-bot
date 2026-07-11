@@ -30,7 +30,7 @@ Mitup talks like a friend, not a product. Friendly and a little playful, never t
 
 ## Anti-patterns
 
-These show up across `docs/user-guide/*.md`, `docs/collaborate/supporter.md`, and `docs/collaborate/translator.md`. They are AI tells. Treat them as bugs and remove them when you see them, even in sections you weren't sent to edit (see the proactive-cleanup rule in the docs-writer agent).
+These show up across `docs/user-guide/*.md`, `docs/collaborate/donation.md`, and `docs/collaborate/translator.md`. They are AI tells. Treat them as bugs and remove them when you see them, even in sections you weren't sent to edit (see the proactive-cleanup rule in the docs-writer agent).
 
 ### 1. Title Case headings
 
@@ -270,7 +270,7 @@ Native mkdocs-material grid for feature lists. Each card is a list item with a F
 
 ### `.badge`
 
-Status chip for table cells (and inline prose). Four variants: `yes` (green), `no` (yellow), `info` (blue), `danger` (red). See `faq/privacy.md` for the canonical example.
+Status chip for table cells (and inline prose). Four variants: `yes` (green), `no` (yellow), `info` (blue), `danger` (red). See the usage comment in `docs/assets/stylesheets/main.css` for the canonical example.
 
 ```markdown
 | `user_id` | <span class="badge yes">stored</span> |

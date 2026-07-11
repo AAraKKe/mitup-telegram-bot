@@ -65,13 +65,13 @@ Variable names must describe what the variable holds, not its type or position:
 ```python
 # Bad
 f = ValidTitleFilter()
-e1 = DateTimeMessageEntity(offset=0, length=8, unix_time=unix_ts)
-e2 = DateTimeMessageEntity(offset=9, length=5, unix_time=unix_ts)
+e1 = EntityDateTime("Meeting time", meeting.datetime, "DT")
+e2 = EntityDateTime("Meeting time", meeting.end_datetime, "DT")
 
 # Good
 title_filter = ValidTitleFilter()
-first_date_entity = DateTimeMessageEntity(offset=0, length=8, unix_time=unix_ts)
-second_date_entity = DateTimeMessageEntity(offset=9, length=5, unix_time=unix_ts)
+start_entity = EntityDateTime("Meeting time", meeting.datetime, "DT")
+end_entity = EntityDateTime("Meeting time", meeting.end_datetime, "DT")
 ```
 
 ## Docstrings

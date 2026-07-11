@@ -11,7 +11,7 @@ The bot supports multiple languages via GNU gettext. The list of supported langu
 ## Architecture
 
 - `libs/core/mitup_bot/translations.py` — `TranslationEngine` wraps gettext with a per-user locale resolver.
-- `libs/telegram/mitup_bot/utils/messages.py` — All user-facing strings are defined as `StrEnum` members in message classes (`Messages`, `ButtonMessages`, `MeetingMessages`, `SettingsMessages`, `NotificationMessages`). The English text is the enum value and serves as the gettext msgid.
+- `libs/telegram/mitup_bot/utils/messages.py` — All user-facing strings are defined as `StrEnum` members in message classes (`ButtonMessages`, `SettingsMessages`, `NotificationMessages`, `MeetingCreationMessages`, and others). The English text is the enum value and serves as the gettext msgid.
 - `libs/core/mitup_bot/locales/` — Compiled `.mo` files and source `.po` files per language.
 - `crowdin.yml` — Configuration for Crowdin, the translation management platform.
 
@@ -28,7 +28,7 @@ This skill owns the **locale workflow** — gettext, `.po`/`.mo` files, Crowdin,
 uv run mb locales update-source    # update en.po source catalog from code
 uv run mb locales build            # compile .po → .mo
 
-# or, equivalently, both in one step:
+# or, to also drop stale entries and validate in one step:
 uv run mb locales sync
 ```
 

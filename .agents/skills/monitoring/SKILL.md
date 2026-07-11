@@ -23,7 +23,7 @@ In handler contexts, `MitupContext` wraps `MetricsClient` and provides convenien
 | Backend | When used |
 |---------|-----------|
 | `EmfBackend` | Production — delegates to `aws_embedded_metrics` for real CloudWatch emission |
-| `NullBackend` | Tests — silent no-op; records are still captured in `MetricsClient._records` |
+| `NullBackend` | Tests — silent no-op; records are captured in `MetricsClient._records` only when the client is built with `record_history=True` (see `tests/helpers/monitoring.py:make_test_metrics_client()`) |
 
 The backend is configured once globally by `configure_emf_backend()` in `app.py`. Never select backends conditionally in handler code.
 
@@ -33,7 +33,7 @@ The backend is configured once globally by `configure_emf_backend()` in `app.py`
 
 - `name: str` — the metric name (typically a `MetricKey` value)
 - `value: float` — the metric value
-- `unit: MetricUnit` — one of `COUNT`, `MILLISECONDS`, `BYTES`, `SECONDS`, `NONE`
+- `unit: MetricUnit` — one of `COUNT`, `MILLISECONDS`, `BYTES`, `SECONDS`, `PERCENT`, `NONE`
 - `dimensions: frozenset[tuple[str, str]]` — immutable dimension pairs
 - `properties: dict[str, Any]` — searchable EMF properties (not dimensions)
 
@@ -41,7 +41,7 @@ The backend is configured once globally by `configure_emf_backend()` in `app.py`
 
 Custom `MetricUnit` enum (in `monitoring/units.py`) replaces the old `aws_embedded_metrics.unit.Unit`:
 
-- `MetricUnit.COUNT`, `MetricUnit.MILLISECONDS`, `MetricUnit.BYTES`, `MetricUnit.SECONDS`, `MetricUnit.NONE`
+- `MetricUnit.COUNT`, `MetricUnit.MILLISECONDS`, `MetricUnit.BYTES`, `MetricUnit.SECONDS`, `MetricUnit.PERCENT`, `MetricUnit.NONE`
 
 <critical_rules>
 Always import `MetricUnit` from `mitup_bot.monitoring`, never from `aws_embedded_metrics`.
@@ -145,7 +145,7 @@ await client.flush()
 
 Use `NullBackend()` in tests and `EmfBackend(...)` in production. The `base_dimensions` are merged into every emission automatically.
 
-Pass `emit_global=True` to `MetricsClient.emit()` when a base-dimensioned client also needs an aggregate series to alarm on. It emits a second, dimensionless copy of the metric that drops `base_dimensions` but keeps them as EMF **properties** — so one alarm can watch across every base-dimension value while Logs Insights still breaks the aggregate down. This mirrors `MitupContext.emit_metric(emit_global=True)` for handlers. Example: the recurrent-events service emits per-`EventType` `Fault`/`Time` plus a dimensionless global copy (`EventType` demoted to a property) so a single `Mitup/Events` alarm catches any failing event type.
+Pass `emit_global=True` to `MetricsClient.emit()` when a base-dimensioned client also needs an aggregate series to alarm on. It emits a second, dimensionless copy of the metric that drops `base_dimensions` but keeps them as EMF **properties** — so one alarm can watch across every base-dimension value while Logs Insights still breaks the aggregate down. `MitupContext.emit_metric()` has no `emit_global` parameter: handler metrics are dimensionless by construction (handler identity always rides as properties, never as a dimension), so there's no base-dimensioned series to collapse. Example: the recurrent-events service emits per-`EventType` `Fault`/`Time` plus a dimensionless global copy (`EventType` demoted to a property) so a single `Mitup/Events` alarm catches any failing event type.
 
 ```python
 client = MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})

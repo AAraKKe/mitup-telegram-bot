@@ -10,7 +10,7 @@ Each AWS Lambda is its own workspace **application** under `apps/lambda-*/`, shi
 
 ## Inventorying what exists
 
-Rather than maintaining a list here (which goes stale), inspect the `apps/lambda-*/` members directly — each ships one handler module under `mitup_bot/lambdas/`. At the time of writing: `apps/lambda-migrations` ships `mitup_bot/lambdas/migrations.py` (runs Alembic upgrade/downgrade; deliberately PTB-free) and `apps/lambda-alarm` ships `mitup_bot/lambdas/alarm_action.py` (forwards CloudWatch alarms to GitLab). Each app's `mb ci check-import-isolation` entry proves its dependency closure; the migrations app additionally asserts PTB is absent.
+Rather than maintaining a list here (which goes stale), inspect the `apps/lambda-*/` members directly — each ships one handler module under `mitup_bot/lambdas/`. At the time of writing: `apps/lambda-migrations` ships `mitup_bot/lambdas/migrations.py` (runs Alembic upgrade/downgrade; deliberately PTB-free) and `apps/lambda-alarm` ships `mitup_bot/lambdas/alarm_action.py` (forwards CloudWatch alarms to GitLab). Each app's `mb ci check-import-isolation` entry proves its dependency closure; both lambda apps additionally assert PTB is absent (`forbidden_imports=("telegram",)`).
 
 ## Constraints
 

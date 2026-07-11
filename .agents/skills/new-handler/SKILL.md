@@ -6,7 +6,7 @@ argument-hint: "[feature-name] [command|callback|conversation|inline]"
 allowed-tools: Read, Write, Bash, Glob
 ---
 
-Read `apps/bot/mitup_bot/handlers/CLAUDE.md` for the full conventions before starting.
+Load the `handler-conventions` skill (`.agents/skills/handler-conventions/SKILL.md`) for the full conventions before starting.
 
 Ask the user for:
 - Feature name (e.g., `reminders`, `settings`)
@@ -18,6 +18,6 @@ Then scaffold:
    - `__init__.py` (empty)
    - `enums.py` with a `HandlerId` subclass for this feature
    - `entry.py` with the entry-point handler function(s), `@with_session`, and guards
-2. Register the handler in `apps/bot/mitup_bot/app.py` using the correct `register_*` method.
-3. Create `tests/handlers/test_<feature>.py` mirroring the test structure.
-4. Remind the user to add the handler context to `CONTEXTS` in `tests/test_failure_modes.py`.
+2. Decorate the entry handler with the correct `@HandlersRegistry.register_*` method, then import the new package in `apps/bot/mitup_bot/handlers/__init__.py`.
+3. Create test file(s) under `tests/bot/handlers/<feature>/test_<module>.py` mirroring the test structure.
+4. Remind the user to add the handler context to `CONTEXTS` in `tests/bot/handlers/test_failure_modes.py`.

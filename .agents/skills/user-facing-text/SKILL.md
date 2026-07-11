@@ -1,6 +1,6 @@
 ---
 name: user-facing-text
-description: How to write every user-facing string in mitup_bot — both the copy (tone, voice, anti-patterns, button-label wording) and the technical plumbing in `libs/telegram/mitup_bot/utils/messages.py` (MessageBase subclasses like `ButtonMessages`, `Messages`, `MeetingMessages`, `NotificationMessages`; `.get()` / `.get_text()` / `.back()`; `${var}` template substitution; inline `<b>`/`<i>`/`<u>`/`<s>`/`<code>`/`<pre>`/`<spoiler>` formatting tags). Use this skill whenever the work touches *any* user-visible message, button label, alert text, callback-query answer, or notification — whether the request is about wording ("make this friendlier", "rewrite the error"), button text ("rename this button"), structure ("add a new menu string"), or implementation ("how do I substitute a name into this message"). If in doubt, load it — it is the single source of truth for bot copy and for the MessageBase API.
+description: How to write every user-facing string in mitup_bot — both the copy (tone, voice, anti-patterns, button-label wording) and the technical plumbing in `libs/telegram/mitup_bot/utils/messages.py` (MessageBase subclasses like `ButtonMessages`, `MainMenuMessages`, `MeetingCreationMessages`, `NotificationMessages`; `.get()` / `.get_text()` / `.back()`; `${var}` template substitution; inline `<b>`/`<i>`/`<u>`/`<s>`/`<code>`/`<pre>`/`<spoiler>` formatting tags). Use this skill whenever the work touches *any* user-visible message, button label, alert text, callback-query answer, or notification — whether the request is about wording ("make this friendlier", "rewrite the error"), button text ("rename this button"), structure ("add a new menu string"), or implementation ("how do I substitute a name into this message"). If in doubt, load it — it is the single source of truth for bot copy and for the MessageBase API.
 user-invocable: false
 ---
 
@@ -39,10 +39,10 @@ All user-facing strings are `StrEnum` members of `MessageBase` subclasses in `li
 | Class | Purpose |
 |-------|---------|
 | `ButtonMessages` | Button labels used by `ButtonConfig` |
-| `Messages` | Main menu and general bot descriptions |
+| `MainMenuMessages` | Main menu and general bot descriptions |
 | `SettingsMessages` | Settings-related text |
-| `MeetingMessages` | Meeting creation, join/leave, edit, delete, invitations |
-| `InlineViewMessages` | Inline query result UI text |
+| `MeetingCreationMessages`, `MeetingDisplayMessages`, `MeetingJoinMessages`, `MeetingInviteMessages`, `MeetingLifecycleMessages`, `MeetingEdit*Messages` | Meeting creation, join/leave, edit, delete, invitations |
+| `InlineQueryMessages` | Inline query result UI text |
 | `NotificationMessages` | Meeting deletion and start notifications |
 | `Weekday`, `Month`, `MonthShort` | Date formatting |
 | `Languages` | Language selection labels |
@@ -66,16 +66,16 @@ The list above is illustrative — treat `messages.py` as the source of truth an
 `MessageBase.get(lang=..., **substitutions)` returns a `FormattedText` with translation, placeholder substitution, and inline formatting applied. Pass it directly wherever a view accepts `FormattedText`:
 
 ```python
-MeetingMessages.INVITE.get(lang=user.lang, title=meeting.title)
+MeetingCreationMessages.SUCCESS.get(lang=user.lang, title=meeting.title)
 
 # Pass to with_context — never extract .text first
-view.with_context(MeetingMessages.SUCCESS.get(lang=user.lang))
+view.with_context(MeetingCreationMessages.SUCCESS.get(lang=user.lang, title=meeting.title))
 ```
 
 Substitution values accept `str`, `int`, `float`, `None`, or another `FormattedText`. A `FormattedText` substitution preserves its entities at the correct offset, which is how you embed one formatted message inside another:
 
 ```python
-invited_by = MeetingMessages.INVITED_BY_USER.get(lang=lang, user=inviter.inline_name)
+invited_by = MeetingDisplayMessages.INVITED_BY.get(lang=lang, user=inviter.inline_name)
 # invited_by is FormattedText with an italic entity
 full_name = render(t"{name} ({invited_by})")  # entities preserved
 ```
@@ -85,15 +85,15 @@ full_name = render(t"{name} ({invited_by})")  # entities preserved
 ```python
 await api.answer_callback_query(
     update,
-    text=MeetingMessages.NOT_FOUND.get_text(lang=lang),
+    text=MeetingInviteMessages.MEETING_NOT_FOUND.get_text(lang=lang),
     show_alert=True,
 )
 ```
 
-`ButtonMessages.back(lang=...)` returns a plain `str` with a `"← "` arrow prepended, for the back-button variant. Button labels don't render entities, so the plain-string return type is intentional:
+`ButtonMessages.back(lang=...)` returns a plain `str` with a `"≪ "` arrow prepended, for the back-button variant. Button labels don't render entities, so the plain-string return type is intentional:
 
 ```python
-ButtonMessages.MAIN_MENU.back(lang=user.lang)  # → "← Main Menu"
+ButtonMessages.MAIN_MENU.back(lang=user.lang)  # → "≪ Main Menu"
 ```
 
 ## Inline formatting in message bodies
@@ -101,21 +101,21 @@ ButtonMessages.MAIN_MENU.back(lang=user.lang)  # → "← Main Menu"
 Embed formatting with HTML-like tags; `parse_format_tags` converts them to `MessageEntity` objects at render time.
 
 ```python
-INVITE_USER_MEETING_NOT_FOUND_ON_CALLBACK = (
-    "<b>Meeting Not Found</b>\n\nThe meeting does not exist anymore."
+MEETING_NOT_FOUND = (
+    "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
 )
-INVITED_BY_USER = "<i>invited by ${user}</i>"
+INVITED_BY = "<i>invited by ${user}</i>"
 ```
 
 Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags may be arbitrarily nested. See the critical rules above for the "close every tag" constraint.
 
 ## Button labels
 
-Button labels are plain text — Telegram ignores entities on buttons. `.get(lang=...)` returns `FormattedText`; `ButtonConfig` strips entities internally, so you can hand it the result of `.get()` directly. For the "← Label" back-button variant, use `.back(lang=...)`, which is already plain `str`:
+Button labels are plain text — Telegram ignores entities on buttons. `.get(lang=...)` returns `FormattedText`; `ButtonConfig` validates that the `FormattedText` carries no entities and unwraps it to plain text — since button-label values never use formatting tags, this is safe in practice, but a labeled value with entities raises a `ValueError` rather than being silently stripped. For the "≪ Label" back-button variant, use `.back(lang=...)`, which is already plain `str`:
 
 ```python
-ButtonConfig(text=ButtonMessages.JOIN.get(lang=lang), callback_data=cb.JOIN)
-ButtonMessages.MAIN_MENU.back(lang=lang)  # → "← Main Menu"
+ButtonConfig(text=ButtonMessages.JOIN.get_text(lang=lang), callback_data=cb.JOIN)
+ButtonMessages.MAIN_MENU.back(lang=lang)  # → "≪ Main Menu"
 ```
 
 ## After adding or editing strings

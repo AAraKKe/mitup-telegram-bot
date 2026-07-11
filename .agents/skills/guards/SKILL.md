@@ -85,5 +85,5 @@ async def show(session: AsyncSession, update: Update, context: TMitupContext):
 ## Failure mode registration
 
 <critical_rules>
-  <rule>If a handler uses any of `current_user`, `meeting_accessible`, `meeting_viewable`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/handlers/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
+  <rule>If a handler uses any of `current_user`, `meeting_accessible`, `meeting_viewable`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/bot/handlers/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
 </critical_rules>
