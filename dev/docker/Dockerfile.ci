@@ -1,7 +1,7 @@
 # This Dockerfile builds the image CI pipeline jobs run on: Python plus uv,
 # with every locked dependency pre-installed so jobs only sync the workspace sources.
 # The image is rebuilt automatically when dependency metadata changes (see .gitlab/ci/docker.yml)
-FROM python:3.14.0-slim-bookworm
+FROM python:3.14.6-slim-bookworm
 
 # Combine all installations into a single RUN command to reduce image layers
 RUN apt-get update && \

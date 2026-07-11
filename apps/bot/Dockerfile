@@ -4,7 +4,7 @@
 #   stage 2 carries only the resulting virtualenv onto a clean base.
 
 # ---- Stage 1: builder ----------------------------------------------------------------------
-FROM python:3.14.0-slim-bookworm AS builder
+FROM python:3.14.6-slim-bookworm AS builder
 
 # uv drives the install. UV_PYTHON_DOWNLOADS=never keeps it on this base image's single system
 # interpreter, so the venv we copy to stage 2 links to a python that also exists there.
@@ -45,7 +45,7 @@ RUN find libs/core/mitup_bot/locales -type f \( -name "*.po" -o -name "*.pot" \)
 RUN uv sync --frozen --no-default-groups --no-editable --package mitup-bot-app
 
 # ---- Stage 2: runtime ----------------------------------------------------------------------
-FROM python:3.14.0-slim-bookworm AS runtime
+FROM python:3.14.6-slim-bookworm AS runtime
 
 WORKDIR /mitup-telegram-bot
 

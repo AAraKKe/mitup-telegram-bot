@@ -6,7 +6,7 @@
 # repo + task-definition image swap + an --events-image flag on `mb deploy`). See MR / issue #247.
 
 # ---- Stage 1: builder ----------------------------------------------------------------------
-FROM python:3.14.0-slim-bookworm AS builder
+FROM python:3.14.6-slim-bookworm AS builder
 
 RUN pip install --no-cache-dir uv
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
@@ -40,7 +40,7 @@ RUN find libs/core/mitup_bot/locales -type f \( -name "*.po" -o -name "*.pot" \)
 RUN uv sync --frozen --no-default-groups --no-editable --package mitup-events-app
 
 # ---- Stage 2: runtime ----------------------------------------------------------------------
-FROM python:3.14.0-slim-bookworm AS runtime
+FROM python:3.14.6-slim-bookworm AS runtime
 
 WORKDIR /mitup-telegram-bot
 
