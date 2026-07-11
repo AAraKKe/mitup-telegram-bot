@@ -9,7 +9,7 @@ allowed-tools: Read, Bash, Glob
 Steps:
 1. Inspect the model changes or task description to understand what the migration needs to do.
 2. Create an empty migration scaffold: `alembic revision -m "$ARGUMENTS"`
-3. Open the generated migration file under `mitup_bot/migrations/versions/`.
+3. Open the generated migration file under `libs/data/mitup_bot/migrations/versions/`.
 4. Write the `upgrade()` and `downgrade()` functions by hand. Do NOT use `--autogenerate` — migrations must be explicitly authored.
 5. Review and check for:
    - Missing `server_default` for non-nullable columns on existing tables

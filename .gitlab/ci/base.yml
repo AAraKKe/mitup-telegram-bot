@@ -26,6 +26,7 @@ include:
   - tools/mb/pyproject.toml
   - libs/core/pyproject.toml
   - libs/monitoring/pyproject.toml
+  - libs/data/pyproject.toml
   - .gitlab-ci.yml
   - .gitlab/ci/docker.yml
 

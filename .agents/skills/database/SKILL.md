@@ -8,7 +8,7 @@ user-invocable: false
 
 ## Engine and sessions
 
-The database layer lives in `mitup_bot/db.py`. It uses SQLAlchemy's **async engine** (psycopg 3 driver) with SQLModel's `AsyncSession`, managed through an `async_sessionmaker` configured at startup via `configure_db()`. Pool sizing comes from `DbConfig` (`pool_size` / `max_overflow` / `pool_timeout`), and the update-concurrency cap (`bot.concurrent_updates`) must fit inside it — `Config` validates `cap ≤ pool_size + max_overflow − POOL_CONNECTION_HEADROOM` at startup, keeping connections free for the job queue and reconcile transactions.
+The database layer lives in `libs/data/mitup_bot/db.py`. It uses SQLAlchemy's **async engine** (psycopg 3 driver) with SQLModel's `AsyncSession`, managed through an `async_sessionmaker` configured at startup via `configure_db()`. Pool sizing comes from `DbConfig` (`pool_size` / `max_overflow` / `pool_timeout`), and the update-concurrency cap (`bot.concurrent_updates`) must fit inside it — `Config` validates `cap ≤ pool_size + max_overflow − POOL_CONNECTION_HEADROOM` at startup, keeping connections free for the job queue and reconcile transactions.
 
 **Pool observability:** when `configure_db()` receives a `metrics_client` (the bot runtime always passes one; CLI commands don't), pool events emit the `DbPool*` metrics defined in `MetricKey`, and `begin()` eagerly checks out the transaction's connection so pool wait time and pool timeouts are measured at transaction start, flushing the accumulated records once per transaction.
 
@@ -83,11 +83,11 @@ Meeting capacity and waiting-list logic is computed in Python over the loaded `j
 
 ## Models
 
-All SQLModel table models live in `mitup_bot/models/` and use SQLModel. Inspect `mitup_bot/models/__init__.py` for the current list of exported models.
+All SQLModel table models live in `libs/data/mitup_bot/models/` and use SQLModel. Inspect `libs/data/mitup_bot/models/__init__.py` for the current list of exported models.
 
 Key patterns:
 
-- **Models are PTB-free.** `import mitup_bot.models` must succeed without python-telegram-bot installed — the migrations Lambda loads model metadata for alembic in a PTB-free image. Never import `telegram` (or anything that transitively reaches it, e.g. `mitup_bot.utils.entities` / `mitup_bot.utils.messages` / the `mitup_bot.utils` package init) at runtime in `mitup_bot/models/`; annotation-only uses go under `TYPE_CHECKING`, and user-facing text rendering belongs in `views/` (see `views/meeting_text.py`).
+- **Models are PTB-free.** `import mitup_bot.models` must succeed without python-telegram-bot installed — the migrations Lambda loads model metadata for alembic in a PTB-free image. Never import `telegram` (or anything that transitively reaches it, e.g. `mitup_bot.utils.entities` / `mitup_bot.utils.messages` / the `mitup_bot.utils` package init) at runtime in `libs/data/mitup_bot/models/`; annotation-only uses go under `TYPE_CHECKING`, and user-facing text rendering belongs in `views/` (see `views/meeting_text.py`).
 
 - All models inherit from `BaseModel` (in `base_model.py`) which provides the `db_id` property.
 - Models with JSON columns that need mutation tracking extend `MutableModel` (in `mutable_model.py`).
@@ -95,14 +95,14 @@ Key patterns:
 
 When adding a new model:
 
-1. Create the model class in the appropriate file under `mitup_bot/models/`.
-2. Export it from `mitup_bot/models/__init__.py`.
+1. Create the model class in the appropriate file under `libs/data/mitup_bot/models/`.
+2. Export it from `libs/data/mitup_bot/models/__init__.py`.
 3. Generate an Alembic migration (see [Migrations](#migrations) below).
 4. Add test helpers in `tests/helpers/` if the model is referenced in 2 or more test modules or requires more than 2 constructor arguments.
 
 ## Migrations
 
-Database migrations use [Alembic](https://alembic.sqlalchemy.org/). Migration scripts live in `mitup_bot/migrations/versions/`.
+Database migrations use [Alembic](https://alembic.sqlalchemy.org/). Migration scripts live in `libs/data/mitup_bot/migrations/versions/`.
 
 Day-to-day commands when running the bot locally:
 

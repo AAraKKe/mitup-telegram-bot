@@ -55,7 +55,7 @@ Button actions carry their own `CallbackData` instance, defined once in [`mitup_
 
 ## Wrap database access
 
-If the handler touches the database, add `@with_session` from [`mitup_bot/db.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/db.py) directly under the registration decorator. It injects an `AsyncSession` as the first positional argument.
+If the handler touches the database, add `@with_session` from [`mitup_bot/db.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/data/mitup_bot/db.py) directly under the registration decorator. It injects an `AsyncSession` as the first positional argument.
 
 ```python
 @HandlersRegistry.register_callback_query(

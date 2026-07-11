@@ -6,6 +6,7 @@ from . import runner
 # import graph, so success proves the package's declared dependencies are a sufficient closure.
 CORE_IMPORTS = "import mitup_bot.config; import mitup_bot.supporter; import mitup_bot.translations"
 MONITORING_IMPORTS = "import mitup_bot.monitoring"
+DATA_IMPORTS = "import mitup_bot.models; import mitup_bot.db"
 
 
 def check_package(name: str, package_paths: list[str], import_statement: str) -> int:
@@ -23,8 +24,13 @@ def check_package(name: str, package_paths: list[str], import_statement: str) ->
 def run_check(repo_root: Path) -> int:
     core_path = str(repo_root / "libs/core")
     monitoring_path = str(repo_root / "libs/monitoring")
+    data_path = str(repo_root / "libs/data")
     core_exit = check_package("mitup-core", [core_path], CORE_IMPORTS)
     # mitup-monitoring declares mitup-core as a workspace dependency; the isolated environment has
     # no workspace, so core is supplied by path to stand in for that declared edge.
     monitoring_exit = check_package("mitup-monitoring", [monitoring_path, core_path], MONITORING_IMPORTS)
-    return core_exit or monitoring_exit
+    # mitup-data declares mitup-core and mitup-monitoring as workspace dependencies, supplied by path
+    # here. python-telegram-bot is deliberately absent: importing the models and the engine proves the
+    # persistence layer is PTB-free, which is what lets the migrations Lambda drop the PTB dependency.
+    data_exit = check_package("mitup-data", [data_path, core_path, monitoring_path], DATA_IMPORTS)
+    return core_exit or monitoring_exit or data_exit

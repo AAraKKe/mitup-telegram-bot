@@ -51,12 +51,13 @@ WORKDIR ${PROJECT_DIR}
 
 # Copy only dependency metadata to pre-install dependencies
 COPY pyproject.toml uv.lock LICENSE ./
-# The root pyproject declares tools/mb, libs/core and libs/monitoring as uv workspace members;
-# uv refuses to resolve when a member is missing, so every member's pyproject must exist too.
+# The root pyproject declares tools/mb, libs/core, libs/monitoring and libs/data as uv workspace
+# members; uv refuses to resolve when a member is missing, so every member's pyproject must exist too.
 # Copying only the pyprojects (not the sources) keeps this layer's cache keyed on dependency metadata.
 COPY tools/mb/pyproject.toml tools/mb/pyproject.toml
 COPY libs/core/pyproject.toml libs/core/pyproject.toml
 COPY libs/monitoring/pyproject.toml libs/monitoring/pyproject.toml
+COPY libs/data/pyproject.toml libs/data/pyproject.toml
 
 # Create minimal package structure to allow dependency installation. The mitup_bot package is a
 # PEP 420 namespace shared across the root and the libs, so no member ships mitup_bot/__init__.py.
@@ -67,7 +68,9 @@ RUN mkdir -p mitup_bot && \
     mkdir -p libs/core/mitup_bot && \
     touch libs/core/mitup_bot/config.py && \
     mkdir -p libs/monitoring/mitup_bot/monitoring && \
-    touch libs/monitoring/mitup_bot/monitoring/__init__.py
+    touch libs/monitoring/mitup_bot/monitoring/__init__.py && \
+    mkdir -p libs/data/mitup_bot && \
+    touch libs/data/mitup_bot/db.py
 
 # Pre-install every locked dependency so CI jobs start fast. `uv cache prune --ci`
 # keeps wheels built from source but drops downloaded ones, which the venv already holds.

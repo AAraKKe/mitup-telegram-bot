@@ -51,7 +51,7 @@ Every interaction, a tapped button, a typed command, a shared location, arrives 
 
   <div class="uflow__node">
     <span class="uflow__title">@with_session</span>
-    <span class="uflow__src">mitup_bot/db.py</span>
+    <span class="uflow__src">libs/data/mitup_bot/db.py</span>
     <span class="uflow__desc">Opens one database session for the handler, read or write.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span></div>

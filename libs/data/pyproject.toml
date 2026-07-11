@@ -1,0 +1,27 @@
+[project]
+name = "mitup-data"
+version = "0.0.1"
+description = "Persistence layer for mitup-telegram-bot: SQLModel tables, the async engine and session lifecycle, and the Alembic migrations tree"
+requires-python = ">=3.14"
+dependencies = [
+    "sqlmodel==0.0.39",
+    "sqlalchemy[asyncio]==2.0.51",
+    "psycopg[binary]==3.3.4",
+    "alembic==1.18.5",
+    "pydantic==2.13.4",
+    "structlog==26.1.0",
+    "cryptography==49.0.0",
+    "mitup-core",
+    "mitup-monitoring",
+]
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+mitup-monitoring = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

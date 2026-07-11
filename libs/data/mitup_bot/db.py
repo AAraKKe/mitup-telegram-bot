@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import functools
 import time
 from collections import Counter
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
-from typing import Any, Concatenate, Literal, Protocol, cast, overload
+from typing import TYPE_CHECKING, Any, Concatenate, Literal, Protocol, cast, overload
 
 import structlog
 from pydantic import BaseModel, ValidationError
@@ -21,7 +23,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from mitup_bot.config import DbConfig
 from mitup_bot.models import MeetupLocation, MessageButtons
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
-from mitup_bot.protocols import ContextOrBotAdapter
+
+if TYPE_CHECKING:  # pragma: no cover
+    # ContextOrBotAdapter reaches python-telegram-bot via mitup_bot.protocols; keeping the import
+    # type-only is what lets this persistence layer stay PTB-free (the migrations Lambda loads it
+    # without python-telegram-bot installed).
+    from mitup_bot.protocols import ContextOrBotAdapter
 
 log = structlog.get_logger(__name__)
 
@@ -45,7 +52,7 @@ class WriteApi[OutboxT: OutboxProtocol](Protocol):
     async def execute_queued(self, outbox: OutboxT): ...
 
 
-OutboxReconciler = Callable[[AsyncSession, ContextOrBotAdapter, OutboxProtocol], Coroutine[Any, Any, None]]
+type OutboxReconciler = Callable[[AsyncSession, ContextOrBotAdapter, OutboxProtocol], Coroutine[Any, Any, None]]
 
 __sessionmaker: async_sessionmaker[AsyncSession] | None = None
 __connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")

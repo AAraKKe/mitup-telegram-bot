@@ -6,7 +6,7 @@ icon: material/database-outline
 
 The data layer is the part of Mitup most likely to surprise you. It looks like ordinary SQLModel, but four rules bend the code in ways that only make sense once someone points them out. This page points them out. When you need the full detail, follow the links to the [database skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/database/SKILL.md), which is the authority.
 
-Everything here lives in [`mitup_bot/db.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/db.py) and the models under [`mitup_bot/models/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/mitup_bot/models).
+Everything here lives in [`mitup_bot/db.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/data/mitup_bot/db.py) and the models under [`mitup_bot/models/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/libs/data/mitup_bot/models).
 
 ## The `@with_session` decorator
 
@@ -58,7 +58,7 @@ The lock is never held across a Telegram send. Locking paths always run under `@
 
 ## Migrations are hand-written
 
-Migrations use [Alembic](https://alembic.sqlalchemy.org/), and revisions live in [`mitup_bot/migrations/versions/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/mitup_bot/migrations/versions). The surprise here is what you do not do: **autogenerate is not used.** Every `upgrade()` and `downgrade()` is written by hand so each schema change is deliberate and reviewable.
+Migrations use [Alembic](https://alembic.sqlalchemy.org/), and revisions live in [`mitup_bot/migrations/versions/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/libs/data/mitup_bot/migrations/versions). The surprise here is what you do not do: **autogenerate is not used.** Every `upgrade()` and `downgrade()` is written by hand so each schema change is deliberate and reviewable.
 
 Day-to-day commands when running the bot locally:
 

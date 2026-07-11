@@ -78,20 +78,19 @@ into `libs/core`).
 ```
 mitup_bot/              # Root package (the bot application)
 ├── app.py              # PTB application entry point (MitupRuntime)
-├── db.py               # Database engine and session decorators
 ├── guards.py           # Input validation for handlers
 ├── cli/                # Production CLI commands
 ├── handlers/           # Bot logic by feature area
 ├── lambdas/            # AWS Lambda functions
-├── migrations/         # Alembic migration scripts
-├── models/             # SQLModel database models
 ├── utils/              # Shared utilities (callbacks, messages, emojis, types)
 └── views/              # View layer
 
 libs/                   # uv workspace libraries sharing the mitup_bot namespace
 ├── core/               # mitup-core: config, logging, i18n engine + locales, base exceptions,
 │                       #   callback_data, handler_id, supporter, limits, keyboard schema, emojis
-└── monitoring/         # mitup-monitoring: CloudWatch EMF metrics emission
+├── monitoring/         # mitup-monitoring: CloudWatch EMF metrics emission
+└── data/               # mitup-data: SQLModel tables (models/), the async engine and session
+                        #   lifecycle (db.py), and the Alembic migrations tree (migrations/)
 
 tools/                  # Dev tooling: the mb CLI (tools/mb/) and helper scripts (not shipped in the wheel)
 tests/                  # Test suite
