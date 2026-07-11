@@ -2,4 +2,4 @@ files:
   - source: /libs/core/mitup_bot/locales/en.po
     translation: /libs/core/mitup_bot/locales/%locale_with_underscore%.po
 commit_message: '🗣️ translations: [skip ci] Translations from Crowdin, (%language%)'
-append_commit_message: false
+append_commit_message: 
