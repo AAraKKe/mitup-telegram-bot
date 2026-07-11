@@ -1,7 +1,12 @@
-from telegram import Update
+from __future__ import annotations
 
-from mitup_bot.callback_data import CallbackData
-from mitup_bot.handler_id import HandlerId
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from telegram import Update
+
+    from mitup_bot.callback_data import CallbackData
+    from mitup_bot.handler_id import HandlerId
 
 
 class HandlerRegisteredError(AttributeError):
