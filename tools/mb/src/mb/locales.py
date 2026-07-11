@@ -11,10 +11,13 @@ app = typer.Typer(no_args_is_help=True, help="Manage gettext locale catalogs.")
 
 
 def locales_stale(locales_dir: Path) -> bool:
-    """Return True when any compiled .mo catalog is missing or older than its .po source.
+    """Return True when the compiled .mo catalogs are missing or out of date with their .po sources.
 
-    Tests need compiled catalogs, but recompiling on every run wastes seconds — the
-    mtime comparison lets `mb test` skip the build when nothing changed.
+    Tests need compiled catalogs, but recompiling on every run wastes seconds — this lets
+    `mb test` skip the build when the sources are unchanged. Freshness is decided by hashing the
+    .po contents against a stamp written at compile time, not by comparing mtimes: a fresh git
+    checkout (every CI job) restamps the .po files newer than the .mo catalogs restored from the
+    build-translations artifact, which an mtime comparison would misread as stale.
     """
     po_files = sorted(locales_dir.glob("*.po"))
     if not po_files:
@@ -23,9 +26,10 @@ def locales_stale(locales_dir: Path) -> bool:
         mo_files = list((locales_dir / po_file.stem / "LC_MESSAGES").glob("*.mo"))
         if not mo_files:
             return True
-        if any(mo_file.stat().st_mtime < po_file.stat().st_mtime for mo_file in mo_files):
-            return True
-    return False
+    stamp = locales_dir / locales_ops.LOCALE_STAMP_NAME
+    if not stamp.exists():
+        return True
+    return stamp.read_text().strip() != locales_ops.po_content_hash(locales_dir)
 
 
 def build_locales() -> int:

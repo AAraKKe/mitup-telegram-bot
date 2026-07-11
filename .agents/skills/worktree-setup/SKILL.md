@@ -1,6 +1,6 @@
 ---
 name: worktree-setup
-description: Bootstrap a fresh git worktree so its environment matches the main checkout. The skill copies the uncommitted `.env` (and `.envrc` if present) from the main checkout — these files aren't tracked by git, so `git worktree add` doesn't bring them along, and without them `uv run` commands pick up the wrong config. It also tells you what else is needed (dependencies, migrations, a running database) without taking those actions itself — so it can't hang on an unavailable Docker daemon or a missing Postgres. Invoke whenever a fresh worktree was just created (manually with `git worktree add` or automatically by a workflow), or when someone reports "the bot won't start in this worktree".
+description: Bootstrap a fresh git worktree so its environment matches the main checkout. The skill copies the uncommitted local files (`.env`, `.envrc` if present, and the dev-bot `dev.toml`) from the main checkout — these files aren't tracked by git, so `git worktree add` doesn't bring them along, and without them `uv run` commands pick up the wrong config or `mb run bot` has no dev environment. It also tells you what else is needed (dependencies, migrations, a running database) without taking those actions itself — so it can't hang on an unavailable Docker daemon or a missing Postgres. Invoke whenever a fresh worktree was just created (manually with `git worktree add` or automatically by a workflow), or when someone reports "the bot won't start in this worktree".
 user-invocable: true
 argument-hint: "[no args needed — operates on the current worktree]"
 allowed-tools: Bash, Read
@@ -19,6 +19,7 @@ This skill closes that specific gap. It only performs **safe, fast, offline** ac
 2. **Copy the local-only files.** For each file below, if it exists in the main worktree but **not** in the current worktree, copy it over. Never overwrite a file that already exists — the user may have diverged it intentionally.
    - `.env` — local environment variables (always copy when present in main)
    - `.envrc` — direnv local config (copy if present)
+   - `libs/core/mitup_bot/environments/dev.toml` — the local dev-bot configuration written by `mb setup --bot-token` (copy if present; without it `mb run bot` has no dev environment). The parent directory is tracked, so a plain `cp` works.
 
 ### Exact command sequence
 
@@ -36,7 +37,7 @@ if [ "$CURRENT" = "$MAIN" ]; then
     exit 0
 fi
 
-for f in .env .envrc; do
+for f in .env .envrc libs/core/mitup_bot/environments/dev.toml; do
     if [ -f "$MAIN/$f" ] && [ ! -f "./$f" ]; then
         cp "$MAIN/$f" "./$f"
         echo "copied $f from main"

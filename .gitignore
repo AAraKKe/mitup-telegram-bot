@@ -38,12 +38,14 @@ site
 
 # Do not store mo binay files, should be build on the fly by CI
 *.mo
+# Freshness stamp co-located with the compiled catalogs (see mb locales_ops.LOCALE_STAMP_NAME)
+.po-content-hash
 
 # AWS folder
 aws
 
 # Any dev file in environments
-mitup_bot/environments/dev*
+libs/core/mitup_bot/environments/dev*
 
 # Claude Code local settings (user-specific permissions)
 .claude/settings.local.json

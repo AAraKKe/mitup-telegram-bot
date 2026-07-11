@@ -39,6 +39,17 @@ def load_config(config_dir: Path) -> Config:
         return Config.from_providers(TomlConfigProvider(Env.DEV))
 
 
+def test_dev_toml_path_matches_config_resolution():
+    """The writer must target the exact directory the config loader reads, or `mb setup` writes a
+    dev.toml nothing loads (the workspace-split regression this guards against)."""
+    from importlib.resources import files
+
+    from mitup_bot import environments
+
+    expected = Path(str(files(environments))) / f"{Env.DEV.value}.toml"
+    assert setup_env.dev_toml_path() == expected
+
+
 def test_generated_config_validates(dev_toml: Path):
     setup_env.write_dev_config(TOKEN, (), force=True)
 

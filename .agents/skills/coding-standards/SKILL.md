@@ -252,6 +252,7 @@ A comment must help someone reading the code *as it stands now*. Delete any comm
 - **Issue/MR references used as narration** — `(issue #220)`, `per the !382 review`, `# see #158`.
 - **Build cross-references** — "mirrors the X path", "extracted here so the web layer doesn't import cli", "distinct from A because…", "instead of the old B", "this keeps Y from re-selecting the table".
 - **Historical rationale** — "was a pre-tiers artifact", "we used to…", "changed in review", "the earlier approach…".
+- **Repo-history narration** — "after the workspace split", "moved from X", "now lives in Y", "no longer imports Z", "since the migration". State the current fact only: not "under libs/core after the split, not the repo root" but "resolved from the installed package".
 - Anything that merely restates an adjacent docstring or the code.
 
 Keep a comment only when it explains a non-obvious *local* fact a future maintainer needs to understand this line — an external-API quirk (Telegram/Patreon), a security reason (constant-time compare), a subtle ownership note (`server_default` so the DB owns the value). Litmus test: *would this still help someone six months from now who never saw the original work?* If not, delete it. This refines the "explain why, not what" rule above — not every *why* survives; build-story *why* does not.

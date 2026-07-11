@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import difflib
+import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,27 @@ msgstr ""
 """
 
 VALIDATE_PO_FILE = Path("validate.po")
+
+# Name of the stamp file, co-located with the compiled catalogs, that records the content hash
+# of the .po sources the catalogs were built from (see po_content_hash).
+LOCALE_STAMP_NAME = ".po-content-hash"
+
+
+def po_content_hash(locales_dir: Path) -> str:
+    """Return a hash of every .po source in ``locales_dir``, keyed by filename.
+
+    The compiled-catalog freshness check content-addresses the sources instead of comparing
+    mtimes, because a fresh ``git checkout`` restamps the .po files newer than the .mo catalogs
+    restored from the ``build-translations`` artifact. An mtime comparison would read that as
+    stale and recompile the catalogs in every CI job; a content hash only changes when a .po
+    actually changes.
+    """
+    digest = hashlib.sha256()
+    for po_file in sorted(locales_dir.glob("*.po")):
+        digest.update(po_file.name.encode())
+        digest.update(b"\0")
+        digest.update(po_file.read_bytes())
+    return digest.hexdigest()
 
 
 def po_file_for_language(lang: str, validate: bool = False) -> Path:
@@ -225,4 +247,9 @@ def compile_locales() -> int:
             return 1
 
         console.success(f"Successfully compiled {po_path} to {mo_path}")
+
+    # Stamp the sources the catalogs were just built from so a later freshness check can skip the
+    # rebuild without depending on mtimes (which a fresh git checkout invalidates).
+    stamp_path = TranslationEngine.LOCALES_DIR / LOCALE_STAMP_NAME
+    stamp_path.write_text(po_content_hash(TranslationEngine.LOCALES_DIR))
     return 0
