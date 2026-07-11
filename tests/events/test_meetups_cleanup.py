@@ -2,9 +2,9 @@ from typing import cast
 
 import pytest
 
-from mitup_bot.cli import meetups_cleanup
-from mitup_bot.cli.commands.recurrent_events import EventType
-from mitup_bot.cli.meetups_cleanup import MEETUPS_DELETION_FAILED
+from mitup_bot.events import meetups_cleanup
+from mitup_bot.events.meetups_cleanup import MEETUPS_DELETION_FAILED
+from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient

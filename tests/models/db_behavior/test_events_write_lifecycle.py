@@ -1,9 +1,9 @@
-"""Empirical proof of #199's acceptance criteria on real Postgres: the CLI broadcast jobs
+"""Empirical proof of #199's acceptance criteria on real Postgres: the recurrent-event jobs
 drive ``db.begin_write`` per meeting, so no transaction or row lock is held across Telegram
 I/O, and their DB fix-ups (unreachable users) land via the lifecycle's reconcile.
 
 Each probe bot executes during the outbox drain and opens a fresh ``db.begin()``
-transaction: whatever it observes there is committed state. If the CLI still held its
+transaction: whatever it observes there is committed state. If a job still held its
 transaction (or the meetup row lock) across the fan-out, the probes would see the stale
 pre-commit state or block until RACE_TIMEOUT.
 
@@ -28,7 +28,7 @@ from telegram.ext import ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import BotAdapter, TelegramApi
-from mitup_bot.cli import inactive_meetings, notify_meetings_started, user_cleanup
+from mitup_bot.events import inactive_meetings, notify_meetings_started, user_cleanup
 from mitup_bot.models import Meetup, Message, Settings, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.backend import NullBackend

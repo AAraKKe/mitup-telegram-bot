@@ -17,7 +17,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
-from mitup_bot.cli import supporter_check
+from mitup_bot.events import supporter_check
 from mitup_bot.models import PatreonCreatorToken, configure_token_encryption
 from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.monitoring.backend import NullBackend

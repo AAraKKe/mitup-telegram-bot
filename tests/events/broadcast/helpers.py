@@ -1,6 +1,6 @@
 from unittest import mock
 
-from mitup_bot.cli.broadcast.types import BatchResult, BroadcastSummary, DeliveryOutcome, LanguageBreakdown
+from mitup_bot.events.broadcast.types import BatchResult, BroadcastSummary, DeliveryOutcome, LanguageBreakdown
 from mitup_bot.models.broadcasts import BroadcastStatus
 from tests.helpers import MockDbSession, Result
 

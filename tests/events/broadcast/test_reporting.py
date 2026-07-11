@@ -3,13 +3,13 @@ from unittest import mock
 import pytest
 from telegram.error import TimedOut
 
-from mitup_bot.cli.broadcast import reporting
-from mitup_bot.cli.broadcast.types import LanguageBreakdown
+from mitup_bot.events.broadcast import reporting
+from mitup_bot.events.broadcast.types import LanguageBreakdown
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.models.broadcasts import BroadcastStatus
 from mitup_bot.utils.entities import FormattedText, parse_format_tags
 from mitup_bot.utils.messages import BroadcastOperatorMessages
-from tests.cli.broadcast.helpers import make_summary, script_exec
+from tests.events.broadcast.helpers import make_summary, script_exec
 from tests.helpers import MockApi, MockDbSession, Result, create_member
 
 

@@ -2,7 +2,7 @@ import pytest
 from sqlmodel import Integer, and_, cast, func, select
 from sqlmodel.sql.expression import Select
 
-from mitup_bot.cli import generate_stats
+from mitup_bot.events import generate_stats
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit

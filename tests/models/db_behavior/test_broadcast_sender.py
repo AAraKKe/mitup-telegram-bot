@@ -25,8 +25,8 @@ from telegram.ext import ExtBot
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import BotAdapter, TelegramApi
-from mitup_bot.cli import broadcast as send_broadcasts
-from mitup_bot.cli.broadcast import MAX_BROADCAST_ATTEMPTS, MAX_DELIVERY_ATTEMPTS
+from mitup_bot.events import broadcast as send_broadcasts
+from mitup_bot.events.broadcast import MAX_BROADCAST_ATTEMPTS, MAX_DELIVERY_ATTEMPTS
 from mitup_bot.models import Broadcast, BroadcastDelivery, BroadcastMessage, Settings, User
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus, BroadcastStatus
 from mitup_bot.models.users import UserStatus

@@ -7,8 +7,8 @@ import structlog
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
-from mitup_bot.cli.commands.migrate_from_rails import ALL_PHASES
 from mitup_bot.lambdas.migrate_from_rails import handler
+from mitup_bot.migration import ALL_PHASES
 
 ALL_PHASES_CSV = ",".join(ALL_PHASES)
 

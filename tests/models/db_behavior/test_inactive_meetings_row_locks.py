@@ -20,7 +20,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
-from mitup_bot.cli import inactive_meetings
+from mitup_bot.events import inactive_meetings
 from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus

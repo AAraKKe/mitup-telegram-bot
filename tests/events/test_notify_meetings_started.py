@@ -2,8 +2,8 @@ from unittest.mock import ANY
 
 import pytest
 
-from mitup_bot.cli import notify_meetings_started
-from mitup_bot.cli.commands.recurrent_events import EventType
+from mitup_bot.events import notify_meetings_started
+from mitup_bot.events.service import EventType
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
@@ -22,7 +22,7 @@ from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 # Inactive-user handling is not exercised here: under the write lifecycle an unreachable
 # participant surfaces at drain time and is marked inactive by the reconcile transaction —
 # see the reconcile tests in tests/test_db.py and the real-Postgres lifecycle tests in
-# tests/models/db_behavior/test_cli_write_lifecycle.py.
+# tests/models/db_behavior/test_events_write_lifecycle.py.
 
 
 @pytest.fixture

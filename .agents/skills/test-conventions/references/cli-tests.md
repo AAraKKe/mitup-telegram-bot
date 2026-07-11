@@ -38,14 +38,14 @@ Key points:
 
 ## Recurrent events tests
 
-The `recurrent_events` module runs periodic async tasks. Tests cover:
+The events service (`mitup_bot/events/service.py`) runs periodic async tasks; its tests live in `tests/events/test_service.py`. The individual job modules and their tests live alongside it under `mitup_bot/events/` and `tests/events/`. The thin `recurrent-events` Click command stays in `mitup_bot/cli/commands/recurrent_events.py` and just parses options before delegating to `service.run_events`. Tests cover:
 
 1. **`IntervalsConfiguration.get()`** — Parametrized test that each `EventType` maps to the correct config field.
 2. **`launch_event()`** — Split into async and sync event types. Async events use `AsyncMock`, sync events use regular `MagicMock`.
 3. **`handle_maintainance()`** — Parametrized over success/fault/leaked-connections scenarios. Uses `StubMetrics` directly (not `StubMetricsEngine`) because there's no handler context.
 4. **`run_periodic()`** — Uses `CancelledError` to break out of the infinite loop after one iteration.
 5. **`run_all_tasks()`** — Patches `run_periodic` to verify all event types are created.
-6. **CLI entry point** — Tests that Click options are parsed and passed through correctly.
+6. **CLI entry point** — Import `cli` from `mitup_bot.cli.commands.recurrent_events`, but patch the orchestration (`Config`, `db`, `build_bot`, `run_all_tasks`, …) at `mitup_bot.events.service`, where `run_events` executes them. Tests that Click options are parsed and passed through correctly.
 
 ### Testing async periodic loops
 

@@ -14,7 +14,7 @@ import pytest
 from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mitup_bot.cli.notify_meetings import USERS_TO_NOTIFY_STATEMENT
+from mitup_bot.events.notify_meetings import USERS_TO_NOTIFY_STATEMENT
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.models.users import UserStatus
 

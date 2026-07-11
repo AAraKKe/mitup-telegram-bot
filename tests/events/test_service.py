@@ -14,12 +14,12 @@ from click.testing import CliRunner
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
-from mitup_bot.cli.commands.recurrent_events import (
+from mitup_bot.cli.commands.recurrent_events import cli
+from mitup_bot.events.service import (
     EventType,
     IntervalsConfiguration,
     build_bot,
     build_broadcast_bot,
-    cli,
     handle_maintainance,
     launch_event,
     run_all_tasks,
@@ -63,7 +63,7 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
     assert config.get(event_type) == getattr(config, field_name)
 
 
-@patch("mitup_bot.cli.commands.recurrent_events.ExtBot")
+@patch("mitup_bot.events.service.ExtBot")
 def test_build_bot(mock_ext_bot: MagicMock):
     bot_config = MagicMock()
     bot_config.token.get_secret_value.return_value = "test-token"
@@ -78,8 +78,8 @@ def test_build_bot(mock_ext_bot: MagicMock):
     assert "defaults" not in call_kwargs
 
 
-@patch("mitup_bot.cli.commands.recurrent_events.AIORateLimiter")
-@patch("mitup_bot.cli.commands.recurrent_events.ExtBot")
+@patch("mitup_bot.events.service.AIORateLimiter")
+@patch("mitup_bot.events.service.ExtBot")
 def test_build_broadcast_bot_applies_configured_rate(mock_ext_bot: MagicMock, mock_rate_limiter: MagicMock):
     bot_config = MagicMock()
     bot_config.token.get_secret_value.return_value = "test-token"
@@ -114,16 +114,16 @@ def test_select_bot_uses_broadcast_bot_for_send_broadcasts():
 
 # Async event types use `await module.run(...)`, sync ones call directly.
 ASYNC_LAUNCH_PARAMS = [
-    (EventType.NOTIFY_START_MEETING, "mitup_bot.cli.commands.recurrent_events.notify_meetings"),
-    (EventType.NOTIFY_MEETING_STARTED, "mitup_bot.cli.commands.recurrent_events.notify_meetings_started"),
-    (EventType.DEACTIVATE_MEETINGS, "mitup_bot.cli.commands.recurrent_events.inactive_meetings"),
-    (EventType.MEETUPS_CLEANUP, "mitup_bot.cli.commands.recurrent_events.meetups_cleanup"),
-    (EventType.SUPPORTER_CHECK, "mitup_bot.cli.commands.recurrent_events.supporter_check"),
+    (EventType.NOTIFY_START_MEETING, "mitup_bot.events.service.notify_meetings"),
+    (EventType.NOTIFY_MEETING_STARTED, "mitup_bot.events.service.notify_meetings_started"),
+    (EventType.DEACTIVATE_MEETINGS, "mitup_bot.events.service.inactive_meetings"),
+    (EventType.MEETUPS_CLEANUP, "mitup_bot.events.service.meetups_cleanup"),
+    (EventType.SUPPORTER_CHECK, "mitup_bot.events.service.supporter_check"),
 ]
 
 SYNC_LAUNCH_PARAMS = [
-    (EventType.USER_CLEANUP, "mitup_bot.cli.commands.recurrent_events.user_cleanup"),
-    (EventType.GENERATE_STATS, "mitup_bot.cli.commands.recurrent_events.generate_stats"),
+    (EventType.USER_CLEANUP, "mitup_bot.events.service.user_cleanup"),
+    (EventType.GENERATE_STATS, "mitup_bot.events.service.generate_stats"),
 ]
 
 
@@ -147,7 +147,7 @@ async def test_launch_event_send_broadcasts():
     client = make_test_metrics_client()
     admin_tg_ids = [111, 222]
 
-    with patch("mitup_bot.cli.commands.recurrent_events.broadcast.run", new_callable=AsyncMock) as mock_run:
+    with patch("mitup_bot.events.service.broadcast.run", new_callable=AsyncMock) as mock_run:
         await launch_event(EventType.SEND_BROADCASTS, api, client, admin_tg_ids)
         mock_run.assert_awaited_once_with(api, client, admin_tg_ids)
 
@@ -176,7 +176,7 @@ async def test_launch_event_binds_event_contextvars():
         structlog.get_logger("mitup_bot").info("event running")
 
     with capture_logs(processors=[merge_contextvars]) as logs:
-        with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run", side_effect=run_emitting_log):
+        with patch("mitup_bot.events.service.user_cleanup.run", side_effect=run_emitting_log):
             await launch_event(EventType.USER_CLEANUP, api, client, [])
 
     event_logs = [log for log in logs if log["event"] == "event running"]
@@ -197,7 +197,7 @@ async def test_launch_event_clears_contextvars_between_events():
     client = make_test_metrics_client()
 
     with capture_logs(processors=[merge_contextvars]) as logs:
-        with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run"):
+        with patch("mitup_bot.events.service.user_cleanup.run"):
             await launch_event(EventType.USER_CLEANUP, api, client, [])
         # Emitted after launch_event returned — must carry neither event field.
         structlog.get_logger("mitup_bot").info("between events")
@@ -219,7 +219,7 @@ async def test_launch_event_uses_distinct_run_id_per_invocation():
         structlog.get_logger("mitup_bot").info("event running")
 
     with capture_logs(processors=[merge_contextvars]) as logs:
-        with patch("mitup_bot.cli.commands.recurrent_events.user_cleanup.run", side_effect=capture_run_id):
+        with patch("mitup_bot.events.service.user_cleanup.run", side_effect=capture_run_id):
             await launch_event(EventType.USER_CLEANUP, api, client, [])
             await launch_event(EventType.USER_CLEANUP, api, client, [])
 
@@ -257,13 +257,13 @@ async def test_handle_maintainance(
 
     with (
         patch(
-            "mitup_bot.cli.commands.recurrent_events.launch_event",
+            "mitup_bot.events.service.launch_event",
             new_callable=AsyncMock,
             side_effect=launch_side_effect,
         ) as mock_launch,
-        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.build_api", return_value=fake_api),
-        patch("mitup_bot.cli.commands.recurrent_events.MetricsClient", side_effect=make_client),
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.build_api", return_value=fake_api),
+        patch("mitup_bot.events.service.MetricsClient", side_effect=make_client),
     ):
         mock_db.get_open_connections.return_value = leaked_connections
 
@@ -336,11 +336,11 @@ async def test_handle_maintainance_emits_telegram_api_time_metrics():
 
     with (
         patch(
-            "mitup_bot.cli.commands.recurrent_events.launch_event",
+            "mitup_bot.events.service.launch_event",
             side_effect=trigger_api_call,
         ),
-        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.MetricsClient", side_effect=make_client),
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.MetricsClient", side_effect=make_client),
     ):
         mock_db.get_open_connections.return_value = 0
 
@@ -413,12 +413,12 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
 
     with (
         patch(
-            "mitup_bot.cli.commands.recurrent_events.launch_event",
+            "mitup_bot.events.service.launch_event",
             new_callable=AsyncMock,
             side_effect=launch_side_effect,
         ),
-        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.build_api"),
     ):
         mock_db.get_open_connections.return_value = 0
         await handle_maintainance(event_type, MagicMock(), [], client=client)
@@ -450,8 +450,8 @@ async def test_run_periodic_runs_event():
 
     # First sleep is the time_before_start delay, second is the interval sleep after handle_maintainance
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.sleep", side_effect=[None, CancelledError()]),
-        patch("mitup_bot.cli.commands.recurrent_events.handle_maintainance", new_callable=AsyncMock) as mock_handle,
+        patch("mitup_bot.events.service.asyncio.sleep", side_effect=[None, CancelledError()]),
+        patch("mitup_bot.events.service.handle_maintainance", new_callable=AsyncMock) as mock_handle,
     ):
         with pytest.raises(CancelledError):
             await run_periodic(60, EventType.USER_CLEANUP, bot, [], time_before_start=0)
@@ -468,8 +468,8 @@ async def test_run_periodic_default_jitter():
         raise CancelledError
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.sleep", side_effect=sleep_side_effect),
-        patch("mitup_bot.cli.commands.recurrent_events.handle_maintainance", new_callable=AsyncMock),
+        patch("mitup_bot.events.service.asyncio.sleep", side_effect=sleep_side_effect),
+        patch("mitup_bot.events.service.handle_maintainance", new_callable=AsyncMock),
     ):
         with pytest.raises(CancelledError):
             await run_periodic(100, EventType.USER_CLEANUP, bot, [], time_before_start=None)
@@ -509,7 +509,7 @@ async def test_run_all_tasks_creates_all_tasks():
         propagated_start_times.append(time_before_start)
         bots_by_event[event_type] = bot
 
-    with patch("mitup_bot.cli.commands.recurrent_events.run_periodic", side_effect=fake_run_periodic):
+    with patch("mitup_bot.events.service.run_periodic", side_effect=fake_run_periodic):
         await run_all_tasks(intervals, bot, broadcast_bot, [], start_time=start_time)
 
     assert set(created_tasks) == set(EventType)
@@ -523,13 +523,13 @@ def test_cli_invokes_with_defaults():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
-        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend") as mock_configure_emf,
-        patch("mitup_bot.cli.commands.recurrent_events.build_bot") as mock_build_bot,
-        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot") as mock_build_broadcast_bot,
-        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.configure_emf_backend") as mock_configure_emf,
+        patch("mitup_bot.events.service.build_bot") as mock_build_bot,
+        patch("mitup_bot.events.service.build_broadcast_bot") as mock_build_broadcast_bot,
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run") as mock_async_run,
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
@@ -552,13 +552,13 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
-        patch("mitup_bot.cli.commands.recurrent_events.db") as mock_db,
-        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = True
@@ -578,14 +578,14 @@ def test_cli_passes_custom_intervals():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
-        patch("mitup_bot.cli.commands.recurrent_events.db"),
-        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
-        patch("mitup_bot.cli.commands.recurrent_events.run_all_tasks", new_callable=AsyncMock) as mock_run_all_tasks,
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run") as mock_async_run,
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db"),
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.run_all_tasks", new_callable=AsyncMock) as mock_run_all_tasks,
+        patch("mitup_bot.events.service.asyncio.run") as mock_async_run,
     ):
         mock_config = MagicMock()
         mock_config.patreon = None
@@ -649,13 +649,13 @@ def test_cli_configures_patreon_when_section_present(restore_patreon_state: None
     patreon_config = create_patreon_config()
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
-        patch("mitup_bot.cli.commands.recurrent_events.db"),
-        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db"),
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
@@ -673,13 +673,13 @@ def test_cli_env_option():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.cli.commands.recurrent_events.Config.from_providers") as mock_config_cls,
-        patch("mitup_bot.cli.commands.recurrent_events.db"),
-        patch("mitup_bot.cli.commands.recurrent_events.configure_emf_backend"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_broadcast_bot"),
-        patch("mitup_bot.cli.commands.recurrent_events.build_api"),
-        patch("mitup_bot.cli.commands.recurrent_events.asyncio.run"),
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db"),
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
     ):
         mock_config = MagicMock()
         mock_config.patreon = None

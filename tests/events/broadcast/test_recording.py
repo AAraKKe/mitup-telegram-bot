@@ -2,12 +2,12 @@ import datetime as dt
 
 import pytest
 
-from mitup_bot.cli.broadcast import recording
-from mitup_bot.cli.broadcast.types import BatchResult, DeliveryOutcome, PendingDelivery
+from mitup_bot.events.broadcast import recording
+from mitup_bot.events.broadcast.types import BatchResult, DeliveryOutcome, PendingDelivery
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
-from tests.cli.broadcast.helpers import batch_of, script_exec
+from tests.events.broadcast.helpers import batch_of, script_exec
 from tests.helpers import MockDbSession, Result, create_member
 from tests.helpers.monitoring import MetricAssertions
 

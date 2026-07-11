@@ -20,9 +20,9 @@ from typing import Any
 import boto3
 import structlog
 
-from mitup_bot.cli.commands.migrate_from_rails import ALL_PHASES, invoke_from_lambda
 from mitup_bot.config import Env
 from mitup_bot.logging_config import Component, configure_logging
+from mitup_bot.migration import ALL_PHASES, invoke_from_lambda
 
 log = structlog.get_logger(__name__)
 

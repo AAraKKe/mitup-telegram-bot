@@ -3,8 +3,8 @@ import logging
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from mitup_bot.cli import user_cleanup
-from mitup_bot.cli.user_cleanup import DELETION_REQUESTED_USERS_SELECT_STATEMENT, INACTIVE_USERS_SELECT_STATEMENT
+from mitup_bot.events import user_cleanup
+from mitup_bot.events.user_cleanup import DELETION_REQUESTED_USERS_SELECT_STATEMENT, INACTIVE_USERS_SELECT_STATEMENT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import PrivacyMessages
@@ -14,7 +14,7 @@ from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 # Farewell delivery failures are not exercised here: under the write lifecycle a failed send
 # surfaces at drain time, after the deletion committed — see the real-Postgres lifecycle tests
-# in tests/models/db_behavior/test_cli_write_lifecycle.py.
+# in tests/models/db_behavior/test_events_write_lifecycle.py.
 
 
 @pytest.fixture

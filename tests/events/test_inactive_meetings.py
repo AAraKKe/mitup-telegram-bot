@@ -3,8 +3,8 @@ from unittest.mock import ANY
 
 import pytest
 
-from mitup_bot.cli import inactive_meetings
-from mitup_bot.cli.commands.recurrent_events import EventType
+from mitup_bot.events import inactive_meetings
+from mitup_bot.events.service import EventType
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import (

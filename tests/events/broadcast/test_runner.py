@@ -4,8 +4,8 @@ from unittest import mock
 import pytest
 from structlog.testing import capture_logs
 
-from mitup_bot.cli.broadcast import runner
-from mitup_bot.cli.broadcast.types import (
+from mitup_bot.events.broadcast import runner
+from mitup_bot.events.broadcast.types import (
     MAX_BROADCAST_ATTEMPTS,
     BatchResult,
     ClaimedBroadcast,

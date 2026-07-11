@@ -6,9 +6,9 @@ import pytest
 from sqlmodel import select
 from structlog.testing import capture_logs
 
-from mitup_bot.cli import supporter_check
-from mitup_bot.cli.commands.recurrent_events import EventType
 from mitup_bot.config import PatreonConfig
+from mitup_bot.events import supporter_check
+from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import PatreonTokenRevoked
 from mitup_bot.models import PatreonCreatorToken, SupporterSubscription, User
 from mitup_bot.monitoring import MetricsClient, MetricUnit
@@ -48,7 +48,7 @@ def reset_runtime() -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def capture_structlog() -> Iterator[None]:
     """Keep the job's structlog emissions off the real pipeline: a bare emission trips the
-    xdist + json-report reporter under coverage (as the rest of the CLI suite already handles)."""
+    xdist + json-report reporter under coverage (as the rest of the events suite already handles)."""
     with capture_logs():
         yield
 

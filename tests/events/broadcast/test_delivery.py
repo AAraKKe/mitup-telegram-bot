@@ -4,8 +4,8 @@ import pytest
 from structlog.testing import capture_logs
 from telegram.error import BadRequest, NetworkError, RetryAfter
 
-from mitup_bot.cli.broadcast import delivery
-from mitup_bot.cli.broadcast.types import (
+from mitup_bot.events.broadcast import delivery
+from mitup_bot.events.broadcast.types import (
     MAX_DELIVERY_ATTEMPTS,
     RETRY_AFTER_MARGIN_SECONDS,
     RETRY_BACKOFF_BASE_SECONDS,

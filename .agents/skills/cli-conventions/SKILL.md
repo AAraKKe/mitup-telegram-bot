@@ -1,6 +1,6 @@
 ---
 name: cli-conventions
-description: CLI conventions for mitup_bot. Auto-load when writing, editing, or reviewing CLI commands in mitup_bot/cli/.
+description: CLI and recurrent-event conventions for mitup_bot. Auto-load when writing, editing, or reviewing CLI commands in mitup_bot/cli/ or recurrent-event jobs in mitup_bot/events/.
 user-invocable: false
 ---
 
@@ -28,19 +28,20 @@ The `launch` command (`mitup_bot/cli/commands/launch.py`) is the entry point to 
 
 To add a new CLI command, create a file in `mitup_bot/cli/commands/`. It will be automatically available — no registration step needed.
 
-## Three-tier location rule
+## Location rule
 
 | Location | Purpose | Example |
 |----------|---------|---------|
-| `mitup_bot/cli/commands/` | Production CLI subcommands | `launch.py`, `deploy.py`, `translations.py` |
-| `mitup_bot/cli/` (top-level) | Operational scripts invoked by lambdas or scheduled tasks | `inactive_meetings.py`, `user_cleanup.py` |
+| `mitup_bot/cli/commands/` | Production CLI subcommands (auto-discovered) | `launch.py`, `deploy.py`, `translations.py` |
+| `mitup_bot/cli/` (top-level) | CLI infrastructure — the entry point and command discovery, not operational logic | `run.py`, `cli_commands.py`, `helpers.py` |
+| `mitup_bot/events/` | Recurrent-event job implementations + the periodic runner that schedules them | `notify_meetings.py`, `broadcast/`, `service.py` |
 | `bin/` (project root) | CI scripts, dev utilities, one-off tooling | `check_ty_ignores.py`, `local-setup.sh` |
 
-Top-level scripts in `mitup_bot/cli/` are not auto-discovered — they are imported and called directly (e.g., from a Lambda handler or a cron job).
+**Keep subcommands thin.** A CLI command that only fronts a service must stay a thin entry point — parse options and delegate to the owning package, which holds the real logic and stays importable without dragging Click (or `boto3`, or `rich`) into a Lambda. The `recurrent-events` command delegates to `mitup_bot.events` (jobs + `service.run_events`), and `migrate-from-rails` delegates to `mitup_bot.migration` (`invoke_from_lambda`, the pipeline runner). Job implementations under `mitup_bot/events/` never import `mitup_bot.cli`.
 
 ## Database and API access
 
-CLI commands run outside the PTB application lifecycle, so they use the non-handler variants of the shared infrastructure. The details live in the owning skills — this section is a pointer, not a second copy of the rules:
+CLI commands and the recurrent-event jobs both run outside the PTB application lifecycle, so they use the non-handler variants of the shared infrastructure. The details live in the owning skills — this section is a pointer, not a second copy of the rules:
 
 - **Database:** sessions are injected by the async `@with_session` decorator from `mitup_bot.db`; sync Click entry points wrap the async pipeline in a single `asyncio.run(...)`. Jobs that broadcast over Telegram wrap each critical section — per meeting or per joined link, whichever row carries the job's flag — in `async with db.begin_write(api)`: the same capture → commit → drain → reconcile lifecycle as write-mode handlers, including the per-meeting row lock when the job mutates meetings. See the `database` skill for the full pattern.
 - **Telegram API:** use `BotAdapter` wrapping an `ExtBot` — never `MitupContext`, which only exists inside the PTB app. See the `api-wrapper` skill for how to construct it and supply a `MetricsClient`.

@@ -4,11 +4,11 @@ from unittest import mock
 
 from sqlalchemy import Row
 
-from mitup_bot.cli.broadcast import claiming
-from mitup_bot.cli.broadcast.types import MAX_BROADCAST_ATTEMPTS, ClaimedBroadcast
+from mitup_bot.events.broadcast import claiming
+from mitup_bot.events.broadcast.types import MAX_BROADCAST_ATTEMPTS, ClaimedBroadcast
 from mitup_bot.models import BroadcastMessage
 from mitup_bot.models.broadcasts import BroadcastStatus
-from tests.cli.broadcast.helpers import script_exec
+from tests.events.broadcast.helpers import script_exec
 from tests.helpers import MockDbSession, Result, create_broadcast, create_member
 
 

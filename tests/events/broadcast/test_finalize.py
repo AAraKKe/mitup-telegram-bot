@@ -3,12 +3,12 @@ from unittest import mock
 import pytest
 from structlog.testing import capture_logs
 
-from mitup_bot.cli.broadcast import finalize
-from mitup_bot.cli.broadcast.types import MAX_BROADCAST_ATTEMPTS
+from mitup_bot.events.broadcast import finalize
+from mitup_bot.events.broadcast.types import MAX_BROADCAST_ATTEMPTS
 from mitup_bot.models import BroadcastMessage
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus, BroadcastStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
-from tests.cli.broadcast.helpers import make_summary, script_exec
+from tests.events.broadcast.helpers import make_summary, script_exec
 from tests.helpers import MockApi, MockDbSession, Result, create_broadcast
 from tests.helpers.monitoring import MetricAssertions
 
