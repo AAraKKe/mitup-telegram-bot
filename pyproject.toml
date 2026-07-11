@@ -184,12 +184,8 @@ keep-runtime-typing = true
 # --------------------------
 # Development/CI environment
 # --------------------------
-[tool.hatch.envs.dev]
-description = """
-Enviroment to be used for bot testing
-"""
-installer = "uv"
-dependencies = [
+[dependency-groups]
+dev = [
     "pytest~=9.1.1",
     "pytest-asyncio~=1.4.0",
     "pytest-cov~=7.1.0",
@@ -207,6 +203,13 @@ dependencies = [
     "testcontainers[postgres]==4.14.2",
     "asgi-lifespan==2.1.0",
 ]
+
+[tool.hatch.envs.dev]
+description = """
+Environment to be used for bot testing
+"""
+installer = "uv"
+dependency-groups = ["dev"]
 
 [tool.hatch.envs.dev.scripts]
 test = [
@@ -252,17 +255,6 @@ clean-locales = "python -m mitup_bot.cli.run translations clean-locales"
 update-locales = ["update-source-language", "clean-locales", "build-locales", "validate-locales"]
 set-local-bot = "python -m mitup_bot.cli.run dev {args:}"
 populate-db = "python bin/populate_db.py {args:}"
-
-# ----------------------
-# Production environment
-# ----------------------
-[tool.hatch.envs.prod]
-installer = "uv"
-[tool.hatch.envs.prod.scripts]
-launch = "mitup launch --env prod"
-help = "mitup launch --help"
-build-locales = "mitup translations build"
-launch-events = "mitup recurrent-events {args:}"
 
 [build-system]
 requires = ["hatchling"]

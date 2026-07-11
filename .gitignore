@@ -13,6 +13,9 @@ report.xml
 # Local .hatch folder
 .hatch
 
+# uv-managed virtual environment
+.venv/
+
 # Ignore some vscode files to allow setting it up
 # by the tool and allow any developer to tweak theirs
 .vscode/settings.json
