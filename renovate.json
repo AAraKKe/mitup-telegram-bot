@@ -60,8 +60,9 @@
       "enabled": false
     },
     {
+      "description": "Group all Python dependency bumps across every uv workspace member (root + tools/mb + future libs/apps)",
       "matchFileNames": [
-        "pyproject.toml"
+        "**/pyproject.toml"
       ],
       "addLabels": [
         "scope::environment"
@@ -79,9 +80,9 @@
       "enabled": false
     },
     {
+      "description": "Silence ruff's noisy patch stream. NOTE: do not add ty here — ty is pre-1.0 (0.0.x), so Renovate classifies every ty release as a patch bump; disabling patch would suppress all ty updates.",
       "matchPackageNames": [
-        "ruff",
-        "pyright"
+        "ruff"
       ],
       "matchUpdateTypes": [
         "patch"
@@ -138,9 +139,8 @@
       "customType": "regex",
       "description": "Update Python version across the codebase",
       "managerFilePatterns": [
-        "/^pyproject\\.toml$/",
-        "/(^|/)Dockerfile(\\.ci|\\.dev|\\.migrations)?$/",
-        "/^dev/docker/Dockerfile$/",
+        "/(^|/)pyproject\\.toml$/",
+        "/(^|/)Dockerfile(\\..+)?$/",
         "/^\\.gitlab/ci/test\\.yml$/"
       ],
       "matchStrings": [
@@ -157,6 +157,12 @@
   ],
   "major": {
     "additionalBranchPrefix": "major-"
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "every weekend"
+    ]
   },
   "pre-commit": {
     "enabled": true
