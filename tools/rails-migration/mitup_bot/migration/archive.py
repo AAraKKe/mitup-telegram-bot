@@ -5,11 +5,13 @@ import gzip
 import io
 import json
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import boto3
-from mypy_boto3_s3 import S3Client
+
+if TYPE_CHECKING:  # pragma: no cover
+    from mypy_boto3_s3 import S3Client
 
 
 class ArchiveWriter:

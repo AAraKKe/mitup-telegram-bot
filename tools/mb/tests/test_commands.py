@@ -93,7 +93,7 @@ def test_db_up_waits_for_health(recorder: CommandRecorder):
 def test_run_bot_local(recorder: CommandRecorder):
     cli.invoke(app, ["run", "bot"])
 
-    assert recorder.commands == [["uv", "run", "mitup", "launch"]]
+    assert recorder.commands == [["uv", "run", "python", "-m", "mitup_bot.bot_cli", "launch"]]
 
 
 def test_run_bot_debug_uses_debugpy(recorder: CommandRecorder):

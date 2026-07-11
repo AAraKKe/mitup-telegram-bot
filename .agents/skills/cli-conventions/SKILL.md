@@ -1,43 +1,37 @@
 ---
 name: cli-conventions
-description: CLI and recurrent-event conventions for mitup_bot. Auto-load when writing, editing, or reviewing CLI commands in mitup_bot/cli/ or recurrent-event jobs in mitup_bot/events/.
+description: CLI and recurrent-event conventions for mitup_bot. Auto-load when writing, editing, or reviewing the app CLI entry modules (bot_cli.py, events_cli.py, the rails-migration cli) or recurrent-event jobs under apps/events/mitup_bot/events/.
 user-invocable: false
 ---
 
 # CLI Conventions
 
-The bot includes a CLI built with [Click](https://click.palletsprojects.com/). The entry point is `mitup_bot/cli/run.py`, registered in `pyproject.toml` as the `mitup` console script.
+Each deployable application owns a small CLI entry point built with [Click](https://click.palletsprojects.com/). There is no shared, auto-discovering CLI package — every app ships exactly one entry module and declares its own console script, because a workspace member may never be shipped by two distributions.
+
+| App / tool | Entry module | Console script | Command(s) |
+|---|---|---|---|
+| `apps/bot` | `mitup_bot/bot_cli.py` | `mitup` | `launch` |
+| `apps/events` | `mitup_bot/events_cli.py` | `mitup` | `recurrent-events` |
+| `tools/rails-migration` | `mitup_bot/migration/cli.py` | `mitup-rails-migration` | (single command) |
 
 ## Scope
 
 <critical_rules>
-  <rule>This CLI is for service entry points only — the commands the production image must run (launching the bot, running recurrent events, one-off data migrations). Dev/CI tooling (deploying, managing locales, validating migrations) lives in the `mb` CLI, not here. It is NOT a general-purpose tooling CLI.</rule>
-  <rule>Developer tooling belongs in `tools/` at the project root, not in `mitup_bot/cli/`: repeatable workflows go in the `mb` CLI (`tools/mb/`), standalone one-off scripts next to it in `tools/`.</rule>
+  <rule>These CLIs are for service entry points only — the commands the production image must run (launching the bot, running recurrent events) and the one-off rails data migration. Dev/CI tooling (deploying, managing locales, validating migrations) lives in the `mb` CLI, not here.</rule>
+  <rule>Developer tooling belongs in `tools/` at the project root: repeatable workflows go in the `mb` CLI (`tools/mb/`), standalone one-off scripts next to it in `tools/`.</rule>
 </critical_rules>
 
-## The `launch` command
+## Console scripts and the `mitup` command
 
-The `launch` command (`mitup_bot/cli/commands/launch.py`) is the entry point to start the bot. It instantiates `MitupRuntime` with the given environment and calls `run()`.
+The bot and events apps both expose a `mitup` console script (`mitup launch`, `mitup recurrent-events`). Those command strings are frozen — the ECS task definitions in the external mitup-infra repo invoke them as container commands. Each app declares its own `mitup` in `[project.scripts]`, exposing only its own subcommand; in production each image installs a single app, so there is no collision.
 
-## Auto-discovery
+The dev workspace installs both apps into one shared venv, where a single `mitup` on PATH is ambiguous (last install wins). So `mb run bot` / `mb run events` invoke each app **by module** (`uv run python -m mitup_bot.bot_cli launch`), which is deterministic. Never rely on a bare `mitup` in the dev venv.
 
-`MitupCliCommand` scans `mitup_bot/cli/commands/` for Python files and registers each as a CLI subcommand:
+## Entry-module shape
 
-- **Filename** `snake_case.py` → **Command** `kebab-case`
-- Each file must define a Click command (typically via `@click.command()`)
+Each entry module defines a Click group named `cli` (its subcommands are the frozen command names) plus a `main()` that calls it, wired as the console script (`mitup = "mitup_bot.bot_cli:main"`). The bot's `launch` instantiates `MitupRuntime` and calls `run()`; the events `recurrent-events` command parses intervals and delegates to `service.run_events`.
 
-To add a new CLI command, create a file in `mitup_bot/cli/commands/`. It will be automatically available — no registration step needed.
-
-## Location rule
-
-| Location | Purpose | Example |
-|----------|---------|---------|
-| `mitup_bot/cli/commands/` | Service entry points (auto-discovered) | `launch.py`, `recurrent_events.py`, `migrate_from_rails.py` |
-| `mitup_bot/cli/` (top-level) | CLI infrastructure — the entry point and command discovery, not operational logic | `run.py`, `cli_commands.py`, `helpers.py` |
-| `mitup_bot/events/` | Recurrent-event job implementations + the periodic runner that schedules them | `notify_meetings.py`, `broadcast/`, `service.py` |
-| `tools/` (project root) | The `mb` dev CLI and standalone helper scripts | `tools/mb/`, `gl_reply_thread.py` |
-
-**Keep subcommands thin.** A CLI command that only fronts a service must stay a thin entry point — parse options and delegate to the owning package, which holds the real logic and stays importable without dragging Click (or `boto3`, or `rich`) into a Lambda. The `recurrent-events` command delegates to `mitup_bot.events` (jobs + `service.run_events`), and `migrate-from-rails` delegates to `mitup_bot.migration` (`invoke_from_lambda`, the pipeline runner). Job implementations under `mitup_bot/events/` never import `mitup_bot.cli`.
+**Keep commands thin.** A command that only fronts a service must stay a thin entry point — parse options and delegate to the owning package, which holds the real logic and stays importable without dragging Click into a lambda. The `recurrent-events` command delegates to `mitup_bot.events` (jobs + `service.run_events`); the rails command delegates to `mitup_bot.migration` (the pipeline runner). Job implementations under `apps/events/mitup_bot/events/` never import a CLI entry module.
 
 ## Database and API access
 
@@ -49,4 +43,4 @@ CLI commands and the recurrent-event jobs both run outside the PTB application l
 
 ## Helper utilities
 
-`mitup_bot/cli/helpers.py` contains shared utilities for CLI scripts. Check it before adding new helpers.
+The rails migration tool's console helpers live in `mitup_bot/migration/console.py`. Check for an existing helper before adding a new one.

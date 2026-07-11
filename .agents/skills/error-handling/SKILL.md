@@ -6,7 +6,7 @@ user-invocable: false
 
 # Error Handling
 
-The bot uses a structured exception hierarchy combined with a centralized error handler. All exceptions are defined in `libs/core/mitup_bot/exceptions.py`; the error handler lives in `mitup_bot/handlers/error_handler.py`.
+The bot uses a structured exception hierarchy combined with a centralized error handler. All exceptions are defined in `libs/core/mitup_bot/exceptions.py`; the error handler lives in `apps/bot/mitup_bot/handlers/error_handler.py`.
 
 ## Error flow
 
@@ -59,7 +59,7 @@ Raised by functions in `guards.py` when handler inputs are invalid. These are th
 
 ## The error handler
 
-`error_handler.handler()` in `mitup_bot/handlers/error_handler.py` is the entry point for all caught exceptions.
+`error_handler.handler()` in `apps/bot/mitup_bot/handlers/error_handler.py` is the entry point for all caught exceptions.
 
 ### Suppressed errors
 

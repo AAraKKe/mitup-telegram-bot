@@ -37,9 +37,3 @@ validate-docker-migrations:
   variables:
     DOCKERFILE_PATH: dev/docker/Dockerfile.migrations
     DOCKERFILE_NAME: migrations
-
-validate-docker-migrate-rails:
-  <<: *docker-build-template
-  variables:
-    DOCKERFILE_PATH: dev/docker/Dockerfile.migrate-rails
-    DOCKERFILE_NAME: migrate-rails

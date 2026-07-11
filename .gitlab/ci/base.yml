@@ -24,21 +24,30 @@ include:
   - pyproject.toml
   - uv.lock
   - tools/mb/pyproject.toml
+  - tools/rails-migration/pyproject.toml
   - libs/core/pyproject.toml
   - libs/monitoring/pyproject.toml
   - libs/data/pyproject.toml
   - libs/telegram/pyproject.toml
+  - libs/patreon/pyproject.toml
+  - apps/bot/pyproject.toml
+  - apps/events/pyproject.toml
+  - apps/lambda-migrations/pyproject.toml
+  - apps/lambda-alarm/pyproject.toml
   - .gitlab-ci.yml
   - .gitlab/ci/docker.yml
 
 # Centralized list of files that trigger deployment when changed
 # Use !reference [.deployment-files] in rules to keep triggers consistent
 .deployment-files: &deployment-files
-  - mitup_bot/**/*
+  - apps/**/*
+  - libs/**/*
   - dev/docker/Dockerfile
   - dev/docker/Dockerfile.ci
   - dev/docker/Dockerfile.migrations
-  - dev/docker/Dockerfile.migrate-rails
+  # Runtime dependencies now live in the member pyprojects (apps/** + libs/**) and the resolved
+  # lock rather than a root [project], so a lock change alone can alter every deployed image.
+  - uv.lock
   - pyproject.toml
   # Include also gitlab yaml files related with deployments
   - .gitlab-ci.yml
@@ -52,9 +61,9 @@ include:
 .docs-files: &docs-files
   - docs/**/*
   - zensical.toml
-  # The CLI command that ships the site to S3 + CloudFront — changing how we
+  # The mb command that ships the site to S3 + CloudFront — changing how we
   # publish must re-trigger the docs pipeline even if no docs page changed.
-  - mitup_bot/cli/commands/publish_docs.py
+  - tools/mb/src/mb/docs_ops.py
   # Include also gitlab yaml files related with documentation
   - .gitlab-ci.yml
   - .gitlab/ci/base.yml

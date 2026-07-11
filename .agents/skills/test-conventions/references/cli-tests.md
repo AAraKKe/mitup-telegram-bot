@@ -2,7 +2,9 @@
 
 ## Overview
 
-CLI commands live in `mitup_bot/cli/commands/`. Tests live in `tests/cli/`. CLI tests typically use `click.testing.CliRunner` and heavy patching since CLI commands orchestrate configuration, DB, metrics, and the bot.
+Each app owns one CLI entry module — `apps/bot/mitup_bot/bot_cli.py` (`launch`) and `apps/events/mitup_bot/events_cli.py` (`recurrent-events`); the rails tool's is `tools/rails-migration/mitup_bot/migration/cli.py`. Tests live in `tests/cli/` (bot) and `tests/events/` (events). CLI tests typically use `click.testing.CliRunner` and heavy patching since the commands orchestrate configuration, DB, metrics, and the bot.
+
+Both app entry modules expose a Click **group** named `cli`; the actual command is a subcommand of it (`launch`, `recurrent-events`). Import the subcommand callback directly when a test invokes it in isolation, or invoke the group with the subcommand name.
 
 ## Pattern: testing a Click CLI command
 
@@ -10,42 +12,40 @@ CLI commands live in `mitup_bot/cli/commands/`. Tests live in `tests/cli/`. CLI 
 from click.testing import CliRunner
 from unittest.mock import MagicMock, patch
 
-from mitup_bot.cli.commands.some_command import cli
+from mitup_bot.events_cli import recurrent_events
 
 
 def test_cli_invokes_with_defaults():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.cli.commands.some_command.Config.from_providers") as mock_config_cls,
-        patch("mitup_bot.cli.commands.some_command.db") as mock_db,
-        patch("mitup_bot.cli.commands.some_command.configure_metrics"),
-        patch("mitup_bot.cli.commands.some_command.build_bot") as mock_build_bot,
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db") as mock_db,
     ):
         mock_config = MagicMock()
         mock_config_cls.return_value = mock_config
 
-        result = runner.invoke(cli, [])
+        result = runner.invoke(recurrent_events, [])
 
         assert result.exit_code == 0, result.output
         mock_config_cls.assert_called_once()
-        mock_db.configure_db.assert_called_once_with(mock_config.db)
 ```
 
 Key points:
-- Always patch at the module where the import lives (e.g., `mitup_bot.cli.commands.some_command.db`), not at the original module.
+- Patch orchestration where it executes (e.g. `mitup_bot.events.service.db`), not at the thin entry module — the command just forwards to the service.
+- The bot's `launch` instantiates `MitupRuntime`; patch it at `mitup_bot.bot_cli.MitupRuntime`.
 - Assert `result.exit_code == 0, result.output` to get the output on failure.
 
 ## Recurrent events tests
 
-The events service (`mitup_bot/events/service.py`) runs periodic async tasks; its tests live in `tests/events/test_service.py`. The individual job modules and their tests live alongside it under `mitup_bot/events/` and `tests/events/`. The thin `recurrent-events` Click command stays in `mitup_bot/cli/commands/recurrent_events.py` and just parses options before delegating to `service.run_events`. Tests cover:
+The events service (`apps/events/mitup_bot/events/service.py`) runs periodic async tasks; its tests live in `tests/events/test_service.py`. The individual job modules and their tests live alongside it under `apps/events/mitup_bot/events/` and `tests/events/`. The thin `recurrent-events` Click command lives in `apps/events/mitup_bot/events_cli.py` and just parses options before delegating to `service.run_events`. Tests cover:
 
 1. **`IntervalsConfiguration.get()`** — Parametrized test that each `EventType` maps to the correct config field.
 2. **`launch_event()`** — Split into async and sync event types. Async events use `AsyncMock`, sync events use regular `MagicMock`.
 3. **`handle_maintainance()`** — Parametrized over success/fault/leaked-connections scenarios. Uses `StubMetrics` directly (not `StubMetricsEngine`) because there's no handler context.
 4. **`run_periodic()`** — Uses `CancelledError` to break out of the infinite loop after one iteration.
 5. **`run_all_tasks()`** — Patches `run_periodic` to verify all event types are created.
-6. **CLI entry point** — Import `cli` from `mitup_bot.cli.commands.recurrent_events`, but patch the orchestration (`Config`, `db`, `build_bot`, `run_all_tasks`, …) at `mitup_bot.events.service`, where `run_events` executes them. Tests that Click options are parsed and passed through correctly.
+6. **CLI entry point** — Import `recurrent_events` from `mitup_bot.events_cli`, but patch the orchestration (`Config`, `db`, `build_bot`, `run_all_tasks`, …) at `mitup_bot.events.service`, where `run_events` executes them. Tests that Click options are parsed and passed through correctly.
 
 ### Testing async periodic loops
 

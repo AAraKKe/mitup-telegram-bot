@@ -5,11 +5,49 @@ requires-python = ">=3.14"
 [manifest]
 members = [
     "mb",
-    "mitup-bot",
+    "mitup-bot-app",
     "mitup-core",
     "mitup-data",
+    "mitup-events-app",
+    "mitup-lambda-alarm-app",
+    "mitup-lambda-migrations-app",
     "mitup-monitoring",
+    "mitup-patreon",
+    "mitup-rails-migration",
     "mitup-telegram",
+]
+
+[manifest.dependency-groups]
+dev = [
+    { name = "asgi-lifespan", specifier = "==2.1.0" },
+    { name = "boto3", specifier = "~=1.34" },
+    { name = "boto3-stubs", extras = ["essential"] },
+    { name = "debugpy" },
+    { name = "deepdiff" },
+    { name = "freezegun", specifier = "~=1.5.5" },
+    { name = "pytest", specifier = "~=9.1.1" },
+    { name = "pytest-asyncio", specifier = "~=1.4.0" },
+    { name = "pytest-cov", specifier = "~=7.1.0" },
+    { name = "pytest-dotenv", specifier = "~=0.5.2" },
+    { name = "pytest-json-report", specifier = "~=1.5.0" },
+    { name = "pytest-xdist", specifier = "~=3.8.0" },
+    { name = "ruff", specifier = "==0.15.0" },
+    { name = "testcontainers", extras = ["postgres"], specifier = "==4.14.2" },
+    { name = "ty", specifier = "==0.0.58" },
+    { name = "zensical" },
+]
+tools = [{ name = "mb", editable = "tools/mb" }]
+workspace = [
+    { name = "mitup-bot-app", editable = "apps/bot" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-data", editable = "libs/data" },
+    { name = "mitup-events-app", editable = "apps/events" },
+    { name = "mitup-lambda-alarm-app", editable = "apps/lambda-alarm" },
+    { name = "mitup-lambda-migrations-app", editable = "apps/lambda-migrations" },
+    { name = "mitup-monitoring", editable = "libs/monitoring" },
+    { name = "mitup-patreon", editable = "libs/patreon" },
+    { name = "mitup-rails-migration", editable = "tools/rails-migration" },
+    { name = "mitup-telegram", editable = "libs/telegram" },
 ]
 
 [[package]]
@@ -871,7 +909,8 @@ source = { editable = "tools/mb" }
 dependencies = [
     { name = "boto3" },
     { name = "boto3-stubs", extra = ["cloudfront", "ecs", "lambda"] },
-    { name = "mitup-bot" },
+    { name = "mitup-core" },
+    { name = "mitup-telegram" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "typer" },
@@ -881,7 +920,8 @@ dependencies = [
 requires-dist = [
     { name = "boto3", specifier = "~=1.34" },
     { name = "boto3-stubs", extras = ["cloudfront", "ecs", "lambda"] },
-    { name = "mitup-bot", editable = "." },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-telegram", editable = "libs/telegram" },
     { name = "pyyaml", specifier = ">=6" },
     { name = "rich", specifier = ">=13" },
     { name = "typer", specifier = ">=0.15" },
@@ -897,100 +937,37 @@ wheels = [
 ]
 
 [[package]]
-name = "mitup-bot"
-source = { editable = "." }
+name = "mitup-bot-app"
+version = "0.0.1"
+source = { editable = "apps/bot" }
 dependencies = [
-    { name = "alembic" },
     { name = "click" },
-    { name = "cryptography" },
     { name = "fastapi" },
     { name = "googlemaps" },
-    { name = "httpx" },
     { name = "mitup-core" },
     { name = "mitup-data" },
     { name = "mitup-monitoring" },
+    { name = "mitup-patreon" },
     { name = "mitup-telegram" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic" },
-    { name = "python-dateutil" },
     { name = "python-telegram-bot", extra = ["ext"] },
     { name = "pyyaml" },
-    { name = "rich" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "sqlmodel" },
-    { name = "structlog" },
-    { name = "tzdata" },
     { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "asgi-lifespan" },
-    { name = "boto3" },
-    { name = "boto3-stubs", extra = ["essential"] },
-    { name = "debugpy" },
-    { name = "deepdiff" },
-    { name = "freezegun" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-dotenv" },
-    { name = "pytest-json-report" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-    { name = "testcontainers" },
-    { name = "ty" },
-    { name = "zensical" },
-]
-tools = [
-    { name = "mb" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = "==1.18.5" },
     { name = "click", specifier = "==8.4.2" },
-    { name = "cryptography", specifier = "==49.0.0" },
     { name = "fastapi", specifier = "==0.139.0" },
     { name = "googlemaps", specifier = "==4.10.0" },
-    { name = "httpx", specifier = "==0.28.1" },
     { name = "mitup-core", editable = "libs/core" },
     { name = "mitup-data", editable = "libs/data" },
     { name = "mitup-monitoring", editable = "libs/monitoring" },
+    { name = "mitup-patreon", editable = "libs/patreon" },
     { name = "mitup-telegram", editable = "libs/telegram" },
-    { name = "psycopg", extras = ["binary"], specifier = "==3.3.4" },
-    { name = "pydantic", specifier = "==2.13.4" },
-    { name = "python-dateutil", specifier = "==2.9.0.post0" },
     { name = "python-telegram-bot", extras = ["ext"], specifier = "==22.8" },
     { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "rich", specifier = "==15.0.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.51" },
-    { name = "sqlmodel", specifier = "==0.0.39" },
-    { name = "structlog", specifier = "==26.1.0" },
-    { name = "tzdata", specifier = "==2026.3" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.51.0" },
 ]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "asgi-lifespan", specifier = "==2.1.0" },
-    { name = "boto3", specifier = "~=1.34" },
-    { name = "boto3-stubs", extras = ["essential"] },
-    { name = "debugpy" },
-    { name = "deepdiff" },
-    { name = "freezegun", specifier = "~=1.5.5" },
-    { name = "pytest", specifier = "~=9.1.1" },
-    { name = "pytest-asyncio", specifier = "~=1.4.0" },
-    { name = "pytest-cov", specifier = "~=7.1.0" },
-    { name = "pytest-dotenv", specifier = "~=0.5.2" },
-    { name = "pytest-json-report", specifier = "~=1.5.0" },
-    { name = "pytest-xdist", specifier = "~=3.8.0" },
-    { name = "ruff", specifier = "==0.15.0" },
-    { name = "testcontainers", extras = ["postgres"], specifier = "==4.14.2" },
-    { name = "ty", specifier = "==0.0.58" },
-    { name = "zensical" },
-]
-tools = [{ name = "mb", editable = "tools/mb" }]
 
 [[package]]
 name = "mitup-core"
@@ -1039,6 +1016,63 @@ requires-dist = [
 ]
 
 [[package]]
+name = "mitup-events-app"
+version = "0.0.1"
+source = { editable = "apps/events" }
+dependencies = [
+    { name = "click" },
+    { name = "mitup-core" },
+    { name = "mitup-data" },
+    { name = "mitup-monitoring" },
+    { name = "mitup-patreon" },
+    { name = "mitup-telegram" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = "==8.4.2" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-data", editable = "libs/data" },
+    { name = "mitup-monitoring", editable = "libs/monitoring" },
+    { name = "mitup-patreon", editable = "libs/patreon" },
+    { name = "mitup-telegram", editable = "libs/telegram" },
+]
+
+[[package]]
+name = "mitup-lambda-alarm-app"
+version = "0.0.1"
+source = { editable = "apps/lambda-alarm" }
+dependencies = [
+    { name = "boto3" },
+    { name = "httpx" },
+    { name = "mitup-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = "~=1.34" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "mitup-core", editable = "libs/core" },
+]
+
+[[package]]
+name = "mitup-lambda-migrations-app"
+version = "0.0.1"
+source = { editable = "apps/lambda-migrations" }
+dependencies = [
+    { name = "alembic" },
+    { name = "mitup-core" },
+    { name = "mitup-data" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = "==1.18.5" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-data", editable = "libs/data" },
+]
+
+[[package]]
 name = "mitup-monitoring"
 version = "0.0.1"
 source = { editable = "libs/monitoring" }
@@ -1052,6 +1086,54 @@ dependencies = [
 requires-dist = [
     { name = "aws-embedded-metrics", specifier = "==3.5.0" },
     { name = "mitup-core", editable = "libs/core" },
+    { name = "rich", specifier = "==15.0.0" },
+]
+
+[[package]]
+name = "mitup-patreon"
+version = "0.0.1"
+source = { editable = "libs/patreon" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "httpx" },
+    { name = "mitup-core" },
+    { name = "mitup-data" },
+    { name = "mitup-monitoring" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = "==49.0.0" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-data", editable = "libs/data" },
+    { name = "mitup-monitoring", editable = "libs/monitoring" },
+]
+
+[[package]]
+name = "mitup-rails-migration"
+version = "0.0.1"
+source = { editable = "tools/rails-migration" }
+dependencies = [
+    { name = "boto3" },
+    { name = "click" },
+    { name = "mitup-core" },
+    { name = "mitup-data" },
+    { name = "mitup-monitoring" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pyyaml" },
+    { name = "rich" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = "~=1.34" },
+    { name = "click", specifier = "==8.4.2" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-data", editable = "libs/data" },
+    { name = "mitup-monitoring", editable = "libs/monitoring" },
+    { name = "psycopg", extras = ["binary"], specifier = "==3.3.4" },
+    { name = "pyyaml", specifier = "==6.0.3" },
     { name = "rich", specifier = "==15.0.0" },
 ]
 

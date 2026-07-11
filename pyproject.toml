@@ -1,58 +1,15 @@
-[project]
-name = "mitup_bot"
-dynamic = ["version"]
-description = "Telegram social bot to manage your meetings"
-license = { file = "LICENSE" }
-requires-python = ">=3.14"
-authors = [
-    { name = "Enrique Araque", email = "minixute@gmail.com" },
-    { name = "Juanpe Araque", email = "erjuanpea@gmail.com" },
-]
-classifiers = [
-    "Development Status :: 1 - Planning",
-    "Programming Language :: Python :: 3.14",
-    "Topic :: Communications :: Chat",
-]
-dependencies = [
-    "python-telegram-bot[ext]==22.8",
-    "click==8.4.2",
-    "python-dateutil==2.9.0.post0",
-    "sqlalchemy[asyncio]==2.0.51",
-    "psycopg[binary]==3.3.4",
-    "sqlmodel==0.0.39",
-    "pydantic==2.13.4",
-    "alembic==1.18.5",
-    "rich==15.0.0",
-    "structlog==26.1.0",
-    "tzdata==2026.3",
-    "googlemaps==4.10.0",
-    "pyyaml==6.0.3",
-    "fastapi==0.139.0",
-    "uvicorn[standard]==0.51.0",
-    "cryptography==49.0.0",
-    "httpx==0.28.1",
-    "mitup-core",
-    "mitup-monitoring",
-    "mitup-data",
-    "mitup-telegram",
-]
-
-[project.urls]
-Source = "https://gitlab.com/meetupbot/mitup-telegram-bot"
-Documentation = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/README.md"
-Issues = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues"
-
-[project.scripts]
-mitup = "mitup_bot.cli.run:main"
-
-[tool.hatch.version]
-path = "mitup_bot/__about__.py"
+# This is a virtual workspace root: it declares no [project] and builds no wheel. Every shippable
+# unit is a workspace member under apps/, libs/ or tools/. The root only wires the workspace
+# together and carries the shared tool configuration (ty/ruff/pytest/coverage).
 
 # Global pytest setup, mainline to run from VSCode
 # Cannot launch VSCode tests/debug with cov plugin
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = "tests"
+# The virtual root installs no package, so the repo root is not on sys.path by default; add it so the
+# `tests` support package (tests.helpers, …) imports the same way it did under the old root install.
+pythonpath = ["."]
 asyncio_mode = "auto"
 filterwarnings = [
     # Dateutil is using a deprecated version of utc timestamp we cannot do anything about.
@@ -76,15 +33,20 @@ env_files = [".env"]
 [tool.ty.src]
 # tools/mb is deliberately not included: it is a standalone package type-checked under its
 # own config (tools/mb/pyproject.toml); `mb typecheck` runs both checks.
-# The libs/* members share the mitup_bot namespace and are checked here as part of the root
-# project, where every runtime dependency (including PTB) is resolvable — they reference PTB
-# types only under TYPE_CHECKING, so they cannot be checked in isolation.
+# Every member that ships mitup_bot code is checked here as part of the root project, where
+# each runtime dependency (including PTB) is resolvable. The libs and the events/lambda members
+# reference PTB types only under TYPE_CHECKING, so they cannot be checked in isolation.
 include = [
-    "mitup_bot",
+    "apps/bot/mitup_bot",
+    "apps/events/mitup_bot",
+    "apps/lambda-migrations/mitup_bot",
+    "apps/lambda-alarm/mitup_bot",
     "libs/core/mitup_bot",
     "libs/monitoring/mitup_bot",
     "libs/data/mitup_bot",
     "libs/telegram/mitup_bot",
+    "libs/patreon/mitup_bot",
+    "tools/rails-migration/mitup_bot",
     "tests",
 ]
 exclude = [
@@ -129,15 +91,13 @@ exclude_also = [
     # Ignore type checking imports
     'if TYPE_CHECKING:',
 ]
-# --------------------------
-# Builds
-# --------------------------
-[tool.hatch.build.targets.wheel]
-exclude = [".gitlab-ci.yaml", ".gitlab", ".vscode", "tools", "tests"]
-packages = ["mitup_bot"]
-
 
 [tool.ruff]
+# Pin the target explicitly: the virtual root has no [project].requires-python for ruff to infer
+# from, so without this ruff falls back to an older default and flags PEP 649 deferred annotations
+# (unquoted forward references) as F821 and version-gated import sorting. Keep in step with the
+# members' requires-python.
+target-version = "py314"
 line-length = 120
 indent-width = 4
 exclude = [
@@ -149,7 +109,22 @@ exclude = [
     "dist",
     "sim.py",
 ]
-src = ["mitup_bot", "tests"]
+# Point at the member package roots (each holds a mitup_bot/ or mb/ tree), NOT their parents:
+# listing `libs`/`apps` directly would make ruff read the member directory names (telegram, core,
+# data, …) as first-party module names and misclassify the real third-party imports.
+src = [
+    "apps/bot",
+    "apps/events",
+    "apps/lambda-migrations",
+    "apps/lambda-alarm",
+    "libs/core",
+    "libs/monitoring",
+    "libs/data",
+    "libs/telegram",
+    "libs/patreon",
+    "tools/rails-migration",
+    "tests",
+]
 
 [tool.ruff.lint]
 select = [
@@ -195,23 +170,55 @@ keep-runtime-typing = true
 # Development/CI environment
 # --------------------------
 [tool.uv.workspace]
-members = ["tools/mb", "libs/core", "libs/monitoring", "libs/data", "libs/telegram"]
+members = [
+    "tools/mb",
+    "tools/rails-migration",
+    "libs/core",
+    "libs/monitoring",
+    "libs/data",
+    "libs/telegram",
+    "libs/patreon",
+    "apps/bot",
+    "apps/events",
+    "apps/lambda-migrations",
+    "apps/lambda-alarm",
+]
 
-# The dev CLI is wired through its own dependency group: `uv sync` installs
-# the default groups, which brings `mb` onto every contributor's PATH.
-# The foundation libraries are resolved from their in-repo sources.
+# The foundation libraries, applications and dev tools are all resolved from their in-repo sources.
 [tool.uv.sources]
 mb = { workspace = true }
 mitup-core = { workspace = true }
 mitup-monitoring = { workspace = true }
 mitup-data = { workspace = true }
 mitup-telegram = { workspace = true }
+mitup-patreon = { workspace = true }
+mitup-bot-app = { workspace = true }
+mitup-events-app = { workspace = true }
+mitup-lambda-migrations-app = { workspace = true }
+mitup-lambda-alarm-app = { workspace = true }
+mitup-rails-migration = { workspace = true }
 
+# With no root [project], a plain `uv sync` installs the dependency-groups only. The `workspace`
+# group lists every member so `uv sync` (which installs the default groups) still assembles the
+# full development environment — the whole namespace importable, `mb` and the app console scripts
+# on PATH — exactly as the old root package did.
 [tool.uv]
-default-groups = ["dev", "tools"]
+default-groups = ["dev", "tools", "workspace"]
 
 [dependency-groups]
 tools = ["mb"]
+workspace = [
+    "mitup-core",
+    "mitup-monitoring",
+    "mitup-data",
+    "mitup-telegram",
+    "mitup-patreon",
+    "mitup-bot-app",
+    "mitup-events-app",
+    "mitup-lambda-migrations-app",
+    "mitup-lambda-alarm-app",
+    "mitup-rails-migration",
+]
 dev = [
     "pytest~=9.1.1",
     "pytest-asyncio~=1.4.0",
@@ -230,7 +237,3 @@ dev = [
     "testcontainers[postgres]==4.14.2",
     "asgi-lifespan==2.1.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"

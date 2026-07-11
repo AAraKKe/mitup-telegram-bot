@@ -12,7 +12,7 @@ from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application
 
 from mitup_bot import api_guards, db, reconcile
-from mitup_bot.cli.cli_commands import MitupCliCommand
+from mitup_bot.bot_cli import cli as bot_cli
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import User as UserModel
@@ -318,9 +318,8 @@ def cli() -> TypeRunner:
         input: str | None = None,
         env: Mapping[str, str] | None = None,
     ) -> Result:
-        command = MitupCliCommand(no_args_is_help=True)
         runner = CliRunner()
-        return runner.invoke(command, args=args, env=env, input=input)
+        return runner.invoke(bot_cli, args=args, env=env, input=input)
 
     return wrapper
 

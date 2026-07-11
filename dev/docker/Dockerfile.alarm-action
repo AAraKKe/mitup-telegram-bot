@@ -1,6 +1,6 @@
 # This Dockerfile is used to generate the docker image used to run the
 # alarm action Lambda, which is invoked by CloudWatch alarms.
-# It mirrors Dockerfile.migrate-rails but needs no alembic.ini or migrations
+# It mirrors Dockerfile.migrations but needs no alembic.ini or migrations
 # directory — it only needs the installed package.
 
 # Stage 1: Builder - Build and install package with all dependencies

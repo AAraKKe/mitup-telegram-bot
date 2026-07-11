@@ -1,0 +1,21 @@
+[project]
+name = "mitup-lambda-migrations-app"
+version = "0.0.1"
+description = "AWS Lambda that runs Alembic upgrades/downgrades against RDS. PTB-free by construction."
+requires-python = ">=3.14"
+dependencies = [
+    "alembic==1.18.5",
+    "mitup-core",
+    "mitup-data",
+]
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+mitup-data = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

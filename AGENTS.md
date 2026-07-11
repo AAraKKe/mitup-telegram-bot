@@ -70,19 +70,20 @@ Versions and pins are defined in `pyproject.toml`. Always check that file — do
 
 ## Project structure
 
-The `mitup_bot.*` import namespace is a PEP 420 namespace package assembled from the root package
-plus the workspace libraries under `libs/` — no member ships a `mitup_bot/__init__.py`. Imports are
-unchanged regardless of which member owns a module (e.g. `from mitup_bot.config import ...` resolves
-into `libs/core`).
+The repository is a uv **virtual workspace**: the root builds no wheel and every shippable unit is a
+workspace member under `apps/`, `libs/` or `tools/`. The `mitup_bot.*` import namespace is a single
+PEP 420 namespace package assembled from all of them — no member ships a `mitup_bot/__init__.py`.
+Imports are unchanged regardless of which member owns a module (e.g. `from mitup_bot.config import ...`
+resolves into `libs/core`, `from mitup_bot.guards import ...` into `libs/telegram`).
 
 ```
-mitup_bot/              # Root package (the bot application)
-├── app.py              # PTB application entry point (MitupRuntime)
-├── guards.py           # Input validation for handlers
-├── mitup_types.py      # Shared handler/context type aliases
-├── cli/                # Production CLI commands
-├── handlers/           # Bot logic by feature area
-└── lambdas/            # AWS Lambda functions
+apps/                   # Deployable applications (each ships its own image / lambda; never imports another app)
+├── bot/                # mitup-bot-app: the PTB runtime + FastAPI webhook (app.py, web/), handlers/,
+│                       #   timezone_api, update_processor, and the `mitup launch` CLI (bot_cli.py)
+├── events/             # mitup-events-app: the recurrent-events runner + jobs (events/) and the
+│                       #   `mitup recurrent-events` CLI (events_cli.py)
+├── lambda-migrations/  # mitup-lambda-migrations-app: the Alembic-runner Lambda (lambdas/migrations.py); PTB-free
+└── lambda-alarm/       # mitup-lambda-alarm-app: the CloudWatch→GitLab alarm Lambda (lambdas/alarm_action.py)
 
 libs/                   # uv workspace libraries sharing the mitup_bot namespace
 ├── core/               # mitup-core: config, logging, i18n engine + locales, base exceptions,
@@ -90,11 +91,15 @@ libs/                   # uv workspace libraries sharing the mitup_bot namespace
 ├── monitoring/         # mitup-monitoring: CloudWatch EMF metrics emission
 ├── data/               # mitup-data: SQLModel tables (models/), the async engine and session
 │                       #   lifecycle (db.py), and the Alembic migrations tree (migrations/)
-└── telegram/           # mitup-telegram: the PTB api wrapper (api_wrapper.py), the view layer
-                        #   (views/), and the message/entity/callback utilities (utils/)
+├── telegram/           # mitup-telegram: the PTB api wrapper (api_wrapper.py), the view layer (views/),
+│                       #   the message/entity/callback utilities (utils/), docs_links, and the shared
+│                       #   glue both apps register at startup (guards, custom_context, mitup_types,
+│                       #   reconcile, api_guards)
+└── patreon/            # mitup-patreon: the Patreon API client, OAuth flow, membership webhooks,
+                        #   and encrypted token storage (shared by the bot and events apps)
 
-tools/                  # Dev tooling: the mb CLI (tools/mb/) and helper scripts (not shipped in the wheel)
-tests/                  # Test suite
+tools/                  # Dev-only members: the mb CLI (tools/mb/) and the one-off rails-migration tool
+tests/                  # Test suite (single suite covering every member)
 .agents/skills/         # Domain knowledge skills (cross-harness; .claude/skills symlinks here)
 .claude/agents/         # Claude Code specialist agents
 ```

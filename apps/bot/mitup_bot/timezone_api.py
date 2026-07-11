@@ -3,10 +3,7 @@ from googlemaps import Client
 from pydantic import BaseModel, ValidationError
 
 from mitup_bot.config import GoogleApiConfig
-from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.monitoring import MetricKey
-
-from .exceptions import (
+from mitup_bot.exceptions import (
     GeocodeClientAlreadyInitializedError,
     GeocodeClientNotConfiguredError,
     IncorrectCoordinatesError,
@@ -16,6 +13,8 @@ from .exceptions import (
     TimezoneClientAlreadyInitializedError,
     TimezoneClientNotConfiguredError,
 )
+from mitup_bot.mitup_types import TMitupContext
+from mitup_bot.monitoring import MetricKey
 
 __geocode_client: googlemaps.Client | None = None
 __timezone_client: googlemaps.Client | None = None

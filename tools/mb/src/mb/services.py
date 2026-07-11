@@ -7,6 +7,13 @@ from . import runner
 run_app = typer.Typer(no_args_is_help=True, help="Run the bot or the recurrent-events worker.")
 docker_app = typer.Typer(no_args_is_help=True, help="Docker compose lifecycle.")
 
+# In production each app ships its own `mitup` console script (bot → launch, events →
+# recurrent-events), but the dev workspace installs both into one shared venv where a single
+# `mitup` on PATH is ambiguous. Invoking each app by its module keeps dev deterministic while the
+# frozen container commands (`mitup launch` / `mitup recurrent-events`) stay valid per image.
+BOT_MODULE = "mitup_bot.bot_cli"
+EVENTS_MODULE = "mitup_bot.events_cli"
+
 DEBUGPY_ARGS = [
     "python",
     "-Xfrozen_modules=off",
@@ -15,7 +22,8 @@ DEBUGPY_ARGS = [
     "--listen",
     "0.0.0.0:5678",
     "--wait-for-client",
-    "mitup_bot/cli/run.py",
+    "-m",
+    BOT_MODULE,
     "launch",
 ]
 
@@ -29,7 +37,7 @@ def bot(
     if docker:
         service = "debug" if debug else "mitup"
         raise typer.Exit(runner.run_command(["docker", "compose", "up", service]))
-    exit_code = runner.uv(*DEBUGPY_ARGS) if debug else runner.uv("mitup", "launch")
+    exit_code = runner.uv(*DEBUGPY_ARGS) if debug else runner.uv("python", "-m", BOT_MODULE, "launch")
     raise typer.Exit(exit_code)
 
 
@@ -41,7 +49,7 @@ def events(
     """Start the recurrent-events worker (extra args pass through)."""
     if docker:
         raise typer.Exit(runner.run_command(["docker", "compose", "up", "events"]))
-    raise typer.Exit(runner.uv("mitup", "recurrent-events", *ctx.args))
+    raise typer.Exit(runner.uv("python", "-m", EVENTS_MODULE, "recurrent-events", *ctx.args))
 
 
 @docker_app.command()

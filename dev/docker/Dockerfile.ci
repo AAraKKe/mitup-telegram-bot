@@ -51,21 +51,29 @@ WORKDIR ${PROJECT_DIR}
 
 # Copy only dependency metadata to pre-install dependencies
 COPY pyproject.toml uv.lock LICENSE ./
-# The root pyproject declares tools/mb, libs/core, libs/monitoring, libs/data and libs/telegram as uv
-# workspace members; uv refuses to resolve when a member is missing, so every member's pyproject must exist too.
-# Copying only the pyprojects (not the sources) keeps this layer's cache keyed on dependency metadata.
+# The root is a virtual workspace: it builds no wheel but declares every member (tools/*, libs/*,
+# apps/*) as a uv workspace member. uv refuses to resolve when a member is missing, so every
+# member's pyproject must exist too. Copying only the pyprojects (not the sources) keeps this
+# layer's cache keyed on dependency metadata.
 COPY tools/mb/pyproject.toml tools/mb/pyproject.toml
+COPY tools/rails-migration/pyproject.toml tools/rails-migration/pyproject.toml
 COPY libs/core/pyproject.toml libs/core/pyproject.toml
 COPY libs/monitoring/pyproject.toml libs/monitoring/pyproject.toml
 COPY libs/data/pyproject.toml libs/data/pyproject.toml
 COPY libs/telegram/pyproject.toml libs/telegram/pyproject.toml
+COPY libs/patreon/pyproject.toml libs/patreon/pyproject.toml
+COPY apps/bot/pyproject.toml apps/bot/pyproject.toml
+COPY apps/events/pyproject.toml apps/events/pyproject.toml
+COPY apps/lambda-migrations/pyproject.toml apps/lambda-migrations/pyproject.toml
+COPY apps/lambda-alarm/pyproject.toml apps/lambda-alarm/pyproject.toml
 
 # Create minimal package structure to allow dependency installation. The mitup_bot package is a
-# PEP 420 namespace shared across the root and the libs, so no member ships mitup_bot/__init__.py.
-RUN mkdir -p mitup_bot && \
-    echo '__version__ = "0.0.0"' > mitup_bot/__about__.py && \
-    mkdir -p tools/mb/src/mb && \
+# PEP 420 namespace shared across every member, so no member ships mitup_bot/__init__.py; each
+# member is stubbed with one touched module so hatchling has something to build.
+RUN mkdir -p tools/mb/src/mb && \
     touch tools/mb/src/mb/__init__.py tools/mb/src/mb/main.py && \
+    mkdir -p tools/rails-migration/mitup_bot/migration && \
+    touch tools/rails-migration/mitup_bot/migration/cli.py && \
     mkdir -p libs/core/mitup_bot && \
     touch libs/core/mitup_bot/config.py && \
     mkdir -p libs/monitoring/mitup_bot/monitoring && \
@@ -73,11 +81,21 @@ RUN mkdir -p mitup_bot && \
     mkdir -p libs/data/mitup_bot && \
     touch libs/data/mitup_bot/db.py && \
     mkdir -p libs/telegram/mitup_bot && \
-    touch libs/telegram/mitup_bot/api_wrapper.py
+    touch libs/telegram/mitup_bot/api_wrapper.py && \
+    mkdir -p libs/patreon/mitup_bot/patreon && \
+    touch libs/patreon/mitup_bot/patreon/__init__.py && \
+    mkdir -p apps/bot/mitup_bot && \
+    touch apps/bot/mitup_bot/app.py && \
+    mkdir -p apps/events/mitup_bot && \
+    touch apps/events/mitup_bot/events_cli.py && \
+    mkdir -p apps/lambda-migrations/mitup_bot/lambdas && \
+    touch apps/lambda-migrations/mitup_bot/lambdas/migrations.py && \
+    mkdir -p apps/lambda-alarm/mitup_bot/lambdas && \
+    touch apps/lambda-alarm/mitup_bot/lambdas/alarm_action.py
 
 # Pre-install every locked dependency so CI jobs start fast. `uv cache prune --ci`
 # keeps wheels built from source but drops downloaded ones, which the venv already holds.
 RUN uv sync --frozen && uv cache prune --ci
 
 # Clean up build files, leaving the empty project directory for the CI job to clone into.
-RUN rm -rf pyproject.toml uv.lock LICENSE mitup_bot tools libs
+RUN rm -rf pyproject.toml uv.lock LICENSE tools libs apps

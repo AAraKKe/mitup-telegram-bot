@@ -47,7 +47,7 @@ Never write a chat mockup from scratch with custom HTML. If neither wrapper fits
 Look in this order:
 
 1. **Factory** — `grep '^def ' libs/telegram/mitup_bot/views/factory.py` and find the one named after the screen (`settings_view`, `main_menu_view`, `create_meeting_view`, `confirmation_view`, …). Read its body in 20 seconds; that *is* the spec.
-2. **Inline `MitupView(`** — when no factory matches, grep the relevant handler under `mitup_bot/handlers/` for `MitupView(` or `PaginatedMitupView(`.
+2. **Inline `MitupView(`** — when no factory matches, grep the relevant handler under `apps/bot/mitup_bot/handlers/` for `MitupView(` or `PaginatedMitupView(`.
 3. **Builder chain** — note `.with_back_button(...)`, `.with_context(...)`, `.with_footnote(...)`, `.with_context_menu(...)` calls on the returned view; each one changes the rendered output (see §6).
 
 If the user asks for a screen by feature name ("the language picker", "the kick-out screen"), grep `views/factory.py` for that word first — most names are descriptive.

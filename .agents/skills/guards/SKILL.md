@@ -6,7 +6,7 @@ user-invocable: false
 
 # Guards
 
-Guards live in `mitup_bot/guards.py`. They validate handler inputs and raise domain exceptions on failure.
+Guards live in `libs/telegram/mitup_bot/guards.py`. They validate handler inputs and raise domain exceptions on failure.
 
 <critical_rules>
   <rule>Always use guards instead of manual validation inside handlers.</rule>

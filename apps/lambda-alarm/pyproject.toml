@@ -1,0 +1,20 @@
+[project]
+name = "mitup-lambda-alarm-app"
+version = "0.0.1"
+description = "AWS Lambda that forwards CloudWatch alarm state changes to GitLab's HTTP alert endpoint. PTB-free by construction."
+requires-python = ">=3.14"
+dependencies = [
+    "boto3~=1.34",
+    "httpx==0.28.1",
+    "mitup-core",
+]
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

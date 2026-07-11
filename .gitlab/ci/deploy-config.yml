@@ -12,11 +12,9 @@
     - aws ecr describe-repositories --region eu-west-1 > describe_response.json
     - ECR_MITUP_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "mitup") | .repositoryUri' describe_response.json)
     - ECR_MIGRATIONS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrations-lambda") | .repositoryUri' describe_response.json)
-    - ECR_MIGRATE_RAILS_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "migrate-rails-lambda") | .repositoryUri' describe_response.json)
     - ECR_ALARM_ACTION_REPO_URI=$(jq -r '.repositories[] | select(.repositoryName == "alarm-action-lambda") | .repositoryUri' describe_response.json)
     - echo "BOT_IMAGE_TAG=${ECR_MITUP_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
     - echo "MIGRATIONS_IMAGE_TAG=${ECR_MIGRATIONS_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
-    - echo "MIGRATE_RAILS_IMAGE_TAG=${ECR_MIGRATE_RAILS_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
     - echo "ALARM_ACTION_IMAGE_TAG=${ECR_ALARM_ACTION_REPO_URI}:ci-${CI_COMMIT_SHORT_SHA}" >> dotenv
 
   artifacts:

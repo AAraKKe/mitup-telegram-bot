@@ -14,7 +14,6 @@ from click.testing import CliRunner
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
-from mitup_bot.cli.commands.recurrent_events import cli
 from mitup_bot.events.service import (
     EventType,
     IntervalsConfiguration,
@@ -26,6 +25,7 @@ from mitup_bot.events.service import (
     run_periodic,
     select_bot,
 )
+from mitup_bot.events_cli import recurrent_events as cli
 from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, NullBackend
 from mitup_bot.patreon.runtime import PatreonRuntime

@@ -156,7 +156,7 @@ Name handler functions after their registration type and action:
 3. Add `@with_session` if database access is needed.
 4. Register the handler in `tests/test_failure_modes.py` if it calls any `guards.*` function (e.g. `guards.current_user`, `guards.meeting_accessible`, `guards.meeting_viewable`, `guards.valid_callback_data`, `guards.valid_meeting_callback_data`).
 5. Create a dedicated test file at `tests/handlers/<package>/test_<module>.py`.
-6. Import the handler module in `mitup_bot/handlers/__init__.py`.
+6. Import the handler module in `apps/bot/mitup_bot/handlers/__init__.py`.
 
 ## Removing a handler — checklist
 
@@ -165,12 +165,12 @@ When deleting a handler entirely:
 1. Remove its `HandlerId` member from `enums.py`.
 2. Delete the handler function and any callbacks/views it exclusively owns.
 3. **Remove its `Context` entries from `tests/test_failure_modes.py`** — every guard call registered there becomes stale and will cause test failures if left behind.
-4. Remove its import from `mitup_bot/handlers/__init__.py` if the whole module is gone.
+4. Remove its import from `apps/bot/mitup_bot/handlers/__init__.py` if the whole module is gone.
 
 ## Shared utilities
 
 <critical_rules>
-  <rule>NEVER import functions from one handler module into another. Shared logic belongs in a `utils.py` within the same package. See `mitup_bot/handlers/inline_query/utils.py` for an example.</rule>
+  <rule>NEVER import functions from one handler module into another. Shared logic belongs in a `utils.py` within the same package. See `apps/bot/mitup_bot/handlers/inline_query/utils.py` for an example.</rule>
 </critical_rules>
 
 ## Localization

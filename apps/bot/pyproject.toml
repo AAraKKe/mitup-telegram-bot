@@ -1,0 +1,35 @@
+[project]
+name = "mitup-bot-app"
+version = "0.0.1"
+description = "The mitup Telegram bot application: the PTB runtime, the FastAPI webhook server, and the feature handlers"
+requires-python = ">=3.14"
+dependencies = [
+    "python-telegram-bot[ext]==22.8",
+    "click==8.4.2",
+    "fastapi==0.139.0",
+    "uvicorn[standard]==0.51.0",
+    "googlemaps==4.10.0",
+    "pyyaml==6.0.3",
+    "mitup-core",
+    "mitup-data",
+    "mitup-monitoring",
+    "mitup-telegram",
+    "mitup-patreon",
+]
+
+[project.scripts]
+mitup = "mitup_bot.bot_cli:main"
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+mitup-data = { workspace = true }
+mitup-monitoring = { workspace = true }
+mitup-telegram = { workspace = true }
+mitup-patreon = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

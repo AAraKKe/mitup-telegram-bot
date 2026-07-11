@@ -1,4 +1,4 @@
-from mitup_bot.cli import helpers
+from mitup_bot.migration import console as helpers
 from tests.helpers import console
 
 

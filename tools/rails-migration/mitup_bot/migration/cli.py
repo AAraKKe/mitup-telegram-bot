@@ -5,7 +5,6 @@ from typing import Any
 import click
 
 from mitup_bot import db
-from mitup_bot.cli.helpers import console, error, success
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.migration import (
     ALL_PHASES,
@@ -18,6 +17,8 @@ from mitup_bot.migration import (
     run_pipeline_then_flush,
 )
 from mitup_bot.monitoring import EmfBackend, MetricsClient, configure_emf_backend
+
+from .console import console, error, success
 
 
 @click.command()
@@ -124,3 +125,11 @@ def cli(
 def print_migration_report(report: dict[str, Any]):
     console().rule("[bold]Migration report")
     console().print_json(json.dumps(report, default=str, indent=2))
+
+
+def main():
+    cli()
+
+
+if __name__ == "__main__":
+    main()

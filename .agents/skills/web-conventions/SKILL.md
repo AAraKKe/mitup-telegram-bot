@@ -1,16 +1,16 @@
 ---
 name: web-conventions
-description: HTTP/web layer conventions for mitup_bot — the FastAPI app factory `create_app()`, the uvicorn server invocation inside `MitupRuntime.run()`, the `POST /telegram` webhook endpoint, the `@asynccontextmanager` lifespan that owns PTB's `initialize`/`start`/`set_webhook`/`stop`/`shutdown` sequence, secret-token validation, and FastAPI dependency injection with `Annotated[T, Depends(...)]`. Use this skill whenever the work touches `mitup_bot/web/`, the FastAPI/uvicorn/lifespan parts of `mitup_bot/app.py`, the PTB webhook lifecycle (`Application.builder().updater(None)`, `app.update_queue.put`, `app.process_update`, `bot.set_webhook`), adding new HTTP routes, OAuth callbacks, the `/telegram` endpoint, or any question about how uvicorn serves the bot — even when the task description doesn't mention FastAPI by name. Includes the hard rules that prevent silent breakage (uvicorn `workers=1`, `log_config=None`, never pass `allowed_updates`, never return non-2xx from `/telegram`).
+description: HTTP/web layer conventions for mitup_bot — the FastAPI app factory `create_app()`, the uvicorn server invocation inside `MitupRuntime.run()`, the `POST /telegram` webhook endpoint, the `@asynccontextmanager` lifespan that owns PTB's `initialize`/`start`/`set_webhook`/`stop`/`shutdown` sequence, secret-token validation, and FastAPI dependency injection with `Annotated[T, Depends(...)]`. Use this skill whenever the work touches `apps/bot/mitup_bot/web/`, the FastAPI/uvicorn/lifespan parts of `apps/bot/mitup_bot/app.py`, the PTB webhook lifecycle (`Application.builder().updater(None)`, `app.update_queue.put`, `app.process_update`, `bot.set_webhook`), adding new HTTP routes, OAuth callbacks, the `/telegram` endpoint, or any question about how uvicorn serves the bot — even when the task description doesn't mention FastAPI by name. Includes the hard rules that prevent silent breakage (uvicorn `workers=1`, `log_config=None`, never pass `allowed_updates`, never return non-2xx from `/telegram`).
 user-invocable: false
 ---
 
 # Web Conventions
 
-The `mitup_bot/web/` package wraps the PTB `Application` with a FastAPI app served by uvicorn. The bot used to run on PTB's built-in webhook server; now uvicorn is the ASGI server and FastAPI owns request routing, with PTB lifecycle managed via FastAPI's lifespan. This skill captures the rules and rationale for everything in `mitup_bot/web/` and the runtime parts of `mitup_bot/app.py`.
+The `apps/bot/mitup_bot/web/` package wraps the PTB `Application` with a FastAPI app served by uvicorn. The bot used to run on PTB's built-in webhook server; now uvicorn is the ASGI server and FastAPI owns request routing, with PTB lifecycle managed via FastAPI's lifespan. This skill captures the rules and rationale for everything in `apps/bot/mitup_bot/web/` and the runtime parts of `apps/bot/mitup_bot/app.py`.
 
 ## How the runtime is wired
 
-`MitupRuntime.run()` (in `mitup_bot/app.py`) is the single entry point. It branches on `config.app.run_mode`:
+`MitupRuntime.run()` (in `apps/bot/mitup_bot/app.py`) is the single entry point. It branches on `config.app.run_mode`:
 
 | Mode | PTB builder | Lifespan does | Notes |
 |---|---|---|---|
@@ -21,7 +21,7 @@ In both modes the runtime ends with `uvicorn.Server(uvicorn.Config(app=fastapi_a
 
 ## Module layout (read these to understand the current state)
 
-Rather than maintaining a list that goes stale, inspect `mitup_bot/web/` directly. At the time of writing it contains:
+Rather than maintaining a list that goes stale, inspect `apps/bot/mitup_bot/web/` directly. At the time of writing it contains:
 
 - `__init__.py` — re-exports `create_app` only.
 - `app.py` — the FastAPI factory `create_app(...)`, the webhook and polling lifespan builders, the `run_shutdown_step` helper that isolates each shutdown step's failure.
@@ -93,7 +93,7 @@ Where DI getters live: **alongside their single consumer** (currently in `telegr
 
 ## Adding a new HTTP route
 
-1. Create a new module in `mitup_bot/web/` (e.g. `mitup_bot/web/foo.py`).
+1. Create a new module in `apps/bot/mitup_bot/web/` (e.g. `apps/bot/mitup_bot/web/foo.py`).
 2. Define a router: `router = APIRouter()`.
 3. Add the endpoint with a typed signature, using `Annotated[T, Depends(...)]` for any per-request state you need.
 4. If the endpoint needs new state that isn't already on `app.state`, add it in `create_app(...)` in `app.py` AND provide a typed getter beside the endpoint.

@@ -82,7 +82,7 @@ uv run mb test --tb=no
 - **No `@pytest.mark.asyncio`** — tests can be `async def` but the pytest-asyncio plugin handles marking automatically.
 - **No trivial tests** — only test actual logic, not basic Python behavior.
 - **Hardcode expected values** — never call the function under test inside an `assert`. If the function is broken, the assertion silently passes. Use literals with a comment: `assert e.offset == 3  # "🎉 " = emoji(2) + space(1)`.
-- **Mirror source paths** — `mitup_bot/handlers/x.py` → `tests/handlers/test_x.py`.
+- **Mirror source paths** — `apps/bot/mitup_bot/handlers/x.py` → `tests/handlers/test_x.py`.
 - **Parametrize aggressively** — use `@pytest.mark.parametrize`. For complex setups, use private callable factories (e.g., `def _scenario_a(owner: User)`) passed as parameters.
 - **Failure mode centralization** — do not test common guards (User not found, Meeting not owned, malformed callback data) in individual handler test files. Register them centrally in `tests/handlers/test_failure_modes.py`. See the `references/failure-modes.md` reference for details.
 - **Type annotations** — never write `-> None` on test functions (it's implicit; see `coding-standards`). Every `# ty: ignore[rule-name]` you add must include a GitHub issue URL on the same line (see `type-checking`); convention-reviewer and CI's `check-ty-ignores` job both enforce this.

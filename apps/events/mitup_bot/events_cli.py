@@ -15,7 +15,12 @@ from mitup_bot.events.service import (
 )
 
 
-@click.command()
+@click.group()
+def cli():
+    """Entry point for the recurrent-events worker container (the ``mitup`` console script)."""
+
+
+@cli.command("recurrent-events")
 @click.option(
     "--user-cleanup-interval",
     default=DEFAULT_USER_CLEANUP_INTERVAL,
@@ -77,7 +82,7 @@ from mitup_bot.events.service import (
     type=float,
     help="Time before starting the first event",
 )
-def cli(
+def recurrent_events(
     user_cleanup_interval: int,
     notify_meeting_interval: int,
     generate_stats_interval: int,
@@ -101,3 +106,11 @@ def cli(
         supporter_check=supporter_check_interval,
     )
     run_events(env, intervals, start_time)
+
+
+def main():
+    cli()
+
+
+if __name__ == "__main__":
+    main()

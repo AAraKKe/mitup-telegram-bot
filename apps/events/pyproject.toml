@@ -1,0 +1,30 @@
+[project]
+name = "mitup-events-app"
+version = "0.0.1"
+description = "The mitup recurrent-events worker: the periodic scheduler and the maintenance/notification/broadcast jobs"
+requires-python = ">=3.14"
+dependencies = [
+    "click==8.4.2",
+    "mitup-core",
+    "mitup-data",
+    "mitup-monitoring",
+    "mitup-telegram",
+    "mitup-patreon",
+]
+
+[project.scripts]
+mitup = "mitup_bot.events_cli:main"
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+mitup-data = { workspace = true }
+mitup-monitoring = { workspace = true }
+mitup-telegram = { workspace = true }
+mitup-patreon = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
