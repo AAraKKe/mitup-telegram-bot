@@ -26,12 +26,13 @@ dependencies = [
     "structlog==26.1.0",
     "tzdata==2026.3",
     "googlemaps==4.10.0",
-    "aws-embedded-metrics==3.5.0",
     "pyyaml==6.0.3",
     "fastapi==0.139.0",
     "uvicorn[standard]==0.51.0",
     "cryptography==49.0.0",
     "httpx==0.28.1",
+    "mitup-core",
+    "mitup-monitoring",
 ]
 
 [project.urls]
@@ -73,7 +74,10 @@ env_files = [".env"]
 [tool.ty.src]
 # tools/mb is deliberately not included: it is a standalone package type-checked under its
 # own config (tools/mb/pyproject.toml); `mb typecheck` runs both checks.
-include = ["mitup_bot", "tests"]
+# The libs/* members share the mitup_bot namespace and are checked here as part of the root
+# project, where every runtime dependency (including PTB) is resolvable — they reference PTB
+# types only under TYPE_CHECKING, so they cannot be checked in isolation.
+include = ["mitup_bot", "libs/core/mitup_bot", "libs/monitoring/mitup_bot", "tests"]
 exclude = [
     "**/.vscode",
     "**/__pycache__",
@@ -182,12 +186,15 @@ keep-runtime-typing = true
 # Development/CI environment
 # --------------------------
 [tool.uv.workspace]
-members = ["tools/mb"]
+members = ["tools/mb", "libs/core", "libs/monitoring"]
 
 # The dev CLI is wired through its own dependency group: `uv sync` installs
 # the default groups, which brings `mb` onto every contributor's PATH.
+# The foundation libraries are resolved from their in-repo sources.
 [tool.uv.sources]
 mb = { workspace = true }
+mitup-core = { workspace = true }
+mitup-monitoring = { workspace = true }
 
 [tool.uv]
 default-groups = ["dev", "tools"]

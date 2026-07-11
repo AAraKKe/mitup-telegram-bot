@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import mitup_bot
+import mitup_bot.db
 from mitup_bot.models import PatreonCreatorToken, Settings, SupporterSubscription, User, configure_token_encryption
 from mitup_bot.models.subscriptions import TokenCipher
 from mitup_bot.supporter import SupporterLevel
@@ -18,7 +18,8 @@ from tests.helpers import create_patreon_creator_token, create_supporter_subscri
 
 pytestmark = pytest.mark.db_test
 
-MIGRATIONS_DIR = Path(mitup_bot.__file__).parent / "migrations" / "versions"
+# mitup_bot is a PEP 420 namespace package (no __file__); anchor on a concrete root module.
+MIGRATIONS_DIR = Path(mitup_bot.db.__file__).parent / "migrations" / "versions"
 SUPPORTER_LEVEL_MIGRATION_PATH = MIGRATIONS_DIR / "c459065f341a_replace_users_is_premium_with_users_.py"
 HOST_LEVEL_RENAME_MIGRATION_PATH = MIGRATIONS_DIR / "0d0d349b705a_rename_supporter_tiers_to_host_levels.py"
 

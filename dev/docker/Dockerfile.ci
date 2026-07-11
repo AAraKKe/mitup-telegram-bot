@@ -51,21 +51,27 @@ WORKDIR ${PROJECT_DIR}
 
 # Copy only dependency metadata to pre-install dependencies
 COPY pyproject.toml uv.lock LICENSE ./
-# The root pyproject declares tools/mb as a uv workspace member; uv refuses to resolve
-# when the member is missing, so its pyproject must exist too. Copying only the
-# pyproject (not the sources) keeps this layer's cache keyed on dependency metadata.
+# The root pyproject declares tools/mb, libs/core and libs/monitoring as uv workspace members;
+# uv refuses to resolve when a member is missing, so every member's pyproject must exist too.
+# Copying only the pyprojects (not the sources) keeps this layer's cache keyed on dependency metadata.
 COPY tools/mb/pyproject.toml tools/mb/pyproject.toml
+COPY libs/core/pyproject.toml libs/core/pyproject.toml
+COPY libs/monitoring/pyproject.toml libs/monitoring/pyproject.toml
 
-# Create minimal package structure to allow dependency installation
+# Create minimal package structure to allow dependency installation. The mitup_bot package is a
+# PEP 420 namespace shared across the root and the libs, so no member ships mitup_bot/__init__.py.
 RUN mkdir -p mitup_bot && \
     echo '__version__ = "0.0.0"' > mitup_bot/__about__.py && \
-    touch mitup_bot/__init__.py && \
     mkdir -p tools/mb/src/mb && \
-    touch tools/mb/src/mb/__init__.py tools/mb/src/mb/main.py
+    touch tools/mb/src/mb/__init__.py tools/mb/src/mb/main.py && \
+    mkdir -p libs/core/mitup_bot && \
+    touch libs/core/mitup_bot/config.py && \
+    mkdir -p libs/monitoring/mitup_bot/monitoring && \
+    touch libs/monitoring/mitup_bot/monitoring/__init__.py
 
 # Pre-install every locked dependency so CI jobs start fast. `uv cache prune --ci`
 # keeps wheels built from source but drops downloaded ones, which the venv already holds.
 RUN uv sync --frozen && uv cache prune --ci
 
 # Clean up build files, leaving the empty project directory for the CI job to clone into.
-RUN rm -rf pyproject.toml uv.lock LICENSE mitup_bot tools
+RUN rm -rf pyproject.toml uv.lock LICENSE mitup_bot tools libs

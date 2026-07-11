@@ -84,7 +84,7 @@ Each feature submodule typically contains:
 
 ## Callback data
 
-All button interactions use `CallbackData` — a Pydantic model defined in `mitup_bot/callback_data.py`. Predefined instances for the whole bot live in `mitup_bot/utils/callbacks.py`. When adding a new handler that needs a button action, add its callback instance there.
+All button interactions use `CallbackData` — a Pydantic model defined in `libs/core/mitup_bot/callback_data.py`. Predefined instances for the whole bot live in `mitup_bot/utils/callbacks.py`. When adding a new handler that needs a button action, add its callback instance there.
 
 ### Formats
 

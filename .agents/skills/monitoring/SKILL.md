@@ -6,7 +6,7 @@ user-invocable: false
 
 # Monitoring & Metrics
 
-The bot uses [AWS Embedded Metrics Format (EMF)](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format.html) for zero-cost CloudWatch metric emission. The monitoring layer lives in `mitup_bot/monitoring/`.
+The bot uses [AWS Embedded Metrics Format (EMF)](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format.html) for zero-cost CloudWatch metric emission. The monitoring layer lives in `libs/monitoring/mitup_bot/monitoring/`.
 
 ## Architecture
 

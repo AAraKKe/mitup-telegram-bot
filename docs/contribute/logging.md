@@ -4,7 +4,7 @@ icon: material/text-box-search-outline
 
 # Logging
 
-Mitup uses [structlog](https://www.structlog.org/) for structured logging. All log output flows through a single pipeline defined in [`mitup_bot/logging_config.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/logging_config.py), which configures both structlog-native loggers and stdlib/third-party loggers (httpx, python-telegram-bot, SQLAlchemy) through the same renderer.
+Mitup uses [structlog](https://www.structlog.org/) for structured logging. All log output flows through a single pipeline defined in [`libs/core/mitup_bot/logging_config.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/logging_config.py), which configures both structlog-native loggers and stdlib/third-party loggers (httpx, python-telegram-bot, SQLAlchemy) through the same renderer.
 
 ## Dev vs prod output
 

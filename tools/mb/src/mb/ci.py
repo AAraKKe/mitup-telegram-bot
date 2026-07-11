@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from . import commit_check, language_matrix, lock_check, runner, ty_ignores
+from . import commit_check, import_isolation, language_matrix, lock_check, runner, ty_ignores
 
 app = typer.Typer(no_args_is_help=True, help="CI checks (normally run by the pipeline).")
 
@@ -35,3 +35,9 @@ def check_ty_ignores():
 def check_languages():
     """Validate the CI language matrix against the supported languages."""
     raise typer.Exit(language_matrix.run_check(runner.repo_root()))
+
+
+@app.command("check-import-isolation")
+def check_import_isolation():
+    """Prove each workspace library imports with only its own declared dependencies."""
+    raise typer.Exit(import_isolation.run_check(runner.repo_root()))

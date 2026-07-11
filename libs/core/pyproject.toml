@@ -1,0 +1,17 @@
+[project]
+name = "mitup-core"
+version = "0.0.1"
+description = "Foundation layer for mitup-telegram-bot: config, logging, i18n, and shared value schemas"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic==2.13.4",
+    "structlog==26.1.0",
+    "tzdata==2026.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

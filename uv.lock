@@ -6,6 +6,8 @@ requires-python = ">=3.14"
 members = [
     "mb",
     "mitup-bot",
+    "mitup-core",
+    "mitup-monitoring",
 ]
 
 [[package]]
@@ -897,12 +899,13 @@ name = "mitup-bot"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
-    { name = "aws-embedded-metrics" },
     { name = "click" },
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "googlemaps" },
     { name = "httpx" },
+    { name = "mitup-core" },
+    { name = "mitup-monitoring" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "python-dateutil" },
@@ -942,12 +945,13 @@ tools = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = "==1.18.5" },
-    { name = "aws-embedded-metrics", specifier = "==3.5.0" },
     { name = "click", specifier = "==8.4.2" },
     { name = "cryptography", specifier = "==49.0.0" },
     { name = "fastapi", specifier = "==0.139.0" },
     { name = "googlemaps", specifier = "==4.10.0" },
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "mitup-monitoring", editable = "libs/monitoring" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.4" },
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "python-dateutil", specifier = "==2.9.0.post0" },
@@ -981,6 +985,40 @@ dev = [
     { name = "zensical" },
 ]
 tools = [{ name = "mb", editable = "tools/mb" }]
+
+[[package]]
+name = "mitup-core"
+version = "0.0.1"
+source = { editable = "libs/core" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "structlog" },
+    { name = "tzdata" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = "==2.13.4" },
+    { name = "structlog", specifier = "==26.1.0" },
+    { name = "tzdata", specifier = "==2026.3" },
+]
+
+[[package]]
+name = "mitup-monitoring"
+version = "0.0.1"
+source = { editable = "libs/monitoring" }
+dependencies = [
+    { name = "aws-embedded-metrics" },
+    { name = "mitup-core" },
+    { name = "rich" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aws-embedded-metrics", specifier = "==3.5.0" },
+    { name = "mitup-core", editable = "libs/core" },
+    { name = "rich", specifier = "==15.0.0" },
+]
 
 [[package]]
 name = "multidict"

@@ -7,14 +7,15 @@ from sqlalchemy import text
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import mitup_bot
+import mitup_bot.db
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 
 pytestmark = pytest.mark.db_test
 
 MIGRATION_PATH = (
-    Path(mitup_bot.__file__).parent
+    # mitup_bot is a PEP 420 namespace package (no __file__); anchor on a concrete root module.
+    Path(mitup_bot.db.__file__).parent
     / "migrations"
     / "versions"
     / "02557bf55f98_add_unique_constraint_on_joined_users_.py"

@@ -6,13 +6,13 @@ user-invocable: false
 
 # Translations
 
-The bot supports multiple languages via GNU gettext. The list of supported languages is defined in `SUPPORTED_LANGUAGES` in `mitup_bot/translations.py` — check that file for the current set.
+The bot supports multiple languages via GNU gettext. The list of supported languages is defined in `SUPPORTED_LANGUAGES` in `libs/core/mitup_bot/translations.py` — check that file for the current set.
 
 ## Architecture
 
-- `mitup_bot/translations.py` — `TranslationEngine` wraps gettext with a per-user locale resolver.
+- `libs/core/mitup_bot/translations.py` — `TranslationEngine` wraps gettext with a per-user locale resolver.
 - `mitup_bot/utils/messages.py` — All user-facing strings are defined as `StrEnum` members in message classes (`Messages`, `ButtonMessages`, `MeetingMessages`, `SettingsMessages`, `NotificationMessages`). The English text is the enum value and serves as the gettext msgid.
-- `mitup_bot/locales/` — Compiled `.mo` files and source `.po` files per language.
+- `libs/core/mitup_bot/locales/` — Compiled `.mo` files and source `.po` files per language.
 - `crowdin.yml` — Configuration for Crowdin, the translation management platform.
 
 ## Relationship to `user-facing-text`

@@ -6,7 +6,7 @@ user-invocable: false
 
 # Configuration
 
-The configuration system lives in `mitup_bot/config.py`. It uses a multi-provider merge strategy with Pydantic validation.
+The configuration system lives in `libs/core/mitup_bot/config.py`. It uses a multi-provider merge strategy with Pydantic validation.
 
 ## How it works
 
@@ -24,7 +24,7 @@ This means **environment variables override TOML file values**.
 
 ### `TomlConfigProvider`
 
-Reads `mitup_bot/environments/{env}.toml` where `env` is a member of the `Env` enum (`DEV`, `PROD`, `SAMPLE`). TOML sections map to config groups.
+Reads `libs/core/mitup_bot/environments/{env}.toml` where `env` is a member of the `Env` enum (`DEV`, `PROD`, `SAMPLE`). TOML sections map to config groups.
 
 ### `EnvVariablesConfigProvider`
 
@@ -75,7 +75,7 @@ Invariants spanning multiple sections live as `model_validator`s on `Config` its
 The `Env` enum in `config.py` defines available environments. To add one:
 
 1. Add a member to the `Env` enum.
-2. Create the corresponding `mitup_bot/environments/{env}.toml` file.
+2. Create the corresponding `libs/core/mitup_bot/environments/{env}.toml` file.
 3. Populate all required config fields.
 
 ## Secrets

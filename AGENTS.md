@@ -70,23 +70,28 @@ Versions and pins are defined in `pyproject.toml`. Always check that file — do
 
 ## Project structure
 
+The `mitup_bot.*` import namespace is a PEP 420 namespace package assembled from the root package
+plus the workspace libraries under `libs/` — no member ships a `mitup_bot/__init__.py`. Imports are
+unchanged regardless of which member owns a module (e.g. `from mitup_bot.config import ...` resolves
+into `libs/core`).
+
 ```
-mitup_bot/              # Main package
+mitup_bot/              # Root package (the bot application)
 ├── app.py              # PTB application entry point (MitupRuntime)
-├── config.py           # Configuration system
 ├── db.py               # Database engine and session decorators
-├── exceptions.py       # Custom exception hierarchy
 ├── guards.py           # Input validation for handlers
 ├── cli/                # Production CLI commands
-├── environments/       # Per-environment TOML config files
 ├── handlers/           # Bot logic by feature area
 ├── lambdas/            # AWS Lambda functions
-├── locales/            # Compiled gettext translation files
 ├── migrations/         # Alembic migration scripts
 ├── models/             # SQLModel database models
-├── monitoring/         # CloudWatch metrics emission
 ├── utils/              # Shared utilities (callbacks, messages, emojis, types)
 └── views/              # View layer
+
+libs/                   # uv workspace libraries sharing the mitup_bot namespace
+├── core/               # mitup-core: config, logging, i18n engine + locales, base exceptions,
+│                       #   callback_data, handler_id, supporter, limits, keyboard schema, emojis
+└── monitoring/         # mitup-monitoring: CloudWatch EMF metrics emission
 
 tools/                  # Dev tooling: the mb CLI (tools/mb/) and helper scripts (not shipped in the wheel)
 tests/                  # Test suite

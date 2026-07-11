@@ -1,0 +1,20 @@
+[project]
+name = "mitup-monitoring"
+version = "0.0.1"
+description = "CloudWatch EMF metrics layer for mitup-telegram-bot"
+requires-python = ">=3.14"
+dependencies = [
+    "aws-embedded-metrics==3.5.0",
+    "rich==15.0.0",
+    "mitup-core",
+]
+
+[tool.uv.sources]
+mitup-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["mitup_bot"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

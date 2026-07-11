@@ -84,7 +84,7 @@ NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"      # → "➕ New meeting"
 SETTINGS    = f"{Emojis.SETTINGS} Settings"            # → "⚙️ Settings"
 ```
 
-So the `.mitup-key` content is the rendered string, emoji included. Look up the actual `Emojis.<NAME>` value in `mitup_bot/emojis.py` if you need the glyph. Never invent the emoji.
+So the `.mitup-key` content is the rendered string, emoji included. Look up the actual `Emojis.<NAME>` value in `libs/core/mitup_bot/emojis.py` if you need the glyph. Never invent the emoji.
 
 **Emojis are raw Unicode glyphs, not Twemoji shortcodes.** Mockups mirror what users see in Telegram, so the glyph in `.mitup-key` must match the glyph the bot actually sends. Do not convert to `:shortcode:` form — shortcodes can render a different image from the real button (e.g. `:heart:` renders as `❤️` but `ButtonMessages.COLLABORATE` is `♥`). This matches the same rule for `.button-like` chips in prose; see the `.button-like` recipe in `docs-style`.
 

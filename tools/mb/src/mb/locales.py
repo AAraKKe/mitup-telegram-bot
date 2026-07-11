@@ -5,7 +5,7 @@ import typer
 
 from . import console, locales_ops, runner
 
-LOCALES_RELATIVE_DIR = Path("mitup_bot/locales")
+LOCALES_RELATIVE_DIR = Path("libs/core/mitup_bot/locales")
 
 app = typer.Typer(no_args_is_help=True, help="Manage gettext locale catalogs.")
 

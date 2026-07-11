@@ -24,6 +24,8 @@ include:
   - pyproject.toml
   - uv.lock
   - tools/mb/pyproject.toml
+  - libs/core/pyproject.toml
+  - libs/monitoring/pyproject.toml
   - .gitlab-ci.yml
   - .gitlab/ci/docker.yml
 

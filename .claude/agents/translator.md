@@ -30,7 +30,7 @@ You have Bash, Read, Edit, and Glob tools available. **Always use them directly*
 
 2. Read `.claude/agents/translations/<lang_code>.md` — this is the source of truth for vocabulary, register, and phrasing. It takes priority over existing `.po` entries when there is a conflict.
 
-3. Read the `.po` file for your language at `mitup_bot/locales/<lang_code>.po`.
+3. Read the `.po` file for your language at `libs/core/mitup_bot/locales/<lang_code>.po`.
 
 ## Translation rules
 

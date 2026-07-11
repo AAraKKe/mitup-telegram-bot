@@ -21,7 +21,7 @@ build-translations:
     access: none
     expire_in: "1 day"
     paths:
-      - mitup_bot/locales
+      - libs/core/mitup_bot/locales
 
 validate-ci-languages:
   stage: build
@@ -95,6 +95,13 @@ check-ty-ignores:
 validate-migrations:
   stage: test
   script: uv run mb db migrate validate
+  needs: [preparation]
+
+check-import-isolation:
+  # Proves each workspace library imports with only its own declared dependencies,
+  # so a lib never silently leans on a dependency it does not declare.
+  stage: test
+  script: uv run mb ci check-import-isolation
   needs: [preparation]
 
 validate-ids:

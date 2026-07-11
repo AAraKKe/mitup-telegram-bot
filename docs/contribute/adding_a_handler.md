@@ -15,7 +15,7 @@ The code lives under [`mitup_bot/handlers/`](https://gitlab.com/meetupbot/mitup-
 
 ## Define a HandlerId
 
-Every handler is identified by a `HandlerId` enum member. Each feature package owns a subclass in its `enums.py`. The members are plain `auto()` values; the base class in [`mitup_bot/handler_id.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/handler_id.py) derives the string value and the metrics dimension for you.
+Every handler is identified by a `HandlerId` enum member. Each feature package owns a subclass in its `enums.py`. The members are plain `auto()` values; the base class in [`libs/core/mitup_bot/handler_id.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/handler_id.py) derives the string value and the metrics dimension for you.
 
 ```python
 from enum import auto

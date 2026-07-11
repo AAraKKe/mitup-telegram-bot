@@ -86,7 +86,7 @@ A Pydantic model wrapping `text` + one action field. `text` is stored as a plain
 - `switch_inline_query` — prompts the user to select a chat and opens inline mode.
 - `switch_inline_query_current_chat` — opens inline mode in the current chat.
 
-`ButtonConfig` (with the `ButtonRow`/`Keyboard` aliases) lives in `mitup_bot/keyboards.py`, not in `views/`: keyboards are persisted as message JSON, so the schema is a wire format that must stay pure data — never add Telegram- or view-dependent behaviour to it, and never change its field names, defaults, or serializers without accounting for rows already stored. Import it from `mitup_bot.keyboards`. Rendering to PTB types stays in views: `to_inline_keyboard_button()` converts one button, `MitupView.markup` the whole keyboard.
+`ButtonConfig` (with the `ButtonRow`/`Keyboard` aliases) lives in `libs/core/mitup_bot/keyboards.py`, not in `views/`: keyboards are persisted as message JSON, so the schema is a wire format that must stay pure data — never add Telegram- or view-dependent behaviour to it, and never change its field names, defaults, or serializers without accounting for rows already stored. Import it from `mitup_bot.keyboards`. Rendering to PTB types stays in views: `to_inline_keyboard_button()` converts one button, `MitupView.markup` the whole keyboard.
 
 ### `CalendarKeyboard`
 

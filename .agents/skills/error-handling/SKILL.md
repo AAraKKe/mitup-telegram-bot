@@ -6,7 +6,7 @@ user-invocable: false
 
 # Error Handling
 
-The bot uses a structured exception hierarchy combined with a centralized error handler. All exceptions are defined in `mitup_bot/exceptions.py`; the error handler lives in `mitup_bot/handlers/error_handler.py`.
+The bot uses a structured exception hierarchy combined with a centralized error handler. All exceptions are defined in `libs/core/mitup_bot/exceptions.py`; the error handler lives in `mitup_bot/handlers/error_handler.py`.
 
 ## Error flow
 
@@ -113,7 +113,7 @@ All `edit_message` calls in `TelegramApi` already use this. Do not add custom tr
 
 ## Adding new exceptions
 
-1. Define the exception in `mitup_bot/exceptions.py`.
+1. Define the exception in `libs/core/mitup_bot/exceptions.py`.
 2. Include contextual data (user IDs, handler IDs, callback data) in the constructor — this aids debugging.
 3. If the exception should be suppressed, add it to `SUPPRESSED_EXCEPTIONS` in the error handler.
 4. If the exception needs special handling (like `InactiveUserInteraction`), add a branch in `error_handler.handler()`.
