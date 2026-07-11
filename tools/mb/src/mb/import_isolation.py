@@ -62,7 +62,7 @@ MEMBERS = (
         ("apps/events", TELEGRAM, PATREON, CORE, DATA, MONITORING),
         "import mitup_bot.events.service; import mitup_bot.events_cli",
     ),
-    # The migrations Lambda is the headline win of the split: it must resolve without PTB at all.
+    # The migrations Lambda must resolve without PTB at all.
     Member(
         "mitup-lambda-migrations-app",
         ("apps/lambda-migrations", CORE, DATA, MONITORING),

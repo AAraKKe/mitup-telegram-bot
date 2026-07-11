@@ -31,11 +31,14 @@ RUN uv export --frozen --no-emit-workspace --no-hashes --no-default-groups \
     --package mitup-lambda-migrations-app --format requirements.txt -o requirements.txt && \
     pip install --no-cache-dir --target /install -r requirements.txt
 
-# In-repo members as wheels: the handler plus the libraries it imports (core, data).
+# In-repo members as wheels: the handler plus its full workspace closure — core, monitoring
+# (mitup-data imports mitup_bot.monitoring at runtime), and data.
 COPY libs/core ./libs/core
+COPY libs/monitoring ./libs/monitoring
 COPY libs/data ./libs/data
 COPY apps/lambda-migrations ./apps/lambda-migrations
 RUN uv build --wheel --package mitup-core -o /wheels && \
+    uv build --wheel --package mitup-monitoring -o /wheels && \
     uv build --wheel --package mitup-data -o /wheels && \
     uv build --wheel --package mitup-lambda-migrations-app -o /wheels && \
     pip install --no-cache-dir --target /install --no-deps /wheels/*.whl
@@ -57,5 +60,12 @@ RUN sed -i 's#^script_location = .*#script_location = mitup_bot/migrations#' ${L
 RUN if python -c "import telegram" 2>/dev/null; then echo "FORBIDDEN: python-telegram-bot present"; exit 1; fi; \
     if python -c "import fastapi" 2>/dev/null; then echo "FORBIDDEN: fastapi present"; exit 1; fi; \
     echo "OK: no PTB / FastAPI in the migrations image"
+
+# Positive guard: the handler's REAL import graph includes alembic's env.py, which loads
+# mitup_bot.db (and through it monitoring and the models) only at run time — a bare handler
+# import would pass with those missing. Import everything env.py imports so a missing member
+# fails the build instead of the deploy.
+RUN python -c "import mitup_bot.lambdas.migrations; import mitup_bot.db; import mitup_bot.models.users" && \
+    echo "OK: handler + alembic env import graph resolves"
 
 CMD ["mitup_bot.lambdas.migrations.run_migrations"]

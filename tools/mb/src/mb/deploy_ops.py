@@ -256,6 +256,6 @@ def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, event
     update_lambda_code(lambda_client, "MitupAlarmActionLambda", alarm_action_image)
 
     # Each ECS service rolls onto its own image. The recurrent-events service takes the events image,
-    # never the bot image: the slim bot image no longer carries the `mitup recurrent-events` command.
+    # never the bot image: the slim bot image doesn't carry the `mitup recurrent-events` command.
     deploy_ecs_service(ecs_client, "mitup", bot_image)
     deploy_ecs_service(ecs_client, "mitup-recurrent-events", events_image)

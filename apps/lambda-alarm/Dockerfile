@@ -49,4 +49,9 @@ RUN if python -c "import telegram" 2>/dev/null; then echo "FORBIDDEN: python-tel
     if python -c "import fastapi" 2>/dev/null; then echo "FORBIDDEN: fastapi present"; exit 1; fi; \
     echo "OK: no PTB / SQLAlchemy / FastAPI in the alarm image"
 
+# Positive guard: prove the handler's import graph resolves inside the image, so a member
+# missing from the wheel list fails the build instead of the first Lambda invocation.
+RUN python -c "import mitup_bot.lambdas.alarm_action" && \
+    echo "OK: alarm handler import graph resolves"
+
 CMD ["mitup_bot.lambdas.alarm_action.handler"]
