@@ -1,44 +1,9 @@
 from typing import Any
 
-from telegram import Update
-
 from mitup_bot.monitoring.backend import MetricsBackend
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.monitoring.record import MetricRecord
 from mitup_bot.monitoring.units import MetricUnit
-
-
-def properties_from_update(update: Update) -> dict[str, Any]:
-    """Create a dictionary with the properties from the provided Update."""
-    return {
-        "Update": update_fields_from_update(update),
-    }
-
-
-def update_fields_from_update(update: Update) -> dict[str, Any]:
-    values = {}
-
-    # Callback data fields
-    if cb := update.callback_query:
-        values["callback"] = {"data": cb.data}
-
-    if user := update.effective_user:
-        values["user"] = {
-            "tg_user_id": user.id,
-            "username": user.username,
-        }
-
-    if message := update.effective_message:
-        values["message"] = {
-            "text": message.text,
-            "markup": message.reply_markup.to_dict() if message.reply_markup is not None else None,
-        }
-
-    # Show inline query queries
-    if query := update.inline_query:
-        values["inline_query"] = {"query": query.query}
-
-    return values
 
 
 class MetricsClient:

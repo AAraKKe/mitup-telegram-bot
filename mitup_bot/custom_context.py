@@ -21,7 +21,6 @@ from mitup_bot.monitoring import (
     CamelCaseStrEnum,
     Feature,
     MetricKey,
-    properties_from_update,
 )
 from mitup_bot.monitoring.backend import EmfBackend
 from mitup_bot.monitoring.client import MetricsClient
@@ -119,6 +118,39 @@ class MitupUserData:
 # than by lying about variance here.
 TB = TypeVar("TB", bound=ExtBot)
 TAPI = TypeVar("TAPI", bound=TelegramApiWrapper)
+
+
+def properties_from_update(update: Update) -> dict[str, Any]:
+    """Create a dictionary with the properties from the provided Update."""
+    return {
+        "Update": update_fields_from_update(update),
+    }
+
+
+def update_fields_from_update(update: Update) -> dict[str, Any]:
+    values = {}
+
+    # Callback data fields
+    if cb := update.callback_query:
+        values["callback"] = {"data": cb.data}
+
+    if user := update.effective_user:
+        values["user"] = {
+            "tg_user_id": user.id,
+            "username": user.username,
+        }
+
+    if message := update.effective_message:
+        values["message"] = {
+            "text": message.text,
+            "markup": message.reply_markup.to_dict() if message.reply_markup is not None else None,
+        }
+
+    # Show inline query queries
+    if query := update.inline_query:
+        values["inline_query"] = {"query": query.query}
+
+    return values
 
 
 class MitupContext(

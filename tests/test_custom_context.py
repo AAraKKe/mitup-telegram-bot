@@ -1,10 +1,12 @@
 from typing import Any
 
 import pytest
+from telegram import Update
 
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
+    update_fields_from_update,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
 from mitup_bot.monitoring import Feature, MetricUnit
@@ -242,3 +244,10 @@ async def test_emit_metric_attaches_handler_identity_as_properties_not_dimension
     )
     # And no record ever carries the handler identity as a dimension.
     metrics.assert_not_emitted(name="handler_metric", dimensions={"Handler": "SomeHandler"})
+
+
+def test_update_fields_from_update_no_effective_user():
+    """An Update with no user omits the 'user' key."""
+    result = update_fields_from_update(Update(update_id=1))
+
+    assert "user" not in result

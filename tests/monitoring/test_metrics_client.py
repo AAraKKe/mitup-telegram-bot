@@ -171,19 +171,3 @@ def test_metric_assertions_assert_not_emitted():
     client = make_client()
 
     MetricAssertions(client).assert_not_emitted(name=MetricKey.FAULT)
-
-
-# ---------------------------------------------------------------------------
-# update_fields_from_update — branch coverage
-# ---------------------------------------------------------------------------
-
-
-def test_update_fields_from_update_no_effective_user():
-    """An Update with no user omits the 'user' key (branch 25->31)."""
-    from telegram import Update
-
-    from mitup_bot.monitoring.client import update_fields_from_update
-
-    result = update_fields_from_update(Update(update_id=1))
-
-    assert "user" not in result

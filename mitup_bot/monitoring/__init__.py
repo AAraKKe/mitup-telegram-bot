@@ -11,7 +11,6 @@ __all__ = [
     "MetricsClient",
     "NULL_DIMENSIONALITY",
     "NullBackend",
-    "properties_from_update",
     "Unit",
 ]
 
@@ -22,4 +21,4 @@ from .metric_keys import CamelCaseStrEnum, Feature, MetricKey
 from .units import MetricUnit
 from .record import MetricRecord
 from .backend import Dimensionality, EmfBackend, MetricsBackend, NULL_DIMENSIONALITY, NullBackend, configure_emf_backend
-from .client import MetricsClient, properties_from_update
+from .client import MetricsClient
