@@ -6,7 +6,7 @@ icon: material/plus-box-outline
 
 A handler is an async function that runs when a matching Telegram update arrives: a `/command`, a button press, a text reply, an inline query. Adding one is the most common first contribution, so this page walks the whole path from an empty file to a passing test.
 
-The code lives under [`mitup_bot/handlers/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/handlers), one package per feature. A package like [`main_menu/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/handlers/main_menu) is a good one to read alongside this page. It holds an `enums.py`, one module per screen, and an `__init__.py` that wires them together.
+The code lives under [`apps/bot/mitup_bot/handlers/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/apps/bot/mitup_bot/handlers), one package per feature. A package like [`main_menu/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/apps/bot/mitup_bot/handlers/main_menu) is a good one to read alongside this page. It holds an `enums.py`, one module per screen, and an `__init__.py` that wires them together.
 
 !!! danger "Two rules that never bend"
 
@@ -31,7 +31,7 @@ Name callback members with a `_CALLBACK` suffix so the intent reads at a glance,
 
 ## Register the callback
 
-Decorate the function with the matching `HandlersRegistry` method. The registry in [`registry.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/handlers/registry.py) has one per update type:
+Decorate the function with the matching `HandlersRegistry` method. The registry in [`registry.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/apps/bot/mitup_bot/handlers/registry.py) has one per update type:
 
 | Update | Method |
 |--------|--------|
@@ -73,7 +73,7 @@ A handler that mutates state and then fans out over Telegram (it takes the per-m
 
 ## Validate the input with guards
 
-Handlers never trust the raw update. The [`guards`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/guards.py) module turns a fuzzy `Update` into the concrete objects you need, raising a clean error when something is missing. Fetch the user early, before branching on anything else, so `user.lang` is in scope everywhere below.
+Handlers never trust the raw update. The [`guards`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/guards.py) module turns a fuzzy `Update` into the concrete objects you need, raising a clean error when something is missing. Fetch the user early, before branching on anything else, so `user.lang` is in scope everywhere below.
 
 ```python
 callback_data = guards.valid_callback_data(
@@ -95,11 +95,11 @@ view = MitupView(
 )
 ```
 
-If your reply needs a string that does not exist yet, add it to the right `MessageBase` subclass, run `hatch run dev:update-locales`, and hand the new keys to the translator. The [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/user-facing-text/SKILL.md) skill owns the wording and the `MessageBase` API.
+If your reply needs a string that does not exist yet, add it to the right `MessageBase` subclass, run `uv run mb locales sync`, and hand the new keys to the translator. The [`user-facing-text`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/user-facing-text/SKILL.md) skill owns the wording and the `MessageBase` API.
 
 ## Wire it into the package
 
-A handler only runs once its module is imported, because the import is what executes the decorator that registers it. Import the new module from the package `__init__.py`, and import that package from [`mitup_bot/handlers/__init__.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/handlers/__init__.py).
+A handler only runs once its module is imported, because the import is what executes the decorator that registers it. Import the new module from the package `__init__.py`, and import that package from [`apps/bot/mitup_bot/handlers/__init__.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/apps/bot/mitup_bot/handlers/__init__.py).
 
 Order matters in two places:
 
@@ -113,13 +113,13 @@ When two modules need each other's enums, pull the shared enum into a standalone
 Every handler gets a test at `tests/handlers/<package>/test_<module>.py`. If the handler calls any `guards.*` function, also register its context in `tests/handlers/test_failure_modes.py`; that matrix exercises each guard's failure path and turns red if a new guard call is left out. Run the ones you touched as you go:
 
 ```bash
-hatch run dev:test-hook tests/handlers/reminders/
+uv run mb test tests/handlers/reminders
 ```
 
 Before opening a merge request, run the full gate:
 
 ```bash
-hatch run dev:validate
+uv run mb validate
 ```
 
 ## Where to go deeper

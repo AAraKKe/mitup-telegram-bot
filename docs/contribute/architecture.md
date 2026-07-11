@@ -4,7 +4,7 @@ icon: material/sitemap-outline
 
 # Architecture
 
-This page is the map you read before the code. It follows one Telegram update from the moment it lands on the webhook to the moment the bot replies, and names the object responsible at each hop. Once you can trace this path, most of `mitup_bot/` reads in order.
+This page is the map you read before the code. It follows one Telegram update from the moment it lands on the webhook to the moment the bot replies, and names the object responsible at each hop. Once you can trace this path, most of the codebase reads in order.
 
 ## The update flow
 
@@ -16,7 +16,7 @@ Every interaction, a tapped button, a typed command, a shared location, arrives 
 
   <div class="uflow__node">
     <span class="uflow__title">POST /telegram</span>
-    <span class="uflow__src">mitup_bot/web/telegram.py</span>
+    <span class="uflow__src">apps/bot/mitup_bot/web/telegram.py</span>
     <span class="uflow__desc">Checks the secret header, parses the JSON, and always answers 204.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span><span class="uflow__gap-label">enqueue and return; work happens out of band</span></div>
@@ -30,21 +30,21 @@ Every interaction, a tapped button, a typed command, a shared location, arrives 
 
   <div class="uflow__node">
     <span class="uflow__title">PerUserUpdateProcessor</span>
-    <span class="uflow__src">mitup_bot/update_processor.py</span>
+    <span class="uflow__src">apps/bot/mitup_bot/update_processor.py</span>
     <span class="uflow__desc">Drains the queue and serializes updates that share a (user, chat) key.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span></div>
 
   <div class="uflow__node">
     <span class="uflow__title">callback_with_metrics</span>
-    <span class="uflow__src">mitup_bot/handlers/registry.py</span>
+    <span class="uflow__src">apps/bot/mitup_bot/handlers/registry.py</span>
     <span class="uflow__desc">Binds log context, times the handler, and routes faults to the error handler.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span></div>
 
   <div class="uflow__node">
     <span class="uflow__title">guards</span>
-    <span class="uflow__src">mitup_bot/guards.py</span>
+    <span class="uflow__src">libs/telegram/mitup_bot/guards.py</span>
     <span class="uflow__desc">Validate and narrow the raw update into the exact type the handler needs.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span></div>
@@ -65,7 +65,7 @@ Every interaction, a tapped button, a typed command, a shared location, arrives 
 
   <div class="uflow__node">
     <span class="uflow__title">context.api reply</span>
-    <span class="uflow__src">mitup_bot/custom_context.py</span>
+    <span class="uflow__src">libs/telegram/mitup_bot/custom_context.py</span>
     <span class="uflow__desc">Sends the rendered view back to the user over the Bot API.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span></div>
@@ -121,11 +121,11 @@ Two properties are worth holding onto. The webhook answers `204` for every well-
 
 ## MitupRuntime, the composition root
 
-[`mitup_bot/app.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/app.py) holds `MitupRuntime`, the single place where the whole bot is wired together. Its constructor builds the config, configures logging, metrics, the database, and the timezone API, then assembles the PTB `Application`: the bot token, the custom `MitupContext`, the rate limiter, and the `PerUserUpdateProcessor`. `HandlersRegistry.bind(app)` registers every handler onto that application. `run()` picks polling or webhook mode from config and starts the server. Nothing else constructs these pieces, so if you want to know what depends on what, start here.
+[`apps/bot/mitup_bot/app.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/apps/bot/mitup_bot/app.py) holds `MitupRuntime`, the single place where the whole bot is wired together. Its constructor builds the config, configures logging, metrics, the database, and the timezone API, then assembles the PTB `Application`: the bot token, the custom `MitupContext`, the rate limiter, and the `PerUserUpdateProcessor`. `HandlersRegistry.bind(app)` registers every handler onto that application. `run()` picks polling or webhook mode from config and starts the server. Nothing else constructs these pieces, so if you want to know what depends on what, start here.
 
 ## The webhook host
 
-[`mitup_bot/web/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/mitup_bot/web) holds the FastAPI app factory and the `POST /telegram` route. The runtime serves it through uvicorn with `workers=1`. That single worker is not an oversight: the PTB `Application` owns in-memory state (conversation states, per-user data) that cannot be shared across processes, so exactly one worker may exist. The endpoint validates the Telegram secret header, parses the update, puts it on `app.update_queue`, and returns.
+[`apps/bot/mitup_bot/web/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/apps/bot/mitup_bot/web) holds the FastAPI app factory and the `POST /telegram` route. The runtime serves it through uvicorn with `workers=1`. That single worker is not an oversight: the PTB `Application` owns in-memory state (conversation states, per-user data) that cannot be shared across processes, so exactly one worker may exist. The endpoint validates the Telegram secret header, parses the update, puts it on `app.update_queue`, and returns.
 
 ## Concurrency in one paragraph
 

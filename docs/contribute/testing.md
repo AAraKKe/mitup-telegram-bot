@@ -4,23 +4,24 @@ icon: material/flask-outline
 
 # Testing and validation
 
-Mitup runs its checks through [Hatch](https://hatch.pypa.io/latest/). Every script below is defined under `[tool.hatch.envs.dev.scripts]` in [`pyproject.toml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/pyproject.toml). Finish the [setup steps](setup.md) first, then run these from the repo root.
+Every check runs through the `mb` developer CLI. Finish the [setup steps](setup.md) first, then run these from the repo root. See [the mb CLI](dev_cli.md) for the full command surface.
 
 ## Two ways to run tests
 
 There are two entry points, and they answer different questions.
 
-* `hatch run dev:test-hook <paths or pytest args>` runs the tests you point it at, in parallel, with no coverage and short tracebacks. It is the fast loop you use while writing code. Pass it a file, a directory, or a `-k` expression: `hatch run dev:test-hook tests/handlers -k broadcast`.
-* `hatch run dev:validate` is the full gate. It runs `format-check`, `lint`, `type-check`, and the whole test suite with coverage, in that order. Run it before you push and before you open a merge request. CI runs the same checks and rejects merge requests that fail them.
+* `uv run mb test [paths or pytest args]` runs the tests you point it at, fast, with no coverage. It's the loop you use while writing code. Pass it a file, a directory, or a `-k` expression, and anything else rides through to pytest: `uv run mb test tests/handlers -k broadcast`. With no path it runs the whole suite.
+* `uv run mb validate` is the full gate. It runs the formatter check, the linter, the type checker, and the whole test suite with coverage, and keeps going even when one step fails, so a single run reports every problem at once instead of stopping at the first. Run it before you push and before you open a merge request. CI runs the same checks and rejects merge requests that fail them.
 
-The steps inside `validate` keep going even when one fails, so a single run reports every problem at once instead of stopping at the first.
+`mb validate --all` extends the gate with the database suite, the locale-catalog validation, and the migration-graph check. That's the fullest local approximation of CI.
 
 ## What each check does
 
-* `hatch run dev:format` rewrites your code with Ruff's formatter. `hatch run dev:format-check` reports formatting drift without touching files.
-* `hatch run dev:lint` runs the Ruff linter and shows a diff of what it would change. `hatch run dev:fix-lint` applies those fixes, including Ruff's unsafe ones, so review the resulting diff. `hatch run dev:fix` does both format and lint fixes in one go.
-* `hatch run dev:type-check` runs [ty](https://github.com/astral-sh/ty), the project's type checker.
-* `hatch run dev:test` runs the full suite with coverage. `hatch run dev:test-hook` is the same suite without coverage, for speed.
+* `uv run mb format` rewrites your code with Ruff's formatter.
+* `uv run mb lint` runs the Ruff linter.
+* `uv run mb typecheck` runs [ty](https://github.com/astral-sh/ty), the project's type checker, over the code and the `mb` tool itself.
+* `uv run mb fix` formats and applies every safe and unsafe lint fix in one pass, so review the resulting diff.
+* `uv run mb test` runs the suite. Add `--cov` for a coverage report; leave it off for speed.
 
 ## Handler tests use a mock Telegram
 
@@ -32,20 +33,22 @@ Most handlers share the same failure paths: the user is not found, the meeting d
 
 ## Database integration tests
 
-Most tests run against a mock session. The tests under [`tests/models/db_behavior/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/tests/models/db_behavior/) run against a real Postgres instance that `testcontainers` spins up for the run, so they need Docker running locally.
+Most tests run against a mock session. The tests under [`tests/models/db_behavior/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tests/models/db_behavior) run against a real Postgres instance that `testcontainers` spins up for the run, so they need Docker running locally. They're skipped during a normal `mb test` run and only execute under the `--db` flag:
 
 ```bash
-hatch run dev:test-db
-hatch run dev:test-db -- tests/models/db_behavior/ -k "cascades" -v
+uv run mb test --db
+uv run mb test --db tests/models/db_behavior -k cascades -v
 ```
-
-Anything you pass after `--` replaces the default `tests/models/db_behavior/` path, so restate that path when you add pytest flags or the run collects the whole suite.
-
-These tests are skipped during a normal `hatch run dev:test` run and only execute under the `--db-tests` flag that `test-db` passes for you.
 
 ## The suite runs once per language in CI
 
-Mitup ships in several languages, and CI runs the full test suite once for each one: `en`, `es_ES`, `gl_ES`, `de_DE`, `pt_BR`, and `it_IT`. A test that passes locally under English can still fail in CI if it hard-codes an English string, so assert against message constants rather than literal text. Locally you can reproduce a single language with `hatch run dev:test -- tests --lang gl_ES`.
+Mitup ships in several languages, and CI runs the full test suite once for each supported one. A test that passes locally under English can still fail in CI if it hard-codes an English string, so assert against message constants rather than literal text. Reproduce a single language locally with the `--lang` flag:
+
+```bash
+uv run mb test --lang gl_ES
+```
+
+The set of languages is [`SUPPORTED_LANGUAGES`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/translations.py) in code, and CI derives its matrix from it. `uv run mb ci check-languages` fails the pipeline if the two ever drift apart, so the matrix can't silently fall behind a newly added language.
 
 ## Going deeper
 

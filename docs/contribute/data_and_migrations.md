@@ -32,7 +32,7 @@ Handlers that change state and then message people over Telegram (edit a meeting
 
 So inside a write-mode handler your code reads top to bottom like normal, but the sends do not happen where you wrote them. They happen after the commit. If the handler raises, the queued calls are discarded along with the rolled-back transaction, so nothing about a half-finished state ever reaches a user.
 
-!!! note "One escape hatch"
+!!! note "One exception"
 
     `context.api.immediate.X(...)` runs a call before the commit, so its failure aborts the transaction. Keep those rare and easy to grep for. The rules for when to reach for it live in the [database skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/database/SKILL.md).
 
@@ -63,9 +63,9 @@ Migrations use [Alembic](https://alembic.sqlalchemy.org/), and revisions live in
 Day-to-day commands when running the bot locally:
 
 ```bash
-hatch run dev:migrations-upgrade    # apply pending migrations
-hatch run dev:migrations-downgrade  # roll back one migration
-hatch run dev:validate-migrations   # check the migration graph
+uv run mb db migrate up        # apply pending migrations
+uv run mb db migrate down      # roll back one migration
+uv run mb db migrate validate  # check the migration graph
 ```
 
 When a model change needs a migration, run the `/new-migration` skill. It scaffolds the revision, walks you through writing both directions by hand, and flags the things that bite: a missing `server_default` on a new non-nullable column, the trigger-managed `created_time` and `updated_time` columns that application code never sets, and a `downgrade()` that has to reverse everything `upgrade()` did. The [new-migration skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/new-migration/SKILL.md) owns that walkthrough.

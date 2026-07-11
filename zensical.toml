@@ -36,6 +36,7 @@ nav = [
       { "Architecture" = "contribute/architecture.md" },
       { "Where things live" = "contribute/project_layout.md" },
       { "Setup" = "contribute/setup.md" },
+      { "The mb CLI" = "contribute/dev_cli.md" },
       { "Adding a handler" = "contribute/adding_a_handler.md" },
       { "Data and migrations" = "contribute/data_and_migrations.md" },
       { "Testing and validation" = "contribute/testing.md" },

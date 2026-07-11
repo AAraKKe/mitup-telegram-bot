@@ -6,104 +6,80 @@ icon: material/wrench-outline
 
 ## Contributor requirements
 
-Mitup is built in Python, deployed in containers on AWS and managed using [Hatch](https://hatch.pypa.io) environments. Contributors must have:
+Mitup is a Python project, managed with [uv](https://docs.astral.sh/uv/) and deployed as containers on AWS. To work on it you need:
 
-*   A Docker installation ([Docker Desktop](https://www.docker.com/products/docker-desktop/) works well if you don't have one)
-*   Knowledge of modern Python, including type annotations
-*   A GitLab account
+* [uv](https://docs.astral.sh/uv/getting-started/installation/), which manages the Python version, the virtual environment, and every dependency
+* A Docker installation ([Docker Desktop](https://www.docker.com/products/docker-desktop/) works well if you don't have one), used for local Postgres and for running the bot in a container
+* [gettext](https://www.gnu.org/software/gettext/), which compiles the translation catalogs
+* A GitLab account
+* Working knowledge of modern Python, including type annotations
 
-## Tools
-
-### Hatch
-
-If you do not have a working installation of Hatch, install it now. We recommend installing Hatch through [pipx](https://pipx.pypa.io/stable/installation/).
-
-```bash
-pipx install hatch
-```
-
-Since we run all commands as part of the Hatch `dev` environment, there's no need to install a specific Python distribution. Hatch manages this automatically when running any command. Mitup is configured to use a specific version of Python, and Hatch attempts to locate a compatible version on your system. If none is found, Hatch installs the required version for the virtual environment `dev`.
-
-### Pre-commit
-
-We use [pre-commit](https://pre-commit.com/) to handle validations for each commit to the repository. Make sure to install it before committing any code to be pushed to the GitLab repo.
-
-```bash
-pipx install pre-commit
-```
-
-### Gettext
-
-While most of the dependencies are handled by Hatch, [gettext](https://www.gnu.org/software/gettext/) needs to be installed on your system before you can run Mitup. It handles the translation files. Follow the instructions on their site to install it.
+uv installs the right Python version for you the first time you sync, so you don't need to install a specific distribution yourself. gettext is the one system dependency uv can't provide; install it with your package manager (`brew install gettext` on macOS, `apt install gettext` on Debian/Ubuntu). You don't need any PostgreSQL client libraries.
 
 !!! note "No PostgreSQL client libraries needed"
 
     Mitup talks to PostgreSQL through [psycopg](https://www.psycopg.org/psycopg3/docs/), pinned with the `binary` extra in [`pyproject.toml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/pyproject.toml). The binary wheels bundle `libpq`, so you don't need a C compiler or a separate PostgreSQL installation.
 
-### Set up local repository
+## Clone and bootstrap
 
-Start by cloning the Mitup code from our [public repo](https://gitlab.com/meetupbot/mitup-telegram-bot)
+Clone the repository from the [public repo](https://gitlab.com/meetupbot/mitup-telegram-bot):
 
 ```bash
 git clone git@gitlab.com:meetupbot/mitup-telegram-bot.git
 cd mitup-telegram-bot
 ```
 
-Set up `pre-commit`:
+Create the environment and install the git hooks in one step:
 
 ```bash
-pre-commit install
-pre-commit run --all-files
+uv sync
+uv run mb setup
 ```
 
-Now let's run the validations. This command will trigger the creation of the `dev` Hatch environment, which is used for all development-related activities.
+`uv sync` reads [`uv.lock`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/uv.lock) and builds a `.venv` at the repo root with every workspace member and dependency. `uv run mb setup` bootstraps the rest of the checkout: it runs `uv sync` again (so it's safe to run on its own), installs the [pre-commit](https://pre-commit.com/) hooks, and copies any local-only config from your main checkout when you're in a worktree. The command is idempotent, so you can re-run it any time your setup drifts.
+
+`mb` is the developer CLI for this repository. Every task below runs through it. See [the mb CLI](dev_cli.md) for the full command surface, or run `uv run mb --help`.
+
+!!! tip "Type hints in your editor"
+
+    Point your editor's interpreter at the workspace virtual environment (`.venv/bin/python` at the repo root). It carries boto3-stubs and the project's type checker, so autocompletion and inline type checking match what CI runs. To generate a shared VS Code (or Cursor) config with the right interpreter and formatter wired up, run `uv run mb setup --vscode`.
+
+## Configure your development bot
+
+To drive your changes through Telegram, link a bot to Mitup. Open [BotFather](https://t.me/BotFather) and register one:
+
+* Run the `/newbot` command
+* Choose a name, e.g. `Mitup-<yourname>-dev`
+* Choose a username, e.g. `mitup_yourname_dev_bot`
+* Copy the token BotFather gives you
+
+Write that token into your local development config:
 
 ```bash
-hatch run dev:validate
+uv run mb setup --bot-token <token>
 ```
 
-!!! info "VS Code and forks"
-    A setup script is included in the repo. It writes a standard `.vscode/settings.json` with the configuration needed to run type checking and formatting correctly, which VS Code and forks like Cursor read the same way. Run:
-    ```
-    hatch run dev:python bin/setup_vscode.py
-    ```
+This generates a `dev.toml` config file that Mitup reads when running locally. If it already exists, the command asks before overwriting; pass `--force` to skip the prompt. To try the broadcast features, add one or more `--admin-id <telegram-user-id>` options and the ids land in `bot.admin_tg_ids`. The full catalogue of config options lives in [`sample.toml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/environments/sample.toml).
 
-    !!! tip "Type hints in your editor"
-        For a better IDE experience with type hints, point your editor at the `dev` environment's interpreter (`hatch env find dev` prints its location). It includes boto3-stubs for enhanced autocompletion and type checking.
+## Set up your database
 
-### Configure your development bot
-
-To test your changes through Telegram, you need to link a bot to Mitup. Head to [BotFather](https://t.me/BotFather) and register a new bot:
-
-*   Run the `/newbot` command
-*   Choose a name for the bot, e.g. `Mitup-<yourname>-dev`
-*   Choose a username for the bot, e.g. `mitup_yourname_dev_bot`
-*   Copy the token provided by BotFather
-
-Next, run the following command:
+Local runs use a Postgres container. Start it and apply the schema:
 
 ```bash
-hatch run dev:set-local-bot <token>
+uv run mb db up
+uv run mb db migrate up
 ```
 
-This creates a `dev.toml` configuration file used by Mitup when running the bot locally via Docker. If `dev.toml` already exists, the command asks before overwriting it; pass `--force` to skip the prompt. To try broadcast features, add one or more `--admin-id <telegram-user-id>` options to pre-fill `admin_tg_ids` in the generated file.
-
-### Set up your database
-
-For local execution, we rely on a Docker instance of PostgreSQL. First, run all database migrations to ensure the database schema is correctly set up:
-
-```bash
-docker compose run migrations-upgrade
-```
-
-This command spins up a PostgreSQL database with a local volume in `./postgres-data` that persists data between executions, and then runs the necessary migrations.
+`mb db up` starts the Postgres container and waits until it reports healthy. `mb db migrate up` runs every pending migration. The container keeps its data in a local `./postgres-data` volume, so the schema and rows survive restarts.
 
 ## Launch Mitup
 
-Once setup is complete, start the bot:
+Start the bot:
 
 ```bash
-docker compose run mitup
+uv run mb run bot
 ```
 
-Open the bot in Telegram via BotFather.
+That runs the bot on your host against the local Postgres. To run it inside docker compose instead, add `--docker`. The recurrent-events worker runs the same way with `uv run mb run events`. Open your bot in Telegram and start a conversation.
+
+Once the bot is running, [the mb CLI](dev_cli.md) covers the rest of the day-to-day workflow: tests, migrations, locales, and the local container lifecycle.

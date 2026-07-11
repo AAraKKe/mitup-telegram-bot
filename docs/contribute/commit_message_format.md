@@ -141,7 +141,7 @@ Before committing, test how your message will be formatted:
 echo "feat: add new feature" > /tmp/test_commit.txt
 
 # Run the formatter
-hatch run dev:python bin/check_commit_message.py /tmp/test_commit.txt
+uv run mb ci check-commit /tmp/test_commit.txt
 
 # View the result
 cat /tmp/test_commit.txt
@@ -153,7 +153,7 @@ cat /tmp/test_commit.txt
 
 ### Implementation
 
-The commit message formatter is implemented in [`bin/check_commit_message.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/bin/check_commit_message.py) and integrated with pre-commit hooks via [`.pre-commit-config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.pre-commit-config.yaml).
+The commit message formatter is the `mb ci check-commit` command, implemented in [`tools/mb/src/mb/commit_check.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/tools/mb/src/mb/commit_check.py) and wired to the `commit-msg` hook in [`.pre-commit-config.yaml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.pre-commit-config.yaml).
 
 ### How it's different
 
@@ -166,7 +166,7 @@ Unlike traditional validators that only check format, this tool:
 
 ### Customizing validation
 
-To change the validation rules, edit [`bin/check_commit_message.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/bin/check_commit_message.py). The regex that parses the commit format, the formatting logic, and the error messages all live in that file.
+To change the validation rules, edit [`tools/mb/src/mb/commit_check.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/tools/mb/src/mb/commit_check.py). The regex that parses the commit format, the formatting logic, and the error messages all live in that file.
 
 ## Troubleshooting
 
@@ -181,10 +181,10 @@ pre-commit install --hook-type commit-msg
 
 ### Import errors
 
-The formatter needs PyYAML, which ships with the dev environment. If you get import errors, run the script through Hatch instead of your system Python:
+The formatter runs inside the workspace environment, which carries every dependency it needs. Always invoke it through uv so it resolves against that environment rather than your system Python:
 
 ```bash
-hatch run dev:python bin/check_commit_message.py /tmp/test_commit.txt
+uv run mb ci check-commit /tmp/test_commit.txt
 ```
 
 ### Commit rejected
