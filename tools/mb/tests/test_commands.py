@@ -44,13 +44,24 @@ def test_fix_formats_then_lints(recorder: CommandRecorder):
     ]
 
 
-def test_typecheck_covers_root_and_mb(recorder: CommandRecorder):
+def test_typecheck_echoes_version_then_covers_root_and_mb(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch):
+    recorder.captured_outputs["ty version"] = "ty 9.9.9 (abcdef0 2026-07-11)"
+    printed: list[str] = []
+    monkeypatch.setattr(console, "info", printed.append)
+
     cli.invoke(app, ["typecheck"])
 
-    assert recorder.commands == [["uv", "run", "ty", "check"], ["uv", "run", "ty", "check"]]
-    assert recorder.calls[0].cwd is None
-    assert recorder.calls[1].cwd is not None
-    assert recorder.calls[1].cwd.name == "mb"
+    assert recorder.commands == [
+        ["uv", "run", "ty", "version"],
+        ["uv", "run", "ty", "check"],
+        ["uv", "run", "ty", "check"],
+    ]
+    assert recorder.calls[1].cwd is None
+    assert recorder.calls[2].cwd is not None
+    assert recorder.calls[2].cwd.name == "mb"
+    # The captured `ty version` output must reach the console, or CI loses the record of
+    # which ty build produced the result even though `ty version` still runs.
+    assert "ty 9.9.9 (abcdef0 2026-07-11)" in printed
 
 
 def test_deploy_passes_arguments_through(recorder: CommandRecorder):

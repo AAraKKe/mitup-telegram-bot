@@ -28,11 +28,11 @@ test:
   parallel:
     matrix:
       - LANG: [en, es_ES, gl_ES, de_DE, pt_BR, it_IT]
-  # Raw pytest instead of `mb test --cov`: this job needs the JUnit/Cobertura/JSON
-  # report flags that the local-facing mb command deliberately leaves out.
+  # `mb test --cov` supplies -n 4, --cov=mitup_bot and the term-missing report; the JUnit/
+  # Cobertura/JSON report flags ride the passthrough. mb test builds stale locales itself,
+  # so no explicit `mb locales build` step is needed.
   script:
-    - uv run mb locales build
-    - uv run pytest -n 4 --cov=mitup_bot --cov-report term-missing:skip-covered --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json tests --lang $LANG
+    - uv run mb test --cov --lang $LANG tests --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   dependencies:
     - build-translations
@@ -76,9 +76,7 @@ linter:
 
 type-check:
   stage: test
-  script: |
-    uv run ty version
-    uv run mb typecheck
+  script: uv run mb typecheck
   needs: [preparation]
 
 check-ty-ignores:
@@ -118,11 +116,9 @@ test-db:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
-  # Raw pytest instead of `mb test --db`: this job needs the JUnit report flag
-  # that the local-facing mb command deliberately leaves out.
+  # `mb test --db` supplies --db-tests --dist no; the JUnit report flag rides the passthrough.
   script:
-    - uv run mb locales build
-    - uv run pytest --db-tests --dist no --junitxml=report.xml tests/models/db_behavior/
+    - uv run mb test --db tests/models/db_behavior/ --junitxml=report.xml
   needs: [preparation]
   artifacts:
     when: always
