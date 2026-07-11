@@ -28,23 +28,36 @@ repos:
     hooks:
       - id: renovate-config-validator
         args: [--strict]
+  # Local hooks run `uv run` with `--no-sync --frozen`: a git hook must never mutate a
+  # tracked file, and a bare `uv run` will re-lock (rewriting uv.lock) and re-sync the
+  # environment whenever a staged pyproject.toml is ahead of uv.lock. pre-commit then sees
+  # the rewritten uv.lock as "files modified by this hook" and aborts the commit. `--frozen`
+  # keeps the lock untouched; `--no-sync` skips the env sync (faster, no env mutation). Both
+  # require the dev environment to already exist — run `uv sync` once after installing hooks.
   - repo: local
     hooks:
       - id: check-commit-message
         name: Check conventional commit message
-        entry: uv run mb ci check-commit
+        entry: uv run --no-sync --frozen mb ci check-commit
         language: system
         stages: [commit-msg]
+      - id: check-lock
+        name: Check uv.lock is up to date
+        entry: uv run --no-sync --frozen mb ci check-lock
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|.*/pyproject\.toml|uv\.lock)$
+        stages: [pre-commit]
       - id: build-docs
         name: Build documentation
-        entry: uv run mb docs build
+        entry: uv run --no-sync --frozen mb docs build
         language: system
         pass_filenames: false
         files: ^(docs/|zensical\.toml$)
         stages: [pre-commit]
       - id: validate-locales
         name: Validate source language
-        entry: uv run mb locales validate
+        entry: uv run --no-sync --frozen mb locales validate
         pass_filenames: false
         language: system
         stages:

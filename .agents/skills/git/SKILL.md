@@ -20,12 +20,39 @@ whether pre-commit hooks are installed:
 
 **Check:** `test -x .git/hooks/commit-msg && echo installed || echo not-installed`
 
-- **Hooks installed** → write `Type[(scope)]: description` — the hook prepends the emoji automatically.
-  Example: `Feat(auth): add JWT login`
+- **Hooks installed** → write `Type[(scope)]: description` — the commit-msg hook rewrites the
+  subject to `{emoji} description` in place and the commit completes in one `git commit`.
+  Example: you type `Feat(auth): add JWT login`, history records `✨(auth) Add JWT login`.
 - **Hooks NOT installed** → write `{emoji} description` — include the emoji directly.
   Example: `✨ Add JWT login` (see `commits_check_config.yaml` for the emoji to use)
 
+**The check is idempotent.** A subject already in valid emoji form (`{emoji}[(scope)] description`
+with an emoji from `commits_check_config.yaml`) is accepted unchanged — the file is left
+byte-for-byte identical, exit 0. So the two shapes are interchangeable with hooks on, and
+`git commit --amend --no-edit` on an already-emojified commit succeeds instead of erroring. A
+lowercase description is still auto-capitalized; a message with neither shape is still rejected.
+
 **Type/emoji mapping** — the authoritative list lives in `commits_check_config.yaml` at the repo root. Read that file before picking a type; it is the single source of truth enforced by CI, and it evolves over time (types get added, emoji get tweaked). Don't rely on a mapping written into this skill — it will drift.
+
+**Fallback when `mb` is unimportable** — the commit-msg hook runs `uv run --no-sync --frozen mb ci check-commit`. If
+`mb` itself is mid-refactor and won't import, the hook aborts every commit. In that narrow case,
+run the gates manually (`uv run mb validate`, or at least `uv run ruff check .`), write the subject
+in emoji form directly, and commit with `--no-verify` to bypass the broken hook. Drop `--no-verify`
+again as soon as `mb` imports.
+
+## Dependency edits (pyproject.toml + uv.lock)
+
+After editing any `pyproject.toml` (root or a `tools/*` workspace member), regenerate and stage the lock **in the same commit**:
+
+```bash
+uv sync            # regenerates uv.lock to match pyproject.toml
+git add pyproject.toml uv.lock   # (or tools/<pkg>/pyproject.toml uv.lock)
+```
+
+- A staged `pyproject.toml` with a stale `uv.lock` is **blocked** by the `check-lock` pre-commit hook with a message pointing you at `uv sync`; CI's `uv lock --check` catches it too. Refresh and stage the lock, then re-commit.
+- The git hooks run `uv run --no-sync --frozen`, so they never rewrite `uv.lock` themselves — but they require the dev env to exist (`uv sync` once after `pre-commit install --install-hooks --hook-type commit-msg --hook-type pre-commit --hook-type pre-push`).
+
+**"files were modified by this hook" (a different failure)** — a *pre-commit-stage* fixer (`trailing-whitespace`, `end-of-file-fixer`, `ruff-format`) legitimately edited a **staged source file**. This is normal: re-stage the fixed files and re-run the same commit (do NOT amend — the previous commit did not happen). It is unrelated to the commit-message rewrite, which commits in one shot.
 
 ---
 

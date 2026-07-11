@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from . import commit_check, language_matrix, runner, ty_ignores
+from . import commit_check, language_matrix, lock_check, runner, ty_ignores
 
 app = typer.Typer(no_args_is_help=True, help="CI checks (normally run by the pipeline).")
 
@@ -17,6 +17,12 @@ def check_commit(
     """Validate commit message format and replace the type prefix with its emoji."""
     config_path = runner.repo_root() / "commits_check_config.yaml"
     raise typer.Exit(commit_check.check_commit_file(commit_msg_file, config_path))
+
+
+@app.command("check-lock")
+def check_lock():
+    """Fail if uv.lock is out of date with any workspace pyproject.toml."""
+    raise typer.Exit(lock_check.run_check(runner.repo_root()))
 
 
 @app.command("check-ty-ignores")

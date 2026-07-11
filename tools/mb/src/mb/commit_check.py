@@ -15,6 +15,17 @@ COMMIT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Regex for the emojified form this tool produces: the leading emoji is matched
+# separately (it varies per type), so this covers only the tail — an optional
+# scope in parentheses, then a space, then the description.
+# Format: [(scope)] description
+EMOJI_TAIL_PATTERN = re.compile(
+    r"^(?:\((?P<scope>[a-z0-9_\-/, ]+)\))?"  # Optional scope (no space before it)
+    r" "  # Single space separating prefix from description
+    r"(?P<description>.+)$",  # Description
+    re.IGNORECASE,
+)
+
 
 class CommitConfigError(RuntimeError):
     """Raised when commits_check_config.yaml is missing or cannot be parsed."""
@@ -41,7 +52,15 @@ class CommitMessageFormatter:
         self.type_lookup = {k.lower(): k for k in self.allowed_types}
 
     def format_commit_message(self, message: str) -> tuple[str | None, str | None]:
-        """Return an (error_message, formatted_message) pair; exactly one side is set."""
+        """Return an (error_message, formatted_message) pair; exactly one side is set.
+
+        Accepts two input shapes and always emits the emoji form:
+        - Conventional ``Type[(scope)]: description`` is rewritten to the emoji form.
+        - An already-emojified ``<emoji>[(scope)] description`` is re-normalized. This
+          makes the check idempotent: a message already in valid emoji form comes back
+          byte-identical, so re-running the hook (e.g. ``git commit --amend --no-edit``)
+          no longer fails.
+        """
         # Skip merge commits
         if message.startswith("Merge "):
             return None, message
@@ -50,27 +69,18 @@ class CommitMessageFormatter:
         lines = message.strip().split("\n")
         subject = lines[0].strip()
 
-        match = COMMIT_PATTERN.match(subject)
-        if not match:
+        # Prefer the already-emojified form so re-runs stay idempotent; fall back to the
+        # conventional Type-prefixed form that contributors type by hand.
+        parsed = self._parse_emoji_form(subject)
+        if parsed is None:
+            parsed = self._parse_conventional_form(subject)
+        if parsed is None:
             return self._format_error_message(subject), None
 
-        # Validate type (case-insensitive)
-        commit_type = match.group("type")
-        if commit_type.lower() not in self.type_lookup:
-            return self._format_type_error(commit_type), None
+        error, emoji, scope, description = parsed
+        if error is not None:
+            return error, None
 
-        # Get the canonical type name and its emoji
-        canonical_type = self.type_lookup[commit_type.lower()]
-        emoji = self.allowed_types[canonical_type].get("emoji", "")
-
-        # Get description and capitalize first letter
-        description = match.group("description").strip()
-        if not description:
-            return "Commit message must have a description after the colon.", None
-        if description[0].islower() and description[0].isalpha():
-            description = description[0].upper() + description[1:]
-
-        scope = match.group("scope")
         formatted_subject = emoji
         if scope:
             formatted_subject += f"({scope})"
@@ -79,6 +89,55 @@ class CommitMessageFormatter:
         # Rebuild the full message, preserving body and footer
         formatted_lines = [formatted_subject, *lines[1:]]
         return None, "\n".join(formatted_lines)
+
+    def _parse_conventional_form(self, subject: str) -> tuple[str | None, str, str | None, str] | None:
+        """Parse a ``Type[(scope)]: description`` subject.
+
+        Returns ``(error, emoji, scope, description)`` when the shape matches (``error`` is
+        set only for a recognized shape with an unusable type/description), or ``None`` when
+        the subject is not conventional form at all.
+        """
+        match = COMMIT_PATTERN.match(subject)
+        if not match:
+            return None
+
+        commit_type = match.group("type")
+        if commit_type.lower() not in self.type_lookup:
+            return self._format_type_error(commit_type), "", None, ""
+
+        canonical_type = self.type_lookup[commit_type.lower()]
+        emoji = self.allowed_types[canonical_type].get("emoji", "")
+        description = match.group("description").strip()
+        if not description:
+            return "Commit message must have a description after the colon.", "", None, ""
+        return None, emoji, match.group("scope"), self._capitalize(description)
+
+    def _parse_emoji_form(self, subject: str) -> tuple[str | None, str, str | None, str] | None:
+        """Parse an already-emojified ``<emoji>[(scope)] description`` subject.
+
+        Returns ``(error, emoji, scope, description)`` when the subject starts with a known
+        emoji and matches the emoji shape, or ``None`` when it does not — in which case the
+        caller falls back to the conventional form.
+        """
+        for info in self.allowed_types.values():
+            emoji = info.get("emoji", "")
+            if not emoji or not subject.startswith(emoji):
+                continue
+            match = EMOJI_TAIL_PATTERN.match(subject[len(emoji) :])
+            if not match:
+                return None
+            description = match.group("description").strip()
+            if not description:
+                return None
+            return None, emoji, match.group("scope"), self._capitalize(description)
+        return None
+
+    @staticmethod
+    def _capitalize(description: str) -> str:
+        """Upper-case the first letter of the description when it is a lowercase letter."""
+        if description and description[0].islower() and description[0].isalpha():
+            return description[0].upper() + description[1:]
+        return description
 
     def format_file(self, commit_msg_file: Path) -> int:
         """Rewrite the commit message file in place. Returns the hook exit code."""
@@ -96,11 +155,19 @@ class CommitMessageFormatter:
             console.raw(f"\n{error_message}")
             return 1
 
-        try:
-            commit_msg_file.write_text(formatted_message)
-        except OSError as error:
-            console.error(f"Failed to write formatted message: {error}")
-            return 1
+        # Preserve the trailing newline git writes into the message file so an
+        # already-valid message stays byte-for-byte identical on a re-run.
+        if message.endswith("\n") and not formatted_message.endswith("\n"):
+            formatted_message += "\n"
+
+        # Only touch the file when the content actually changes. A no-op write would
+        # break idempotent re-runs (``git commit --amend --no-edit``) for no benefit.
+        if formatted_message != message:
+            try:
+                commit_msg_file.write_text(formatted_message)
+            except OSError as error:
+                console.error(f"Failed to write formatted message: {error}")
+                return 1
 
         original_subject = message.split("\n")[0]
         formatted_subject = formatted_message.split("\n")[0]
