@@ -1,7 +1,8 @@
 import pytest
-from mb import validate
 from mb.main import app
 from typer.testing import CliRunner
+
+from mb import validate
 
 cli = CliRunner()
 

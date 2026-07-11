@@ -35,7 +35,10 @@ config-staging:
     name: staging
   # Do not block deployment on formatting/style issues
   needs:
-    - test
+    # A deploy blocks on the whole test suite (every `test-suite` matrix entry) and the db suite.
+    # Both run on the default branch (their `rules` always fire there), so neither needs `optional`.
+    - test-suite
+    - test-db
     - type-check
     - validate-locales
     - validate-migrations

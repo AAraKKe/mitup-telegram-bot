@@ -51,6 +51,19 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
         metafunc.parametrize("lang", langs, ids=[f"lang_{lang}" for lang in langs])
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]):
+    """Tag every language-parametrized test with the ``i18n`` marker.
+
+    A test is language-dependent exactly when its fixture closure pulls the ``lang`` fixture — the
+    same signal that drives the parametrization above. CI runs the 6-language matrix over just these
+    items (``-m i18n``) and everything else once (``-m 'not i18n'``), so the marker is what keeps the
+    matrix scoped to locale-rendering behavior instead of multiplying the whole suite by six.
+    """
+    for item in items:
+        if isinstance(item, pytest.Function) and "lang" in item.fixturenames:
+            item.add_marker("i18n")
+
+
 # execnet's serializer dispatches on the EXACT type, not via isinstance, so a `str`/`int`/`dict`
 # subclass (e.g. a `StrEnum` member such as `Env`, or an `IntEnum`) is NOT recognized and raises
 # `DumpError`. Only these exact scalar types pass through unchanged.

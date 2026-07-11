@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from mb import commit_check
 
 CONFIG = """

@@ -8,12 +8,13 @@ from unittest import mock
 
 import pytest
 import typer
-from mb import console, deploy_ops
 from mb.main import app
 from mypy_boto3_ecs import ECSClient
 from mypy_boto3_ecs.type_defs import ServiceDeploymentTypeDef
 from mypy_boto3_lambda import LambdaClient
 from typer.testing import CliRunner
+
+from mb import console, deploy_ops
 
 cli = CliRunner()
 

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 import typer
+
 from mb import console, docs_ops
 
 MODULE_PATH = "mb.docs_ops"

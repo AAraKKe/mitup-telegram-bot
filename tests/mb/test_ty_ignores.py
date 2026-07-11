@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from mb import ty_ignores
 
 # The directive text is assembled at runtime: the CI scan reads tools/ sources as raw

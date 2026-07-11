@@ -27,38 +27,86 @@ validate-ci-languages:
   stage: build
   script: uv run mb ci check-languages
 
-test:
+# The whole suite runs from one `parallel:matrix` job. `mb test --member $TARGET` maps a member
+# to its `tests/<name>` subtree (tests/ mirrors the member layout), so there is no trigger list to
+# keep in sync. Language-rendering members (apps/bot, libs/telegram, apps/events) contribute a
+# `-m "not i18n"` single run plus a `-m i18n` run per supported language; every other member runs
+# once. One broad trigger (below) gates the job: it errs toward running the suite so a new test is
+# never silently dropped by an out-of-date trigger list.
+.test-rules: &test_rules
+  - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  - changes:
+      - apps/**/*
+      - libs/**/*
+      - tools/**/*
+      - tests/**/*
+      - uv.lock
+      - pyproject.toml
+      - .gitlab/ci/test.yml
+
+test-suite:
   stage: test
-  parallel:
-    matrix:
-      - LANG: [en, es_ES, gl_ES, de_DE, pt_BR, it_IT]
-  # `mb test --cov` supplies -n 4, --cov=mitup_bot and the term-missing report; the JUnit/
-  # Cobertura/JSON report flags ride the passthrough. mb test builds stale locales itself,
-  # so no explicit `mb locales build` step is needed.
-  script:
-    - uv run mb test --cov --lang $LANG tests --cov-report xml:coverage.xml --junitxml=report.xml --json-report --json-report-file=report.json
-  coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
+  needs: [preparation, build-translations]
   dependencies:
     - build-translations
-  needs: [preparation, build-translations, validate-ci-languages]
+  parallel:
+    matrix:
+      - TARGET:
+          - libs/core
+          - libs/monitoring
+          - libs/data
+          - libs/patreon
+          - apps/lambda-migrations
+          - apps/lambda-alarm
+          - tools/rails-migration
+          - tools/mb
+      - TARGET:
+          - apps/bot
+          - libs/telegram
+          - apps/events
+        MARKER: ["not i18n"]
+      - TARGET:
+          - apps/bot
+          - libs/telegram
+          - apps/events
+        LOCALE: [en, es_ES, gl_ES, de_DE, pt_BR, it_IT]
+  # Each entry writes its coverage to a uniquely named raw data file and does not report a
+  # percentage; `coverage-report` combines all of them into the single project number so partial
+  # per-entry slices are never averaged.
+  variables:
+    COVERAGE_FILE: ".coverage.${CI_JOB_ID}"
+  script:
+    - |
+      if [ -n "${LOCALE:-}" ]; then
+        uv run mb test --member "$TARGET" --lang "$LOCALE" -m i18n --cov --junit report.xml
+      elif [ -n "${MARKER:-}" ]; then
+        uv run mb test --member "$TARGET" -m "$MARKER" --cov --junit report.xml
+      else
+        uv run mb test --member "$TARGET" --cov --junit report.xml
+      fi
   artifacts:
-    when: always # Important to get reports when test fail
+    when: always # Important to get reports when tests fail
+    paths:
+      - .coverage.*
     reports:
       junit: report.xml
+  rules: *test_rules
+
+coverage-report:
+  stage: test
+  needs: [test-suite, test-db]
+  script:
+    - uv run coverage combine .coverage.*
+    - uv run coverage xml -o coverage.xml
+    - uv run coverage report
+  coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
+  artifacts:
+    when: always
+    reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
-  rules:
-    # Run always in master
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    # run only when the mitupbot, dev or tests folders are updated
-    - changes:
-        - mitup_bot/**/*
-        - pyproject.toml
-        - uv.lock
-        - tools/**/*
-        - dev/**/*
-        - tests/**/*
+  rules: *test_rules
 
 format-check:
   stage: test
@@ -127,14 +175,19 @@ test-db:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
-  # `mb test --db` supplies --db-tests --dist no; the JUnit report flag rides the passthrough.
+    COVERAGE_FILE: ".coverage.${CI_JOB_ID}"
+  # `mb test --db --cov` runs the db suite serially with coverage; its raw data file feeds the
+  # combined `coverage-report`. The JUnit report flag rides the passthrough.
   script:
-    - uv run mb test --db tests/models/db_behavior/ --junitxml=report.xml
+    - uv run mb test --db --cov tests/data/db_behavior/ --junitxml=report.xml
   needs: [preparation]
   artifacts:
     when: always
+    paths:
+      - .coverage.*
     reports:
       junit: report.xml
+  rules: *test_rules
 
 validate-local-setup:
   # This job validates the fresh-contributor bootstrap on a clean image:

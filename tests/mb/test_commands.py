@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 from command_recording import CommandRecorder
-from mb import console, runner
 from mb.main import app
 from typer.testing import CliRunner
+
+from mb import console, runner
 
 cli = CliRunner()
 
@@ -118,11 +119,15 @@ def test_test_command_forwards_flags_and_passthrough(recorder: CommandRecorder):
     assert pytest_call[-5:] == ["--lang", "es_ES", "tests/utils", "-k", "menu"]
 
 
-def test_test_command_rejects_cov_with_db(recorder: CommandRecorder):
+def test_test_command_composes_db_with_coverage(recorder: CommandRecorder):
     result = cli.invoke(app, ["test", "--cov", "--db"])
 
-    assert result.exit_code == 2
-    assert recorder.commands == []
+    assert result.exit_code == 0
+    pytest_call = recorder.commands[-1]
+    assert "--db-tests" in pytest_call
+    assert pytest_call[pytest_call.index("--dist") : pytest_call.index("--dist") + 2] == ["--dist", "no"]
+    assert "--cov=mitup_bot" in pytest_call
+    assert "-n" not in pytest_call
 
 
 def test_location_note_is_none_at_repo_root():

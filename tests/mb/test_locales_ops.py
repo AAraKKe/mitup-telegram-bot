@@ -3,10 +3,10 @@ from unittest import mock
 
 import pytest
 from command_recording import CommandRecorder
-from mb import console, locales_ops
 from mb.locales import app
 from typer.testing import CliRunner
 
+from mb import console, locales_ops
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
 
 cli = CliRunner()

@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pytest
 from command_recording import CommandRecorder
-from mb import console
 from mb.main import app
 from typer.testing import CliRunner
+
+from mb import console
 
 cli = CliRunner()
 

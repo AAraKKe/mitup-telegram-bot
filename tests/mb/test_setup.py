@@ -5,10 +5,10 @@ from unittest import mock
 import pytest
 import typer
 from command_recording import CommandRecorder
-from mb import console, setup_env
 from mb.main import app
 from typer.testing import CliRunner
 
+from mb import console, setup_env
 from mitup_bot.config import Config, Env, TomlConfigProvider
 
 cli = CliRunner()

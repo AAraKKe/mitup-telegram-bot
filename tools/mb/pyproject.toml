@@ -30,10 +30,10 @@ mitup-telegram = { workspace = true }
 packages = ["src/mb"]
 
 [tool.ty.src]
-include = ["src", "tests"]
+include = ["src"]
 
 [tool.ty.environment]
-root = ["src", "tests"]
+root = ["src"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,9 +1,10 @@
 from pathlib import Path
 
 import pytest
-from mb import console, migrate_ops
 from mb.main import app
 from typer.testing import CliRunner
+
+from mb import console, migrate_ops
 
 cli = CliRunner()
 

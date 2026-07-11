@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from command_recording import CommandRecorder
+
 from mb import console, runner
 
 

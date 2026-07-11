@@ -27,6 +27,7 @@ filterwarnings = [
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "db_test: marks tests requiring a live Postgres container (deselected unless --db-tests is given)",
+    "i18n: marks a language-dependent test (auto-applied to every test that uses the `lang` fixture); CI runs the 6-language matrix over `-m i18n` and the rest once via `-m 'not i18n'`",
 ]
 env_files = [".env"]
 
@@ -149,8 +150,10 @@ ignore = ["SIM117"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mitup_bot", "tests"]
-# Eensure alembic is not confused with our local alembic folder
-known-third-party = ["alembic"]
+# `tests` is a `src` root, so a `tests/<name>/` subtree would otherwise make `<name>` look like a
+# first-party module. Pin the third-party packages that collide with a test subtree directory name
+# (alembic; telegram, whose tests live in tests/telegram/) so their imports stay classified correctly.
+known-third-party = ["alembic", "telegram"]
 
 [tool.ruff.lint.pycodestyle]
 max-doc-length = 120

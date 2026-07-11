@@ -2,8 +2,9 @@ import json
 from pathlib import Path
 
 import pytest
-from mb import vscode
 from rich.prompt import Confirm
+
+from mb import vscode
 
 
 @pytest.fixture
