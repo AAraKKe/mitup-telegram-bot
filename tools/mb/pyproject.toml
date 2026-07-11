@@ -1,0 +1,22 @@
+[project]
+name = "mb"
+version = "0.1.0"
+description = "Developer CLI for the mitup-telegram-bot repository"
+requires-python = ">=3.14"
+dependencies = ["typer>=0.15"]
+
+[project.scripts]
+mb = "mb.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mb"]
+
+[tool.ty.src]
+include = ["src", "tests"]
+
+[tool.ty.environment]
+root = ["src", "tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

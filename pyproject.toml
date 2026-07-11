@@ -184,7 +184,19 @@ keep-runtime-typing = true
 # --------------------------
 # Development/CI environment
 # --------------------------
+[tool.uv.workspace]
+members = ["tools/mb"]
+
+# The dev CLI is wired through its own dependency group: `uv sync` installs default groups,
+# and hatch never consumes this one (a workspace source would break its resolver).
+[tool.uv.sources]
+mb = { workspace = true }
+
+[tool.uv]
+default-groups = ["dev", "tools"]
+
 [dependency-groups]
+tools = ["mb"]
 dev = [
     "pytest~=9.1.1",
     "pytest-asyncio~=1.4.0",
