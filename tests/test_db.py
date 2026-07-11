@@ -324,6 +324,20 @@ async def test_write_mode_requires_a_context_like_argument():
 # ---------------------------------------------------------------------------
 
 
+async def test_begin_write_requires_a_registered_reconciler(write_context: SimpleNamespace):
+    api: TelegramApi = write_context.api
+
+    # The registration check fires at entry, before any capture or session opens — the db is
+    # left unconfigured here, so getting past it would raise DbNotInitializedError instead.
+    with mock.patch("mitup_bot.db.__outbox_reconciler", None):
+        with pytest.raises(db.OutboxReconcilerNotRegisteredError):
+            async with db.begin_write(api):
+                raise AssertionError("the body must not run without a reconciler")
+
+    # The refusal left no capture mode behind: the next critical section can start its own.
+    api.begin_capture()
+
+
 async def test_begin_write_commits_before_queued_calls_drain(
     mock_session: MockDbSession, write_context: SimpleNamespace, fanout_bot: mock.AsyncMock
 ):

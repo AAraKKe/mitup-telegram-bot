@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application
 
-from mitup_bot import db
+from mitup_bot import db, reconcile
 from mitup_bot.cli.cli_commands import MitupCliCommand
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.models import Meetup, MeetupLocation, Settings
@@ -136,6 +136,13 @@ def none():
     Specially in places where pytest getfixture value is used to dinamically load fixtures
     """
     return None
+
+
+@pytest.fixture(autouse=True)
+def outbox_reconciler():
+    """Mirror the startup wiring both process entry points perform: write-mode lifecycles
+    refuse to run without the model-aware reconciler registered on the db layer."""
+    reconcile.register_outbox_reconciler()
 
 
 @pytest.fixture

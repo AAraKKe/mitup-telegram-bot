@@ -9,7 +9,7 @@ from uuid import uuid4
 import structlog
 from telegram.ext import AIORateLimiter, ExtBot
 
-from mitup_bot import db, patreon
+from mitup_bot import db, patreon, reconcile
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.events import (
@@ -225,6 +225,7 @@ def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
 
     pool_metrics_client = MetricsClient(EmfBackend()) if config.db.pool_metrics_enabled else None
     db.configure_db(config.db, metrics_client=pool_metrics_client)
+    reconcile.register_outbox_reconciler()
     configure_logging(env, Component.EVENTS, config.app.log_level)
     configure_emf_backend(config.metrics)
     configure_patreon(config)

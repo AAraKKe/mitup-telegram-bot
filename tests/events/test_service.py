@@ -548,6 +548,31 @@ def test_cli_invokes_with_defaults():
         mock_async_run.assert_called_once()
 
 
+def test_cli_registers_the_outbox_reconciler():
+    runner = CliRunner()
+
+    with (
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.db"),
+        patch("mitup_bot.events.service.reconcile") as mock_reconcile,
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
+    ):
+        mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = False
+        mock_config.patreon = None
+        mock_config_cls.return_value = mock_config
+
+        result = runner.invoke(cli, [])
+
+        assert result.exit_code == 0, result.output
+        # Write-mode lifecycles refuse to run without the reconciler: startup must wire it.
+        mock_reconcile.register_outbox_reconciler.assert_called_once_with()
+
+
 def test_cli_instruments_pool_when_pool_metrics_enabled():
     runner = CliRunner()
 

@@ -173,6 +173,14 @@ def test_init_configures_db_with_metrics_when_pool_metrics_enabled(patch_runtime
     assert isinstance(configure_call.kwargs["metrics_client"], MetricsClient)
 
 
+def test_init_registers_the_outbox_reconciler(patch_runtime_deps: RuntimeDeps):
+    with mock.patch("mitup_bot.app.reconcile.register_outbox_reconciler") as mock_register:
+        MitupRuntime(Env.DEV)
+
+    # Write-mode lifecycles refuse to run without the reconciler: startup must wire it.
+    mock_register.assert_called_once_with()
+
+
 def test_init_configures_timezone_api(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 

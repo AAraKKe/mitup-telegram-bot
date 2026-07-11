@@ -46,6 +46,7 @@ Handlers use it through `@with_session(write=True)`, a thin wrapper that capture
 - Drop defensive "flush before send" calls: commit-before-drain provides fail-early ordering structurally.
 - `context.api.immediate.X(...)` is the escape hatch for a call that must run pre-commit (its failure aborts the transaction). Keep usages rare and greppable.
 - If the body raises, the queue is discarded with the rolled-back transaction — nothing about aborted state is rendered.
+- **The reconcile behavior is registered, not built in.** `db.py` knows the api and its outbox only through the structural `WriteApi` / `OutboxProtocol` protocols; the model-aware fix-up logic lives in `mitup_bot/reconcile.py` and is wired via `reconcile.register_outbox_reconciler()` at startup. `begin_write` refuses to run without a registered reconciler, so every new process entry point that runs write-mode critical sections must call it once (the bot runtime, the recurrent-events CLI, and the test suite's root conftest already do).
 
 ### `racy_flush` — the single racy-write primitive
 

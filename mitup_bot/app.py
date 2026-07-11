@@ -4,7 +4,7 @@ import structlog
 import uvicorn
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
-from mitup_bot import db, docs_links, patreon, supporter, timezone_api
+from mitup_bot import db, docs_links, patreon, reconcile, supporter, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
@@ -67,6 +67,7 @@ class MitupRuntime:
     def __setup_db(self):
         metrics_client = MetricsClient(EmfBackend()) if self.config.db.pool_metrics_enabled else None
         db.configure_db(self.config.db, metrics_client=metrics_client)
+        reconcile.register_outbox_reconciler()
 
     def __setup_timezone_api(self):
         timezone_api.configure(self.config.google_api)

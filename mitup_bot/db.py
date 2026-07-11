@@ -4,7 +4,7 @@ from collections import Counter
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
-from typing import Any, Concatenate, Literal, Protocol, overload
+from typing import Any, Concatenate, Literal, Protocol, cast, overload
 
 import structlog
 from pydantic import BaseModel, ValidationError
@@ -15,20 +15,43 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import ConnectionPoolEntry, PoolProxiedConnection, QueuePool
-from sqlmodel import SQLModel, col, delete, select
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mitup_bot.api_wrapper import ApiOutbox, TelegramApi, TelegramApiWrapper
 from mitup_bot.config import DbConfig
-from mitup_bot.models import MeetupLocation, Message, MessageButtons, User
+from mitup_bot.models import MeetupLocation, MessageButtons
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.protocols import ContextOrBotAdapter
 
 log = structlog.get_logger(__name__)
+
+
+class OutboxProtocol(Protocol):
+    """The reconcile surface of an api outbox: the DB fix-ups recorded while the queued
+    fan-out drained, to be applied by the registered reconciler."""
+
+    dead_message_ids: list[int]
+    inactive_tg_user_ids: list[int]
+
+
+class WriteApi[OutboxT: OutboxProtocol](Protocol):
+    """The capture/drain surface the write lifecycle drives on the api, expressed
+    structurally so this module never depends on the api implementation."""
+
+    @property
+    def adapter(self) -> ContextOrBotAdapter: ...
+    def begin_capture(self) -> OutboxT: ...
+    def end_capture(self): ...
+    async def execute_queued(self, outbox: OutboxT): ...
+
+
+OutboxReconciler = Callable[[AsyncSession, ContextOrBotAdapter, OutboxProtocol], Coroutine[Any, Any, None]]
 
 __sessionmaker: async_sessionmaker[AsyncSession] | None = None
 __connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")
 __active_connections: Counter[str] = Counter()
 __pool_metrics: MetricsClient | None = None
+__outbox_reconciler: OutboxReconciler | None = None
 
 
 class DbNotInitializedError(RuntimeError):
@@ -39,6 +62,13 @@ class DbNotInitializedError(RuntimeError):
 class DbAlreadyInitializedError(RuntimeError):
     def __init__(self):
         super().__init__("Database has already been configured.")
+
+
+class OutboxReconcilerNotRegisteredError(RuntimeError):
+    def __init__(self):
+        super().__init__(
+            "No outbox reconciler has been registered. See mitup_bot.db.set_outbox_reconciler for information."
+        )
 
 
 def serialize_pydantic_model(model: BaseModel) -> str:
@@ -55,6 +85,17 @@ def deserialize_pydantic_model(data: str) -> BaseModel | None:
     with suppress(ValidationError):
         return MessageButtons.model_validate_json(data)
     return None
+
+
+def set_outbox_reconciler(reconciler: OutboxReconciler):
+    """Register the model-aware reconcile behavior the write lifecycle applies after a drain.
+
+    The db layer owns the lifecycle ordering (capture, commit, drain, reconcile) but not the
+    models the fix-ups touch; every process entry point that runs write-mode critical
+    sections registers the reconciler once at startup (see mitup_bot.reconcile).
+    """
+    global __outbox_reconciler
+    __outbox_reconciler = reconciler
 
 
 def set_connection_context(context: str):
@@ -248,40 +289,34 @@ class _WriteHandlerDecorator(Protocol):
     ) -> Callable[P, Coroutine[Any, Any, R]]: ...
 
 
-def capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> TelegramApi:
+def capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> WriteApi[Any]:
     """Take the api to capture on from the handler's context: handlers follow the
     ``(session, update, context)`` convention, so at the call site the context is the last
-    positional argument (or an explicit ``context=`` keyword)."""
+    positional argument (or an explicit ``context=`` keyword). The check is structural
+    (does the candidate's ``.api`` expose the capture lifecycle?) because this module only
+    knows the api through the `WriteApi` protocol."""
     candidate = kwargs.get("context", args[-1] if args else None)
     api = getattr(candidate, "api", None)
-    if isinstance(api, TelegramApi):
-        return api
+    if api is not None and callable(getattr(api, "begin_capture", None)):
+        return cast("WriteApi[Any]", api)
     raise TypeError(
         "with_session(write=True) requires the MitupContext (exposing `.api`) as the last positional "
         "argument or the `context` keyword; non-handler code uses db.begin_write(api) directly"
     )
 
 
-async def apply_reconcile(api: TelegramApiWrapper, outbox: ApiOutbox):
-    """Apply the DB fix-ups discovered while draining the outbox, in one short transaction:
-    drop Message rows Telegram reported gone and mark unreachable users inactive."""
+async def apply_reconcile(api: WriteApi[Any], outbox: OutboxProtocol):
+    """Run the registered reconciler over the DB fix-ups discovered while draining the
+    outbox, in one short transaction; a drain that recorded nothing skips the transaction."""
     if not outbox.dead_message_ids and not outbox.inactive_tg_user_ids:
         return
+    assert __outbox_reconciler is not None, "begin_write refuses to start without a registered reconciler"
     async with begin() as session:
-        if outbox.dead_message_ids:
-            log.info("Deleting messages reported gone during fan-out", message_ids=outbox.dead_message_ids)
-            await session.exec(  # type: ignore[call-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
-                delete(Message).where(col(Message.id).in_(outbox.dead_message_ids))
-            )
-        for tg_user_id in dict.fromkeys(outbox.inactive_tg_user_ids):
-            user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
-            if user is not None and user.mark_inactive():
-                log.info("Marking user as inactive", tg_user_id=tg_user_id)
-                api.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
+        await __outbox_reconciler(session, api.adapter, outbox)
 
 
 @asynccontextmanager
-async def begin_write(api: TelegramApiWrapper) -> AsyncGenerator[AsyncSession]:
+async def begin_write[OutboxT: OutboxProtocol](api: WriteApi[OutboxT]) -> AsyncGenerator[AsyncSession]:
     """Run one write-mode critical section: the api is in capture mode for the body (every
     ``api.*`` call enqueues a plain-data snapshot), the transaction commits — releasing the
     pooled connection and any per-meeting row lock — and only then do the queued Telegram
@@ -297,6 +332,8 @@ async def begin_write(api: TelegramApiWrapper) -> AsyncGenerator[AsyncSession]:
     A body exception discards the queue along with the rolled-back transaction — nothing
     about aborted state is rendered.
     """
+    if __outbox_reconciler is None:
+        raise OutboxReconcilerNotRegisteredError()
     outbox = api.begin_capture()
     try:
         async with begin() as session:
