@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from . import checks, console, runner, testing
+from . import checks, console, locales_ops, migrate_ops, testing
 
 Gate = tuple[str, Callable[[], int]]
 
@@ -60,8 +60,8 @@ def standard_gates() -> list[Gate]:
 def extended_gates() -> list[Gate]:
     return [
         ("db tests", lambda: testing.run_tests([], db=True)),
-        ("locales", lambda: runner.uv("mitup", "translations", "validate-locales")),
-        ("migrations", lambda: runner.uv("mitup", "validate-migrations")),
+        ("locales", locales_ops.ensure_all_translations),
+        ("migrations", migrate_ops.validate_migration_graph),
     ]
 
 

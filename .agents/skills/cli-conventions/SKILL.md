@@ -11,7 +11,7 @@ The bot includes a CLI built with [Click](https://click.palletsprojects.com/). T
 ## Scope
 
 <critical_rules>
-  <rule>This CLI is for production-related commands only — commands that are part of the bot's operational lifecycle (launching, deploying, running migrations, managing translations, etc.). It is NOT a general-purpose tooling CLI.</rule>
+  <rule>This CLI is for service entry points only — the commands the production image must run (launching the bot, running recurrent events, one-off data migrations). Dev/CI tooling (deploying, managing locales, validating migrations) lives in the `mb` CLI, not here. It is NOT a general-purpose tooling CLI.</rule>
   <rule>Developer tooling belongs in `tools/` at the project root, not in `mitup_bot/cli/`: repeatable workflows go in the `mb` CLI (`tools/mb/`), standalone one-off scripts next to it in `tools/`.</rule>
 </critical_rules>
 
@@ -32,7 +32,7 @@ To add a new CLI command, create a file in `mitup_bot/cli/commands/`. It will be
 
 | Location | Purpose | Example |
 |----------|---------|---------|
-| `mitup_bot/cli/commands/` | Production CLI subcommands (auto-discovered) | `launch.py`, `deploy.py`, `translations.py` |
+| `mitup_bot/cli/commands/` | Service entry points (auto-discovered) | `launch.py`, `recurrent_events.py`, `migrate_from_rails.py` |
 | `mitup_bot/cli/` (top-level) | CLI infrastructure — the entry point and command discovery, not operational logic | `run.py`, `cli_commands.py`, `helpers.py` |
 | `mitup_bot/events/` | Recurrent-event job implementations + the periodic runner that schedules them | `notify_meetings.py`, `broadcast/`, `service.py` |
 | `tools/` (project root) | The `mb` dev CLI and standalone helper scripts | `tools/mb/`, `gl_reply_thread.py` |

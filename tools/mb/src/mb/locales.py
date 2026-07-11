@@ -1,8 +1,9 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import typer
 
-from . import console, runner
+from . import console, locales_ops, runner
 
 LOCALES_RELATIVE_DIR = Path("mitup_bot/locales")
 
@@ -28,7 +29,7 @@ def locales_stale(locales_dir: Path) -> bool:
 
 
 def build_locales() -> int:
-    return runner.run_step("Compiling locale catalogs", runner.uv_argv("mitup", "translations", "build"))
+    return locales_ops.compile_locales()
 
 
 def ensure_locales_built() -> int:
@@ -38,37 +39,56 @@ def ensure_locales_built() -> int:
     return build_locales()
 
 
+def update_source_catalog() -> int:
+    locales_ops.generate_translations(validate=False)
+    console.success("English source catalog updated.")
+    return 0
+
+
 @app.command()
 def build():
     """Compile .po sources into .mo catalogs."""
-    raise typer.Exit(build_locales())
+    raise typer.Exit(locales_ops.compile_locales())
 
 
-@app.command()
-def sync():
-    """Update the source catalog, drop stale entries, rebuild, and validate."""
-    steps = (
-        ("Updating source catalog", ("mitup", "translations", "update")),
-        ("Removing stale entries", ("mitup", "translations", "clean-locales")),
-        ("Compiling locale catalogs", ("mitup", "translations", "build")),
-        ("Validating locale catalogs", ("mitup", "translations", "validate-locales")),
-    )
-    for index, (title, command_args) in enumerate(steps, start=1):
-        console.step(f"({index}/{len(steps)}) {title}")
-        exit_code = runner.uv(*command_args)
-        if exit_code != 0:
-            console.error(f"{title} failed (exit code {exit_code}).")
-            raise typer.Exit(exit_code)
-    console.success("Locales synced.")
+@app.command("update-source")
+def update_source():
+    """Regenerate the English source catalog from the message definitions in code."""
+    raise typer.Exit(update_source_catalog())
+
+
+@app.command("validate-ids")
+def validate_ids():
+    """Ensure every message in code has an entry in the English source catalog."""
+    locales_ops.generate_translations(validate=True)
+    raise typer.Exit(locales_ops.validate_translations())
 
 
 @app.command()
 def validate():
-    """Validate that every locale catalog is complete and consistent."""
-    raise typer.Exit(runner.uv("mitup", "translations", "validate-locales"))
+    """Validate that every locale catalog carries the same msgids as English."""
+    raise typer.Exit(locales_ops.ensure_all_translations())
 
 
 @app.command()
 def clean():
     """Remove stale msgid blocks from non-English catalogs."""
-    raise typer.Exit(runner.uv("mitup", "translations", "clean-locales"))
+    raise typer.Exit(locales_ops.clean_all_locales())
+
+
+@app.command()
+def sync():
+    """Update the source catalog, drop stale entries, rebuild, and validate."""
+    steps: tuple[tuple[str, Callable[[], int]], ...] = (
+        ("Updating source catalog", update_source_catalog),
+        ("Removing stale entries", locales_ops.clean_all_locales),
+        ("Compiling locale catalogs", locales_ops.compile_locales),
+        ("Validating locale catalogs", locales_ops.ensure_all_translations),
+    )
+    for index, (title, step) in enumerate(steps, start=1):
+        console.step(f"({index}/{len(steps)}) {title}")
+        exit_code = step()
+        if exit_code != 0:
+            console.error(f"{title} failed (exit code {exit_code}).")
+            raise typer.Exit(exit_code)
+    console.success("Locales synced.")

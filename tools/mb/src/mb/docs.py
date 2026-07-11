@@ -1,6 +1,6 @@
 import typer
 
-from . import runner
+from . import docs_ops, runner
 
 app = typer.Typer(no_args_is_help=True, help="Documentation site.")
 
@@ -17,7 +17,7 @@ def build():
     raise typer.Exit(runner.uv("zensical", "build"))
 
 
-@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-def publish(ctx: typer.Context):
-    """Publish the docs site (extra args pass through)."""
-    raise typer.Exit(runner.uv("mitup", "publish-docs", *ctx.args))
+@app.command()
+def publish():
+    """Sync the built docs site to S3 and invalidate the CloudFront cache."""
+    docs_ops.publish_docs()

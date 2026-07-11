@@ -161,6 +161,20 @@ def test_raw_does_not_interpret_markup(capsys: pytest.CaptureFixture[str]):
     assert "literal [bold]tags[/bold] stay" in capsys.readouterr().out
 
 
+def test_command_echo_notes_non_root_location(capsys: pytest.CaptureFixture[str]):
+    console.configure(plain=True)
+    console.command_echo("uv run ty check", location="tools/mb")
+    assert "$ uv run ty check  (in tools/mb)" in capsys.readouterr().out
+
+
+def test_command_echo_omits_location_at_root(capsys: pytest.CaptureFixture[str]):
+    console.configure(plain=True)
+    console.command_echo("uv run ty check")
+    output = capsys.readouterr().out
+    assert "$ uv run ty check" in output
+    assert "(in " not in output
+
+
 # --- spinner: animated only on an interactive TTY, static line otherwise ---
 
 

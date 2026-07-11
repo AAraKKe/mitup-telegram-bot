@@ -25,8 +25,8 @@ This skill owns the **locale workflow** — gettext, `.po`/`.mo` files, Crowdin,
 2. After adding or modifying a string, regenerate the source language file and the compiled locales:
 
 ```bash
-uv run mitup translations update   # update .pot / en.po from code
-uv run mb locales build             # compile .po → .mo
+uv run mb locales update-source    # update en.po source catalog from code
+uv run mb locales build            # compile .po → .mo
 
 # or, equivalently, both in one step:
 uv run mb locales sync
@@ -45,7 +45,7 @@ These are product identity and appear identically on Patreon; localizing them wo
 
 Two checks exist:
 
-- `uv run mitup translations validate-ids` — ensures every Python message has an entry in `en.po` (English source vs code)
+- `uv run mb locales validate-ids` — ensures every Python message has an entry in `en.po` (English source vs code)
 - `uv run mb locales validate` — ensures every non-English `.po` file contains the same msgids as `en.po`, reporting missing/extra entries per language
 
 ## Orchestrating translator agents
@@ -62,5 +62,5 @@ When English strings have been updated and translations need review, tell the tr
 ## CI enforcement
 
 Two CI jobs enforce translation correctness:
-- `validate-ids` — runs `uv run mitup translations validate-ids`; ensures every message in code has a corresponding entry in `en.po`.
+- `validate-ids` — runs `uv run mb locales validate-ids`; ensures every message in code has a corresponding entry in `en.po`.
 - `validate-locales` — runs `uv run mb locales validate`; ensures all non-English `.po` files are in sync with English. Depends on `build-translations`.

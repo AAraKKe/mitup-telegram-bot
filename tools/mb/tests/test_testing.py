@@ -1,4 +1,5 @@
 from collections import Counter
+from unittest import mock
 
 import pytest
 from command_recording import CommandRecorder
@@ -107,21 +108,23 @@ def test_run_tests_skips_locale_build_when_fresh(recorder: CommandRecorder, monk
 
 def test_run_tests_builds_locales_when_stale(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(locales, "locales_stale", lambda locales_dir: True)
+    build = mock.Mock(return_value=0)
+    monkeypatch.setattr(locales, "build_locales", build)
 
     testing.run_tests([])
 
-    assert recorder.commands[0] == ["uv", "run", "mitup", "translations", "build"]
-    assert recorder.commands[1][:3] == ["uv", "run", "pytest"]
+    build.assert_called_once()
+    assert recorder.commands[0][:3] == ["uv", "run", "pytest"]
 
 
 def test_run_tests_propagates_locale_build_failure(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(locales, "locales_stale", lambda locales_dir: True)
-    recorder.exit_codes["translations build"] = 3
+    monkeypatch.setattr(locales, "build_locales", lambda: 3)
 
     exit_code = testing.run_tests([])
 
     assert exit_code == 3
-    assert len(recorder.commands) == 1, "pytest must not run when the locale build fails"
+    assert recorder.commands == [], "pytest must not run when the locale build fails"
 
 
 def test_cov_run_forces_color(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch):

@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import runner
+from . import migrate_ops, runner
 
 app = typer.Typer(no_args_is_help=True, help="Local database lifecycle.")
 migrate_app = typer.Typer(no_args_is_help=True, help="Alembic migrations.")
@@ -35,6 +35,10 @@ def migrate_new(name: Annotated[str, typer.Argument(help="Migration slug/descrip
 
 
 @migrate_app.command("validate")
-def migrate_validate():
+def migrate_validate(
+    revisions_path: Annotated[
+        str | None, typer.Option("-p", "--revisions-path", help="Path to the folder containing alembic revisions.")
+    ] = None,
+):
     """Validate the migration graph (single head, clean upgrade path)."""
-    raise typer.Exit(runner.uv("mitup", "validate-migrations"))
+    raise typer.Exit(migrate_ops.validate_migration_graph(revisions_path))

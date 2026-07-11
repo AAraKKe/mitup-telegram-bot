@@ -37,6 +37,6 @@ This [checklist](https://docs.gitlab.com/ee/user/markdown.html#task-lists) encou
 - [ ] This modification has been tested in a local environment and proof has been presented and evaluated.
 - [ ] The documentation has been updated accordingly
 - [ ] The code in the MR has been validated (run `uv run mb validate`)
-- [ ] If new strings have been added to messages, the source language has been updated (run `uv run mitup translations update`)
+- [ ] If new strings have been added to messages, the source language has been updated (run `uv run mb locales update-source`)
 
 /assign me

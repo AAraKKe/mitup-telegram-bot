@@ -97,7 +97,7 @@ validate-ids:
   # Validates that all messages in code are present in the English translations file
   stage: test
   script:
-    - uv run mitup translations validate-ids
+    - uv run mb locales validate-ids
 
 validate-locales:
   # Validates that all non-English .po files contain the same msgids as English

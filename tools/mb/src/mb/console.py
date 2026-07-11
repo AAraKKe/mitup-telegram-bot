@@ -101,10 +101,13 @@ def step(title: str):
     output.print(f"[bold cyan]{GLYPH_STEP}[/bold cyan] [bold]{title}[/bold]")
 
 
-def command_echo(command_line: str):
+def command_echo(command_line: str, location: str | None = None):
     # Command lines may contain literal brackets (pytest -k patterns), so markup is off
-    # and the dim style is applied out of band.
-    output.print(f"$ {command_line}", markup=False, highlight=False, style="dim")
+    # and the dim style is applied out of band. *location* (a path relative to the repo
+    # root) is appended when the command runs somewhere other than the root, so the two
+    # `ty check` runs don't read as an accidental duplicate in the logs.
+    suffix = f"  (in {location})" if location else ""
+    output.print(f"$ {command_line}{suffix}", markup=False, highlight=False, style="dim")
 
 
 def raw(text: str):
@@ -114,6 +117,10 @@ def raw(text: str):
 
 def show(renderable: object):
     output.print(renderable)
+
+
+def rule(title: str = ""):
+    output.rule(title)
 
 
 def styled_table(title: str) -> Table:

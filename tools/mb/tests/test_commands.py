@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from command_recording import CommandRecorder
 from mb import console, runner
@@ -64,12 +66,6 @@ def test_typecheck_echoes_version_then_covers_root_and_mb(recorder: CommandRecor
     assert "ty 9.9.9 (abcdef0 2026-07-11)" in printed
 
 
-def test_deploy_passes_arguments_through(recorder: CommandRecorder):
-    cli.invoke(app, ["deploy", "--env", "dev", "--dry-run"])
-
-    assert recorder.commands == [["uv", "run", "mitup", "deploy", "--env", "dev", "--dry-run"]]
-
-
 def test_migrate_down_defaults_to_one_step(recorder: CommandRecorder):
     cli.invoke(app, ["db", "migrate", "down"])
 
@@ -113,18 +109,6 @@ def test_run_bot_docker_uses_compose_service(recorder: CommandRecorder):
     assert recorder.commands == [["docker", "compose", "up", "mitup"]]
 
 
-def test_locales_sync_stops_at_first_failure(recorder: CommandRecorder):
-    recorder.exit_codes["translations clean-locales"] = 4
-
-    result = cli.invoke(app, ["locales", "sync"])
-
-    assert result.exit_code == 4
-    assert recorder.commands == [
-        ["uv", "run", "mitup", "translations", "update"],
-        ["uv", "run", "mitup", "translations", "clean-locales"],
-    ]
-
-
 def test_test_command_forwards_flags_and_passthrough(recorder: CommandRecorder):
     result = cli.invoke(app, ["test", "tests/utils", "--lang", "es_ES", "-k", "menu"])
 
@@ -139,6 +123,16 @@ def test_test_command_rejects_cov_with_db(recorder: CommandRecorder):
 
     assert result.exit_code == 2
     assert recorder.commands == []
+
+
+def test_location_note_is_none_at_repo_root():
+    root = Path("/repo")
+    assert runner.location_note(root, root) is None
+
+
+def test_location_note_is_relative_for_a_subdirectory():
+    root = Path("/repo")
+    assert runner.location_note(root / "tools" / "mb", root) == "tools/mb"
 
 
 def test_run_step_reports_success_and_hides_output(recorder: CommandRecorder, capsys: pytest.CaptureFixture[str]):

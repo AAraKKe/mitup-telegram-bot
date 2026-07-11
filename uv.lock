@@ -228,6 +228,9 @@ essential = [
     { name = "mypy-boto3-s3" },
     { name = "mypy-boto3-sqs" },
 ]
+lambda = [
+    { name = "mypy-boto3-lambda" },
+]
 
 [[package]]
 name = "botocore"
@@ -862,6 +865,9 @@ name = "mb"
 version = "0.1.0"
 source = { editable = "tools/mb" }
 dependencies = [
+    { name = "boto3" },
+    { name = "boto3-stubs", extra = ["cloudfront", "ecs", "lambda"] },
+    { name = "mitup-bot" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "typer" },
@@ -869,6 +875,9 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "boto3", specifier = "~=1.34" },
+    { name = "boto3-stubs", extras = ["cloudfront", "ecs", "lambda"] },
+    { name = "mitup-bot", editable = "." },
     { name = "pyyaml", specifier = ">=6" },
     { name = "rich", specifier = ">=13" },
     { name = "typer", specifier = ">=0.15" },
@@ -911,7 +920,7 @@ dependencies = [
 dev = [
     { name = "asgi-lifespan" },
     { name = "boto3" },
-    { name = "boto3-stubs", extra = ["cloudfront", "ecs", "essential"] },
+    { name = "boto3-stubs", extra = ["essential"] },
     { name = "debugpy" },
     { name = "deepdiff" },
     { name = "freezegun" },
@@ -956,7 +965,7 @@ requires-dist = [
 dev = [
     { name = "asgi-lifespan", specifier = "==2.1.0" },
     { name = "boto3", specifier = "~=1.34" },
-    { name = "boto3-stubs", extras = ["essential", "ecs", "cloudfront"] },
+    { name = "boto3-stubs", extras = ["essential"] },
     { name = "debugpy" },
     { name = "deepdiff" },
     { name = "freezegun", specifier = "~=1.5.5" },

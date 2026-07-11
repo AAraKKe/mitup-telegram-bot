@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import checks, ci, console, db, docs, locales, runner, services, setup_env, testing, validate
+from . import checks, ci, console, db, deploy_ops, docs, locales, services, setup_env, testing, validate
 
 app = typer.Typer(
     name="mb",
@@ -66,10 +66,16 @@ def typecheck():
     raise typer.Exit(checks.run_typecheck())
 
 
-@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-def deploy(ctx: typer.Context):
-    """Deploy the bot (extra args pass through)."""
-    raise typer.Exit(runner.uv("mitup", "deploy", *ctx.args))
+@app.command()
+def deploy(
+    migrations_image: Annotated[str, typer.Option("--migrations-image", help="Uri of the migrations lambda image.")],
+    bot_image: Annotated[str, typer.Option("--bot-image", help="Uri of the bot image pushed to ECR.")],
+    alarm_action_image: Annotated[
+        str, typer.Option("--alarm-action-image", help="Uri of the alarm action lambda image.")
+    ],
+):
+    """Deploy the bot: update the lambdas and roll out the ECS services."""
+    deploy_ops.deploy(migrations_image, bot_image, alarm_action_image)
 
 
 if __name__ == "__main__":

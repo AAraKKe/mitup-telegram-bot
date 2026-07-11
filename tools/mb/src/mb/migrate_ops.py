@@ -1,12 +1,11 @@
 from dataclasses import dataclass, field
 
-import click
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from rich.console import Console, RenderableType
+from rich.console import RenderableType
 from rich.tree import Tree
 
-console = Console(width=90)
+from . import console
 
 
 @dataclass
@@ -63,18 +62,14 @@ def validate_and_draw(base_revision: Revision) -> bool:
     found_branch = len(base_revision.child_revisions) > 1
 
     for revision in base_revision.child_revisions:
-        console.print(revision.renderable())
-        console.print()
+        console.show(revision.renderable())
+        console.info("")
         found_branch = found_branch or validate_and_draw(revision)
 
     return found_branch
 
 
-@click.command()
-@click.option(
-    "-p", "--revisions-path", help="Path to the folder containing alembic revisions", show_default=True, default=None
-)
-def cli(revisions_path: str | None):
+def validate_migration_graph(revisions_path: str | None = None) -> int:
     if revisions_path is None:
         config = Config("alembic.ini")
     else:
@@ -84,10 +79,11 @@ def cli(revisions_path: str | None):
     try:
         revision_graph = build_migration_graph(config)
     except KeyError as exc:
-        console.print(f"[bold red]Revision {exc.args[0]!r} is referenced by another revision but it doesn't exist")
-        raise click.Abort() from exc
+        console.error(f"Revision {exc.args[0]!r} is referenced by another revision but it doesn't exist")
+        return 1
 
     console.rule("Migrations List")
     if validate_and_draw(revision_graph):
-        console.print("[bold red]Branching migrations found! Check the output above.")
-        raise click.Abort()
+        console.error("Branching migrations found! Check the output above.")
+        return 1
+    return 0

@@ -20,10 +20,22 @@ def build_env(extra_env: dict[str, str] | None) -> dict[str, str] | None:
     return {**os.environ, **extra_env} if extra_env else None
 
 
+def location_note(target: Path, root: Path) -> str | None:
+    """Path of *target* relative to *root* for the command echo, or None when it is the root."""
+    if target == root:
+        return None
+    try:
+        return str(target.relative_to(root))
+    except ValueError:
+        return str(target)
+
+
 def run_command(args: list[str], *, cwd: Path | None = None, extra_env: dict[str, str] | None = None) -> int:
     """Run *args* from the repo root (or *cwd*), streaming its output, and return its exit code."""
-    console.command_echo(shlex.join(args))
-    completed = subprocess.run(args, cwd=cwd or repo_root(), env=build_env(extra_env))
+    root = repo_root()
+    target = cwd or root
+    console.command_echo(shlex.join(args), location=location_note(target, root))
+    completed = subprocess.run(args, cwd=target, env=build_env(extra_env))
     return completed.returncode
 
 
@@ -41,9 +53,11 @@ def run_quiet(args: list[str], *, cwd: Path | None = None, extra_env: dict[str, 
 
 def run_step(description: str, args: list[str], *, cwd: Path | None = None) -> int:
     """Run a quiet, short command behind a spinner, dumping its captured output only on failure."""
-    console.command_echo(shlex.join(args))
+    root = repo_root()
+    target = cwd or root
+    console.command_echo(shlex.join(args), location=location_note(target, root))
     with console.spinner(description):
-        exit_code, captured = run_quiet(args, cwd=cwd)
+        exit_code, captured = run_quiet(args, cwd=target)
     if exit_code == 0:
         console.success(description)
         return exit_code

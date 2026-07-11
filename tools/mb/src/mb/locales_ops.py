@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import datetime as dt
 import difflib
-import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import click
+from rich.text import Text
 
 from mitup_bot.__about__ import __version__ as version
-from mitup_bot.cli.helpers import console, error, success
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
-from mitup_bot.utils.messages import MessageBase
+
+from . import console, runner
+
+if TYPE_CHECKING:
+    from mitup_bot.utils.messages import MessageBase
 
 METADATA = f"""
 # MitupBot translations files.
@@ -31,7 +36,6 @@ msgstr ""
 """
 
 VALIDATE_PO_FILE = Path("validate.po")
-POT_FILE = TranslationEngine.LOCALES_DIR / f"{TranslationEngine.DOMAIN}.pot"
 
 
 def po_file_for_language(lang: str, validate: bool = False) -> Path:
@@ -43,7 +47,10 @@ def mo_file_for_language(lang: str) -> Path:
 
 
 def all_messages() -> list[type[MessageBase]]:
-    # Get all classes from translations that are of type MessageBase
+    # Importing the module registers every MessageBase subclass; __subclasses__ then
+    # sees them all. Kept lazy so plain `mb` invocations don't import the bot's copy.
+    from mitup_bot.utils.messages import MessageBase
+
     return [cls for cls in MessageBase.__subclasses__() if cls != MessageBase]
 
 
@@ -61,13 +68,16 @@ def generate_translations(validate: bool):
                 f.write(f'msgstr "{msgstr}"\n')
 
 
-def print_diff_line(line: str):
-    if line.startswith("-"):
-        console().print(f"[red bold]{line}[/]", end="")
-    elif line.startswith("+"):
-        console().print(f"[green bold]{line}[/]", end="")
-    else:
-        console().print(line, end="")
+def diff_report(diff_lines: list[str]) -> Text:
+    report = Text()
+    for line in diff_lines:
+        if line.startswith("-"):
+            report.append(line, style="bold red")
+        elif line.startswith("+"):
+            report.append(line, style="bold green")
+        else:
+            report.append(line)
+    return report
 
 
 def validate_translations() -> int:
@@ -78,13 +88,11 @@ def validate_translations() -> int:
         validate = [line for line in f.readlines() if "PO-Revision-Date" not in line and len(line) > 0]
 
     if diff := list(difflib.unified_diff(real, validate)):
-        for line in diff:
-            print_diff_line(line)
-
-        error("Translations files are not up to date.")
+        console.show(diff_report(diff))
+        console.error("Translations files are not up to date.")
         return 1
 
-    success("Translations files are up to date.")
+    console.success("Translations files are up to date.")
     return 0
 
 
@@ -137,14 +145,14 @@ def clean_all_locales() -> int:
         try:
             text = po_path.read_text(encoding="utf-8")
         except OSError as exc:
-            error(f"{lang}: could not read {po_path}: {exc}")
+            console.error(f"{lang}: could not read {po_path}: {exc}")
             had_error = True
             continue
 
         kept, removed_msgids = filter_blocks(parse_po_blocks(text), english_msgids)
 
         if not removed_msgids:
-            success(f"{lang}: already clean")
+            console.success(f"{lang}: already clean")
             continue
 
         cleaned = "\n\n".join("\n".join(block) for block in kept) + "\n"
@@ -152,19 +160,19 @@ def clean_all_locales() -> int:
         try:
             po_path.write_text(cleaned, encoding="utf-8")
         except OSError as exc:
-            error(f"{lang}: could not write {po_path}: {exc}")
+            console.error(f"{lang}: could not write {po_path}: {exc}")
             had_error = True
             continue
 
-        console().print(f"{lang}: removed {len(removed_msgids)} stale entry(s):")
+        console.info(f"{lang}: removed {len(removed_msgids)} stale entry(s):")
         for msgid in removed_msgids:
-            console().print(f"  [yellow]- {msgid.strip(chr(34))}[/]")
+            console.info(f"  [yellow]- {msgid.strip(chr(34))}[/]")
 
     return 1 if had_error else 0
 
 
 def ensure_all_translations() -> int:
-    console().print(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
+    console.info(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
 
     english_msgids = msgids_for_language("en")
     non_english_languages = [lang for lang in SUPPORTED_LANGUAGES if lang != "en"]
@@ -177,83 +185,44 @@ def ensure_all_translations() -> int:
         extra = sorted(lang_msgids - english_msgids)
 
         if not missing and not extra:
-            success(f"{lang} is in sync with en")
+            console.success(f"{lang} is in sync with en")
             continue
 
         diverged = True
         if missing:
-            error(f"{lang} is missing {len(missing)} msgid(s):")
+            console.error(f"{lang} is missing {len(missing)} msgid(s):")
             for msgid in missing:
-                console().print(f"  [red]- {msgid.strip(chr(34))}[/]")
+                console.info(f"  [red]- {msgid.strip(chr(34))}[/]")
         if extra:
-            error(f"{lang} has {len(extra)} stale msgid(s) (removed/renamed in English):")
+            console.error(f"{lang} has {len(extra)} stale msgid(s) (removed/renamed in English):")
             for msgid in extra:
-                console().print(f"  [yellow]- {msgid.strip(chr(34))}[/]")
+                console.info(f"  [yellow]- {msgid.strip(chr(34))}[/]")
 
     if not diverged:
-        success("All languages are in sync with English.")
+        console.success("All languages are in sync with English.")
         return 0
 
     return 1
 
 
-@click.group()
-def cli():
-    """All commands related to translations management."""
-    ...  # pragma: no cover
-
-
-@cli.command()
-def update():
-    """Update the English translation file with every message available in mitup_bot.utils.messages"""
-    generate_translations(False)
-    success("English file updated successfully.")
-
-
-@cli.command()
-@click.pass_context
-def validate_ids(ctx: click.Context):
-    """Ensure that all messages are present in the source translation file."""
-    generate_translations(True)
-    ctx.exit(validate_translations())
-
-
-@cli.command()
-@click.pass_context
-def validate_locales(ctx: click.Context):
-    """Validate that all po files contain the same msgids."""
-    ctx.exit(ensure_all_translations())
-
-
-@cli.command()
-@click.pass_context
-def clean_locales(ctx: click.Context):
-    """Remove stale msgid blocks from non-English .po files."""
-    ctx.exit(clean_all_locales())
-
-
-@cli.command()
-@click.pass_context
-def build(ctx: click.Context):
-    """Build all translations files for the bot."""
+def compile_locales() -> int:
     for lang in SUPPORTED_LANGUAGES:
         po_path = po_file_for_language(lang)
         mo_path = mo_file_for_language(lang)
 
         if not po_path.exists():
-            error(f"ERROR: Po file {po_path} does not exist.")
-            ctx.exit(1)
+            console.error(f"Po file {po_path} does not exist.")
+            return 1
 
         if not mo_path.parent.exists():
-            console().print(f"Creating mo path for language {lang}")
+            console.info(f"Creating mo path for language {lang}")
             mo_path.parent.mkdir(parents=True)
 
-        # Compile po file
-        console().print(f"Compiling {lang!r} mo file...")
+        console.info(f"Compiling {lang!r} mo file...")
+        exit_code = runner.run_command(["msgfmt", "-o", str(mo_path.absolute()), str(po_path.absolute())])
+        if exit_code != 0:
+            console.error(f"Error compiling {po_path} (exit code {exit_code}).")
+            return 1
 
-        try:
-            subprocess.run(["msgfmt", "-o", mo_path.absolute(), po_path.absolute()], check=True)
-            success(f"Successfully compiled {po_path} to {mo_path}")
-        except Exception as e:
-            error(f"Error compiling {po_path}: {e}")
-            ctx.exit(1)
+        console.success(f"Successfully compiled {po_path} to {mo_path}")
+    return 0
