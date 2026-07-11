@@ -10,6 +10,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
@@ -29,7 +30,7 @@ async def test_cancel_edit_meeting_works(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
     assert result is ConversationHandler.END
-    context.api.assert_edit_message_called(update, meeting.edit_view)
+    context.api.assert_edit_message_called(update, meeting_views.edit_view(meeting))
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL)]), indirect=True)

@@ -3,6 +3,8 @@ __all__ = (
     "factory",
     "GridMitupView",
     "InlineResultsButton",
+    "meeting",
+    "meeting_settings",
     "MitupView",
     "MitupInlineView",
     "PaginatedMitupView",
@@ -23,3 +25,5 @@ from .mitup_view import (
 from .calendar import CalendarKeyboard
 from .context import RenderContext
 from . import factory
+from . import meeting
+from . import meeting_settings

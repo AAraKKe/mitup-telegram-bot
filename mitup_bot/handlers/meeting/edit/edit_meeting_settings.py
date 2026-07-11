@@ -11,6 +11,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
 
@@ -36,7 +37,7 @@ async def callback_query_edit_meeting_settings(session: AsyncSession, update: Up
             context=context,
         )
     ) is not None:
-        await context.api.edit_message(update=update, view=meeting.settings_view)
+        await context.api.edit_message(update=update, view=meeting_views.settings_view(meeting))
 
 
 @asynccontextmanager
@@ -80,7 +81,7 @@ def create_meeting_settings_toggle_handler(
     handler_id: EditMeetingHandlerId,
     callback_data: cb.CallbackData,
     attribute: str,
-    return_view: Callable[[Meetup], MitupView] = lambda meeting: meeting.settings_view,
+    return_view: Callable[[Meetup], MitupView] = meeting_views.settings_view,
 ):
     @HandlersRegistry.register_callback_query(handler_id, callback_data=callback_data)
     @with_session(write=True)

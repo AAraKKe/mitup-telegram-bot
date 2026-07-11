@@ -7,6 +7,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.utils import MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -47,5 +48,5 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user.lang)
     await context.api.edit_message(
         update=update,
-        view=full_meeting.edit_view.with_context(success_message),
+        view=meeting_views.edit_view(full_meeting).with_context(success_message),
     )

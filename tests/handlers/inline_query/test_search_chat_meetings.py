@@ -12,6 +12,7 @@ from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import InlineQueryMessages
 from mitup_bot.views import MitupInlineView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -80,7 +81,7 @@ async def test_search_returns_matching_meetings(
 
     context.api.assert_answer_inline_query_called(
         update=update,
-        results=[meeting.inline_view(chat_instance=CHAT_INSTANCE)],
+        results=[meeting_views.inline_view(meeting, chat_instance=CHAT_INSTANCE)],
         cache_time=0,
     )
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SEARCH_CHAT_MEETINGS)})
@@ -170,7 +171,7 @@ async def test_search_filters_to_single_result(
 
     context.api.assert_answer_inline_query_called(
         update=update,
-        results=[expected_meeting.inline_view(chat_instance=CHAT_INSTANCE)],
+        results=[meeting_views.inline_view(expected_meeting, chat_instance=CHAT_INSTANCE)],
         cache_time=0,
     )
 
@@ -232,9 +233,9 @@ async def test_search_sorts_by_relevance(
     context.api.assert_answer_inline_query_called(
         update=update,
         results=[
-            future_meeting.inline_view(chat_instance=CHAT_INSTANCE),
-            no_date_meeting.inline_view(chat_instance=CHAT_INSTANCE),
-            past_meeting.inline_view(chat_instance=CHAT_INSTANCE),
+            meeting_views.inline_view(future_meeting, chat_instance=CHAT_INSTANCE),
+            meeting_views.inline_view(no_date_meeting, chat_instance=CHAT_INSTANCE),
+            meeting_views.inline_view(past_meeting, chat_instance=CHAT_INSTANCE),
         ],
         cache_time=0,
     )

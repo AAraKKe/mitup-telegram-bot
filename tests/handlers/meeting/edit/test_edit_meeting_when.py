@@ -8,6 +8,7 @@ from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditWhenMessages
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -67,7 +68,7 @@ async def test_when_entry_renders_when_view(
 
     context, _ = await call_handler(EditMeetingHandlerId.WHEN_ENTRY_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_edit_message_called(update, meeting.when_view)
+    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting))
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +137,9 @@ async def test_confirm_clear_times(
 
     context.api.assert_edit_message_called(
         update,
-        meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user_with_settings.lang)),
+        meeting_views.when_view(meeting).with_context(
+            MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user_with_settings.lang)
+        ),
     )
     context.api.assert_update_meeting_messages_called(
         meeting=meeting,
@@ -179,7 +182,9 @@ async def test_decline_clear_times(
 
     context.api.assert_edit_message_called(
         update,
-        meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user_with_settings.lang)),
+        meeting_views.when_view(meeting).with_context(
+            MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user_with_settings.lang)
+        ),
     )
     context.api.assert_update_meeting_messages_not_called()
 
@@ -214,7 +219,7 @@ async def test_lock_on_start_toggle(
 
     assert meeting.lock_on_start == (not initial_lock)  # flipped
 
-    context.api.assert_edit_message_called(update, meeting.when_view)
+    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting))
     context.api.assert_update_meeting_messages_called(
         meeting=meeting,
         current_message=meeting.message_from_update(update),  # None -- no message registered

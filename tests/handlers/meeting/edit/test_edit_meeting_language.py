@@ -8,6 +8,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditLanguageMessages
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -77,7 +78,7 @@ async def test_callback_set_meeting_language(
 
     # Verify the keyboard for all messages was updated
     for message in meeting.messages:
-        assert message.buttons.keyboard == meeting.build_inline_keyboard()
+        assert message.buttons.keyboard == meeting_views.build_inline_keyboard(meeting)
 
     # Verify the success message was shown
     context.api.assert_edit_message_called(
@@ -130,7 +131,7 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
     for message in messages:
         new_keyboard = message.buttons.keyboard
         # The keyboards should be updated to the new language
-        assert new_keyboard == meeting.build_inline_keyboard()
+        assert new_keyboard == meeting_views.build_inline_keyboard(meeting)
 
     # Verify meeting messages were updated via API
     context.api.assert_update_meeting_messages_called(meeting)

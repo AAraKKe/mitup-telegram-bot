@@ -13,6 +13,7 @@ from mitup_bot.utils import ButtonMessages, InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import InlineResultsButton, MitupInlineView
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import InlineQueryId
 from .utils import meeting_unavailable_view, sort_meetings
@@ -57,7 +58,7 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
     ]
 
     if user and (active_meetings := [m for m in user.meetups if m.active]):
-        results.extend(meeting.inline_view() for meeting in sort_meetings(active_meetings))
+        results.extend(meeting_views.inline_view(meeting) for meeting in sort_meetings(active_meetings))
 
     await context.api.answer_inline_query(update=update, results=results, button=button, cache_time=0)
 
@@ -81,7 +82,7 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
     meeting = await Meetup.by_id(session, meeting_id)
 
     if meeting and meeting.active and (meeting.public or meeting.is_owned_by(user)):
-        results = [meeting.inline_view()]
+        results = [meeting_views.inline_view(meeting)]
         context.put_feature_metric(Feature.SHARE_MEETING)
     else:
         results = [meeting_unavailable_view(user.lang)]

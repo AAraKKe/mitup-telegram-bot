@@ -15,6 +15,7 @@ from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import meeting as meeting_views
 
 from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
@@ -116,7 +117,7 @@ async def create_meeting_message_handler(
     await session.refresh(meetup, ["joined_links"])
 
     success_message = MeetingCreationMessages.SUCCESS.get(title=meetup.title, lang=user.lang)
-    view = meetup.edit_view.with_context(success_message)
+    view = meeting_views.edit_view(meetup).with_context(success_message)
     await context.api.send_message(update=update, view=view)
     context.put_feature_metric(Feature.CREATE_MEETING)
     return ConversationHandler.END

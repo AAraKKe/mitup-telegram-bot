@@ -4,6 +4,7 @@ from telegram import Update
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
@@ -15,7 +16,7 @@ async def test_edit_default_options_view(
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(meeting, query_field="id")
 
-    expected_view = meeting.settings_view
+    expected_view = meeting_views.settings_view(meeting)
 
     context, _ = await call_handler(EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK, handler_context=handler_context)
 
@@ -96,7 +97,7 @@ async def test_callbacks_to_set_meeting_setting(
 
     context, _ = await call_handler(handler_id, handler_context=handler_context)
 
-    expected_view = meeting.settings_view
+    expected_view = meeting_views.settings_view(meeting)
 
     context.api.assert_edit_message_called(update, expected_view)
     assert_default_options_value(meeting, handler_id, waiting_list, public, invitation, incognito)

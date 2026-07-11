@@ -8,6 +8,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditWhenMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
 
@@ -24,7 +25,7 @@ async def callback_query_when_entry(session: AsyncSession, update: Update, conte
     if meeting is None:
         return
 
-    await context.api.edit_message(update=update, view=meeting.when_view)
+    await context.api.edit_message(update=update, view=meeting_views.when_view(meeting))
 
 
 @HandlersRegistry.register_callback_query(
@@ -68,7 +69,7 @@ async def callback_query_confirm_clear_times(session: AsyncSession, update: Upda
     meeting.end_datetime = None
     meeting.lock_on_start = False
 
-    view = meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user.lang))
+    view = meeting_views.when_view(meeting).with_context(MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user.lang))
     await context.api.edit_message(update=update, view=view)
     await context.api.update_meeting_messages(
         meeting=meeting,
@@ -91,7 +92,7 @@ async def callback_query_decline_clear_times(session: AsyncSession, update: Upda
     if meeting is None:
         return
 
-    view = meeting.when_view.with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user.lang))
+    view = meeting_views.when_view(meeting).with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user.lang))
     await context.api.edit_message(update=update, view=view)
 
 
@@ -111,7 +112,7 @@ async def callback_query_set_lock_on_start(session: AsyncSession, update: Update
 
     meeting.lock_on_start = not meeting.lock_on_start
 
-    await context.api.edit_message(update=update, view=meeting.when_view)
+    await context.api.edit_message(update=update, view=meeting_views.when_view(meeting))
     await context.api.update_meeting_messages(
         meeting=meeting,
         current_message=meeting.message_from_update(update),

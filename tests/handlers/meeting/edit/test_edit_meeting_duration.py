@@ -15,6 +15,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -159,7 +160,7 @@ async def test_cancel_during_duration_input_returns_to_view(
     # end_datetime must not have changed
     assert meeting.end_datetime == end_datetime  # unchanged
 
-    context.api.assert_edit_message_called(update, meeting.when_view)
+    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting))
     assert state == ConversationHandler.END
 
 

@@ -14,6 +14,7 @@ from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.factory import confirmation_view, main_menu_view
 
 from .enums import ConversationInviteState, MeetingHandlerId
@@ -151,7 +152,7 @@ async def abort_invitation(
     meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
 
     if meeting is not None and user.own_meeting(meeting_id):
-        view = meeting.view_for(user).with_context(message=message)
+        view = meeting_views.view_for(meeting, user).with_context(message=message)
     else:
         view = main_menu_view(guards.render_context(user, update, context), message=message)
 
@@ -258,7 +259,9 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             return ConversationHandler.END
 
         message = MeetingInviteMessages.SUCCESS.get(lang=user.lang, name=invited_user_name, meeting_title=meeting.title)
-        await context.api.edit_message(update=update, view=meeting.view_for(user).with_context(message=message))
+        await context.api.edit_message(
+            update=update, view=meeting_views.view_for(meeting, user).with_context(message=message)
+        )
 
         # Clean the stored data related to the conversation
         context.clean_user_data([ContextId.INVITE_USERS])

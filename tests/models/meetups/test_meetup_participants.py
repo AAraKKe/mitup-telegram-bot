@@ -6,6 +6,7 @@ from mitup_bot.models import JoinedUsers
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import create_meetup, create_user
 
 
@@ -105,7 +106,7 @@ def test_participant_returns_specific_participant_by_user_id():
 )
 def test_share_button_in_keyboard(is_public):
     meetup = create_meetup(123, "Meeting", public=is_public)
-    keyboard = meetup.build_inline_keyboard()
+    keyboard = meeting_views.build_inline_keyboard(meetup)
 
     share_buttons = [btn for row in keyboard for btn in row if btn.switch_inline_query is not None]
     if is_public:

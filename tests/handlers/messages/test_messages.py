@@ -11,6 +11,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
@@ -45,7 +46,7 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
 
     assert meeting.title == update.effective_message.text
 
-    view = meeting.edit_view.with_context(
+    view = meeting_views.edit_view(meeting).with_context(
         MeetingEditContentMessages.TITLE_SUCCESS.get(title=update.effective_message.text)
     )
     context.api.assert_send_message_called(update, view)
@@ -70,7 +71,7 @@ async def test_edit_description_message_handler_update_the_description_and_send_
 
     assert meeting.description == update.effective_message.text
 
-    view = meeting.edit_view.with_context(
+    view = meeting_views.edit_view(meeting).with_context(
         MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=update.effective_message.text)
     )
     context.api.assert_send_message_called(update, view)

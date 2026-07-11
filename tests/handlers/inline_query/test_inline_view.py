@@ -12,6 +12,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import ButtonMessages, InlineQueryMessages
 from mitup_bot.views import InlineResultsButton, MitupInlineView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import HandlerContext, create_meetup, create_user
 from tests.helpers.context import call_handler
 from tests.helpers.fixtures import UpdateRequest
@@ -161,7 +162,7 @@ def active_meetings_scenario() -> tuple[User, list[MitupInlineView]]:
     m1 = create_meetup(10, "Meeting A")
     m2 = create_meetup(11, "Meeting B")
     user = create_user(id=1, tg_user_id=123, first_name="Test", owned_meetings=[m1, m2])
-    return user, [m1.inline_view(), m2.inline_view()]
+    return user, [meeting_views.inline_view(m1), meeting_views.inline_view(m2)]
 
 
 def mixed_active_inactive_scenario() -> tuple[User, list[MitupInlineView]]:
@@ -169,7 +170,7 @@ def mixed_active_inactive_scenario() -> tuple[User, list[MitupInlineView]]:
     active = create_meetup(10, "Active")
     inactive = create_meetup(11, "Inactive", active=False)
     user = create_user(id=1, tg_user_id=123, first_name="Test", owned_meetings=[active, inactive])
-    return user, [active.inline_view()]
+    return user, [meeting_views.inline_view(active)]
 
 
 @pytest.mark.parametrize(
@@ -223,9 +224,9 @@ async def test_inline_view_sorts_user_meetings_by_relevance(
         update=update,
         results=[
             chat_card(DEFAULT_LANG),
-            future.inline_view(),
-            no_date.inline_view(),
-            past.inline_view(),
+            meeting_views.inline_view(future),
+            meeting_views.inline_view(no_date),
+            meeting_views.inline_view(past),
         ],
         button=inline_button(DEFAULT_LANG),
         cache_time=0,
@@ -254,9 +255,9 @@ async def test_inline_view_sorts_no_datetime_meetings_by_created_time(
         update=update,
         results=[
             chat_card(DEFAULT_LANG),
-            early.inline_view(),
-            middle.inline_view(),
-            late.inline_view(),
+            meeting_views.inline_view(early),
+            meeting_views.inline_view(middle),
+            meeting_views.inline_view(late),
         ],
         button=inline_button(DEFAULT_LANG),
         cache_time=0,

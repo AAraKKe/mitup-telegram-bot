@@ -8,6 +8,7 @@ from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import MeetingAttachMessages, MeetingDisplayMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -37,7 +38,9 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
         already_attached = is_already_attached(meeting, chat_instance)
 
         if (current_message := meeting.message_from_update(update)) is None:
-            current_message = Message.from_update(update, meeting, user)
+            current_message = Message.from_update(
+                update, meeting, meeting_views.keyboard_for_update(update, meeting, user)
+            )
             meeting.messages.append(current_message)
         elif current_message.chat_instance is None and chat_instance:
             current_message.chat_instance = chat_instance

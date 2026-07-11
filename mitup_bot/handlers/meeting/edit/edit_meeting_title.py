@@ -13,6 +13,7 @@ from mitup_bot.utils import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 
@@ -73,7 +74,9 @@ async def edit_title_meeting_message_handler(session: AsyncSession, update: Upda
         meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
         meeting.title = update.effective_message.text
 
-        view = meeting.edit_view.with_context(MeetingEditContentMessages.TITLE_SUCCESS.get(title=meeting.title))
+        view = meeting_views.edit_view(meeting).with_context(
+            MeetingEditContentMessages.TITLE_SUCCESS.get(title=meeting.title)
+        )
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)
 

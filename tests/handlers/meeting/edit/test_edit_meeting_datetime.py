@@ -28,6 +28,7 @@ from mitup_bot.utils.messages import (
     SupporterMessages,
 )
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -65,7 +66,7 @@ def set_new_date_view(lang: str, meeting_id: int, datetime: FormattedText) -> Mi
 
 
 def update_meeting_view(meeting: Meetup, datetime: FormattedText) -> MitupView:
-    return meeting.edit_view.with_context(
+    return meeting_views.edit_view(meeting).with_context(
         MeetingEditDateTimeMessages.DATE_UPDATED.get(lang=meeting.lang, datetime=datetime)
     )
 
@@ -397,7 +398,7 @@ async def test_set_time_message_with_valid_time(
 
     context.api.assert_send_message_called(
         update,
-        meeting.when_view.with_context(
+        meeting_views.when_view(meeting).with_context(
             MeetingEditDateTimeMessages.TIME_SUCCESS.get(
                 lang=user_with_settings.lang,
                 datetime=datetime_entity(int(expected_meeting_time.timestamp())),
@@ -537,7 +538,7 @@ async def test_edit_time_can_be_cancelled(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    context.api.assert_edit_message_called(update, meeting.when_view, times=1)
+    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting), times=1)
 
 
 @pytest.mark.parametrize(
@@ -673,7 +674,7 @@ async def test_date_time_entity_message(
 
     context.api.assert_send_message_called(
         update,
-        meeting.when_view.with_context(
+        meeting_views.when_view(meeting).with_context(
             MeetingEditDateTimeMessages.DATE_UPDATED.get(
                 lang=user_with_settings.lang,
                 datetime=datetime_entity(DATE_TIME_ENTITY_UNIX_TIME),
@@ -799,7 +800,7 @@ async def test_cancel_start_time(
     assert response == ConversationHandler.END
     # cleanup_states must have removed EDIT_MEETING_TIME from context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
-    context.api.assert_edit_message_called(update, meeting.when_view)
+    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting))
 
 
 @pytest.mark.parametrize(
@@ -892,7 +893,7 @@ async def test_set_time_past_end_datetime_clears_end(
     )
     context.api.assert_send_message_called(
         update,
-        meeting.when_view.with_context(expected_context_message),
+        meeting_views.when_view(meeting).with_context(expected_context_message),
     )
 
 
@@ -1044,7 +1045,7 @@ async def test_datetime_entity_past_end_datetime_clears_end(
     )
     context.api.assert_send_message_called(
         update,
-        meeting.when_view.with_context(expected_context_message),
+        meeting_views.when_view(meeting).with_context(expected_context_message),
     )
     context.api.assert_update_meeting_messages_called(meeting)
 

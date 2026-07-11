@@ -16,6 +16,7 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import AnyFloat, StubMitupContext, create_meetup
 from tests.helpers.context import build_context
 from tests.helpers.monitoring import MetricAssertions
@@ -202,8 +203,8 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
     await context.api.update_meeting_messages(meeting=meeting)
 
     edit: mock.MagicMock = context.bot.edit_message_text
-    inline_view = meeting.inline_view()
-    main_view = meeting.main_view()
+    inline_view = meeting_views.inline_view(meeting)
+    main_view = meeting_views.main_view(meeting)
     expected_call_params = {
         "text": inline_view.description.text,
         "entities": inline_view.description.entities or None,

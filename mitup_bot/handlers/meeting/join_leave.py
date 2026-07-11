@@ -15,6 +15,7 @@ from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import MeetingHandlerId
 
@@ -80,7 +81,7 @@ async def register_default_user(session: AsyncSession, update: Update) -> User:
     session.add(new_user)
     await session.flush()
     # The join/leave paths read the new user's collections right away (joined_meeting, and
-    # own_meeting via Message.from_update); a freshly flushed instance has never loaded them
+    # own_meeting via keyboard_for_update); a freshly flushed instance has never loaded them
     # and User marks both lazy="raise", so load them explicitly.
     await session.refresh(new_user, ["joined_links", "meetups"])
 
@@ -165,7 +166,7 @@ async def handle_join_leave_operation(
     if meeting := await Meetup.by_id(session, data.id, for_update=True):
         # The locked load ran with populate_existing, which re-hydrates every entity its selectin
         # cascade touches — including `user` when they own or participate in this meeting —
-        # resetting the lazy="raise" collections read below (own_meeting via Message.from_update,
+        # resetting the lazy="raise" collections read below (own_meeting via keyboard_for_update,
         # joined_meeting in the operations) to unloaded. Re-load them; the row lock is already
         # held, so the re-read is race-safe.
         await session.refresh(user, ["meetups", "joined_links"])
@@ -189,7 +190,9 @@ async def handle_join_leave_operation(
 
         # Common message handling
         if (current_message := meeting.message_from_update(update)) is None:
-            current_message = Message.from_update(update, meeting, user)
+            current_message = Message.from_update(
+                update, meeting, meeting_views.keyboard_for_update(update, meeting, user)
+            )
             meeting.messages.append(current_message)
 
         # Execute core operation

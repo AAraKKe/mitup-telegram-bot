@@ -26,6 +26,7 @@ from mitup_bot.utils.messages import (
     MeetingEditSettingsMessages,
 )
 from mitup_bot.views import MitupInlineView, MitupView
+from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.factory import options_button
 from tests.helpers import UpdateRequest, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
@@ -648,7 +649,7 @@ def test_has_message(update: Update, meeting: Meetup, has_message: bool):
 def test_add_message_to_meeting_from_update(
     meeting: Meetup, update: Update, message_id: int, inline_message_id: str, chat_id: int, chat_instance: str
 ):
-    message = meeting.add_message(update, meeting.owner)
+    message = meeting.add_message(update, meeting_views.keyboard_for_update(update, meeting, meeting.owner))
 
     assert message.inline_message_id == inline_message_id
     assert message.message_id == message_id
@@ -662,20 +663,18 @@ def test_add_message_does_nothing_if_message_exists():
         id=123,
         message_id=123,
         chat_id=123,
-        buttons=MessageButtons(keyboard=meeting.main_view().keyboard),
+        buttons=MessageButtons(keyboard=meeting_views.main_view(meeting).keyboard),
         meetup=meeting,
     )
 
-    assert message == meeting.add_message(
-        Update(123, message=TgMessage(message_id=123, date=datetime.now(), chat=Chat(id=123, type="PRIVATE"))),
-        meeting.owner,
-    )
+    update = Update(123, message=TgMessage(message_id=123, date=datetime.now(), chat=Chat(id=123, type="PRIVATE")))
+    assert message == meeting.add_message(update, meeting_views.keyboard_for_update(update, meeting, meeting.owner))
     assert len(meeting.messages) == 1
 
 
 def test_add_message_fails_if_no_message_in_update(meeting: Meetup):
     with pytest.raises(NoMessageAvailable):
-        meeting.add_message(Update(123), meeting.owner)
+        meeting.add_message(Update(123), meeting_views.keyboard_for_update(Update(123), meeting, meeting.owner))
 
 
 def expected_meeting_settings_view(
@@ -731,7 +730,7 @@ def test_default_meeting_options_view(
     meeting.public = public
     meeting.waiting_list = waiting_list
 
-    view = meeting.settings_view
+    view = meeting_views.settings_view(meeting)
 
     expected_view = expected_meeting_settings_view(meeting)
 
@@ -775,7 +774,7 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None):
     # except when the meeting has no language
     meeting.language = meeting_language
     used_language = meeting_language or meeting.owner.lang
-    view = meeting.inline_view()
+    view = meeting_views.inline_view(meeting)
 
     expected_view = MitupInlineView(
         description=meeting.inline_message,
@@ -797,7 +796,7 @@ def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
     meeting.language = meeting_language
     used_language = meeting_language or meeting.owner.lang
 
-    view = meeting.inline_view(chat_instance="some_chat_instance")
+    view = meeting_views.inline_view(meeting, chat_instance="some_chat_instance")
 
     expected_view = MitupInlineView(
         description=meeting.inline_message,

@@ -7,10 +7,6 @@ from sqlalchemy import Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
 
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
-from mitup_bot.views import MitupView
-from mitup_bot.views.factory import options_button
 
 from .base_model import BaseModel
 
@@ -60,43 +56,3 @@ class Settings(BaseModel, SQLModel, table=True):
             # We should log this and use UTC instead.
             log.warning("Invalid timezone, falling back to UTC", timezone=self.timezone, user_id=self.user_id)
             return ZoneInfo("UTC")
-
-    def default_meeting_settings_view(self) -> MitupView:
-        keyboard = [
-            [
-                options_button(
-                    cb.SET_DEFAULT_WAITING_LIST,
-                    ButtonMessages.WAITING_LIST.get(lang=self.language),
-                    self.default_waiting_list,
-                ),
-                options_button(
-                    cb.SET_DEFAULT_PUBLIC,
-                    ButtonMessages.PUBLIC.get(lang=self.language),
-                    self.default_public,
-                ),
-            ],
-            [
-                options_button(
-                    cb.SET_DEFAULT_INVITATIONS,
-                    ButtonMessages.OPEN_INVITATION.get(lang=self.language),
-                    self.default_allow_invitation,
-                ),
-                options_button(
-                    cb.SET_DEFAULT_INCOGNITO,
-                    ButtonMessages.INCOGNITO.get(lang=self.language),
-                    self.default_incognito,
-                ),
-            ],
-            [
-                options_button(
-                    cb.SET_DEFAULT_LOCK_ON_START,
-                    ButtonMessages.LOCK_ON_START.get(lang=self.language),
-                    self.default_lock_on_start,
-                ),
-            ],
-        ]
-
-        return MitupView(
-            SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION.get(lang=self.language),
-            keyboard=keyboard,
-        ).with_back_button(ButtonMessages.SETTINGS, self.language, cb.SETTINGS)

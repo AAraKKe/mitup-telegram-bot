@@ -19,6 +19,7 @@ from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_dateti
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDateTimeMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
+from mitup_bot.views import meeting as meeting_views
 
 from ..utils import scheduling_horizon_rejection
 from .enums import ConversationMeetingState, EditMeetingHandlerId
@@ -180,7 +181,7 @@ async def callback_query_cancel_start_time(session: AsyncSession, update: Update
         cleanup_states(context)
         return ConversationHandler.END
 
-    await context.api.edit_message(update=update, view=meeting.when_view)
+    await context.api.edit_message(update=update, view=meeting_views.when_view(meeting))
     cleanup_states(context)
     return ConversationHandler.END
 
@@ -450,7 +451,7 @@ async def date_time_entity_message_handler(
         if end_cleared:
             context_message = prepend_end_cleared_notice(lang=current_user.lang, base_message=context_message)
 
-        view = meeting.when_view.with_context(context_message)
+        view = meeting_views.when_view(meeting).with_context(context_message)
 
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)
@@ -508,7 +509,7 @@ async def set_time_message_handler(
         if end_cleared:
             context_message = prepend_end_cleared_notice(lang=current_user.lang, base_message=context_message)
 
-        view = meeting.when_view.with_context(context_message)
+        view = meeting_views.when_view(meeting).with_context(context_message)
 
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)

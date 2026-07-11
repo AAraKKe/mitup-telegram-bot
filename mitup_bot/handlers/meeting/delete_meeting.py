@@ -12,6 +12,7 @@ from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
+from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -110,5 +111,7 @@ async def callback_query_decline_delete_meeting(session: AsyncSession, update: U
 
     await context.api.edit_message(
         update=update,
-        view=meeting.main_view().with_context(MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user.lang)),
+        view=meeting_views.main_view(meeting).with_context(
+            MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user.lang)
+        ),
     )

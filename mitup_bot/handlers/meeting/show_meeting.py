@@ -5,6 +5,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -34,4 +35,4 @@ async def callback_query_show_meeting(session: AsyncSession, update: Update, con
         return
 
     back_button = meeting_detail_back_button(callback_data.source, callback_data.page, user.lang)
-    await context.api.edit_message(update=update, view=meeting.view_for(user, back_button=back_button))
+    await context.api.edit_message(update=update, view=meeting_views.view_for(meeting, user, back_button=back_button))

@@ -9,6 +9,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditLanguageMessages
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
 
@@ -56,7 +57,9 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     # everywhere
     meeting.language = SUPPORTED_LANGUAGES[valid_data.id]
     for message in meeting.messages:
-        message.buttons.keyboard = meeting.build_inline_keyboard(is_searchable=message.chat_instance is not None)
+        message.buttons.keyboard = meeting_views.build_inline_keyboard(
+            meeting, is_searchable=message.chat_instance is not None
+        )
 
     await context.api.edit_message(
         update=update,

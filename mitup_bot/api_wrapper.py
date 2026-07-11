@@ -37,6 +37,7 @@ from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
+from mitup_bot.views import meeting as meeting_views
 
 TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
@@ -642,9 +643,9 @@ class TelegramApi:
         """
 
         view = (
-            meeting.inline_view(chat_instance=message.chat_instance)
+            meeting_views.inline_view(meeting, chat_instance=message.chat_instance)
             if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
-            else meeting.main_view()
+            else meeting_views.main_view(meeting)
         )
 
         # Update the stored buttons to match the current view to ensure they are persisted.

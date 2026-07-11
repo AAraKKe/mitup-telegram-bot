@@ -9,6 +9,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.emojis import Emojis
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
 from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import create_meetup, create_user
 
 
@@ -42,7 +43,7 @@ def test_external_view():
         ],
     )
 
-    assert expected_view == meeting.external_view()
+    assert expected_view == meeting_views.external_view(meeting)
 
 
 def test_edit_view(user_with_settings: User):
@@ -103,7 +104,7 @@ def test_edit_view(user_with_settings: User):
         ],
     )
 
-    assert expected_view == meeting.edit_view
+    assert expected_view == meeting_views.edit_view(meeting)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +206,7 @@ def test_main_view_hides_join_leave_row_when_locked_and_in_progress(user_with_se
 
     assert meeting.is_in_progress  # guard: the branch condition must be True
 
-    view = meeting.main_view()
+    view = meeting_views.main_view(meeting)
 
     join_cb = cb.JOIN.with_id(meeting.db_id)
     join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
@@ -226,7 +227,7 @@ def test_external_view_hides_join_leave_row_when_locked_and_in_progress(user_wit
 
     assert meeting.is_in_progress  # guard: the branch condition must be True
 
-    view = meeting.external_view()
+    view = meeting_views.external_view(meeting)
 
     join_cb = cb.JOIN.with_id(meeting.db_id)
     join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
@@ -238,7 +239,7 @@ def test_build_inline_keyboard_hides_join_leave_row_when_locked_and_in_progress(
     """build_inline_keyboard must omit the join/leave row when is_locked_and_in_progress=True."""
     meeting = create_meetup(id=1, owner=user_with_settings)
 
-    keyboard = meeting.build_inline_keyboard(is_locked_and_in_progress=True)
+    keyboard = meeting_views.build_inline_keyboard(meeting, is_locked_and_in_progress=True)
 
     join_cb = cb.JOIN.with_id(meeting.db_id)
     join_buttons = [btn for row in keyboard for btn in row if btn.callback_data == join_cb]
@@ -272,8 +273,8 @@ def make_not_in_progress_meeting(owner: User):
 @pytest.mark.parametrize(
     "get_view",
     [
-        lambda m: m.main_view(),
-        lambda m: m.external_view(),
+        lambda m: meeting_views.main_view(m),
+        lambda m: meeting_views.external_view(m),
     ],
     ids=["main_view", "external_view"],
 )
@@ -296,7 +297,7 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_language(user_w
 
     assert meeting.is_in_progress  # guard: precondition for the branch under test
 
-    view = meeting.inline_view()
+    view = meeting_views.inline_view(meeting)
     # meeting.lang resolves to meeting.language ("en") since it is explicitly set
     expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
     assert expected_text in view.description.text
@@ -312,7 +313,7 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(use
 
     assert meeting.is_in_progress  # guard: precondition for the branch under test
 
-    view = meeting.inline_view()
+    view = meeting_views.inline_view(meeting)
     # meeting.lang falls through to meeting.user_language when language is None
     expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
     assert expected_text in view.description.text
@@ -321,8 +322,8 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(use
 @pytest.mark.parametrize(
     "get_view",
     [
-        lambda m: m.main_view(),
-        lambda m: m.external_view(),
+        lambda m: meeting_views.main_view(m),
+        lambda m: meeting_views.external_view(m),
     ],
     ids=["main_view", "external_view"],
 )
@@ -342,7 +343,7 @@ def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_s
 
     assert not meeting.is_in_progress  # guard: precondition
 
-    view = meeting.inline_view()
+    view = meeting_views.inline_view(meeting)
     # inline_view uses meeting.lang (meeting.language or meeting.user_language)
     expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
     assert expected_text not in view.description.text

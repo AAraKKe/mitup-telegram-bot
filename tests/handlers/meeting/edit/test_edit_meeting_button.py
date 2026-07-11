@@ -8,6 +8,7 @@ from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.meeting.edit.entry import callback_query_edit_meeting
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import StubMitupContext, UpdateRequest, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
@@ -70,7 +71,7 @@ async def test_edit_meeting_works_as_expected(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    view = user_with_settings.meetups[0].edit_view
+    view = meeting_views.edit_view(user_with_settings.meetups[0])
 
     await callback_query_edit_meeting(update, context)
 

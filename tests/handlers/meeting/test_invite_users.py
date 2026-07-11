@@ -14,6 +14,7 @@ from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     MockDbSession,
@@ -215,7 +216,7 @@ async def test_cancel_name_request(
 
     # Owners are returned to their meeting; everyone else lands on the main menu
     if owner_id == 123:
-        expected_view = meeting.view_for(user_with_settings).with_context(message)
+        expected_view = meeting_views.view_for(meeting, user_with_settings).with_context(message)
     else:
         expected_view = views.factory.main_menu_view(RenderContext(lang=user_with_settings.lang), message=message)
 
@@ -260,7 +261,7 @@ async def test_complete_user_invitation(
 
     # User has been sent confirmation of the invitation
     # With the proper view depending on who invited the user
-    expected_view = meeting.main_view() if owner_id == 123 else meeting.external_view()
+    expected_view = meeting_views.main_view(meeting) if owner_id == 123 else meeting_views.external_view(meeting)
     expected_view = expected_view.with_context(
         MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )
@@ -389,7 +390,7 @@ async def test_invite_user_decline_confirmation(
     message = MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang)
 
     if owner_id == 123:
-        expected_view = meeting.view_for(user_with_settings).with_context(message)
+        expected_view = meeting_views.view_for(meeting, user_with_settings).with_context(message)
     else:
         expected_view = views.factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang),
@@ -438,7 +439,7 @@ async def test_invite_user_adds_to_the_waiting_list(
     confirm_context = result.last_context
 
     # User has been sent confirmation of the invitation to the waiting list
-    expected_view = meeting.main_view().with_context(
+    expected_view = meeting_views.main_view(meeting).with_context(
         MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
     )
 

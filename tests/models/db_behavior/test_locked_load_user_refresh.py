@@ -61,7 +61,7 @@ async def test_owner_join_survives_locked_meeting_load(db_session: AsyncSession,
     which runs with populate_existing. That re-hydrates every entity the selectin cascade
     touches — including the meeting's owner, who here is the already-loaded current user —
     resetting `User.meetups`/`joined_links` (not part of the meeting's load) to unloaded. The
-    next `own_meeting` access (`Message.from_update`) then raised InvalidRequestError
+    next `own_meeting` access (`views.meeting.keyboard_for_update`) then raised InvalidRequestError
     (issue #207). This pins the post-lock `session.refresh` in `handle_join_leave_operation`.
 
     Runs on a dedicated session on the same engine (nothing committed; rolled back on close).
@@ -72,7 +72,7 @@ async def test_owner_join_survives_locked_meeting_load(db_session: AsyncSession,
         owner = await User.by_tg_user_id(session, OWNER_TG_USER_ID, must_exist=True)
 
         tg_owner = TgUser(id=OWNER_TG_USER_ID, first_name="LLU Owner", is_bot=False)
-        # A bot-chat update: Message.from_update reads user.meetups via own_meeting.
+        # A bot-chat update: keyboard_for_update reads user.meetups via own_meeting.
         update = create_update(UpdateRequest(callback_query=cb.JOIN.with_id(meeting.db_id)), tg_user=tg_owner)
         context = join_context(update, app, meeting.db_id)
 
@@ -92,7 +92,7 @@ async def test_participant_rejoin_survives_locked_meeting_load(db_session: Async
     A mere participant's User is re-hydrated via the locked meeting's joined_links load, so the
     join operation's `joined_meeting` read (user.joined_links) tripped the lazy="raise" guard
     as well. The inline update keeps this variant on the joined_links read alone —
-    Message.from_update only reads own_meeting for bot-chat messages.
+    keyboard_for_update only reads own_meeting for bot-chat messages.
     """
     async with AsyncSession(async_engine(db_session)) as session:
         meeting = await seed_owned_meeting(session)

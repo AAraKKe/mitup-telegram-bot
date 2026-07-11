@@ -10,6 +10,7 @@ from mitup_bot.monitoring import Feature
 from mitup_bot.utils import InlineQueryMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupInlineView
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from .utils import search_chat_meetings_button, sort_meetings
@@ -44,7 +45,7 @@ async def search_chat_meetings(session: AsyncSession, update: Update, context: T
 
     if meetings:
         sorted_meetings = sort_meetings(meetings)
-        results = [meeting.inline_view(chat_instance=chat_instance) for meeting in sorted_meetings]
+        results = [meeting_views.inline_view(meeting, chat_instance=chat_instance) for meeting in sorted_meetings]
     else:
         results = [
             MitupInlineView(

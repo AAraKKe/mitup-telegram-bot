@@ -10,6 +10,7 @@ from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingLifecycleMessages, SupporterMessages
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -52,7 +53,7 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
     success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user_with_settings.lang)
     context.api.assert_edit_message_called(
         update,
-        inactive_meeting.edit_view.with_context(success_message),
+        meeting_views.edit_view(inactive_meeting).with_context(success_message),
     )
 
 

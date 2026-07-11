@@ -11,21 +11,15 @@ from telegram import Update
 
 from mitup_bot import limits
 from mitup_bot.exceptions import MeetupNotFound
-from mitup_bot.keyboards import ButtonConfig, Keyboard
+from mitup_bot.keyboards import Keyboard
 from mitup_bot.models import Message
 from mitup_bot.utils import (
     ButtonMessages,
     Emojis,
-    MeetingAttachMessages,
     MeetingDisplayMessages,
     MeetingEditParticipantsMessages,
-    MeetingEditSettingsMessages,
-    MeetingEditWhenMessages,
 )
-from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import Bold, EntityDateTime, FormattedText, render
-from mitup_bot.views import MitupInlineView, MitupView
-from mitup_bot.views.factory import options_button
 
 from .base_model import BaseModel
 from .mutable_model import MutableModel
@@ -265,10 +259,14 @@ class Meetup(BaseModel, SQLModel, table=True):
             )
         return None
 
-    def add_message(self, update: Update, user: User) -> Message:
-        """Link a message to this meeting if not already linked and return the message object."""
+    def add_message(self, update: Update, keyboard: Keyboard) -> Message:
+        """Link a message to this meeting if not already linked and return the message object.
+
+        `keyboard` is stored on a newly created message; build it with
+        `views.meeting.keyboard_for_update`.
+        """
         if (message := self.message_from_update(update)) is None:
-            message = Message.from_update(update, self, user)
+            message = Message.from_update(update, self, keyboard)
         return message
 
     @property
@@ -464,232 +462,6 @@ class Meetup(BaseModel, SQLModel, table=True):
 
         return render(result)
 
-    def _join_leave_row(self, lang: str) -> list[ButtonConfig]:
-        """Return the [JOIN, (INVITE,) LEAVE] row, inserting INVITE only when allow_invitation is True."""
-        join = ButtonConfig(text=ButtonMessages.JOIN.get(lang=lang), callback_data=cb.JOIN.with_id(self.db_id))
-        invite = ButtonConfig(text=ButtonMessages.INVITE.get(lang=lang), callback_data=cb.INVITE.with_id(self.db_id))
-        leave = ButtonConfig(text=ButtonMessages.LEAVE.get(lang=lang), callback_data=cb.LEAVE.with_id(self.db_id))
-        return [join, invite, leave] if self.allow_invitation else [join, leave]
-
-    def _main_menu_back_button(self) -> ButtonConfig:
-        return ButtonConfig(
-            text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
-            callback_data=cb.MAIN_MENU,
-        )
-
-    def main_view(self, back_button: ButtonConfig | None = None) -> MitupView:
-        """Owner-facing detail view.
-
-        `back_button` lets the caller point the trailing back button at the list the user came
-        from; when omitted it defaults to the main menu.
-        """
-        keyboard: Keyboard = []
-        if not (self.lock_on_start and self.is_in_progress):
-            keyboard.append(self._join_leave_row(self.user_language))
-        keyboard.extend(
-            [
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.EDIT.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.DELETE.get(lang=self.user_language),
-                        callback_data=cb.DELETE_MEETING.with_id(self.db_id),
-                    ),
-                ],
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.SHARE.get(lang=self.user_language), switch_inline_query=str(self.db_id)
-                    ),
-                ],
-                [back_button or self._main_menu_back_button()],
-            ]
-        )
-        view = MitupView(self.message, keyboard)
-        if self.is_in_progress:
-            view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.user_language))
-        return view
-
-    def external_view(self, back_button: ButtonConfig | None = None) -> MitupView:
-        """This is the view shown to users that do not own the meeting when checking through meetings I have joined.
-
-        `back_button` lets the caller point the trailing back button at the list the user came
-        from; when omitted it defaults to the main menu.
-        """
-        keyboard: Keyboard = []
-        if not (self.lock_on_start and self.is_in_progress):
-            keyboard.append(self._join_leave_row(self.user_language))
-        keyboard.append([back_button or self._main_menu_back_button()])
-        view = MitupView(self.inline_message, keyboard)
-        if self.is_in_progress:
-            view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.user_language))
-        return view
-
-    def view_for(self, user: User, back_button: ButtonConfig | None = None) -> MitupView:
-        """Get the appropriate view for the given user depending on whether they own the meeting or not.
-
-        `back_button` is forwarded to whichever view is rendered.
-        """
-        return self.main_view(back_button) if self.is_owned_by(user) else self.external_view(back_button)
-
-    @property
-    def edit_view(self) -> MitupView:
-        keyboard: Keyboard = [
-            [
-                ButtonConfig(
-                    text=ButtonMessages.TITLE.get(lang=self.user_language),
-                    callback_data=cb.EDIT_MEETING_TITLE.with_id(self.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.DESCRIPTION.get(lang=self.user_language),
-                    callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(self.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.WHEN.get(lang=self.user_language),
-                    callback_data=cb.EDIT_MEETING_WHEN.with_id(self.db_id),
-                ),
-            ],
-        ]
-        keyboard.extend(
-            [
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.PARTICIPANTS.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.LOCATION.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_LOCATION.with_id(self.db_id),
-                    ),
-                ],
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.LANGUAGE.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(self.db_id),
-                    ),
-                    ButtonConfig(
-                        text=ButtonMessages.SETTINGS.get(lang=self.user_language),
-                        callback_data=cb.EDIT_MEETING_SETTINGS.with_id(self.db_id),
-                    ),
-                ],
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.DONE.get(lang=self.user_language),
-                        callback_data=cb.SHOW_MEETING.with_id(self.db_id),
-                    ),
-                ],
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.back(lang=self.user_language),
-                        callback_data=cb.MAIN_MENU,
-                    ),
-                ],
-            ]
-        )
-        return MitupView(self.message, keyboard)
-
-    @property
-    def settings_view(self) -> MitupView:
-        keyboard = [
-            [
-                options_button(
-                    cb.SET_MEETING_WAITING_LIST.with_id(self.db_id),
-                    ButtonMessages.WAITING_LIST.get(lang=self.owner.lang),
-                    self.waiting_list,
-                ),
-                options_button(
-                    cb.SET_MEETING_PUBLIC.with_id(self.db_id),
-                    ButtonMessages.PUBLIC.get(lang=self.owner.lang),
-                    self.public,
-                ),
-            ],
-            [
-                options_button(
-                    cb.SET_MEETING_ALLOW_INVITATIONS.with_id(self.db_id),
-                    ButtonMessages.OPEN_INVITATION.get(lang=self.owner.lang),
-                    self.allow_invitation,
-                ),
-                options_button(
-                    cb.SET_MEETING_INCOGNITO.with_id(self.db_id),
-                    ButtonMessages.INCOGNITO.get(lang=self.owner.lang),
-                    self.incognito,
-                ),
-            ],
-        ]
-
-        return MitupView(
-            MeetingEditSettingsMessages.DESCRIPTION.get(lang=self.owner.lang),
-            keyboard=keyboard,
-        ).with_back_button(ButtonMessages.EDIT, self.owner.lang, cb.EDIT_MEETING.with_id(self.db_id))
-
-    def _when_view_with_start(self) -> tuple[str | FormattedText, Keyboard]:
-        start_entity = EntityDateTime(
-            MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), cast(dt.datetime, self.datetime), "DT"
-        )
-        set_start_button = ButtonConfig(
-            text=ButtonMessages.SET_START_TIME.get(lang=self.user_language),
-            callback_data=cb.SET_MEETING_START_TIME.with_id(self.db_id),
-        )
-        set_end_button = ButtonConfig(
-            text=ButtonMessages.SET_END_TIME.get(lang=self.user_language),
-            callback_data=cb.SET_MEETING_END_TIME.with_id(self.db_id),
-        )
-        lock_toggle = options_button(
-            cb.SET_MEETING_LOCK_ON_START.with_id(self.db_id),
-            ButtonMessages.LOCK_ON_START.get(lang=self.user_language),
-            self.lock_on_start,
-        )
-        clear_button = ButtonConfig(
-            text=ButtonMessages.CLEAR_TIMES.get(lang=self.user_language),
-            callback_data=cb.DELETE_MEETING_TIMES.with_id(self.db_id),
-        )
-
-        if self.end_datetime is not None:
-            end_entity = EntityDateTime(
-                MeetingDisplayMessages.DATETIME_ENTITY_LABEL.get_text(), self.end_datetime, "DT"
-            )
-            description: str | FormattedText = MeetingEditWhenMessages.DESCRIPTION_BOTH.get(
-                lang=self.user_language,
-                start_datetime=render(t"{start_entity}"),
-                end_datetime=render(t"{end_entity}"),
-            )
-        else:
-            description = MeetingEditWhenMessages.DESCRIPTION_START_ONLY.get(
-                lang=self.user_language,
-                start_datetime=render(t"{start_entity}"),
-            )
-
-        keyboard: Keyboard = [
-            [set_start_button, set_end_button],
-            [lock_toggle],
-            [clear_button],
-        ]
-        return description, keyboard
-
-    @property
-    def when_view(self) -> MitupView:
-        if self.datetime is None:
-            # Lock-on-start is only offered once a start time exists: without a start there is no
-            # window to freeze on, so the toggle would be a no-op. Setting a start time reveals it.
-            description: str | FormattedText = MeetingEditWhenMessages.DESCRIPTION_NO_TIMES.get(lang=self.user_language)
-            keyboard: Keyboard = [
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.SET_START_TIME.get(lang=self.user_language),
-                        callback_data=cb.SET_MEETING_START_TIME.with_id(self.db_id),
-                    ),
-                ],
-            ]
-        else:
-            description, keyboard = self._when_view_with_start()
-
-        return MitupView(description, keyboard).with_back_button(
-            ButtonMessages.EDIT, self.user_language, cb.EDIT_MEETING.with_id(self.db_id)
-        )
-
     def enforce_datetime_ordering(self) -> bool:
         """Clear end_datetime if it's no longer after datetime. Returns True if cleared."""
         if self.end_datetime is None or self.datetime is None:
@@ -701,54 +473,6 @@ class Meetup(BaseModel, SQLModel, table=True):
             self.lock_on_start = False
             return True
         return False
-
-    def inline_view(self, *, chat_instance: str | None = None) -> MitupInlineView:
-        is_searchable = chat_instance is not None
-        footnote = (
-            MeetingAttachMessages.FOOTNOTE_ACTIVE.get(lang=self.lang)
-            if is_searchable
-            else MeetingAttachMessages.FOOTNOTE_INACTIVE.get(lang=self.lang)
-        )
-        view = MitupInlineView(
-            description=self.inline_message,
-            keyboard=self.build_inline_keyboard(
-                is_searchable=is_searchable,
-                is_locked_and_in_progress=self.lock_on_start and self.is_in_progress,
-            ),
-            id=str(self.db_id),
-            title=str(self.title),
-            inline_description=self.inline_query_message,
-        )
-        if self.is_in_progress:
-            view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=self.lang))
-        return view.with_footnote(footnote)
-
-    def build_inline_keyboard(
-        self, *, is_searchable: bool = False, is_locked_and_in_progress: bool = False
-    ) -> Keyboard:
-        keyboard: Keyboard = []
-
-        if not is_locked_and_in_progress:
-            keyboard.append(self._join_leave_row(self.lang))
-
-        if self.public:
-            keyboard.append(
-                [
-                    ButtonConfig(text=ButtonMessages.SHARE.get(lang=self.lang), switch_inline_query=str(self.db_id)),
-                ]
-            )
-
-        if not is_searchable:
-            keyboard.append(
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.MAKE_SEARCHABLE.get(lang=self.lang),
-                        callback_data=cb.ATTACH_TO_CHAT.with_id(self.db_id),
-                    ),
-                ]
-            )
-
-        return keyboard
 
     @overload
     @classmethod

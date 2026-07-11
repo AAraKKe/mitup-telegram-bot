@@ -4,6 +4,7 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import create_meetup, create_user
 
 # --- Invite button visibility in main_view and external_view ---
@@ -18,7 +19,7 @@ def invite_buttons(view: MitupView, meeting: Meetup) -> list[ButtonConfig]:
 def test_main_view_invite_button_visibility(allow_invitation: bool, user_with_settings: User):
     meeting = create_meetup(id=10, owner=user_with_settings, invitation=allow_invitation)
 
-    view = meeting.main_view()
+    view = meeting_views.main_view(meeting)
     found_invite_buttons = invite_buttons(view, meeting)
 
     if allow_invitation:
@@ -31,7 +32,7 @@ def test_main_view_invite_button_visibility(allow_invitation: bool, user_with_se
 def test_external_view_invite_button_visibility(allow_invitation: bool, user_with_settings: User):
     meeting = create_meetup(id=11, owner=user_with_settings, invitation=allow_invitation)
 
-    view = meeting.external_view()
+    view = meeting_views.external_view(meeting)
     found_invite_buttons = invite_buttons(view, meeting)
 
     if allow_invitation:

@@ -12,6 +12,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -226,9 +227,9 @@ async def test_decline_delete_meeting_works(
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
         update,
-        user_with_settings.meetups[0]
-        .main_view()
-        .with_context(MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user_with_settings.lang)),
+        meeting_views.main_view(user_with_settings.meetups[0]).with_context(
+            MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user_with_settings.lang)
+        ),
     )
 
 

@@ -18,6 +18,7 @@ from mitup_bot.utils.entities import EntityDateTime, build_datetime_link, render
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDurationMessages
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import MitupView, factory
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date, to_utc
@@ -105,7 +106,7 @@ async def callback_query_cancel_edit_duration(session: AsyncSession, update: Upd
     if meeting is None:
         return ConversationHandler.END
 
-    await context.api.edit_message(update=update, view=meeting.when_view)
+    await context.api.edit_message(update=update, view=meeting_views.when_view(meeting))
 
     return ConversationHandler.END
 
@@ -207,7 +208,7 @@ async def save_end_datetime_and_finish(
     """Shared tail of both end-datetime flows; broadcast runs post-commit via write mode."""
     meeting.end_datetime = end_dt
 
-    response_view = meeting.when_view
+    response_view = meeting_views.when_view(meeting)
 
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(meeting=meeting)

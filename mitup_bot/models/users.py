@@ -11,12 +11,13 @@ from telegram.ext import ExtBot
 from mitup_bot import supporter
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.views import MitupView
 
 from . import JoinedUsers, Meetup
 from .base_model import BaseModel
 
 if TYPE_CHECKING:
+    from mitup_bot.views import MitupView
+
     from . import JoinedUsers, Meetup, Settings
 
 

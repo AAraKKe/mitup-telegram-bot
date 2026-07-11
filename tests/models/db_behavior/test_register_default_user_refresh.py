@@ -37,7 +37,7 @@ def inline_update(meeting_id: int, joiner: TgUser) -> Update:
 
 
 def bot_chat_update(meeting_id: int, joiner: TgUser) -> Update:
-    """A join clicked in the bot chat — Message.from_update additionally reads user.meetups."""
+    """A join clicked in the bot chat — keyboard_for_update additionally reads user.meetups."""
     return create_update(UpdateRequest(callback_query=cb.JOIN.with_id(meeting_id)), tg_user=joiner)
 
 
@@ -50,7 +50,7 @@ async def test_unregistered_join_registers_user_and_creates_membership(
     """An unregistered user's join runs end-to-end against the real schema.
 
     `register_default_user` flushes the new JOINED_ONLY row and the join path immediately reads
-    its collections (`joined_meeting`, and `own_meeting` via `Message.from_update`), which
+    its collections (`joined_meeting`, and `own_meeting` via `views.meeting.keyboard_for_update`), which
     `User` marks lazy="raise". This is the regression pin for the explicit
     `session.refresh(new_user, ["joined_links", "meetups"])` after the flush — remove it and
     this test fails with InvalidRequestError from the raise guard.

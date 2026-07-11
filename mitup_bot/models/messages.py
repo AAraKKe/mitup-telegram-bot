@@ -13,7 +13,7 @@ from .base_model import BaseModel
 from .mutable_model import MutableModel
 
 if TYPE_CHECKING:  # pragma: no cover
-    from . import Meetup, User
+    from . import Meetup
 
 
 class MessageButtons(MutableModel):
@@ -45,24 +45,19 @@ class Message(BaseModel, SQLModel, table=True):
         return hash(self) == hash(other) if isinstance(other, Message) else NotImplemented
 
     @classmethod
-    def from_update(cls, update: Update, meeting: Meetup, user: User) -> Message:
+    def from_update(cls, update: Update, meeting: Meetup, keyboard: Keyboard) -> Message:
+        """Create the stored message for the update, persisting `keyboard` as its buttons.
+
+        Keyboard selection is view-layer work — build it with `views.meeting.keyboard_for_update`.
+        """
         message_id = None
         inline_message_id = None
         chat_instance = None
-        keyboard = meeting.inline_view().keyboard
         if update.effective_message:
             message_id = update.effective_message.message_id
-            # This is a message from the chat with the bot. Either by the user that owns it
-            # or someone that has joined. Only shows the edit button if the user owns it
-            keyboard = (
-                meeting.main_view().keyboard if user.own_meeting(meeting.db_id) else meeting.external_view().keyboard
-            )
         if update.callback_query and update.callback_query.inline_message_id:
             inline_message_id = update.callback_query.inline_message_id
             chat_instance = update.callback_query.chat_instance
-            # This is a message from a shared meeting outside the chat with the bot
-            # Rebuild the keyboard with the now-known chat_instance
-            keyboard = meeting.inline_view(chat_instance=chat_instance).keyboard
         chat_id = update.effective_chat.id if update.effective_chat else None
         if message_id is None and inline_message_id is None:
             raise NoMessageAvailable("No message_id or inline_message_id found in the update")

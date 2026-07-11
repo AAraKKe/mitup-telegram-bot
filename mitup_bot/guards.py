@@ -345,7 +345,7 @@ async def meeting_viewable(
     """Check whether the user may *view* the meeting, whether they own it or have only joined it.
 
     Unlike `meeting_accessible`, a non-owner who has joined an active meeting is allowed through so
-    the caller can render the non-owner view (`Meetup.external_view`) instead of being bounced to the
+    the caller can render the non-owner view (`views.meeting.external_view`) instead of being bounced to the
     main menu. Can only be used when a meeting is accessed from the bot chat.
     """
 

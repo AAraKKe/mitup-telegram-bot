@@ -8,6 +8,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.factory import options_button
+from mitup_bot.views.meeting_settings import default_meeting_settings_view
 
 
 def test_valid_timezone(settings: Settings):
@@ -75,7 +76,7 @@ def test_default_meeting_options_view(
     settings.default_waiting_list = waiting_list
     settings.default_lock_on_start = lock_on_start
 
-    view = settings.default_meeting_settings_view()
+    view = default_meeting_settings_view(settings)
 
     expected_view = expected_default_meeting_options_view(settings)
 

@@ -6,6 +6,7 @@ from mitup_bot.guards import current_user
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
+from mitup_bot.views.meeting_settings import default_meeting_settings_view
 
 from .entry import EditSettingsHandlerId
 
@@ -21,7 +22,7 @@ async def callback_query_edit_default_meeting_options(session: AsyncSession, upd
 
     await context.api.edit_message(
         update=update,
-        view=user.settings.default_meeting_settings_view(),
+        view=default_meeting_settings_view(user.settings),
     )
 
 
@@ -36,7 +37,7 @@ async def callback_query_toggle_default_waiting_list(session: AsyncSession, upda
 
     await context.api.edit_message(
         update=update,
-        view=user.settings.default_meeting_settings_view(),
+        view=default_meeting_settings_view(user.settings),
     )
 
 
@@ -49,7 +50,7 @@ async def callback_query_toggle_default_public(session: AsyncSession, update: Up
 
     await context.api.edit_message(
         update=update,
-        view=user.settings.default_meeting_settings_view(),
+        view=default_meeting_settings_view(user.settings),
     )
 
 
@@ -64,7 +65,7 @@ async def callback_query_toggle_default_invitations(session: AsyncSession, updat
 
     await context.api.edit_message(
         update=update,
-        view=user.settings.default_meeting_settings_view(),
+        view=default_meeting_settings_view(user.settings),
     )
 
 
@@ -79,7 +80,7 @@ async def callback_query_toggle_default_incognito(session: AsyncSession, update:
 
     await context.api.edit_message(
         update=update,
-        view=user.settings.default_meeting_settings_view(),
+        view=default_meeting_settings_view(user.settings),
     )
 
 
@@ -94,5 +95,5 @@ async def callback_query_toggle_default_lock_on_start(session: AsyncSession, upd
 
     await context.api.edit_message(
         update=update,
-        view=user.settings.default_meeting_settings_view(),
+        view=default_meeting_settings_view(user.settings),
     )

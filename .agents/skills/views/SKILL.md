@@ -149,6 +149,16 @@ view = MitupView(
 ).with_back_button(ButtonMessages.EDIT, lang, cb.EDIT_MEETING.with_id(meeting_id))
 ```
 
-## Model-level views
+## Model-driven views (`views/meeting.py`, `views/meeting_settings.py`)
 
-`Meetup` (and similar domain models) expose their own views as properties: `main_view`, `edit_view`, `settings_view`, `inline_view`, `external_view`. For new meeting-related screens, prefer adding a property on `Meetup` following this pattern — it keeps the screen logic next to the data it renders and makes handler sites small (`meeting.main_view(lang=user.lang)` rather than building a view from scratch).
+Screens rendered *from* a domain model — the meeting detail/edit/settings/when/inline screens and the default-meeting-options screen — live in `views/meeting.py` and `views/meeting_settings.py`, not in `factory.py` and **never on the model itself**. Models must not import the view layer; anything returning a `MitupView`/`MitupInlineView`/`Keyboard` belongs in `views/`.
+
+These factories take the model as their **first positional argument** instead of a `RenderContext`, because they render in a language derived from the model (the meeting's own language or its owner's), independent of the acting user:
+
+```python
+from mitup_bot.views import meeting as meeting_views
+
+view = meeting_views.view_for(meeting, user, back_button=back_button)
+```
+
+For a new meeting-related screen, add a function to `views/meeting.py` following this pattern. `views/meeting.py` also owns `keyboard_for_update`, which picks the keyboard to persist on a stored `Message` (owner vs participant vs inline) — callers pass its result to `Message.from_update` / `Meetup.add_message`.

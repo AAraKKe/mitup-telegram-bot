@@ -10,6 +10,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.mitup_types import TMitupContext
 from mitup_bot.views import factory
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
 from .utils import cleanup_states
@@ -30,7 +31,7 @@ async def callback_query_edit_meeting(session: AsyncSession, update: Update, con
         return
 
     # Only allow editing the meeting if the meeting belongs to the user
-    await context.api.edit_message(update=update, view=meeting.edit_view)
+    await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
 
 
 @HandlersRegistry.register_callback_query(
@@ -59,7 +60,7 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
     if meetup is None:
         return ConversationHandler.END
 
-    await context.api.edit_message(update=update, view=meetup.edit_view)
+    await context.api.edit_message(update=update, view=meeting_views.edit_view(meetup))
 
     # Cleanup any possible state set by any handler related with editing the meeting
     cleanup_states(context)

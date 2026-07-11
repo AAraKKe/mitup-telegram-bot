@@ -6,6 +6,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils.messages import InlineQueryMessages
 from mitup_bot.views import MitupInlineView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers.context import HandlerContext, call_handler
 from tests.helpers.fixtures import UpdateRequest, create_meetup, create_user
 from tests.helpers.monitoring import MetricAssertions
@@ -80,7 +81,9 @@ async def test_share_meeting(
     # meeting gets an explicit placeholder result instead of a silently stalled picker (issue #176).
     if should_share:
         assert meetup is not None, "should_share implies the meeting was created"
-        context.api.assert_answer_inline_query_called(update=update, results=[meetup.inline_view()], cache_time=0)
+        context.api.assert_answer_inline_query_called(
+            update=update, results=[meeting_views.inline_view(meetup)], cache_time=0
+        )
         metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.SHARE_MEETING)})
     else:
         context.api.assert_answer_inline_query_called(
@@ -138,4 +141,4 @@ async def test_share_meeting_strips_surrounding_whitespace(
 
     context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
 
-    context.api.assert_answer_inline_query_called(update, results=[meetup.inline_view()], cache_time=0)
+    context.api.assert_answer_inline_query_called(update, results=[meeting_views.inline_view(meetup)], cache_time=0)

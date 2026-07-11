@@ -14,6 +14,7 @@ from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -64,7 +65,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
-    expected_view = target_meeting.main_view()
+    expected_view = meeting_views.main_view(target_meeting)
     context.api.assert_edit_message_called(update, expected_view)
 
 
@@ -137,8 +138,8 @@ async def test_show_meeting_renders_external_view_for_joined_but_not_owned_meeti
 
     # The handler builds the back button in the viewer's language (no origin in the callback, so it
     # targets the main menu), unlike external_view's owner-language default back button.
-    expected_view = joined_meeting.external_view(
-        back_button=meeting_detail_back_button(None, 1, user_with_settings.lang)
+    expected_view = meeting_views.external_view(
+        joined_meeting, back_button=meeting_detail_back_button(None, 1, user_with_settings.lang)
     )
     context.api.assert_edit_message_called(update, expected_view)
     context.api.assert_send_message_not_called()
@@ -165,8 +166,8 @@ async def test_show_meeting_external_view_back_button_targets_originating_list_p
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
-    expected_view = joined_meeting.external_view(
-        back_button=meeting_detail_back_button(MeetingListSource.JOINED, 2, user_with_settings.lang)
+    expected_view = meeting_views.external_view(
+        joined_meeting, back_button=meeting_detail_back_button(MeetingListSource.JOINED, 2, user_with_settings.lang)
     )
     context.api.assert_edit_message_called(update, expected_view)
 

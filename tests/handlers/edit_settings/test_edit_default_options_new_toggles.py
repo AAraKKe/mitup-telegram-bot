@@ -4,6 +4,7 @@ from telegram import Update
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views.meeting_settings import default_meeting_settings_view
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
@@ -39,5 +40,5 @@ async def test_toggle_flips_value_and_re_renders_default_meeting_settings(
     assert getattr(settings, attr_name) == (not initial_value)
 
     # After toggling lock, the default_meeting_settings_view() is re-rendered (not a sub-screen)
-    expected_view = settings.default_meeting_settings_view()
+    expected_view = default_meeting_settings_view(settings)
     context.api.assert_edit_message_called(update, expected_view)

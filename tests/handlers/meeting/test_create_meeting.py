@@ -18,6 +18,7 @@ from mitup_bot.utils import MeetingCreationMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     ConversationStep,
     ConversationTester,
@@ -75,7 +76,7 @@ async def test_meeting_creation_successful(
 
     title_step = result.get_step(1)
     message = MeetingCreationMessages.SUCCESS.get(title=new_meeting.title, lang=user_with_settings.lang)
-    view = new_meeting.edit_view.with_context(message)
+    view = meeting_views.edit_view(new_meeting).with_context(message)
     title_step.context.api.assert_send_message_called(title_step.context.get_update(), view)
 
 
