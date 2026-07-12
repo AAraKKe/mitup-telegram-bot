@@ -44,7 +44,7 @@ def test_publish_docs_invalidates_everything(
     mock_boto_client.return_value = mock_cf_client
     mock_cf_client.list_distributions.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200},
-        "DistributionList": {"Items": [{"Id": mock_dist_id}]},
+        "DistributionList": {"Items": [{"Id": mock_dist_id, "Aliases": {"Items": [os.environ["BOT_DOMAIN"]]}}]},
     }
     mock_cf_client.create_invalidation.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 201},
@@ -117,7 +117,7 @@ def test_publish_docs_create_invalidation_error(
     mock_boto_client.return_value = mock_cf_client
     mock_cf_client.list_distributions.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200},
-        "DistributionList": {"Items": [{"Id": mock_dist_id}]},
+        "DistributionList": {"Items": [{"Id": mock_dist_id, "Aliases": {"Items": [os.environ["BOT_DOMAIN"]]}}]},
     }
     create_invalid_response = {"ResponseMetadata": {"HTTPStatusCode": 400}, "Error": {"Message": "Bad Request"}}
     mock_cf_client.create_invalidation.return_value = create_invalid_response
@@ -158,6 +158,48 @@ def test_get_distribution_id_api_error(capsys: pytest.CaptureFixture[str]):
         docs_ops.get_distribution_id(mock_client)
 
     assert "Failed to get the distribution ID" in combined(capsys)
+
+
+def test_get_distribution_id_single_match():
+    """The sole distribution is selected when its aliases include `BOT_DOMAIN`."""
+    mock_client = MagicMock()
+    mock_client.list_distributions.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+        "DistributionList": {"Items": [{"Id": "MATCHING123", "Aliases": {"Items": [os.environ["BOT_DOMAIN"]]}}]},
+    }
+
+    assert docs_ops.get_distribution_id(mock_client) == "MATCHING123"
+
+
+def test_get_distribution_id_selects_alias_match_among_many():
+    """The distribution whose aliases include `BOT_DOMAIN` is picked, not the first one."""
+    mock_client = MagicMock()
+    mock_client.list_distributions.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+        "DistributionList": {
+            "Items": [
+                {"Id": "OTHER111", "Aliases": {"Items": ["other.domain.com"]}},
+                {"Id": "MATCHING222", "Aliases": {"Items": [os.environ["BOT_DOMAIN"]]}},
+                {"Id": "NOALIASES333", "Aliases": {"Items": None}},
+            ]
+        },
+    }
+
+    assert docs_ops.get_distribution_id(mock_client) == "MATCHING222"
+
+
+def test_get_distribution_id_no_alias_match(capsys: pytest.CaptureFixture[str]):
+    """`get_distribution_id` aborts when no distribution carries `BOT_DOMAIN` as an alias."""
+    mock_client = MagicMock()
+    mock_client.list_distributions.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+        "DistributionList": {"Items": [{"Id": "OTHER111", "Aliases": {"Items": ["other.domain.com"]}}]},
+    }
+
+    with pytest.raises(typer.Abort):
+        docs_ops.get_distribution_id(mock_client)
+
+    assert f"No CloudFront distribution has {os.environ['BOT_DOMAIN']} as an alias" in combined(capsys)
 
 
 def build_popen_mock(returncode: int = 0, output_lines: list[str] | None = None) -> MagicMock:

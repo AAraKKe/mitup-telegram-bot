@@ -92,27 +92,34 @@ def s3_sync():
 
 
 def get_distribution_id(client: CloudFrontClient) -> str:
-    """Get the distribution ID for the CloudFront distribution that serves the site."""
+    """Return the ID of the CloudFront distribution whose aliases include `BOT_DOMAIN`.
+
+    The account may host several distributions, so we match on the alias rather
+    than taking the first one. A CloudFront alias is unique across the account,
+    so at most one distribution can match.
+    """
     distributions = client.list_distributions()
 
     if distributions["ResponseMetadata"]["HTTPStatusCode"] != 200:
         console.error(f"Failed to get the distribution ID. Response: {distributions}")
         raise typer.Abort()
 
-    distribution = distributions["DistributionList"].get("Items")
+    items = distributions["DistributionList"].get("Items")
 
-    if distribution is None:
+    if not items:
         console.error(f"No distributions found. Response: {distributions}")
         console.show(distributions)
         raise typer.Abort()
-    elif not distribution:
-        console.error(f"No distributions found (empty list). Response: {distributions}")
-        console.show(distributions)
-        raise typer.Abort()
 
-    console.info(f"[bold]Distribution ID[/bold]: {distribution[0]['Id']}")
+    bot_domain = os.environ["BOT_DOMAIN"]
+    for item in items:
+        if bot_domain in (item["Aliases"].get("Items") or []):
+            console.info(f"[bold]Distribution ID[/bold]: {item['Id']}")
+            return item["Id"]
 
-    return distribution[0]["Id"]
+    console.error(f"No CloudFront distribution has {bot_domain} as an alias. Response: {distributions}")
+    console.show(distributions)
+    raise typer.Abort()
 
 
 def publish_docs():
