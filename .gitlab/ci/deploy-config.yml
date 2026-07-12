@@ -28,37 +28,6 @@
     expire_in: 2 hours
     access: none
 
-config-staging:
-  extends: .aws-config
-  resource_group: staging
-  environment:
-    name: staging
-  # Do not block deployment on formatting/style issues
-  needs:
-    # A deploy blocks on the whole test suite (every `test-suite` matrix entry) and the db suite.
-    # Both run on the default branch (their `rules` always fire there), so neither needs `optional`.
-    - test-suite
-    - test-db
-    - type-check
-    - validate-locales
-    - validate-migrations
-    - semgrep-sast
-    - secret_detection
-
-  rules:
-    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
-      when: on_success
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths: !reference [.deployment-files]
-      when: on_success
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths: !reference [.docs-files]
-      when: on_success
-
 config-prod:
   extends: .aws-config
   environment:

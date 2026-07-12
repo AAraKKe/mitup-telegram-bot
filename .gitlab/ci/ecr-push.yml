@@ -59,59 +59,18 @@
 # HARD PREREQUISITE: the `events` ECR repo (created by mitup-infra !43) must be merged and applied
 # before this MR merges, so the push destination resolves (see deploy-config.yml).
 
-## -------------- Push to staging ---------------
-push-bot-tagged-staging:
-  extends: .push-ecr
-  resource_group: bot-tagged-staging
-  environment:
-    name: staging
-  dependencies:
-    - build-translations
-    - config-staging
-  variables:
-    DOCKERFILE: apps/bot/Dockerfile
-    PUSH_DESTINATION: $BOT_IMAGE_TAG
-  rules:
-    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
-      when: on_success
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths: !reference [.deployment-files]
-      when: on_success
-
-push-migrations-lambda-staging:
-  extends: push-bot-tagged-staging
-  resource_group: migrations-tagged-staging
-  variables:
-    DOCKERFILE: apps/lambda-migrations/Dockerfile
-    PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
-
-push-alarm-action-lambda-staging:
-  extends: push-bot-tagged-staging
-  resource_group: alarm-action-tagged-staging
-  variables:
-    DOCKERFILE: apps/lambda-alarm/Dockerfile
-    PUSH_DESTINATION: $ALARM_ACTION_IMAGE_TAG
-
-push-events-tagged-staging:
-  extends: push-bot-tagged-staging
-  resource_group: events-tagged-staging
-  variables:
-    DOCKERFILE: apps/events/Dockerfile
-    PUSH_DESTINATION: $EVENTS_IMAGE_TAG
-
 ## ------------- Push to prod --------------
 push-bot-tagged-prod:
-  # We can reuse the one for staging and change the environment
-  extends: push-bot-tagged-staging
+  extends: .push-ecr
   resource_group: bot-tagged-prod
   environment:
     name: production
   dependencies:
     - build-translations
     - config-prod
+  variables:
+    DOCKERFILE: apps/bot/Dockerfile
+    PUSH_DESTINATION: $BOT_IMAGE_TAG
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never

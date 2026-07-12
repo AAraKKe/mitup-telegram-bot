@@ -37,27 +37,6 @@ include:
   - .gitlab-ci.yml
   - .gitlab/ci/docker.yml
 
-# Centralized list of files that trigger deployment when changed
-# Use !reference [.deployment-files] in rules to keep triggers consistent
-.deployment-files: &deployment-files
-  # Each app owns its Dockerfile under apps/X/Dockerfile, so apps/**/* already covers every
-  # per-app image (bot, events, both lambdas). libs/**/* covers the shared libraries baked into
-  # them. The CI image Dockerfile stays listed because the push/deploy jobs run on it.
-  - apps/**/*
-  - libs/**/*
-  - dev/docker/Dockerfile.ci
-  - .dockerignore
-  # Runtime dependencies now live in the member pyprojects (apps/** + libs/**) and the resolved
-  # lock rather than a root [project], so a lock change alone can alter every deployed image.
-  - uv.lock
-  - pyproject.toml
-  # Include also gitlab yaml files related with deployments
-  - .gitlab-ci.yml
-  - .gitlab/ci/base.yml
-  - .gitlab/ci/deploy.yml
-  - .gitlab/ci/deploy-config.yml
-  - .gitlab/ci/ecr-push.yml
-
 # Centralized list of documentation files
 # Use !reference [.docs-files] in rules for documentation changes
 .docs-files: &docs-files

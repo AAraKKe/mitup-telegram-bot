@@ -17,25 +17,6 @@
       --alarm-action-image $ALARM_ACTION_IMAGE_TAG
       --events-image $EVENTS_IMAGE_TAG
 
-## -------------- Deploy staging ---------------
-deploy-staging:
-  # This job will first run the migrations on the database and the update ECS
-  extends: .migrate-and-deploy
-  resource_group: deploy-staging
-  dependencies:
-    - config-staging
-  environment:
-    name: staging
-  rules:
-    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /\[force-deploy\]/
-      when: on_success
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes:
-        paths: !reference [.deployment-files]
-      when: on_success
-
 ## -------------- Deploy prod ---------------
 deploy-production:
   # This job will first run the migrations on the database and the update ECS

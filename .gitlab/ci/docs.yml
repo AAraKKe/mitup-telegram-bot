@@ -27,22 +27,6 @@ build-docs:
     - !reference [.aws-prep]
     - uv run mb docs publish
 
-push-docs-staging:
-  extends: .push-docs
-  resource_group: docs-staging
-  environment:
-    name: staging
-  dependencies:
-    - config-staging
-    - build-docs
-  rules:
-    - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      # Only run if in the default branch and the doc files change
-      changes:
-        paths: !reference [.docs-files]
-
 push-docs-production:
   extends: .push-docs
   resource_group: docs-production
@@ -73,4 +57,4 @@ publish_docs_manual:
       when: manual
       allow_failure: true
   environment:
-    name: staging
+    name: production
