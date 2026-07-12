@@ -11,6 +11,8 @@ import structlog
 from telegram import (
     CallbackQuery,
     Chat,
+    ChatMember,
+    ChatMemberRestricted,
     InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultArticle,
@@ -20,6 +22,7 @@ from telegram import (
     MessageEntity,
     Update,
 )
+from telegram.constants import ChatMemberStatus
 from telegram.error import BadRequest, Forbidden, NetworkError
 from telegram.ext import ExtBot
 
@@ -214,6 +217,27 @@ def resolve_view(view: MitupView | FormattedText | str) -> MitupView:
     return MitupView(view, keyboard=[])
 
 
+def chat_member_is_present(member: ChatMember) -> bool:
+    """Whether a ChatMember counts as currently inside the chat.
+
+    A restricted user is only present when Telegram reports `is_member` — a restricted
+    non-member has already left but keeps its restrictions on record.
+    """
+    if isinstance(member, ChatMemberRestricted):
+        return member.is_member
+    return member.status in {ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.MEMBER}
+
+
+def chat_member_is_admin(member: ChatMember) -> bool:
+    """Whether a ChatMember is the chat creator or an administrator (unbannable)."""
+    return member.status in {ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR}
+
+
+def chat_member_is_banned(member: ChatMember) -> bool:
+    """Whether a ChatMember has been banned (kicked) from the chat."""
+    return member.status == ChatMemberStatus.BANNED
+
+
 def edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
     """Extract (chat_id, message_id, inline_message_id) for an edit from the update."""
     if update.effective_message:
@@ -278,6 +302,14 @@ class TelegramApiWrapper(Protocol):
         meeting: Meetup,
     ): ...
     async def clear_reply_markup(self, update: Update): ...
+    # Immediate admin operations on a supergroup — never routed through the outbox.
+    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int): ...
+    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int): ...
+    async def ban_chat_member(self, chat_id: int, tg_user_id: int): ...
+    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True): ...
+    async def is_chat_member(self, chat_id: int, tg_user_id: int) -> bool: ...
+    async def is_chat_admin(self, chat_id: int, tg_user_id: int) -> bool: ...
+    async def is_chat_banned(self, chat_id: int, tg_user_id: int) -> bool: ...
 
 
 class _ImmediateApi:
@@ -803,3 +835,58 @@ class TelegramApi:
                 was_deleted=was_deleted,
                 has_finished=has_finished,
             )
+
+    # -- Supergroup admin operations --------------------------------------------------------
+    # Immediate ops (never enqueued): join-request gating and ban/unban for the hosts-only
+    # group. A Telegram failure is logged and swallowed so it never crashes the caller (the
+    # join-request handler, the daily supporter-check job, or the Collaborate screen render).
+
+    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int):
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            try:
+                await self.adapter.bot.approve_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
+            except (Forbidden, BadRequest) as e:
+                log.warning("Failed to approve chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+
+    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int):
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            try:
+                await self.adapter.bot.decline_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
+            except (Forbidden, BadRequest) as e:
+                log.warning("Failed to decline chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+
+    async def ban_chat_member(self, chat_id: int, tg_user_id: int):
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            try:
+                await self.adapter.bot.ban_chat_member(chat_id=chat_id, user_id=tg_user_id)
+            except (Forbidden, BadRequest) as e:
+                log.warning("Failed to ban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+
+    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True):
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            try:
+                await self.adapter.bot.unban_chat_member(
+                    chat_id=chat_id, user_id=tg_user_id, only_if_banned=only_if_banned
+                )
+            except (Forbidden, BadRequest) as e:
+                log.warning("Failed to unban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+
+    async def _fetch_chat_member(self, chat_id: int, tg_user_id: int) -> ChatMember | None:
+        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
+            try:
+                return await self.adapter.bot.get_chat_member(chat_id=chat_id, user_id=tg_user_id)
+            except (Forbidden, BadRequest) as e:
+                log.warning("Failed to fetch chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+                return None
+
+    async def is_chat_member(self, chat_id: int, tg_user_id: int) -> bool:
+        member = await self._fetch_chat_member(chat_id, tg_user_id)
+        return member is not None and chat_member_is_present(member)
+
+    async def is_chat_admin(self, chat_id: int, tg_user_id: int) -> bool:
+        member = await self._fetch_chat_member(chat_id, tg_user_id)
+        return member is not None and chat_member_is_admin(member)
+
+    async def is_chat_banned(self, chat_id: int, tg_user_id: int) -> bool:
+        member = await self._fetch_chat_member(chat_id, tg_user_id)
+        return member is not None and chat_member_is_banned(member)

@@ -4,7 +4,7 @@ from unittest import mock
 
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
-from telegram import CallbackQuery, Chat, InlineQuery, Location, Message, MessageEntity, Update
+from telegram import CallbackQuery, Chat, ChatJoinRequest, InlineQuery, Location, Message, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
@@ -50,6 +50,8 @@ class UpdateRequest:
             If True, a default CallbackQuery will be added. If a CallbackData object is provided, it will be used to
             generate the CallbackQuery. Defaults to False.
         inline_query (str, optional): The inline query string. Defaults to "".
+        chat_join_request (bool, optional): When True the update carries a ChatJoinRequest built from the
+            fixture's chat and user. Defaults to False.
     """
 
     user: bool = True
@@ -64,6 +66,7 @@ class UpdateRequest:
     inline_query: str | InlineQuery = ""
     inline_message_id: str = "some_inline_message_id"
     from_bot_chat: bool = True
+    chat_join_request: bool = False
 
 
 def create_meetup(
@@ -380,6 +383,11 @@ def create_update(
             else default_cb
         )
         return Update(DEFAULT_MESSAGE_ID, callback_query=query)
+    if request.chat_join_request:
+        return Update(
+            DEFAULT_MESSAGE_ID,
+            chat_join_request=ChatJoinRequest(chat=chat, from_user=user, date=DEFAULT_TEST_DATE, user_chat_id=user.id),
+        )
     if request.inline_query:
         if isinstance(request.inline_query, InlineQuery):
             return Update(DEFAULT_MESSAGE_ID, inline_query=request.inline_query)

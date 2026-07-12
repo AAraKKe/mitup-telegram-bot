@@ -21,7 +21,7 @@ from sqlmodel import and_, col, func, null, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
-from mitup_bot import db, patreon, supporter
+from mitup_bot import db, hosts_group, patreon, supporter
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonTokenRevoked
@@ -33,6 +33,7 @@ from mitup_bot.patreon.creator_token import TokenRefresher, load_creator_state, 
 from mitup_bot.patreon.models import MemberResource
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
+from mitup_bot.views.collaborate import hosts_group_removed_view
 
 log = structlog.get_logger(__name__)
 
@@ -163,6 +164,26 @@ async def load_user(session: AsyncSession, user_id: int) -> User | None:
     return (await session.exec(select(User).where(User.id == user_id))).first()
 
 
+async def remove_from_hosts_group(api: TelegramApiWrapper, user: User):
+    """Ban a revoked host from the hosts-only group, unless they are the group creator/administrator.
+
+    banChatMember cannot ban the creator and fails on other admins, so an admin is skipped rather
+    than attempted. The removal DM is sent only when the user was actually in the group, so a lapsed
+    host who never joined is not told they were removed. A no-op when the feature is unconfigured. The
+    api wrapper swallows Telegram failures, so this never aborts the daily job."""
+    chat_id = hosts_group.chat_id()
+    if chat_id is None:
+        return
+    if await api.is_chat_admin(chat_id, user.tg_user_id):
+        log.info("Skipping hosts-group removal for a group admin", tg_user_id=user.tg_user_id, chat_id=chat_id)
+        return
+    was_member = await api.is_chat_member(chat_id, user.tg_user_id)
+    await api.ban_chat_member(chat_id, user.tg_user_id)
+    log.info("Removed lapsed host from the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
+    if was_member:
+        await api.send_message_to_user(user, hosts_group_removed_view(user.lang))
+
+
 async def process_due_subscription(
     subscription_id: int, active_amounts: dict[str, int], api: TelegramApiWrapper
 ) -> DueOutcome:
@@ -194,6 +215,7 @@ async def process_due_subscription(
             return DueOutcome.GRACE_STARTED
         user.supporter_level = SupporterLevel.NONE
         await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
+        await remove_from_hosts_group(api, user)
         return DueOutcome.SUPPORT_LOST
 
 

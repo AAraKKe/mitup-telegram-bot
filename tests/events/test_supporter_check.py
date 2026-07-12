@@ -10,6 +10,7 @@ from mitup_bot.config import PatreonConfig
 from mitup_bot.events import supporter_check
 from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import PatreonTokenRevoked
+from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import PatreonCreatorToken, SupporterSubscription, User
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.patreon import TokenPair
@@ -23,6 +24,7 @@ from mitup_bot.patreon.models import (
 from mitup_bot.patreon.runtime import PatreonRuntime, configure
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
+from mitup_bot.views.collaborate import hosts_group_removed_view
 from tests.helpers import (
     MockApi,
     MockDbSession,
@@ -51,6 +53,20 @@ def capture_structlog() -> Iterator[None]:
     xdist + json-report reporter under coverage (as the rest of the events suite already handles)."""
     with capture_logs():
         yield
+
+
+@pytest.fixture(autouse=True)
+def reset_hosts_group() -> Iterator[None]:
+    """Isolate the hosts-group holder: default it off so unrelated tests never ban, and restore it."""
+    saved_chat_id = HostsGroupState.chat_id
+    saved_invite_url = HostsGroupState.invite_url
+    HostsGroupState.chat_id = None
+    HostsGroupState.invite_url = None
+    try:
+        yield
+    finally:
+        HostsGroupState.chat_id = saved_chat_id
+        HostsGroupState.invite_url = saved_invite_url
 
 
 @pytest.fixture
@@ -337,6 +353,93 @@ async def test_due_no_longer_due_is_skipped(mock_session: MockDbSession, api: Mo
 
     assert outcome is supporter_check.DueOutcome.SKIPPED
     api.assert_method_just_called("send_message_to_user", times=0)
+
+
+# ---------------------------------------------------------------------------
+# Hosts-only group removal on status loss
+# ---------------------------------------------------------------------------
+
+HOSTS_GROUP_CHAT_ID = -1001234567890
+
+
+async def test_remove_from_hosts_group_member_is_banned_and_notified(api: MockApi):
+    """A non-admin who was in the group is banned and told they were removed."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    api.register_on_method("is_chat_member", return_value=True)
+    user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
+
+    await supporter_check.remove_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=1)
+    assert api.call_args("ban_chat_member").kwargs == {"chat_id": HOSTS_GROUP_CHAT_ID, "tg_user_id": 101}
+    api.assert_send_message_to_user_called(user, hosts_group_removed_view(user.lang))
+
+
+async def test_remove_from_hosts_group_non_member_is_banned_without_dm(api: MockApi):
+    """A non-admin who was never in the group is banned but not told they were removed."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    # is_chat_member defaults to False: the user was never a member.
+    user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
+
+    await supporter_check.remove_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=1)
+    api.assert_method_just_called("send_message_to_user", times=0)
+
+
+async def test_remove_from_hosts_group_skips_admin(api: MockApi):
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    api.register_on_method("is_chat_admin", return_value=True)
+    user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
+
+    await supporter_check.remove_from_hosts_group(api, user)
+
+    # banChatMember cannot ban the creator and fails on admins, so an admin is never attempted; the
+    # membership read and removal DM are skipped entirely too.
+    api.assert_method_just_called("ban_chat_member", times=0)
+    api.mock_method("is_chat_member").assert_not_called()
+    api.assert_method_just_called("send_message_to_user", times=0)
+
+
+async def test_remove_from_hosts_group_noop_when_unconfigured(api: MockApi):
+    # reset_hosts_group leaves chat_id None: the feature is off, so no membership lookup or ban runs.
+    user = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
+
+    await supporter_check.remove_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=0)
+    api.mock_method("is_chat_admin").assert_not_called()
+
+
+async def test_due_lapsed_after_grace_bans_from_hosts_group(mock_session: MockDbSession, api: MockApi):
+    """The single revocation site also removes the lapsed host from the hosts-only group."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    subscription, user = make_subscription_user(
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+    )
+    user.supporter_level = SupporterLevel.HOST_2
+    register_due(mock_session, subscription, user)
+
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
+
+    assert outcome is supporter_check.DueOutcome.SUPPORT_LOST
+    assert user.supporter_level is SupporterLevel.NONE
+    api.assert_method_just_called("ban_chat_member", times=1)
+    assert api.call_args("ban_chat_member").kwargs == {"chat_id": HOSTS_GROUP_CHAT_ID, "tg_user_id": user.tg_user_id}
+
+
+async def test_due_lapsed_does_not_ban_when_unconfigured(mock_session: MockDbSession, api: MockApi):
+    """With the feature off, revocation revokes perks but never touches the group."""
+    subscription, user = make_subscription_user(
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+    )
+    user.supporter_level = SupporterLevel.HOST_2
+    register_due(mock_session, subscription, user)
+
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
+
+    assert outcome is supporter_check.DueOutcome.SUPPORT_LOST
+    api.assert_method_just_called("ban_chat_member", times=0)
 
 
 # ---------------------------------------------------------------------------

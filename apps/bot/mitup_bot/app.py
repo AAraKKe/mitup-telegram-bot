@@ -4,7 +4,7 @@ import structlog
 import uvicorn
 from telegram.ext import AIORateLimiter, Application, ContextTypes
 
-from mitup_bot import api_guards, db, docs_links, patreon, reconcile, supporter, timezone_api
+from mitup_bot import api_guards, db, docs_links, hosts_group, patreon, reconcile, supporter, timezone_api
 from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, RunModes, TomlConfigProvider
 from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
@@ -42,6 +42,9 @@ class MitupRuntime:
         # Adopt the merged free-tier limits so the supporter-tier policy resolves caps against the
         # deployed values.
         supporter.configure(self.config.limits)
+        # Adopt the hosts-only group settings so the join-request handler and the Patreon web layer
+        # can gate on them; the feature stays a no-op until a chat id is configured.
+        hosts_group.configure(self.config.bot)
         # Point docs-site links at this environment's docs host, derived from the bot domain.
         docs_links.configure(self.config.bot.domain)
         self.app = self.__build_application()

@@ -18,6 +18,7 @@ When building a new screen, check the **factory catalogue** below *first* — re
   <rule>NEVER reimplement date picking. Always use `CalendarKeyboard` from `views/calendar.py`.</rule>
   <rule>Pass `MessageBase.get()` output directly as `description` — never extract `.text` first, as that strips formatting entities.</rule>
   <rule>Telegram limits callback data to 64 bytes. `ButtonConfig` validates this at construction time and will raise if exceeded.</rule>
+  <rule>A proactive message — anything sent to a user outside a button/command they just pressed, i.e. via `api.send_message_to_user` / `send_messages_to_users` (notification DMs, membership/tier changes, group readmission or removal, reminders) — MUST carry a navigation keyboard, at minimum a Main-menu button (`ButtonMessages.MAIN_MENU` + `cb.MAIN_MENU`). Build a `MitupView` for it and pass that view to the send call, never a bare `MessageBase.get(...)`. Reason: a proactive message arrives with no surrounding UI, so a keyboard-less one strands the user with no way back into the bot except typing a command. Reuse a factory in `views/collaborate.py` (e.g. `link_confirmation_view`, `hosts_group_readmitted_view`, `hosts_group_removed_view`) or add one there following the same `.with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)` shape.</rule>
 </critical_rules>
 
 Button-label sourcing (never hardcode, always `ButtonMessages.get(lang=...)` / `.back(lang=...)`) is owned by the `user-facing-text` skill — see there for the full rule and examples.

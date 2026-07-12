@@ -989,6 +989,12 @@ msgstr "<b>☕️ Agora o teu nivel é Brewer</b>\n\nA túa insignia de Brewer s
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Agora o teu nivel é Gamemaster</b>\n\nA túa insignia de Gamemaster está activa e aplícanse os teus límites de Gamemaster: organiza máis quedadas á vez, prográmaas con máis antelación e convida a cantas persoas queiras a cada unha. Grazas por apoiar Mitup."
 
+msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
+msgstr "<b>O teu acceso ao Hosts-Only Group rematou</b>\n\nO teu apoio como Host chegou á súa fin, e agradecémosche moito o tempo que apoiaches Mitup. Por agora sacámoste do Hosts-Only Group. Cando volvas ser Host, podes volver unirte a el desde o menú Colabora."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
+msgstr "<b>Xa tes de volta o teu acceso como Host</b>\n\nBenvido/a de novo. As túas vantaxes de Host están activas outra vez, e es benvido/a no Hosts-Only Group. Toca abaixo para unirte de novo."
+
 msgid "AdminMessages.MENU_DESCRIPTION"
 msgstr ""
 
@@ -1000,3 +1006,9 @@ msgstr ""
 
 msgid "ButtonMessages.OPEN_IN_MAPS"
 msgstr "📍 Abrir no mapa"
+
+msgid "ButtonMessages.HOSTS_GROUP_JOIN"
+msgstr "👥 Unirse ao grupo exclusivo de Hosts"
+
+msgid "ButtonMessages.HOSTS_GROUP_OPEN"
+msgstr "👥 Abrir o grupo exclusivo de Hosts"

@@ -219,6 +219,24 @@ def test_bot_config_broadcast_max_rate_override_parses(raw: object, expected: in
     assert config.broadcast_max_rate == expected
 
 
+def test_bot_config_hosts_group_defaults_to_disabled():
+    config = BotConfig(token=SecretStr("fake-bot-token"))
+
+    assert config.hosts_group_chat_id is None
+    assert config.hosts_group_invite_url is None
+
+
+def test_bot_config_hosts_group_values_are_kept():
+    config = BotConfig(
+        token=SecretStr("fake-bot-token"),
+        hosts_group_chat_id=-1001234567890,
+        hosts_group_invite_url="https://t.me/+abcdef",
+    )
+
+    assert config.hosts_group_chat_id == -1001234567890
+    assert config.hosts_group_invite_url == "https://t.me/+abcdef"
+
+
 def test_bot_config_admin_tg_ids_defaults_to_empty():
     config = BotConfig(token=SecretStr("fake-bot-token"))
 

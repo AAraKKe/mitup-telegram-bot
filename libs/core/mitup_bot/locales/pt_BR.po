@@ -839,6 +839,12 @@ msgstr "💶 Ser um Host"
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desconectar conta Patreon"
 
+msgid "ButtonMessages.HOSTS_GROUP_JOIN"
+msgstr "👥 Entrar no Grupo Exclusivo de Hosts"
+
+msgid "ButtonMessages.HOSTS_GROUP_OPEN"
+msgstr "👥 Abrir o Grupo Exclusivo de Hosts"
+
 msgid "CollaborateMessages.NOT_LINKED"
 msgstr "<b>Apoie o Mitup com Patreon</b>\n\nO Mitup é gratuito. Se ele ajuda você a reunir suas pessoas, você pode apoiá-lo no Patreon e desbloquear benefícios de Host como agradecimento.\n\n<b>Como Gamemaster:</b> tenha até ${active_meetings} eventos ativos ao mesmo tempo, agende até ${scheduling_days} dias adiante e convide participantes ilimitados por evento.\n\n<b>Como Commissioner:</b> tudo ilimitado.\n\nConecte sua conta Patreon para começar."
 
@@ -988,6 +994,12 @@ msgstr "<b>☕️ Seu nível agora é Brewer</b>\n\nSeu selo de Brewer continua 
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Seu nível agora é Gamemaster</b>\n\nSeu selo de Gamemaster está ativo, e valem os limites de Gamemaster: realize mais eventos ao mesmo tempo, agende-os com mais antecedência e convide quantas pessoas quiser para cada um. Obrigado por apoiar o Mitup."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
+msgstr "<b>Seu acesso ao Grupo Exclusivo de Hosts terminou</b>\n\nSeu apoio como Host chegou ao fim, e somos gratos pelo tempo em que você apoiou o Mitup. Por enquanto, removemos você do Grupo Exclusivo de Hosts. Sempre que você se tornar um Host novamente, você pode entrar de novo pelo menu Colabore."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
+msgstr "<b>Seu acesso de Host está de volta</b>\n\nBem-vindo de volta. Seus benefícios de Host estão ativos novamente, e você é bem-vindo no Grupo Exclusivo de Hosts. Toque abaixo para entrar."
 
 msgid "AdminMessages.MENU_DESCRIPTION"
 msgstr ""

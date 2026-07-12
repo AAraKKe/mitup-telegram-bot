@@ -32,7 +32,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import Application
 
-from mitup_bot import db, patreon, supporter
+from mitup_bot import db, hosts_group, patreon, supporter
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
@@ -48,6 +48,7 @@ from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationM
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
+    hosts_group_readmitted_view,
     link_confirmation_view,
 )
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
@@ -430,6 +431,24 @@ async def exchange_and_link(
     return result_page_for(outcome, bot_username)
 
 
+async def readmit_to_hosts_group(api: TelegramApiWrapper, user: User):
+    """Lift any hosts-only group ban so a re-activated host can request to join again.
+
+    Idempotent: ``unban_chat_member(only_if_banned=True)`` is a no-op when the user was never banned.
+    The readmission DM is sent only when the user was actually banned, so a first-time linker (who runs
+    this path too) is not told they were welcomed back. The banned status is read before the unban,
+    since after it the user is no longer banned. A no-op when the feature is unconfigured; the api
+    wrapper swallows Telegram failures."""
+    chat_id = hosts_group.chat_id()
+    if chat_id is None:
+        return
+    was_banned = await api.is_chat_banned(chat_id, user.tg_user_id)
+    await api.unban_chat_member(chat_id, user.tg_user_id, only_if_banned=True)
+    if was_banned:
+        await api.send_message_to_user(user, hosts_group_readmitted_view(user.lang, hosts_group.invite_url()))
+        log.info("Re-admitted host to the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
+
+
 async def link_patreon_account(
     api: TelegramApiWrapper,
     tg_user_id: int,
@@ -519,6 +538,8 @@ async def link_patreon_account(
 
     # The transaction has committed; refreshing the tapped message is a best-effort UI touch-up that
     # must never fail the link or the DM, so it runs out here (immediate mode) rather than enqueued.
+    if outcome is LinkOutcome.LINKED_SUPPORTER:
+        await readmit_to_hosts_group(api, linked_user)
     await refresh_tapped_message(api, linked_user, message_id, outcome)
     return outcome
 
@@ -761,8 +782,13 @@ async def apply_membership_event(
             )
             return WebhookApplied.UNCHANGED
 
+        previous_level = user.supporter_level
         outcome = apply_membership_transition(user, subscription, level)
         await notify_membership_change(api, user, outcome)
+        # Re-admit only on a genuine reactivation (was not a supporter, now is); tier-to-tier moves
+        # between host levels leave any existing group membership untouched.
+        if not supporter.is_supporter(previous_level) and supporter.is_supporter(user.supporter_level):
+            await readmit_to_hosts_group(api, user)
         log.info(
             "Patreon webhook applied",
             stage="apply",

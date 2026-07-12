@@ -14,6 +14,7 @@ from telegram.error import BadRequest
 from mitup_bot import patreon, supporter
 from mitup_bot.config import LimitsConfig, PatreonConfig, RunModes
 from mitup_bot.exceptions import PatreonApiError
+from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import SupporterSubscription
 from mitup_bot.models.users import UserStatus
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
@@ -24,6 +25,7 @@ from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationM
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
+    hosts_group_readmitted_view,
     link_confirmation_view,
 )
 from mitup_bot.web import patreon as web_patreon
@@ -789,3 +791,106 @@ async def test_upsert_updates_in_place():
     assert result is existing
     assert existing not in session.objects_added  # updated in place, not recreated
     assert existing.patreon_user_id == "p-654"
+
+
+# --- Hosts-only group re-admit on (re)link ---
+
+HOSTS_GROUP_CHAT_ID = -1001234567890
+HOSTS_GROUP_INVITE_URL = "https://t.me/+hostsonly"
+
+
+@pytest.fixture
+def reset_hosts_group() -> Iterator[None]:
+    saved_chat_id = HostsGroupState.chat_id
+    saved_invite_url = HostsGroupState.invite_url
+    HostsGroupState.chat_id = None
+    HostsGroupState.invite_url = None
+    try:
+        yield
+    finally:
+        HostsGroupState.chat_id = saved_chat_id
+        HostsGroupState.invite_url = saved_invite_url
+
+
+def sent_views(api: MockApi) -> list[object]:
+    """The views passed to every send_message_to_user call, so a test can check whether a specific
+    DM (e.g. the readmission notice) was among them without counting the confirmation DM."""
+    return [call.kwargs["view"] for call in api.call_args_list("send_message_to_user")]
+
+
+async def test_link_supporter_readmits_banned_host_with_dm(
+    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
+):
+    """A returning host who was banned is unbanned and sent the welcome-back view: the readmission
+    copy with a Join button (the group is configured) plus a Main-menu button."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    HostsGroupState.invite_url = HOSTS_GROUP_INVITE_URL
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_660)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    api.register_on_method("is_chat_banned", return_value=True)
+    outcome = await link_patreon_account(api, 997_660, patreon_user_id="p-660", supporter_level=SupporterLevel.HOST_2)
+
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
+    api.assert_method_just_called("unban_chat_member", times=1)
+    assert api.call_args("unban_chat_member").kwargs == {
+        "chat_id": HOSTS_GROUP_CHAT_ID,
+        "tg_user_id": 997_660,
+        "only_if_banned": True,
+    }
+    assert hosts_group_readmitted_view(user.lang, HOSTS_GROUP_INVITE_URL) in sent_views(api)
+
+
+async def test_link_supporter_unbans_first_time_linker_without_dm(
+    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
+):
+    """A first-time linker was never banned: the unban is idempotent and no readmission DM is sent."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_660)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    # is_chat_banned defaults to False: the user was never in the group.
+    outcome = await link_patreon_account(api, 997_660, patreon_user_id="p-660", supporter_level=SupporterLevel.HOST_2)
+
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
+    api.assert_method_just_called("unban_chat_member", times=1)
+    assert hosts_group_readmitted_view(user.lang, HostsGroupState.invite_url) not in sent_views(api)
+
+
+async def test_link_non_patron_does_not_readmit(
+    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
+):
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_661)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    outcome = await link_patreon_account(api, 997_661, patreon_user_id="p-661", supporter_level=SupporterLevel.NONE)
+
+    assert outcome is LinkOutcome.LINKED_NO_PATRON
+    api.assert_method_just_called("unban_chat_member", times=0)
+
+
+async def test_link_supporter_noop_when_hosts_group_unconfigured(
+    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
+):
+    # reset_hosts_group leaves chat_id None: linking as a supporter never touches the group.
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_662)
+    session.add_object(user, "tg_user_id")
+    patch_begin_write(session)
+
+    api = MockApi()
+    outcome = await link_patreon_account(api, 997_662, patreon_user_id="p-662", supporter_level=SupporterLevel.HOST_2)
+
+    assert outcome is LinkOutcome.LINKED_SUPPORTER
+    api.assert_method_just_called("unban_chat_member", times=0)
+    api.mock_method("is_chat_banned").assert_not_called()

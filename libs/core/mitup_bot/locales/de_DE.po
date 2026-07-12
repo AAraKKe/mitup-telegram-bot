@@ -839,6 +839,12 @@ msgstr "💶 Host werden"
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Patreon-Konto trennen"
 
+msgid "ButtonMessages.HOSTS_GROUP_JOIN"
+msgstr "👥 Der Hosts-Gruppe beitreten"
+
+msgid "ButtonMessages.HOSTS_GROUP_OPEN"
+msgstr "👥 Hosts-Gruppe öffnen"
+
 msgid "CollaborateMessages.NOT_LINKED"
 msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und als Dankeschön Host-Vorteile freischalten.\n\n<b>Als Gamemaster:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Commissioner:</b> alles unbegrenzt.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
 
@@ -988,6 +994,12 @@ msgstr "<b>🎲 Deine Stufe ist jetzt Gamemaster</b>\n\nDein Gamemaster-Abzeiche
 
 msgid "SupporterNotificationMessages.ORGANIZER_UNLOCKED"
 msgstr "<b>🏆 Du bist ein Commissioner</b>\n\nDanke, dass du Mitup unterstützt. Dein Commissioner-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
+msgstr "<b>Dein Zugang zur Hosts-Gruppe ist beendet</b>\n\nDeine Unterstützung als Host ist zu Ende gegangen, und wir sind dankbar für die Zeit, in der du Mitup unterstützt hast. Wir haben dich vorerst aus der Hosts-Gruppe entfernt. Sobald du wieder ein Host wirst, kannst du ihr über das Mithelfen-Menü erneut beitreten."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
+msgstr "<b>Dein Host-Zugang ist zurück</b>\n\nWillkommen zurück. Deine Host-Vorteile sind wieder aktiv, und du bist herzlich in der Hosts-Gruppe willkommen. Tippe unten, um ihr wieder beizutreten."
 
 msgid "AdminMessages.MENU_DESCRIPTION"
 msgstr ""

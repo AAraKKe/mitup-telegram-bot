@@ -83,6 +83,18 @@ async def test_something(update: Update, ...):
 | `inline_query` | `str \| InlineQuery` | `""` | Inline query string |
 | `inline_message_id` | `str` | `"some_inline_message_id"` | Inline message ID |
 | `from_bot_chat` | `bool` | `True` | `False` for inline/shared messages |
+| `chat_join_request` | `bool` | `False` | Build a `ChatJoinRequest` update from the fixture's chat and user |
+
+### New Telegram update types go through the shared fixture
+
+When the bot starts handling a new kind of Telegram `Update` (a `ChatJoinRequest`, a poll answer, a
+chat-member change, etc.), wire it into the shared `update` fixture the same way the existing types
+are: add a boolean field to `UpdateRequest` and a branch in `create_update` (both in
+`tests/helpers/fixtures.py`) that builds the update from the fixture's `tg_chat` / `tg_user`. Tests
+then request that update type by tagging `@pytest.mark.parametrize("update", [UpdateRequest(...)],
+indirect=True)` and tweak the scenario through fixtures (configure the DB user, the feature flags,
+etc.) rather than constructing the `Update` object by hand in the test module. Do **not** hand-build
+Telegram `Update`s in individual test files — that is what the fixture is for.
 
 ## Factory helpers
 

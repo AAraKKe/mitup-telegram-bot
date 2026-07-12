@@ -17,6 +17,7 @@ from fastapi import FastAPI
 
 from mitup_bot import patreon
 from mitup_bot.config import PatreonConfig, RunModes
+from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.patreon import PatreonRuntime
@@ -30,6 +31,7 @@ from mitup_bot.patreon.models import (
 )
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
+from mitup_bot.views.collaborate import hosts_group_readmitted_view
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
     SUPPORT_GRACE_DAYS,
@@ -493,3 +495,112 @@ def test_apply_transition_starts_grace_on_loss_and_keeps_level():
     # marked notified so the daily due-flow revokes rather than re-announcing grace.
     assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)
+
+
+# --- Hosts-only group re-admit on reactivation ---
+
+HOSTS_GROUP_CHAT_ID = -1001234567890
+HOSTS_GROUP_INVITE_URL = "https://t.me/+hostsonly"
+
+
+@pytest.fixture
+def reset_hosts_group() -> Iterator[None]:
+    saved_chat_id = HostsGroupState.chat_id
+    saved_invite_url = HostsGroupState.invite_url
+    HostsGroupState.chat_id = None
+    HostsGroupState.invite_url = None
+    try:
+        yield
+    finally:
+        HostsGroupState.chat_id = saved_chat_id
+        HostsGroupState.invite_url = saved_invite_url
+
+
+def sent_views(api: MockApi) -> list[object]:
+    """The views passed to every send_message_to_user call, so a test can check whether the
+    readmission DM was among them without counting the upgrade notification."""
+    return [call.kwargs["view"] for call in api.call_args_list("send_message_to_user")]
+
+
+async def test_reactivation_readmits_banned_host_with_dm(
+    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig, reset_hosts_group: None
+):
+    """A NONE -> supporter reactivation of a banned host lifts the ban and sends the welcome-back
+    view: the readmission copy with a Join button (the group is configured) plus a Main-menu button."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    HostsGroupState.invite_url = HOSTS_GROUP_INVITE_URL
+    session = MockDbSession()
+    user, _subscription = seed_link(session, level=SupporterLevel.NONE)
+    patch_begin_write(session)
+    api = MockApi()
+    api.register_on_method("is_chat_banned", return_value=True)
+
+    outcome = await apply_membership_event(
+        api, "members:create", WebhookMemberPayload.model_validate(member_dict(cents=500))
+    )
+
+    assert outcome is WebhookApplied.UPGRADED
+    api.assert_method_just_called("unban_chat_member", times=1)
+    assert api.call_args("unban_chat_member").kwargs == {
+        "chat_id": HOSTS_GROUP_CHAT_ID,
+        "tg_user_id": user.tg_user_id,
+        "only_if_banned": True,
+    }
+    assert hosts_group_readmitted_view(user.lang, HOSTS_GROUP_INVITE_URL) in sent_views(api)
+
+
+async def test_reactivation_unbans_never_banned_host_without_dm(
+    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig, reset_hosts_group: None
+):
+    """A reactivation of a host who was never banned runs the idempotent unban but sends no DM."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    session = MockDbSession()
+    user, _subscription = seed_link(session, level=SupporterLevel.NONE)
+    patch_begin_write(session)
+    api = MockApi()
+    # is_chat_banned defaults to False: the returning host was never banned.
+
+    outcome = await apply_membership_event(
+        api, "members:create", WebhookMemberPayload.model_validate(member_dict(cents=500))
+    )
+
+    assert outcome is WebhookApplied.UPGRADED
+    api.assert_method_just_called("unban_chat_member", times=1)
+    assert hosts_group_readmitted_view(user.lang, HostsGroupState.invite_url) not in sent_views(api)
+
+
+async def test_tier_to_tier_upgrade_does_not_readmit(
+    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig, reset_hosts_group: None
+):
+    """A move between host tiers (already a supporter) leaves any group membership untouched."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    session = MockDbSession()
+    user, _subscription = seed_link(session, level=SupporterLevel.HOST_2)
+    patch_begin_write(session)
+    api = MockApi()
+
+    outcome = await apply_membership_event(
+        api, "members:update", WebhookMemberPayload.model_validate(member_dict(cents=1000))
+    )
+
+    assert outcome is WebhookApplied.UPGRADED
+    assert user.supporter_level is SupporterLevel.HOST_3
+    api.assert_method_just_called("unban_chat_member", times=0)
+
+
+async def test_reactivation_noop_when_hosts_group_unconfigured(
+    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig, reset_hosts_group: None
+):
+    # reset_hosts_group leaves chat_id None: a reactivation grants perks but never touches the group.
+    session = MockDbSession()
+    seed_link(session, level=SupporterLevel.NONE)
+    patch_begin_write(session)
+    api = MockApi()
+
+    outcome = await apply_membership_event(
+        api, "members:create", WebhookMemberPayload.model_validate(member_dict(cents=500))
+    )
+
+    assert outcome is WebhookApplied.UPGRADED
+    api.assert_method_just_called("unban_chat_member", times=0)
+    api.mock_method("is_chat_banned").assert_not_called()

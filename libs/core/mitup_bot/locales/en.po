@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-12 01:26\n"
+"PO-Revision-Date: 2026-07-12 12:09\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -223,6 +223,12 @@ msgstr "💶 Become a Host"
 
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Unlink Patreon account"
+
+msgid "ButtonMessages.HOSTS_GROUP_JOIN"
+msgstr "👥 Join the Hosts-Only Group"
+
+msgid "ButtonMessages.HOSTS_GROUP_OPEN"
+msgstr "👥 Open the Hosts-Only Group"
 
 msgid "MainMenuMessages.DESCRIPTION"
 msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
@@ -766,6 +772,12 @@ msgstr "<b>☕️ Your tier is now Brewer</b>\n\nYour Brewer badge stays on your
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Your tier is now Gamemaster</b>\n\nYour Gamemaster badge is on, and your Gamemaster limits apply: run more meetings at once, schedule them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
+msgstr "<b>Your Hosts-Only Group access has ended</b>\n\nYour Host support has come to an end, and we're grateful for the time you backed Mitup. We've removed you from the Hosts-Only Group for now. Whenever you become a Host again, you can rejoin it from the Collaborate menu."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
+msgstr "<b>Your Host access is back</b>\n\nWelcome back. Your Host perks are on again, and you're welcome in the Hosts-Only Group. Tap below to rejoin."
 
 msgid "Weekday.MONDAY"
 msgstr "Mon"

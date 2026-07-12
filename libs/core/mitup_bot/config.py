@@ -176,6 +176,13 @@ class BotConfig(BaseModel):
     # keeps the feature dormant until ids are set. In production it is set via env var override
     # (MITUPBOT__BOT__ADMIN_TG_IDS) so the allowlist stays out of the checked-in TOML.
     admin_tg_ids: list[int] = Field(default_factory=list)
+    # Hosts-only Telegram supergroup wiring. Both are None by default, which fully disables the
+    # feature: every group operation (join-request approval, ban/unban on supporter-status change,
+    # the Collaborate group button) is a no-op until both are set. Neither is a secret; in
+    # production they are set via env override (MITUPBOT__BOT__HOSTS_GROUP_CHAT_ID /
+    # MITUPBOT__BOT__HOSTS_GROUP_INVITE_URL).
+    hosts_group_chat_id: int | None = None
+    hosts_group_invite_url: str | None = None
 
     @field_validator("admin_tg_ids", mode="before")
     @classmethod

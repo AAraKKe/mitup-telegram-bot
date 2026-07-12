@@ -12,6 +12,11 @@ from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_
 
 from .constants import DEFAULT_CURRENT_MESSAGE, DEFAULT_FALSE, DEFAULT_NONE, DefaultValue
 
+# Sentinel marking a register_on_method argument as omitted, so a canned ``None`` return value or a
+# ``None`` side effect (which clears a previously registered one) can still be distinguished from "leave
+# the mock untouched".
+UNSET: Any = object()
+
 
 @dataclass
 class MockApi(TelegramApi):
@@ -22,6 +27,11 @@ class MockApi(TelegramApi):
 
     def __init__(self):
         self.mock_mapping: dict[str, mock.AsyncMock] = {}
+        # Predicate membership/admin ops default to False so tests opt in explicitly; a bare AsyncMock
+        # return would be truthy and silently flip the ban/label decisions that read them.
+        self.register_on_method("is_chat_member", return_value=False)
+        self.register_on_method("is_chat_admin", return_value=False)
+        self.register_on_method("is_chat_banned", return_value=False)
 
     def begin_capture(self) -> ApiOutbox:
         """MockApi is transparent to write-mode capture: the decorator gets an outbox that
@@ -84,6 +94,40 @@ class MockApi(TelegramApi):
 
     async def clear_reply_markup(self, update: Update):
         return await self.call_mock("clear_reply_markup", update=update)
+
+    def approve_chat_join_request(self, chat_id: int, tg_user_id: int):
+        return self.call_mock("approve_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id)
+
+    def decline_chat_join_request(self, chat_id: int, tg_user_id: int):
+        return self.call_mock("decline_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id)
+
+    def ban_chat_member(self, chat_id: int, tg_user_id: int):
+        return self.call_mock("ban_chat_member", chat_id=chat_id, tg_user_id=tg_user_id)
+
+    def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True):
+        return self.call_mock(
+            "unban_chat_member", chat_id=chat_id, tg_user_id=tg_user_id, only_if_banned=only_if_banned
+        )
+
+    def is_chat_member(self, chat_id: int, tg_user_id: int):
+        return self.call_mock("is_chat_member", chat_id=chat_id, tg_user_id=tg_user_id)
+
+    def is_chat_admin(self, chat_id: int, tg_user_id: int):
+        return self.call_mock("is_chat_admin", chat_id=chat_id, tg_user_id=tg_user_id)
+
+    def is_chat_banned(self, chat_id: int, tg_user_id: int):
+        return self.call_mock("is_chat_banned", chat_id=chat_id, tg_user_id=tg_user_id)
+
+    def register_on_method(self, name: str, *, return_value: Any = UNSET, side_effect: Any = UNSET) -> mock.AsyncMock:
+        """Register a canned return value and/or side effect on a mocked api method, so a test can
+        control what a query method (``is_chat_member``, ``is_chat_admin``, ``is_chat_banned``) answers
+        without monkeypatching the class. Returns the underlying mock so the caller can assert on it."""
+        mocked = self.mock_method(name)
+        if return_value is not UNSET:
+            mocked.return_value = return_value
+        if side_effect is not UNSET:
+            mocked.side_effect = side_effect
+        return mocked
 
     def call_mock(self, name: str, **kwargs: DefaultValue | Any) -> mock.AsyncMock:
         new_kwargs = {arg: value for arg, value in kwargs.items() if not isinstance(value, DefaultValue)}

@@ -14,6 +14,7 @@ from telegram.ext import (
     ApplicationHandlerStop,
     BaseHandler,
     CallbackQueryHandler,
+    ChatJoinRequestHandler,
     ChatMemberHandler,
     CommandHandler,
     ConversationHandler,
@@ -422,6 +423,43 @@ class HandlersRegistry:
                 handler=ChatMemberHandler(
                     callback=callback_with_metrics(handler_id, "ChatMember", callback, cls.env),
                     chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER,
+                    block=block,
+                ),
+                bindable=bindable,
+                group=group,
+            )
+
+            return callback
+
+        return wrapper
+
+    @classmethod
+    def register_chat_join_request(
+        cls,
+        handler_id: HandlerId,
+        bindable: bool = True,
+        group: int = 0,
+        block: bool = True,
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
+        """
+        Decorator used to register a callback for a ChatJoinRequestHandler.
+
+        ``chat_join_request`` updates arrive when a user requests to join a chat the bot administers
+        with the invite-users right. They belong to Telegram's default update set, so registering this
+        handler requires no change to the webhook's ``allowed_updates``.
+
+        For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.chatjoinrequesthandler.html
+        """  # noqa: E501
+
+        def wrapper(
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
+            if handler_id in cls.handlers:
+                raise HandlerRegisteredError(handler_id)
+
+            cls.handlers[handler_id] = HandlerWrapper(
+                handler=ChatJoinRequestHandler(
+                    callback=callback_with_metrics(handler_id, "ChatJoinRequest", callback, cls.env),
                     block=block,
                 ),
                 bindable=bindable,

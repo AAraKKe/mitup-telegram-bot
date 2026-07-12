@@ -9,7 +9,7 @@ from uuid import uuid4
 import structlog
 from telegram.ext import AIORateLimiter, ExtBot
 
-from mitup_bot import api_guards, db, patreon, reconcile
+from mitup_bot import api_guards, db, hosts_group, patreon, reconcile
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
 from mitup_bot.events import (
@@ -230,6 +230,9 @@ def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
     configure_logging(env, Component.EVENTS, config.app.log_level)
     configure_emf_backend(config.metrics)
     configure_patreon(config)
+    # Adopt the hosts-only group settings so the supporter-check job can remove lapsed hosts;
+    # a no-op until a chat id is configured.
+    hosts_group.configure(config.bot)
 
     bot = build_bot(config.bot)
     broadcast_bot = build_broadcast_bot(config.bot)

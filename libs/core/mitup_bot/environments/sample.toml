@@ -29,6 +29,12 @@ admin_tg_ids = [123456789]
 # highest-rate traffic from crowding out time-sensitive events on the shared limiter.
 # Optional; defaults to 5 when omitted. Tune at rollout via MITUPBOT__BOT__BROADCAST_MAX_RATE.
 broadcast_max_rate = 5
+# Hosts-only Telegram supergroup: numeric chat id and static invite URL of the members-only
+# group. Both OPTIONAL and unset here — leaving either blank fully disables the feature (every
+# group operation is a no-op). In production set them via env override
+# MITUPBOT__BOT__HOSTS_GROUP_CHAT_ID / MITUPBOT__BOT__HOSTS_GROUP_INVITE_URL.
+# hosts_group_chat_id = -1001234567890
+# hosts_group_invite_url = "https://t.me/+abcdefghijklmnop"
 
 [db]
 # Database connection configuration

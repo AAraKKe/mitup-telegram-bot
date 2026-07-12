@@ -34,6 +34,7 @@ def build_context(
     app: StubMitupApp,
     with_meeting_id: dict[ContextId, int] | None = None,
     metrics: MetricsClient | None = None,
+    api: MockApi | None = None,
 ) -> StubMitupContext:
     if update.effective_message:
         update.effective_message.set_bot(app.bot)
@@ -41,7 +42,7 @@ def build_context(
     client = metrics or make_test_metrics_client()
 
     context = MitupContext.from_update(update=update, application=app)
-    context.api = MockApi()
+    context.api = api or MockApi()
     context.metrics = client
 
     for context_id, meeting_id in (with_meeting_id or {}).items():
@@ -57,6 +58,7 @@ async def call_handler(
     handler_context: HandlerContext,
     with_meeting_id: dict[ContextId, int] | None = None,
     user_id: int | None = None,
+    api: MockApi | None = None,
 ) -> tuple[StubMitupContext, Enum | None]:
     """Call a handler directly with the given HandlerContext, building the context.
 
@@ -65,11 +67,13 @@ async def call_handler(
         handler_context: The HandlerContext containing the update and app.
         with_meeting_id: Optional mapping of ContextId to meeting IDs to pre-populate in the context.
         user_id: Optional user ID to get the state of the conversation handler, if any.
+        api: Optional pre-configured MockApi, so a test can register query return values / side effects
+            before the handler runs. Defaults to a fresh MockApi.
     """
     update = handler_context.update
     app = handler_context.app
 
-    context = build_context(update, app, with_meeting_id, metrics=handler_context.metrics_client)
+    context = build_context(update, app, with_meeting_id, metrics=handler_context.metrics_client, api=api)
 
     handler = HandlersRegistry.get_handler(handler_id)
 

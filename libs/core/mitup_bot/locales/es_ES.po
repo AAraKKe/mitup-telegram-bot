@@ -209,6 +209,12 @@ msgstr "💶 Hazte Host"
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desvincular cuenta de Patreon"
 
+msgid "ButtonMessages.HOSTS_GROUP_JOIN"
+msgstr "👥 Unirse al Grupo solo para Hosts"
+
+msgid "ButtonMessages.HOSTS_GROUP_OPEN"
+msgstr "👥 Abrir el Grupo solo para Hosts"
+
 msgid "MainMenuMessages.DESCRIPTION"
 msgstr "¡Bienvenido a MitUp Bot!\n\n"
 "Elige una de las siguientes opciones:"
@@ -988,6 +994,12 @@ msgstr "<b>☕️ Tu nivel ahora es Brewer</b>\n\nTu insignia de Brewer sigue en
 
 msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Tu nivel ahora es Gamemaster</b>\n\nTu insignia de Gamemaster está activa y se aplican tus límites de Gamemaster: organiza más quedadas a la vez, prográmalas con más antelación e invita a cuanta gente quieras a cada una. Gracias por apoyar a Mitup."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
+msgstr "<b>Tu acceso al Hosts-Only Group ha terminado</b>\n\nTu apoyo como Host ha llegado a su fin, y te agradecemos el tiempo que has respaldado a Mitup. Por ahora te hemos quitado del Hosts-Only Group. Cuando vuelvas a ser Host, podrás unirte de nuevo desde el menú Colabora."
+
+msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
+msgstr "<b>Tu acceso de Host ha vuelto</b>\n\nBienvenido de nuevo. Tus ventajas de Host están activas otra vez, y eres bienvenido en el Hosts-Only Group. Toca abajo para volver a unirte."
 
 msgid "AdminMessages.MENU_DESCRIPTION"
 msgstr ""

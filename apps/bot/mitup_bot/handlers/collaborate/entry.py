@@ -21,7 +21,7 @@ async def callback_query_collaborate(session: AsyncSession, update: Update, cont
     user = await guards.current_user(update, session, load_collections=False)
     # The tapped message is edited in place below; carry its id through the OAuth state so the web
     # callback can refresh this same message into the linked view after linking.
-    view = await build_collaborate_view(session, user, tapped_message_id(update))
+    view = await build_collaborate_view(session, user, context, tapped_message_id(update))
     await context.api.edit_message(update=update, view=view)
 
 
@@ -41,7 +41,7 @@ async def callback_query_unlink_patreon(session: AsyncSession, update: Update, c
     # The pending delete flushes before build_collaborate_view re-reads the subscription, so the
     # view resolves to the not-linked state; the context line confirms the unlink above it. The
     # tapped message id is threaded through the fresh OAuth state so a later re-link can refresh it.
-    view = (await build_collaborate_view(session, user, tapped_message_id(update))).with_context(
+    view = (await build_collaborate_view(session, user, context, tapped_message_id(update))).with_context(
         CollaborateMessages.UNLINKED.get(lang=user.lang)
     )
     await context.api.edit_message(update=update, view=view)

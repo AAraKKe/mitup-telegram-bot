@@ -14,6 +14,7 @@ __all__ = (
     "broadcast",
     "collaborate",
     "privacy",
+    "hosts_group",
     "chat_member",
     "stale_cancel",
 )
@@ -36,6 +37,7 @@ from . import (
     broadcast,
     collaborate,
     privacy,
+    hosts_group,
 )
 
 # Flat handler modules registered directly on the registry

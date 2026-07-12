@@ -139,6 +139,8 @@ class ButtonMessages(MessageBase):
     LINK_PATREON = f"{Emojis.HEART} Link Patreon account"
     BECOME_PATRON = f"{Emojis.DONATE} Become a Host"
     UNLINK_PATREON = "Unlink Patreon account"
+    HOSTS_GROUP_JOIN = f"{Emojis.PEOPLE} Join the Hosts-Only Group"
+    HOSTS_GROUP_OPEN = f"{Emojis.PEOPLE} Open the Hosts-Only Group"
 
     def back(self, lang: str, **kwargs: str) -> str:
         return f"{self.GO_BACK} {self.get(lang=lang, **kwargs)}"
@@ -851,6 +853,21 @@ class SupporterNotificationMessages(MessageBase):
         f"<b>{Emojis.HOST_2} Your tier is now Gamemaster</b>\n\n"
         "Your Gamemaster badge is on, and your Gamemaster limits apply: run more meetings at once, schedule "
         "them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
+    )
+
+    # Support lapsed for a Host who was in the members-only group: the job bans them and sends this DM.
+    HOSTS_GROUP_REMOVED = (
+        "<b>Your Hosts-Only Group access has ended</b>\n\n"
+        "Your Host support has come to an end, and we're grateful for the time you backed Mitup. "
+        "We've removed you from the Hosts-Only Group for now. Whenever you become a Host again, "
+        "you can rejoin it from the Collaborate menu."
+    )
+    # A previously removed member became a Host again: the job unbans them and sends this DM. They
+    # aren't added back automatically, so the DM carries a direct join button that the copy points to.
+    HOSTS_GROUP_READMITTED = (
+        "<b>Your Host access is back</b>\n\n"
+        "Welcome back. Your Host perks are on again, and you're welcome in the Hosts-Only Group. "
+        "Tap below to rejoin."
     )
 
     @classmethod

@@ -4,7 +4,8 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from telegram import Message, MessageEntity, Update
+from telegram import ChatMember, ChatMemberRestricted, Message, MessageEntity, Update
+from telegram.constants import ChatMemberStatus
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
 
@@ -16,6 +17,9 @@ from mitup_bot.api_wrapper import (
     QueuedApiCall,
     TelegramApi,
     build_api,
+    chat_member_is_admin,
+    chat_member_is_banned,
+    chat_member_is_present,
     handle_edit_errors,
 )
 from mitup_bot.exceptions import (
@@ -1177,3 +1181,219 @@ async def test_execute_queued_message_without_db_id_gets_no_reconcile_entry(tele
     await telegram_api.execute_queued(outbox)
 
     assert outbox.dead_message_ids == []
+
+
+# ---------------------------------------------------------------------------
+# Supergroup membership helpers: chat_member_is_present / chat_member_is_admin / chat_member_is_banned
+# ---------------------------------------------------------------------------
+
+
+def make_chat_member(status: ChatMemberStatus, *, is_member: bool | None = None) -> ChatMember:
+    if status is ChatMemberStatus.RESTRICTED:
+        restricted = MagicMock(spec=ChatMemberRestricted)
+        restricted.status = status
+        restricted.is_member = is_member
+        return restricted
+    member = MagicMock(spec=ChatMember)
+    member.status = status
+    return member
+
+
+@pytest.mark.parametrize(
+    "status, is_member, expected",
+    [
+        (ChatMemberStatus.OWNER, None, True),
+        (ChatMemberStatus.ADMINISTRATOR, None, True),
+        (ChatMemberStatus.MEMBER, None, True),
+        (ChatMemberStatus.RESTRICTED, True, True),
+        (ChatMemberStatus.RESTRICTED, False, False),
+        (ChatMemberStatus.LEFT, None, False),
+        (ChatMemberStatus.BANNED, None, False),
+    ],
+    ids=["owner", "administrator", "member", "restricted_present", "restricted_left", "left", "banned"],
+)
+def test_chat_member_is_present(status: ChatMemberStatus, is_member: bool | None, expected: bool):
+    assert chat_member_is_present(make_chat_member(status, is_member=is_member)) is expected
+
+
+@pytest.mark.parametrize(
+    "status, expected",
+    [
+        (ChatMemberStatus.OWNER, True),
+        (ChatMemberStatus.ADMINISTRATOR, True),
+        (ChatMemberStatus.MEMBER, False),
+        (ChatMemberStatus.RESTRICTED, False),
+        (ChatMemberStatus.LEFT, False),
+        (ChatMemberStatus.BANNED, False),
+    ],
+    ids=["owner", "administrator", "member", "restricted", "left", "banned"],
+)
+def test_chat_member_is_admin(status: ChatMemberStatus, expected: bool):
+    is_member = True if status is ChatMemberStatus.RESTRICTED else None
+    assert chat_member_is_admin(make_chat_member(status, is_member=is_member)) is expected
+
+
+@pytest.mark.parametrize(
+    "status, expected",
+    [
+        (ChatMemberStatus.BANNED, True),
+        (ChatMemberStatus.OWNER, False),
+        (ChatMemberStatus.ADMINISTRATOR, False),
+        (ChatMemberStatus.MEMBER, False),
+        (ChatMemberStatus.RESTRICTED, False),
+        (ChatMemberStatus.LEFT, False),
+    ],
+    ids=["banned", "owner", "administrator", "member", "restricted", "left"],
+)
+def test_chat_member_is_banned(status: ChatMemberStatus, expected: bool):
+    is_member = True if status is ChatMemberStatus.RESTRICTED else None
+    assert chat_member_is_banned(make_chat_member(status, is_member=is_member)) is expected
+
+
+# ---------------------------------------------------------------------------
+# Supergroup admin operations: approve/decline/ban/unban
+# ---------------------------------------------------------------------------
+
+
+async def test_approve_chat_join_request_calls_bot(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.approve_chat_join_request(chat_id=-100, tg_user_id=555)
+
+    bot.approve_chat_join_request.assert_awaited_once_with(chat_id=-100, user_id=555)
+
+
+async def test_decline_chat_join_request_calls_bot(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.decline_chat_join_request(chat_id=-100, tg_user_id=555)
+
+    bot.decline_chat_join_request.assert_awaited_once_with(chat_id=-100, user_id=555)
+
+
+async def test_ban_chat_member_calls_bot(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.ban_chat_member(chat_id=-100, tg_user_id=555)
+
+    bot.ban_chat_member.assert_awaited_once_with(chat_id=-100, user_id=555)
+
+
+async def test_unban_chat_member_defaults_to_only_if_banned(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.unban_chat_member(chat_id=-100, tg_user_id=555)
+
+    bot.unban_chat_member.assert_awaited_once_with(chat_id=-100, user_id=555, only_if_banned=True)
+
+
+async def test_unban_chat_member_can_force_unban(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.unban_chat_member(chat_id=-100, tg_user_id=555, only_if_banned=False)
+
+    bot.unban_chat_member.assert_awaited_once_with(chat_id=-100, user_id=555, only_if_banned=False)
+
+
+@pytest.mark.parametrize(
+    "method_name, bot_attr",
+    [
+        ("approve_chat_join_request", "approve_chat_join_request"),
+        ("decline_chat_join_request", "decline_chat_join_request"),
+        ("ban_chat_member", "ban_chat_member"),
+        ("unban_chat_member", "unban_chat_member"),
+    ],
+)
+@pytest.mark.parametrize(
+    "error",
+    [Forbidden("not enough rights"), BadRequest("USER_NOT_PARTICIPANT")],
+    ids=["forbidden", "bad_request"],
+)
+async def test_admin_ops_swallow_telegram_errors(
+    telegram_api: TelegramApi, bot: AsyncMock, method_name: str, bot_attr: str, error: Exception
+):
+    getattr(bot, bot_attr).side_effect = error
+
+    # A Telegram failure must never propagate to the caller (handler / job / render).
+    await getattr(telegram_api, method_name)(chat_id=-100, tg_user_id=555)
+
+
+# ---------------------------------------------------------------------------
+# is_chat_member / is_chat_admin / is_chat_banned
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "status, is_member, expected",
+    [
+        (ChatMemberStatus.MEMBER, None, True),
+        (ChatMemberStatus.RESTRICTED, False, False),
+        (ChatMemberStatus.LEFT, None, False),
+    ],
+    ids=["member", "restricted_left", "left"],
+)
+async def test_is_chat_member_maps_status(
+    telegram_api: TelegramApi, bot: AsyncMock, status: ChatMemberStatus, is_member: bool | None, expected: bool
+):
+    bot.get_chat_member.return_value = make_chat_member(status, is_member=is_member)
+
+    assert await telegram_api.is_chat_member(chat_id=-100, tg_user_id=555) is expected
+    bot.get_chat_member.assert_awaited_once_with(chat_id=-100, user_id=555)
+
+
+@pytest.mark.parametrize(
+    "status, expected",
+    [
+        (ChatMemberStatus.OWNER, True),
+        (ChatMemberStatus.ADMINISTRATOR, True),
+        (ChatMemberStatus.MEMBER, False),
+    ],
+    ids=["owner", "administrator", "member"],
+)
+async def test_is_chat_admin_maps_status(
+    telegram_api: TelegramApi, bot: AsyncMock, status: ChatMemberStatus, expected: bool
+):
+    bot.get_chat_member.return_value = make_chat_member(status)
+
+    assert await telegram_api.is_chat_admin(chat_id=-100, tg_user_id=555) is expected
+
+
+@pytest.mark.parametrize(
+    "error",
+    [Forbidden("member list is inaccessible"), BadRequest("user not found")],
+    ids=["forbidden", "bad_request"],
+)
+async def test_is_chat_member_degrades_to_false_on_error(telegram_api: TelegramApi, bot: AsyncMock, error: Exception):
+    bot.get_chat_member.side_effect = error
+
+    # A failed lookup must never break the caller; it degrades to "not a member".
+    assert await telegram_api.is_chat_member(chat_id=-100, tg_user_id=555) is False
+
+
+@pytest.mark.parametrize(
+    "error",
+    [Forbidden("member list is inaccessible"), BadRequest("user not found")],
+    ids=["forbidden", "bad_request"],
+)
+async def test_is_chat_admin_degrades_to_false_on_error(telegram_api: TelegramApi, bot: AsyncMock, error: Exception):
+    bot.get_chat_member.side_effect = error
+
+    assert await telegram_api.is_chat_admin(chat_id=-100, tg_user_id=555) is False
+
+
+@pytest.mark.parametrize(
+    "status, expected",
+    [
+        (ChatMemberStatus.BANNED, True),
+        (ChatMemberStatus.MEMBER, False),
+        (ChatMemberStatus.LEFT, False),
+    ],
+    ids=["banned", "member", "left"],
+)
+async def test_is_chat_banned_maps_status(
+    telegram_api: TelegramApi, bot: AsyncMock, status: ChatMemberStatus, expected: bool
+):
+    bot.get_chat_member.return_value = make_chat_member(status)
+
+    assert await telegram_api.is_chat_banned(chat_id=-100, tg_user_id=555) is expected
+
+
+@pytest.mark.parametrize(
+    "error",
+    [Forbidden("member list is inaccessible"), BadRequest("user not found")],
+    ids=["forbidden", "bad_request"],
+)
+async def test_is_chat_banned_degrades_to_false_on_error(telegram_api: TelegramApi, bot: AsyncMock, error: Exception):
+    bot.get_chat_member.side_effect = error
+
+    assert await telegram_api.is_chat_banned(chat_id=-100, tg_user_id=555) is False

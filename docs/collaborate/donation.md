@@ -72,6 +72,12 @@ Patreon also lets you pledge a custom amount. You get the highest tier your pled
 
 You can unlink your Patreon account from the same screen whenever you want. Unlinking removes the connection right away and your account goes back to the free limits.
 
+## Joining the members-only group
+
+The group is for Hosts, so the bot lets you in once your Patreon account is linked and it sees you as one. Open *♥ Collaborate*{.button-like} and tap the button to join the private Telegram group.
+
+Your spot follows your Host status. If your support ends, the bot removes you from the group. Resubscribe and you can rejoin from the same screen.
+
 ## Where your money goes
 
 Everything goes into running the bot. Nobody draws a salary. The bill is mostly:
