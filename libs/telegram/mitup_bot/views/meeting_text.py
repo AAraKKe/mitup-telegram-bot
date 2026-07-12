@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import urllib.parse
 from string.templatelib import Template
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,25 @@ def participant_name(link: JoinedUsers) -> FormattedText:
         invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=language, user=link.invited_by.inline_name)
         return render(t"{name} ({invited_by_text})")
     return FormattedText(name)
+
+
+MAPS_SEARCH_URL = "https://www.google.com/maps/search/"
+
+
+def maps_url(location: MeetupLocation) -> str | None:
+    """Google Maps universal search link for the location, or None when it has no coordinates or name.
+
+    Coordinates are stored as (longitude, latitude); Google expects latitude,longitude, so the pair is
+    flipped here. `api=1` is required by Google's Maps URL API.
+    """
+    if location.coordinates is not None:
+        longitude, latitude = location.coordinates
+        query = f"{latitude},{longitude}"
+    elif location.coerced_name is not None:
+        query = location.coerced_name
+    else:
+        return None
+    return f"{MAPS_SEARCH_URL}?{urllib.parse.urlencode({'api': 1, 'query': query})}"
 
 
 def location_description(location: MeetupLocation, lang: str) -> FormattedText:

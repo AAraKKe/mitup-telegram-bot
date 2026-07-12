@@ -131,6 +131,9 @@ msgstr "👥 Participantes"
 msgid "ButtonMessages.LOCATION"
 msgstr "🗺️ Lugar"
 
+msgid "ButtonMessages.OPEN_IN_MAPS"
+msgstr "📍 Abrir en Maps"
+
 msgid "ButtonMessages.DONE"
 msgstr "✅ Hecho"
 

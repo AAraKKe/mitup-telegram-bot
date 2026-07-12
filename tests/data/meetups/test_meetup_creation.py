@@ -32,6 +32,7 @@ from mitup_bot.views.meeting_text import (
     inline_message,
     inline_query_message,
     location_description,
+    maps_url,
     meeting_message,
     participants_badge,
     participants_text,
@@ -746,7 +747,7 @@ def test_default_meeting_options_view(
     assert expected_view == view
 
 
-def expected_inline_keyboard(language: str, *, chat_instance: str | None = None) -> Keyboard:
+def expected_inline_keyboard(language: str, location: MeetupLocation, *, chat_instance: str | None = None) -> Keyboard:
     expected_keyboard = [
         [
             ButtonConfig(
@@ -759,6 +760,11 @@ def expected_inline_keyboard(language: str, *, chat_instance: str | None = None)
             ),
         ]
     ]
+
+    if (url := maps_url(location)) is not None:
+        expected_keyboard.append(
+            [ButtonConfig(text=ButtonMessages.OPEN_IN_MAPS.get_text(lang=language), url=url)],
+        )
 
     if not chat_instance:
         expected_keyboard.append(
@@ -787,7 +793,7 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None):
 
     expected_view = MitupInlineView(
         description=inline_message(meeting),
-        keyboard=expected_inline_keyboard(language=used_language),
+        keyboard=expected_inline_keyboard(language=used_language, location=meeting.location),
         id="123",
         title=meeting.title,
         inline_description=inline_query_message(meeting),
@@ -809,7 +815,9 @@ def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
 
     expected_view = MitupInlineView(
         description=inline_message(meeting),
-        keyboard=expected_inline_keyboard(language=used_language, chat_instance="some_chat_instance"),
+        keyboard=expected_inline_keyboard(
+            language=used_language, location=meeting.location, chat_instance="some_chat_instance"
+        ),
         id="123",
         title=meeting.title,
         inline_description=inline_query_message(meeting),

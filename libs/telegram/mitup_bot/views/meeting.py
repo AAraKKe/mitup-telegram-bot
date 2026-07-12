@@ -15,7 +15,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, render
 from mitup_bot.views import MitupInlineView, MitupView
 from mitup_bot.views.factory import options_button
-from mitup_bot.views.meeting_text import inline_message, inline_query_message, meeting_message
+from mitup_bot.views.meeting_text import inline_message, inline_query_message, maps_url, meeting_message
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -31,6 +31,14 @@ def join_leave_row(meeting: Meetup, lang: str) -> list[ButtonConfig]:
     )
     leave = ButtonConfig(text=ButtonMessages.LEAVE.get_text(lang=lang), callback_data=cb.LEAVE.with_id(meeting.db_id))
     return [join, invite, leave] if meeting.allow_invitation else [join, leave]
+
+
+def maps_row(meeting: Meetup, lang: str) -> Keyboard:
+    """Single-button row linking the location to Google Maps, or no rows when the location is unset."""
+    url = maps_url(meeting.location)
+    if url is None:
+        return []
+    return [[ButtonConfig(text=ButtonMessages.OPEN_IN_MAPS.get_text(lang=lang), url=url)]]
 
 
 def main_menu_back_button(meeting: Meetup) -> ButtonConfig:
@@ -49,6 +57,7 @@ def main_view(meeting: Meetup, back_button: ButtonConfig | None = None) -> Mitup
     keyboard: Keyboard = []
     if not (meeting.lock_on_start and meeting.is_in_progress):
         keyboard.append(join_leave_row(meeting, meeting.user_language))
+    keyboard.extend(maps_row(meeting, meeting.user_language))
     keyboard.extend(
         [
             [
@@ -85,6 +94,7 @@ def external_view(meeting: Meetup, back_button: ButtonConfig | None = None) -> M
     keyboard: Keyboard = []
     if not (meeting.lock_on_start and meeting.is_in_progress):
         keyboard.append(join_leave_row(meeting, meeting.user_language))
+    keyboard.extend(maps_row(meeting, meeting.user_language))
     keyboard.append([back_button or main_menu_back_button(meeting)])
     view = MitupView(inline_message(meeting), keyboard)
     if meeting.is_in_progress:
@@ -286,6 +296,8 @@ def build_inline_keyboard(
 
     if not is_locked_and_in_progress:
         keyboard.append(join_leave_row(meeting, meeting.lang))
+
+    keyboard.extend(maps_row(meeting, meeting.lang))
 
     if meeting.public:
         keyboard.append(

@@ -99,6 +99,7 @@ class ButtonMessages(MessageBase):
     SET_TIME = f"{Emojis.CLOCK} Set time"
     PARTICIPANTS = f"{Emojis.JOINED} Participants"
     LOCATION = f"{Emojis.MAP} Location"
+    OPEN_IN_MAPS = f"{Emojis.PIN} Open in Maps"
     DONE = f"{Emojis.CHECK} Done"
     JOIN = f"{Emojis.CHECK} Join"
     INVITE = f"{Emojis.FRIEND} Invite"

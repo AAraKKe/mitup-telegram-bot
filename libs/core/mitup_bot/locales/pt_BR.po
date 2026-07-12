@@ -997,3 +997,6 @@ msgstr ""
 
 msgid "AdminMessages.BUTTON_BROADCAST"
 msgstr ""
+
+msgid "ButtonMessages.OPEN_IN_MAPS"
+msgstr "📍 Abrir no mapa"
