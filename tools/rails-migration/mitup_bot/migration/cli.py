@@ -26,7 +26,8 @@ from .console import console, error, success
     "--env",
     default=Env.PROD,
     type=click.Choice(choices=Env, case_sensitive=False),
-    help="Environment for target-DB config. Defaults to prod since this tool is meant to run inside Lambda.",
+    help="Which environment's config supplies the target-DB connection (the new-schema Postgres the run "
+    "writes into). MITUPBOT__DB__* env vars still override individual settings. Defaults to prod.",
 )
 @click.option(
     "--rails-url",

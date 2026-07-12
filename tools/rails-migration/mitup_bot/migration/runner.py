@@ -1,17 +1,14 @@
-import asyncio
 import logging
-import os
 from typing import Any
 
 from mitup_bot import db
-from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
-from mitup_bot.monitoring import EmfBackend, MetricsClient, configure_emf_backend
+from mitup_bot.monitoring import MetricsClient
 
 from .archive import ArchiveWriter
 from .modes import MigrationMode
 from .phases import run_migration
 from .rails_reader import RailsReader
-from .reporting import MetricsFlusher, MigrationReporter, OutputMode
+from .reporting import MigrationReporter, OutputMode
 
 ALL_PHASES = ("users", "meetups", "joins", "invitations", "messages", "archive", "verify")
 
@@ -98,32 +95,3 @@ async def run_pipeline_then_flush(
 
 def has_migration_failures(report: dict[str, Any]) -> bool:
     return any(phase.get("failed", 0) for phase in report.get("phases", {}).values())
-
-
-def invoke_from_lambda(
-    rails_url: str, archive_s3_uri: str | None, *, dry_run: bool, phases: str = ",".join(ALL_PHASES)
-):
-    """Programmatic entry point so the Lambda wrapper can invoke without going through Click."""
-    env_default = os.environ.get("MITUPBOT_ENV", Env.PROD.value)
-    selected_phases = tuple(p.strip() for p in phases.split(",") if p.strip())
-    mode = MigrationMode.DRY_RUN if dry_run else MigrationMode.LIVE
-
-    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(env=Env(env_default)))
-    config.db.engine_echo = False
-    configure_migration_logging(OutputMode.LOG)
-    db.configure_db(config.db, skip_if_initialized=True)
-    configure_emf_backend(config.metrics)
-
-    backend = EmfBackend(base_dimensions={"Tool": "MigrateFromRails"})
-    metrics = MetricsClient(backend=backend)
-    flush_every = int(os.environ.get("MIGRATE_METRICS_FLUSH_EVERY", "50"))
-    flusher = MetricsFlusher(metrics, flush_every=flush_every)
-    reporter = MigrationReporter(OutputMode.LOG, flusher=flusher)
-    batch_size = int(os.environ.get("MIGRATE_BATCH_SIZE", "1000"))
-
-    report = asyncio.run(
-        run_pipeline_then_flush(rails_url, archive_s3_uri, batch_size, selected_phases, mode, metrics, reporter)
-    )
-
-    if has_migration_failures(report):
-        raise RuntimeError("Migration finished with failed rows. See the audit table for details.")

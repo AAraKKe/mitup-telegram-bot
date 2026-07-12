@@ -10,7 +10,6 @@ __all__ = [
     "RowMappingError",
     "configure_migration_logging",
     "has_migration_failures",
-    "invoke_from_lambda",
     "map_invitation",
     "map_join",
     "map_meetup",
@@ -39,7 +38,6 @@ from .runner import (
     ALL_PHASES,
     configure_migration_logging,
     has_migration_failures,
-    invoke_from_lambda,
     run_migration_pipeline,
     run_pipeline_then_flush,
 )
