@@ -111,7 +111,7 @@ push-bot-tagged-prod:
     name: production
   dependencies:
     - build-translations
-    - config-staging
+    - config-prod
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
