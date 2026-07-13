@@ -57,7 +57,7 @@ await context.api.edit_message(update=update, view=meeting.main_view)
 | Private pydantic fields | `_snake_case` | `_outbox` |
 | Internal instance methods (class not meant for outside use) | `_snake_case` | `_freeze`, `_build_key` |
 | Private inner dataclasses | `_PascalCase` | `_MarkerSpan` |
-| Type aliases | `PascalCase` | `Keyboard`, `TMitupContext` |
+| Type aliases and type objects (`TypeVar`, `NewType`, `TypeAdapter`) | `PascalCase` | `Keyboard`, `TMitupContext`, `PipelineList` |
 | Section separators | `# ---` with a label | `# --- UTF-16 helper ---` |
 
 Variable names must describe what the variable holds, not its type or position:
@@ -153,6 +153,12 @@ Type aliases belong at module level and use `PascalCase`:
 ```python
 ButtonRow = list[ButtonConfig]
 Keyboard = list[ButtonRow]
+```
+
+The same casing applies to any module-level binding that *denotes a type* rather than holding a runtime value — a `TypeVar`, `NewType`, or a `TypeAdapter`. Name it like a class (`PascalCase`); never as an `UPPER_SNAKE_CASE` constant and never with a leading underscore, because it represents a type, not a value:
+
+```python
+PipelineList = TypeAdapter(list[Pipeline])
 ```
 
 ## Python idioms

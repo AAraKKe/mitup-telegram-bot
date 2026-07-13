@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import checks, ci, console, db, deploy_ops, docs, locales, services, setup_env, testing, validate
+from . import checks, ci, console, db, deploy_ops, docs, locales, release, services, setup_env, testing, validate
 
 app = typer.Typer(
     name="mb",
@@ -32,6 +32,7 @@ app.command(
 )(testing.test_command)
 app.command("validate")(validate.validate_command)
 app.command("setup")(setup_env.setup_command)
+app.command("release")(release.release_command)
 
 app.add_typer(db.app, name="db")
 app.add_typer(services.run_app, name="run")

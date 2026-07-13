@@ -18,7 +18,7 @@ build-ci → pre-flight → analysis → build → test → prepare-deployment �
 ```
 
 Most development work interacts with the **build** and **test** stages. The stages from
-`prepare-deployment` onward only do work on the default branch, the `release` branch, or tags.
+`prepare-deployment` onward run the deploy and docs-publish work only on `v*` tag pipelines.
 
 ## The CI image and the MR-image mechanism (`base.yml`, `docker.yml`)
 
@@ -80,41 +80,41 @@ entries just ignore it since they localize nothing.
 
 ## Deploy flow (`deploy-config.yml`, `ecr-push.yml`, `deploy.yml`)
 
-Deployment runs on `main` (→ staging) and `release` (→ production). Four images are deployed: **bot**,
-**events**, **migrations-lambda**, and **alarm-action-lambda**.
+Deployment targets the production account only and runs on **`v*` tag pipelines** — a release tag is
+cut with `uv run mb release`. Four images are deployed: **bot**, **events**, **migrations-lambda**,
+and **alarm-action-lambda**.
 
-1. **`config-{staging,prod}`** (`prepare-deployment`) authenticate via a job-scoped OIDC token
-   (`.aws-prep`), describe the ECR repos, and write each image's URI — tagged `:ci-${CI_COMMIT_SHORT_SHA}` —
+1. **`config-prod`** (`prepare-deployment`) authenticates via a job-scoped OIDC token
+   (`.aws-prep`), describes the ECR repos, and writes each image's URI — tagged `:ci-${CI_COMMIT_SHORT_SHA}` —
    into a `dotenv` artifact (`BOT_IMAGE_TAG`, `EVENTS_IMAGE_TAG`, `MIGRATIONS_IMAGE_TAG`,
    `ALARM_ACTION_IMAGE_TAG`). Every downstream job authenticates with **its own** OIDC token rather
    than inheriting credentials, because a job can queue for a long time behind a deploy bake.
-2. **`push-*-{staging,prod}`** (`push-ecr`) build each app's `apps/X/Dockerfile` and push the
+2. **`push-*-prod`** (`push-ecr`) build each app's `apps/X/Dockerfile` and push the
    sha-tagged image plus `:latest` to ECR. These push jobs stay **grouped** (not per-path): a deploy
    resolves every image by the current commit sha, so each `:ci-<sha>` tag must exist whenever a
    deploy runs. The registry build-cache makes unchanged images near-instant to re-push. (Path
    gating lives on the MR-only `validate-docker` matrix job, where there is no deploy to satisfy.)
-3. **`deploy-{staging,production}`** (`deploy`) run `uv run mb deploy --migrations-image … --bot-image …
+3. **`deploy-production`** (`deploy`) runs `uv run mb deploy --migrations-image … --bot-image …
    --alarm-action-image … --events-image …`, which applies the Alembic migrations (migrations
    Lambda) and rolls out the ECS services.
 
-`config-staging` blocks on the quality gates via `needs:` (`test-suite`, `test-db`, `type-check`,
-`validate-locales`, `validate-migrations`, `semgrep-sast`, `secret_detection`) — formatting/style jobs are deliberately
-excluded so they never block a deploy.
+Every deploy-path job gates on `$CI_COMMIT_TAG =~ /^v/`, so a `main` pipeline runs
+build/test/analysis/validate only and never deploys. The quality gates still block a deploy through
+stage ordering: the deploy jobs live in `prepare-deployment` and later stages, which cannot start
+until the whole `test` stage passes. The `GitLabCI-Service` OIDC trust is scoped to `v*` tag refs, so
+only a tag pipeline can assume the deploy role.
 
-## Commit-title deploy switches
+## Commit-title deploy switch
 
-The push and deploy jobs read the commit title:
+The push and deploy jobs read the tagged commit's title:
 
-- **`[no-deploy]`** — hard `when: never` on every push/deploy/docs job. Use it on cleanup or
-  infra-only merges that must not trigger a staging roll.
-- **`[force-deploy]`** — on the default branch, deploy even when no `.deployment-files` path changed
-  (the normal trigger is a change under `.deployment-files`: `apps/**`, `libs/**`, `uv.lock`, the
-  root `pyproject.toml`, `.dockerignore`, and the deploy-related CI YAML).
+- **`[no-deploy]`** — hard `when: never` on every push/deploy/docs job. On a `v*` tag pipeline it
+  suppresses the roll-out even though the tag matched; use it only when a tagged commit must not deploy.
 
 ## Resource groups
 
-Each environment-touching job declares a `resource_group` (e.g. `deploy-staging`, `bot-tagged-prod`,
-`docs-staging`) so GitLab serializes concurrent pipelines onto the same target and a new deploy
+Each environment-touching job declares a `resource_group` (e.g. `deploy-production`, `bot-tagged-prod`,
+`docs-production`) so GitLab serializes concurrent pipelines onto the same target and a new deploy
 cannot overtake an in-flight one.
 
 ## Documentation (`docs.yml`)
