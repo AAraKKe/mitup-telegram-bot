@@ -14,6 +14,7 @@ chat *does* go through the translated pipeline. Every failure render is logged w
 trace a support question back to its cause.
 """
 
+import base64
 import datetime as dt
 import hashlib
 import hmac
@@ -66,6 +67,13 @@ router = APIRouter()
 SUPPORT_GRACE_DAYS = 7
 
 RESULT_TEMPLATE = Template((Path(__file__).parent / "templates" / "patreon_result.html").read_text(encoding="utf-8"))
+
+# The corner branding is embedded as a base64 data URI rather than an <img src> URL: these pages are
+# served standalone with no static-file mount, so an external reference would 404. Encoding the
+# transparent horizontal lockup once at import keeps every rendered page self-contained and the logo
+# pixel-accurate (no dependency on the viewer's fonts). The asset ships in the wheel like the template.
+LOGO_BYTES = (Path(__file__).parent / "assets" / "logo-horizontal-transparent.png").read_bytes()
+LOGO_IMG = f'<img class="logo" src="data:image/png;base64,{base64.b64encode(LOGO_BYTES).decode("ascii")}" alt="Mitup">'
 
 # Reused across the failure pages: every one points the user back to the same in-bot button.
 RETRY_HINT = "Head back to Mitup and tap Link Patreon account in the Collaborate menu"
@@ -185,7 +193,7 @@ def resolve_state(code: str | None, state: str | None) -> ResolvedCallback:
 def render_result_page(title: str, message: str, bot_username: str | None, *, status_code: int = 200) -> HTMLResponse:
     """Fill the branded result template with the given title/message and a link back to the bot."""
     return_link = f'<a class="cta" href="https://t.me/{bot_username}">Open Mitup</a>' if bot_username else ""
-    html = RESULT_TEMPLATE.substitute(title=title, message=message, return_link=return_link)
+    html = RESULT_TEMPLATE.substitute(title=title, message=message, return_link=return_link, logo=LOGO_IMG)
     return HTMLResponse(content=html, status_code=status_code)
 
 

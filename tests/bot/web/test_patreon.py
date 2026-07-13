@@ -488,8 +488,11 @@ def test_render_result_page_fills_branded_template():
     # Title and message are substituted into the Mitup-branded shell.
     assert "<h1>A Title</h1>" in body
     assert "A message body." in body
-    # The shell carries the Mitup wordmark and the return link to the bot.
-    assert 'class="wordmark"' in body
+    # The shell carries the embedded Mitup logo (a self-contained data URI, no external image) and
+    # the return link to the bot.
+    assert 'class="logo"' in body
+    assert 'src="data:image/png;base64,' in body
+    assert 'alt="Mitup"' in body
     assert "mitup" in body.lower()
     assert '<a class="cta" href="https://t.me/MitupBot">Open Mitup</a>' in body
 

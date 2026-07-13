@@ -25,16 +25,7 @@
     color: var(--mitup-ink);
   }
   header { padding: 1.5rem 2rem; }
-  .wordmark {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--mitup-blue);
-  }
-  .wordmark .dot { color: var(--mitup-yellow); }
+  .logo { display: block; height: 44px; width: auto; }
   main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1rem; }
   .card {
     max-width: 30rem;
@@ -63,7 +54,7 @@
 </style>
 </head>
 <body>
-  <header><span class="wordmark">mitup<span class="dot">.</span></span></header>
+  <header>$logo</header>
   <main>
     <div class="card">
       <h1>$title</h1>
