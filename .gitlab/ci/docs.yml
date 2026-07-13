@@ -10,7 +10,9 @@ build-docs:
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
-    # Only run if the doc files change
+    # A release tag republishes the docs after the deploy, so the site must be built on tags too
+    # (push-docs depends on this artifact); otherwise only build when the docs change.
+    - if: $CI_COMMIT_TAG =~ /^v/
     - changes:
         paths: !reference [.docs-files]
 
@@ -27,11 +29,11 @@ build-docs:
     - !reference [.aws-prep]
     - uv run mb docs publish
 
-push-docs-production:
+push-docs:
   extends: .push-docs
-  resource_group: docs-production
+  resource_group: docs
   dependencies:
-    - config-prod
+    - deploy-config
     - build-docs
   environment:
     name: production

@@ -59,15 +59,15 @@
 # HARD PREREQUISITE: the `events` ECR repo (created by mitup-infra !43) must be merged and applied
 # before this MR merges, so the push destination resolves (see deploy-config.yml).
 
-## ------------- Push to prod --------------
-push-bot-tagged-prod:
+## ------------- Push the deployable images to ECR --------------
+push-bot:
   extends: .push-ecr
-  resource_group: bot-tagged-prod
+  resource_group: bot
   environment:
     name: production
   dependencies:
     - build-translations
-    - config-prod
+    - deploy-config
   variables:
     DOCKERFILE: apps/bot/Dockerfile
     PUSH_DESTINATION: $BOT_IMAGE_TAG
@@ -76,23 +76,23 @@ push-bot-tagged-prod:
       when: never
     - if: $CI_COMMIT_TAG =~ /^v/
 
-push-migrations-lambda-prod:
-  extends: push-bot-tagged-prod
-  resource_group: migrations-tagged-prod
+push-migrations-lambda:
+  extends: push-bot
+  resource_group: migrations
   variables:
     DOCKERFILE: apps/lambda-migrations/Dockerfile
     PUSH_DESTINATION: $MIGRATIONS_IMAGE_TAG
 
-push-alarm-action-lambda-prod:
-  extends: push-bot-tagged-prod
-  resource_group: alarm-action-tagged-prod
+push-alarm-action-lambda:
+  extends: push-bot
+  resource_group: alarm-action
   variables:
     DOCKERFILE: apps/lambda-alarm/Dockerfile
     PUSH_DESTINATION: $ALARM_ACTION_IMAGE_TAG
 
-push-events-tagged-prod:
-  extends: push-bot-tagged-prod
-  resource_group: events-tagged-prod
+push-events:
+  extends: push-bot
+  resource_group: events
   variables:
     DOCKERFILE: apps/events/Dockerfile
     PUSH_DESTINATION: $EVENTS_IMAGE_TAG

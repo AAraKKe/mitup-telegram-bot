@@ -28,7 +28,7 @@
     expire_in: 2 hours
     access: none
 
-config-prod:
+deploy-config:
   extends: .aws-config
   environment:
     name: production

@@ -36,7 +36,7 @@ Because the image bakes in dependencies, it must be rebuilt when dependency meta
 the root and every member `pyproject.toml`, and the CI YAML). When an MR touches one of those,
 `CI_IMAGE_TAG` is set to `mr-${CI_MERGE_REQUEST_IID}` and the `build-docker-ci` job (stage
 `build-ci`) builds and pushes that MR-scoped image before the rest of the pipeline uses it.
-Otherwise `CI_IMAGE_TAG` stays `latest`. On `main`/`release`, a change to those files rebuilds and
+Otherwise `CI_IMAGE_TAG` stays `latest`. On `main`, a change to those files rebuilds and
 republishes `:latest`; `[build-ci]` in a commit title forces the build; a manual trigger is the
 fallback.
 
@@ -68,6 +68,12 @@ and pytest key their color output off it (animations stay off — `mb` only anim
 | `test-db` | `uv run mb test --db --cov tests/data/db_behavior/` against a `docker:dind` Postgres service — serial (shared Postgres), with its raw coverage file feeding `coverage-report` | Same trigger as `test-suite` |
 | `validate-local-setup` | On a clean `python:3.14-bookworm` image, proves the fresh-contributor bootstrap (install uv → `uv sync --frozen` → `mb --help`) and that the commit-message hook (`mb ci check-commit`) rejects/accepts/idempotently re-validates | `allow_failure` on the default branch |
 
+Every test-stage job — plus `validate-ci-languages` — carries the shared `.skip-on-tags` rule
+anchor (`{ if: $CI_COMMIT_TAG, when: never }`, defined at the top of `test.yml`), so **none of them
+run on a `v*` tag pipeline**. A tag pipeline is deploy-only (see [Deploy flow](#deploy-flow-deploy-configyml-ecr-pushyml-deployyml)); only `preparation`,
+`build-translations`, and `build-docs` from the earlier stages run on a tag, because the deploy needs
+their artifacts. The "always"/trigger notes above therefore describe MR and `main` pipelines.
+
 The deployable-image builds are one matrixed job (`validate-docker-build.yml`): `validate-docker`
 builds all four `apps/X/Dockerfile`s in a `parallel:matrix`, **only on MRs**, behind one broad
 trigger (`apps/**`, `libs/**`, `uv.lock`, the root `pyproject.toml`, `.dockerignore`, the job's own
@@ -84,25 +90,31 @@ Deployment targets the production account only and runs on **`v*` tag pipelines*
 cut with `uv run mb release`. Four images are deployed: **bot**, **events**, **migrations-lambda**,
 and **alarm-action-lambda**.
 
-1. **`config-prod`** (`prepare-deployment`) authenticates via a job-scoped OIDC token
+There is a single set of deploy jobs (no staging/prod pairs): they still carry
+`environment: name: production` for GitLab deployment tracking, but the names are unqualified.
+
+1. **`deploy-config`** (`prepare-deployment`) authenticates via a job-scoped OIDC token
    (`.aws-prep`), describes the ECR repos, and writes each image's URI — tagged `:ci-${CI_COMMIT_SHORT_SHA}` —
    into a `dotenv` artifact (`BOT_IMAGE_TAG`, `EVENTS_IMAGE_TAG`, `MIGRATIONS_IMAGE_TAG`,
    `ALARM_ACTION_IMAGE_TAG`). Every downstream job authenticates with **its own** OIDC token rather
    than inheriting credentials, because a job can queue for a long time behind a deploy bake.
-2. **`push-*-prod`** (`push-ecr`) build each app's `apps/X/Dockerfile` and push the
-   sha-tagged image plus `:latest` to ECR. These push jobs stay **grouped** (not per-path): a deploy
-   resolves every image by the current commit sha, so each `:ci-<sha>` tag must exist whenever a
-   deploy runs. The registry build-cache makes unchanged images near-instant to re-push. (Path
-   gating lives on the MR-only `validate-docker` matrix job, where there is no deploy to satisfy.)
-3. **`deploy-production`** (`deploy`) runs `uv run mb deploy --migrations-image … --bot-image …
+2. **`push-bot` / `push-migrations-lambda` / `push-alarm-action-lambda` / `push-events`**
+   (`push-ecr`) build each app's `apps/X/Dockerfile` and push the sha-tagged image plus `:latest` to
+   ECR. They pull only the `build-translations` (compiled catalogs baked into the bot/events images)
+   and `deploy-config` artifacts. These push jobs stay **grouped** (not per-path): a deploy resolves every
+   image by the current commit sha, so each `:ci-<sha>` tag must exist whenever a deploy runs. The
+   registry build-cache makes unchanged images near-instant to re-push. (Path gating lives on the
+   MR-only `validate-docker` matrix job, where there is no deploy to satisfy.)
+3. **`deploy`** (`deploy`) runs `uv run mb deploy --migrations-image … --bot-image …
    --alarm-action-image … --events-image …`, which applies the Alembic migrations (migrations
    Lambda) and rolls out the ECS services.
 
-Every deploy-path job gates on `$CI_COMMIT_TAG =~ /^v/`, so a `main` pipeline runs
-build/test/analysis/validate only and never deploys. The quality gates still block a deploy through
-stage ordering: the deploy jobs live in `prepare-deployment` and later stages, which cannot start
-until the whole `test` stage passes. The `GitLabCI-Service` OIDC trust is scoped to `v*` tag refs, so
-only a tag pipeline can assume the deploy role.
+Every deploy-path job gates on `$CI_COMMIT_TAG =~ /^v/`, and the whole `test` stage is skipped on
+tags, so a tag pipeline runs only `preparation` → `build-translations`/`build-docs` → `deploy-config` →
+`push-*` → `deploy` → `push-docs`. The quality gates are **not** re-run on the tag: `mb release`
+refuses to cut the tag unless `main`'s pipeline for that commit was already green, and the
+`GitLabCI-Service` OIDC trust is scoped to `v*` tag refs so only a tag pipeline can assume the deploy
+role.
 
 ## Commit-title deploy switch
 
@@ -113,17 +125,18 @@ The push and deploy jobs read the tagged commit's title:
 
 ## Resource groups
 
-Each environment-touching job declares a `resource_group` (e.g. `deploy-production`, `bot-tagged-prod`,
-`docs-production`) so GitLab serializes concurrent pipelines onto the same target and a new deploy
-cannot overtake an in-flight one.
+Each deploy-touching job declares a `resource_group` (e.g. `deploy`, `bot`, `docs`) so GitLab
+serializes concurrent pipelines onto the same target and a new deploy cannot overtake an in-flight
+one.
 
 ## Documentation (`docs.yml`)
 
 `build-docs` (stage `prepare-deployment`, `uv run mb docs build`) runs when `.docs-files` change
-(`docs/**`, `zensical.toml`, `tools/mb/src/mb/docs_ops.py`, and the docs CI YAML). `push-docs-*`
-(stage `documentation`, `uv run mb docs publish`) sync the built `site/` to S3 and invalidate
-CloudFront — **after** the deploy, so docs never describe a bot that has not rolled out yet.
-`publish_docs_manual` is an on-demand default-branch job.
+(`docs/**`, `zensical.toml`, `tools/mb/src/mb/docs_ops.py`, and the docs CI YAML) **and on every
+`v*` tag** — the tag trigger is required because `push-docs` runs on the tag and depends on the
+`build-docs` artifact. `push-docs` (stage `documentation`, `uv run mb docs publish`) syncs the built
+`site/` to S3 and invalidates CloudFront — **after** the deploy, so docs never describe a bot that
+has not rolled out yet. `publish_docs_manual` is an on-demand default-branch job.
 
 ## Running validation locally
 

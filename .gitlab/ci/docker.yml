@@ -45,8 +45,8 @@ build-docker-ci:
   rules:
     # Build automatically for MR-specific images (when CI files changed in MR)
     - if: '$CI_IMAGE_TAG =~ /^mr-/'
-    # Build on main/release when CI files changed
-    - if: '($CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_BRANCH == "release")'
+    # Build on main when CI files changed
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       changes: !reference [.ci-docker-files]
     # Allow manual trigger with [build-ci] in commit message
     - if: '$CI_COMMIT_TITLE =~ /\[build-ci\]/'

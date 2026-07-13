@@ -1,3 +1,10 @@
+# A `v*` tag runs a deploy-only pipeline: `mb release` already refused to cut the tag unless main's
+# pipeline was green, so the quality gates never need to re-run on the tag. Splice this rule into a
+# job's `rules` to keep it off tag pipelines while leaving its normal MR/default-branch triggers.
+.skip-on-tags: &skip-on-tags
+  if: $CI_COMMIT_TAG
+  when: never
+
 preparation:
   stage: build
   script:
@@ -26,6 +33,9 @@ build-translations:
 validate-ci-languages:
   stage: build
   script: uv run mb ci check-languages
+  rules:
+    - *skip-on-tags
+    - when: on_success
 
 # The whole suite runs from one `parallel:matrix` job. `mb test --member $TARGET` maps a member
 # to its `tests/<name>` subtree (tests/ mirrors the member layout), so there is no trigger list to
@@ -34,6 +44,7 @@ validate-ci-languages:
 # once. One broad trigger (below) gates the job: it errs toward running the suite so a new test is
 # never silently dropped by an out-of-date trigger list.
 .test-rules: &test_rules
+  - *skip-on-tags
   - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   - changes:
       - apps/**/*
@@ -113,6 +124,7 @@ format-check:
   script: uv run mb format --check
   needs: [preparation]
   rules:
+    - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true
     - when: on_success
@@ -122,6 +134,7 @@ linter:
   script: uv run mb lint
   needs: [preparation]
   rules:
+    - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true
     - when: on_success
@@ -130,6 +143,9 @@ type-check:
   stage: test
   script: uv run mb typecheck
   needs: [preparation]
+  rules:
+    - *skip-on-tags
+    - when: on_success
 
 check-ty-ignores:
   stage: test
@@ -144,6 +160,9 @@ validate-migrations:
   stage: test
   script: uv run mb db migrate validate
   needs: [preparation]
+  rules:
+    - *skip-on-tags
+    - when: on_success
 
 check-import-isolation:
   # Proves each workspace library imports with only its own declared dependencies,
@@ -151,12 +170,18 @@ check-import-isolation:
   stage: test
   script: uv run mb ci check-import-isolation
   needs: [preparation]
+  rules:
+    - *skip-on-tags
+    - when: on_success
 
 validate-ids:
   # Validates that all messages in code are present in the English translations file
   stage: test
   script:
     - uv run mb locales validate-ids
+  rules:
+    - *skip-on-tags
+    - when: on_success
 
 validate-locales:
   # Validates that all non-English .po files contain the same msgids as English
@@ -166,6 +191,9 @@ validate-locales:
   dependencies:
     - build-translations
   needs: [preparation, build-translations]
+  rules:
+    - *skip-on-tags
+    - when: on_success
 
 test-db:
   stage: test
@@ -205,6 +233,7 @@ validate-local-setup:
     # The emojified result must re-validate byte-for-byte (idempotent re-run / --amend).
     - 'cp commit-msg.txt commit-msg.before && uv run mb ci check-commit commit-msg.txt && cmp commit-msg.txt commit-msg.before'
   rules:
+    - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true
     - when: on_success

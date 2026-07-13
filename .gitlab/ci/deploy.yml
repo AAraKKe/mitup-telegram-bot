@@ -17,13 +17,13 @@
       --alarm-action-image $ALARM_ACTION_IMAGE_TAG
       --events-image $EVENTS_IMAGE_TAG
 
-## -------------- Deploy prod ---------------
-deploy-production:
+## -------------- Deploy ---------------
+deploy:
   # This job will first run the migrations on the database and the update ECS
   extends: .migrate-and-deploy
   dependencies:
-    - config-prod
-  resource_group: deploy-production
+    - deploy-config
+  resource_group: deploy
   environment:
     name: production
   rules:

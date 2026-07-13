@@ -68,11 +68,10 @@ workflow:
       changes: !reference [.ci-docker-files]
       variables:
         CI_IMAGE_TAG: "mr-${CI_MERGE_REQUEST_IID}"
-    # All other cases - use existing latest image (or build it if on main/release with CI changes)
+    # All other cases - use existing latest image (or build it if on main with CI changes)
     - if: '$CI_MERGE_REQUEST_ID'
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_COMMIT_BRANCH == "release"'
 
 # This is a GitLab provided job, no need to configure it
 sast:
