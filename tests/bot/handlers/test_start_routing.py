@@ -28,6 +28,7 @@ from mitup_bot.handlers.registration_process.enums import (
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import PrivacyMessages, RegistrationMessages
+from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.views import RenderContext
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import MockApi, UpdateRequest, create_bot_config, create_user, make_test_metrics_client
@@ -220,7 +221,9 @@ async def test_member_start_inline_deep_link_enters_create_meeting(
 
     api = await process_update(routing_app, update)
 
-    api.assert_send_message_called(update, create_meeting_view(RenderContext(lang=user_with_settings.lang)))
+    api.assert_send_message_called(
+        update, create_meeting_view(RenderContext(lang=user_with_settings.lang), datetime_link=build_datetime_link())
+    )
     create_meeting = conversation_for(MeetingHandlerId.CREATE_MEETING_CONVERSATION)
     assert create_meeting._conversations.get(CONVERSATION_KEY) == ConversationMeetingState.TITLE
     registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)

@@ -97,7 +97,7 @@ async def handle_non_existing_user_join(session: AsyncSession, update: Update, c
     await user_joins_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
-        text=MeetingJoinMessages.JOIN_UNREGISTERED.get(),
+        text=MeetingJoinMessages.JOIN_UNREGISTERED.get(user=user.inline_name),
         show_alert=True,
     )
 
@@ -146,7 +146,7 @@ async def handle_non_existing_user_leave(session: AsyncSession, update: Update, 
     await user_leaves_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
-        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get(),
+        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get(user=user.inline_name),
         show_alert=True,
     )
 

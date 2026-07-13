@@ -273,7 +273,7 @@ async def test_non_existent_user_joins_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_UNREGISTERED.get(),
+        text=MeetingJoinMessages.JOIN_UNREGISTERED.get(user=user.inline_name),
         show_alert=True,
     )
 
@@ -385,7 +385,7 @@ async def test_non_existing_user_leaves_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get(),
+        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get(user=user.inline_name),
         show_alert=True,
     )
 

@@ -99,6 +99,6 @@ async def test_unregistered_join_registers_user_and_creates_membership(
         assert len(memberships) == 1
 
         context.api.assert_answer_callback_query_called(
-            update, text=MeetingJoinMessages.JOIN_UNREGISTERED.get(), show_alert=True
+            update, text=MeetingJoinMessages.JOIN_UNREGISTERED.get(user=new_user.inline_name), show_alert=True
         )
         context.api.assert_method_just_called("update_meeting_messages")

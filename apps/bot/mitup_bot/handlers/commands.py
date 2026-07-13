@@ -7,6 +7,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.mitup_types import TMitupContext
+from mitup_bot.utils.entities import build_datetime_link
 
 from .command_enums import CommandsId
 from .registry import HandlersRegistry
@@ -47,7 +48,7 @@ async def existing_user_start(
         # CommandsId.START_WITH_EXISTING_USER as an entry point.
         from mitup_bot.handlers.meeting.enums import ConversationMeetingState
 
-        view = views.factory.create_meeting_view(ctx)
+        view = views.factory.create_meeting_view(ctx, datetime_link=build_datetime_link())
         await context.api.send_message(update=update, view=view)
         return ConversationMeetingState.TITLE
 
