@@ -5,9 +5,11 @@ from command_recording import CommandRecorder
 from mb.main import app
 from typer.testing import CliRunner
 
-from mb import release
+from mb import release, runner
 
 cli = CliRunner()
+
+TAG_PIPELINE_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines/42"
 
 
 @pytest.fixture(autouse=True)
@@ -17,15 +19,23 @@ def plain_wide_console(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("COLUMNS", "200")
 
 
+@pytest.fixture(autouse=True)
+def no_poll_sleep(monkeypatch: pytest.MonkeyPatch):
+    """Never actually sleep between pipeline polls; the tests drive the responses directly."""
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+
 def green_repo(recorder: CommandRecorder, *, tags: str = "v1.2.3\n", head: str = "abc123def456") -> CommandRecorder:
-    """Prime the recorder as a clean main checkout in sync with a green origin/main."""
+    """Prime the recorder with a green origin/main tip at *head*.
+
+    The pre-release green check filters pipelines by `sha`; the post-push watch filters by `ref`, so
+    the two queries are keyed separately — a test can override one without disturbing the other.
+    """
     recorder.captured_outputs.update(
         {
-            "status --porcelain": "",
-            "rev-parse --abbrev-ref HEAD": "main",
-            "rev-parse HEAD": head,
             "rev-parse origin/main": head,
-            "glab api": json.dumps([{"id": 7, "status": "success"}]),
+            "pipelines?sha=": json.dumps([{"id": 7, "status": "success"}]),
+            "pipelines?ref=": json.dumps([{"id": 42, "status": "created", "web_url": TAG_PIPELINE_URL}]),
             "tag --list": tags,
         }
     )
@@ -39,10 +49,11 @@ def test_release_tags_and_pushes_next_patch(recorder: CommandRecorder):
 
     assert result.exit_code == 0
     assert ["git", "fetch", "--tags", "origin"] in recorder.commands
-    assert ["git", "tag", "-a", "v1.2.4", "-m", "v1.2.4"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
     assert ["git", "push", "origin", "v1.2.4"] in recorder.commands
+    assert ["glab", "api", "projects/:id/pipelines?ref=v1.2.4"] in recorder.commands
     assert "Released v1.2.4" in result.output
-    assert "ref=v1.2.4" in result.output
+    assert f"Deploy pipeline started: {TAG_PIPELINE_URL}" in result.output
 
 
 def test_release_minor_bump(recorder: CommandRecorder):
@@ -50,7 +61,7 @@ def test_release_minor_bump(recorder: CommandRecorder):
 
     cli.invoke(app, ["release", "--minor"])
 
-    assert ["git", "tag", "-a", "v1.3.0", "-m", "v1.3.0"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.3.0", "abc123def456", "-m", "v1.3.0"] in recorder.commands
 
 
 def test_release_major_bump(recorder: CommandRecorder):
@@ -58,7 +69,7 @@ def test_release_major_bump(recorder: CommandRecorder):
 
     cli.invoke(app, ["release", "--major"])
 
-    assert ["git", "tag", "-a", "v2.0.0", "-m", "v2.0.0"] in recorder.commands
+    assert ["git", "tag", "-a", "v2.0.0", "abc123def456", "-m", "v2.0.0"] in recorder.commands
 
 
 def test_release_first_ever_tag_is_v0_1_0(recorder: CommandRecorder):
@@ -66,7 +77,7 @@ def test_release_first_ever_tag_is_v0_1_0(recorder: CommandRecorder):
 
     cli.invoke(app, ["release"])
 
-    assert ["git", "tag", "-a", "v0.1.0", "-m", "v0.1.0"] in recorder.commands
+    assert ["git", "tag", "-a", "v0.1.0", "abc123def456", "-m", "v0.1.0"] in recorder.commands
 
 
 def test_release_ignores_non_semver_tags(recorder: CommandRecorder):
@@ -74,7 +85,7 @@ def test_release_ignores_non_semver_tags(recorder: CommandRecorder):
 
     cli.invoke(app, ["release"])
 
-    assert ["git", "tag", "-a", "v2.4.11", "-m", "v2.4.11"] in recorder.commands
+    assert ["git", "tag", "-a", "v2.4.11", "abc123def456", "-m", "v2.4.11"] in recorder.commands
 
 
 def test_release_rejects_both_bump_flags(recorder: CommandRecorder):
@@ -87,40 +98,24 @@ def test_release_rejects_both_bump_flags(recorder: CommandRecorder):
     assert not any("tag" in command for command in recorder.commands)
 
 
-def test_release_aborts_on_dirty_working_tree(recorder: CommandRecorder):
+def test_release_tags_origin_main_regardless_of_local_state(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["status --porcelain"] = " M tools/mb/src/mb/release.py"
-
-    result = cli.invoke(app, ["release"])
-
-    assert result.exit_code != 0
-    assert "uncommitted changes" in result.output
-    assert not any("push" in command for command in recorder.commands)
-
-
-def test_release_aborts_off_main(recorder: CommandRecorder):
-    green_repo(recorder)
+    recorder.captured_outputs["rev-parse origin/main"] = "999fedcba000"
+    # A dirty tree, untracked files, and a feature branch must not influence the release.
+    recorder.captured_outputs["status --porcelain"] = " M tools/mb/src/mb/release.py\n?? scratch.txt"
     recorder.captured_outputs["rev-parse --abbrev-ref HEAD"] = "feature-branch"
 
     result = cli.invoke(app, ["release"])
 
-    assert result.exit_code != 0
-    assert "cut from 'main'" in result.output
-
-
-def test_release_aborts_when_out_of_sync_with_origin(recorder: CommandRecorder):
-    green_repo(recorder)
-    recorder.captured_outputs["rev-parse origin/main"] = "999fedcba000"
-
-    result = cli.invoke(app, ["release"])
-
-    assert result.exit_code != 0
-    assert "not in sync with origin/main" in result.output
+    assert result.exit_code == 0
+    assert ["glab", "api", "projects/:id/pipelines?sha=999fedcba000"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.2.4", "999fedcba000", "-m", "v1.2.4"] in recorder.commands
+    assert ["git", "status", "--porcelain"] not in recorder.commands
 
 
 def test_release_aborts_when_no_pipeline_exists(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["glab api"] = "[]"
+    recorder.captured_outputs["pipelines?sha="] = "[]"
 
     result = cli.invoke(app, ["release"])
 
@@ -130,7 +125,9 @@ def test_release_aborts_when_no_pipeline_exists(recorder: CommandRecorder):
 
 def test_release_aborts_when_latest_pipeline_is_not_green(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["glab api"] = json.dumps([{"id": 5, "status": "success"}, {"id": 9, "status": "running"}])
+    recorder.captured_outputs["pipelines?sha="] = json.dumps(
+        [{"id": 5, "status": "success"}, {"id": 9, "status": "running"}]
+    )
 
     result = cli.invoke(app, ["release"])
 
@@ -140,21 +137,55 @@ def test_release_aborts_when_latest_pipeline_is_not_green(recorder: CommandRecor
 
 def test_release_uses_latest_pipeline_even_after_an_older_failure(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["glab api"] = json.dumps([{"id": 3, "status": "failed"}, {"id": 8, "status": "success"}])
+    recorder.captured_outputs["pipelines?sha="] = json.dumps(
+        [{"id": 3, "status": "failed"}, {"id": 8, "status": "success"}]
+    )
 
     result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
 
 
+def test_release_falls_back_to_pipelines_listing_when_no_pipeline_starts(recorder: CommandRecorder):
+    green_repo(recorder)
+    recorder.captured_outputs["pipelines?ref="] = "[]"
+
+    result = cli.invoke(app, ["release"])
+
+    assert result.exit_code == 0
+    assert "Released v1.2.4" in result.output
+    assert "has not appeared yet" in result.output
+    assert f"{release.PIPELINES_URL}?ref=v1.2.4" in result.output
+
+
+def test_pipeline_url_for_ref_waits_until_a_pipeline_appears(monkeypatch: pytest.MonkeyPatch):
+    responses = iter(["[]", json.dumps([{"id": 5, "status": "created", "web_url": "https://x/5"}])])
+    monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (0, next(responses)))
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+    assert release.pipeline_url_for_ref("v1.2.4") == "https://x/5"
+
+
+def test_pipeline_url_for_ref_gives_up_after_the_poll_budget(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (0, "[]"))
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+    assert release.pipeline_url_for_ref("v1.2.4") is None
+
+
 @pytest.mark.parametrize(
     ("exit_codes", "outputs", "expected_message"),
     [
-        pytest.param({"status --porcelain": 1}, {}, "`git status --porcelain` failed", id="git-read-fails"),
+        pytest.param({"rev-parse origin/main": 1}, {}, "`git rev-parse origin/main` failed", id="git-read-fails"),
         pytest.param({"fetch": 1}, {}, None, id="fetch-fails"),
-        pytest.param({"glab api": 1}, {}, "Could not query the GitLab pipeline status", id="pipeline-query-fails"),
         pytest.param(
-            {}, {"glab api": "not-json"}, "Could not parse the GitLab pipeline response", id="unparseable-response"
+            {"pipelines?sha=": 1}, {}, "Could not query the GitLab pipeline status", id="pipeline-query-fails"
+        ),
+        pytest.param(
+            {},
+            {"pipelines?sha=": "not-json"},
+            "Could not parse the GitLab pipeline response",
+            id="unparseable-response",
         ),
         pytest.param({"tag -a": 1}, {}, None, id="tag-creation-fails"),
         pytest.param({"push origin": 1}, {}, None, id="tag-push-fails"),
