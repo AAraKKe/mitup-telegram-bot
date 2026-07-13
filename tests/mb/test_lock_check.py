@@ -30,6 +30,7 @@ def test_runs_uv_lock_check_read_only(monkeypatch):
     def fake_run_quiet(args, **kwargs):
         captured["args"] = args
         captured["cwd"] = kwargs.get("cwd")
+        captured["drop_env"] = kwargs.get("drop_env")
         return 0, ""
 
     monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
@@ -39,3 +40,5 @@ def test_runs_uv_lock_check_read_only(monkeypatch):
     # It must call the read-only `uv lock --check`, never a lock-mutating command.
     assert captured["args"] == ["uv", "lock", "--check"]
     assert captured["cwd"] == Path("/repo")
+    # UV_FROZEN must be stripped, or the CI image's UV_FROZEN=1 degrades --check to --check-exists.
+    assert captured["drop_env"] == ["UV_FROZEN"]

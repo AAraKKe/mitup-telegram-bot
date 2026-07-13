@@ -1,6 +1,7 @@
 import os
 import shlex
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 
 from . import console
@@ -16,8 +17,23 @@ def repo_root() -> Path:
     return Path(result.stdout.strip())
 
 
-def build_env(extra_env: dict[str, str] | None) -> dict[str, str] | None:
-    return {**os.environ, **extra_env} if extra_env else None
+def build_env(
+    extra_env: dict[str, str] | None,
+    *,
+    drop_env: Sequence[str] | None = None,
+) -> dict[str, str] | None:
+    """Merge *extra_env* over the current environment, removing every name in *drop_env*.
+
+    Returns None (inherit the environment unchanged) when neither is given.
+    """
+    if not extra_env and not drop_env:
+        return None
+    env: dict[str, str] = dict(os.environ)
+    if extra_env:
+        env.update(extra_env)
+    for name in drop_env or ():
+        env.pop(name, None)
+    return env
 
 
 def location_note(target: Path, root: Path) -> str | None:
@@ -39,12 +55,18 @@ def run_command(args: list[str], *, cwd: Path | None = None, extra_env: dict[str
     return completed.returncode
 
 
-def run_quiet(args: list[str], *, cwd: Path | None = None, extra_env: dict[str, str] | None = None) -> tuple[int, str]:
+def run_quiet(
+    args: list[str],
+    *,
+    cwd: Path | None = None,
+    extra_env: dict[str, str] | None = None,
+    drop_env: Sequence[str] | None = None,
+) -> tuple[int, str]:
     """Run *args* capturing combined stdout+stderr, for short steps wrapped in a spinner."""
     completed = subprocess.run(
         args,
         cwd=cwd or repo_root(),
-        env=build_env(extra_env),
+        env=build_env(extra_env, drop_env=drop_env),
         capture_output=True,
         text=True,
     )

@@ -29,7 +29,10 @@ workspace sources. Two Dockerfile details matter:
 - `ENV UV_PROJECT_ENVIRONMENT=/opt/uv-venv` keeps the venv **outside** the checkout, which GitLab
   wipes on every job.
 - `ENV UV_FROZEN=1` makes every job-time `uv run` / `uv sync` respect `uv.lock` instead of
-  re-resolving.
+  re-resolving. One caveat: for `uv lock` the same flag maps to `--check-exists`, so a bare
+  `uv lock --check` job would only confirm the lock file exists, never that it is up to date. The
+  `validate-lock` job goes through `mb ci check-lock`, which strips `UV_FROZEN` to force the real
+  drift comparison.
 
 Because the image bakes in dependencies, it must be rebuilt when dependency metadata changes. The
 `workflow.rules` in `base.yml` watch the `.ci-docker-files` anchor (the CI Dockerfile, `uv.lock`,
@@ -43,11 +46,18 @@ fallback.
 `FORCE_COLOR: "1"` is a global variable in `base.yml`: GitLab renders ANSI in job logs, and `mb`
 and pytest key their color output off it (animations stay off — `mb` only animates on a TTY).
 
+## Pre-flight stage
+
+| Job | What it does |
+|-----|-------------|
+| `validate-lock` (`test.yml`) | `uv run mb ci check-lock` — fails when `uv.lock` has drifted from any workspace `pyproject.toml`. Sits in `pre-flight` (after the CI image exists, before `build`/`test`) so a stale lock short-circuits the pipeline before any translation build or the matrix runs |
+| `auto-format` (`update-renovate.yml`) | On `renovate/*` MR branches, runs `mb fix` and pushes a formatting-fix commit back to the branch |
+
 ## Build stage (`test.yml`)
 
 | Job | What it does |
 |-----|-------------|
-| `preparation` | Verifies Python and uv, times `uv sync --frozen`, then runs `uv lock --check` to reject a stale lock, and prints `uv tree` |
+| `preparation` | Verifies Python and uv, times `uv sync --frozen`, and prints `uv tree` |
 | `build-translations` | Compiles the locale `.mo` catalogs (`uv run mb locales build`) and publishes `libs/core/mitup_bot/locales` as a 1-day artifact that later jobs consume |
 | `validate-ci-languages` | `uv run mb ci check-languages` — the CI language matrix matches the supported languages |
 

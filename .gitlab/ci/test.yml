@@ -5,6 +5,19 @@
   if: $CI_COMMIT_TAG
   when: never
 
+# Fail the pipeline before any build/test work when the committed lock has drifted from a
+# workspace pyproject. It runs in `pre-flight` (after the CI image is built, before `build`/`test`)
+# so a stale lock never wastes a translation build or the whole matrix. `mb ci check-lock` wraps
+# `uv lock --check` and strips the image's UV_FROZEN so the flag performs a real up-to-date
+# comparison rather than a mere existence check.
+validate-lock:
+  stage: pre-flight
+  script:
+    - uv run mb ci check-lock
+  rules:
+    - *skip-on-tags
+    - when: on_success
+
 preparation:
   stage: build
   script:
@@ -12,10 +25,6 @@ preparation:
     - python --version
     - uv --version
     - time uv sync --frozen
-    # Guard against a stale lock: `uv sync --frozen` installs from uv.lock without checking it
-    # against pyproject.toml, so a forgotten `uv sync` after a dependency edit would pass silently.
-    # `uv lock --check` fails when the committed lock is out of date with any workspace pyproject.
-    - uv lock --check
     - uv tree
     - echo $PWD
 
