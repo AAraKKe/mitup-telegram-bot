@@ -1,6 +1,7 @@
 ---
 name: type-checking
-description: Everything about the `ty` type checker in this project — how to run it, type annotation conventions, when to prefer `cast` over `# type: ignore`, documented known-false-positives, the `check-ty-ignores` CI job, and the exact format required for `# ty: ignore[rule-name]` suppressions (including the mandatory GitHub issue URL). Use this skill whenever a `ty` error needs investigation, whenever a suppression is added/removed/reviewed, or whenever someone asks "how do I silence this type error" — even if the request is phrased as a quick task like "add a ty-ignore here". Also covers the interactive workflow for inserting a suppression on a specific file/line.
+description: >-
+  Everything about the `ty` type checker in this project — how to run it, type annotation conventions, when to prefer `cast` over `# type: ignore`, documented known-false-positives, the `check-ty-ignores` CI job, and the exact format required for `# ty: ignore[rule-name]` suppressions (including the mandatory GitHub issue URL). Use this skill whenever a `ty` error needs investigation, whenever a suppression is added/removed/reviewed, or whenever someone asks "how do I silence this type error" — even if the request is phrased as a quick task like "add a ty-ignore here". Also covers the interactive workflow for inserting a suppression on a specific file/line.
 user-invocable: true
 argument-hint: "[rule-name] [optional: file:line]"
 allowed-tools: Read, Edit, WebSearch, Bash, Grep

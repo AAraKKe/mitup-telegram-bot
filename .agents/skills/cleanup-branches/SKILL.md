@@ -1,6 +1,7 @@
 ---
 name: cleanup-branches
-description: Clean up stale local git branches whose GitLab merge request has already been merged — interactively and safely. Handles three cases: (1) the branch is in sync with its upstream and the MR is merged → delete without asking; (2) the branch has local commits that aren't on the remote but the remote MR is still merged → surface each one individually and ask the user to keep / rebase / delete; (3) the branch has no upstream or no MR → skip and report. Use this skill whenever the user asks to "clean up branches", "delete old branches", "prune merged branches", "tidy the repo", or reports that they have too many stale branches lying around. It never force-deletes, never touches `main`/`release`/the currently-checked-out branch, and never pushes anything.
+description: >-
+  Clean up stale local git branches whose GitLab merge request has already been merged — interactively and safely. Handles three cases: (1) the branch is in sync with its upstream and the MR is merged → delete without asking; (2) the branch has local commits that aren't on the remote but the remote MR is still merged → surface each one individually and ask the user to keep / rebase / delete; (3) the branch has no upstream or no MR → skip and report. Use this skill whenever the user asks to "clean up branches", "delete old branches", "prune merged branches", "tidy the repo", or reports that they have too many stale branches lying around. It never force-deletes, never touches `main`/`release`/the currently-checked-out branch, and never pushes anything.
 user-invocable: true
 argument-hint: "[no args needed — operates on the current repo]"
 allowed-tools: Bash, AskUserQuestion
