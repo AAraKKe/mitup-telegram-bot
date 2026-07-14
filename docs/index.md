@@ -4,6 +4,16 @@ hide:
     - toc
 ---
 
+<!-- Home-page latest-news strip, full-width above the hero. Hand-edited pointer to the
+     newest post: update the title, href, and data-published (ISO date) together when a
+     new post ships. assets/javascripts/news-banner.js hides this 14 days after
+     data-published. -->
+<div class="news-banner news-topbar" data-published="2026-07-14" markdown>
+
+[:fontawesome-solid-bullhorn: **New** · Lorem ipsum dolor sit amet · Read the post →](news/sample-post.md)
+
+</div>
+
 <section class="hero" markdown>
 
 <span class="eyebrow"><span class="dot"></span> Online · serving thousands of groups</span>

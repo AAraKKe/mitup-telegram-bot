@@ -7,6 +7,9 @@ extra_css = [
   "assets/stylesheets/main.css",
   "assets/stylesheets/mitup-components.css",
 ]
+extra_javascript = [
+  "assets/javascripts/news-banner.js",
+]
 
 nav = [
   { "Home" = "index.md" },
@@ -45,6 +48,10 @@ nav = [
       { "Logging" = "contribute/logging.md" },
       { "Commit format" = "contribute/commit_message_format.md" },
     ] },
+  ] },
+  { "News" = [
+    { "What's new" = "news/index.md" },
+    { "Lorem ipsum dolor sit amet" = "news/sample-post.md" },
   ] },
 ]
 

@@ -777,11 +777,68 @@ html, body {
   }
 }
 
+/* ─── News ─────────────────────────────────────────────────── */
+/* Date line under a post title */
+.md-typeset .news-meta {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: -0.4rem 0 1.8rem;
+}
+
+/* Date chip inside a news card on the landing grid */
+.md-typeset .grid.cards .news-card__date {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--blue-deep);
+  margin-bottom: 0.4rem;
+}
+
+/* Home-page latest-news strip: the hand-edited pointer to the newest post under
+   docs/news/, full-width above the hero. assets/javascripts/news-banner.js hides it
+   14 days past its data-published date. */
+.md-typeset .news-banner.is-expired {
+  display: none;
+}
+
+.md-typeset .news-topbar {
+  margin: -2.6rem -2rem 2.4rem;
+  padding: 0.8rem 1rem;
+  background: var(--blue-soft);
+  border-bottom: 2px solid var(--yellow);
+  text-align: center;
+}
+@media (min-width: 1220px) {
+  .md-typeset .news-topbar { margin-left: calc(-50vw + 50%); margin-right: calc(-50vw + 50%); }
+}
+.md-typeset .news-topbar p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.md-typeset .news-topbar a {
+  color: var(--blue-deep);
+  font-weight: 600;
+}
+.md-typeset .news-topbar a:hover {
+  color: var(--ink);
+}
+
 /* Mobile fallbacks */
 @media (max-width: 768px) {
   .hero { padding: 1.5rem 1rem; }
   .hero h1 { font-size: 2rem !important; }
   .hero p { font-size: 0.95rem; }
+  .news-topbar { padding: 0.65rem 0.75rem; }
+  .news-topbar p { font-size: 0.82rem; }
   .demo-section { padding: 2rem 0.5rem; margin: 2rem -1rem; }
   .demo-title { font-size: 1.5rem !important; }
   .demo-frame { height: 620px; border-radius: 14px; }
