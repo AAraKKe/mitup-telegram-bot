@@ -10,6 +10,7 @@ from . import console, runner
 DEFAULT_BRANCH = "main"
 FIRST_VERSION = (0, 1, 0)
 VERSION_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)$")
+MERGE_REQUEST_REF_RE = re.compile(r"!(\d+)")
 PIPELINES_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines"
 PIPELINE_POLL_INTERVAL_SECONDS = 3
 PIPELINE_POLL_ATTEMPTS = 20
@@ -24,6 +25,17 @@ class Pipeline(BaseModel):
 
 
 PipelineList = TypeAdapter(list[Pipeline])
+
+
+class MergeRequest(BaseModel):
+    title: str
+
+
+class Milestone(BaseModel):
+    title: str
+
+
+MilestoneList = TypeAdapter(list[Milestone])
 
 
 def git_capture(*args: str) -> str:
@@ -104,14 +116,23 @@ def latest_version() -> Version | None:
 def next_version(current: Version | None, bump: str) -> Version:
     if current is None:
         return FIRST_VERSION
-    major, minor, patch = current
-    match bump:
-        case "major":
-            return (major + 1, 0, 0)
-        case "minor":
-            return (major, minor + 1, 0)
-        case _:
-            return (major, minor, patch + 1)
+    major, minor, _ = current
+    if bump == "major":
+        return (major + 1, 0, 0)
+    return (major, minor + 1, 0)
+
+
+def second_next_version(version: Version, bump: str) -> Version:
+    """Version two releases ahead of *version* in the bumped dimension — the runway milestone to open.
+
+    The very next release always has a milestone already, so opening the one two ahead keeps a
+    spare bucket for issues at all times (releasing v0.2.0 as a minor opens v0.4.0; a major opens
+    two majors out).
+    """
+    major, minor, _ = version
+    if bump == "major":
+        return (major + 2, 0, 0)
+    return (major, minor + 2, 0)
 
 
 def format_version(version: Version) -> str:
@@ -126,11 +147,87 @@ def create_and_push_tag(version: str, sha: str):
         raise typer.Abort()
 
 
+def merge_request_ids(previous_tag: str | None, sha: str) -> list[int]:
+    """MR IIDs referenced by the commits shipping in this release, newest first, without duplicates.
+
+    Squash and merge commits carry their MR as a `!123` reference, so the range `previous_tag..sha`
+    (all of `sha`'s history when there is no previous tag) yields exactly what changed since the
+    last release.
+    """
+    revision_range = f"{previous_tag}..{sha}" if previous_tag else sha
+    log = git_capture("log", "--format=%B", revision_range)
+    ids: list[int] = []
+    for match in MERGE_REQUEST_REF_RE.finditer(log):
+        iid = int(match[1])
+        if iid not in ids:
+            ids.append(iid)
+    return ids
+
+
+def merge_request_title(iid: int) -> str | None:
+    """Title of merge request *iid* via the GitLab API, or None when the lookup fails."""
+    exit_code, output = runner.run_quiet(["glab", "api", f"projects/:id/merge_requests/{iid}"])
+    if exit_code != 0:
+        return None
+    try:
+        return MergeRequest.model_validate_json(output).title
+    except ValidationError:
+        return None
+
+
+def build_release_notes(previous_tag: str | None, sha: str) -> str:
+    """Changelog body listing every merge request that shipped since *previous_tag* as `[!IID] title`."""
+    lines = [
+        f"- [!{iid}] {title}" for iid in merge_request_ids(previous_tag, sha) if (title := merge_request_title(iid))
+    ]
+    return "\n".join(lines)
+
+
+def milestone_exists(title: str) -> bool:
+    """Whether a project milestone titled *title* already exists (False when the query cannot answer)."""
+    exit_code, output = runner.run_quiet(["glab", "api", f"projects/:id/milestones?title={title}"])
+    if exit_code != 0:
+        return False
+    try:
+        return bool(MilestoneList.validate_json(output))
+    except ValidationError:
+        return False
+
+
+def ensure_milestone(title: str) -> bool:
+    """Open the project milestone *title* if it is missing; return whether it exists afterward.
+
+    A creation failure is non-fatal: it returns False so the caller can carry on without the
+    milestone rather than let a broken `glab` invocation sink the release.
+    """
+    if milestone_exists(title):
+        console.info(f"Milestone {title} already exists")
+        return True
+    if runner.run_step(f"Opening milestone {title}", ["glab", "milestone", "create", "--title", title]) != 0:
+        console.warn(f"Could not open milestone {title}; create it manually if needed.")
+        return False
+    return True
+
+
+def create_release(version: str, notes: str, milestone: str | None):
+    """Publish a GitLab release for *version*, titled with the tag and milestoned when *milestone* is set.
+
+    Runs after the tag is pushed, so a failure is non-fatal: the tag and its deploy pipeline
+    already stand, and the release can be cut by hand from the existing tag if this step fails.
+    Passing no milestone (because it could not be opened) still publishes the release, just unlinked.
+    """
+    args = ["glab", "release", "create", version, "--name", version, "--notes", notes]
+    if milestone is not None:
+        args += ["--milestone", milestone]
+    if runner.run_step(f"Creating release {version}", args) != 0:
+        console.warn(f"Could not create the GitLab release for {version}; the tag is pushed, so create it manually.")
+
+
 def release_command(
-    minor: Annotated[bool, typer.Option("--minor", help="Bump the minor version instead of the patch.")] = False,
-    major: Annotated[bool, typer.Option("--major", help="Bump the major version instead of the patch.")] = False,
+    minor: Annotated[bool, typer.Option("--minor", help="Bump the minor version (the default).")] = False,
+    major: Annotated[bool, typer.Option("--major", help="Bump the major version instead of the minor.")] = False,
 ):
-    """Tag origin/main's green tip as a `v*` release and push it to trigger the deploy pipeline.
+    """Tag origin/main's green tip as a `v*` release, publish it with notes, and open the runway milestone.
 
     Reads nothing from the local checkout: the release always ships the freshest origin/main
     commit, so a dirty tree, untracked files, or a feature branch never block or influence it.
@@ -143,10 +240,17 @@ def release_command(
     sha = git_capture("rev-parse", f"origin/{DEFAULT_BRANCH}")
     ensure_pipeline_is_green(sha)
 
-    bump = "major" if major else "minor" if minor else "patch"
-    version = format_version(next_version(latest_version(), bump))
+    bump = "major" if major else "minor"
+    previous = latest_version()
+    previous_tag = format_version(previous) if previous else None
+    released = next_version(previous, bump)
+    version = format_version(released)
 
     create_and_push_tag(version, sha)
+
+    ensure_milestone(format_version(second_next_version(released, bump)))
+    milestone = version if ensure_milestone(version) else None
+    create_release(version, build_release_notes(previous_tag, sha), milestone)
 
     console.success(f"Released {version}")
     with console.spinner("Waiting for the deploy pipeline to start"):
