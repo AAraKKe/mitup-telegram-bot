@@ -179,6 +179,25 @@ def test_release_reports_success_even_when_the_release_publish_fails(recorder: C
     assert "Released v1.3.0" in result.output
 
 
+def test_release_waits_for_the_tag_before_publishing(recorder: CommandRecorder):
+    green_repo(recorder)
+
+    cli.invoke(app, ["release"])
+
+    assert ["glab", "api", "projects/:id/repository/tags/v1.3.0"] in recorder.commands
+
+
+def test_release_warns_but_still_publishes_when_the_tag_never_registers(recorder: CommandRecorder):
+    green_repo(recorder)
+    recorder.exit_codes["repository/tags/"] = 1  # the API never reports the pushed tag
+
+    result = cli.invoke(app, ["release"])
+
+    assert result.exit_code == 0
+    assert "is not visible via the API yet" in result.output
+    assert release_create_call(recorder)  # the release is still attempted rather than aborted
+
+
 def test_merge_request_title_is_none_on_an_unparseable_response(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (0, "not-json"))
 
@@ -300,6 +319,21 @@ def test_pipeline_url_for_ref_retries_past_a_failed_or_unparseable_poll(monkeypa
     monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.pipeline_url_for_ref("v1.2.4") == "https://x/5"
+
+
+def test_wait_for_tag_returns_true_once_the_tag_registers(monkeypatch: pytest.MonkeyPatch):
+    responses = iter([(1, "404"), (0, json.dumps({"name": "v1.2.4"}))])
+    monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: next(responses))
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+    assert release.wait_for_tag("v1.2.4") is True
+
+
+def test_wait_for_tag_gives_up_after_the_poll_budget(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (1, "404"))
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+    assert release.wait_for_tag("v1.2.4") is False
 
 
 @pytest.mark.parametrize(

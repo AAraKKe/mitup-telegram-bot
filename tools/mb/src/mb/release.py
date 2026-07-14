@@ -14,6 +14,8 @@ MERGE_REQUEST_REF_RE = re.compile(r"!(\d+)")
 PIPELINES_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines"
 PIPELINE_POLL_INTERVAL_SECONDS = 3
 PIPELINE_POLL_ATTEMPTS = 20
+TAG_POLL_INTERVAL_SECONDS = 2
+TAG_POLL_ATTEMPTS = 15
 
 Version = tuple[int, int, int]
 
@@ -147,6 +149,23 @@ def create_and_push_tag(version: str, sha: str):
         raise typer.Abort()
 
 
+def wait_for_tag(version: str) -> bool:
+    """Poll until the pushed tag is visible to the REST API, returning whether it appeared in time.
+
+    `git push` and the API are eventually consistent. Cutting the release before the API sees the
+    tag makes `glab release create` assume it is missing, default its ref to the branch tip, and
+    ask GitLab to create the tag — which the protected `v*` pattern rejects with a 403. Waiting for
+    the tag to register keeps the release attached to the tag we already pushed.
+    """
+    for attempt in range(TAG_POLL_ATTEMPTS):
+        exit_code, _ = runner.run_quiet(["glab", "api", f"projects/:id/repository/tags/{version}"])
+        if exit_code == 0:
+            return True
+        if attempt < TAG_POLL_ATTEMPTS - 1:
+            time.sleep(TAG_POLL_INTERVAL_SECONDS)
+    return False
+
+
 def merge_request_ids(previous_tag: str | None, sha: str) -> list[int]:
     """MR IIDs referenced by the commits shipping in this release, newest first, without duplicates.
 
@@ -250,6 +269,10 @@ def release_command(
 
     ensure_milestone(format_version(second_next_version(released, bump)))
     milestone = version if ensure_milestone(version) else None
+    with console.spinner("Waiting for the tag to register"):
+        tag_visible = wait_for_tag(version)
+    if not tag_visible:
+        console.warn(f"Tag {version} is not visible via the API yet; the release may fail to attach.")
     create_release(version, build_release_notes(previous_tag, sha), milestone)
 
     console.success(f"Released {version}")
