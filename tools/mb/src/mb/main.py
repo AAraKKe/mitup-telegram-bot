@@ -70,20 +70,40 @@ def typecheck():
 
 @app.command()
 def deploy(
-    migrations_image: Annotated[str, typer.Option("--migrations-image", help="Uri of the migrations lambda image.")],
-    bot_image: Annotated[str, typer.Option("--bot-image", help="Uri of the bot image pushed to ECR.")],
+    migrations_image: Annotated[
+        str | None, typer.Option("--migrations-image", help="Uri of the migrations lambda image.")
+    ] = None,
+    bot_image: Annotated[str | None, typer.Option("--bot-image", help="Uri of the bot image pushed to ECR.")] = None,
     alarm_action_image: Annotated[
-        str, typer.Option("--alarm-action-image", help="Uri of the alarm action lambda image.")
-    ],
+        str | None, typer.Option("--alarm-action-image", help="Uri of the alarm action lambda image.")
+    ] = None,
     events_image: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--events-image",
             help="Uri of the recurrent-events image — the only image carrying the `mitup recurrent-events` command.",
         ),
-    ],
+    ] = None,
+    refresh: Annotated[
+        bool,
+        typer.Option(
+            "--refresh",
+            help="Redeploy both ECS services onto their latest registered task definition without building a new "
+            "one or running migrations — use to pick up an infra/task-definition change.",
+        ),
+    ] = False,
 ):
     """Deploy the bot: update the lambdas and roll out the ECS services."""
+    if refresh:
+        deploy_ops.refresh()
+        return
+
+    if migrations_image is None or bot_image is None or alarm_action_image is None or events_image is None:
+        console.error(
+            "--migrations-image, --bot-image, --alarm-action-image and --events-image are all required unless --refresh"
+        )
+        raise typer.Abort()
+
     deploy_ops.deploy(migrations_image, bot_image, alarm_action_image, events_image)
 
 

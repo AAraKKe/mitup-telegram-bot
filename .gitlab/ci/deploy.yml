@@ -30,3 +30,24 @@ deploy:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     - if: $CI_COMMIT_TAG =~ /^v/
+
+## -------------- Refresh ---------------
+# Manual button on the default-branch pipeline: re-rolls both ECS services onto their latest
+# registered task definition (e.g. after an infra apply) without building images or migrating.
+# `environment: production` is required — it is what makes the GitLab OIDC token carry the
+# `environment`/`environment_protected` claims the infra OIDC trust keys on, so production must be a
+# GitLab Protected Environment for the trust to grant access. No image tags, so no deploy-config dep.
+deploy:refresh:
+  stage: deploy
+  id_tokens:
+    OIDC_TOKEN:
+      aud: mitup-gitlab-ci-service
+  resource_group: deploy
+  environment:
+    name: production
+  script:
+    - !reference [.aws-prep]
+    - uv run mb deploy --refresh
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual

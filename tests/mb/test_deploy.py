@@ -360,7 +360,9 @@ def test_update_ecs_service_succeeds(capsys: pytest.CaptureFixture[str]):
     with context.setup_mock() as (function, ecs):
         deploy_ops.update_ecs_service(ecs, "MyTask", "MyService", "MyCluster")
 
-    context.assert_ecs_called("update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask")
+    context.assert_ecs_called(
+        "update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask", forceNewDeployment=False
+    )
     assert "✓ ECS service 'MyService' has been updated" in combined(capsys)
 
 
@@ -371,8 +373,22 @@ def test_update_ecs_service_fails(capsys: pytest.CaptureFixture[str]):
         with pytest.raises(typer.Abort):
             deploy_ops.update_ecs_service(ecs, "MyTask", "MyService", "MyCluster")
 
-    context.assert_ecs_called("update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask")
+    context.assert_ecs_called(
+        "update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask", forceNewDeployment=False
+    )
     assert "✗ Error updating ECS service 'MyService'. StatusCode: 404" in combined(capsys)
+
+
+def test_update_ecs_service_forces_new_deployment(capsys: pytest.CaptureFixture[str]):
+    context = DeploymentContext(update_ecs_responses=[{"ResponseMetadata": {"HTTPStatusCode": 200}}])
+
+    with context.setup_mock() as (function, ecs):
+        deploy_ops.update_ecs_service(ecs, "MyTask", "MyService", "MyCluster", force_new_deployment=True)
+
+    context.assert_ecs_called(
+        "update_service", cluster="MyCluster", service="MyService", taskDefinition="MyTask", forceNewDeployment=True
+    )
+    assert "✓ ECS service 'MyService' has been updated" in combined(capsys)
 
 
 def test_find_service_deployment_arn_found_on_first_attempt(mock_time: mock.MagicMock):
@@ -540,11 +556,10 @@ def test_deployment_reached_terminal_state_aborts_without_status(capsys: pytest.
     assert "✗ Failed to get the status of the deployment for ECS service 'MyService'" in combined(capsys)
 
 
-def test_waiting_for_deployment_succeeds_and_suppresses_duplicate_progress(
+def test_wait_for_deployments_succeeds_and_suppresses_duplicate_progress(
     mock_time: mock.MagicMock, capsys: pytest.CaptureFixture[str]
 ):
     context = DeploymentContext(
-        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
         describe_deployments_responses=[
             deployments_response(service_deployment(status="IN_PROGRESS")),
             deployments_response(service_deployment(status="IN_PROGRESS")),
@@ -553,9 +568,10 @@ def test_waiting_for_deployment_succeeds_and_suppresses_duplicate_progress(
     )
 
     with context.setup_mock() as (function, ecs):
-        deploy_ops.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+        deploy_ops.wait_for_deployments(ecs, {"MyService": "MyDeploymentArn"})
 
     context.assert_ecs_called("describe_service_deployments", n=3, serviceDeploymentArns=["MyDeploymentArn"])
+    context.ecs_client.list_service_deployments.assert_not_called()
     output = combined(capsys)
     # The two identical IN_PROGRESS polls collapse into a single progress line.
     assert output.count("Deployment IN_PROGRESS") == 1
@@ -564,9 +580,8 @@ def test_waiting_for_deployment_succeeds_and_suppresses_duplicate_progress(
     mock_time.sleep.assert_called_with(10)
 
 
-def test_waiting_for_deployment_prints_progress_on_each_transition(capsys: pytest.CaptureFixture[str]):
+def test_wait_for_deployments_prints_progress_on_each_transition(capsys: pytest.CaptureFixture[str]):
     context = DeploymentContext(
-        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
         describe_deployments_responses=[
             deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="DEPLOY_SERVICE")),
             deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="BAKE_TIME")),
@@ -575,7 +590,7 @@ def test_waiting_for_deployment_prints_progress_on_each_transition(capsys: pytes
     )
 
     with context.setup_mock() as (function, ecs):
-        deploy_ops.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+        deploy_ops.wait_for_deployments(ecs, {"MyService": "MyDeploymentArn"})
 
     output = combined(capsys)
     assert "Deployment IN_PROGRESS · stage DEPLOY_SERVICE" in output
@@ -583,11 +598,10 @@ def test_waiting_for_deployment_prints_progress_on_each_transition(capsys: pytes
     assert "Deployment SUCCESSFUL" in output
 
 
-def test_waiting_for_deployment_prints_heartbeat_when_progress_is_unchanged(
+def test_wait_for_deployments_prints_heartbeat_when_progress_is_unchanged(
     mock_time: mock.MagicMock, capsys: pytest.CaptureFixture[str]
 ):
     context = DeploymentContext(
-        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
         describe_deployments_responses=[
             deployments_response(service_deployment(status="IN_PROGRESS")),
             deployments_response(service_deployment(status="IN_PROGRESS")),
@@ -597,14 +611,13 @@ def test_waiting_for_deployment_prints_heartbeat_when_progress_is_unchanged(
     mock_time.monotonic.side_effect = [0.0, 61.0, 61.0]
 
     with context.setup_mock() as (function, ecs):
-        deploy_ops.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+        deploy_ops.wait_for_deployments(ecs, {"MyService": "MyDeploymentArn"})
 
     assert combined(capsys).count("Deployment IN_PROGRESS") == 2
 
 
-def test_waiting_for_deployment_polls_through_rollback_and_aborts_on_final_outcome(capsys: pytest.CaptureFixture[str]):
+def test_wait_for_deployments_polls_through_rollback_and_aborts_on_final_outcome(capsys: pytest.CaptureFixture[str]):
     context = DeploymentContext(
-        list_deployments_responses=[deployments_response(service_deployment(serviceDeploymentArn="MyDeploymentArn"))],
         describe_deployments_responses=[
             deployments_response(service_deployment(status="IN_PROGRESS")),
             deployments_response(service_deployment(status="ROLLBACK_IN_PROGRESS")),
@@ -614,7 +627,7 @@ def test_waiting_for_deployment_polls_through_rollback_and_aborts_on_final_outco
 
     with context.setup_mock() as (function, ecs):
         with pytest.raises(typer.Abort):
-            deploy_ops.waiting_for_deployment_to_finish(ecs, cluster="MyCluster", service="MyService")
+            deploy_ops.wait_for_deployments(ecs, {"MyService": "MyDeploymentArn"})
 
     context.assert_ecs_called("describe_service_deployments", n=3, serviceDeploymentArns=["MyDeploymentArn"])
     output = combined(capsys)
@@ -622,23 +635,88 @@ def test_waiting_for_deployment_polls_through_rollback_and_aborts_on_final_outco
     assert "✗ Deployment of ECS service 'MyService' ended as ROLLBACK_SUCCESSFUL: Circuit breaker" in output
 
 
-def test_command_deploys_each_service_with_its_registered_task_definition():
-    # The recurrent-events service rolls onto its own events image, never the bot image.
+def test_wait_for_deployments_polls_every_service_each_round(capsys: pytest.CaptureFixture[str]):
+    # mitup succeeds first; events keeps being polled until it succeeds a round later.
+    context = DeploymentContext(
+        describe_deployments_responses=[
+            deployments_response(service_deployment(status="IN_PROGRESS")),  # round 1: mitup
+            deployments_response(service_deployment(status="IN_PROGRESS")),  # round 1: events
+            deployments_response(service_deployment(status="SUCCESSFUL")),  # round 2: mitup
+            deployments_response(service_deployment(status="IN_PROGRESS")),  # round 2: events
+            deployments_response(service_deployment(status="SUCCESSFUL")),  # round 3: events only
+        ],
+    )
+
+    with context.setup_mock() as (function, ecs):
+        deploy_ops.wait_for_deployments(ecs, {"mitup": "MitupArn", "mitup-recurrent-events": "EventsArn"})
+
+    # 2 + 2 + 1 polls; the last round only re-polls events, which is still in flight after mitup ends.
+    context.assert_ecs_called("describe_service_deployments", n=5, serviceDeploymentArns=["EventsArn"])
+    output = combined(capsys)
+    assert "mitup: Deployment IN_PROGRESS" in output
+    assert "mitup-recurrent-events: Deployment IN_PROGRESS" in output
+    assert "✓ ECS service 'mitup' successfully deployed!" in output
+    assert "✓ ECS service 'mitup-recurrent-events' successfully deployed!" in output
+    # Events progress is visible before mitup finishes — the whole point of polling both together.
+    assert output.index("mitup-recurrent-events: Deployment IN_PROGRESS") < output.index(
+        "✓ ECS service 'mitup' successfully deployed!"
+    )
+
+
+def test_start_ecs_deployment_registers_updates_and_returns_arn():
+    with (
+        mock.patch("mb.deploy_ops.register_task_definition") as register_task_definition,
+        mock.patch("mb.deploy_ops.update_ecs_service") as update_ecs_service,
+        mock.patch("mb.deploy_ops.find_service_deployment_arn") as find_service_deployment_arn,
+    ):
+        register_task_definition.return_value = "MyTaskArn"
+        find_service_deployment_arn.return_value = "MyDeploymentArn"
+        ecs = mock.MagicMock(spec=ECSClient)
+
+        result = deploy_ops.start_ecs_deployment(ecs, "mitup", "bot_image:latest")
+
+    assert result == "MyDeploymentArn"
+    register_task_definition.assert_called_once_with(ecs, "mitup", "bot_image:latest")
+    update_ecs_service.assert_called_once_with(ecs, "MyTaskArn", service="mitup", cluster="mitup")
+    find_service_deployment_arn.assert_called_once_with(ecs, cluster="mitup", service="mitup")
+
+
+def test_start_ecs_refresh_forces_new_deployment_without_registering():
+    with (
+        mock.patch("mb.deploy_ops.register_task_definition") as register_task_definition,
+        mock.patch("mb.deploy_ops.update_ecs_service") as update_ecs_service,
+        mock.patch("mb.deploy_ops.find_service_deployment_arn") as find_service_deployment_arn,
+    ):
+        find_service_deployment_arn.return_value = "MyDeploymentArn"
+        ecs = mock.MagicMock(spec=ECSClient)
+
+        result = deploy_ops.start_ecs_refresh(ecs, "mitup")
+
+    assert result == "MyDeploymentArn"
+    register_task_definition.assert_not_called()
+    # The family name equals the service name; ECS resolves it to the latest ACTIVE revision.
+    update_ecs_service.assert_called_once_with(
+        ecs, "mitup", service="mitup", cluster="mitup", force_new_deployment=True
+    )
+    find_service_deployment_arn.assert_called_once_with(ecs, cluster="mitup", service="mitup")
+
+
+def test_command_starts_both_services_before_waiting():
+    # The recurrent-events service rolls onto its own events image, never the bot image. Both roll-outs
+    # start before either wait so their bake windows overlap for the cross-gated rollback alarms.
     with (
         mock.patch("mb.deploy_ops.update_lambda_code") as update_lambda_code,
         mock.patch("mb.deploy_ops.invoke_lambda") as invoke_lambda,
-        mock.patch("mb.deploy_ops.register_task_definition") as register_task_definition,
-        mock.patch("mb.deploy_ops.update_ecs_service") as update_ecs_service,
-        mock.patch("mb.deploy_ops.waiting_for_deployment_to_finish") as waiting_for_deployment_to_finish,
+        mock.patch("mb.deploy_ops.start_ecs_deployment") as start_ecs_deployment,
+        mock.patch("mb.deploy_ops.wait_for_deployments") as wait_for_deployments,
     ):
-        register_task_definition.side_effect = ["MitupTaskArn", "RecurrentEventsTaskArn"]
+        start_ecs_deployment.side_effect = ["MitupDeploymentArn", "RecurrentEventsDeploymentArn"]
 
         manager = mock.MagicMock()
         manager.attach_mock(update_lambda_code, "update_lambda_code")
         manager.attach_mock(invoke_lambda, "invoke_lambda")
-        manager.attach_mock(register_task_definition, "register_task_definition")
-        manager.attach_mock(update_ecs_service, "update_ecs_service")
-        manager.attach_mock(waiting_for_deployment_to_finish, "waiting_for_deployment_to_finish")
+        manager.attach_mock(start_ecs_deployment, "start_ecs_deployment")
+        manager.attach_mock(wait_for_deployments, "wait_for_deployments")
 
         with DeploymentContext().setup_mock() as (function, ecs):
             result = cli.invoke(
@@ -661,41 +739,79 @@ def test_command_deploys_each_service_with_its_registered_task_definition():
             mock.call.update_lambda_code(function, "MitupMigrationsLambda", "migrations_image:latest"),
             mock.call.invoke_lambda(function, "MitupMigrationsLambda"),
             mock.call.update_lambda_code(function, "MitupAlarmActionLambda", "alarm_action_image:latest"),
-            mock.call.register_task_definition(ecs, "mitup", "bot_image:latest"),
-            mock.call.update_ecs_service(ecs, "MitupTaskArn", service="mitup", cluster="mitup"),
-            mock.call.waiting_for_deployment_to_finish(ecs, cluster="mitup", service="mitup"),
-            mock.call.register_task_definition(ecs, "mitup-recurrent-events", "events_image:latest"),
-            mock.call.update_ecs_service(
-                ecs, "RecurrentEventsTaskArn", service="mitup-recurrent-events", cluster="mitup-recurrent-events"
-            ),
-            mock.call.waiting_for_deployment_to_finish(
-                ecs, cluster="mitup-recurrent-events", service="mitup-recurrent-events"
+            mock.call.start_ecs_deployment(ecs, "mitup", "bot_image:latest"),
+            mock.call.start_ecs_deployment(ecs, "mitup-recurrent-events", "events_image:latest"),
+            mock.call.wait_for_deployments(
+                ecs, {"mitup": "MitupDeploymentArn", "mitup-recurrent-events": "RecurrentEventsDeploymentArn"}
             ),
         ]
+
+
+def test_command_refresh_starts_both_services_before_waiting():
+    with (
+        mock.patch("mb.deploy_ops.start_ecs_refresh") as start_ecs_refresh,
+        mock.patch("mb.deploy_ops.wait_for_deployments") as wait_for_deployments,
+    ):
+        start_ecs_refresh.side_effect = ["MitupDeploymentArn", "RecurrentEventsDeploymentArn"]
+
+        manager = mock.MagicMock()
+        manager.attach_mock(start_ecs_refresh, "start_ecs_refresh")
+        manager.attach_mock(wait_for_deployments, "wait_for_deployments")
+
+        with DeploymentContext().setup_mock() as (function, ecs):
+            result = cli.invoke(app, ["deploy", "--refresh"])
+
+        assert result.exit_code == 0, result.output
+        assert manager.mock_calls == [
+            mock.call.start_ecs_refresh(ecs, "mitup"),
+            mock.call.start_ecs_refresh(ecs, "mitup-recurrent-events"),
+            mock.call.wait_for_deployments(
+                ecs, {"mitup": "MitupDeploymentArn", "mitup-recurrent-events": "RecurrentEventsDeploymentArn"}
+            ),
+        ]
+
+
+def test_command_refresh_skips_migrations_and_images():
+    with (
+        mock.patch("mb.deploy_ops.refresh") as refresh,
+        mock.patch("mb.deploy_ops.deploy") as deploy,
+    ):
+        result = cli.invoke(app, ["deploy", "--refresh"])
+
+    assert result.exit_code == 0, result.output
+    refresh.assert_called_once_with()
+    deploy.assert_not_called()
+
+
+def test_command_aborts_when_images_missing_without_refresh():
+    with (
+        mock.patch("mb.deploy_ops.refresh") as refresh,
+        mock.patch("mb.deploy_ops.deploy") as deploy,
+    ):
+        result = cli.invoke(app, ["deploy", "--bot-image", "bot_image:latest"])
+
+    assert result.exit_code != 0
+    refresh.assert_not_called()
+    deploy.assert_not_called()
+    assert "required unless --refresh" in result.output
 
 
 @pytest.mark.parametrize(
     "side_effects,number_of_calls,exit_code",
     [
-        [(typer.Abort, None, [None, None], [None, None], [None, None]), (1, 0, 0, 0, 0), 1],
-        [(None, typer.Abort, [None, None], [None, None], [None, None]), (1, 1, 0, 0, 0), 1],
-        [(None, None, [typer.Abort, None], [None, None], [None, None]), (2, 1, 1, 0, 0), 1],
-        [(None, None, [None, None], [typer.Abort, None], [None, None]), (2, 1, 1, 1, 0), 1],
-        [(None, None, [None, None], [None, None], [typer.Abort, None]), (2, 1, 1, 1, 1), 1],
-        [(None, None, [None, typer.Abort], [None, None], [None, None]), (2, 1, 2, 1, 1), 1],
-        [(None, None, [None, None], [None, typer.Abort], [None, None]), (2, 1, 2, 2, 1), 1],
-        [(None, None, [None, None], [None, None], [None, typer.Abort]), (2, 1, 2, 2, 2), 1],
-        [(None, None, [None, None], [None, None], [None, None]), (2, 1, 2, 2, 2), 0],
+        [(typer.Abort, None, [None, None], None), (1, 0, 0, 0), 1],
+        [(None, typer.Abort, [None, None], None), (1, 1, 0, 0), 1],
+        [(None, None, [typer.Abort, None], None), (2, 1, 1, 0), 1],
+        [(None, None, [None, typer.Abort], None), (2, 1, 2, 0), 1],
+        [(None, None, [None, None], typer.Abort), (2, 1, 2, 1), 1],
+        [(None, None, [None, None], None), (2, 1, 2, 1), 0],
     ],
     ids=[
         "fail_on_update_migrations_lambda",
         "fail_on_invoke_lambda",
-        "fail_on_register_task_definition",
-        "fail_on_update_ecs_service",
-        "fail_on_waiting_for_deployment",
-        "fail_on_register_recurrent_events_task",
-        "fail_on_update_events_service",
-        "fail_on_waiting_for_events_deployment",
+        "fail_on_start_bot_deployment",
+        "fail_on_start_events_deployment",
+        "fail_on_wait_for_deployments",
         "all_successful",
     ],
 )
@@ -705,15 +821,13 @@ def test_command_chain_is_not_broken(
     with (
         mock.patch("mb.deploy_ops.update_lambda_code") as update_lambda_code,
         mock.patch("mb.deploy_ops.invoke_lambda") as invoke_lambda,
-        mock.patch("mb.deploy_ops.register_task_definition") as register_task_definition,
-        mock.patch("mb.deploy_ops.update_ecs_service") as update_ecs_service,
-        mock.patch("mb.deploy_ops.waiting_for_deployment_to_finish") as waiting_for_deployment_to_finish,
+        mock.patch("mb.deploy_ops.start_ecs_deployment") as start_ecs_deployment,
+        mock.patch("mb.deploy_ops.wait_for_deployments") as wait_for_deployments,
     ):
         update_lambda_code.side_effect = side_effects[0]
         invoke_lambda.side_effect = side_effects[1]
-        register_task_definition.side_effect = side_effects[2]
-        update_ecs_service.side_effect = side_effects[3]
-        waiting_for_deployment_to_finish.side_effect = side_effects[4]
+        start_ecs_deployment.side_effect = side_effects[2]
+        wait_for_deployments.side_effect = side_effects[3]
 
         with DeploymentContext().setup_mock() as (func, ecs):
             result = cli.invoke(
@@ -735,6 +849,5 @@ def test_command_chain_is_not_broken(
         assert result.exit_code == exit_code, result.output
         assert len(update_lambda_code.call_args_list) == number_of_calls[0]
         assert len(invoke_lambda.call_args_list) == number_of_calls[1]
-        assert len(register_task_definition.call_args_list) == number_of_calls[2]
-        assert len(update_ecs_service.call_args_list) == number_of_calls[3]
-        assert len(waiting_for_deployment_to_finish.call_args_list) == number_of_calls[4]
+        assert len(start_ecs_deployment.call_args_list) == number_of_calls[2]
+        assert len(wait_for_deployments.call_args_list) == number_of_calls[3]

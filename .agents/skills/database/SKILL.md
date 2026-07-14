@@ -114,6 +114,14 @@ uv run mb db migrate validate   # Validate migration graph integrity
 
 When a model change needs a new migration, invoke the `new-migration` skill — it walks through scaffolding the revision file, writing `upgrade()` / `downgrade()` by hand (autogenerate is disallowed), and validating that both paths apply cleanly. Don't repeat the walkthrough here; that skill owns it.
 
+### Deploy ordering and the shared database
+
+Migrations run (`alembic upgrade head`, via the migrations Lambda) **before** the new app images roll, against the still-running previous code — and a rolled-back ECS deploy does **not** undo them, so it runs the *previous* image against the *new* schema. Every migration must therefore be backward-compatible with the currently-deployed image.
+
+The bot and the recurrent-events services share **one** database. A schema or data change must be safe for **both** at once, not just the service you happen to be editing.
+
+Breaking changes must be split across separate releases — **expand → migrate → contract**: add the new (nullable) shape, backfill, and dual-write first; switch reads/writes in a later release; drop or rename only once nothing references the old shape. Never drop or rename a column in the same release that stops using it.
+
 ## Automatic timestamps
 
 PostgreSQL triggers (`set_created_time()`, `set_updated_time()`) defined in migration `65b4c46d9141` set `CURRENT_TIMESTAMP` on insert and update respectively. Application code never assigns these fields.

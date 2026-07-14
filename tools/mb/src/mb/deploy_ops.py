@@ -125,12 +125,15 @@ def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> 
     return arn
 
 
-def update_ecs_service(ecs_client: ECSClient, task_definition: str, service: str, cluster: str):
+def update_ecs_service(
+    ecs_client: ECSClient, task_definition: str, service: str, cluster: str, *, force_new_deployment: bool = False
+):
     console.info(f"Updating ECS service {service!r}...")
     response = ecs_client.update_service(
         cluster=cluster,
         service=service,
         taskDefinition=task_definition,
+        forceNewDeployment=force_new_deployment,
     )
 
     status_code = response["ResponseMetadata"]["HTTPStatusCode"]
@@ -217,34 +220,59 @@ def deployment_reached_terminal_state(deployment: ServiceDeploymentTypeDef, serv
     return False
 
 
-def waiting_for_deployment_to_finish(ecs_client: ECSClient, cluster: str, service: str):
-    console.info(f"Waiting for ECS service {service!r} to deploy...")
-    deployment_arn = find_service_deployment_arn(ecs_client, cluster=cluster, service=service)
+def wait_for_deployments(ecs_client: ECSClient, deployments: dict[str, str]):
+    """Poll every started deployment together, returning once all have succeeded.
 
-    last_progress: str | None = None
+    *deployments* maps each service name to its deployment ARN. Each round polls every service
+    still in flight and logs its progress (prefixed with the service, on a transition or on the
+    heartbeat so a long bake doesn't look like a hung job). A service reaching a failed terminal
+    state aborts the whole command: the services are cross-gated on the same rollback alarms, so a
+    fault in one rolls both back and there is nothing left to wait for.
+    """
+    console.info(f"Waiting for {len(deployments)} ECS deployment(s) to finish...")
+    pending = dict(deployments)  # service -> arn, drained as each service succeeds
+    last_progress: dict[str, str] = {}
     last_printed_at = 0.0
-    while True:
-        deployment = describe_service_deployment(ecs_client, deployment_arn)
-
-        # Only log transitions, plus a heartbeat so a long bake doesn't look like a hung job
-        progress = format_deployment_progress(deployment)
+    while pending:
         now = time.monotonic()
-        if progress != last_progress or now - last_printed_at >= DEPLOYMENT_HEARTBEAT_SECONDS:
-            console.info(progress)
-            last_progress = progress
+        heartbeat = now - last_printed_at >= DEPLOYMENT_HEARTBEAT_SECONDS
+        for service, deployment_arn in list(pending.items()):
+            deployment = describe_service_deployment(ecs_client, deployment_arn)
+
+            progress = f"{service}: {format_deployment_progress(deployment)}"
+            if progress != last_progress.get(service) or heartbeat:
+                console.info(progress)
+                last_progress[service] = progress
+
+            if deployment_reached_terminal_state(deployment, service):
+                del pending[service]
+
+        if heartbeat:
             last_printed_at = now
-
-        if deployment_reached_terminal_state(deployment, service):
-            return
-
-        time.sleep(DEPLOYMENT_POLL_INTERVAL_SECONDS)
+        if pending:
+            time.sleep(DEPLOYMENT_POLL_INTERVAL_SECONDS)
 
 
-def deploy_ecs_service(ecs_client: ECSClient, service: str, image: str):
-    """Roll one ECS service (which runs in a cluster named after itself) onto a new image."""
+def start_ecs_deployment(ecs_client: ECSClient, service: str, image: str) -> str:
+    """Register a new task definition, roll the service onto it, and return the deployment ARN.
+
+    Each ECS service runs in a cluster named after itself. This only starts the roll-out; the
+    caller waits on the returned ARN so several services can bake concurrently.
+    """
     task_definition_arn = register_task_definition(ecs_client, service, image)
     update_ecs_service(ecs_client, task_definition_arn, service=service, cluster=service)
-    waiting_for_deployment_to_finish(ecs_client, cluster=service, service=service)
+    return find_service_deployment_arn(ecs_client, cluster=service, service=service)
+
+
+def start_ecs_refresh(ecs_client: ECSClient, service: str) -> str:
+    """Force a new deployment onto the service's latest ACTIVE task-definition revision.
+
+    Passing the family name (which equals the service name) as the task definition lets ECS
+    resolve it to the newest ACTIVE revision, adopting a terraform-registered task definition
+    without registering a new one here. Returns the deployment ARN for the caller to wait on.
+    """
+    update_ecs_service(ecs_client, service, service=service, cluster=service, force_new_deployment=True)
+    return find_service_deployment_arn(ecs_client, cluster=service, service=service)
 
 
 def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, events_image: str):
@@ -255,7 +283,25 @@ def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, event
     invoke_lambda(lambda_client, "MitupMigrationsLambda")
     update_lambda_code(lambda_client, "MitupAlarmActionLambda", alarm_action_image)
 
-    # Each ECS service rolls onto its own image. The recurrent-events service takes the events image,
-    # never the bot image: the slim bot image doesn't carry the `mitup recurrent-events` command.
-    deploy_ecs_service(ecs_client, "mitup", bot_image)
-    deploy_ecs_service(ecs_client, "mitup-recurrent-events", events_image)
+    # Start both roll-outs before waiting so their bake windows overlap: the rollback alarms are
+    # cross-gated on both services, so a fault in either one can only roll both back while both bakes
+    # are still open. The recurrent-events service takes the events image, never the bot image: the
+    # slim bot image doesn't carry the `mitup recurrent-events` command.
+    deployments = {
+        "mitup": start_ecs_deployment(ecs_client, "mitup", bot_image),
+        "mitup-recurrent-events": start_ecs_deployment(ecs_client, "mitup-recurrent-events", events_image),
+    }
+    wait_for_deployments(ecs_client, deployments)
+
+
+def refresh():
+    """Redeploy both ECS services onto their latest registered task definition — no lambdas, no migrations."""
+    ecs_client = boto3.client("ecs", region_name="eu-west-1")
+
+    # Start both refreshes before waiting so their bake windows overlap and the cross-gated rollback
+    # alarms can react to a fault in either service while both bakes are still open.
+    deployments = {
+        "mitup": start_ecs_refresh(ecs_client, "mitup"),
+        "mitup-recurrent-events": start_ecs_refresh(ecs_client, "mitup-recurrent-events"),
+    }
+    wait_for_deployments(ecs_client, deployments)
