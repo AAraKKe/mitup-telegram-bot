@@ -118,7 +118,7 @@ coverage-report:
   script:
     - uv run coverage combine .coverage.*
     - uv run coverage xml -o coverage.xml
-    - uv run coverage report
+    - uv run coverage report --skip-covered --show-missing
   coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   artifacts:
     when: always
