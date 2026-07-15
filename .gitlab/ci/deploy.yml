@@ -51,3 +51,6 @@ deploy:refresh:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
+      # Without allow_failure, an unplayed manual job pins the pipeline status at 'manual'
+      # instead of 'success' — which blocks `mb release`, since it requires a green pipeline.
+      allow_failure: true

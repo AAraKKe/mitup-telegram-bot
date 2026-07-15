@@ -126,6 +126,14 @@ refuses to cut the tag unless `main`'s pipeline for that commit was already gree
 `GitLabCI-Service` OIDC trust is scoped to `v*` tag refs so only a tag pipeline can assume the deploy
 role.
 
+## Manual jobs on `main` must carry `allow_failure: true`
+
+An unplayed `when: manual` job without `allow_failure: true` pins its pipeline's overall status at
+`manual` instead of `success` — and `mb release` refuses to cut a tag unless the latest `main`
+pipeline reports `success`. Every manual job on default-branch pipelines (`deploy:refresh`,
+`build-docker-ci`'s fallback rule) therefore sets `allow_failure: true` on the manual rule. Apply
+the same to any new manual job.
+
 ## Commit-title deploy switch
 
 The push and deploy jobs read the tagged commit's title:
@@ -146,7 +154,9 @@ one.
 `v*` tag** — the tag trigger is required because `push-docs` runs on the tag and depends on the
 `build-docs` artifact. `push-docs` (stage `documentation`, `uv run mb docs publish`) syncs the built
 `site/` to S3 and invalidates CloudFront — **after** the deploy, so docs never describe a bot that
-has not rolled out yet. `publish_docs_manual` is an on-demand default-branch job.
+has not rolled out yet. There is no out-of-band docs publish job: docs go live with the next
+release, or run `uv run mb docs build && uv run mb docs publish` locally under operator
+credentials.
 
 ## Running validation locally
 
