@@ -12,14 +12,19 @@
 # comparison rather than a mere existence check.
 validate-lock:
   stage: pre-flight
+  needs: [{job: build-docker-ci, optional: true}]
   script:
     - uv run mb ci check-lock
   rules:
     - *skip-on-tags
     - when: on_success
 
+# A visibility canary: proves the CI image resolves and times a cold `uv sync`. Nothing consumes
+# its output — it blocks nothing and its failure only warns.
 preparation:
   stage: build
+  needs: [{job: build-docker-ci, optional: true}]
+  allow_failure: true
   script:
     - echo "Using CI image tag ${CI_IMAGE_TAG}"
     - python --version
@@ -30,6 +35,7 @@ preparation:
 
 build-translations:
   stage: build
+  needs: [{job: build-docker-ci, optional: true}]
   script:
     - uv run mb locales build
   artifacts:
@@ -41,6 +47,7 @@ build-translations:
 
 validate-ci-languages:
   stage: build
+  needs: [{job: build-docker-ci, optional: true}]
   script: uv run mb ci check-languages
   rules:
     - *skip-on-tags
@@ -66,7 +73,7 @@ validate-ci-languages:
 
 test-suite:
   stage: test
-  needs: [preparation, build-translations]
+  needs: [build-translations]
   dependencies:
     - build-translations
   parallel:
@@ -131,7 +138,7 @@ coverage-report:
 format-check:
   stage: test
   script: uv run mb format --check
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   rules:
     - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -141,7 +148,7 @@ format-check:
 linter:
   stage: test
   script: uv run mb lint
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   rules:
     - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -151,7 +158,7 @@ linter:
 type-check:
   stage: test
   script: uv run mb typecheck
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   rules:
     - *skip-on-tags
     - when: on_success
@@ -160,7 +167,7 @@ check-ty-ignores:
   stage: test
   script:
     - uv run mb ci check-ty-ignores
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -168,7 +175,7 @@ check-ty-ignores:
 validate-migrations:
   stage: test
   script: uv run mb db migrate validate
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   rules:
     - *skip-on-tags
     - when: on_success
@@ -178,7 +185,7 @@ check-import-isolation:
   # so a lib never silently leans on a dependency it does not declare.
   stage: test
   script: uv run mb ci check-import-isolation
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   rules:
     - *skip-on-tags
     - when: on_success
@@ -186,6 +193,7 @@ check-import-isolation:
 validate-ids:
   # Validates that all messages in code are present in the English translations file
   stage: test
+  needs: [{job: build-docker-ci, optional: true}]
   script:
     - uv run mb locales validate-ids
   rules:
@@ -199,7 +207,7 @@ validate-locales:
     - uv run mb locales validate
   dependencies:
     - build-translations
-  needs: [preparation, build-translations]
+  needs: [build-translations]
   rules:
     - *skip-on-tags
     - when: on_success
@@ -217,7 +225,7 @@ test-db:
   # combined `coverage-report`. The JUnit report flag rides the passthrough.
   script:
     - uv run mb test --db --cov tests/data/db_behavior/ --junitxml=report.xml
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   artifacts:
     when: always
     paths:

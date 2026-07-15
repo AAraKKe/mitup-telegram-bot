@@ -35,6 +35,11 @@
   after_script:
     - docker buildx rm builder
 
+# Exists in the pipeline ONLY when the image must actually be (re)built. Other jobs reference it
+# with `needs: [{job: build-docker-ci, optional: true}]`: present -> they wait for the fresh image;
+# absent -> they start immediately. The on-demand manual rebuild is the separate job below — it must
+# NOT share this name, because an unplayed manual job in a `needs` list silently SKIPS every
+# dependent job while the pipeline still reports success.
 build-docker-ci:
   stage: build-ci
   variables:
@@ -50,6 +55,20 @@ build-docker-ci:
       changes: !reference [.ci-docker-files]
     # Allow manual trigger with [build-ci] in commit message
     - if: '$CI_COMMIT_TITLE =~ /\[build-ci\]/'
-    # Manual fallback for any other case
+
+# Manual on-demand rebuild of the CI image. Nothing `needs` this job, so leaving it unplayed
+# affects nothing.
+build-docker-ci-manual:
+  stage: build-ci
+  variables:
+    DOCKERFILE: Dockerfile.ci
+    PUSH_DESTINATION: "${CI_REGISTRY_IMAGE}/ci-python:${CI_IMAGE_TAG}"
+  extends: .docker-build-push
+  rules:
+    # Redundant when the automatic job already runs
+    - if: '$CI_IMAGE_TAG =~ /^mr-/'
+      when: never
+    - if: '$CI_COMMIT_TITLE =~ /\[build-ci\]/'
+      when: never
     - when: manual
       allow_failure: true

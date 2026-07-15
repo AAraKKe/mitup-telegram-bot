@@ -4,6 +4,8 @@
 # behind a deploy bake never inherits an expired token from this job.
 .aws-config: &aws-env-config
   stage: prepare-deployment
+  interruptible: false
+  needs: [{job: build-docker-ci, optional: true}]
   id_tokens:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service

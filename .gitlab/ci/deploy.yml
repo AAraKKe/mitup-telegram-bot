@@ -4,6 +4,7 @@
 .migrate-and-deploy:
   &deploy # This job will first run the migrations on the database and the update ECS
   stage: deploy
+  interruptible: false
   id_tokens:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service
@@ -21,6 +22,7 @@
 deploy:
   # This job will first run the migrations on the database and the update ECS
   extends: .migrate-and-deploy
+  needs: [deploy-config, push-bot, push-migrations-lambda, push-alarm-action-lambda, push-events]
   dependencies:
     - deploy-config
   resource_group: deploy
@@ -39,6 +41,7 @@ deploy:
 # GitLab Protected Environment for the trust to grant access. No image tags, so no deploy-config dep.
 deploy:refresh:
   stage: deploy
+  interruptible: false
   id_tokens:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service

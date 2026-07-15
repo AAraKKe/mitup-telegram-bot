@@ -46,6 +46,26 @@ fallback.
 `FORCE_COLOR: "1"` is a global variable in `base.yml`: GitLab renders ANSI in job logs, and `mb`
 and pytest key their color output off it (animations stay off — `mb` only animates on a TTY).
 
+## DAG: jobs start on `needs`, not stages
+
+Stages exist for display grouping; execution order comes from explicit `needs`. Most jobs carry
+`needs: [{job: build-docker-ci, optional: true}]` — the one real prerequisite every ci-image job
+has. `build-docker-ci` exists in the pipeline only when the image must actually be rebuilt (an MR
+touching `.ci-docker-files`, `main` with such changes, a `[build-ci]` title); then everything
+waits for the fresh image. In every other pipeline the job is absent and `optional: true` lets
+dependents start immediately. The on-demand rebuild is the separate `build-docker-ci-manual` job,
+which nothing `needs` — an unplayed manual job in a `needs` list silently SKIPS all its dependents
+while the pipeline still reports success, so never point `needs` at a manual job.
+Artifact consumers name their producers instead (`test-suite` → `build-translations`, the pushes →
+`build-translations` + `deploy-config`, `deploy` → the four pushes, `push-docs` → `deploy`).
+When adding a job, give it explicit `needs` — a job with none waits for every earlier stage and
+re-serializes the pipeline.
+
+All jobs are `interruptible: true` via `default:` (with `workflow.auto_cancel.on_new_commit:
+interruptible`), so a force-push cancels the superseded pipeline's runs. The deploy-path jobs
+(`deploy-config`, `.push-ecr`, `deploy`, `deploy:refresh`, `.push-docs`) opt out with
+`interruptible: false` — a production roll-out must never be cancelled by a newer commit.
+
 ## Pre-flight stage
 
 | Job | What it does |
@@ -57,7 +77,7 @@ and pytest key their color output off it (animations stay off — `mb` only anim
 
 | Job | What it does |
 |-----|-------------|
-| `preparation` | Verifies Python and uv, times `uv sync --frozen`, and prints `uv tree` |
+| `preparation` | Visibility canary: verifies Python and uv, times `uv sync --frozen`, and prints `uv tree`. Nothing consumes its output — it is `allow_failure: true` and no job `needs` it |
 | `build-translations` | Compiles the locale `.mo` catalogs (`uv run mb locales build`) and publishes `libs/core/mitup_bot/locales` as a 1-day artifact that later jobs consume |
 | `validate-ci-languages` | `uv run mb ci check-languages` — the CI language matrix matches the supported languages |
 

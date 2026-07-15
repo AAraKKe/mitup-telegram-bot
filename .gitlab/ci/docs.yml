@@ -6,7 +6,7 @@ build-docs:
     paths:
       - site
     expire_in: 1 day
-  needs: [preparation]
+  needs: [{job: build-docker-ci, optional: true}]
   rules:
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
@@ -20,6 +20,7 @@ build-docs:
 # Run after deploy to be sure that documentation is not updated until the bot has been updated
 .push-docs: &push-docs
   stage: documentation
+  interruptible: false
   id_tokens:
     OIDC_TOKEN:
       aud: mitup-gitlab-ci-service
@@ -32,6 +33,7 @@ build-docs:
 push-docs:
   extends: .push-docs
   resource_group: docs
+  needs: [deploy, build-docs, deploy-config]
   dependencies:
     - deploy-config
     - build-docs

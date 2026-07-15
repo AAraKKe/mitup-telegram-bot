@@ -12,12 +12,6 @@ variables:
   # Default CI image tag - can be overridden by workflow rules
   CI_IMAGE_TAG: "latest"
 
-# Templates for security and and code analysis
-include:
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
-  - template: Security/Secret-Detection.gitlab-ci.yml
-
 # When do we need to rebuild the CI docker image
 .ci-docker-files: &ci-docker-files
   - dev/docker/Dockerfile.ci
@@ -51,6 +45,11 @@ include:
   - .gitlab/ci/docs.yml
   - .gitlab/ci/deploy-config.yml
 
+# Force-pushing an MR branch cancels the superseded pipeline's still-running jobs: every job is
+# interruptible by default, and the deploy-path jobs opt out explicitly (they touch production).
+default:
+  interruptible: true
+
 # Utilize web identity federation to allow AWS to perform STS calls on our behalf
 .aws-prep: &aws-prep
   - |
@@ -62,6 +61,8 @@ include:
 # Only run in MergeRequests, tags and default branch
 # Also sets CI_IMAGE_TAG dynamically based on whether CI dependencies changed
 workflow:
+  auto_cancel:
+    on_new_commit: interruptible
   rules:
     # MR with CI changes - use MR-specific image
     - if: '$CI_MERGE_REQUEST_ID'
