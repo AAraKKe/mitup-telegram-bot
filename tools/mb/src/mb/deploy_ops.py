@@ -1,6 +1,8 @@
 import base64
 import json
 import time
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 
 import boto3
 import typer
@@ -16,6 +18,39 @@ DEPLOYMENT_POLL_INTERVAL_SECONDS = 10
 DEPLOYMENT_HEARTBEAT_SECONDS = 60
 DEPLOYMENT_DISCOVERY_ATTEMPTS = 6
 DEPLOYMENT_DISCOVERY_DELAY_SECONDS = 5
+
+COLUMN_SEPARATOR = " · "
+MISSING_VALUE = "—"
+DEFAULT_COLUMN_STYLE = "bold"
+SERVICE_NAME_STYLES = ("bold cyan", "bold magenta")
+DEPLOYMENT_STATUS_STYLES = {
+    "PENDING": "dim",
+    "IN_PROGRESS": "yellow",
+    "SUCCESSFUL": "green",
+    "STOP_REQUESTED": "red",
+    "STOPPED": "red",
+    "ROLLBACK_REQUESTED": "red",
+    "ROLLBACK_IN_PROGRESS": "red",
+    "ROLLBACK_SUCCESSFUL": "red",
+    "ROLLBACK_FAILED": "red",
+}
+LIFECYCLE_STAGE_STYLES = {"BAKE_TIME": "bold bright_blue"}
+
+
+def column_label(value: str) -> str:
+    return value.replace("_", " ")
+
+
+# Columns pad to the values a healthy ROLLING deploy prints (the infra services never use
+# blue/green, so the traffic-shift stages can't occur) rather than the full API enums — padding
+# to rare values like POST_PRODUCTION_TRAFFIC_SHIFT would leave dead air on every normal line.
+# Longer values (the rollback statuses) simply overflow their column, which makes those lines
+# stand out.
+EXPECTED_STATUSES = ("PENDING", "IN_PROGRESS", "SUCCESSFUL")
+EXPECTED_STAGES = ("RECONCILE_SERVICE", "PRE_SCALE_UP", "SCALE_UP", "POST_SCALE_UP", "BAKE_TIME", "CLEAN_UP")
+STATUS_COLUMN_WIDTH = max(len(column_label(status)) for status in EXPECTED_STATUSES)
+STAGE_COLUMN_WIDTH = max(len(column_label(stage)) for stage in EXPECTED_STAGES)
+TASK_COUNTS_COLUMN_WIDTH = len("tasks 0/0 running, 0 pending")
 
 
 def wait_for_lambda_update(lambda_client: LambdaClient, name: str) -> FunctionConfigurationTypeDef:
@@ -187,13 +222,71 @@ def format_task_counts(deployment: ServiceDeploymentTypeDef) -> str | None:
     return f"tasks {running}/{requested} running, {pending} pending"
 
 
-def format_deployment_progress(deployment: ServiceDeploymentTypeDef) -> str:
-    parts = [f"Deployment [bold]{deployment.get('status', 'UNKNOWN')}[/]"]
-    if (stage := deployment.get("lifecycleStage")) is not None:
-        parts.append(f"stage [bold]{stage}[/]")
-    if (task_counts := format_task_counts(deployment)) is not None:
-        parts.append(task_counts)
-    return " · ".join(parts)
+def styled_column(text: str, width: int, style: str) -> str:
+    return f"[{style}]{text.ljust(width)}[/]"
+
+
+def format_stage_elapsed(seconds: float) -> str:
+    minutes, remainder = divmod(int(seconds), 60)
+    return f"{minutes:02d}:{remainder:02d}"
+
+
+def format_deployment_line(
+    deployment: ServiceDeploymentTypeDef, *, service: str, name_width: int, service_style: str
+) -> str:
+    status = deployment.get("status", "UNKNOWN")
+    if (stage := deployment.get("lifecycleStage")) is None:
+        stage_text, stage_style = MISSING_VALUE, DEFAULT_COLUMN_STYLE
+    else:
+        stage_text, stage_style = column_label(stage), LIFECYCLE_STAGE_STYLES.get(stage, DEFAULT_COLUMN_STYLE)
+    task_counts = format_task_counts(deployment) or MISSING_VALUE
+    columns = (
+        styled_column(service, name_width, service_style),
+        styled_column(
+            column_label(status), STATUS_COLUMN_WIDTH, DEPLOYMENT_STATUS_STYLES.get(status, DEFAULT_COLUMN_STYLE)
+        ),
+        styled_column(stage_text, STAGE_COLUMN_WIDTH, stage_style),
+        task_counts.ljust(TASK_COUNTS_COLUMN_WIDTH),
+    )
+    return COLUMN_SEPARATOR.join(columns)
+
+
+@dataclass
+class DeploymentProgressLog:
+    """Prints one aligned status line per service poll, skipping lines whose content did not change.
+
+    The trailing column shows how long the deployment has sat in its current lifecycle stage,
+    so during BAKE_TIME it reads as time spent baking. That timer is excluded from the change
+    detection — it advances on every poll and would otherwise defeat the deduplication.
+    """
+
+    name_width: int
+    service_styles: dict[str, str]
+    last_lines: dict[str, str] = field(default_factory=dict)
+    stage_entries: dict[str, tuple[str | None, float]] = field(default_factory=dict)
+
+    @classmethod
+    def for_services(cls, services: Iterable[str]) -> DeploymentProgressLog:
+        names = list(services)
+        styles = {name: SERVICE_NAME_STYLES[index % len(SERVICE_NAME_STYLES)] for index, name in enumerate(names)}
+        return cls(name_width=max(len(name) for name in names), service_styles=styles)
+
+    def stage_elapsed(self, service: str, stage: str | None, now: float) -> float:
+        entry = self.stage_entries.get(service)
+        if entry is None or entry[0] != stage:
+            entry = (stage, now)
+            self.stage_entries[service] = entry
+        return now - entry[1]
+
+    def echo(self, service: str, deployment: ServiceDeploymentTypeDef, now: float, *, heartbeat: bool):
+        elapsed = self.stage_elapsed(service, deployment.get("lifecycleStage"), now)
+        line = format_deployment_line(
+            deployment, service=service, name_width=self.name_width, service_style=self.service_styles[service]
+        )
+        if line == self.last_lines.get(service) and not heartbeat:
+            return
+        console.progress(f"{line}{COLUMN_SEPARATOR}[dim]{format_stage_elapsed(elapsed)}[/]")
+        self.last_lines[service] = line
 
 
 def deployment_reached_terminal_state(deployment: ServiceDeploymentTypeDef, service: str) -> bool:
@@ -224,25 +317,21 @@ def wait_for_deployments(ecs_client: ECSClient, deployments: dict[str, str]):
     """Poll every started deployment together, returning once all have succeeded.
 
     *deployments* maps each service name to its deployment ARN. Each round polls every service
-    still in flight and logs its progress (prefixed with the service, on a transition or on the
+    still in flight and logs its progress as one aligned line (on a transition or on the
     heartbeat so a long bake doesn't look like a hung job). A service reaching a failed terminal
     state aborts the whole command: the services are cross-gated on the same rollback alarms, so a
     fault in one rolls both back and there is nothing left to wait for.
     """
     console.info(f"Waiting for {len(deployments)} ECS deployment(s) to finish...")
     pending = dict(deployments)  # service -> arn, drained as each service succeeds
-    last_progress: dict[str, str] = {}
+    progress_log = DeploymentProgressLog.for_services(deployments)
     last_printed_at = 0.0
     while pending:
         now = time.monotonic()
         heartbeat = now - last_printed_at >= DEPLOYMENT_HEARTBEAT_SECONDS
         for service, deployment_arn in list(pending.items()):
             deployment = describe_service_deployment(ecs_client, deployment_arn)
-
-            progress = f"{service}: {format_deployment_progress(deployment)}"
-            if progress != last_progress.get(service) or heartbeat:
-                console.info(progress)
-                last_progress[service] = progress
+            progress_log.echo(service, deployment, now, heartbeat=heartbeat)
 
             if deployment_reached_terminal_state(deployment, service):
                 del pending[service]

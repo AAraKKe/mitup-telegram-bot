@@ -12,6 +12,7 @@ from mb.main import app
 from mypy_boto3_ecs import ECSClient
 from mypy_boto3_ecs.type_defs import ServiceDeploymentTypeDef
 from mypy_boto3_lambda import LambdaClient
+from rich.text import Text
 from typer.testing import CliRunner
 
 from mb import console, deploy_ops
@@ -486,35 +487,94 @@ def test_format_task_counts(deployment: ServiceDeploymentTypeDef, expected: str 
     assert deploy_ops.format_task_counts(deployment) == expected
 
 
+def plain_line(markup_line: str) -> str:
+    return Text.from_markup(markup_line).plain
+
+
+def aligned_columns(service: str, name_width: int, status: str, stage: str, task_counts: str) -> str:
+    return " · ".join(
+        (
+            service.ljust(name_width),
+            status.ljust(deploy_ops.STATUS_COLUMN_WIDTH),
+            stage.ljust(deploy_ops.STAGE_COLUMN_WIDTH),
+            task_counts.ljust(deploy_ops.TASK_COUNTS_COLUMN_WIDTH),
+        )
+    )
+
+
 @pytest.mark.parametrize(
-    "deployment,expected",
+    "deployment,status,stage,task_counts",
     [
-        (service_deployment(status="IN_PROGRESS"), "Deployment [bold]IN_PROGRESS[/]"),
-        (
-            service_deployment(status="IN_PROGRESS", lifecycleStage="DEPLOY_SERVICE"),
-            "Deployment [bold]IN_PROGRESS[/] · stage [bold]DEPLOY_SERVICE[/]",
-        ),
-        (
-            service_deployment(
-                status="IN_PROGRESS",
-                targetServiceRevision={"runningTaskCount": 2, "pendingTaskCount": 1, "requestedTaskCount": 3},
-            ),
-            "Deployment [bold]IN_PROGRESS[/] · tasks 2/3 running, 1 pending",
-        ),
         (
             service_deployment(
                 status="IN_PROGRESS",
                 lifecycleStage="BAKE_TIME",
                 targetServiceRevision={"runningTaskCount": 2, "pendingTaskCount": 1, "requestedTaskCount": 3},
             ),
-            "Deployment [bold]IN_PROGRESS[/] · stage [bold]BAKE_TIME[/] · tasks 2/3 running, 1 pending",
+            "IN PROGRESS",
+            "BAKE TIME",
+            "tasks 2/3 running, 1 pending",
         ),
-        (service_deployment(), "Deployment [bold]UNKNOWN[/]"),
+        (service_deployment(status="IN_PROGRESS"), "IN PROGRESS", "—", "—"),
+        (service_deployment(), "UNKNOWN", "—", "—"),
     ],
-    ids=["status_only", "with_stage", "with_task_counts", "with_stage_and_counts", "missing_status"],
+    ids=["all_columns", "missing_stage_and_counts", "missing_status"],
 )
-def test_format_deployment_progress(deployment: ServiceDeploymentTypeDef, expected: str):
-    assert deploy_ops.format_deployment_progress(deployment) == expected
+def test_format_deployment_line_pads_every_column(
+    deployment: ServiceDeploymentTypeDef, status: str, stage: str, task_counts: str
+):
+    line = deploy_ops.format_deployment_line(deployment, service="mitup", name_width=22, service_style="bold cyan")
+
+    assert plain_line(line) == aligned_columns("mitup", 22, status, stage, task_counts)
+
+
+def test_format_deployment_line_styles_service_status_and_stage():
+    deployment = service_deployment(status="IN_PROGRESS", lifecycleStage="BAKE_TIME")
+
+    line = deploy_ops.format_deployment_line(deployment, service="mitup", name_width=5, service_style="bold cyan")
+
+    assert line.startswith("[bold cyan]mitup[/]")
+    assert "[yellow]" in line
+    assert "[bold bright_blue]" in line
+
+
+@pytest.mark.parametrize(
+    "seconds,expected",
+    [(0.0, "00:00"), (59.9, "00:59"), (61.0, "01:01"), (3700.0, "61:40")],
+    ids=["zero", "sub_minute", "over_a_minute", "over_an_hour"],
+)
+def test_format_stage_elapsed(seconds: float, expected: str):
+    assert deploy_ops.format_stage_elapsed(seconds) == expected
+
+
+def test_progress_log_assigns_distinct_service_styles_and_pads_to_the_longest_name():
+    progress_log = deploy_ops.DeploymentProgressLog.for_services(["mitup", "mitup-recurrent-events"])
+
+    assert progress_log.service_styles["mitup"] != progress_log.service_styles["mitup-recurrent-events"]
+    assert progress_log.name_width == len("mitup-recurrent-events")
+
+
+def test_progress_log_suppresses_unchanged_lines(capsys: pytest.CaptureFixture[str]):
+    progress_log = deploy_ops.DeploymentProgressLog.for_services(["mitup"])
+    deployment = service_deployment(status="IN_PROGRESS")
+
+    progress_log.echo("mitup", deployment, 0.0, heartbeat=False)
+    progress_log.echo("mitup", deployment, 10.0, heartbeat=False)
+
+    assert combined(capsys).count("IN PROGRESS") == 1
+
+
+def test_progress_log_timer_counts_within_a_stage_and_resets_on_stage_change(capsys: pytest.CaptureFixture[str]):
+    progress_log = deploy_ops.DeploymentProgressLog.for_services(["mitup"])
+    baking = service_deployment(status="IN_PROGRESS", lifecycleStage="BAKE_TIME")
+    cleaning = service_deployment(status="IN_PROGRESS", lifecycleStage="CLEAN_UP")
+
+    progress_log.echo("mitup", baking, 0.0, heartbeat=False)
+    progress_log.echo("mitup", baking, 70.0, heartbeat=True)
+    progress_log.echo("mitup", cleaning, 100.0, heartbeat=False)
+
+    timers = [line.rsplit(" · ", 1)[1] for line in combined(capsys).splitlines()]
+    assert timers == ["00:00", "01:10", "00:00"]
 
 
 def test_deployment_reached_terminal_state_reports_success(capsys: pytest.CaptureFixture[str]):
@@ -574,7 +634,7 @@ def test_wait_for_deployments_succeeds_and_suppresses_duplicate_progress(
     context.ecs_client.list_service_deployments.assert_not_called()
     output = combined(capsys)
     # The two identical IN_PROGRESS polls collapse into a single progress line.
-    assert output.count("Deployment IN_PROGRESS") == 1
+    assert output.count("IN PROGRESS") == 1
     assert "✓ ECS service 'MyService' successfully deployed!" in output
     assert mock_time.sleep.call_count == 2
     mock_time.sleep.assert_called_with(10)
@@ -583,7 +643,7 @@ def test_wait_for_deployments_succeeds_and_suppresses_duplicate_progress(
 def test_wait_for_deployments_prints_progress_on_each_transition(capsys: pytest.CaptureFixture[str]):
     context = DeploymentContext(
         describe_deployments_responses=[
-            deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="DEPLOY_SERVICE")),
+            deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="SCALE_UP")),
             deployments_response(service_deployment(status="IN_PROGRESS", lifecycleStage="BAKE_TIME")),
             deployments_response(service_deployment(status="SUCCESSFUL")),
         ],
@@ -593,9 +653,9 @@ def test_wait_for_deployments_prints_progress_on_each_transition(capsys: pytest.
         deploy_ops.wait_for_deployments(ecs, {"MyService": "MyDeploymentArn"})
 
     output = combined(capsys)
-    assert "Deployment IN_PROGRESS · stage DEPLOY_SERVICE" in output
-    assert "Deployment IN_PROGRESS · stage BAKE_TIME" in output
-    assert "Deployment SUCCESSFUL" in output
+    assert "SCALE UP" in output
+    assert "BAKE TIME" in output
+    assert "SUCCESSFUL" in output
 
 
 def test_wait_for_deployments_prints_heartbeat_when_progress_is_unchanged(
@@ -613,7 +673,7 @@ def test_wait_for_deployments_prints_heartbeat_when_progress_is_unchanged(
     with context.setup_mock() as (function, ecs):
         deploy_ops.wait_for_deployments(ecs, {"MyService": "MyDeploymentArn"})
 
-    assert combined(capsys).count("Deployment IN_PROGRESS") == 2
+    assert combined(capsys).count("IN PROGRESS") == 2
 
 
 def test_wait_for_deployments_polls_through_rollback_and_aborts_on_final_outcome(capsys: pytest.CaptureFixture[str]):
@@ -631,7 +691,7 @@ def test_wait_for_deployments_polls_through_rollback_and_aborts_on_final_outcome
 
     context.assert_ecs_called("describe_service_deployments", n=3, serviceDeploymentArns=["MyDeploymentArn"])
     output = combined(capsys)
-    assert "Deployment ROLLBACK_IN_PROGRESS" in output
+    assert "ROLLBACK IN PROGRESS" in output
     assert "✗ Deployment of ECS service 'MyService' ended as ROLLBACK_SUCCESSFUL: Circuit breaker" in output
 
 
@@ -653,14 +713,15 @@ def test_wait_for_deployments_polls_every_service_each_round(capsys: pytest.Capt
     # 2 + 2 + 1 polls; the last round only re-polls events, which is still in flight after mitup ends.
     context.assert_ecs_called("describe_service_deployments", n=5, serviceDeploymentArns=["EventsArn"])
     output = combined(capsys)
-    assert "mitup: Deployment IN_PROGRESS" in output
-    assert "mitup-recurrent-events: Deployment IN_PROGRESS" in output
+    # Both service names pad to the longest name, so every column starts at the same offset.
+    mitup_line = "mitup".ljust(len("mitup-recurrent-events")) + " · IN PROGRESS"
+    events_line = "mitup-recurrent-events · IN PROGRESS"
+    assert mitup_line in output
+    assert events_line in output
     assert "✓ ECS service 'mitup' successfully deployed!" in output
     assert "✓ ECS service 'mitup-recurrent-events' successfully deployed!" in output
     # Events progress is visible before mitup finishes — the whole point of polling both together.
-    assert output.index("mitup-recurrent-events: Deployment IN_PROGRESS") < output.index(
-        "✓ ECS service 'mitup' successfully deployed!"
-    )
+    assert output.index(events_line) < output.index("✓ ECS service 'mitup' successfully deployed!")
 
 
 def test_start_ecs_deployment_registers_updates_and_returns_arn():

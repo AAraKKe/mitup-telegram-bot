@@ -97,6 +97,15 @@ def info(message: str):
     output.print(message)
 
 
+def progress(message: str):
+    """Print a column-aligned status line, markup on, without width-based wrapping.
+
+    rich wraps at the detected console width (80 when output is piped, as in CI logs),
+    which would fold wide aligned lines; soft_wrap emits each line unbroken.
+    """
+    output.print(message, soft_wrap=True)
+
+
 def step(title: str):
     output.print(f"[bold cyan]{GLYPH_STEP}[/bold cyan] [bold]{title}[/bold]")
 
