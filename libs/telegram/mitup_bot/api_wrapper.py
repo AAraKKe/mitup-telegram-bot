@@ -49,6 +49,9 @@ TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Message_id_invalid"),
     re.compile(r"Message to edit not found"),
+    # The whole chat is unknown to the bot (private chat deleted, bot kicked from the group):
+    # the stored message can never be edited again, so it gets the same dead-message treatment.
+    re.compile(r"Chat not found"),
 ]
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
 
@@ -757,7 +760,8 @@ class TelegramApi:
 
     async def _edit_meeting_message_now(self, edit: MeetingMessageEdit) -> bool:
         """Execute a rendered meeting-message edit. Returns True when Telegram reports the
-        message gone (deleted by the user), leaving the DB cleanup to the caller."""
+        message unreachable (deleted by the user, or its chat gone), leaving the DB cleanup
+        to the caller."""
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             try:
                 await self.adapter.bot.edit_message_text(

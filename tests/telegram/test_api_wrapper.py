@@ -275,8 +275,9 @@ async def test_handle_edit_errors_ignores_message_not_modified(adapter: BotAdapt
     [
         "Message_id_invalid",
         "Message to edit not found",
+        "Chat not found",
     ],
-    ids=["message_id_invalid", "message_to_edit_not_found"],
+    ids=["message_id_invalid", "message_to_edit_not_found", "chat_not_found"],
 )
 async def test_handle_edit_errors_swallows_message_not_found(adapter: BotAdapter, error_message: str):
     # The DB cleanup for vanished meeting messages lives in update_single_meeting_message /

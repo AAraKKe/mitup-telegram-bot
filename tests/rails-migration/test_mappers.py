@@ -53,7 +53,7 @@ def test_map_user_and_settings_copies_core_fields_and_splits_settings():
         "created_time": created,
         "updated_time": updated,
     }
-    assert settings["language"] == "es"
+    assert settings["language"] == "es_ES"
     assert settings["timezone"] == "Europe/Madrid"
     assert settings["notification"] is True
     assert settings["notification_time"] == 10
@@ -80,6 +80,27 @@ def test_map_user_migrates_phantom_as_joined_only_invited_placeholder():
     assert user["first_name"] == "ghost"
     assert user["status"] is UserStatus.JOINED_ONLY
     assert settings["language"] == "en"
+
+
+@pytest.mark.parametrize(
+    "rails_lang,locale",
+    [("en", "en"), ("es", "es_ES"), ("gl", "gl_ES"), ("de", "de_DE"), ("pt", "pt_BR"), ("it", "it_IT")],
+)
+def test_map_user_translates_every_rails_language_code(rails_lang: str, locale: str):
+    row = {"id": 1, "tg_user_id": 5, "first_name": "Polyglot", "active": True, "lang": rails_lang}
+    _, settings = map_user_and_settings(row)
+    assert settings["language"] == locale
+
+
+def test_map_user_unknown_language_falls_back_to_english():
+    row = {"id": 1, "tg_user_id": 5, "first_name": "Mystery", "active": True, "lang": "fr"}
+    _, settings = map_user_and_settings(row)
+    assert settings["language"] == "en"
+
+
+def test_map_meetup_translates_language_and_keeps_none():
+    assert map_meetup({"id": 1, "title": "Hi", "lang": "gl"}, owner_new_id=1)["language"] == "gl_ES"
+    assert map_meetup({"id": 1, "title": "Hi"}, owner_new_id=1)["language"] is None
 
 
 def test_map_user_inactive_real_user_becomes_left():

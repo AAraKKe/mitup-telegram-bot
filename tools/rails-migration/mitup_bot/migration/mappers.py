@@ -6,6 +6,7 @@ import yaml
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import MeetupLocation, MessageButtons
 from mitup_bot.models.users import UserStatus
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 
 
 class RowMappingError(ValueError): ...
@@ -16,6 +17,17 @@ class RowMappingError(ValueError): ...
 # like regular users — the JoinedUsers + invitations phases need the row in the audit
 # table to graft `invited_by_id` later.
 PHANTOM_TG_USER_ID = -1
+
+# Rails stored bare ISO-639 codes (en, es, gl, de, pt, it); each is the prefix of exactly
+# one supported locale identifier, so the mapping derives from SUPPORTED_LANGUAGES itself.
+RAILS_LANGUAGE_TO_LOCALE = {locale.split("_")[0]: locale for locale in SUPPORTED_LANGUAGES}
+
+
+def map_language(value: object) -> str | None:
+    """Translate a Rails language code into its locale identifier (None when absent or unknown)."""
+    if value is None:
+        return None
+    return RAILS_LANGUAGE_TO_LOCALE.get(str(value))
 
 
 def map_user_and_settings(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -35,7 +47,7 @@ def map_user_and_settings(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str
     }
 
     settings_kwargs: dict[str, Any] = {
-        "language": row.get("lang") or "en",
+        "language": map_language(row.get("lang")) or "en",
         "timezone": row.get("timezone") or "UTC",
         "notification": coerce_bool(row.get("notif"), default=True),
         "notification_time": coerce_int(row.get("notif_time"), default=5),
@@ -65,7 +77,7 @@ def map_meetup(row: dict[str, Any], owner_new_id: int) -> dict[str, Any]:
         "datetime": row.get("time"),
         "end_datetime": None,
         "max_members": max_members,
-        "language": row.get("lang"),
+        "language": map_language(row.get("lang")),
         "location": parse_location(row.get("location")),
         "active": coerce_bool(row.get("active"), default=True),
         "waiting_list": coerce_bool(row.get("waiting"), default=False),
