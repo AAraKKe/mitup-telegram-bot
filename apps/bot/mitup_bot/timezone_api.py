@@ -1,4 +1,5 @@
 import googlemaps
+import structlog
 from googlemaps import Client
 from pydantic import BaseModel, ValidationError
 
@@ -15,6 +16,8 @@ from mitup_bot.exceptions import (
 )
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.monitoring import MetricKey
+
+log = structlog.get_logger(__name__)
 
 __geocode_client: googlemaps.Client | None = None
 __timezone_client: googlemaps.Client | None = None
@@ -100,6 +103,9 @@ def get_timezone_by_location(latitude: float, longitude: float, context: TMitupC
         with context.with_time_metric("GoogleTimeZoneApi"):
             timezone = timezone_client().timezone((latitude, longitude))  # type: ignore
     except googlemaps.exceptions.ApiError as e:
+        # Covers any Google-side rejection — quota, auth, upstream 5xx — not only a bad key; the
+        # log line preserves what Google actually answered.
+        log.warning("Google timezone API call failed", exc_info=e)
         raise IncorrectTimezoneKeyError() from e
 
     if timezone is None:
@@ -128,6 +134,9 @@ def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation:
                 geocode_client().geocode(address)[0]  # type: ignore
             )
     except googlemaps.exceptions.ApiError as e:
+        # Covers any Google-side rejection — quota, auth, upstream 5xx — not only a bad key; the
+        # log line preserves what Google actually answered.
+        log.warning("Google geocode API call failed", exc_info=e)
         raise IncorrectGeocodeKeyError() from e
     except (IndexError, ValidationError) as e:
         context.emit_metric(

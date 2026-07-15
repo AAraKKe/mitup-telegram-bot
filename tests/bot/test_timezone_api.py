@@ -4,6 +4,7 @@ from unittest import mock
 import googlemaps
 import pytest
 from pydantic import SecretStr
+from structlog.testing import capture_logs
 
 from mitup_bot import timezone_api
 from mitup_bot.config import GoogleApiConfig
@@ -168,17 +169,33 @@ def test_get_timezone_by_location_raises_with_missing_timezone_client(context: S
 
 
 def test_get_timezone_by_location_raise_incorrect_timezone_key_error(timezone_client, context: StubMitupContext):
-    timezone_client.timezone.side_effect = googlemaps.exceptions.ApiError(404)
+    error = googlemaps.exceptions.ApiError(404)
+    timezone_client.timezone.side_effect = error
 
-    with pytest.raises(IncorrectTimezoneKeyError):
-        timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+    with capture_logs() as logs:
+        with pytest.raises(IncorrectTimezoneKeyError):
+            timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+
+    # The Google response detail is preserved in a log line — the raised error alone reads as a
+    # key problem even when the cause is quota/auth/upstream.
+    warnings = [entry for entry in logs if entry["event"] == "Google timezone API call failed"]
+    assert len(warnings) == 1
+    assert warnings[0]["log_level"] == "warning"
+    assert warnings[0]["exc_info"] is error
 
 
 def test_get_coordinates_raise_incorrect_geocode_key_error(geocode_client, context: StubMitupContext):
-    geocode_client.geocode.side_effect = googlemaps.exceptions.ApiError(404)
+    error = googlemaps.exceptions.ApiError(404)
+    geocode_client.geocode.side_effect = error
 
-    with pytest.raises(IncorrectGeocodeKeyError):
-        timezone_api.get_coordinates("New York", context)
+    with capture_logs() as logs:
+        with pytest.raises(IncorrectGeocodeKeyError):
+            timezone_api.get_coordinates("New York", context)
+
+    warnings = [entry for entry in logs if entry["event"] == "Google geocode API call failed"]
+    assert len(warnings) == 1
+    assert warnings[0]["log_level"] == "warning"
+    assert warnings[0]["exc_info"] is error
 
 
 def test_get_timezone_by_location_raises_incorrect_coordinates_error(timezone_client, context: StubMitupContext):

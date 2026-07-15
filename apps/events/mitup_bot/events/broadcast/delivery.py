@@ -88,6 +88,9 @@ async def deliver_one(
     except NetworkError:
         raise
     except Exception as error:
+        # The delivery row keeps only str(error); a systemic non-NetworkError bug would otherwise
+        # surface as a growing retry backlog with no traceback anywhere.
+        log.warning("Unexpected broadcast delivery error", exc_info=error, tg_user_id=user.tg_user_id)
         delay = dt.timedelta(seconds=RETRY_BACKOFF_BASE_SECONDS * 2 ** (attempt_count - 1))
         return DeliveryClassification(BroadcastDeliveryStatus.RETRY_PENDING, str(error), retry_delay=delay)
     return DeliveryClassification(BroadcastDeliveryStatus.SENT, None)

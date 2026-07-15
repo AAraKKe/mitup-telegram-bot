@@ -103,6 +103,42 @@ def test_wrong_event_fails():
     assert error["input"] == "myAction"
 
 
+def test_wrong_event_logs_before_reraising():
+    """A malformed invocation leaves a structured record; the raise still fails the invocation."""
+    event = {"action": "myAction", "revision": "myRevision"}
+
+    with capture_logs() as logs:
+        with pytest.raises(ValidationError):
+            run_migrations(event, None)
+
+    invalid_logs = [log for log in logs if log["event"] == "Invalid migration event"]
+    assert len(invalid_logs) == 1
+    assert invalid_logs[0]["log_level"] == "error"
+    assert invalid_logs[0]["exc_info"] is True
+    assert invalid_logs[0]["invocation_event"] == event
+
+
+def test_migration_failure_logs_with_invocation_context():
+    """A failed alembic run logs "Migration failed" with the traceback while flow/action/revision
+    are still bound, then re-raises so the Lambda invocation fails."""
+    event = {"action": "upgrade", "revision": "abc123"}
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with mock.patch("mitup_bot.lambdas.migrations.command") as mock_command:
+            with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                mock_command.upgrade.side_effect = RuntimeError("boom")
+                with pytest.raises(RuntimeError, match="boom"):
+                    run_migrations(event, None)
+
+    failed_logs = [log for log in logs if log["event"] == "Migration failed"]
+    assert len(failed_logs) == 1
+    entry = failed_logs[0]
+    assert entry["log_level"] == "error"
+    assert entry["exc_info"] is True
+    assert entry["flow"] == "migrations"
+    assert entry["revision"] == "abc123"
+
+
 def test_binds_invocation_contextvars_during_handler_body():
     """run_migrations binds flow/action/revision for the duration of the handler so the
     "Migration started" / "Migration completed" logs (and any alembic logging) carry the

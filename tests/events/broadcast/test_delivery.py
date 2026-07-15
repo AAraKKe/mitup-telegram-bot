@@ -56,6 +56,24 @@ async def test_deliver_one_classifies_outcome(
     api.assert_send_message_to_user_called(user=user, view=view)
 
 
+async def test_deliver_one_logs_unexpected_error(api: MockApi):
+    """The delivery row keeps only str(error); the traceback of an unexpected failure must land in
+    a log line or a systemic bug is invisible behind a growing retry backlog."""
+    user = create_member(1, 10)
+    view = broadcast_recipient_view("<b>hi</b>", "en")
+    error = RuntimeError("boom")
+    api.mock_method("send_message_to_user").side_effect = error
+
+    with capture_logs() as logs:
+        await delivery.deliver_one(api, user, view, attempt_count=1)
+
+    warnings = [entry for entry in logs if entry["event"] == "Unexpected broadcast delivery error"]
+    assert len(warnings) == 1
+    assert warnings[0]["log_level"] == "warning"
+    assert warnings[0]["exc_info"] is error
+    assert warnings[0]["tg_user_id"] == user.tg_user_id
+
+
 async def test_deliver_one_flood_control_backoff_honors_retry_after_plus_margin(api: MockApi):
     api.mock_method("send_message_to_user").side_effect = RetryAfter(30)
 

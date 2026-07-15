@@ -1,4 +1,5 @@
 import pytest
+from structlog.testing import capture_logs
 from telegram import Update
 from telegram.error import TelegramError
 
@@ -217,6 +218,21 @@ async def test_handle_error_for_uncaght_exception(context: StubMitupContext, met
         dimensions_exact=True,
         properties={"Handler": "SomeHandler", "HandlerType": "Callback"},
     )
+
+
+async def test_handle_error_logs_the_exception(context: StubMitupContext):
+    """Every fault produces a structured error line with the traceback attached, in every env —
+    the log-side record that carries the handler contextvars the EMF Fault record lacks."""
+    context.prepare_handler_metrics({"Handler": "SomeHandler", "HandlerType": "Callback"})
+    error = ValueError("boom")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+
+    fault_logs = [entry for entry in logs if entry["event"] == "An error occurred while handling the update"]
+    assert len(fault_logs) == 1
+    assert fault_logs[0]["log_level"] == "error"
+    assert fault_logs[0]["exc_info"] is error
 
 
 # --- Guard error handling ---

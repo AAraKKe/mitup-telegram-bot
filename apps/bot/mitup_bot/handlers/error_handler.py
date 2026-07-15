@@ -141,12 +141,13 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
 
     context.metrics.add_stack_trace()
 
+    # The log-side record of the fault. It runs inside the handler's bound contextvars, so the line
+    # carries flow/handler/update_id/tg_user_id — the correlation the EMF Fault record lacks.
+    # exc_info is passed explicitly rather than read from the ambient exception state, which the
+    # awaits above may have replaced.
+    log.error("An error occurred while handling the update", exc_info=error)
+
     # Guard failures are internal faults the user should not see silently: notify them and redirect
     # to the main menu. The fault metric above already carries the per-guard suffix.
     if isinstance(error, GuardError):
         await notify_guard_error(context)
-
-    # If we are in development mode, lets print the exception when it happens
-    if env is Env.DEV:  # pragma: no cover
-        # Print exception with rich logger
-        log.exception("An error occurred while handling the update")
