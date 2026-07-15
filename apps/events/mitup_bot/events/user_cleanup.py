@@ -1,10 +1,10 @@
 import structlog
-from sqlmodel import and_, col, delete, select
+from sqlmodel import and_, col, delete, exists, select, true
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.models import User
+from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import PrivacyMessages
@@ -13,9 +13,25 @@ from mitup_bot.views import MitupView
 log = structlog.get_logger(__name__)
 
 INACTIVE_USERS_SELECT_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
-    and_(User.status == UserStatus.LEFT, User.tg_user_id != -1)
+    and_(
+        User.status == UserStatus.LEFT,
+        User.tg_user_id != -1,
+        ~exists(select(1).select_from(Meetup).where(and_(Meetup.owner_id == User.id, Meetup.active == true()))),
+        ~exists(
+            select(1)
+            .select_from(JoinedUsers)
+            .join(Meetup)
+            .where(and_(JoinedUsers.user_id == User.id, Meetup.active == true()))
+        ),
+    )
 )
-"""Selects IDs of LEFT users who are not invited (outside) users.
+"""Selects IDs of LEFT users who are safe to purge outright.
+
+A LEFT user is retained — not deleted — while they still own an active meeting or hold a join link
+to one: deleting them cascades their owned meetings and drops their participation, silently kicking
+them out of every meeting they merely stopped receiving messages for. They become purgeable only
+once no active meeting depends on them (their dateless meetings deactivate on the LEFT-owner schedule
+in `inactive_meetings`, which is how the system converges).
 
 JOINED_ONLY users are intentionally excluded — they are cleaned up exclusively
 by `inactive_meetings` once none of their meetings remain active.

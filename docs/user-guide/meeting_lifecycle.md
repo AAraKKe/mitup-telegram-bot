@@ -147,6 +147,12 @@ You don't mark a meeting as finished by hand. Mitup does it for you a short whil
     To keep it joinable through the meeting, set an end time. Mitup then waits until a few
     minutes after the end instead.
 
+## If you leave the bot
+
+Leaving the bot, by blocking it or deleting your chat with it, doesn't pull you out of your meetings. You stay the owner of the ones you made and stay on the lists of the ones you joined, so the plans you set up don't fall apart the moment you step away. Your account is cleaned up only once none of your meetings are still active.
+
+One meeting winds down sooner, though. An undated meeting you own normally waits a year for you to come back and give it a date. With you unreachable there's no one to add it, so Mitup finishes that meeting a month after you created it instead.
+
 ## What happens when it becomes inactive
 
 Becoming inactive is tidy, not destructive. Here's what changes:

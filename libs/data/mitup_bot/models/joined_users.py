@@ -21,7 +21,7 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
     meetup_id: int | None = Field(default=None, foreign_key="meetups.id", ondelete="CASCADE")
-    invited_by_id: int | None = Field(default=None, foreign_key="users.id")
+    invited_by_id: int | None = Field(default=None, foreign_key="users.id", ondelete="SET NULL")
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     is_waiting_list: bool = False
     notification_sent: bool = False

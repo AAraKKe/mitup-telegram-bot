@@ -18,15 +18,17 @@ log = structlog.get_logger(__name__)
 # The amount of time a meeting stays active after it has been created when there is no datetime set
 INTERVAL_TO_DEACTIVATE = "1 year"
 
-# Query to get all meetings to be deactivated
-#   - The meeting is currently active
-#   - The meeting has a datetime set
-#   - The current time is past meeting.datetime + timeout from the owner's settings
-#
-# If the meeting does not have a datetime set, the meeting is deactivated INTERVAL_TO_DEACTIVATE from the creation date.
-# When end_datetime is set, the meeting window extends to end_datetime + timeout.
-# When only datetime is set, the meeting is deactivated after datetime + timeout.
-# When no datetime is set, fall back to created_time + INTERVAL_TO_DEACTIVATE.
+# A dateless meeting whose owner has LEFT the bot deactivates this soon after creation instead of the
+# full year: an owner who is gone should not keep undated meetings alive for a year, and once the
+# meeting deactivates the owner stops owning an active meeting and becomes purgeable by user_cleanup.
+LEFT_OWNER_INTERVAL_TO_DEACTIVATE = "1 month"
+
+# Query to get all active meetings that are due for deactivation. A meeting is due when any of:
+#   - It has a datetime set and the current time is past its window: end_datetime (or datetime when
+#     there is no end) plus the owner's configured timeout.
+#   - It has no datetime and its owner has LEFT the bot, and created_time is older than
+#     LEFT_OWNER_INTERVAL_TO_DEACTIVATE.
+#   - It has no datetime (owner in any status) and created_time is older than INTERVAL_TO_DEACTIVATE.
 MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
     select(Meetup)
     .join(User)
@@ -38,6 +40,11 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
                 and_(
                     Meetup.datetime == null(),
                     Meetup.created_time + func.cast(literal(INTERVAL_TO_DEACTIVATE), INTERVAL) < func.now(),
+                ),
+                and_(
+                    Meetup.datetime == null(),
+                    User.status == UserStatus.LEFT,
+                    Meetup.created_time + func.cast(literal(LEFT_OWNER_INTERVAL_TO_DEACTIVATE), INTERVAL) < func.now(),
                 ),
                 and_(
                     Meetup.datetime != null(),

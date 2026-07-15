@@ -160,6 +160,29 @@ async def test_select_query_filters_correctly(mock_session: MockDbSession, api: 
     assert "= 'member'" not in expected_query
 
 
+async def test_select_retains_users_tied_to_active_meetings(mock_session: MockDbSession, api: MockApi):
+    """A LEFT user is nominated only when no active meeting depends on them: two NOT EXISTS guards,
+    one over owned meetups and one over joined links, both scoped to active meetings."""
+    client = make_test_metrics_client()
+
+    await user_cleanup.run(api, client)
+
+    compiled = mock_session.normalize_query(
+        str(
+            INACTIVE_USERS_SELECT_STATEMENT.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
+        )
+    )
+    assert compiled in mock_session.queries_executed
+    # Owned-meeting guard.
+    assert (
+        "NOT (EXISTS (SELECT 1 FROM meetups WHERE meetups.owner_id = users.id AND meetups.active = true))" in compiled
+    )
+    # Joined-link guard.
+    assert "joined_users.user_id = users.id AND meetups.active = true" in compiled
+
+
 async def test_deletion_requested_query_filters_correctly(mock_session: MockDbSession, api: MockApi):
     """The farewell select must scope to status='deletion_requested' and nothing else."""
     client = make_test_metrics_client()

@@ -2,8 +2,14 @@ import datetime as dt
 from unittest.mock import ANY
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from mitup_bot.events import inactive_meetings
+from mitup_bot.events.inactive_meetings import (
+    INTERVAL_TO_DEACTIVATE,
+    LEFT_OWNER_INTERVAL_TO_DEACTIVATE,
+    MEETINGS_TO_DEACTIVATE_STATEMENT,
+)
 from mitup_bot.events.service import EventType
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient
@@ -256,6 +262,29 @@ async def test_multiple_meetings_deactivated(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
         value=0,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+
+
+def test_deactivation_statement_has_left_owner_dateless_branch():
+    """The dateless-meeting predicate carries both windows: the general one-year rule and the
+    one-month rule that applies only when the owner has LEFT the bot. The behavioural coverage of
+    which meetings each window selects lives in the db_behavior deactivation-query tests."""
+    assert INTERVAL_TO_DEACTIVATE == "1 year"
+    assert LEFT_OWNER_INTERVAL_TO_DEACTIVATE == "1 month"
+
+    compiled = " ".join(
+        str(
+            MEETINGS_TO_DEACTIVATE_STATEMENT.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
+        ).split()
+    )
+    # General window: any dateless meeting older than a year.
+    assert "meetups.datetime IS NULL AND meetups.created_time + CAST('1 year' AS INTERVAL) < now()" in compiled
+    # LEFT-owner window: a dateless meeting whose owner has left, older than a month.
+    assert (
+        "meetups.datetime IS NULL AND users.status = 'left' "
+        "AND meetups.created_time + CAST('1 month' AS INTERVAL) < now()" in compiled
     )
 
 
