@@ -1,7 +1,7 @@
 import datetime as dt
 from enum import StrEnum
 
-from sqlalchemy import Column, DateTime, Enum, FetchedValue, Integer, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue, Integer, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from .base_model import BaseModel
@@ -47,7 +47,7 @@ class BroadcastDeliveryStatus(StrEnum):
 class Broadcast(BaseModel, SQLModel, table=True):
     __tablename__: str = "broadcasts"
 
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
     name: str
     # native_enum=False keeps the column a plain VARCHAR while coercing loaded rows back to
     # BroadcastStatus, so `status is BroadcastStatus.X` checks hold everywhere a row is loaded.
@@ -59,7 +59,7 @@ class Broadcast(BaseModel, SQLModel, table=True):
             server_default=BroadcastStatus.DRAFT.value,
         ),
     )
-    author_tg_id: int
+    author_tg_id: int = Field(sa_type=BigInteger)
     # Bumped once per send run; the sender declares a terminal FAILED after a threshold.
     attempts: int = 0
     total_recipients: int | None = None
@@ -103,8 +103,8 @@ class BroadcastMessage(BaseModel, SQLModel, table=True):
     __tablename__: str = "broadcast_messages"
     __table_args__ = (UniqueConstraint("broadcast_id", "language", name="uq_broadcast_messages_broadcast_id_language"),)
 
-    id: int | None = Field(default=None, primary_key=True)
-    broadcast_id: int | None = Field(default=None, foreign_key="broadcasts.id", ondelete="CASCADE")
+    id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
+    broadcast_id: int | None = Field(default=None, foreign_key="broadcasts.id", ondelete="CASCADE", sa_type=BigInteger)
     # A value from `mitup_bot.translations.SUPPORTED_LANGUAGES`.
     language: str
     body_html: str
@@ -133,9 +133,9 @@ class BroadcastDelivery(BaseModel, SQLModel, table=True):
     # insert a second delivery row for a recipient it already enqueued.
     __table_args__ = (UniqueConstraint("broadcast_id", "user_id", name="uq_broadcast_deliveries_broadcast_id_user_id"),)
 
-    id: int | None = Field(default=None, primary_key=True)
-    broadcast_id: int | None = Field(default=None, foreign_key="broadcasts.id", ondelete="CASCADE")
-    user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
+    id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
+    broadcast_id: int | None = Field(default=None, foreign_key="broadcasts.id", ondelete="CASCADE", sa_type=BigInteger)
+    user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
     language_sent: str
     status: BroadcastDeliveryStatus = Field(
         default=BroadcastDeliveryStatus.PENDING,

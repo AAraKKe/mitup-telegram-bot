@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
-from sqlalchemy import JSON, Column, DateTime, FetchedValue
+from sqlalchemy import JSON, BigInteger, Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -45,8 +45,8 @@ class MeetupLocation(MutableModel):
 class Meetup(BaseModel, SQLModel, table=True):
     __tablename__: str = "meetups"
 
-    id: int | None = Field(default=None, primary_key=True)
-    owner_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
+    id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
+    owner_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
     title: str = Field(nullable=False)
     waiting_list: bool = Field(nullable=False)
     public: bool = Field(nullable=False)

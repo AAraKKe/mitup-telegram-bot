@@ -2,7 +2,7 @@ import datetime as dt
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
-from sqlalchemy import Column, DateTime, Enum, FetchedValue
+from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -39,8 +39,8 @@ class User(BaseModel, SQLModel, table=True):
     __tablename__: str = "users"
 
     first_name: str
-    tg_user_id: int
-    id: int | None = Field(default=None, primary_key=True)
+    tg_user_id: int = Field(sa_type=BigInteger)
+    id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(
         default=None,

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
-from sqlalchemy import Column, DateTime, FetchedValue
+from sqlalchemy import BigInteger, Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
 
 from mitup_bot.translations import TranslationEngine
@@ -19,8 +19,8 @@ log = structlog.get_logger(__name__)
 class Settings(BaseModel, SQLModel, table=True):
     __tablename__: str = "settings"
 
-    id: int | None = Field(default=None, primary_key=True)
-    user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
+    id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
+    user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(
         default=None,
@@ -30,7 +30,7 @@ class Settings(BaseModel, SQLModel, table=True):
     timezone: str = "UTC"
     notification: bool = True
     notification_time: int = 5
-    timeout: int = 5
+    timeout: int = Field(default=5, sa_type=BigInteger)
     default_waiting_list: bool = False
     default_public: bool = False
     default_allow_invitation: bool = False

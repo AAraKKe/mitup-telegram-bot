@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, BigInteger, Column
 from sqlmodel import Field, Relationship, SQLModel
 
 from mitup_bot.exceptions import NoMessageAvailable
@@ -25,8 +25,8 @@ class Message(BaseModel, SQLModel, table=True):
     __tablename__ = "messages"
 
     id: int = Field(default=None, primary_key=True)
-    message_id: int | None = None
-    chat_id: int | None = None
+    message_id: int | None = Field(default=None, sa_type=BigInteger)
+    chat_id: int | None = Field(default=None, sa_type=BigInteger)
     inline_message_id: str | None = None
     chat_instance: str | None = None
     meetup_id: int = Field(default=None, foreign_key="meetups.id")
