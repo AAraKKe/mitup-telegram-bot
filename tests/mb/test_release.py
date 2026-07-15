@@ -72,11 +72,20 @@ def test_release_major_bump(recorder: CommandRecorder):
     assert ["git", "tag", "-a", "v2.0.0", "abc123def456", "-m", "v2.0.0"] in recorder.commands
 
 
+RELEASE_POST_PREFIX = ["glab", "api", "-X", "POST", "projects/:id/releases"]
+
+
 def release_create_call(recorder: CommandRecorder) -> list[str]:
-    """The single `glab release create` invocation the run recorded."""
-    calls = [command for command in recorder.commands if command[:3] == ["glab", "release", "create"]]
-    assert len(calls) == 1, f"expected exactly one `glab release create`, got {calls}"
+    """The single release-creation POST the run recorded."""
+    calls = [command for command in recorder.commands if command[: len(RELEASE_POST_PREFIX)] == RELEASE_POST_PREFIX]
+    assert len(calls) == 1, f"expected exactly one release POST, got {calls}"
     return calls[0]
+
+
+def release_notes_field(call: list[str]) -> str:
+    """The notes carried by a release-creation POST (its `description=` form field)."""
+    prefix = "description="
+    return next(argument for argument in call if argument.startswith(prefix)).removeprefix(prefix)
 
 
 def test_release_opens_runway_and_current_milestones(recorder: CommandRecorder):
@@ -114,9 +123,12 @@ def test_release_creates_gitlab_release_titled_and_milestoned_with_the_tag(recor
     cli.invoke(app, ["release"])
 
     call = release_create_call(recorder)
-    assert call[3] == "v1.3.0"
-    assert call[call.index("--name") + 1] == "v1.3.0"
-    assert call[call.index("--milestone") + 1] == "v1.3.0"
+    assert "tag_name=v1.3.0" in call
+    assert "name=v1.3.0" in call
+    assert "milestones[]=v1.3.0" in call
+    # Never a ref: with only tag_name, GitLab can only attach the release to the pushed tag —
+    # a stale replica fails the POST instead of attempting to create the protected tag.
+    assert not any("ref" in argument for argument in call)
 
 
 def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: CommandRecorder):
@@ -128,8 +140,7 @@ def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: Comm
     cli.invoke(app, ["release"])
 
     call = release_create_call(recorder)
-    notes = call[call.index("--notes") + 1]
-    assert notes == "- [!34] Add the widget\n- [!12] Fix the gadget"
+    assert release_notes_field(call) == "- [!34] Add the widget\n- [!12] Fix the gadget"
     assert ["glab", "api", "projects/:id/merge_requests/34"] in recorder.commands
 
 
@@ -143,7 +154,7 @@ def test_release_notes_dedupe_references_and_drop_unfetchable_titles(recorder: C
     cli.invoke(app, ["release"])
 
     call = release_create_call(recorder)
-    assert call[call.index("--notes") + 1] == "- [!34] Add the widget"
+    assert release_notes_field(call) == "- [!34] Add the widget"
 
 
 def test_release_notes_are_empty_when_no_merge_requests_shipped(recorder: CommandRecorder):
@@ -153,7 +164,7 @@ def test_release_notes_are_empty_when_no_merge_requests_shipped(recorder: Comman
     cli.invoke(app, ["release"])
 
     call = release_create_call(recorder)
-    assert call[call.index("--notes") + 1] == ""
+    assert release_notes_field(call) == ""
 
 
 def test_release_publishes_without_a_milestone_when_it_cannot_be_opened(recorder: CommandRecorder):
@@ -164,13 +175,13 @@ def test_release_publishes_without_a_milestone_when_it_cannot_be_opened(recorder
 
     assert result.exit_code == 0
     assert "Could not open milestone v1.3.0" in result.output
-    assert "--milestone" not in release_create_call(recorder)
+    assert not any(argument.startswith("milestones[]=") for argument in release_create_call(recorder))
     assert "Released v1.3.0" in result.output
 
 
 def test_release_reports_success_even_when_the_release_publish_fails(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.exit_codes["release create"] = 1
+    recorder.exit_codes["POST projects/:id/releases"] = 1
 
     result = cli.invoke(app, ["release"])
 
@@ -256,6 +267,23 @@ def test_release_skips_the_sweep_when_the_milestone_could_not_be_opened(recorder
 
     assert result.exit_code == 0
     assert not any("PUT" in command for command in recorder.commands)
+
+
+def test_create_release_retries_until_the_tag_registers(monkeypatch: pytest.MonkeyPatch):
+    """A POST that fails while GitLab's replicas have not caught up with the pushed tag is retried."""
+    responses = iter([(1, "tag not yet visible"), (0, "{}")])
+    calls: list[list[str]] = []
+
+    def fake_run_quiet(args: list[str], **kwargs: object) -> tuple[int, str]:
+        calls.append(args)
+        return next(responses)
+
+    monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+    release.create_release("v1.2.4", "notes", None)
+
+    assert len(calls) == 2
 
 
 def test_merge_request_is_none_on_an_unparseable_response(monkeypatch: pytest.MonkeyPatch):

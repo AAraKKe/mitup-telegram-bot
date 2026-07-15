@@ -16,6 +16,8 @@ PIPELINE_POLL_INTERVAL_SECONDS = 3
 PIPELINE_POLL_ATTEMPTS = 20
 TAG_POLL_INTERVAL_SECONDS = 2
 TAG_POLL_ATTEMPTS = 15
+RELEASE_POST_INTERVAL_SECONDS = 3
+RELEASE_POST_ATTEMPTS = 5
 
 Version = tuple[int, int, int]
 
@@ -283,15 +285,42 @@ def ensure_milestone(title: str) -> bool:
 def create_release(version: str, notes: str, milestone: str | None):
     """Publish a GitLab release for *version*, titled with the tag and milestoned when *milestone* is set.
 
-    Runs after the tag is pushed, so a failure is non-fatal: the tag and its deploy pipeline
-    already stand, and the release can be cut by hand from the existing tag if this step fails.
-    Passing no milestone (because it could not be opened) still publishes the release, just unlinked.
+    The release is POSTed to the REST API directly with only `tag_name` — never a ref — so GitLab
+    can do nothing but attach it to the already-pushed tag. `glab release create` instead validates
+    the tag with its own API read first, and GitLab's replicas are eventually consistent: when that
+    read misses the fresh tag, glab falls back to creating the tag from a ref, which the protected
+    `v*` pattern rejects with a 403. Without a ref, a stale replica merely fails the request, and
+    the POST is retried until the tag registers.
+
+    Runs after the tag is pushed, so exhausting the retries is non-fatal: the tag and its deploy
+    pipeline already stand, and the release can be cut by hand from the existing tag.
     """
-    args = ["glab", "release", "create", version, "--name", version, "--notes", notes]
+    args = [
+        "glab",
+        "api",
+        "-X",
+        "POST",
+        "projects/:id/releases",
+        "-f",
+        f"tag_name={version}",
+        "-f",
+        f"name={version}",
+        "-f",
+        f"description={notes}",
+    ]
     if milestone is not None:
-        args += ["--milestone", milestone]
-    if runner.run_step(f"Creating release {version}", args) != 0:
-        console.warn(f"Could not create the GitLab release for {version}; the tag is pushed, so create it manually.")
+        args += ["-f", f"milestones[]={milestone}"]
+
+    output = ""
+    for attempt in range(RELEASE_POST_ATTEMPTS):
+        exit_code, output = runner.run_quiet(args)
+        if exit_code == 0:
+            console.info(f"Created release {version}")
+            return
+        if attempt < RELEASE_POST_ATTEMPTS - 1:
+            time.sleep(RELEASE_POST_INTERVAL_SECONDS)
+    console.warn(f"Could not create the GitLab release for {version}; the tag is pushed, so create it manually.")
+    console.raw(output.rstrip())
 
 
 def release_command(
