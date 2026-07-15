@@ -19,8 +19,8 @@ from mitup_bot.events.service import (
     IntervalsConfiguration,
     build_bot,
     build_broadcast_bot,
+    dispatch_event,
     handle_maintainance,
-    launch_event,
     run_all_tasks,
     run_periodic,
     select_bot,
@@ -132,23 +132,23 @@ SYNC_LAUNCH_PARAMS = [
     ASYNC_LAUNCH_PARAMS,
     ids=[e.name for e, _ in ASYNC_LAUNCH_PARAMS],
 )
-async def test_launch_event_async(event_type: EventType, module_path: str):
+async def test_dispatch_event_async(event_type: EventType, module_path: str):
     api = MockApi()
     client = make_test_metrics_client()
 
     with patch(f"{module_path}.run", new_callable=AsyncMock) as mock_run:
-        await launch_event(event_type, api, client, [])
+        await dispatch_event(event_type, api, client, [])
         mock_run.assert_awaited_once_with(api, client)
 
 
-async def test_launch_event_send_broadcasts():
+async def test_dispatch_event_send_broadcasts():
     """SEND_BROADCASTS dispatches send_broadcasts.run with the operator allowlist appended."""
     api = MockApi()
     client = make_test_metrics_client()
     admin_tg_ids = [111, 222]
 
     with patch("mitup_bot.events.service.broadcast.run", new_callable=AsyncMock) as mock_run:
-        await launch_event(EventType.SEND_BROADCASTS, api, client, admin_tg_ids)
+        await dispatch_event(EventType.SEND_BROADCASTS, api, client, admin_tg_ids)
         mock_run.assert_awaited_once_with(api, client, admin_tg_ids)
 
 
@@ -157,19 +157,26 @@ async def test_launch_event_send_broadcasts():
     SYNC_LAUNCH_PARAMS,
     ids=[e.name for e, _ in SYNC_LAUNCH_PARAMS],
 )
-async def test_launch_event_sync(event_type: EventType, module_path: str):
+async def test_dispatch_event_sync(event_type: EventType, module_path: str):
     api = MockApi()
     client = make_test_metrics_client()
 
     with patch(f"{module_path}.run") as mock_run:
-        await launch_event(event_type, api, client, [])
+        await dispatch_event(event_type, api, client, [])
         mock_run.assert_called_once_with(api, client)
 
 
-async def test_launch_event_binds_event_contextvars():
+async def run_maintainance_with_mocked_db(event_type: EventType, client: MetricsClient):
+    """Run handle_maintainance with the db module mocked out, for tests that only care about
+    logging side effects."""
+    with patch("mitup_bot.events.service.db") as mock_db:
+        mock_db.get_open_connections.return_value = 0
+        await handle_maintainance(event_type, MagicMock(), [], client=client)
+
+
+async def test_handle_maintainance_binds_event_contextvars():
     """A log emitted while an event runs carries flow/event_type (both the dispatched EventType.value)
-    and a run_id, bound by launch_event for the duration of the dispatched run()."""
-    api = MockApi()
+    and a run_id, bound by handle_maintainance for the duration of the run."""
     client = make_test_metrics_client()
 
     def run_emitting_log(_api: object, _client: object):
@@ -177,7 +184,7 @@ async def test_launch_event_binds_event_contextvars():
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with patch("mitup_bot.events.service.user_cleanup.run", side_effect=run_emitting_log):
-            await launch_event(EventType.USER_CLEANUP, api, client, [])
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
 
     event_logs = [log for log in logs if log["event"] == "event running"]
     assert len(event_logs) == 1
@@ -190,16 +197,15 @@ async def test_launch_event_binds_event_contextvars():
     assert len(run_id) == 32  # uuid4().hex
 
 
-async def test_launch_event_clears_contextvars_between_events():
+async def test_handle_maintainance_clears_contextvars_between_events():
     """bound_contextvars auto-clears on exit, so flow/event_type/run_id must not leak from one event
-    into a log emitted after launch_event returns (events run back-to-back in run_periodic)."""
-    api = MockApi()
+    into a log emitted after handle_maintainance returns (events run back-to-back in run_periodic)."""
     client = make_test_metrics_client()
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with patch("mitup_bot.events.service.user_cleanup.run"):
-            await launch_event(EventType.USER_CLEANUP, api, client, [])
-        # Emitted after launch_event returned — must carry neither event field.
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
+        # Emitted after handle_maintainance returned — must carry neither event field.
         structlog.get_logger("mitup_bot").info("between events")
 
     after_logs = [log for log in logs if log["event"] == "between events"]
@@ -210,9 +216,8 @@ async def test_launch_event_clears_contextvars_between_events():
     assert "run_id" not in entry
 
 
-async def test_launch_event_uses_distinct_run_id_per_invocation():
-    """Each launch_event invocation generates a fresh run_id so back-to-back events are distinguishable."""
-    api = MockApi()
+async def test_handle_maintainance_uses_distinct_run_id_per_invocation():
+    """Each run generates a fresh run_id so back-to-back events are distinguishable."""
     client = make_test_metrics_client()
 
     def capture_run_id(_api: object, _client: object):
@@ -220,12 +225,35 @@ async def test_launch_event_uses_distinct_run_id_per_invocation():
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with patch("mitup_bot.events.service.user_cleanup.run", side_effect=capture_run_id):
-            await launch_event(EventType.USER_CLEANUP, api, client, [])
-            await launch_event(EventType.USER_CLEANUP, api, client, [])
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
 
     run_ids = [log["run_id"] for log in logs if log["event"] == "event running"]
     assert len(run_ids) == 2
     assert run_ids[0] != run_ids[1]
+
+
+async def test_handle_maintainance_fault_logs_exception_under_run_context():
+    """A failing run produces one structlog error line with the exception attached, emitted while
+    flow/event_type/run_id are still bound — the log-side half of fault triage."""
+    client = make_test_metrics_client()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch(
+            "mitup_bot.events.service.dispatch_event",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("boom"),
+        ):
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
+
+    fault_logs = [log for log in logs if log["event"] == "Recurrent event run failed"]
+    assert len(fault_logs) == 1
+    entry = fault_logs[0]
+    assert entry["log_level"] == "error"
+    assert entry["exc_info"] is True  # log.exception attaches the active exception
+    assert entry["flow"] == EventType.USER_CLEANUP.value
+    assert entry["event_type"] == EventType.USER_CLEANUP.value
+    assert len(entry["run_id"]) == 32
 
 
 MAINTAINANCE_PARAMS = [
@@ -257,10 +285,10 @@ async def test_handle_maintainance(
 
     with (
         patch(
-            "mitup_bot.events.service.launch_event",
+            "mitup_bot.events.service.dispatch_event",
             new_callable=AsyncMock,
             side_effect=launch_side_effect,
-        ) as mock_launch,
+        ) as mock_dispatch,
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.build_api", return_value=fake_api),
         patch("mitup_bot.events.service.MetricsClient", side_effect=make_client),
@@ -272,7 +300,7 @@ async def test_handle_maintainance(
         mock_db.set_connection_context.assert_called_once_with(event_type.value)
         assert len(captured_client) == 1
         client = captured_client[0]
-        mock_launch.assert_awaited_once_with(event_type, fake_api, client, [])
+        mock_dispatch.assert_awaited_once_with(event_type, fake_api, client, [])
 
         assertions = MetricAssertions(client)
         assertions.assert_emitted(
@@ -336,7 +364,7 @@ async def test_handle_maintainance_emits_telegram_api_time_metrics():
 
     with (
         patch(
-            "mitup_bot.events.service.launch_event",
+            "mitup_bot.events.service.dispatch_event",
             side_effect=trigger_api_call,
         ),
         patch("mitup_bot.events.service.db") as mock_db,
@@ -413,7 +441,7 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
 
     with (
         patch(
-            "mitup_bot.events.service.launch_event",
+            "mitup_bot.events.service.dispatch_event",
             new_callable=AsyncMock,
             side_effect=launch_side_effect,
         ),
@@ -443,6 +471,40 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
     assert dimensionless["Fault"] == expected_fault
     assert dimensionless["EventType"] == event_type.value
     assert all("EventType" not in dims for dims in dimension_sets(dimensionless))
+
+    # Every EMF record of the run carries the same run_id property, matching the run's structlog
+    # contextvar so Fault records can be joined to their log lines.
+    assert len(dimensioned["run_id"]) == 32
+    assert dimensioned["run_id"] == dimensionless["run_id"]
+
+
+async def test_handle_maintainance_fault_trace_reaches_both_emf_records():
+    """A run that fails before emitting any metric still serializes the stack trace onto BOTH the
+    EventType-dimensioned Fault record and the dimensionless global copy — the record the
+    Mitup/Events alarm and `Fault = 1` Logs Insights queries surface."""
+    event_type = EventType.USER_CLEANUP
+    backend, sink = build_capturing_backend()
+    client = MetricsClient(backend, base_dimensions={"EventType": event_type.value})
+
+    with (
+        patch(
+            "mitup_bot.events.service.dispatch_event",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.build_api"),
+    ):
+        mock_db.get_open_connections.return_value = 0
+        await handle_maintainance(event_type, MagicMock(), [], client=client)
+
+    payloads = [json.loads(line) for line in sink.serialized]
+    assert len(payloads) == 2
+
+    for payload in payloads:
+        assert payload["Fault"] == 1
+        assert "RuntimeError" in str(payload["exception"])
+        assert "boom" in str(payload["exception"])
 
 
 async def test_run_periodic_runs_event():

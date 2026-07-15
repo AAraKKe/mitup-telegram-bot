@@ -148,35 +148,41 @@ async def dispatch_event(
             assert_never(never)  # pragma: no cover
 
 
-async def launch_event(event_type: EventType, api: TelegramApiWrapper, client: MetricsClient, admin_tg_ids: list[int]):
-    with structlog.contextvars.bound_contextvars(
-        flow=event_type.value, event_type=event_type.value, run_id=uuid4().hex
-    ):
-        await dispatch_event(event_type, api, client, admin_tg_ids)
-
-
 async def handle_maintainance(
     event_type: EventType, bot: ExtBot, admin_tg_ids: list[int], client: MetricsClient | None = None
 ):
     client = client or MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.value})
     api = build_api(BotAdapter(bot, client))
 
+    # run_id rides on every EMF record of this run as a global property, so a Fault record in
+    # CloudWatch joins the structlog lines that carry the same run_id via contextvars.
+    run_id = uuid4().hex
+    client.set_global_property("run_id", run_id)
+
     start_time = perf_counter()
     fault = False
-    try:
-        db.set_connection_context(event_type.value)
-        await launch_event(event_type, api, client, admin_tg_ids)
-    except Exception:
-        fault = True
-        client.add_stack_trace("exception")
-    finally:
-        # emit_global adds a dimensionless copy of Fault/Time so a single Mitup/Events alarm can
-        # watch "any event type is failing"/aggregate run duration; EventType stays as an EMF
-        # property on those copies for per-event breakdown in Logs Insights.
-        client.emit(MetricKey.FAULT, 1 if fault else 0, MetricUnit.COUNT, emit_global=True)
-        client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS, emit_global=True)
-        client.emit(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections(event_type.value), MetricUnit.COUNT)
-        await client.flush()
+    with structlog.contextvars.bound_contextvars(flow=event_type.value, event_type=event_type.value, run_id=run_id):
+        try:
+            db.set_connection_context(event_type.value)
+            await dispatch_event(event_type, api, client, admin_tg_ids)
+        except Exception:
+            fault = True
+            # Emit the fault before attaching the trace: add_stack_trace only reaches EMF loggers
+            # that already exist, and this emit is what creates the dimensionless global logger.
+            # The trace itself must be captured inside the except block — the EMF library reads
+            # sys.exc_info(), which Python clears once the block exits.
+            client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
+            client.add_stack_trace("exception")
+            log.exception("Recurrent event run failed")
+        finally:
+            # emit_global adds a dimensionless copy of Fault/Time so a single Mitup/Events alarm can
+            # watch "any event type is failing"/aggregate run duration; EventType stays as an EMF
+            # property on those copies for per-event breakdown in Logs Insights.
+            if not fault:
+                client.emit(MetricKey.FAULT, 0, MetricUnit.COUNT, emit_global=True)
+            client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS, emit_global=True)
+            client.emit(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections(event_type.value), MetricUnit.COUNT)
+            await client.flush()
 
 
 async def run_periodic(
