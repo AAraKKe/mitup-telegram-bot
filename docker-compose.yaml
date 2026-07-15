@@ -50,6 +50,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Throwaway Postgres for the legacy Rails pg_dump, used only by the one-off rails migration.
+  # No volume: every `docker compose up` starts from an empty database, ready for a fresh restore.
+  heroku-postgres:
+    image: postgres:18.4
+    restart: always
+    environment:
+      POSTGRES_USER: mitupbot
+      POSTGRES_PASSWORD: 12345pass
+      POSTGRES_DB: rails
+    ports:
+      - 5445:5432
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U mitupbot -d rails" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   mitup: &launch-bot
     image: mitup-bot-dev
     depends_on:

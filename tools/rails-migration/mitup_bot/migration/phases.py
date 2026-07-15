@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import func
-from sqlmodel import select
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.migration.archive import ArchiveWriter
@@ -278,6 +278,23 @@ async def migrate_joins(
     return summary
 
 
+async def load_join_pairs(session: AsyncSession) -> dict[tuple[int, int], int]:
+    """Map every (user_id, meetup_id) pair in joined_users to the row's id.
+
+    Column-only select on purpose: loading JoinedUsers entities fires the model's selectin
+    relationship loads (user, invited_by, and meetup — which in turn selectin-loads its
+    owner, messages, and every joined_link), so a per-invitation entity lookup costs many
+    queries per row. One columns-only pass keeps the invitations phase at a single query
+    up front plus a dict hit per row.
+    """
+    rows = await session.exec(select(JoinedUsers.user_id, JoinedUsers.meetup_id, JoinedUsers.id))
+    return {
+        (user_id, meetup_id): join_id
+        for user_id, meetup_id, join_id in rows
+        if user_id is not None and meetup_id is not None and join_id is not None
+    }
+
+
 async def migrate_invitations(
     *,
     session: AsyncSession,
@@ -292,6 +309,7 @@ async def migrate_invitations(
     await reporter.phase_start("invitations", "invitations")
     user_map = await audit.existing_mapping("users")
     meetup_map = await audit.existing_mapping("meetups")
+    join_pairs = await load_join_pairs(session)
     already = await audit.processed_old_ids("invitations")
 
     for row in reader.stream("SELECT * FROM invitations ORDER BY id"):
@@ -315,27 +333,23 @@ async def migrate_invitations(
             await record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "phantom-or-not-migrated")
             continue
 
-        join = (
-            await session.exec(
-                select(JoinedUsers).where((JoinedUsers.user_id == friend_new) & (JoinedUsers.meetup_id == meetup_new))
-            )
-        ).first()
-        if join is None:
+        join_id = join_pairs.get((friend_new, meetup_new))
+        if join_id is None:
             summary.skipped += 1
             await record_row_skipped(metrics, mode, "invitations", audit, reporter, old_id, "no-joined-link")
             continue
 
         try:
             async with session.begin_nested():
-                for key, value in map_invitation(host_new).items():
-                    setattr(join, key, value)
-                session.add(join)
+                await session.exec(
+                    update(JoinedUsers).where(col(JoinedUsers.id) == join_id).values(**map_invitation(host_new))
+                )
         except Exception as exc:  # noqa: BLE001
             summary.failed += 1
             await record_row_failed(metrics, mode, "invitations", audit, reporter, old_id, repr(exc))
             continue
         summary.inserted += 1
-        await record_row_inserted(metrics, mode, "invitations", audit, reporter, old_id, int(join.id or 0))
+        await record_row_inserted(metrics, mode, "invitations", audit, reporter, old_id, join_id)
 
     summary.duration_ms = int((time.perf_counter() - start) * 1000)
     emit_phase_duration(metrics, mode, "invitations", summary.duration_ms)

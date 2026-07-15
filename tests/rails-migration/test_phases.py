@@ -1,12 +1,15 @@
 from collections.abc import Iterator
+from contextlib import asynccontextmanager
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from mitup_bot.migration import phases
 from mitup_bot.migration.archive import ArchiveWriter
+from mitup_bot.migration.audit import AuditStatus
 from mitup_bot.migration.modes import MigrationMode
-from mitup_bot.migration.phases import run_migration
+from mitup_bot.migration.phases import load_join_pairs, migrate_invitations, run_migration
 from mitup_bot.migration.rails_reader import RailsReader
 from mitup_bot.migration.reporting import MigrationReporter, OutputMode
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
@@ -167,6 +170,71 @@ async def test_run_migration_unknown_phase_raises_value_error():
             phases=("nonsense",),
             reporter=make_reporter(),
         )
+
+
+async def test_load_join_pairs_maps_pairs_and_drops_null_columns():
+    session = MagicMock()
+    session.exec = AsyncMock(return_value=[(10, 20, 5), (None, 20, 6), (10, None, 7)])
+
+    pairs = await load_join_pairs(session)
+
+    assert pairs == {(10, 20): 5}
+
+
+async def test_migrate_invitations_updates_joins_from_preloaded_pairs(monkeypatch: pytest.MonkeyPatch):
+    reader = _StubRailsReader(
+        rows_by_query={
+            "FROM invitations": [
+                {"id": 1, "friend_id": 1, "host_id": 3, "meetup_id": 2},  # updates join row 5
+                {"id": 2, "friend_id": 1, "host_id": 3, "meetup_id": 9},  # meetup never migrated
+                {"id": 3, "friend_id": 4, "host_id": 3, "meetup_id": 2},  # no joined_users row
+                {"id": 4, "friend_id": None, "host_id": 3, "meetup_id": 2},  # null fk
+            ]
+        }
+    )
+    audit = MagicMock()
+    audit.processed_old_ids = AsyncMock(return_value=set())
+    audit.existing_mapping = AsyncMock(
+        side_effect=lambda table: {"users": {1: 10, 3: 30, 4: 40}, "meetups": {2: 20}}[table]
+    )
+    audit.record = AsyncMock()
+
+    session = MagicMock()
+    session.exec = AsyncMock()
+
+    @asynccontextmanager
+    async def fake_begin_nested():
+        yield
+
+    session.begin_nested = fake_begin_nested
+    monkeypatch.setattr(phases, "load_join_pairs", AsyncMock(return_value={(10, 20): 5}))
+    metrics, _ = make_metrics()
+
+    summary = await migrate_invitations(
+        session=session,
+        reader=cast(RailsReader, reader),
+        audit=audit,
+        metrics=metrics,
+        mode=MigrationMode.DRY_RUN,
+        reporter=make_reporter(),
+    )
+
+    assert (summary.read, summary.inserted, summary.skipped, summary.failed) == (4, 1, 3, 0)
+
+    # Exactly one statement runs against the session: the UPDATE grafting the host's new id
+    # onto the matched joined_users row. The pair lookup itself is a dict hit, not a query.
+    assert session.exec.await_count == 1
+    statement = session.exec.await_args_list[0].args[0]
+    compiled = str(statement.compile(compile_kwargs={"literal_binds": True}))
+    assert "UPDATE joined_users SET invited_by_id=30" in compiled
+    assert "WHERE joined_users.id = 5" in compiled
+
+    audit.record.assert_any_await("invitations", 1, new_id=5, status=AuditStatus.INSERTED)
+    audit.record.assert_any_await(
+        "invitations", 2, new_id=None, status=AuditStatus.SKIPPED, note="phantom-or-not-migrated"
+    )
+    audit.record.assert_any_await("invitations", 3, new_id=None, status=AuditStatus.SKIPPED, note="no-joined-link")
+    audit.record.assert_any_await("invitations", 4, new_id=None, status=AuditStatus.SKIPPED, note="null-fk")
 
 
 def test_stub_reader_conforms_to_rails_reader_protocol():

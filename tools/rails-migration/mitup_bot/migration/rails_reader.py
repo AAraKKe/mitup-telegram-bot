@@ -1,9 +1,13 @@
+import logging
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from typing import Any, LiteralString, cast
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
+
+log = logging.getLogger("mitup_bot.migration")
 
 
 class RailsReader(AbstractContextManager["RailsReader"]):
@@ -13,13 +17,21 @@ class RailsReader(AbstractContextManager["RailsReader"]):
     materialize whole tables in memory.
     """
 
-    def __init__(self, dsn: str, batch_size: int = 1000):
+    def __init__(self, dsn: str, batch_size: int = 1000, connect_timeout: int = 10):
         self._dsn = dsn
         self._batch_size = batch_size
+        self._connect_timeout = connect_timeout
         self._conn: psycopg.Connection | None = None
 
     def __enter__(self) -> RailsReader:
-        self._conn = psycopg.connect(self._dsn, autocommit=False)
+        target = conninfo_to_dict(self._dsn)
+        log.info(
+            "Connecting to Rails DB at %s:%s (connect timeout %ds)",
+            target.get("host"),
+            target.get("port"),
+            self._connect_timeout,
+        )
+        self._conn = psycopg.connect(self._dsn, autocommit=False, connect_timeout=self._connect_timeout)
         self._conn.read_only = True
         return self
 

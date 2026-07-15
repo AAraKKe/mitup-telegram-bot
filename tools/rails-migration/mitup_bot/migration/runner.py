@@ -12,6 +12,8 @@ from .reporting import MigrationReporter, OutputMode
 
 ALL_PHASES = ("users", "meetups", "joins", "invitations", "messages", "archive", "verify")
 
+log = logging.getLogger("mitup_bot.migration")
+
 
 class DryRunDiscard(Exception):
     """Raised inside a db.begin() block to trigger rollback while preserving the report."""
@@ -46,6 +48,7 @@ async def run_migration_pipeline(
     mode: MigrationMode,
     metrics: MetricsClient,
     reporter: MigrationReporter,
+    connect_timeout: int = 10,
 ) -> dict[str, Any]:
     """Execute the pipeline inside a single DB transaction.
 
@@ -55,12 +58,14 @@ async def run_migration_pipeline(
     returned to the caller. Per-row failures are isolated via SAVEPOINTs inside each
     phase, so they don't abort the outer transaction.
     """
+    log.info("Starting migration pipeline (mode=%s, phases=%s)", mode, ", ".join(phases))
     writer = ArchiveWriter(s3_uri=archive_s3_uri, dry_run=mode is MigrationMode.DRY_RUN)
     report: dict[str, Any] = {}
     try:
         # RailsReader stays a sync context manager (psycopg's blocking API), so it cannot
         # join the async with.
-        with RailsReader(rails_url, batch_size=batch_size) as reader:
+        with RailsReader(rails_url, batch_size=batch_size, connect_timeout=connect_timeout) as reader:
+            log.info("Connecting to target DB…")
             async with db.begin() as session:
                 report = await run_migration(
                     session=session,
@@ -75,6 +80,7 @@ async def run_migration_pipeline(
                     raise DryRunDiscard()
     except DryRunDiscard:
         pass
+    log.info("Migration pipeline complete (mode=%s)", mode)
     return report
 
 
@@ -86,9 +92,12 @@ async def run_pipeline_then_flush(
     mode: MigrationMode,
     metrics: MetricsClient,
     reporter: MigrationReporter,
+    connect_timeout: int = 10,
 ) -> dict[str, Any]:
     """Single event-loop entry point: the engine and the final metrics flush share one loop."""
-    report = await run_migration_pipeline(rails_url, archive_s3_uri, batch_size, phases, mode, metrics, reporter)
+    report = await run_migration_pipeline(
+        rails_url, archive_s3_uri, batch_size, phases, mode, metrics, reporter, connect_timeout
+    )
     await metrics.flush()
     return report
 
