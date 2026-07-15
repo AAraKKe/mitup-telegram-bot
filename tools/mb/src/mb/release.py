@@ -29,12 +29,15 @@ class Pipeline(BaseModel):
 PipelineList = TypeAdapter(list[Pipeline])
 
 
-class MergeRequest(BaseModel):
-    title: str
-
-
 class Milestone(BaseModel):
     title: str
+    id: int | None = None
+
+
+class MergeRequest(BaseModel):
+    iid: int
+    title: str
+    milestone: Milestone | None = None
 
 
 MilestoneList = TypeAdapter(list[Milestone])
@@ -183,23 +186,72 @@ def merge_request_ids(previous_tag: str | None, sha: str) -> list[int]:
     return ids
 
 
-def merge_request_title(iid: int) -> str | None:
-    """Title of merge request *iid* via the GitLab API, or None when the lookup fails."""
+def merge_request(iid: int) -> MergeRequest | None:
+    """Merge request *iid* via the GitLab API, or None when the lookup fails."""
     exit_code, output = runner.run_quiet(["glab", "api", f"projects/:id/merge_requests/{iid}"])
     if exit_code != 0:
         return None
     try:
-        return MergeRequest.model_validate_json(output).title
+        return MergeRequest.model_validate_json(output)
     except ValidationError:
         return None
 
 
-def build_release_notes(previous_tag: str | None, sha: str) -> str:
-    """Changelog body listing every merge request that shipped since *previous_tag* as `[!IID] title`."""
-    lines = [
-        f"- [!{iid}] {title}" for iid in merge_request_ids(previous_tag, sha) if (title := merge_request_title(iid))
-    ]
-    return "\n".join(lines)
+def shipped_merge_requests(previous_tag: str | None, sha: str) -> list[MergeRequest]:
+    """The merge requests shipping in this release, newest first, dropping any that cannot be fetched.
+
+    Fetched once and shared by the release notes and the milestone sweep, so each MR costs a single
+    API call.
+    """
+    return [mr for iid in merge_request_ids(previous_tag, sha) if (mr := merge_request(iid))]
+
+
+def build_release_notes(merge_requests: list[MergeRequest]) -> str:
+    """Changelog body listing every shipped merge request as `[!IID] title`."""
+    return "\n".join(f"- [!{mr.iid}] {mr.title}" for mr in merge_requests)
+
+
+def milestone_id(title: str) -> int | None:
+    """Numeric id of the project milestone titled *title*, or None when it cannot be resolved."""
+    exit_code, output = runner.run_quiet(["glab", "api", f"projects/:id/milestones?title={title}"])
+    if exit_code != 0:
+        return None
+    try:
+        milestones = MilestoneList.validate_json(output)
+    except ValidationError:
+        return None
+    return milestones[0].id if milestones else None
+
+
+def assign_merge_requests_to_milestone(merge_requests: list[MergeRequest], title: str):
+    """Set milestone *title* on every shipped merge request that has none yet.
+
+    An MR that already carries a milestone was assigned deliberately (e.g. to a later version), so
+    it is left untouched. Runs after the release is published, so every failure is non-fatal: the
+    milestone can always be set by hand from the release's changelog list.
+    """
+    unassigned: list[MergeRequest] = []
+    for mr in merge_requests:
+        if mr.milestone is None:
+            unassigned.append(mr)
+        else:
+            console.info(f"!{mr.iid} already belongs to {mr.milestone.title}; leaving it")
+    if not unassigned:
+        return
+
+    resolved_id = milestone_id(title)
+    if resolved_id is None:
+        console.warn(f"Could not resolve the id of milestone {title}; assign the shipped MRs manually.")
+        return
+
+    for mr in unassigned:
+        exit_code, _ = runner.run_quiet(
+            ["glab", "api", "-X", "PUT", f"projects/:id/merge_requests/{mr.iid}", "-f", f"milestone_id={resolved_id}"]
+        )
+        if exit_code == 0:
+            console.info(f"Assigned {title} to !{mr.iid} {mr.title}")
+        else:
+            console.warn(f"Could not assign {title} to !{mr.iid}; set it manually.")
 
 
 def milestone_exists(title: str) -> bool:
@@ -246,7 +298,8 @@ def release_command(
     minor: Annotated[bool, typer.Option("--minor", help="Bump the minor version (the default).")] = False,
     major: Annotated[bool, typer.Option("--major", help="Bump the major version instead of the minor.")] = False,
 ):
-    """Tag origin/main's green tip as a `v*` release, publish it with notes, and open the runway milestone.
+    """Tag origin/main's green tip as a `v*` release, publish it with notes, open the runway
+    milestone, and milestone the shipped merge requests.
 
     Reads nothing from the local checkout: the release always ships the freshest origin/main
     commit, so a dirty tree, untracked files, or a feature branch never block or influence it.
@@ -273,7 +326,10 @@ def release_command(
         tag_visible = wait_for_tag(version)
     if not tag_visible:
         console.warn(f"Tag {version} is not visible via the API yet; the release may fail to attach.")
-    create_release(version, build_release_notes(previous_tag, sha), milestone)
+    shipped = shipped_merge_requests(previous_tag, sha)
+    create_release(version, build_release_notes(shipped), milestone)
+    if milestone is not None:
+        assign_merge_requests_to_milestone(shipped, milestone)
 
     console.success(f"Released {version}")
     with console.spinner("Waiting for the deploy pipeline to start"):

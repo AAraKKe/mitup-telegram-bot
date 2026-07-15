@@ -122,8 +122,8 @@ def test_release_creates_gitlab_release_titled_and_milestoned_with_the_tag(recor
 def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: CommandRecorder):
     green_repo(recorder)
     recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\nMerge (!12) into main\n"
-    recorder.captured_outputs["merge_requests/34"] = json.dumps({"title": "Add the widget"})
-    recorder.captured_outputs["merge_requests/12"] = json.dumps({"title": "Fix the gadget"})
+    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
+    recorder.captured_outputs["merge_requests/12"] = json.dumps({"iid": 12, "title": "Fix the gadget"})
 
     cli.invoke(app, ["release"])
 
@@ -135,9 +135,9 @@ def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: Comm
 
 def test_release_notes_dedupe_references_and_drop_unfetchable_titles(recorder: CommandRecorder):
     green_repo(recorder)
-    # !34 is referenced twice (deduplicated); !12's title cannot be fetched, so it is dropped.
+    # !34 is referenced twice (deduplicated); !12 cannot be fetched, so it is dropped.
     recorder.captured_outputs["log --format"] = "Ship it (!34)\n\nMerge (!12) into main\nFollow-up (!34)\n"
-    recorder.captured_outputs["merge_requests/34"] = json.dumps({"title": "Add the widget"})
+    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.exit_codes["merge_requests/12"] = 1
 
     cli.invoke(app, ["release"])
@@ -198,10 +198,70 @@ def test_release_warns_but_still_publishes_when_the_tag_never_registers(recorder
     assert release_create_call(recorder)  # the release is still attempted rather than aborted
 
 
-def test_merge_request_title_is_none_on_an_unparseable_response(monkeypatch: pytest.MonkeyPatch):
+def test_release_milestones_shipped_mrs_and_leaves_manual_assignments(recorder: CommandRecorder):
+    green_repo(recorder)
+    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\nMerge (!12) into main\n"
+    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
+    recorder.captured_outputs["merge_requests/12"] = json.dumps(
+        {"iid": 12, "title": "Fix the gadget", "milestone": {"title": "v9.9.9"}}
+    )
+    recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])
+
+    result = cli.invoke(app, ["release"])
+
+    assert result.exit_code == 0
+    assert ["glab", "api", "-X", "PUT", "projects/:id/merge_requests/34", "-f", "milestone_id=77"] in recorder.commands
+    assert "Assigned v1.3.0 to !34 Add the widget" in result.output
+    # !12 was milestoned by hand (to a later version); the sweep must not overwrite it.
+    assert not any("PUT" in command and "merge_requests/12" in " ".join(command) for command in recorder.commands)
+    assert "!12 already belongs to v9.9.9; leaving it" in result.output
+
+
+def test_release_sweep_warns_when_the_milestone_id_cannot_be_resolved(recorder: CommandRecorder):
+    green_repo(recorder)
+    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n"
+    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
+    recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0"}])  # id missing
+
+    result = cli.invoke(app, ["release"])
+
+    assert result.exit_code == 0
+    assert "Could not resolve the id of milestone v1.3.0" in result.output
+    assert not any("PUT" in command for command in recorder.commands)
+
+
+def test_release_sweep_warns_but_continues_when_an_assignment_fails(recorder: CommandRecorder):
+    green_repo(recorder)
+    recorder.captured_outputs["log --format"] = "Ship it (!34)\nFix it (!35)\n"
+    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
+    recorder.captured_outputs["merge_requests/35"] = json.dumps({"iid": 35, "title": "Polish the widget"})
+    recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])
+    recorder.exit_codes["-X PUT projects/:id/merge_requests/34"] = 1
+
+    result = cli.invoke(app, ["release"])
+
+    assert result.exit_code == 0
+    assert "Could not assign v1.3.0 to !34" in result.output
+    assert "Assigned v1.3.0 to !35 Polish the widget" in result.output
+    assert "Released v1.3.0" in result.output
+
+
+def test_release_skips_the_sweep_when_the_milestone_could_not_be_opened(recorder: CommandRecorder):
+    green_repo(recorder)
+    recorder.captured_outputs["log --format"] = "Ship it (!34)\n"
+    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
+    recorder.exit_codes["milestone create --title v1.3.0"] = 1
+
+    result = cli.invoke(app, ["release"])
+
+    assert result.exit_code == 0
+    assert not any("PUT" in command for command in recorder.commands)
+
+
+def test_merge_request_is_none_on_an_unparseable_response(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (0, "not-json"))
 
-    assert release.merge_request_title(7) is None
+    assert release.merge_request(7) is None
 
 
 def test_milestone_exists_is_false_when_the_query_fails(monkeypatch: pytest.MonkeyPatch):
