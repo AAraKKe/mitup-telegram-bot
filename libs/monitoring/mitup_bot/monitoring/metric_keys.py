@@ -51,6 +51,8 @@ class MetricKey(CamelCaseStrEnum):
     INACTIVE_USERS = auto()
     """Stat for the total of invited users"""
     INVITED_USERS = auto()
+    """Stat for the total number of users in the database"""
+    TOTAL_USERS = auto()
     """Stat for the total number of active meetings"""
     ACTIVE_MEETINGS = auto()
     """Stat for the total number of meetings with a datetime set"""
@@ -65,6 +67,8 @@ class MetricKey(CamelCaseStrEnum):
     MEETINGS_WITH_INVITATION = auto()
     """Stat for the total number of shared meetings"""
     SHARED_MEETINGS = auto()
+    """Stat for the total number of meetings in the database"""
+    TOTAL_MEETINGS = auto()
     """Number of meetings that should be deactivated"""
     MEETINGS_TO_DEACTIVATE = auto()
     """Number of meetings successfully deactivated"""
