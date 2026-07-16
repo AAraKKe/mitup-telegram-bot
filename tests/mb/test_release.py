@@ -409,12 +409,39 @@ def test_pipeline_url_for_ref_retries_past_a_failed_or_unparseable_poll(monkeypa
     assert release.pipeline_url_for_ref("v1.2.4") == "https://x/5"
 
 
-def test_wait_for_tag_returns_true_once_the_tag_registers(monkeypatch: pytest.MonkeyPatch):
-    responses = iter([(1, "404"), (0, json.dumps({"name": "v1.2.4"}))])
-    monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: next(responses))
+def test_wait_for_tag_requires_consecutive_consistent_reads(monkeypatch: pytest.MonkeyPatch):
+    """The poll returns True only after the tag reads back the required number of times in a row."""
+    found = (0, json.dumps({"name": "v1.2.4"}))
+    responses = iter([(1, "404"), *([found] * release.TAG_POLL_CONSECUTIVE_SUCCESSES)])
+    calls: list[list[str]] = []
+
+    def fake_run_quiet(args: list[str], **kwargs: object) -> tuple[int, str]:
+        calls.append(args)
+        return next(responses)
+
+    monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
     monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.wait_for_tag("v1.2.4") is True
+    assert len(calls) == 1 + release.TAG_POLL_CONSECUTIVE_SUCCESSES
+
+
+def test_wait_for_tag_resets_the_streak_on_a_stale_read(monkeypatch: pytest.MonkeyPatch):
+    """A failed read between successes restarts the consecutive count — one hit on a fresh replica
+    while others are stale must not release the poll early."""
+    found = (0, json.dumps({"name": "v1.2.4"}))
+    responses = iter([found, (1, "404"), *([found] * release.TAG_POLL_CONSECUTIVE_SUCCESSES)])
+    calls: list[list[str]] = []
+
+    def fake_run_quiet(args: list[str], **kwargs: object) -> tuple[int, str]:
+        calls.append(args)
+        return next(responses)
+
+    monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+
+    assert release.wait_for_tag("v1.2.4") is True
+    assert len(calls) == 2 + release.TAG_POLL_CONSECUTIVE_SUCCESSES
 
 
 def test_wait_for_tag_gives_up_after_the_poll_budget(monkeypatch: pytest.MonkeyPatch):

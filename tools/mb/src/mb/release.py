@@ -15,9 +15,13 @@ PIPELINES_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines"
 PIPELINE_POLL_INTERVAL_SECONDS = 3
 PIPELINE_POLL_ATTEMPTS = 20
 TAG_POLL_INTERVAL_SECONDS = 2
-TAG_POLL_ATTEMPTS = 15
-RELEASE_POST_INTERVAL_SECONDS = 3
-RELEASE_POST_ATTEMPTS = 5
+TAG_POLL_ATTEMPTS = 30
+# One successful read proves nothing on gitlab.com: tag lookups are served by replicated Gitaly
+# nodes, so a fresh node can answer 200 while stale ones still miss the tag. Requiring several
+# consecutive hits is the same convergence heuristic the pipeline reads use.
+TAG_POLL_CONSECUTIVE_SUCCESSES = 3
+RELEASE_POST_INTERVAL_SECONDS = 10
+RELEASE_POST_ATTEMPTS = 12
 
 Version = tuple[int, int, int]
 
@@ -155,16 +159,19 @@ def create_and_push_tag(version: str, sha: str):
 
 
 def wait_for_tag(version: str) -> bool:
-    """Poll until the pushed tag is visible to the REST API, returning whether it appeared in time.
+    """Poll until the pushed tag reads back consistently, returning whether it converged in time.
 
     `git push` and the API are eventually consistent. Cutting the release before the API sees the
-    tag makes `glab release create` assume it is missing, default its ref to the branch tip, and
-    ask GitLab to create the tag — which the protected `v*` pattern rejects with a 403. Waiting for
-    the tag to register keeps the release attached to the tag we already pushed.
+    tag makes GitLab's release service treat it as missing and refuse with a protected-tag 403 (the
+    v0.4.0 release hit exactly this even after a single successful tag read). One 200 only proves
+    one replica has the tag, so the poll demands `TAG_POLL_CONSECUTIVE_SUCCESSES` hits in a row —
+    a failed read resets the streak — before the release POST is attempted.
     """
+    consecutive_successes = 0
     for attempt in range(TAG_POLL_ATTEMPTS):
         exit_code, _ = runner.run_quiet(["glab", "api", f"projects/:id/repository/tags/{version}"])
-        if exit_code == 0:
+        consecutive_successes = consecutive_successes + 1 if exit_code == 0 else 0
+        if consecutive_successes >= TAG_POLL_CONSECUTIVE_SUCCESSES:
             return True
         if attempt < TAG_POLL_ATTEMPTS - 1:
             time.sleep(TAG_POLL_INTERVAL_SECONDS)
@@ -290,7 +297,9 @@ def create_release(version: str, notes: str, milestone: str | None):
     the tag with its own API read first, and GitLab's replicas are eventually consistent: when that
     read misses the fresh tag, glab falls back to creating the tag from a ref, which the protected
     `v*` pattern rejects with a 403. Without a ref, a stale replica merely fails the request, and
-    the POST is retried until the tag registers.
+    the POST is retried until the tag registers. The retry budget spans about two minutes
+    (`RELEASE_POST_ATTEMPTS` x `RELEASE_POST_INTERVAL_SECONDS`) because replica convergence has
+    been observed to outlast a short burst of retries even after the tag polls read consistently.
 
     Runs after the tag is pushed, so exhausting the retries is non-fatal: the tag and its deploy
     pipeline already stand, and the release can be cut by hand from the existing tag.
