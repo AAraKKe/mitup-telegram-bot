@@ -1065,6 +1065,7 @@ dependencies = [
     { name = "alembic" },
     { name = "mitup-core" },
     { name = "mitup-data" },
+    { name = "psycopg", extra = ["binary"] },
 ]
 
 [package.metadata]
@@ -1072,6 +1073,7 @@ requires-dist = [
     { name = "alembic", specifier = "==1.18.5" },
     { name = "mitup-core", editable = "libs/core" },
     { name = "mitup-data", editable = "libs/data" },
+    { name = "psycopg", extras = ["binary"], specifier = "==3.3.4" },
 ]
 
 [[package]]

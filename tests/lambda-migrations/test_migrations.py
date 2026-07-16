@@ -8,9 +8,26 @@ from pydantic import ValidationError
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
-from mitup_bot.config import Env
-from mitup_bot.lambdas.migrations import AlembicActions, run_migrations
+from mitup_bot.config import DbConfig, Env
+from mitup_bot.lambdas.migrations import (
+    APP_DB_PASSWORD_ENV,
+    APP_DB_USERNAME_ENV,
+    AlembicActions,
+    app_role_conninfo,
+    app_role_statements,
+    run_migrations,
+)
 from mitup_bot.logging_config import Component
+
+
+def set_app_role_credentials(monkeypatch: pytest.MonkeyPatch, username: str, password: str):
+    monkeypatch.setenv(APP_DB_USERNAME_ENV, username)
+    monkeypatch.setenv(APP_DB_PASSWORD_ENV, password)
+
+
+def clear_app_role_credentials(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv(APP_DB_USERNAME_ENV, raising=False)
+    monkeypatch.delenv(APP_DB_PASSWORD_ENV, raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -199,3 +216,177 @@ def test_clears_invocation_contextvars_after_return():
     entry = after_logs[0]
     for field in ("flow", "action", "revision", "aws_request_id"):
         assert field not in entry
+
+
+def test_app_role_conninfo_strips_async_driver_and_encodes_password():
+    """The conninfo drops the +psycopg async suffix and percent-encodes reserved password bytes so
+    psycopg's libpq parser reads it back intact."""
+    db_config = DbConfig(username="master", password="p@ss:word", url="db.internal", database="mitup", port=5432)
+
+    conninfo = app_role_conninfo(db_config)
+
+    assert conninfo == "postgresql://master:p%40ss%3Aword@db.internal:5432/mitup"
+
+
+def test_app_role_statements_compose_expected_sql():
+    """The composed statements quote the role as an identifier and the password as a literal, and
+    cover create-if-absent, password reset, grants, and default privileges — in that order."""
+    rendered = [statement.as_string(None) for statement in app_role_statements("mitup_app", "s3cr'et")]
+
+    assert rendered == [
+        "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'mitup_app') THEN "
+        'CREATE ROLE "mitup_app" WITH LOGIN; END IF; END $$',
+        "ALTER ROLE \"mitup_app\" WITH LOGIN PASSWORD 's3cr''et'",
+        'GRANT USAGE ON SCHEMA public TO "mitup_app"',
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "mitup_app"',
+        'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "mitup_app"',
+        'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "mitup_app"',
+        'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO "mitup_app"',
+    ]
+
+
+@pytest.mark.parametrize(
+    ("username", "password"),
+    [
+        pytest.param(None, None, id="both-unset"),
+        pytest.param("   ", "top-secret", id="whitespace-username"),
+        pytest.param("mitup_app", None, id="password-unset"),
+        pytest.param("mitup_app", "", id="password-empty"),
+    ],
+)
+def test_app_role_bootstrap_skipped_when_credentials_incomplete(
+    monkeypatch: pytest.MonkeyPatch, username: str | None, password: str | None
+):
+    """With the app-role env vars unset, blank, or only partially configured the bootstrap is a
+    no-op: no DB connection is opened, the skip is logged, and the alembic command still runs."""
+    clear_app_role_credentials(monkeypatch)
+    if username is not None:
+        monkeypatch.setenv(APP_DB_USERNAME_ENV, username)
+    if password is not None:
+        monkeypatch.setenv(APP_DB_PASSWORD_ENV, password)
+
+    with capture_logs() as logs:
+        with mock.patch("mitup_bot.lambdas.migrations.psycopg") as mock_psycopg:
+            with mock.patch("mitup_bot.lambdas.migrations.command") as mock_command:
+                with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                    run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    mock_psycopg.connect.assert_not_called()
+    mock_command.upgrade.assert_called_once()
+    skip_logs = [log for log in logs if log["event"].startswith("App role bootstrap skipped")]
+    assert len(skip_logs) == 1
+
+
+def test_app_role_bootstrap_runs_expected_statements(monkeypatch: pytest.MonkeyPatch):
+    """With credentials set, a psycopg connection is opened in autocommit mode and every composed
+    statement is executed as the master user; the success line carries the role name."""
+    set_app_role_credentials(monkeypatch, "mitup_app", "top-secret")
+
+    cursor = mock.MagicMock(name="cursor")
+
+    with capture_logs() as logs:
+        with mock.patch("mitup_bot.lambdas.migrations.psycopg") as mock_psycopg:
+            with mock.patch("mitup_bot.lambdas.migrations.MitupConfig"):
+                with mock.patch(
+                    "mitup_bot.lambdas.migrations.app_role_conninfo", return_value="postgresql://master@db/mitup"
+                ):
+                    connection = mock_psycopg.connect.return_value.__enter__.return_value
+                    connection.cursor.return_value.__enter__.return_value = cursor
+                    with mock.patch("mitup_bot.lambdas.migrations.command"):
+                        with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                            run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    mock_psycopg.connect.assert_called_once_with("postgresql://master@db/mitup", autocommit=True)
+    executed = [call.args[0].as_string(None) for call in cursor.execute.call_args_list]
+    expected = [statement.as_string(None) for statement in app_role_statements("mitup_app", "top-secret")]
+    assert executed == expected
+    ensured_logs = [log for log in logs if log["event"] == "App role ensured"]
+    assert len(ensured_logs) == 1
+    assert ensured_logs[0]["app_role"] == "mitup_app"
+
+
+def test_invalid_app_role_name_raises_after_alembic_runs(monkeypatch: pytest.MonkeyPatch):
+    """A role name failing the strict pattern fails the invocation (raises) without opening a DB
+    connection. The alembic command has already run — the bootstrap follows it."""
+    set_app_role_credentials(monkeypatch, "Robert'); DROP", "irrelevant")
+
+    with capture_logs() as logs:
+        with mock.patch("mitup_bot.lambdas.migrations.psycopg") as mock_psycopg:
+            with mock.patch("mitup_bot.lambdas.migrations.command") as mock_command:
+                with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                    with pytest.raises(ValueError):
+                        run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    mock_command.upgrade.assert_called_once()
+    mock_psycopg.connect.assert_not_called()
+    error_logs = [log for log in logs if log["event"] == "App role name is invalid"]
+    assert len(error_logs) == 1
+
+
+def test_app_role_bootstrap_failure_logs_and_propagates(monkeypatch: pytest.MonkeyPatch):
+    """A failure while applying the role fails the invocation and logs "App role bootstrap failed"
+    with exc_info so the traceback reaches CloudWatch."""
+    set_app_role_credentials(monkeypatch, "mitup_app", "top-secret")
+
+    with capture_logs() as logs:
+        with mock.patch("mitup_bot.lambdas.migrations.psycopg") as mock_psycopg:
+            mock_psycopg.connect.side_effect = RuntimeError("connection refused")
+            with mock.patch("mitup_bot.lambdas.migrations.MitupConfig"):
+                with mock.patch(
+                    "mitup_bot.lambdas.migrations.app_role_conninfo", return_value="postgresql://master@db/mitup"
+                ):
+                    with mock.patch("mitup_bot.lambdas.migrations.command"):
+                        with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                            with pytest.raises(RuntimeError, match="connection refused"):
+                                run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    failure_logs = [log for log in logs if log["event"] == "App role bootstrap failed"]
+    assert len(failure_logs) == 1
+    assert failure_logs[0]["exc_info"] is True
+
+
+def test_app_role_password_never_appears_in_logs(monkeypatch: pytest.MonkeyPatch):
+    """No captured log line — from any phase of the run — contains the app-role password value."""
+    password = "sup3r-s3cret-r0tat3d"
+    set_app_role_credentials(monkeypatch, "mitup_app", password)
+
+    cursor = mock.MagicMock(name="cursor")
+
+    with capture_logs() as logs:
+        with mock.patch("mitup_bot.lambdas.migrations.psycopg") as mock_psycopg:
+            with mock.patch("mitup_bot.lambdas.migrations.MitupConfig"):
+                with mock.patch(
+                    "mitup_bot.lambdas.migrations.app_role_conninfo", return_value="postgresql://master@db/mitup"
+                ):
+                    connection = mock_psycopg.connect.return_value.__enter__.return_value
+                    connection.cursor.return_value.__enter__.return_value = cursor
+                    with mock.patch("mitup_bot.lambdas.migrations.command"):
+                        with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                            run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    assert not any(password in str(value) for log in logs for value in log.values())
+
+
+def test_app_role_bootstrap_runs_after_alembic_command(monkeypatch: pytest.MonkeyPatch):
+    """Ordering guarantee: the alembic upgrade runs before the psycopg connection is opened, so the
+    grants cover tables the migration just created."""
+    set_app_role_credentials(monkeypatch, "mitup_app", "top-secret")
+
+    manager = mock.Mock()
+    cursor = mock.MagicMock(name="cursor")
+
+    with mock.patch("mitup_bot.lambdas.migrations.psycopg") as mock_psycopg:
+        manager.attach_mock(mock_psycopg.connect, "connect")
+        connection = mock_psycopg.connect.return_value.__enter__.return_value
+        connection.cursor.return_value.__enter__.return_value = cursor
+        with mock.patch("mitup_bot.lambdas.migrations.MitupConfig"):
+            with mock.patch(
+                "mitup_bot.lambdas.migrations.app_role_conninfo", return_value="postgresql://master@db/mitup"
+            ):
+                with mock.patch("mitup_bot.lambdas.migrations.command") as mock_command:
+                    manager.attach_mock(mock_command.upgrade, "upgrade")
+                    with mock.patch("mitup_bot.lambdas.migrations.Config"):
+                        run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    ordered = [call[0] for call in manager.mock_calls if call[0] in {"upgrade", "connect"}]
+    assert ordered == ["upgrade", "connect"]
