@@ -22,6 +22,7 @@ LOG_LEVEL : str (optional, default "INFO")
 
 import json
 import os
+from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -49,7 +50,7 @@ class AlarmState(BaseModel):
 
     value: str
     reason: str | None = None
-    reason_data: str | None = None  # JSON string — kept as-is, never parsed
+    reason_data: str | None = None  # JSON string; parsed on demand, not by pydantic
     timestamp: str | None = None
 
 
@@ -58,7 +59,7 @@ class AlarmPreviousState(BaseModel):
 
     value: str | None = None
     reason: str | None = None
-    reason_data: str | None = None  # JSON string — kept as-is on the model, parsed when building payload
+    reason_data: str | None = None  # JSON string; parsed on demand, not by pydantic
     timestamp: str | None = None
 
 
@@ -154,6 +155,123 @@ def build_alarm_console_url(region: str, alarm_name: str) -> str:
     )
 
 
+def alarm_name_from_arn(arn: str) -> str | None:
+    """Return the alarm name (the ARN segment after ``:alarm:``), or None when absent."""
+    if ":alarm:" not in arn:
+        return None
+    return arn.split(":alarm:", 1)[1]
+
+
+def extract_triggering_alarms(state: AlarmState) -> list[str]:
+    """Return the names of the child alarms that fired a composite alarm.
+
+    Composite alarms carry a ``triggeringAlarms`` list inside the JSON-string ``reason_data``;
+    each entry's name is the ARN segment after ``:alarm:``. Never raises — non-composite or
+    malformed payloads yield an empty list.
+    """
+    parsed = maybe_parse_json(state.reason_data)
+    if not isinstance(parsed, dict):
+        return []
+    triggering = parsed.get("triggeringAlarms")
+    if not isinstance(triggering, list):
+        return []
+    names = (
+        alarm_name_from_arn(entry["arn"])
+        for entry in triggering
+        if isinstance(entry, dict) and isinstance(entry.get("arn"), str)
+    )
+    return [name for name in names if name is not None]
+
+
+def parse_cloudwatch_timestamp(value: str | None) -> datetime | None:
+    """Parse a CloudWatch timestamp (e.g. ``2026-07-15T21:11:41.875+0000``); None on failure."""
+    if value is None:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def format_transition_timestamp(value: str | None) -> str | None:
+    """Render a CloudWatch timestamp without sub-second noise; fall back to the raw value."""
+    parsed = parse_cloudwatch_timestamp(value)
+    if parsed is None:
+        return value
+    return parsed.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def format_outage_duration(previous: str | None, current: str | None) -> str | None:
+    """Human-readable gap between two CloudWatch timestamps (e.g. ``16m``); None when unparseable."""
+    start = parse_cloudwatch_timestamp(previous)
+    end = parse_cloudwatch_timestamp(current)
+    if start is None or end is None:
+        return None
+    seconds = int((end - start).total_seconds())
+    if seconds < 0:
+        return None
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, _remaining_seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m"
+    hours, remaining_minutes = divmod(minutes, 60)
+    return f"{hours}h {remaining_minutes}m"
+
+
+def configuration_description(alarm_data: AlarmData) -> str | None:
+    """Return the operator-facing alarm description from the terraform configuration, if any."""
+    if alarm_data.configuration is None:
+        return None
+    description = alarm_data.configuration.get("description")
+    return str(description) if description else None
+
+
+def build_headline(state: AlarmState, previous_timestamp: str | None, triggering_alarms: list[str]) -> str:
+    """First description line: a recovery notice, the triggering child alarms, or the raw reason."""
+    if state.value == "OK":
+        duration = format_outage_duration(previous_timestamp, state.timestamp)
+        return f"Alarm recovered after {duration}." if duration else "Alarm recovered."
+    if triggering_alarms:
+        names = ", ".join(f"**{name}**" for name in triggering_alarms)
+        return f"Triggered by: {names}"
+    return state.reason or "CloudWatch alarm state changed"
+
+
+def build_state_line(state: AlarmState, previous_state: AlarmPreviousState | None) -> str:
+    previous_value = previous_state.value if previous_state else None
+    transition = f"{previous_value or 'unknown'} → {state.value}"
+    if formatted_timestamp := format_transition_timestamp(state.timestamp):
+        return f"**State:** {transition} at {formatted_timestamp}"
+    return f"**State:** {transition}"
+
+
+def build_console_links(region: str, alarm_url: str, triggering_alarms: list[str]) -> list[str]:
+    return [
+        f"[Open alarm in CloudWatch]({alarm_url})",
+        *(f"[Open {name} in CloudWatch]({build_alarm_console_url(region, name)})" for name in triggering_alarms),
+    ]
+
+
+def build_description(alarm: AlarmEvent, alarm_url: str, triggering_alarms: list[str]) -> str:
+    """Build the Markdown description GitLab renders on the incident and forwards downstream.
+
+    The description is the only field that reliably survives into GitLab's Telegram/email
+    fanout, so it carries the operator-facing context: what fired, why, the state transition,
+    and console deep links.
+    """
+    state = alarm.alarm_data.state
+    previous_state = alarm.alarm_data.previous_state
+    previous_timestamp = previous_state.timestamp if previous_state else None
+
+    paragraphs = [build_headline(state, previous_timestamp, triggering_alarms)]
+    if alarm_description := configuration_description(alarm.alarm_data):
+        paragraphs.append(alarm_description)
+    paragraphs.append(build_state_line(state, previous_state))
+    paragraphs.extend(build_console_links(alarm.region, alarm_url, triggering_alarms))
+    return "\n\n".join(paragraphs)
+
+
 def build_gitlab_payload(alarm: AlarmEvent) -> dict[str, Any]:
     """Build a generic GitLab alert payload from the alarm event.
 
@@ -166,48 +284,39 @@ def build_gitlab_payload(alarm: AlarmEvent) -> dict[str, Any]:
     that GitLab auto-resolves the open alert with the matching fingerprint.
     """
     state = alarm.alarm_data.state
-    previous_state_value = alarm.alarm_data.previous_state.value if alarm.alarm_data.previous_state else None
+    previous_state = alarm.alarm_data.previous_state
+    previous_state_value = previous_state.value if previous_state else None
 
-    severity = "critical" if state.value == "ALARM" else "info"
-    # The console URL goes in two places: alarm_url (clickable in GitLab's alert-details view)
-    # and the description — the only field that reliably survives into GitLab's downstream
-    # Telegram/email notification fanout.
+    triggering_alarms = extract_triggering_alarms(state)
     alarm_url = build_alarm_console_url(alarm.region, alarm.alarm_data.alarm_name)
-    reason = state.reason or "CloudWatch alarm state changed"
-    description = f"{reason}\n\nAlarm: {alarm_url}"
-
-    # Setting end_time on a payload whose fingerprint matches an open GitLab alert
-    # triggers GitLab's automatic recovery flow, closing the incident.
-    is_recovery = state.value == "OK"
-
-    alarm_data_dump = alarm.alarm_data.model_dump()
-    # Replace reason_data strings with their parsed JSON objects when possible, so the
-    # GitLab alert payload carries structured data instead of an escaped JSON string.
-    alarm_data_dump["state"]["reason_data"] = maybe_parse_json(state.reason_data)
-    if alarm_data_dump.get("previous_state") and alarm.alarm_data.previous_state:
-        alarm_data_dump["previous_state"]["reason_data"] = maybe_parse_json(alarm.alarm_data.previous_state.reason_data)
+    severity = "critical" if state.value == "ALARM" else "info"
 
     payload: dict[str, Any] = {
         "title": alarm.alarm_data.alarm_name,
-        "description": description,
+        "description": build_description(alarm, alarm_url, triggering_alarms),
         "start_time": state.timestamp,
         "monitoring_tool": "AWS CloudWatch",
         "severity": severity,
         # fingerprint deduplicates re-firings of the same alarm in GitLab.
         "fingerprint": alarm.alarm_arn,
-        # Full alarm context so every alert is self-contained and queryable.
+        "gitlab_environment_name": "production",
+        # Curated flat context — GitLab dumps every non-native field on the alert-details page.
         "alarm_url": alarm_url,
         "alarm_arn": alarm.alarm_arn,
         "region": alarm.region,
         "account_id": alarm.account_id,
         "state": state.value,
         "previous_state": previous_state_value,
-        "alarm_data": alarm_data_dump,
+        "state_transitioned_at": state.timestamp,
     }
 
-    if is_recovery:
+    if alarm_description := configuration_description(alarm.alarm_data):
+        payload["alarm_description"] = alarm_description
+    if triggering_alarms:
+        payload["triggering_alarms"] = triggering_alarms
+    # end_time on a payload whose fingerprint matches an open alert triggers GitLab's recovery flow.
+    if state.value == "OK":
         payload["end_time"] = state.timestamp
-
     if namespace := extract_metric_namespace(alarm.alarm_data):
         payload["service"] = namespace
 
@@ -237,6 +346,8 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         ctx_fields["aws_request_id"] = context.aws_request_id
 
     with structlog.contextvars.bound_contextvars(**ctx_fields):
+        # The payload carries only curated fields, so log the raw event to keep it queryable here.
+        log.info("Alarm event received", raw_event=event)
         param_name = os.environ["GITLAB_ALERT_SSM_PARAM"]
         credentials = fetch_gitlab_credentials(param_name)
 

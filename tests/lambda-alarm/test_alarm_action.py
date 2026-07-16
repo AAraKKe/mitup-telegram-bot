@@ -12,8 +12,10 @@ from structlog.testing import capture_logs
 
 from mitup_bot.lambdas.alarm_action import (
     GITLAB_POST_TIMEOUT_S,
+    AlarmState,
     GitLabAlertCredentials,
     build_alarm_console_url,
+    extract_triggering_alarms,
     handler,
 )
 
@@ -55,6 +57,35 @@ def metric_alarm_event() -> dict[str, Any]:
                     }
                 ],
             },
+        },
+    }
+
+
+def composite_alarm_event() -> dict[str, Any]:
+    """A CloudWatch composite-alarm event whose reasonData names the triggering child alarms."""
+    return {
+        "source": "aws.cloudwatch",
+        "alarmArn": "arn:aws:cloudwatch:eu-west-1:123456789012:alarm:MitupEventFault",
+        "accountId": "123456789012",
+        "region": "eu-west-1",
+        "time": "2026-07-15T21:11:41Z",
+        "alarmData": {
+            "alarmName": "MitupEventFault",
+            "state": {
+                "value": "ALARM",
+                "reason": "arn:aws:cloudwatch:...:alarm:MitupEventFault transitioned to ALARM",
+                "reasonData": (
+                    '{"triggeringAlarms":[{"arn":'
+                    '"arn:aws:cloudwatch:eu-west-1:123456789012:alarm:MitupEventFault-DeactivateMeetings",'
+                    '"state":{"value":"ALARM"}}]}'
+                ),
+                "timestamp": "2026-07-15T21:11:41.875+0000",
+            },
+            "previousState": {
+                "value": "OK",
+                "timestamp": "2026-07-15T20:55:41.000+0000",
+            },
+            "configuration": {"description": "Composite alarm for event-processing faults."},
         },
     }
 
@@ -116,15 +147,156 @@ def test_happy_path_posts_critical_alert(
     assert payload["severity"] == "critical"  # state value ALARM
     assert payload["monitoring_tool"] == "AWS CloudWatch"
     assert payload["state"] == "ALARM"
+    assert payload["previous_state"] == "OK"
+    assert payload["state_transitioned_at"] == "2026-06-23T10:00:00.000+0000"  # state.timestamp
     assert payload["service"] == "Mitup/Bot"  # configuration.metrics[].metricStat.metric.namespace
     assert payload["fingerprint"] == "arn:aws:cloudwatch:eu-west-1:123456789012:alarm:bot-errors"  # alarmArn
     assert "end_time" not in payload  # end_time is only set on recovery (state == "OK")
 
-    # reasonData is a JSON string on the wire but the payload carries it parsed into a dict.
-    parsed_reason_data = payload["alarm_data"]["state"]["reason_data"]
-    assert isinstance(parsed_reason_data, dict)
-    assert parsed_reason_data["version"] == "1.0"
+    assert result == {"status": "ok", "alarm": "bot-errors"}
 
+
+def test_payload_omits_raw_alarm_data(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """The curated payload never carries the raw alarm_data dump GitLab would flatten into noise."""
+    handler(metric_alarm_event(), None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert "alarm_data" not in payload
+
+
+def test_gitlab_environment_name_present(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """Every payload tags the GitLab production environment so alerts route to the right monitor."""
+    handler(metric_alarm_event(), None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["gitlab_environment_name"] == "production"
+
+
+def test_raw_event_logged_at_info(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """The handler logs the validated event once so the full context stays queryable in the log group."""
+    event = metric_alarm_event()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        handler(event, None)
+
+    received = [entry for entry in logs if entry["event"] == "Alarm event received"]
+    assert len(received) == 1
+    assert received[0]["raw_event"] == event
+
+
+def test_metric_alarm_keeps_reason_in_description(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """A metric alarm keeps CloudWatch's Threshold-Crossed reason as the description headline."""
+    handler(metric_alarm_event(), None)
+
+    description = mock_post.call_args.kwargs["json"]["description"]
+    assert description.startswith("Threshold crossed: 1 datapoint greater than the threshold.")
+    # The console link and the operator-facing configuration description both appear.
+    assert f"[Open alarm in CloudWatch]({build_alarm_console_url('eu-west-1', 'bot-errors')})" in description
+    assert "Fires when the bot logs an error." in description
+    # The state-transition line renders both states and the sub-second-trimmed timestamp.
+    assert "**State:** OK → ALARM at 2026-06-23T10:00:00+0000" in description
+
+
+def test_configuration_description_surfaced_in_description_and_field(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """configuration.description feeds both the Markdown body and the alarm_description custom field."""
+    handler(metric_alarm_event(), None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["alarm_description"] == "Fires when the bot logs an error."
+    assert "Fires when the bot logs an error." in payload["description"]
+
+
+def test_configuration_description_omitted_when_absent(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """With no configuration.description, the alarm_description custom field is omitted entirely."""
+    event = metric_alarm_event()
+    del event["alarmData"]["configuration"]["description"]
+
+    handler(event, None)
+
+    assert "alarm_description" not in mock_post.call_args.kwargs["json"]
+
+
+def test_composite_event_extracts_triggering_alarms(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """A composite alarm names its triggering children in the headline, the links, and a custom field."""
+    handler(composite_alarm_event(), None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["triggering_alarms"] == ["MitupEventFault-DeactivateMeetings"]
+
+    description = payload["description"]
+    assert description.startswith("Triggered by: **MitupEventFault-DeactivateMeetings**")
+    child_url = build_alarm_console_url("eu-west-1", "MitupEventFault-DeactivateMeetings")
+    assert f"[Open MitupEventFault-DeactivateMeetings in CloudWatch]({child_url})" in description
+
+
+def test_recovery_description_includes_duration_and_end_time(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """A recovery headline reports the outage duration and the payload sets end_time for auto-resolve."""
+    event = metric_alarm_event()
+    event["alarmData"]["state"]["value"] = "OK"
+    event["alarmData"]["previousState"]["value"] = "ALARM"
+
+    handler(event, None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    # 09:55 → 10:00 is a 5-minute outage.
+    assert payload["description"].startswith("Alarm recovered after 5m.")
+    assert payload["end_time"] == "2026-06-23T10:00:00.000+0000"  # state.timestamp
+    assert payload["severity"] == "info"  # non-ALARM state
+    assert "**State:** ALARM → OK at 2026-06-23T10:00:00+0000" in payload["description"]
+
+
+def test_recovery_without_parseable_timestamps_omits_duration(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """When the timestamps don't parse, the recovery headline drops the duration but never crashes."""
+    event = metric_alarm_event()
+    event["alarmData"]["state"]["value"] = "OK"
+    event["alarmData"]["state"]["timestamp"] = "not a timestamp"
+
+    handler(event, None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["description"].startswith("Alarm recovered.")
+    assert "after" not in payload["description"].splitlines()[0]
+
+
+def test_malformed_reason_data_yields_no_triggering_alarms(
+    mock_fetch_credentials: mock.MagicMock,
+    mock_post: mock.MagicMock,
+):
+    """Non-JSON reasonData is tolerated: no crash and no triggering_alarms custom field."""
+    event = metric_alarm_event()
+    event["alarmData"]["state"]["reasonData"] = "not json"
+
+    result = handler(event, None)
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert "triggering_alarms" not in payload
     assert result == {"status": "ok", "alarm": "bot-errors"}
 
 
@@ -313,36 +485,9 @@ def test_tolerant_payload_without_optional_blocks(
 
     payload = mock_post.call_args.kwargs["json"]
     assert payload["previous_state"] is None
+    # With no previous state the transition line still renders, defaulting to "unknown".
+    assert "**State:** unknown → ALARM" in payload["description"]
     assert result == {"status": "ok", "alarm": "bot-errors"}
-
-
-def test_reason_data_parsed_in_payload(
-    mock_fetch_credentials: mock.MagicMock,
-    mock_post: mock.MagicMock,
-):
-    """A JSON-string reasonData is parsed into a structured object in the posted payload."""
-    event = metric_alarm_event()
-    event["alarmData"]["state"]["reasonData"] = '{"version":"1.0","threshold":5}'
-
-    handler(event, None)
-
-    payload = mock_post.call_args.kwargs["json"]
-    parsed_reason_data = payload["alarm_data"]["state"]["reason_data"]
-    assert parsed_reason_data == {"version": "1.0", "threshold": 5}
-
-
-def test_reason_data_left_as_string_when_not_json(
-    mock_fetch_credentials: mock.MagicMock,
-    mock_post: mock.MagicMock,
-):
-    """maybe_parse_json never raises: a non-JSON reasonData is forwarded verbatim as the original string."""
-    event = metric_alarm_event()
-    event["alarmData"]["state"]["reasonData"] = "not json"
-
-    handler(event, None)
-
-    payload = mock_post.call_args.kwargs["json"]
-    assert payload["alarm_data"]["state"]["reason_data"] == "not json"
 
 
 def test_service_omitted_when_no_metric_namespace(
@@ -364,8 +509,8 @@ def test_missing_reason_and_timestamp_fall_back(
     mock_fetch_credentials: mock.MagicMock,
     mock_post: mock.MagicMock,
 ):
-    """When the alarm state omits reason and timestamp, build_gitlab_payload uses its generic fallback
-    description and a None start_time."""
+    """When the alarm state omits reason and timestamp, the description uses its generic headline
+    fallback and start_time is None."""
     event = metric_alarm_event()
     event["alarmData"]["state"].pop("reason", None)
     event["alarmData"]["state"].pop("timestamp", None)
@@ -373,11 +518,13 @@ def test_missing_reason_and_timestamp_fall_back(
     handler(event, None)
 
     payload = mock_post.call_args.kwargs["json"]
-    assert payload["description"].startswith("CloudWatch alarm state changed")  # build_gitlab_payload fallback
+    assert payload["description"].startswith("CloudWatch alarm state changed")  # headline fallback
     # The console link is present even on the fallback path.
     assert payload["alarm_url"] == build_alarm_console_url("eu-west-1", "bot-errors")
-    assert payload["description"].endswith(f"Alarm: {payload['alarm_url']}")
+    assert f"[Open alarm in CloudWatch]({payload['alarm_url']})" in payload["description"]
     assert payload["start_time"] is None
+    # With no timestamp the state line drops the "at ..." suffix.
+    assert "**State:** OK → ALARM" in payload["description"]
 
 
 def test_payload_includes_alarm_console_url(
@@ -393,9 +540,29 @@ def test_payload_includes_alarm_console_url(
     # itself is pinned by test_build_alarm_console_url_encodes_name_and_region below.
     expected_url = build_alarm_console_url("eu-west-1", "bot-errors")
     assert payload["alarm_url"] == expected_url
-    assert payload["description"].endswith(f"Alarm: {expected_url}")
-    # The original CloudWatch reason still leads the description.
-    assert payload["description"].startswith("Threshold crossed: 1 datapoint greater than the threshold.")
+    assert f"[Open alarm in CloudWatch]({expected_url})" in payload["description"]
+
+
+@pytest.mark.parametrize(
+    ("reason_data", "expected"),
+    [
+        (
+            '{"triggeringAlarms":[{"arn":"arn:aws:cloudwatch:eu-west-1:1:alarm:Child-A"},'
+            '{"arn":"arn:aws:cloudwatch:eu-west-1:1:alarm:Child-B"}]}',
+            ["Child-A", "Child-B"],
+        ),
+        ("not json", []),  # non-JSON reasonData
+        ('{"version":"1.0"}', []),  # JSON without triggeringAlarms
+        ('{"triggeringAlarms":"nope"}', []),  # triggeringAlarms not a list
+        ('{"triggeringAlarms":[{"state":{"value":"ALARM"}}]}', []),  # entry without arn
+        ('{"triggeringAlarms":[{"arn":"no-alarm-segment"}]}', []),  # arn missing :alarm: segment
+        (None, []),  # absent reasonData
+    ],
+)
+def test_extract_triggering_alarms(reason_data: str | None, expected: list[str]):
+    """extract_triggering_alarms names every child arn defensively, never raising on bad input."""
+    state = AlarmState(value="ALARM", reasonData=reason_data)
+    assert extract_triggering_alarms(state) == expected
 
 
 @pytest.mark.parametrize(
