@@ -60,6 +60,10 @@ build-docker-ci:
 # affects nothing.
 build-docker-ci-manual:
   stage: build-ci
+  # Keep auto-cancel (workflow.auto_cancel.on_new_commit: interruptible) away from this job:
+  # a canceled allow_failure job flips an otherwise-green pipeline to "passed with warnings",
+  # while an unplayed manual job stays in the neutral `manual` state.
+  interruptible: false
   variables:
     DOCKERFILE: Dockerfile.ci
     PUSH_DESTINATION: "${CI_REGISTRY_IMAGE}/ci-python:${CI_IMAGE_TAG}"

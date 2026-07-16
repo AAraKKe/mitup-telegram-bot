@@ -46,7 +46,9 @@ variables:
   - .gitlab/ci/deploy-config.yml
 
 # Force-pushing an MR branch cancels the superseded pipeline's still-running jobs: every job is
-# interruptible by default, and the deploy-path jobs opt out explicitly (they touch production).
+# interruptible by default. Jobs opt out explicitly for two reasons: the deploy-path jobs touch
+# production, and the unplayed manual jobs would flip a green pipeline to "passed with warnings"
+# if auto-cancel swept them (canceled allow_failure job) instead of leaving them in `manual`.
 default:
   interruptible: true
 
