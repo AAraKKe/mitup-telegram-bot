@@ -52,7 +52,7 @@ Everything in the stored cards got there through something you did yourself: sta
     <div class="tldr-rows">
       <div class="tldr-row">
         <div class="tldr-row__label">Language</div>
-        <div class="tldr-row__why">Replies in your preferred language (defaults from Telegram, changeable in Settings).</div>
+        <div class="tldr-row__why">Replies in your preferred language (English until you change it in Settings).</div>
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Timezone</div>
@@ -92,7 +92,7 @@ Everything in the stored cards got there through something you did yourself: sta
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Bot's own messages<span class="tldr-row__flag"><span class="tldr-pill"><span class="dot"></span>Temporary</span></span></div>
-        <div class="tldr-row__why">Chat and message IDs for bot-sent messages, never the message text itself, so the bot can edit or delete them when something changes.</div>
+        <div class="tldr-row__why">Chat, message, and inline-message IDs for bot-sent messages, plus the button layout the bot drew (which contains no user text). Never the message text itself. Kept so the bot can edit or delete those messages when something changes.</div>
       </div>
       <div class="tldr-row">
         <div class="tldr-row__label">Guests you've invited</div>
@@ -207,7 +207,7 @@ In both cases, the Google Maps lookups are stateless queries that cannot be tied
 
 Backing Mitup on Patreon is optional, and so is telling the bot about it. If you want your Host badge and higher limits, you link your Patreon account through *♥ Collaborate*{.button-like} in the main menu:
 
-1. The bot sends you to Patreon, where you approve the connection on Patreon's own page.
+1. The bot sends you to Patreon, where you approve the connection on Patreon's own page. The link carries an encrypted reference that Patreon can't read. It exists only to route the confirmation back to your Telegram chat, and it expires after one hour.
 2. Patreon hands the bot a one-time sign-in token. The bot uses it once, to ask Patreon "which account is this, and are they a member of the Mitup campaign?", then discards it.
 3. The bot saves your numeric Patreon account ID, your tier, and when your current membership period ends. That is the whole record.
 
@@ -223,23 +223,25 @@ For the GDPR-minded, the legal bases are the boring ones:
 
 ## How long we keep your data
 
-**Your user record** persists while you're an active Mitup user. If you were once a member and then block the bot (or if a message we send to you fails), we set a flag on your account. A cleanup job runs periodically and deletes all flagged users, which cascades to your settings, owned meetings, and RSVPs.
+**Your user record** persists while you're an active Mitup user. If you were once a member and then block the bot (or if a message we send to you fails), we set a flag on your account. A cleanup job runs periodically and deletes flagged accounts once they no longer own or participate in any active meeting, which cascades to your settings, owned meetings, and RSVPs.
 
 If you joined a meeting via someone else's group message without ever opening the bot directly, your record exists only for the lifetime of those meetings and is removed when they end.
 
-**Meetings you've joined** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed. A guest someone added by name is a placeholder entry on the meeting, not a user record, and disappears with the meeting.
+**Meetings you've joined** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed. A guest someone added by name is a placeholder entry on the meeting, never linked to any Telegram account, and disappears with the meeting.
 
 **Meetings you own:** when a meeting becomes inactive, how long it's kept afterward, and when it's permanently deleted are covered on the [Meeting lifecycle](../user-guide/meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page.
 
 **Your Patreon link** exists only while you keep it. Unlink from the Collaborate screen and the record is deleted on the spot. Deleting your user record removes it too.
 
+**Operational logs.** Every interaction with the bot writes diagnostic logs so we can keep the service running and debug problems. Every log line carries your Telegram numeric ID. The metric log lines additionally record your username, the text of messages you send to the bot, the buttons you tap, and the text of your inline searches. Never the content of your other Telegram chats. If you link Patreon, the linking flow also logs your numeric Patreon account ID. Logs delete themselves automatically: application and background-job logs after 30 days, maintenance and deployment logs after 30 days (these contain no user data), and database engine logs after 90 days. Routine statement logging is off on the database, so user data reaches those logs only incidentally, in error diagnostics. The legal basis is our legitimate interest in operating, debugging, and securing the service. Logs are never used for profiling, analytics, or advertising.
+
 ## Your rights and how to exercise them
 
-**Access and export.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}, then *📦 Export my data*{.button-like}. The bot replies with a JSON file containing everything Mitup stores about you: your user record, your settings, every meeting you own, every meeting you've joined, and your Patreon link if you have one. Other people in your meetings appear by their display name only. If you've blocked the bot, unblock it and the button works again. If something else is in the way, email `privacy@mitup.social` and we'll figure it out together.
+**Access and export.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}, then *📦 Export my data*{.button-like}. The bot replies with a JSON file containing everything Mitup stores about you: your user record, your settings, every meeting you own, every meeting you've joined, and your Patreon link if you have one. Other people in your meetings appear only by the display name they show on Telegram, meaning their @username or first name. If you've blocked the bot, unblock it, send the `/start` command to reactivate your account, and the export button works again. If something else is in the way, email `privacy@mitup.social` and we'll figure it out together.
 
 **Rectification.** Edit your display name, language, or timezone directly in the bot's settings menu. For other corrections, email us.
 
-**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}, then *🗑️ Delete my data*{.button-like}, and confirm twice. Once confirmed, your account is marked for deletion and stops working right away, and within a day your user record, every meeting you own, every RSVP you've made, and your Patreon link are permanently removed. You get one final message confirming it's done. If you ever want to use Mitup again, send the `/start` command in your chat with the bot and it sets you up from scratch, with no memory of your old account.
+**Erasure.** Tap *🛡️ Privacy*{.button-like} under *⚙️ Settings*{.button-like}, then *🗑️ Delete my data*{.button-like}, and confirm twice. Once confirmed, your account is marked for deletion and stops working right away, and within a day your user record, every meeting you own, every RSVP you've made, and your Patreon link are permanently removed. Your Telegram ID and username may still appear in short-lived operational logs after that; those expire automatically within the retention periods above (at most 90 days, and 30 for application logs) and are never used to reconstruct an account. You get one final message confirming it's done. If you ever want to use Mitup again, send the `/start` command in your chat with the bot and it sets you up from scratch, with no memory of your old account.
 
 **Portability.** The export is plain JSON, formatted for import into another system if you wish.
 
@@ -247,7 +249,7 @@ If you joined a meeting via someone else's group message without ever opening th
 
 **Complaints.** If you believe your rights have been infringed, you can also lodge a complaint with your local data protection supervisory authority. In the EU, that's the authority of the country you live in.
 
-**Who the controller is.** Mitup is maintained by individuals, not a registered company. The maintainers decide what data is collected and why, which makes them the data controller in GDPR terms. If you have concerns the maintainers don't resolve, you can raise them via email or by opening an issue in the [GitLab repository](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues).
+**Who the controller is.** Mitup is maintained by individuals based in Spain, not a registered company. They decide what data is collected and why, which makes them the data controller in GDPR terms. The maintainers monitor `privacy@mitup.social` and respond to data-subject requests and supervisory-authority enquiries there. You can raise any concern via that email or by opening an issue in the [GitLab repository](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues). Given Mitup's scale and non-commercial nature, a Data Protection Officer is not required; `privacy@mitup.social` is the single contact point for all data-protection matters.
 
 ## Security
 
@@ -263,10 +265,10 @@ If you joined a meeting via someone else's group message without ever opening th
 
 Mitup shares your data only with:
 
-* **Telegram.** The bot sends messages to your account and receives messages from you via Telegram's infrastructure.
-* **Google (Google Maps Platform).** When you set up your timezone or attach a location to a meeting, we use the Google Maps Time Zone API to resolve coordinates into an IANA timezone string. When you type an address rather than sending a pin, we also use the Google Maps Geocoding API to resolve that address into coordinates. We send only the address text or the coordinates themselves. We never send your Telegram ID, your name, or any other piece of your profile. Google receives a one-off lookup query that cannot be tied back to you by us.
-* **Patreon.** Only if you link your Patreon account. The bot asks Patreon for your account ID and your membership status in the Mitup campaign, nothing more. Your pledge, payment method, and billing details live on Patreon and never reach the bot. See [how Patreon linking works](#how-patreon-linking-works).
-* **AWS.** Your data lives on managed AWS services in the EU (ECS where the bot runs, RDS for the Postgres database, Lambda for migrations, SSM Parameter Store for secrets, CloudWatch for operational logs, S3 and CloudFront for this documentation site). AWS processes that data on our behalf as an infrastructure provider, under AWS's standard GDPR data processing addendum. We decide what is stored and how it's used.
+* **Telegram.** The bot sends messages to your account and receives messages from you via Telegram's infrastructure. Telegram operates its own international messaging infrastructure and acts as the independent controller of the messaging layer.
+* **Google (Google Maps Platform).** When you set up your timezone, by typing a city name or sending a location pin, we use the Google Maps Time Zone API to resolve coordinates into an IANA timezone string. When you type an address rather than sending a pin, we also use the Google Maps Geocoding API to resolve that address into coordinates. We send only the address text or the coordinates themselves. We never send your Telegram ID, your name, or any other piece of your profile. Google receives a one-off lookup query that cannot be tied back to you by us. Google is established in the United States; transfers of these lookup queries rely on Google's EU-U.S. Data Privacy Framework certification and/or Standard Contractual Clauses.
+* **Patreon.** Only if you link your Patreon account. The bot asks Patreon for your account ID and your membership status in the Mitup campaign, nothing more. Your pledge, payment method, and billing details live on Patreon and never reach the bot. Patreon is established in the United States; transfers of the limited data it receives rely on Patreon's EU-U.S. Data Privacy Framework certification and/or Standard Contractual Clauses. See [how Patreon linking works](#how-patreon-linking-works).
+* **AWS.** Your data lives on Amazon Web Services (AWS) infrastructure in the EU. AWS processes it on our behalf as an infrastructure provider, under AWS's standard GDPR data processing addendum. We decide what is stored and how it's used.
 
 No analytics firms, ad networks, or third-party tracking services have access to your data.
 
@@ -276,19 +278,19 @@ If user data is exposed due to a breach in Mitup's infrastructure or a compromis
 
 1. Notify affected users via Telegram message as soon as we're aware.
 2. Post a summary on this page.
-3. Follow any applicable legal requirements for breach notification (e.g. GDPR Article 33).
+3. Where the breach is likely to result in a risk to your rights, notify the competent supervisory authority within 72 hours of becoming aware of it (GDPR Article 33) and notify affected users without undue delay (Article 34).
 
 ## If Mitup shuts down
 
-If the project ceases operations, all user data in the database will be deleted. We'll announce the shutdown via the bot's main menu message and on this page at least 30 days in advance.
+If the project ceases operations, all user data in the database will be deleted. We'll announce the shutdown via a message from the bot and on this page at least 30 days in advance.
 
 ## Changes to this policy
 
-Material changes to this policy will be announced via a notice in the bot's main menu and on this page. The revision date below shows the last update.
+Material changes to this policy will be announced via a message from the bot and on this page. The revision date below shows the last update.
 
 ---
 
-**Last revised:** July 9, 2026
+**Last revised:** July 16, 2026
 
 ---
 
