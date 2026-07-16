@@ -10,13 +10,13 @@ Announcements, milestones, and notes on where Mitup is headed. Newest first.
 
 <div class="grid cards" markdown>
 
-- :fontawesome-solid-newspaper: **Lorem ipsum dolor sit amet**
+- :fontawesome-solid-newspaper: **Welcome to the new Mitup**
 
     ---
-    <span class="news-card__date">14 July 2026</span>
+    <span class="news-card__date">16 July 2026</span>
 
-    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent euismod nisl eget ultricies aliquam.
+    The new Mitup is out: rebuilt from scratch, open source, and ready to grow. The story starts in a Destiny clan with a copy-paste raid list.
 
-    [Read the post →](sample-post.md)
+    [Read the post →](welcome_to_the_new_mitup.md)
 
 </div>

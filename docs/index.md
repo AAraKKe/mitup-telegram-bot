@@ -4,13 +4,15 @@ hide:
     - toc
 ---
 
-<!-- Home-page latest-news strip, full-width above the hero. Hand-edited pointer to the
-     newest post: update the title, href, and data-published (ISO date) together when a
-     new post ships. assets/javascripts/news-banner.js hides this 14 days after
-     data-published. -->
-<div class="news-banner news-topbar" data-published="2026-07-14" markdown>
+<!-- Home-page latest-news pill, a compact centered chip above the hero. Hand-edited
+     pointer to the newest post: update the title, href, and data-published (ISO date)
+     together when a new post ships. The "· Read the post" tail collapses on mobile
+     (max-width: 768px) so the pill stays on one line; keep it inside the
+     news-pill__tail span. assets/javascripts/news-banner.js hides the whole pill 14
+     days after data-published. -->
+<div class="news-banner news-pill" data-published="2026-07-16" markdown>
 
-[:fontawesome-solid-bullhorn: **New** · Lorem ipsum dolor sit amet · Read the post →](news/sample-post.md)
+[:fontawesome-solid-bullhorn: **New** · Welcome to the new Mitup <span class="news-pill__tail">· Read the post</span> →](news/welcome_to_the_new_mitup.md){.news-pill__link}
 
 </div>
 
@@ -28,7 +30,7 @@ A friendly bot that lives in your DMs, not in your group chat. Create a meeting,
 </div>
 
 <div class="hero-meta" markdown>
-<div><strong>2014</strong>Online since</div>
+<div><strong>2015</strong>Online since</div>
 <div><strong>6 languages</strong>Community translated</div>
 <div><strong>MIT</strong>Open source</div>
 <div><strong>No ads</strong>Kept going by supporters</div>
