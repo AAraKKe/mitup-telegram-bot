@@ -21,7 +21,11 @@ TAG_POLL_ATTEMPTS = 30
 # consecutive hits is the same convergence heuristic the pipeline reads use.
 TAG_POLL_CONSECUTIVE_SUCCESSES = 3
 RELEASE_POST_INTERVAL_SECONDS = 10
-RELEASE_POST_ATTEMPTS = 12
+# The release POST needs a long runway: GitLab re-checks protected-tag *creation* permission even
+# when the tag already exists (gitlab-org/gitlab#448356), so any stale replica turns into a 403
+# rather than a retryable miss, and convergence on gitlab.com has been observed to exceed two
+# minutes after the tag polls already read consistently. Six minutes of retries absorbs that.
+RELEASE_POST_ATTEMPTS = 36
 
 Version = tuple[int, int, int]
 
@@ -127,10 +131,12 @@ def latest_version() -> Version | None:
 def next_version(current: Version | None, bump: str) -> Version:
     if current is None:
         return FIRST_VERSION
-    major, minor, _ = current
+    major, minor, patch = current
     if bump == "major":
         return (major + 1, 0, 0)
-    return (major, minor + 1, 0)
+    if bump == "minor":
+        return (major, minor + 1, 0)
+    return (major, minor, patch + 1)
 
 
 def second_next_version(version: Version, bump: str) -> Version:
@@ -297,7 +303,7 @@ def create_release(version: str, notes: str, milestone: str | None):
     the tag with its own API read first, and GitLab's replicas are eventually consistent: when that
     read misses the fresh tag, glab falls back to creating the tag from a ref, which the protected
     `v*` pattern rejects with a 403. Without a ref, a stale replica merely fails the request, and
-    the POST is retried until the tag registers. The retry budget spans about two minutes
+    the POST is retried until the tag registers. The retry budget spans about six minutes
     (`RELEASE_POST_ATTEMPTS` x `RELEASE_POST_INTERVAL_SECONDS`) because replica convergence has
     been observed to outlast a short burst of retries even after the tag polls read consistently.
 
@@ -333,24 +339,26 @@ def create_release(version: str, notes: str, milestone: str | None):
 
 
 def release_command(
-    minor: Annotated[bool, typer.Option("--minor", help="Bump the minor version (the default).")] = False,
-    major: Annotated[bool, typer.Option("--major", help="Bump the major version instead of the minor.")] = False,
+    patch: Annotated[bool, typer.Option("--patch", help="Bump the patch version (the default).")] = False,
+    minor: Annotated[bool, typer.Option("--minor", help="Bump the minor version instead of the patch.")] = False,
+    major: Annotated[bool, typer.Option("--major", help="Bump the major version instead of the patch.")] = False,
 ):
-    """Tag origin/main's green tip as a `v*` release, publish it with notes, open the runway
-    milestone, and milestone the shipped merge requests.
+    """Tag origin/main's green tip as a `v*` release and publish it with notes. Minor and major
+    releases additionally open the runway milestone and milestone the shipped merge requests;
+    patch releases carry no milestone at all.
 
     Reads nothing from the local checkout: the release always ships the freshest origin/main
     commit, so a dirty tree, untracked files, or a feature branch never block or influence it.
     """
-    if minor and major:
-        console.error("Pass at most one of --minor/--major.")
+    if sum([patch, minor, major]) > 1:
+        console.error("Pass at most one of --patch/--minor/--major.")
         raise typer.Abort()
 
     fetch_origin()
     sha = git_capture("rev-parse", f"origin/{DEFAULT_BRANCH}")
     ensure_pipeline_is_green(sha)
 
-    bump = "major" if major else "minor"
+    bump = "major" if major else "minor" if minor else "patch"
     previous = latest_version()
     previous_tag = format_version(previous) if previous else None
     released = next_version(previous, bump)
@@ -358,8 +366,10 @@ def release_command(
 
     create_and_push_tag(version, sha)
 
-    ensure_milestone(format_version(second_next_version(released, bump)))
-    milestone = version if ensure_milestone(version) else None
+    milestone = None
+    if bump != "patch":
+        ensure_milestone(format_version(second_next_version(released, bump)))
+        milestone = version if ensure_milestone(version) else None
     with console.spinner("Waiting for the tag to register"):
         tag_visible = wait_for_tag(version)
     if not tag_visible:

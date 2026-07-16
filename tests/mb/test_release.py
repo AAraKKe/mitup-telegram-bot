@@ -42,18 +42,26 @@ def green_repo(recorder: CommandRecorder, *, tags: str = "v1.2.3\n", head: str =
     return recorder
 
 
-def test_release_tags_and_pushes_next_minor(recorder: CommandRecorder):
+def test_release_tags_and_pushes_next_patch(recorder: CommandRecorder):
     green_repo(recorder)
 
     result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
     assert ["git", "fetch", "--tags", "origin"] in recorder.commands
-    assert ["git", "tag", "-a", "v1.3.0", "abc123def456", "-m", "v1.3.0"] in recorder.commands
-    assert ["git", "push", "origin", "v1.3.0"] in recorder.commands
-    assert ["glab", "api", "projects/:id/pipelines?ref=v1.3.0"] in recorder.commands
-    assert "Released v1.3.0" in result.output
+    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
+    assert ["git", "push", "origin", "v1.2.4"] in recorder.commands
+    assert ["glab", "api", "projects/:id/pipelines?ref=v1.2.4"] in recorder.commands
+    assert "Released v1.2.4" in result.output
     assert f"Deploy pipeline started: {TAG_PIPELINE_URL}" in result.output
+
+
+def test_release_patch_bump(recorder: CommandRecorder):
+    green_repo(recorder)
+
+    cli.invoke(app, ["release", "--patch"])
+
+    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
 
 
 def test_release_minor_bump(recorder: CommandRecorder):
@@ -89,13 +97,23 @@ def release_notes_field(call: list[str]) -> str:
 
 
 def test_release_opens_runway_and_current_milestones(recorder: CommandRecorder):
-    green_repo(recorder)  # latest tag v1.2.3; a default (minor) release cuts v1.3.0
+    green_repo(recorder)  # latest tag v1.2.3; a minor release cuts v1.3.0
 
-    cli.invoke(app, ["release"])
+    cli.invoke(app, ["release", "--minor"])
 
     # The runway milestone is two minors ahead; the released version's own milestone is opened too.
     assert ["glab", "milestone", "create", "--title", "v1.5.0"] in recorder.commands
     assert ["glab", "milestone", "create", "--title", "v1.3.0"] in recorder.commands
+
+
+def test_release_patch_opens_no_milestone(recorder: CommandRecorder):
+    green_repo(recorder)  # latest tag v1.2.3; a default (patch) release cuts v1.2.4
+
+    cli.invoke(app, ["release"])
+
+    assert not any(command[:3] == ["glab", "milestone", "create"] for command in recorder.commands)
+    assert not any(argument.startswith("milestones[]=") for argument in release_create_call(recorder))
+    assert not any("PUT" in command for command in recorder.commands)
 
 
 def test_release_major_opens_runway_two_majors_ahead(recorder: CommandRecorder):
@@ -111,7 +129,7 @@ def test_release_skips_a_milestone_that_already_exists(recorder: CommandRecorder
     green_repo(recorder)
     recorder.captured_outputs["milestones?title=v1.5.0"] = json.dumps([{"title": "v1.5.0"}])
 
-    result = cli.invoke(app, ["release"])
+    result = cli.invoke(app, ["release", "--minor"])
 
     assert "Milestone v1.5.0 already exists" in result.output
     assert ["glab", "milestone", "create", "--title", "v1.5.0"] not in recorder.commands
@@ -120,7 +138,7 @@ def test_release_skips_a_milestone_that_already_exists(recorder: CommandRecorder
 def test_release_creates_gitlab_release_titled_and_milestoned_with_the_tag(recorder: CommandRecorder):
     green_repo(recorder)
 
-    cli.invoke(app, ["release"])
+    cli.invoke(app, ["release", "--minor"])
 
     call = release_create_call(recorder)
     assert "tag_name=v1.3.0" in call
@@ -171,7 +189,7 @@ def test_release_publishes_without_a_milestone_when_it_cannot_be_opened(recorder
     green_repo(recorder)
     recorder.exit_codes["milestone create --title v1.3.0"] = 1  # the released version's own milestone
 
-    result = cli.invoke(app, ["release"])
+    result = cli.invoke(app, ["release", "--minor"])
 
     assert result.exit_code == 0
     assert "Could not open milestone v1.3.0" in result.output
@@ -186,8 +204,8 @@ def test_release_reports_success_even_when_the_release_publish_fails(recorder: C
     result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
-    assert "Could not create the GitLab release for v1.3.0" in result.output
-    assert "Released v1.3.0" in result.output
+    assert "Could not create the GitLab release for v1.2.4" in result.output
+    assert "Released v1.2.4" in result.output
 
 
 def test_release_waits_for_the_tag_before_publishing(recorder: CommandRecorder):
@@ -195,7 +213,7 @@ def test_release_waits_for_the_tag_before_publishing(recorder: CommandRecorder):
 
     cli.invoke(app, ["release"])
 
-    assert ["glab", "api", "projects/:id/repository/tags/v1.3.0"] in recorder.commands
+    assert ["glab", "api", "projects/:id/repository/tags/v1.2.4"] in recorder.commands
 
 
 def test_release_warns_but_still_publishes_when_the_tag_never_registers(recorder: CommandRecorder):
@@ -218,7 +236,7 @@ def test_release_milestones_shipped_mrs_and_leaves_manual_assignments(recorder: 
     )
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])
 
-    result = cli.invoke(app, ["release"])
+    result = cli.invoke(app, ["release", "--minor"])
 
     assert result.exit_code == 0
     assert ["glab", "api", "-X", "PUT", "projects/:id/merge_requests/34", "-f", "milestone_id=77"] in recorder.commands
@@ -234,7 +252,7 @@ def test_release_sweep_warns_when_the_milestone_id_cannot_be_resolved(recorder: 
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0"}])  # id missing
 
-    result = cli.invoke(app, ["release"])
+    result = cli.invoke(app, ["release", "--minor"])
 
     assert result.exit_code == 0
     assert "Could not resolve the id of milestone v1.3.0" in result.output
@@ -249,7 +267,7 @@ def test_release_sweep_warns_but_continues_when_an_assignment_fails(recorder: Co
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])
     recorder.exit_codes["-X PUT projects/:id/merge_requests/34"] = 1
 
-    result = cli.invoke(app, ["release"])
+    result = cli.invoke(app, ["release", "--minor"])
 
     assert result.exit_code == 0
     assert "Could not assign v1.3.0 to !34" in result.output
@@ -263,7 +281,7 @@ def test_release_skips_the_sweep_when_the_milestone_could_not_be_opened(recorder
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.exit_codes["milestone create --title v1.3.0"] = 1
 
-    result = cli.invoke(app, ["release"])
+    result = cli.invoke(app, ["release", "--minor"])
 
     assert result.exit_code == 0
     assert not any("PUT" in command for command in recorder.commands)
@@ -311,17 +329,19 @@ def test_release_ignores_non_semver_tags(recorder: CommandRecorder):
 
     cli.invoke(app, ["release"])
 
-    assert ["git", "tag", "-a", "v2.5.0", "abc123def456", "-m", "v2.5.0"] in recorder.commands
+    assert ["git", "tag", "-a", "v2.4.11", "abc123def456", "-m", "v2.4.11"] in recorder.commands
 
 
-def test_release_rejects_both_bump_flags(recorder: CommandRecorder):
+@pytest.mark.parametrize("flags", [["--minor", "--major"], ["--patch", "--minor"], ["--patch", "--major"]])
+def test_release_rejects_combined_bump_flags(recorder: CommandRecorder, flags: list[str]):
     green_repo(recorder)
 
-    result = cli.invoke(app, ["release", "--minor", "--major"])
+    result = cli.invoke(app, ["release", *flags])
 
     assert result.exit_code != 0
-    assert "at most one of --minor/--major" in result.output
-    assert not any("tag" in command for command in recorder.commands)
+    assert "at most one of --patch/--minor/--major" in result.output
+    # The conflict aborts before the fetch, so no git or glab command runs at all.
+    assert not recorder.commands
 
 
 def test_release_tags_origin_main_regardless_of_local_state(recorder: CommandRecorder):
@@ -335,7 +355,7 @@ def test_release_tags_origin_main_regardless_of_local_state(recorder: CommandRec
 
     assert result.exit_code == 0
     assert ["glab", "api", "projects/:id/pipelines?sha=999fedcba000"] in recorder.commands
-    assert ["git", "tag", "-a", "v1.3.0", "999fedcba000", "-m", "v1.3.0"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.2.4", "999fedcba000", "-m", "v1.2.4"] in recorder.commands
     assert ["git", "status", "--porcelain"] not in recorder.commands
 
 
@@ -379,9 +399,9 @@ def test_release_falls_back_to_pipelines_listing_when_no_pipeline_starts(recorde
     result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
-    assert "Released v1.3.0" in result.output
+    assert "Released v1.2.4" in result.output
     assert "has not appeared yet" in result.output
-    assert f"{release.PIPELINES_URL}?ref=v1.3.0" in result.output
+    assert f"{release.PIPELINES_URL}?ref=v1.2.4" in result.output
 
 
 def test_pipeline_url_for_ref_waits_until_a_pipeline_appears(monkeypatch: pytest.MonkeyPatch):
@@ -490,8 +510,10 @@ def test_release_aborts_on_command_failure(
 @pytest.mark.parametrize(
     ("current", "bump", "expected"),
     [
+        ((1, 4, 2), "patch", (1, 4, 3)),
         ((1, 4, 2), "minor", (1, 5, 0)),
         ((1, 4, 2), "major", (2, 0, 0)),
+        (None, "patch", (0, 1, 0)),
         (None, "minor", (0, 1, 0)),
         (None, "major", (0, 1, 0)),
     ],
