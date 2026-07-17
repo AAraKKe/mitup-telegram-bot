@@ -1,0 +1,44 @@
+# Crowdin synchronization, driven by `mb locales push` / `mb locales pull`
+# (tools/mb/src/mb/crowdin_ops.py).
+#
+# Required CI/CD variables (Settings > CI/CD > Variables, masked):
+#   CROWDIN_API_KEY - Crowdin personal access token (projects read, source files,
+#                     translations, storages).
+#   RENOVATE_TOKEN  - project access token with push + MR rights; shared with the
+#                     auto-format job, used by crowdin-pull to push the MR branch.
+#
+# crowdin-pull runs from an hourly pipeline schedule targeting the default branch. The
+# schedule must define SCHEDULE_REASON="crowdin-sync" (each schedule names its purpose so
+# jobs opt into exactly one) plus SAST_DISABLED, DEPENDENCY_SCANNING_DISABLED and
+# SECRET_DETECTION_DISABLED (all "true") — the security templates gate on those variables,
+# and their branch rules would otherwise run the scanners hourly. Every repo-owned job
+# carries its own schedule exclusion instead.
+
+# Seed Crowdin after every default-branch push: upload the English source catalog (Crowdin
+# diffs revisions server-side; only modified strings lose approval) and any repo translations
+# Crowdin lacks. Idempotent — when nothing changed it is a fast no-op.
+crowdin-push:
+  stage: validate
+  # Gate on validate-locales so a catalog that diverged from English never reaches Crowdin.
+  needs: [validate-locales]
+  script:
+    - uv run mb locales push
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Merge approved Crowdin translations back into the catalogs and keep a single MR open with
+# the result. The branch is rebuilt from the schedule's HEAD every run, so the MR always
+# shows the current approved-vs-main delta and shrinks by itself when an approval is revoked.
+# Labeling the MR `crowdin::hold` pauses the sync (e.g. for manual pre-merge fixes on the
+# branch); remove the label to resume the hourly rebuilds.
+crowdin-pull:
+  stage: build
+  needs: []
+  variables:
+    GIT_STRATEGY: clone
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_REASON == "crowdin-sync"'
+  script:
+    - uv run mb locales pull
+    - uv run mb locales validate
+    - uv run mb locales create-mr

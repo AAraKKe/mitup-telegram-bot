@@ -5,6 +5,7 @@ description = "Developer CLI for the mitup-telegram-bot repository"
 requires-python = ">=3.14"
 dependencies = [
     "typer>=0.15",
+    "httpx==0.28.1",
     "pyyaml>=6",
     "rich>=13",
     "pydantic==2.13.4",

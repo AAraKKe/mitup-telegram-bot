@@ -5,6 +5,14 @@
   if: $CI_COMMIT_TAG
   when: never
 
+# Scheduled pipelines exist solely for the hourly Crowdin pull (crowdin.yml). Splice this into
+# every job's `rules` so the schedule runs nothing else: `rules:changes` evaluates to true on
+# schedules and the default-branch/on_success rules match them, so an unspliced job would ride
+# the hourly pipeline.
+.skip-on-schedules: &skip-on-schedules
+  if: '$CI_PIPELINE_SOURCE == "schedule"'
+  when: never
+
 # Fail the pipeline before any build/test work when the committed lock has drifted from a
 # workspace pyproject. It runs in `pre-flight` (after the CI image is built, before `build`/`test`)
 # so a stale lock never wastes a translation build or the whole matrix. `mb ci check-lock` wraps
@@ -16,6 +24,7 @@ validate-lock:
   script:
     - uv run mb ci check-lock
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -32,6 +41,9 @@ preparation:
     - time uv sync --frozen
     - uv tree
     - echo $PWD
+  rules:
+    - *skip-on-schedules
+    - when: on_success
 
 build-translations:
   stage: build
@@ -44,12 +56,16 @@ build-translations:
     expire_in: "1 day"
     paths:
       - libs/core/mitup_bot/locales
+  rules:
+    - *skip-on-schedules
+    - when: on_success
 
 validate-ci-languages:
   stage: build
   needs: [{job: build-docker-ci, optional: true}]
   script: uv run mb ci check-languages
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -60,6 +76,7 @@ validate-ci-languages:
 # once. One broad trigger (below) gates the job: it errs toward running the suite so a new test is
 # never silently dropped by an out-of-date trigger list.
 .test-rules: &test_rules
+  - *skip-on-schedules
   - *skip-on-tags
   - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   - changes:
@@ -140,6 +157,7 @@ format-check:
   script: uv run mb format --check
   needs: [{job: build-docker-ci, optional: true}]
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true
@@ -150,6 +168,7 @@ linter:
   script: uv run mb lint
   needs: [{job: build-docker-ci, optional: true}]
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true
@@ -160,6 +179,7 @@ type-check:
   script: uv run mb typecheck
   needs: [{job: build-docker-ci, optional: true}]
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -177,6 +197,7 @@ validate-migrations:
   script: uv run mb db migrate validate
   needs: [{job: build-docker-ci, optional: true}]
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -187,6 +208,7 @@ check-import-isolation:
   script: uv run mb ci check-import-isolation
   needs: [{job: build-docker-ci, optional: true}]
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -197,6 +219,7 @@ validate-ids:
   script:
     - uv run mb locales validate-ids
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -209,6 +232,7 @@ validate-locales:
     - build-translations
   needs: [build-translations]
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - when: on_success
 
@@ -250,6 +274,7 @@ validate-local-setup:
     # The emojified result must re-validate byte-for-byte (idempotent re-run / --amend).
     - 'cp commit-msg.txt commit-msg.before && uv run mb ci check-commit commit-msg.txt && cmp commit-msg.txt commit-msg.before'
   rules:
+    - *skip-on-schedules
     - *skip-on-tags
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       allow_failure: true

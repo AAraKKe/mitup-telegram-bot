@@ -909,6 +909,7 @@ source = { editable = "tools/mb" }
 dependencies = [
     { name = "boto3" },
     { name = "boto3-stubs", extra = ["cloudfront", "ecs", "lambda"] },
+    { name = "httpx" },
     { name = "mitup-core" },
     { name = "mitup-telegram" },
     { name = "pydantic" },
@@ -921,6 +922,7 @@ dependencies = [
 requires-dist = [
     { name = "boto3", specifier = "~=1.34" },
     { name = "boto3-stubs", extras = ["cloudfront", "ecs", "lambda"] },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "mitup-core", editable = "libs/core" },
     { name = "mitup-telegram", editable = "libs/telegram" },
     { name = "pydantic", specifier = "==2.13.4" },

@@ -104,6 +104,13 @@ run on a `v*` tag pipeline**. A tag pipeline is deploy-only (see [Deploy flow](#
 `build-translations`, and `build-docs` from the earlier stages run on a tag, because the deploy needs
 their artifacts. The "always"/trigger notes above therefore describe MR and `main` pipelines.
 
+Every repo-owned job outside the tag-gated deploy path also carries a **schedule exclusion**
+(`.skip-on-schedules` in `test.yml`, inline `when: never` rules in `docker.yml`/`docs.yml`):
+scheduled pipelines exist solely for the hourly `crowdin-pull` (see [Crowdin sync](#crowdin-sync-crowdinyml)).
+`rules:changes` evaluates to **true** on scheduled pipelines and the default-branch/`on_success`
+rules match them too, so a job added without the exclusion silently rides the hourly schedule —
+give every new job either a tag/MR `if` gate or the schedule splice.
+
 The deployable-image builds are one matrixed job (`validate-docker-build.yml`): `validate-docker`
 builds all four `apps/X/Dockerfile`s in a `parallel:matrix`, **only on MRs**, behind one broad
 trigger (`apps/**`, `libs/**`, `uv.lock`, the root `pyproject.toml`, `.dockerignore`, the job's own
@@ -177,6 +184,31 @@ one.
 has not rolled out yet. There is no out-of-band docs publish job: docs go live with the next
 release, or run `uv run mb docs build && uv run mb docs publish` locally under operator
 credentials.
+
+## Crowdin sync (`crowdin.yml`)
+
+Two jobs drive the Crowdin round-trip through `mb locales push` / `mb locales pull` (see the
+`translations` skill for the sync semantics):
+
+- **`crowdin-push`** (stage `validate`) runs on every default-branch push, after
+  `validate-locales`, and uploads the English catalog plus any repo translations Crowdin lacks.
+  Needs the masked `CROWDIN_API_KEY` CI variable.
+- **`crowdin-pull`** (stage `build`, `needs: []`) runs only on schedules that set
+  `SCHEDULE_REASON="crowdin-sync"` — every scheduled job gates on its own `SCHEDULE_REASON`
+  value, so adding a new schedule for another purpose never triggers this one. It
+  pulls approved translations, validates the catalogs, and runs `mb locales create-mr`
+  (`tools/mb/src/mb/crowdin_mr_ops.py`), which — when the result differs from the scheduled
+  ref — force-pushes the `crowdin-translations` branch with push options that create or update
+  a single open MR. Needs `CROWDIN_API_KEY` plus `RENOVATE_TOKEN` — the same project access
+  token the `auto-format` job pushes with. Labeling the open MR `crowdin::hold` makes
+  `create-mr` exit before touching anything (for manual pre-merge fixes on the branch); removing
+  the label resumes the hourly rebuilds — which discard any manual commits on the branch.
+
+The hourly pipeline schedule targets the default branch and must define
+`SCHEDULE_REASON="crowdin-sync"` plus `SAST_DISABLED`, `DEPENDENCY_SCANNING_DISABLED` and
+`SECRET_DETECTION_DISABLED` (all `"true"`) as schedule variables — the GitLab security templates
+don't honor the repo's schedule exclusions, and those documented kill-switch variables are what
+keeps the scanners off the hourly run.
 
 ## Running validation locally
 

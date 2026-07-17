@@ -20,6 +20,8 @@ include:
   - local: .gitlab/ci/deploy.yml
   # Documentation
   - local: .gitlab/ci/docs.yml
+  # Crowdin translation sync
+  - local: .gitlab/ci/crowdin.yml
   # Security templates
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Dependency-Scanning.gitlab-ci.yml

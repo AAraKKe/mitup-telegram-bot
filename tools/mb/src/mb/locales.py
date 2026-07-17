@@ -1,9 +1,10 @@
 from collections.abc import Callable
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
-from . import console, locales_ops, runner
+from . import console, crowdin_mr_ops, crowdin_ops, locales_ops, runner
 
 LOCALES_RELATIVE_DIR = Path("libs/core/mitup_bot/locales")
 
@@ -78,6 +79,32 @@ def validate():
 def clean():
     """Remove stale msgid blocks from non-English catalogs."""
     raise typer.Exit(locales_ops.clean_all_locales())
+
+
+@app.command()
+def push(
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Report what would be uploaded without writing to Crowdin.")
+    ] = False,
+):
+    """Push the English source catalog and Crowdin-missing translations to Crowdin."""
+    raise typer.Exit(crowdin_ops.push_catalogs(dry_run=dry_run))
+
+
+@app.command()
+def pull(
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Report what would change without touching the catalogs.")
+    ] = False,
+):
+    """Pull approved Crowdin translations into the locale catalogs and recompile them."""
+    raise typer.Exit(crowdin_ops.pull_catalogs(dry_run=dry_run))
+
+
+@app.command("create-mr")
+def create_mr():
+    """Commit pulled translations and force-push the crowdin-translations MR branch (CI only)."""
+    raise typer.Exit(crowdin_mr_ops.create_translations_mr())
 
 
 @app.command()

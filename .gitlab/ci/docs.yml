@@ -8,6 +8,10 @@ build-docs:
     expire_in: 1 day
   needs: [{job: build-docker-ci, optional: true}]
   rules:
+    # Scheduled pipelines run only the Crowdin pull; `changes` evaluates to true on schedules,
+    # so without this the docs would build hourly.
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
     - if: $CI_COMMIT_TITLE =~ /\[no-deploy\]/
       when: never
     # A release tag republishes the docs after the deploy, so the site must be built on tags too

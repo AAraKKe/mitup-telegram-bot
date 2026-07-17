@@ -60,7 +60,7 @@ default:
     echo "${OIDC_TOKEN}" > /tmp/web_identity_token
     echo -e "[profile default]\nrole_arn=${SERVICE_CI_ROLE_ARN}\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
 
-# Only run in MergeRequests, tags and default branch
+# Only run in MergeRequests, tags, the default branch, and scheduled pipelines
 # Also sets CI_IMAGE_TAG dynamically based on whether CI dependencies changed
 workflow:
   auto_cancel:
@@ -74,6 +74,11 @@ workflow:
     # All other cases - use existing latest image (or build it if on main with CI changes)
     - if: '$CI_MERGE_REQUEST_ID'
     - if: '$CI_COMMIT_TAG'
+    # Scheduled pipelines run only the Crowdin pull (crowdin.yml): every other job carries a
+    # schedule exclusion, because `rules:changes` evaluates to true on schedules and the
+    # default-branch rules match them too — without the exclusions the whole suite would run
+    # hourly. Keep this rule above the default-branch one so schedule pipelines are explicit.
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 # This is a GitLab provided job, no need to configure it
