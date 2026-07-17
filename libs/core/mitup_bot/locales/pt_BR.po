@@ -111,13 +111,13 @@ msgid "ButtonMessages.DATE"
 msgstr "🗓️ Data"
 
 msgid "ButtonMessages.TIME"
-msgstr "🕒 Hora"
+msgstr "🕒 Horário"
 
 msgid "ButtonMessages.NOTIFICATIONS_TIME"
-msgstr "⏰ Hora"
+msgstr "⏰ Horário"
 
 msgid "ButtonMessages.SET_TIME"
-msgstr "🕒 Definir hora"
+msgstr "🕒 Definir horário"
 
 msgid "ButtonMessages.PARTICIPANTS"
 msgstr "👥 Participantes"
@@ -126,7 +126,7 @@ msgid "ButtonMessages.LOCATION"
 msgstr "🗺️ Local"
 
 msgid "ButtonMessages.DONE"
-msgstr "✅ Evento concluído"
+msgstr "✅ Concluído"
 
 msgid "ButtonMessages.JOIN"
 msgstr "✅ Aceitar"
@@ -159,7 +159,7 @@ msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
 msgstr "Sem limite"
 
 msgid "ButtonMessages.MEETING_KICK_OUT"
-msgstr "Expulsar"
+msgstr "Remover"
 
 msgid "ButtonMessages.DELETE_DATE"
 msgstr "🗑️ Remover data"
@@ -239,7 +239,7 @@ msgstr "Aqui você pode configurar as opções padrão usadas ao criar um evento
 "<b>Bloquear ao iniciar</b>: quando ativado e um evento tem uma duração definida, os participantes não podem entrar ou sair assim que o evento começa. Quando desativado, os participantes ainda podem entrar ou sair livremente."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
-msgstr "Tempo limite define quanto tempo um evento é mantido após terminar. Após esse tempo, o evento será desativado. Você pode ativá-lo novamente a partir do seu <b>Menu de eventos anteriores</b>.\n\n"
+msgstr "O tempo limite define por quanto tempo um evento é mantido ativo após seu início. Eventos sem duração definida são desativados quando esse tempo passa. Após a desativação, você pode reativar um evento a partir do seu <b>Menu de eventos anteriores</b>.\n\n"
 "O tempo limite atual é <b>${timeout} minutos</b>\n\n"
 "Envie o tempo limite (em minutos) que você gostaria de usar ou toque em Cancelar para voltar."
 
@@ -345,7 +345,7 @@ msgid "MeetingJoinMessages.JOIN_FULL_WAITING_LIST"
 msgstr "O evento está cheio. Você foi adicionado à lista de espera."
 
 msgid "MeetingJoinMessages.JOIN_UNREGISTERED"
-msgstr "Você se juntou ao evento, %{user}! Parece que você nunca usou Mitup antes, abra um chat com @mitupbot para receber notificações e criar novos eventos!"
+msgstr "Você se juntou ao evento, ${user}! Parece que você nunca usou Mitup antes, abra um chat com @mitupbot para receber notificações e criar novos eventos!"
 
 msgid "MeetingJoinMessages.LEAVE_SUCCESS"
 msgstr "Você saiu do evento"
@@ -354,7 +354,7 @@ msgid "MeetingJoinMessages.LEAVE_NOT_JOINED"
 msgstr "Você não pode sair de um evento que não se juntou"
 
 msgid "MeetingJoinMessages.LEAVE_UNREGISTERED"
-msgstr "Você saiu do evento, %{user}! Parece que você nunca usou Mitup antes, abra um chat com @mitupbot para receber notificações e criar novos eventos!"
+msgstr "Você saiu do evento, ${user}! Parece que você nunca usou Mitup antes, abra um chat com @mitupbot para receber notificações e criar novos eventos!"
 
 msgid "MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST"
 msgstr "Há um lugar disponível no evento <b>${meeting_title}</b>. Você foi promovido da lista de espera!"
@@ -470,10 +470,10 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION"
 msgstr "Estes são os usuários que se juntaram ao evento. Escolha quem você quer remover."
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
-msgstr "Tem certeza de que deseja expulsar <b>${participant}</b> do evento <b>${meeting_title}</b>?"
+msgstr "Tem certeza de que deseja remover <b>${participant}</b> do evento <b>${meeting_title}</b>?"
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
-msgstr "O participante que você tentou expulsar não está mais no evento."
+msgstr "O participante que você tentou remover não está mais no evento."
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_SUCCESS"
 msgstr "<b>${participant}</b> removido."
@@ -500,7 +500,7 @@ msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
 msgstr "Evento excluído."
 
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
-msgstr "O evento não foi excluído"
+msgstr "O evento não será excluído"
 
 msgid "CommonMessages.DELETED_MEETING_ALERT"
 msgstr "Este evento foi excluído"
@@ -512,7 +512,7 @@ msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Escolha o que você deseja definir para seu evento.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e a hora de uma vez.</i>"
 
 msgid "CommonMessages.DATETIME_INVALID"
-msgstr "Toque em <b>Data</b> ou <b>Hora</b> para atualizá-las, ou envie uma mensagem com ${datetime_link} para definir ambas de uma vez."
+msgstr "Toque em <b>Data</b> ou <b>Horário</b> para atualizá-las, ou envie uma mensagem com ${datetime_link} para definir ambas de uma vez."
 
 msgid "MeetingEditDateTimeMessages.DATE_EDIT_PROMPT"
 msgstr "Selecione a nova data. Pressione <b>🗑️ Remover data</b> se você quiser desconfigurar a data e hora do evento."
@@ -547,7 +547,7 @@ msgstr "Meu relógio interno é antigo e não consegue entender essa hora de fic
 "Tente novamente com uma hora que tenha horas válidas (00-23) e minutos (00-59), tenho certeza que consigo trabalhar com isso 🧠."
 
 msgid "MeetingEditDurationMessages.ON_EXIT"
-msgstr "Desculpe, eu esperava a duração em minutos. Você gostaria de enviar? Caso contrário, toque em Cancelar para sair."
+msgstr "Desculpe, eu esperava o horário de término. Você gostaria de enviar? Caso contrário, toque em Cancelar para sair."
 
 msgid "MeetingDisplayMessages.DELETED_BANNER"
 msgstr "🚫 Este evento foi excluído 🚫"
@@ -759,7 +759,7 @@ msgid "MeetingDisplayMessages.IN_PROGRESS_BANNER"
 msgstr "▶️ Este evento está em andamento ▶️"
 
 msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
-msgstr "✅ Este evento terminou ✅\n\n<b>Duração:</b> ${duration} minutos · <b>Participantes:</b> ${attendee_count}"
+msgstr "✅ Este evento terminou ✅\n\n<b>De:</b> ${start_datetime} · <b>Até:</b> ${end_datetime} · <b>Participantes:</b> ${attendee_count}"
 
 msgid "MeetingDisplayMessages.START_LABEL"
 msgstr "Começa"
@@ -819,7 +819,7 @@ msgid "MeetingEditWhenMessages.CLEAR_CONFIRMATION"
 msgstr "Tem certeza de que deseja limpar a hora de início e término?"
 
 msgid "MeetingEditWhenMessages.CLEAR_DECLINED"
-msgstr "Os horários não serão limpos"
+msgstr "Os horários não serão limpos."
 
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "O horário de início deve estar no futuro."
@@ -960,7 +960,7 @@ msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Você atingiu o máximo de ${cap} eventos ativos. Encerre ou exclua um antes de criar outro."
+msgstr "Seu limite de Gamemaster é ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para virar Commissioner e remover o limite."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
 msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Defina um limite mais baixo, ou toque em Colabore no menu principal para apoiar o Mitup e hospedar mais."
@@ -969,7 +969,7 @@ msgid "SupporterMessages.SCHEDULING_HORIZON"
 msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Escolha uma data mais próxima, ou toque em Colabore no menu principal para apoiar o Mitup e agendar mais para o futuro."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Você pode agendar eventos até ${days} dias no futuro. Escolha uma data mais próxima."
+msgstr "Seu plano Gamemaster agenda eventos até ${days} dias no futuro. Escolha uma data mais próxima, ou toque em Colabore no menu principal para virar Commissioner e remover o limite."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Seus benefícios de Host estão em período de carência</b>\n\nNão conseguimos confirmar uma contribuição ativa no Patreon na sua conta, então seus benefícios de Host serão desativados em uma semana. Se sua contribuição ainda estiver ativa, não é preciso fazer nada e ela será renovada automaticamente. Caso contrário, você pode apoiar o Mitup novamente pelo menu Colabore."

@@ -195,25 +195,29 @@ class CommonMessages(MessageBase):
 
 
 class SupporterMessages(MessageBase):
-    """Free-tier limit notices. All are shown as plain callback-query alerts or short messages, so
-    they must stay entity-free (no inline-formatting tags)."""
+    """Plan-limit notices for free and Gamemaster users. All are shown as plain callback-query alerts
+    or short messages, so they must stay entity-free (no inline-formatting tags)."""
 
     # Free user at the active-meetings cap: explain and point at Collaborate.
     ACTIVE_MEETINGS_CAP = (
         "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start "
         "another, or tap Collaborate in the main menu to support Mitup and unlock more."
     )
-    # Gamemaster-tier user at the (much higher) sanity cap: no upsell, just the limit.
+    # Gamemaster user at their raised cap: name the tier and point at Commissioner, which lifts it.
     ACTIVE_MEETINGS_CAP_PATRON = (
-        "You've reached the maximum of ${cap} active meetings. Wrap up or delete one before starting another."
+        "Your Gamemaster limit is ${cap} active meetings. Wrap up or delete one to start another, "
+        "or tap Collaborate in the main menu to go Commissioner and drop the cap."
     )
     # Free user picking a start date beyond the horizon.
     SCHEDULING_HORIZON = (
         "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap "
         "Collaborate in the main menu to support Mitup and schedule further out."
     )
-    # Gamemaster-tier user beyond the extended horizon.
-    SCHEDULING_HORIZON_PATRON = "You can schedule meetings up to ${days} days ahead. Pick an earlier date."
+    # Gamemaster user beyond their raised horizon: name the tier and point at Commissioner, which lifts it.
+    SCHEDULING_HORIZON_PATRON = (
+        "Your Gamemaster plan schedules up to ${days} days ahead. Pick an earlier date, or tap "
+        "Collaborate in the main menu to go Commissioner and drop the limit."
+    )
     # Free owner trying to set a participant limit above the free-tier capacity: explain and point at
     # Collaborate. Gamemaster-tier owners are uncapped, so there is no Gamemaster counterpart.
     PARTICIPANT_CAPACITY = (

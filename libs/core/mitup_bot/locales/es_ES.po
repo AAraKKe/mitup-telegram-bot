@@ -313,7 +313,7 @@ msgid "MeetingCreationMessages.PROMPT"
 msgstr "Vamos a crear una quedada. Dime cual será el título\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
 
 msgid "MeetingCreationMessages.SUCCESS"
-msgstr "Se ha creado una quedada con el título ${title}.\n\n"
+msgstr "Se ha creado una quedada con el título <b>${title}</b>.\n\n"
 "Puedes añadir más información a la quedada. Los campos que no se rellenen al crear la quedada no se mostrarán cuando se comparta.\n\n"
 "Cuando acabes pulsa en ✅ Hecho"
 
@@ -385,7 +385,7 @@ msgid "MeetingJoinMessages.LEAVE_UNREGISTERED"
 msgstr "¡Has abandonado la quedada, ${user}! Parece que es la primera vez que usas Mitup, abre un chat privado con @mitupbot para recibir notificaciones y ¡crear nuevas quedadas!"
 
 msgid "MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST"
-msgstr "Hay un espacio libre en la quedada ${meeting_title}. ¡Te has unido desde la lista de espera!"
+msgstr "Hay un espacio libre en la quedada <b>${meeting_title}</b>. ¡Te has unido desde la lista de espera!"
 
 msgid "MeetingCreationMessages.INVALID_TITLE_ENTITY"
 msgstr "Solo entiendo un título o un título con una fecha 🤔.\n\nPor favor, envía solo el título de la quedada, o el título con una fecha formateada por Telegram. Haz clic en <b>Cancelar</b> para salir."
@@ -486,7 +486,7 @@ msgid "MeetingEditParticipantsMessages.DESCRIPTION"
 msgstr "Aquí podrás gestionar los participantes de la quedada: puedes establecer el número máximo de personas que pueden asistir, así como expulsar a cualquiera de los participantes."
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
-msgstr "Envíame el número máximo de miembros permitidos en la quedada (debe ser un número superior a 0) o selecciona <i>Ilimitado</i> para permitir un número ilimitado de participantes."
+msgstr "Envíame el número máximo de miembros permitidos en la quedada (debe ser un número superior a 0) o selecciona <i>Sin límite</i> para permitir un número ilimitado de participantes."
 
 msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
 msgstr "Se ha establecido correctamente un máximo de <b>${max_participants}</b> participantes"
@@ -540,7 +540,7 @@ msgid "CommonMessages.DATETIME_INVALID"
 msgstr "Toca <b>Fecha</b> u <b>Hora</b> para actualizarlas, o envía un mensaje con ${datetime_link} para establecer ambas a la vez."
 
 msgid "MeetingEditDateTimeMessages.DATE_EDIT_PROMPT"
-msgstr "Seleccione la nueva fecha. Presione <b>🗑️ Eliminar fecha</b> si desea eliminar la fecha y hora de la quedada."
+msgstr "Selecciona la nueva fecha. Pulsa <b>🗑️ Eliminar fecha</b> si quieres eliminar la fecha y hora de la quedada."
 
 msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
 msgstr "Selecciona la fecha."
@@ -555,13 +555,13 @@ msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
 msgstr "La fecha de fin ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 23:59.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 23:59."
 
 msgid "MeetingEditDateTimeMessages.DATE_UPDATED"
-msgstr "La fecha de la quedada se ha establecido para el <b>${datetime}</b>"
+msgstr "La fecha de la quedada se ha establecido para el ${datetime}"
 
 msgid "CommonMessages.TIME_PROMPT"
 msgstr "Enviarme la hora de la quedada usando el formato <i>HH:MM</i> (por ejemplo, 21:30)"
 
 msgid "MeetingEditDateTimeMessages.TIME_SUCCESS"
-msgstr "La hora de la quedada se ha establecido para el <b>${datetime}</b>"
+msgstr "La hora de la quedada se ha establecido para el ${datetime}"
 
 msgid "CommonMessages.TIME_INVALID_FORMAT"
 msgstr "No entiendo esa hora que me has enviado 🤔...\n\n"
@@ -618,7 +618,7 @@ msgid "MeetingDisplayMessages.IN_PROGRESS_BANNER"
 msgstr "▶️ Esta quedada está en curso ▶️"
 
 msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
-msgstr "✅ Esta quedada ha finalizado ✅\n\n<b>Duración:</b> ${duration} minutos · <b>Asistentes:</b> ${attendee_count}"
+msgstr "✅ Esta quedada ha finalizado ✅\n\n<b>Desde:</b> ${start_datetime} · <b>Hasta:</b> ${end_datetime} · <b>Asistentes:</b> ${attendee_count}"
 
 msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "Esta quedada ya ha comenzado y su lista de asistentes está bloqueada."
@@ -855,7 +855,7 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
 msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"
 
 msgid "MeetingEditDurationMessages.ON_EXIT"
-msgstr "Perdona, estaba esperando la duración en minutos. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."
+msgstr "Perdona, estaba esperando la hora de finalización. ¿Te gustaría enviarla? Si no, toca Cancelar para salir."
 
 msgid "MeetingEditDurationMessages.END_PROMPT"
 msgstr "La quedada comienza a <b>${start_datetime}</b>. Establece cuándo termina.\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
@@ -960,7 +960,7 @@ msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Has alcanzado el máximo de ${cap} quedadas activas. Cierra o elimina una antes de crear otra."
+msgstr "Tu límite como Gamemaster es de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para pasarte a Commissioner y eliminar el límite."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
 msgstr "Las quedadas gratuitas admiten hasta ${cap} participantes. Elige un límite menor, o pulsa Colabora en el menú principal para apoyar a Mitup y admitir más."
@@ -969,7 +969,7 @@ msgid "SupporterMessages.SCHEDULING_HORIZON"
 msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para apoyar a Mitup y programar más lejos."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana."
+msgstr "Tu plan Gamemaster te permite programar hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para pasarte a Commissioner y eliminar el límite."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Tus ventajas de Host están en periodo de gracia</b>\n\nNo hemos podido confirmar una aportación activa de Patreon en tu cuenta, así que tus ventajas de Host se desactivarán en una semana. Si tu aportación sigue activa, no tienes que hacer nada y se renovará automáticamente. Si no, puedes volver a apoyar a Mitup desde el menú Colabora."

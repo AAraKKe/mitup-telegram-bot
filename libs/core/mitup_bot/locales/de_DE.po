@@ -18,7 +18,7 @@ msgstr ""
 "Language-Team: German\n"
 
 msgid "ButtonMessages.MAIN_MENU"
-msgstr "≪ Hauptmenü"
+msgstr "Hauptmenü"
 
 msgid "ButtonMessages.GO_BACK"
 msgstr "≪"
@@ -42,7 +42,7 @@ msgid "ButtonMessages.PAST_MEETINGS"
 msgstr "💾 Deine vergangenen Treffen"
 
 msgid "ButtonMessages.JOINED_MEETINGS"
-msgstr "👥 Du nimmst teil an…"
+msgstr "👥 Beigetretene Treffen"
 
 msgid "ButtonMessages.SETTINGS"
 msgstr "⚙️ Einstellungen"
@@ -205,7 +205,7 @@ msgstr "Willkommen bei Mitup Bot ${first_name}!\n\n"
 "<b>Wichtig</b>: Wir speichern deinen Standort nicht und diese Information wird nur zur Konfiguration deiner Zeitzone verwendet."
 
 msgid "RegistrationMessages.TIMEZONE_SUCCESS"
-msgstr "Perfekt! Deine Zeitzone ist ${timezone}"
+msgstr "Deine Zeitzone ist ${timezone}"
 
 msgid "RegistrationMessages.TIMEZONE_FAIL"
 msgstr "Es tut mir leid, ich konnte deine Zeitzone nicht festlegen. Bitte versuche es erneut."
@@ -233,12 +233,12 @@ msgstr "Hier kannst du die Standardoptionen konfigurieren, die beim Erstellen ei
 "<b>Bei Start sperren</b>: Wenn aktiviert und ein Treffen eine festgelegte Dauer hat, können die Teilnehmer nicht beitreten oder das Treffen verlassen, sobald es beginnt. Wenn deaktiviert, können die Teilnehmer frei beitreten oder gehen."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
-msgstr "Das Timeout definiert, wie lange ein Treffen nach seinem Ende beibehalten wird. Nach dieser Zeit wird das Treffen deaktiviert. Du kannst es erneut über dein <b>Menü für vergangene Treffen</b> aktivieren.\n\n"
+msgstr "Das Timeout definiert, wie lange ein Treffen nach seinem Beginn aktiv bleibt. Treffen ohne festgelegte Dauer werden deaktiviert, sobald diese Zeit verstrichen ist. Nach der Deaktivierung kannst du ein Treffen über dein <b>Menü für vergangene Treffen</b> reaktivieren.\n\n"
 "Das aktuelle Timeout beträgt <b>${timeout} Minuten</b>\n\n"
 "Sende das Timeout (in Minuten), das du verwenden möchtest, oder tippe auf Abbrechen, um zurückzugehen."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
-msgstr "Oups! Das sieht nicht wie eine gültige Nummer aus. Bitte gib eine positive ganze Zahl ein. Keine Dezimalzahlen erlaubt!"
+msgstr "Oops! Das sieht nicht wie eine gültige Zahl aus. Bitte gib eine positive ganze Zahl ein. Keine Dezimalzahlen erlaubt!"
 
 msgid "SettingsMessages.TIMEOUT_SUCCESS"
 msgstr "Das Timeout wurde auf <b>${timeout} Minuten</b> eingestellt"
@@ -336,7 +336,7 @@ msgid "MeetingJoinMessages.JOIN_FULL_WAITING_LIST"
 msgstr "Das Treffen ist voll. Du wurdest zur Warteliste hinzugefügt."
 
 msgid "MeetingJoinMessages.JOIN_UNREGISTERED"
-msgstr "Du bist dem Treffen beigetreten, %{user}! Es scheint, dass du Mitup noch nicht verwendet hast. Öffne einen Chat mit @mitupbot, um Benachrichtigungen zu erhalten und neue Treffen zu erstellen!"
+msgstr "Du bist dem Treffen beigetreten, ${user}! Es scheint, dass du Mitup noch nicht verwendet hast. Öffne einen Chat mit @mitupbot, um Benachrichtigungen zu erhalten und neue Treffen zu erstellen!"
 
 msgid "MeetingJoinMessages.LEAVE_SUCCESS"
 msgstr "Du hast das Treffen verlassen"
@@ -345,7 +345,7 @@ msgid "MeetingJoinMessages.LEAVE_NOT_JOINED"
 msgstr "Du kannst ein Treffen nicht verlassen, dem du nicht beigetreten bist"
 
 msgid "MeetingJoinMessages.LEAVE_UNREGISTERED"
-msgstr "Du hast das Treffen verlassen, %{user}! Es scheint, dass du Mitup noch nicht verwendet hast. Öffne einen Chat mit @mitupbot, um Benachrichtigungen zu erhalten und neue Treffen zu erstellen!"
+msgstr "Du hast das Treffen verlassen, ${user}! Es scheint, dass du Mitup noch nicht verwendet hast. Öffne einen Chat mit @mitupbot, um Benachrichtigungen zu erhalten und neue Treffen zu erstellen!"
 
 msgid "MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST"
 msgstr "Es gibt einen freien Platz im Treffen <b>${meeting_title}</b>. Du wurdest jetzt von der Warteliste befördert!"
@@ -471,7 +471,7 @@ msgstr "Du kannst verschiedene Aspekte deines Treffens konfigurieren:\n\n"
 
 msgid "MeetingListMessages.ACTIVE_EMPTY"
 msgstr "Du hast noch keine Treffen.\n\n"
-"Klicke auf ${new_meeting_button} im Hauptmenü, um ein Treffen zu erstellen."
+"Klicke auf <b>${new_meeting_button}</b> im Hauptmenü, um ein Treffen zu erstellen."
 
 msgid "MeetingListMessages.ACTIVE_DESCRIPTION"
 msgstr "Dies sind alle deine aktiven Treffen."
@@ -501,7 +501,7 @@ msgid "Weekday.THURSDAY"
 msgstr "Don"
 
 msgid "Weekday.FRIDAY"
-msgstr "Frei"
+msgstr "Fre"
 
 msgid "Weekday.SATURDAY"
 msgstr "Sam"
@@ -699,7 +699,7 @@ msgid "MeetingEditContentMessages.DESCRIPTION_ON_EXIT"
 msgstr "Es tut mir leid, ich erwartete die Beschreibung deines Treffens. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
 
 msgid "MeetingEditDurationMessages.ON_EXIT"
-msgstr "Es tut mir leid, ich erwartete die Dauer in Minuten. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
+msgstr "Es tut mir leid, ich erwartete die Endzeit. Möchtest du sie senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
 
 msgid "MeetingEditLocationMessages.COORDINATES_ON_EXIT"
 msgstr "Es tut mir leid, ich erwartete den Ort deines Treffens. Möchtest du ihn senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."
@@ -759,7 +759,7 @@ msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "Dieses Treffen hat bereits begonnen und seine Teilnehmerliste ist gesperrt."
 
 msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
-msgstr "✅ Dieses Treffen ist beendet ✅\n\n<b>Dauer:</b> ${duration} Minuten · <b>Teilnehmer:</b> ${attendee_count}"
+msgstr "✅ Dieses Treffen ist beendet ✅\n\n<b>Von:</b> ${start_datetime} · <b>Bis:</b> ${end_datetime} · <b>Teilnehmer:</b> ${attendee_count}"
 
 msgid "MeetingDisplayMessages.IN_PROGRESS_BANNER"
 msgstr "▶️ Dieses Treffen läuft gerade ▶️"
@@ -783,7 +783,7 @@ msgid "MeetingEditDurationMessages.END_PROMPT"
 msgstr "Treffen beginnt um <b>${start_datetime}</b>. Stelle fest, wann es endet.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal festzulegen.</i>"
 
 msgid "MeetingEditDurationMessages.END_EDIT_PROMPT"
-msgstr "Treffen beginnt um <b>${start_datetime}</b>. Das Treffen endet derzeit um <b>${end_datetime}</b>.\n\nSteile die neue Endzeit fest.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal festzulegen.</i>"
+msgstr "Treffen beginnt um <b>${start_datetime}</b>. Das Treffen endet derzeit um <b>${end_datetime}</b>.\n\nLege die neue Endzeit fest.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal festzulegen.</i>"
 
 msgid "MeetingEditDurationMessages.END_BEFORE_START"
 msgstr "Die Endzeit muss nach der Startzeit liegen."
@@ -960,7 +960,7 @@ msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Du hast das Maximum von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, bevor du ein weiteres erstellst."
+msgstr "Dein Gamemaster-Limit beträgt ${cap} aktive Treffen. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Commissioner zu werden und das Limit aufzuheben."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
 msgstr "Kostenlose Treffen können bis zu ${cap} Teilnehmer aufnehmen. Setze ein niedrigeres Limit, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr Teilnehmer zu hosten."
@@ -969,7 +969,7 @@ msgid "SupporterMessages.SCHEDULING_HORIZON"
 msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und noch weiter zu planen."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Du kannst Treffen bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum."
+msgstr "Dein Gamemaster-Plan plant bis zu ${days} Tage im Voraus. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Commissioner zu werden und das Limit aufzuheben."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Deine Host-Vorteile sind in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Host-Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Andernfalls kannst du Mitup über das Mithelfen-Menü erneut unterstützen."
