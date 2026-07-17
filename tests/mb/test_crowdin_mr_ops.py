@@ -16,8 +16,16 @@ TOKEN = "glpat-SECRETVALUE"
 # The oauth2:<token>@ remote the push targets; the token must never reach console output.
 REMOTE_URL = f"https://oauth2:{TOKEN}@{SERVER_HOST}/{PROJECT_PATH}.git"
 
+# The token owner's /user payload; commits must carry this identity to pass the
+# committer-email push rule.
+TOKEN_USER = {
+    "name": "Crowdin Sync",
+    "commit_email": "12345-crowdin-sync@noreply.gitlab.example",
+    "email": "crowdin-sync@service.example",
+}
+
 FULL_ENV = {
-    "RENOVATE_TOKEN": TOKEN,
+    "CROWDIN_GIT_TOKEN": TOKEN,
     "CI_API_V4_URL": API_V4_URL,
     "CI_PROJECT_ID": PROJECT_ID,
     "CI_SERVER_HOST": SERVER_HOST,
@@ -78,13 +86,25 @@ def install_git_recorder(monkeypatch: pytest.MonkeyPatch, recorder: GitRecorder)
     monkeypatch.setattr(crowdin_mr_ops.subprocess, "run", recorder)
 
 
-def install_hold_response(monkeypatch: pytest.MonkeyPatch, payload: object) -> dict[str, object]:
-    """Patch httpx.get to serve ``payload`` and record the outbound request kwargs."""
+def install_api_responses(
+    monkeypatch: pytest.MonkeyPatch, mrs_payload: object, user_payload: object = None
+) -> dict[str, object]:
+    """Patch httpx.get to serve the merge-requests and /user endpoints, recording requests.
+
+    Merge-request request kwargs land under plain keys ("url", "params", "headers");
+    the /user request records under "user_url" / "user_headers".
+    """
     seen: dict[str, object] = {}
 
     def fake_get(url: str, **kwargs: object) -> httpx.Response:
-        seen["url"] = url
-        seen.update(kwargs)
+        if url.endswith("/user"):
+            seen["user_url"] = url
+            seen["user_headers"] = kwargs.get("headers")
+            payload = user_payload if user_payload is not None else TOKEN_USER
+        else:
+            seen["url"] = url
+            seen.update(kwargs)
+            payload = mrs_payload
         return httpx.Response(200, json=payload, request=httpx.Request("GET", url))
 
     monkeypatch.setattr(crowdin_mr_ops.httpx, "get", fake_get)
@@ -102,7 +122,7 @@ def test_ci_environment_returns_all_values(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.parametrize(
     "missing",
-    ["RENOVATE_TOKEN", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH"],
+    ["CROWDIN_GIT_TOKEN", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH"],
 )
 def test_ci_environment_reports_missing_variable(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], missing: str
@@ -130,7 +150,7 @@ def test_ci_environment_lists_every_missing_variable(
 
 
 def test_hold_requested_true_when_label_present(monkeypatch: pytest.MonkeyPatch):
-    seen = install_hold_response(monkeypatch, [{"labels": ["something", "crowdin::hold"]}])
+    seen = install_api_responses(monkeypatch, [{"labels": ["something", "crowdin::hold"]}])
 
     assert crowdin_mr_ops.hold_requested(FULL_ENV) is True
     assert seen["url"] == f"{API_V4_URL}/projects/{PROJECT_ID}/merge_requests"
@@ -139,13 +159,13 @@ def test_hold_requested_true_when_label_present(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_hold_requested_false_when_label_absent(monkeypatch: pytest.MonkeyPatch):
-    install_hold_response(monkeypatch, [{"labels": ["other"]}, {"labels": []}])
+    install_api_responses(monkeypatch, [{"labels": ["other"]}, {"labels": []}])
 
     assert crowdin_mr_ops.hold_requested(FULL_ENV) is False
 
 
 def test_hold_requested_false_when_no_open_mr(monkeypatch: pytest.MonkeyPatch):
-    install_hold_response(monkeypatch, [])
+    install_api_responses(monkeypatch, [])
 
     assert crowdin_mr_ops.hold_requested(FULL_ENV) is False
 
@@ -156,6 +176,34 @@ def test_hold_requested_raises_on_error_status(monkeypatch: pytest.MonkeyPatch):
 
     with pytest.raises(httpx.HTTPStatusError):
         crowdin_mr_ops.hold_requested(FULL_ENV)
+
+
+# --- token_identity ---
+
+
+def test_token_identity_prefers_commit_email(monkeypatch: pytest.MonkeyPatch):
+    seen = install_api_responses(monkeypatch, [])
+
+    assert crowdin_mr_ops.token_identity(FULL_ENV) == ("Crowdin Sync", "12345-crowdin-sync@noreply.gitlab.example")
+    assert seen["user_url"] == f"{API_V4_URL}/user"
+    assert seen["user_headers"] == {"PRIVATE-TOKEN": TOKEN}
+
+
+@pytest.mark.parametrize("commit_email", [None, ""], ids=["null", "empty"])
+def test_token_identity_falls_back_to_email(monkeypatch: pytest.MonkeyPatch, commit_email: str | None):
+    install_api_responses(
+        monkeypatch, [], user_payload={"name": "Bot", "commit_email": commit_email, "email": "bot@example"}
+    )
+
+    assert crowdin_mr_ops.token_identity(FULL_ENV) == ("Bot", "bot@example")
+
+
+def test_token_identity_raises_on_error_status(monkeypatch: pytest.MonkeyPatch):
+    request = httpx.Request("GET", f"{API_V4_URL}/user")
+    monkeypatch.setattr(crowdin_mr_ops.httpx, "get", lambda *a, **k: httpx.Response(401, request=request))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        crowdin_mr_ops.token_identity(FULL_ENV)
 
 
 # --- catalogs_changed ---
@@ -178,6 +226,7 @@ def test_catalogs_changed_reads_diff_exit_code(monkeypatch: pytest.MonkeyPatch, 
 
 
 def test_push_translations_branch_runs_full_git_sequence(monkeypatch: pytest.MonkeyPatch):
+    install_api_responses(monkeypatch, [])
     recorder = GitRecorder()
     install_git_recorder(monkeypatch, recorder)
 
@@ -185,7 +234,7 @@ def test_push_translations_branch_runs_full_git_sequence(monkeypatch: pytest.Mon
 
     assert recorder.calls == [
         ["git", "config", "user.name", "Crowdin Sync"],
-        ["git", "config", "user.email", "crowdin-sync-bot@mitup.social"],
+        ["git", "config", "user.email", "12345-crowdin-sync@noreply.gitlab.example"],
         ["git", "checkout", "-B", "crowdin-translations"],
         ["git", "add", "--", "libs/core/mitup_bot/locales/*.po"],
         ["git", "commit", "-m", "🗣️ Update approved translations from Crowdin"],
@@ -220,7 +269,7 @@ def drive_create_mr(
     if get_override is not None:
         monkeypatch.setattr(crowdin_mr_ops.httpx, "get", get_override)
     else:
-        install_hold_response(monkeypatch, list(hold_payload))
+        install_api_responses(monkeypatch, list(hold_payload))
     recorder = GitRecorder(diff_returncode=diff_returncode, fail_on=fail_on)
     install_git_recorder(monkeypatch, recorder)
     return recorder
@@ -238,10 +287,10 @@ def test_create_translations_mr_happy_path_pushes(monkeypatch: pytest.MonkeyPatc
 def test_create_translations_mr_missing_env_exits_one(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
-    set_ci_env(monkeypatch, RENOVATE_TOKEN=None)
+    set_ci_env(monkeypatch, CROWDIN_GIT_TOKEN=None)
 
     assert crowdin_mr_ops.create_translations_mr() == 1
-    assert "RENOVATE_TOKEN" in combined(capsys)
+    assert "CROWDIN_GIT_TOKEN" in combined(capsys)
 
 
 def test_create_translations_mr_hold_leaves_branch_untouched(

@@ -2,10 +2,12 @@
 # (tools/mb/src/mb/crowdin_ops.py).
 #
 # Required CI/CD variables (Settings > CI/CD > Variables, masked):
-#   CROWDIN_API_KEY - Crowdin personal access token (projects read, source files,
-#                     translations, storages).
-#   RENOVATE_TOKEN  - project access token with push + MR rights; shared with the
-#                     auto-format job, used by crowdin-pull to push the MR branch.
+#   CROWDIN_API_KEY   - Crowdin personal access token (projects read, source files,
+#                       translations, storages).
+#   CROWDIN_GIT_TOKEN - PAT of the crowdin-sync service account (api + write_repository;
+#                       the account needs Developer on the project). crowdin-pull pushes
+#                       the MR branch with it and commits as the token's owner — the
+#                       committer-email push rule rejects any other identity.
 #
 # crowdin-pull runs from an hourly pipeline schedule targeting the default branch. The
 # schedule must define SCHEDULE_REASON="crowdin-sync" (each schedule names its purpose so

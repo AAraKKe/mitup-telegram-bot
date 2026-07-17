@@ -17,12 +17,10 @@ from . import console, runner
 MR_BRANCH = "crowdin-translations"
 HOLD_LABEL = "crowdin::hold"
 MR_TITLE = "🗣️ Update approved translations from Crowdin"
-COMMIT_AUTHOR_NAME = "Crowdin Sync"
-COMMIT_AUTHOR_EMAIL = "crowdin-sync-bot@mitup.social"
 LOCALES_PATHSPEC = "libs/core/mitup_bot/locales/*.po"
 
-# CI_JOB_TOKEN can neither read the merge-requests API nor push, hence the project token.
-TOKEN_ENV_VAR = "RENOVATE_TOKEN"
+# CI_JOB_TOKEN can neither read the merge-requests API nor push, hence the dedicated token.
+TOKEN_ENV_VAR = "CROWDIN_GIT_TOKEN"
 CI_ENV_VARS = ("CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH")
 REQUEST_TIMEOUT_S = 30.0
 
@@ -46,6 +44,23 @@ def hold_requested(environment: dict[str, str]) -> bool:
     return any(HOLD_LABEL in merge_request["labels"] for merge_request in response.json())
 
 
+def token_identity(environment: dict[str, str]) -> tuple[str, str]:
+    """The token owner's name and commit email.
+
+    The project enforces the committer-email push rule: a push is rejected unless the
+    commit's committer email belongs to the pushing user, so the commit must be authored
+    as whoever owns the token.
+    """
+    response = httpx.get(
+        f"{environment['CI_API_V4_URL']}/user",
+        headers={"PRIVATE-TOKEN": environment[TOKEN_ENV_VAR]},
+        timeout=REQUEST_TIMEOUT_S,
+    )
+    response.raise_for_status()
+    user = response.json()
+    return user["name"], user.get("commit_email") or user["email"]
+
+
 def git(*args: str):
     subprocess.run(["git", *args], cwd=runner.repo_root(), check=True)
 
@@ -56,8 +71,9 @@ def catalogs_changed() -> bool:
 
 
 def push_translations_branch(environment: dict[str, str]):
-    git("config", "user.name", COMMIT_AUTHOR_NAME)
-    git("config", "user.email", COMMIT_AUTHOR_EMAIL)
+    committer_name, committer_email = token_identity(environment)
+    git("config", "user.name", committer_name)
+    git("config", "user.email", committer_email)
     git("checkout", "-B", MR_BRANCH)
     git("add", "--", LOCALES_PATHSPEC)
     git("commit", "-m", MR_TITLE)

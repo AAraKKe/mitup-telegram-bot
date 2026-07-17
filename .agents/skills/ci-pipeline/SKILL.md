@@ -199,8 +199,11 @@ Two jobs drive the Crowdin round-trip through `mb locales push` / `mb locales pu
   pulls approved translations, validates the catalogs, and runs `mb locales create-mr`
   (`tools/mb/src/mb/crowdin_mr_ops.py`), which — when the result differs from the scheduled
   ref — force-pushes the `crowdin-translations` branch with push options that create or update
-  a single open MR. Needs `CROWDIN_API_KEY` plus `RENOVATE_TOKEN` — the same project access
-  token the `auto-format` job pushes with. Labeling the open MR `crowdin::hold` makes
+  a single open MR. Needs `CROWDIN_API_KEY` plus `CROWDIN_GIT_TOKEN` — a PAT of the
+  crowdin-sync service account (Developer on the project, `api` + `write_repository`).
+  `create-mr` commits as the token's owner (fetched from `GET /user`) because the project's
+  committer-email push rule rejects any identity the pushing user doesn't own — never
+  hardcode a committer identity in a CI push job. Labeling the open MR `crowdin::hold` makes
   `create-mr` exit before touching anything (for manual pre-merge fixes on the branch); removing
   the label resumes the hourly rebuilds — which discard any manual commits on the branch.
 
