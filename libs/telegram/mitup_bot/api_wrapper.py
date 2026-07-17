@@ -782,6 +782,13 @@ class TelegramApi:
                     self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
                     return True
                 raise
+            except Forbidden as e:
+                # The chat can no longer be written to (the user blocked the bot, deactivated
+                # their account, or the bot lost access to the group): the stored message can
+                # never be edited again, so it gets the same dead-message treatment.
+                log.warning("Meeting message unreachable, dropping it", chat_id=edit.chat_id, error=str(e))
+                self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
+                return True
         return False
 
     async def _queued_meeting_message_edit(self, edit: MeetingMessageEdit, outbox: ApiOutbox):

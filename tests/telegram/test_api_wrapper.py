@@ -580,6 +580,20 @@ async def test_update_single_meeting_message_not_found_is_swallowed_in_immediate
     await telegram_api.update_single_meeting_message(msg, meeting)
 
 
+@pytest.mark.parametrize(
+    "error_message",
+    ["Forbidden: user is deactivated", "Forbidden: bot was blocked by the user"],
+)
+async def test_update_single_meeting_message_forbidden_is_swallowed_in_immediate_mode(
+    telegram_api: TelegramApi, bot: AsyncMock, error_message: str
+):
+    meeting, msg = make_bot_chat_meeting()
+    bot.edit_message_text.side_effect = Forbidden(error_message)
+
+    # An unreachable chat gets the same dead-message treatment as a deleted message.
+    await telegram_api.update_single_meeting_message(msg, meeting)
+
+
 # ---------------------------------------------------------------------------
 # update_meeting_messages
 # ---------------------------------------------------------------------------
@@ -1161,6 +1175,24 @@ async def test_execute_queued_records_dead_message_for_reconcile(
     telegram_api.end_capture()
 
     bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+    await telegram_api.execute_queued(outbox)
+    await api_metrics_client.flush()
+
+    assert outbox.dead_message_ids == [1]  # msg.id — the reconcile transaction deletes the row
+    api_metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, times=1)
+    api_metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+async def test_execute_queued_records_dead_message_on_forbidden(
+    telegram_api: TelegramApi, bot: AsyncMock, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    meeting, msg = make_bot_chat_meeting()
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+
+    bot.edit_message_text.side_effect = Forbidden("Forbidden: user is deactivated")
     await telegram_api.execute_queued(outbox)
     await api_metrics_client.flush()
 

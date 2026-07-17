@@ -116,6 +116,7 @@ All edit operations route through the shared suppression logic (`handle_edit_err
 
 - **"Message is not modified"** — silently ignored (content unchanged, no-op)
 - **"Message to edit not found" / "Message_id_invalid"** — message deleted by user; `MESSAGE_DELETED` is emitted and the stale `Message` DB record is removed via the outbox reconcile transaction (write mode only — immediate mode just emits the metric)
+- **`Forbidden` on a meeting-message fan-out edit** — the chat is unreachable (user blocked the bot, deactivated their account, or the bot lost group access); same dead-message treatment: `MESSAGE_DELETED` plus the reconcile removal. `handle_edit_errors()` does not catch `Forbidden` — update-based edits answer a live interaction, where it cannot occur.
 
 The suppressed patterns are compiled regexes defined inside `libs/telegram/mitup_bot/api_wrapper.py` (grep for `_ERROR_PATTERNS` / `_ERRORS_TO_IGNORE_PATTERNS` to see the current list — the exact names and set of patterns change as Telegram's error strings evolve). Do not add custom try/except blocks for these cases — extend the regex list in that module instead.
 
