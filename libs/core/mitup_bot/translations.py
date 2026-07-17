@@ -25,3 +25,21 @@ class TranslationEngine:
             cls.__load_translation(lang)
 
         return cls.translations[lang].gettext(message_id)
+
+
+# Each supported locale has a unique primary subtag ("es" → "es_ES", "pt" → "pt_BR", ...), so a
+# Telegram language_code can be matched on its primary subtag alone.
+LANGUAGE_CODE_TO_LOCALE = {locale.split("_")[0]: locale for locale in SUPPORTED_LANGUAGES}
+
+
+def locale_for_language_code(language_code: str | None) -> str:
+    """Map a Telegram `language_code` to a supported locale, falling back to English.
+
+    Telegram sends the user's client language as an optional IETF BCP-47 tag like "en", "es-MX" or
+    "pt-br". Matching is on the primary subtag only, so "es" and "es-MX" both resolve to "es_ES".
+    An absent or unsupported tag yields the English fallback locale.
+    """
+    if language_code is None:
+        return TranslationEngine.FALLBACK_LANG
+    primary_subtag = language_code.lower().split("-")[0]
+    return LANGUAGE_CODE_TO_LOCALE.get(primary_subtag, TranslationEngine.FALLBACK_LANG)

@@ -42,7 +42,9 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
         RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, handler_context=handler_context
     )
 
-    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=cast(Message, update.effective_message).text)
+    message = RegistrationMessages.TIMEZONE_SUCCESS.get(
+        timezone=cast(Message, update.effective_message).text, lang=user_with_settings.lang
+    )
     view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(message)
 
     mock_session.assert_added(user_with_settings)
@@ -104,7 +106,7 @@ async def test_registration_timezone_with_location_update_correctly(
 
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
-    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Dublin")
+    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Dublin", lang=user_with_settings.lang)
     view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(message)
 
     mock_session.assert_added(user_with_settings)

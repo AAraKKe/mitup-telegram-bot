@@ -52,6 +52,8 @@ class UpdateRequest:
         inline_query (str, optional): The inline query string. Defaults to "".
         chat_join_request (bool, optional): When True the update carries a ChatJoinRequest built from the
             fixture's chat and user. Defaults to False.
+        language_code (str | None, optional): When set, overrides the sender's Telegram ``language_code``
+            (the IETF BCP-47 client-language tag). Defaults to None, leaving the fixture user's value.
     """
 
     user: bool = True
@@ -67,6 +69,7 @@ class UpdateRequest:
     inline_message_id: str = "some_inline_message_id"
     from_bot_chat: bool = True
     chat_join_request: bool = False
+    language_code: str | None = None
 
 
 def create_meetup(
@@ -350,6 +353,16 @@ def create_update(
     # Use defaults if not provided to make fixture injection easier
     chat = tg_chat or Chat(id=DEFAULT_CHAT_ID, type="private")
     user = tg_user or TgUser(**DEFAULT_TG_USER_PARAMS)
+
+    if request.language_code is not None:
+        user = TgUser(
+            id=user.id,
+            first_name=user.first_name,
+            is_bot=user.is_bot,
+            last_name=user.last_name,
+            username=user.username,
+            language_code=request.language_code,
+        )
 
     if request.command:
         bot_command = request.command if isinstance(request.command, str) else "test_command"

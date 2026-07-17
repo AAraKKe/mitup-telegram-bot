@@ -56,7 +56,7 @@ async def start_onboarding(
         await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user.lang))
         return ConversationHandler.END
 
-    message = RegistrationMessages.TIMEZONE_PROMPT.get(first_name=user.first_name)
+    message = RegistrationMessages.TIMEZONE_PROMPT.get(first_name=user.first_name, lang=user.lang)
 
     await context.api.send_message(update=update, view=message)
 
@@ -96,7 +96,7 @@ async def registration_timezone_text_message_handler(
     # is a no-op for them.
     user.status = UserStatus.MEMBER
 
-    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone)
+    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone, lang=user.lang)
     view = factory.main_menu_view(guards.render_context(user, update, context)).with_context(message)
 
     await context.api.send_message(update=update, view=view)
@@ -138,7 +138,7 @@ async def registration_timezone_location_message_handler(
     # is a no-op for them.
     user.status = UserStatus.MEMBER
 
-    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone)
+    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone, lang=user.lang)
     view = factory.main_menu_view(guards.render_context(user, update, context)).with_context(message)
 
     await context.api.send_message(update=update, view=view)

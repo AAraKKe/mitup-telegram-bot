@@ -72,7 +72,7 @@ async def test_registration_timezone_text_message_handler_sets_timezone_and_ends
     result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=update.effective_message.text)
+        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=update.effective_message.text, lang=user_with_settings.lang)
     )
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == update.effective_message.text
@@ -113,7 +113,7 @@ async def test_registration_timezone_location_message_handler_sets_timezone_and_
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
     view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Madrid")
+        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Madrid", lang=user_with_settings.lang)
     )
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == "Europe/Madrid"
@@ -293,6 +293,24 @@ async def test_brand_new_user_starts_with_member_status(
     added_users = [obj for obj in mock_session.objects_added if isinstance(obj, User)]
     assert len(added_users) == 1
     assert added_users[0].status is UserStatus.MEMBER
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(command="start", language_code="es-ES")], indirect=True)
+async def test_brand_new_spanish_client_gets_prompt_in_seeded_language(
+    update: Update,
+    context: StubMitupContext,
+    mock_session: MockDbSession,
+):
+    """A brand-new user whose Telegram client is Spanish is greeted in Spanish.
+
+    The seeded Settings language ("es_ES") flows into the timezone prompt via `user.lang`.
+    """
+    await claimed_state(command_start_with_new_user(update, context))
+
+    context.api.assert_send_message_called(
+        update,
+        RegistrationMessages.TIMEZONE_PROMPT.get(first_name="Test User", lang="es_ES"),
+    )
 
 
 async def test_brand_new_user_completes_conversation_with_member_status(

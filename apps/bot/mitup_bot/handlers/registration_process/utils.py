@@ -8,6 +8,7 @@ from telegram.ext import ApplicationHandlerStop
 
 from mitup_bot.exceptions import EffectiveUserNotSet
 from mitup_bot.models import Settings, User
+from mitup_bot.translations import locale_for_language_code
 
 
 def claim_update[**P](
@@ -50,7 +51,7 @@ async def get_or_create_onboarding_user(session: AsyncSession, update: Update) -
         tg_user_id=update.effective_user.id,
         last_name=update.effective_user.last_name,
         username=update.effective_user.username,
-        settings=Settings(),
+        settings=Settings(language=locale_for_language_code(update.effective_user.language_code)),
     )
     session.add(new_user)
     return new_user
