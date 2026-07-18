@@ -30,13 +30,18 @@ def green_repo(recorder: CommandRecorder, *, tags: str = "v1.2.3\n", head: str =
 
     The pre-release green check filters pipelines by `sha`; the post-push watch filters by `ref`, so
     the two queries are keyed separately — a test can override one without disturbing the other.
+    *tags* are served as origin's `ls-remote` listing, each with its peeled `^{}` companion line.
     """
+    listing = "".join(
+        f"cafe{index:04x}\trefs/tags/{tag}\ncafe{index:04x}\trefs/tags/{tag}^{{}}\n"
+        for index, tag in enumerate(tags.split())
+    )
     recorder.captured_outputs.update(
         {
             "rev-parse origin/main": head,
             "pipelines?sha=": json.dumps([{"id": 7, "status": "success"}]),
             "pipelines?ref=": json.dumps([{"id": 42, "status": "created", "web_url": TAG_PIPELINE_URL}]),
-            "tag --list": tags,
+            "ls-remote --tags": listing,
         }
     )
     return recorder
@@ -133,6 +138,26 @@ def test_release_skips_a_milestone_that_already_exists(recorder: CommandRecorder
 
     assert "Milestone v1.5.0 already exists" in result.output
     assert ["glab", "milestone", "create", "--title", "v1.5.0"] not in recorder.commands
+
+
+def test_release_milestone_queries_include_ancestor_group_milestones(recorder: CommandRecorder):
+    green_repo(recorder)
+
+    cli.invoke(app, ["release", "--minor"])
+
+    assert ["glab", "api", "projects/:id/milestones?title=v1.3.0&include_parent_milestones=true"] in recorder.commands
+
+
+def test_release_reuses_an_existing_group_milestone_instead_of_creating_it(recorder: CommandRecorder):
+    green_repo(recorder)
+    # GitLab rejects a project milestone shadowing a group one, so the group milestone must be
+    # detected as existing and carried onto the release as-is.
+    recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 66, "group_id": 9}])
+
+    cli.invoke(app, ["release", "--minor"])
+
+    assert ["glab", "milestone", "create", "--title", "v1.3.0"] not in recorder.commands
+    assert "milestones[]=v1.3.0" in release_create_call(recorder)
 
 
 def test_release_creates_gitlab_release_titled_and_milestoned_with_the_tag(recorder: CommandRecorder):
@@ -330,6 +355,17 @@ def test_release_ignores_non_semver_tags(recorder: CommandRecorder):
     cli.invoke(app, ["release"])
 
     assert ["git", "tag", "-a", "v2.4.11", "abc123def456", "-m", "v2.4.11"] in recorder.commands
+
+
+def test_release_reads_the_previous_version_from_origin_not_local_tags(recorder: CommandRecorder):
+    green_repo(recorder)  # origin knows v1.2.3 only
+    # A stray local-only tag at a higher version must not shift the changelog range.
+    recorder.captured_outputs["tag --list"] = "v1.2.3\nv9.9.9\n"
+
+    cli.invoke(app, ["release"])
+
+    assert ["git", "ls-remote", "--tags", "origin", "v*"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
 
 
 @pytest.mark.parametrize("flags", [["--minor", "--major"], ["--patch", "--minor"], ["--patch", "--major"]])

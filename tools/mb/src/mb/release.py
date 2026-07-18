@@ -123,8 +123,20 @@ def parse_version(tag: str) -> Version | None:
 
 
 def latest_version() -> Version | None:
-    """Highest `vMAJOR.MINOR.PATCH` tag, or None when no version tag exists yet."""
-    versions = [parsed for line in git_capture("tag", "--list", "v*").splitlines() if (parsed := parse_version(line))]
+    """Highest `vMAJOR.MINOR.PATCH` tag on origin, or None when no version tag exists yet.
+
+    Reads the remote tag listing, never the local one: a local-only tag at or past the released
+    commit would silently shrink the changelog range, so only tags that origin knows about count
+    as releases. The preceding fetch guarantees every remote tag also resolves locally for the
+    changelog's `git log` range.
+    """
+    versions: list[Version] = []
+    for line in git_capture("ls-remote", "--tags", "origin", "v*").splitlines():
+        tag = line.split("refs/tags/")[-1]
+        if tag.endswith("^{}"):
+            continue
+        if parsed := parse_version(tag):
+            versions.append(parsed)
     return max(versions) if versions else None
 
 
@@ -227,8 +239,10 @@ def build_release_notes(merge_requests: list[MergeRequest]) -> str:
 
 
 def milestone_id(title: str) -> int | None:
-    """Numeric id of the project milestone titled *title*, or None when it cannot be resolved."""
-    exit_code, output = runner.run_quiet(["glab", "api", f"projects/:id/milestones?title={title}"])
+    """Numeric id of the project or ancestor-group milestone titled *title*, or None when it cannot be resolved."""
+    exit_code, output = runner.run_quiet(
+        ["glab", "api", f"projects/:id/milestones?title={title}&include_parent_milestones=true"]
+    )
     if exit_code != 0:
         return None
     try:
@@ -270,8 +284,15 @@ def assign_merge_requests_to_milestone(merge_requests: list[MergeRequest], title
 
 
 def milestone_exists(title: str) -> bool:
-    """Whether a project milestone titled *title* already exists (False when the query cannot answer)."""
-    exit_code, output = runner.run_quiet(["glab", "api", f"projects/:id/milestones?title={title}"])
+    """Whether a milestone titled *title* already exists (False when the query cannot answer).
+
+    Ancestor-group milestones count: GitLab rejects a project milestone whose title shadows a
+    group one, so an existing group milestone must be reused rather than re-created. Releases and
+    merge requests accept group milestones exactly like project ones.
+    """
+    exit_code, output = runner.run_quiet(
+        ["glab", "api", f"projects/:id/milestones?title={title}&include_parent_milestones=true"]
+    )
     if exit_code != 0:
         return False
     try:
