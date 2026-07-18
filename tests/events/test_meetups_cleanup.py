@@ -3,7 +3,6 @@ from typing import cast
 import pytest
 
 from mitup_bot.events import meetups_cleanup
-from mitup_bot.events.meetups_cleanup import MEETUPS_DELETION_FAILED
 from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.keyboards import ButtonConfig
@@ -113,7 +112,7 @@ async def test_delete_no_meetings(
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
     metrics.assert_emitted(
-        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        name=MetricKey.MEETINGS_DELETION_FAILED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
@@ -152,7 +151,7 @@ async def test_delete_meeting_successfully(
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
     metrics.assert_emitted(
-        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        name=MetricKey.MEETINGS_DELETION_FAILED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
@@ -183,7 +182,7 @@ async def test_delete_meeting_with_outside_users(
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
     metrics.assert_emitted(
-        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        name=MetricKey.MEETINGS_DELETION_FAILED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
@@ -216,7 +215,7 @@ async def test_delete_partial_failure_inactive_user(
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
     metrics.assert_emitted(
-        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        name=MetricKey.MEETINGS_DELETION_FAILED,
         value=1,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
@@ -242,7 +241,7 @@ async def test_run_orchestrates_both_functions(
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
     metrics.assert_emitted(
-        name=MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED),
+        name=MetricKey.MEETINGS_DELETION_FAILED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )

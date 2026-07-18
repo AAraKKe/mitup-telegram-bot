@@ -10,6 +10,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from .claiming import (
     claim_next_broadcast,
     claim_pending_batch,
+    count_broadcast_backlog,
     count_unfinished_deliveries,
     load_broadcast_bodies,
     materialize_audience,
@@ -30,12 +31,29 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient, admin_tg_ids: lis
     broadcast is left `SENDING` for the next tick to resume — per-recipient failures never
     propagate, they are counted and rolled up at finalization.
     """
+    await emit_backlog_gauges(metrics)
     claimed = await claim_next_broadcast()
     if claimed is None:
         return
 
     with structlog.contextvars.bound_contextvars(broadcast_id=claimed.broadcast_id):
         await process_claimed_broadcast(api, metrics, admin_tg_ids, claimed)
+
+
+async def emit_backlog_gauges(metrics: MetricsClient):
+    """Emit the queue-depth gauges, but only on ticks that have backlog to report.
+
+    Broadcasts are rare operator-triggered events, so an always-on zero baseline would be permanent
+    noise; a quiet system emits nothing. While anything is QUEUED, SENDING or parked RETRY_PENDING,
+    all three gauges emit every tick (zeros included for the quiet ones) so an active run — or a
+    stuck queue — is a live, complete reading.
+    """
+    queued, sending, retry_pending = await count_broadcast_backlog()
+    if not (queued or sending or retry_pending):
+        return
+    metrics.emit(MetricKey.BROADCASTS_QUEUED, queued, MetricUnit.COUNT)
+    metrics.emit(MetricKey.BROADCASTS_SENDING, sending, MetricUnit.COUNT)
+    metrics.emit(MetricKey.BROADCAST_DELIVERIES_RETRY_PENDING, retry_pending, MetricUnit.COUNT)
 
 
 async def process_claimed_broadcast(
@@ -52,10 +70,12 @@ async def process_claimed_broadcast(
     total = await materialize_audience(claimed.broadcast_id, list(bodies))
     # An initial progress datapoint doubles as the "broadcast started/resumed" marker that dropping
     # BROADCAST_MESSAGES_TO_SEND removed: on a resumed broadcast it reads the true current percent,
-    # and it is the only progress signal on a tick where no delivery is due yet. No explicit flush —
-    # the first batch's flush (or the run-end flush) carries it.
+    # and it is the only progress signal on a tick where no delivery is due yet. Flushed right away
+    # so it owns its flush window — the shared EMF logger is last-writer-wins on properties, and
+    # sharing a window with the first batch would clobber this datapoint's total/remaining.
     if total:
         await emit_progress(metrics, claimed.broadcast_id, total)
+        await metrics.flush()
 
     await send_all_pending(api, metrics, claimed.broadcast_id, total, bodies)
     if await defer_for_pending_retries(claimed.broadcast_id):

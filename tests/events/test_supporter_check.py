@@ -614,6 +614,9 @@ async def test_run_happy_path_emits_creator_ttl_and_counters(
     metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
     # Per-subscription faults: a clean run still emits the 0-baseline so the series stays continuous.
     metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
+    # Items-processed counters: nothing was due, and the sweep saw one active patron.
+    metrics.assert_emitted(name=supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=1, unit=MetricUnit.COUNT)
 
 
 async def test_run_logs_summary_on_success(
@@ -785,3 +788,6 @@ async def test_run_counts_grace_extensions(
 
     metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=1, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
+    # The one due subscription was processed and the sweep saw one active patron.
+    metrics.assert_emitted(name=supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=1, unit=MetricUnit.COUNT)

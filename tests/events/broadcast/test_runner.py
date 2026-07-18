@@ -24,28 +24,54 @@ RETRY_PENDING = BroadcastDeliveryStatus.RETRY_PENDING
 
 
 async def test_run_returns_early_when_nothing_claimed(
-    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+    api: MockApi, metrics_client: MetricsClient, metrics: MetricAssertions, monkeypatch: pytest.MonkeyPatch
 ):
+    monkeypatch.setattr(runner, "count_broadcast_backlog", mock.AsyncMock(return_value=(0, 0, 0)))
     monkeypatch.setattr(runner, "claim_next_broadcast", mock.AsyncMock(return_value=None))
     process = mock.AsyncMock()
     monkeypatch.setattr(runner, "process_claimed_broadcast", process)
 
     await runner.run(api, metrics_client, [1])
+    await metrics_client.flush()
 
     process.assert_not_awaited()
+    # A quiet system emits no backlog gauges — broadcasts are rare, so no always-on zero baseline.
+    metrics.assert_not_emitted(name=MetricKey.BROADCASTS_QUEUED)
+    metrics.assert_not_emitted(name=MetricKey.BROADCASTS_SENDING)
+    metrics.assert_not_emitted(name=MetricKey.BROADCAST_DELIVERIES_RETRY_PENDING)
 
 
 async def test_run_delegates_to_processing_when_claimed(
-    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+    api: MockApi, metrics_client: MetricsClient, metrics: MetricAssertions, monkeypatch: pytest.MonkeyPatch
 ):
+    monkeypatch.setattr(runner, "count_broadcast_backlog", mock.AsyncMock(return_value=(2, 1, 7)))
     claimed = ClaimedBroadcast(broadcast_id=5, author_tg_id=99, attempts=1, terminal_failure=False)
     monkeypatch.setattr(runner, "claim_next_broadcast", mock.AsyncMock(return_value=claimed))
     process = mock.AsyncMock()
     monkeypatch.setattr(runner, "process_claimed_broadcast", process)
 
     await runner.run(api, metrics_client, [1])
+    await metrics_client.flush()
 
     process.assert_awaited_once_with(api, metrics_client, [1], claimed)
+    metrics.assert_emitted(name=MetricKey.BROADCASTS_QUEUED, value=2, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=MetricKey.BROADCASTS_SENDING, value=1, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=MetricKey.BROADCAST_DELIVERIES_RETRY_PENDING, value=7, unit=MetricUnit.COUNT)
+
+
+async def test_emit_backlog_gauges_emits_zeros_for_quiet_series_when_any_backlog_exists(
+    metrics_client: MetricsClient, metrics: MetricAssertions, monkeypatch: pytest.MonkeyPatch
+):
+    """Once anything is in the backlog, all three gauges emit — zeros included for the quiet
+    series — so the reading during an active or stuck run is complete."""
+    monkeypatch.setattr(runner, "count_broadcast_backlog", mock.AsyncMock(return_value=(0, 0, 3)))
+
+    await runner.emit_backlog_gauges(metrics_client)
+    await metrics_client.flush()
+
+    metrics.assert_emitted(name=MetricKey.BROADCASTS_QUEUED, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=MetricKey.BROADCASTS_SENDING, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=MetricKey.BROADCAST_DELIVERIES_RETRY_PENDING, value=3, unit=MetricUnit.COUNT)
 
 
 async def test_process_claimed_broadcast_terminal_failure_finalizes_failed(
@@ -92,6 +118,27 @@ async def test_process_claimed_broadcast_normal_path_emits_initial_progress(
     )
     send_all.assert_awaited_once_with(api, metrics_client, 5, 4, {"en": "hi"})
     finalize.assert_awaited_once_with(api, metrics_client, [1], 42, 5, BroadcastStatus.DONE)
+
+
+async def test_process_claimed_broadcast_flushes_the_initial_progress_datapoint(
+    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    """The claim-tick progress datapoint gets its own flush window — the shared EMF logger is
+    last-writer-wins on properties, so sharing a window with the first batch would clobber its
+    total/remaining properties."""
+    monkeypatch.setattr(runner, "load_broadcast_bodies", mock.AsyncMock(return_value={"en": "hi"}))
+    monkeypatch.setattr(runner, "materialize_audience", mock.AsyncMock(return_value=4))
+    monkeypatch.setattr(runner, "count_unfinished_deliveries", mock.AsyncMock(return_value=4))
+    monkeypatch.setattr(runner, "send_all_pending", mock.AsyncMock())
+    monkeypatch.setattr(runner, "defer_for_pending_retries", mock.AsyncMock(return_value=False))
+    monkeypatch.setattr(runner, "finalize_and_report", mock.AsyncMock())
+    flush = mock.AsyncMock()
+    monkeypatch.setattr(metrics_client, "flush", flush)
+    claimed = ClaimedBroadcast(broadcast_id=5, author_tg_id=42, attempts=1, terminal_failure=False)
+
+    await runner.process_claimed_broadcast(api, metrics_client, [1], claimed)
+
+    flush.assert_awaited_once()
 
 
 async def test_process_claimed_broadcast_defers_finalization_when_retries_pending(

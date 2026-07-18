@@ -60,6 +60,9 @@ GRACE_EXTENDED_METRIC = "PatreonGraceExtended"
 # Per-subscription processing faults. Emitted every run (0 when the sweep is clean) so the series is
 # continuous rather than a failure-only signal; the run still raises after emitting when any row failed.
 SUBSCRIPTION_FAULTS_METRIC = "PatreonSubscriptionFaults"
+# Items-processed counters, emitted every run (zeros included) like the outcome counters above.
+DUE_SUBSCRIPTIONS_PROCESSED_METRIC = "PatreonDueSubscriptionsProcessed"
+ACTIVE_PATRONS_METRIC = "PatreonActivePatrons"
 
 
 class DueOutcome(Enum):
@@ -324,6 +327,8 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     metrics.emit(UPGRADES_METRIC, upgraded, MetricUnit.COUNT)
     metrics.emit(DOWNGRADES_METRIC, downgraded, MetricUnit.COUNT)
     metrics.emit(SUBSCRIPTION_FAULTS_METRIC, len(failures), MetricUnit.COUNT)
+    metrics.emit(DUE_SUBSCRIPTIONS_PROCESSED_METRIC, len(due_outcomes), MetricUnit.COUNT)
+    metrics.emit(ACTIVE_PATRONS_METRIC, len(active_amounts), MetricUnit.COUNT)
 
     if failures:
         raise RuntimeError(f"Supporter check failed for {len(failures)} subscriptions. Check logs for details.")

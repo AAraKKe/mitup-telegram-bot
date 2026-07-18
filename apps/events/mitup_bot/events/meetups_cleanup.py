@@ -24,8 +24,6 @@ PERMANENT_EXPIRATION_INTERVAL = "180 days"
 """Interval after expiration date to notify the owner that the meeting will be permanently deleted tomorrow."""
 PERMANENT_EXPIRATION_NOTIFICATION_INTERVAL = "173 days"  # A week before the permanent expiration
 
-MEETUPS_DELETION_FAILED = "MeetupsDeletionFailed"
-
 MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
     and_(
         Meetup.expiration_notification_sent == false(),
@@ -122,8 +120,8 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
     deleted_count = len(meeting_ids)
     failed_count = len(meetups) - deleted_count
 
-    metrics.emit(MetricKey.MEETUPS_DELETED, len(meeting_ids), MetricUnit.COUNT)
-    metrics.emit(MetricKey.FAULT.with_prefix(MEETUPS_DELETION_FAILED), failed_count, MetricUnit.COUNT)
+    metrics.emit(MetricKey.MEETUPS_DELETED, deleted_count, MetricUnit.COUNT)
+    metrics.emit(MetricKey.MEETINGS_DELETION_FAILED, failed_count, MetricUnit.COUNT)
 
 
 @db.with_session

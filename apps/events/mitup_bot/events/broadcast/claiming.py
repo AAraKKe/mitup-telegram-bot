@@ -64,6 +64,28 @@ async def claim_next_broadcast(session: AsyncSession) -> ClaimedBroadcast | None
 
 
 @db.with_session
+async def count_broadcast_backlog(session: AsyncSession) -> tuple[int, int, int]:
+    """Counts of QUEUED broadcasts, SENDING broadcasts, and RETRY_PENDING deliveries across all
+    broadcasts — the backlog gauges every sender tick emits so a stuck queue is graphable."""
+    status_rows = (
+        await session.exec(
+            select(col(Broadcast.status), func.count())
+            .where(col(Broadcast.status).in_([BroadcastStatus.QUEUED, BroadcastStatus.SENDING]))
+            .group_by(col(Broadcast.status))
+        )
+    ).all()
+    by_status = dict(status_rows)
+    retry_pending = (
+        await session.exec(
+            select(func.count())
+            .select_from(BroadcastDelivery)
+            .where(col(BroadcastDelivery.status) == BroadcastDeliveryStatus.RETRY_PENDING)
+        )
+    ).one()
+    return by_status.get(BroadcastStatus.QUEUED, 0), by_status.get(BroadcastStatus.SENDING, 0), retry_pending
+
+
+@db.with_session
 async def count_unfinished_deliveries(session: AsyncSession, broadcast_id: int) -> int:
     statement = (
         select(func.count())

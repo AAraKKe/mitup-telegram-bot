@@ -59,16 +59,24 @@ class MetricKey(CamelCaseStrEnum):
     TOTAL_USERS = auto()
     """Stat for the total number of active meetings"""
     ACTIVE_MEETINGS = auto()
-    """Stat for the total number of meetings with a datetime set"""
+    """Stat for the number of active meetings with a datetime set"""
     MEETINGS_WITH_DATETIME = auto()
-    """Stat for the total number of inactive meetings"""
-    INACTIVE_MEETINGS = auto()
-    """Stat for the total number of incognito meetings"""
+    """Stat for the number of active incognito meetings"""
     INCOGNITO_MEETINGS = auto()
-    """Stat for the total number of public meetings"""
+    """Stat for the number of active public meetings"""
     PUBLIC_MEETINGS = auto()
-    """Stat for the total number of meetings with invitation"""
+    """Stat for the number of active meetings with invitation"""
     MEETINGS_WITH_INVITATION = auto()
+    """Stat for the number of active meetings currently inside their in-progress window"""
+    MEETINGS_IN_PROGRESS = auto()
+    """Stat for the number of users on the waiting list of an active meeting"""
+    WAITING_LIST_SIZE = auto()
+    """Stat for the number of users with a linked Patreon account (supporter_subscriptions rows)"""
+    LINKED_PATREON_ACCOUNTS = auto()
+    """Stat for the number of linked subscriptions currently in their expiration grace period"""
+    SUBSCRIPTIONS_IN_GRACE = auto()
+    """Stat for the number of users that have turned meeting notifications off"""
+    NOTIFICATIONS_DISABLED = auto()
     """Stat for the total number of shared meetings"""
     SHARED_MEETINGS = auto()
     """Stat for the total number of meetings in the database"""
@@ -153,6 +161,14 @@ class MetricKey(CamelCaseStrEnum):
     BROADCAST_BATCH_MESSAGES_SENT = auto()
     """Live 0-100 completion of the broadcast, computed from the delivery table after each batch"""
     BROADCAST_PROGRESS_PERCENT = auto()
+    """Backlog gauge: broadcasts sitting QUEUED; emitted only on sender ticks with backlog to report"""
+    BROADCASTS_QUEUED = auto()
+    """Backlog gauge: broadcasts currently SENDING; emitted only on sender ticks with backlog to report"""
+    BROADCASTS_SENDING = auto()
+    """Backlog gauge: deliveries parked RETRY_PENDING; emitted only on sender ticks with backlog to report"""
+    BROADCAST_DELIVERIES_RETRY_PENDING = auto()
+    """Number of expired meetings whose permanent deletion failed (owner unreachable for the notice)"""
+    MEETINGS_DELETION_FAILED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

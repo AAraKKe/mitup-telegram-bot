@@ -18,6 +18,22 @@ async def test_count_deliveries_reads_scalar(mock_session: MockDbSession):
     assert await claiming.count_deliveries(mock_session, 5) == 7
 
 
+async def test_count_broadcast_backlog_reads_grouped_statuses_and_retry_count(mock_session: MockDbSession):
+    script_exec(
+        mock_session,
+        Result(results=((BroadcastStatus.QUEUED, 2), (BroadcastStatus.SENDING, 1))),
+        Result(results=(7,)),
+    )
+
+    assert await claiming.count_broadcast_backlog() == (2, 1, 7)
+
+
+async def test_count_broadcast_backlog_reads_zeros_when_idle(mock_session: MockDbSession):
+    script_exec(mock_session, Result(), Result(results=(0,)))
+
+    assert await claiming.count_broadcast_backlog() == (0, 0, 0)
+
+
 async def test_resolve_claimed_recipients_pairs_users_to_deliveries(mock_session: MockDbSession):
     first = create_member(1, 11, "en")
     second = create_member(2, 12, "es_ES")
