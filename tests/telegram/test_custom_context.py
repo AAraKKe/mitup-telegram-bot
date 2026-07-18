@@ -1,11 +1,14 @@
+import datetime as dt
 from typing import Any
 
 import pytest
-from telegram import Update
+from telegram import Chat, InlineQuery, Location, Message, Update
+from telegram import User as TgUser
 
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
+    fault_fields_from_update,
     update_fields_from_update,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
@@ -251,3 +254,98 @@ def test_update_fields_from_update_no_effective_user():
     result = update_fields_from_update(Update(update_id=1))
 
     assert "user" not in result
+
+
+async def test_timing_metrics_success_emits_fault_zero(context: StubMitupContext, metrics: MetricAssertions):
+    with context.with_time_metric("MyMetric"):
+        pass
+
+    await context.flush_metrics()
+
+    metrics.assert_emitted(
+        name="MyMetricTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+        properties={"Success": True},
+    )
+    metrics.assert_emitted(name="MyMetricFault", value=0)
+
+
+async def test_timing_metrics_emit_even_when_the_timed_call_raises(
+    context: StubMitupContext, metrics: MetricAssertions
+):
+    with pytest.raises(ValueError, match="boom"):
+        with context.with_time_metric("MyMetric"):
+            raise ValueError("boom")
+
+    await context.flush_metrics()
+
+    metrics.assert_emitted(
+        name="MyMetricTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+        properties={"Success": False},
+    )
+    metrics.assert_emitted(name="MyMetricFault", value=1)
+
+
+async def test_user_data_mutations_emit_no_metrics(context: StubMitupContext, metrics: MetricAssertions):
+    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, 123)
+    context.store_text(ContextId.EDIT_MEETING_LOCATION_NAME, "raw user text")
+    context.clean_user_data([ContextId.EDIT_MEETING_LOCATION_NAME])
+
+    await context.flush_metrics()
+
+    metrics.assert_not_emitted(name="StoredMeetingId")
+    metrics.assert_not_emitted(name="StoredContextText")
+    metrics.assert_not_emitted(name="CleanUserData")
+
+
+def test_update_fields_from_update_carries_ids_but_no_text_username_or_markup():
+    user = TgUser(id=42, first_name="Ada", is_bot=False, username="ada_l")
+    chat = Chat(id=7, type=Chat.PRIVATE)
+    message = Message(message_id=99, date=dt.datetime.now(dt.UTC), chat=chat, from_user=user, text="secret user text")
+
+    result = update_fields_from_update(Update(update_id=1, message=message))
+
+    assert result["user"] == {"tg_user_id": 42}
+    assert result["message"] == {"message_id": 99}
+
+
+def test_update_fields_from_update_drops_inline_query_text():
+    user = TgUser(id=42, first_name="Ada", is_bot=False)
+    inline_query = InlineQuery(id="iq1", from_user=user, query="secret search", offset="")
+
+    result = update_fields_from_update(Update(update_id=1, inline_query=inline_query))
+
+    assert "inline_query" not in result
+    assert result["user"] == {"tg_user_id": 42}
+
+
+def test_fault_fields_carry_the_trigger_and_its_context():
+    user = TgUser(id=42, first_name="Ada", is_bot=False, username="ada_l")
+    chat = Chat(id=7, type=Chat.PRIVATE)
+    message = Message(message_id=99, date=dt.datetime.now(dt.UTC), chat=chat, from_user=user, text="/start Madrid")
+
+    fields = fault_fields_from_update(Update(update_id=5, message=message))
+
+    assert fields == {
+        "update_id": 5,
+        "tg_user_id": 42,
+        "username": "ada_l",
+        "chat_id": 7,
+        "message_id": 99,
+        "trigger_text": "/start Madrid",
+    }
+
+
+def test_fault_fields_carry_a_location_trigger():
+    user = TgUser(id=42, first_name="Ada", is_bot=False)
+    chat = Chat(id=7, type=Chat.PRIVATE)
+    location = Location(longitude=1.5, latitude=41.2)
+    message = Message(message_id=99, date=dt.datetime.now(dt.UTC), chat=chat, from_user=user, location=location)
+
+    fields = fault_fields_from_update(Update(update_id=5, message=message))
+
+    assert fields["location"] == {"latitude": 41.2, "longitude": 1.5}
+    assert fields["trigger_text"] is None

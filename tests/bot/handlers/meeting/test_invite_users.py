@@ -703,8 +703,6 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
 
     # The FAULT metric should have been emitted with the expected prefix,
     # batched together with the other standard handler metrics in a single log line.
-    # The ContextId property is set by clean_user_data before the metric is emitted.
-    metrics.assert_emitted(name="CleanUserData", value=1)
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("FallbackInviteUserConversation"), value=1.0)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)

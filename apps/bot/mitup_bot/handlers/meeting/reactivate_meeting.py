@@ -5,6 +5,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
@@ -50,3 +51,5 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
         update=update,
         view=meeting_views.edit_view(full_meeting).with_context(success_message),
     )
+
+    context.put_feature_metric(Feature.REACTIVATE_MEETING)

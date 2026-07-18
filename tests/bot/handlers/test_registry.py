@@ -1,5 +1,6 @@
 from contextlib import suppress
 from enum import Enum, auto
+from typing import Any, cast
 from unittest import mock
 
 import pytest
@@ -14,7 +15,7 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback
-from mitup_bot.monitoring import MetricUnit
+from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import (
@@ -171,9 +172,11 @@ def test_cannot_register_same_conversation_twice():
 async def test_callback_query_fallback_answers_with_sorry_message(
     update: Update,
     app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
 ):
-    """callback_query_fallback calls bot.answer_callback_query with the fallback message."""
-    context = build_context(update, app)
+    """callback_query_fallback answers with the fallback message and counts the unhandled interaction."""
+    context = build_context(update, app, metrics=metrics_client)
     assert update.callback_query is not None
 
     await callback_query_fallback(update, context)
@@ -184,6 +187,20 @@ async def test_callback_query_fallback_answers_with_sorry_message(
         "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀",
         show_alert=True,
     )
+    await context.flush_metrics()
+    metrics.assert_emitted(name=MetricKey.UNHANDLED_CALLBACK, value=1)
+
+
+def test_bind_registers_fallback_through_metrics_wrapper():
+    """The catch-all fallback must go through callback_with_metrics so unhandled interactions
+    emit Fault/Time and get their buffered metrics flushed like every registered handler."""
+    app = ApplicationBuilder().token("AAA").build()
+    HandlersRegistry.bind(app)
+
+    fallback_handler = app.handlers[0][-1]
+    wrapped_callback = cast(Any, fallback_handler.callback)
+    assert wrapped_callback is not callback_query_fallback
+    assert wrapped_callback.__qualname__.startswith("callback_with_metrics")
 
 
 def test_cannot_register_same_inline_handler_twice():

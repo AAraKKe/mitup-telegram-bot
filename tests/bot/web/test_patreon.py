@@ -17,6 +17,7 @@ from mitup_bot.exceptions import PatreonApiError
 from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import SupporterSubscription
 from mitup_bot.models.users import UserStatus
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
 from mitup_bot.patreon.models import IdentityData, IdentityResponse
 from mitup_bot.supporter import SupporterLevel
@@ -39,6 +40,7 @@ from mitup_bot.web.patreon import (
     upsert_subscription,
 )
 from tests.helpers import (
+    MetricAssertions,
     MockApi,
     build_ptb_app_mock,
     build_test_web_app,
@@ -46,6 +48,7 @@ from tests.helpers import (
     create_patreon_config,
     create_supporter_subscription,
     create_user,
+    make_test_metrics_client,
 )
 from tests.helpers.stub_db import MockDbSession
 
@@ -897,3 +900,67 @@ async def test_link_supporter_noop_when_hosts_group_unconfigured(
     assert outcome is LinkOutcome.LINKED_SUPPORTER
     api.assert_method_just_called("unban_chat_member", times=0)
     api.mock_method("is_chat_banned").assert_not_called()
+
+
+# --- Patreon link funnel metrics ---
+
+
+async def test_callback_funnel_emits_started_and_completed_on_link(
+    ptb_app: MagicMock, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
+):
+    metrics_client = make_test_metrics_client()
+    metrics = MetricAssertions(metrics_client)
+    web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
+    FakePatreonClient.exchange_error = None
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+    monkeypatch.setattr(web_patreon, "link_patreon_account", AsyncMock(return_value=LinkOutcome.LINKED_SUPPORTER))
+    state = oauth.encode_state(patreon_config, 997_630)
+
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback", params={"code": "c", "state": state})
+
+    assert response.status_code == 200
+    metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
+    metrics.assert_emitted(name=MetricKey.FLOW_COMPLETED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
+
+
+async def test_callback_funnel_denied_consent_counts_started_only(ptb_app: MagicMock, patreon_config: PatreonConfig):
+    metrics_client = make_test_metrics_client()
+    metrics = MetricAssertions(metrics_client)
+    web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
+
+    async with build_web_client(web_app) as client:
+        await client.get("/patreon/callback", params={"error": "access_denied"})
+
+    metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
+    metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
+
+
+async def test_callback_funnel_unlinked_outcome_does_not_count_completed(
+    ptb_app: MagicMock, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
+):
+    metrics_client = make_test_metrics_client()
+    metrics = MetricAssertions(metrics_client)
+    web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
+    FakePatreonClient.exchange_error = None
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+    monkeypatch.setattr(web_patreon, "link_patreon_account", AsyncMock(return_value=LinkOutcome.UNKNOWN_USER))
+    state = oauth.encode_state(patreon_config, 997_631)
+
+    async with build_web_client(web_app) as client:
+        await client.get("/patreon/callback", params={"code": "c", "state": state})
+
+    metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
+    metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
+
+
+async def test_callback_funnel_bare_hit_emits_nothing(ptb_app: MagicMock, patreon_config: PatreonConfig):
+    metrics_client = make_test_metrics_client()
+    metrics = MetricAssertions(metrics_client)
+    web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
+
+    async with build_web_client(web_app) as client:
+        await client.get("/patreon/callback")
+
+    metrics.assert_not_emitted(name=MetricKey.FLOW_STARTED)
+    metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)

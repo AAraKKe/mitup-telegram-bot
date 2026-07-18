@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -5,13 +6,14 @@ from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.monitoring import Feature
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditLanguageMessages
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -71,4 +73,4 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     # Since the language has changed, we need to update the messages of the meeting
     await context.api.update_meeting_messages(meeting=meeting)
 
-    context.put_feature_metric(Feature.MEETING_LANGUAGE_SET)
+    log.info("Meeting language set", meeting_id=meeting.db_id, language=meeting.language)

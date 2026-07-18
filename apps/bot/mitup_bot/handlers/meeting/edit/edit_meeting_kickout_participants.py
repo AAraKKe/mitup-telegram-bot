@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -6,13 +7,14 @@ from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import JoinedUsers, Meetup, User
-from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 
 from .enums import EditMeetingHandlerId
 from .views import edit_participants_view, kick_out_users_view
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -192,7 +194,7 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
         skip_current=True,
     )
 
-    context.put_feature_metric(Feature.KICK_OUT_PARTICIPANT)
+    log.info("Participant kicked out", meeting_id=meeting.db_id, participant_user_id=participant.user.db_id)
 
 
 async def kickout_user_to_edit_participants(

@@ -96,7 +96,7 @@ class Context:
     )
     shows_deleted_message_when_not_found: bool = True  # False for handlers using user_owns_meeting directly
     meeting_id: dict[ContextId, int] | None = None  # Meeting id to store in the context data
-    # Extra metric emissions for this handler (e.g. CleanUserData). Each is a (name, times) pair.
+    # Extra metric emissions for this handler. Each is a (name, times) pair.
     extra_metrics: list[tuple[str, int]] = field(default_factory=list)
     # Override extra_metrics when the meeting is not found. Uses UNSET sentinel as default (falls back to
     # extra_metrics). Set to [] to explicitly assert no extra metrics.
@@ -147,8 +147,6 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="cancel_start_time",
-        extra_metrics=[("CleanUserData", 7)],
-        extra_metrics_not_found=[("CleanUserData", 7)],
     ),
     Context(
         handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
@@ -167,7 +165,6 @@ CONTEXTS = [
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="set_meeting_time_message",
-        extra_metrics=[("CleanUserData", 1)],
         meeting_id={ContextId.EDIT_MEETING_TIME: 99},
     ),
     Context(
@@ -537,8 +534,6 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="cancel_start_time_inactive",
-        extra_metrics=[("CleanUserData", 7)],
-        extra_metrics_non_owner_inactive=[("CleanUserData", 7)],
     ),
     Context(
         handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,

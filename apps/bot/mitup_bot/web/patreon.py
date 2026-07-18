@@ -40,7 +40,7 @@ from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonSt
 from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.client import MetricsClient
-from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.patreon import PatreonClient, oauth, webhooks
 from mitup_bot.patreon.client import MEMBER_DELETE_TRIGGER
 from mitup_bot.patreon.models import MemberResource, WebhookMemberPayload
@@ -349,6 +349,10 @@ async def patreon_callback(
             has_state=params.has_state,
             has_error=params.has_error,
         )
+        # Funnel entry: any genuine Patreon redirect (consent granted or denied) counts as a link
+        # attempt; bare scanner hits and unconfigured environments do not.
+        if resolved.outcome not in (CallbackOutcome.BARE, CallbackOutcome.UNCONFIGURED):
+            metrics_client.emit_feature(Feature.PATREON_LINK, name=MetricKey.FLOW_STARTED)
         return await render_resolved_callback(ptb_app, metrics_client, params, resolved)
 
 
@@ -436,6 +440,8 @@ async def exchange_and_link(
     outcome = await link_patreon_account(
         api, tg_user_id, patreon_user_id=identity.patreon_user_id, supporter_level=level, message_id=message_id
     )
+    if outcome in (LinkOutcome.LINKED_SUPPORTER, LinkOutcome.LINKED_NO_PATRON):
+        metrics_client.emit_feature(Feature.PATREON_LINK, name=MetricKey.FLOW_COMPLETED)
     return result_page_for(outcome, bot_username)
 
 

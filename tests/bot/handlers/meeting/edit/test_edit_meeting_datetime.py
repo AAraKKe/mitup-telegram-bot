@@ -15,7 +15,7 @@ from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, Edit
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
-from mitup_bot.monitoring import MetricKey, MetricUnit
+from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils import render
@@ -332,9 +332,6 @@ async def test_edit_meeting_time_callback(
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
     else:
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
-        metrics.assert_emitted(
-            name="StoredMeetingId", value=1, properties={"ContextId": ContextId.EDIT_MEETING_TIME.value}
-        )
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -392,8 +389,12 @@ async def test_set_time_message_with_valid_time(
 
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
-    metrics.assert_emitted(name="CleanUserData", value=1)
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
+    metrics.assert_emitted(
+        name=MetricKey.COUNT,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"EditedField": "datetime"},
+    )
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
     context.api.assert_send_message_called(
@@ -746,7 +747,6 @@ async def test_date_time_entity_message_user_not_found(
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
-    metrics.assert_emitted(name="CleanUserData", value=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 

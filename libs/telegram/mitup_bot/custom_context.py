@@ -127,28 +127,54 @@ def properties_from_update(update: Update) -> dict[str, Any]:
     }
 
 
-def update_fields_from_update(update: Update) -> dict[str, Any]:
-    values = {}
+def fault_fields_from_update(update: Update) -> dict[str, Any]:
+    """The trigger and its context for failure-path logs: what the user did (message text,
+    location, callback data, inline query) plus who/where (user, chat, message ids).
 
-    # Callback data fields
+    Richer than the lean happy-path properties — a fault must be debuggable from the log alone,
+    and log retention owns the PII lifecycle — but deliberately not the full update: the incoming
+    message's reply markup and the rest of Telegram's envelope are noise.
+    """
+    fields: dict[str, Any] = {"update_id": update.update_id}
+
+    if user := update.effective_user:
+        fields["tg_user_id"] = user.id
+        fields["username"] = user.username
+
+    if chat := update.effective_chat:
+        fields["chat_id"] = chat.id
+
+    if message := update.effective_message:
+        fields["message_id"] = message.message_id
+        fields["trigger_text"] = message.text
+        if message.location is not None:
+            fields["location"] = {
+                "latitude": message.location.latitude,
+                "longitude": message.location.longitude,
+            }
+
+    if cb := update.callback_query:
+        fields["callback_data"] = cb.data
+
+    if query := update.inline_query:
+        fields["inline_query"] = query.query
+
+    return fields
+
+
+def update_fields_from_update(update: Update) -> dict[str, Any]:
+    """Only identifiers and callback data ride the metrics stream: message text, usernames,
+    reply markup, and inline-query text are PII and must stay out of the EMF log lines."""
+    values: dict[str, Any] = {}
+
     if cb := update.callback_query:
         values["callback"] = {"data": cb.data}
 
     if user := update.effective_user:
-        values["user"] = {
-            "tg_user_id": user.id,
-            "username": user.username,
-        }
+        values["user"] = {"tg_user_id": user.id}
 
     if message := update.effective_message:
-        values["message"] = {
-            "text": message.text,
-            "markup": message.reply_markup.to_dict() if message.reply_markup is not None else None,
-        }
-
-    # Show inline query queries
-    if query := update.inline_query:
-        values["inline_query"] = {"query": query.query}
+        values["message"] = {"message_id": message.message_id}
 
     return values
 
@@ -242,12 +268,12 @@ class MitupContext(
         except Exception:
             if ensure_clean:
                 self.user_data.remove_context(context)
-                self.emit_metric("CleanUserData", properties={"ContextId": context.value})
+                self.log.debug("User data context cleaned", context_id=context.value)
             raise
 
         if ensure_clean:
             self.user_data.remove_context(context)
-            self.emit_metric("CleanUserData", properties={"ContextId": context.value})
+            self.log.debug("User data context cleaned", context_id=context.value)
 
     @contextmanager
     def meeting_id(self, context: ContextId, ensure_clean=True) -> Generator[int]:
@@ -269,10 +295,7 @@ class MitupContext(
             raise InvalidUserData("User data requested but not set")
 
         self.user_data.store_meeting_id(context, meeting_id)
-        self.emit_metric(
-            "StoredMeetingId",
-            properties={"StoredMeetingId": meeting_id, "ContextId": context.value},
-        )
+        self.log.debug("Stored meeting id in user data", context_id=context.value, meeting_id=meeting_id)
 
     def store_text(self, context: ContextId, text: str | FormattedText):
         if self.user_data is None:  # pragma: no cover
@@ -280,10 +303,8 @@ class MitupContext(
 
         ftext = text if isinstance(text, FormattedText) else FormattedText(text)
         self.user_data.store_text(context, ftext)
-        self.emit_metric(
-            "StoredContextText",
-            properties={"ContextId": context.value, "StoredText": ftext.text},
-        )
+        # The stored text is raw user input; log only its length to keep it out of the log stream.
+        self.log.debug("Stored text in user data", context_id=context.value, text_length=len(ftext.text))
 
     def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData):
         fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
@@ -302,7 +323,7 @@ class MitupContext(
 
         for context in contexts:
             self.user_data.remove_context(context)
-            self.emit_metric("CleanUserData", properties={"ContextId": context.value})
+            self.log.debug("User data context cleaned", context_id=context.value)
 
     def clean_all_user_data(self):
         if self.user_data is None:  # pragma: no cover
@@ -383,17 +404,31 @@ class MitupContext(
 
     @contextmanager
     def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
-        """Measure elapsed time and emit a `<prefix>Time` metric in milliseconds on exit."""
-        start_time = perf_counter()
-        yield
-        elapsed_time = 1000 * (perf_counter() - start_time)
+        """Measure elapsed time and emit `<prefix>Time` plus a continuous 0/1 `<prefix>Fault` on exit.
 
-        self.emit_metric(
-            MetricKey.TIME.with_prefix(prefix, separator=""),
-            elapsed_time,
-            MetricUnit.MILLISECONDS,
-            include_handler_properties=handler_metrics,
-        )
+        Both emit even when the timed call raises, so latency series keep their failure samples
+        (no survivorship bias during incidents) and the fault series is gap-free and alarmable.
+        """
+        start_time = perf_counter()
+        success = False
+        try:
+            yield
+            success = True
+        finally:
+            elapsed_time = 1000 * (perf_counter() - start_time)
+
+            self.emit_metric(
+                MetricKey.TIME.with_prefix(prefix, separator=""),
+                elapsed_time,
+                MetricUnit.MILLISECONDS,
+                include_handler_properties=handler_metrics,
+                properties={"Success": success},
+            )
+            self.emit_metric(
+                MetricKey.FAULT.with_prefix(prefix, separator=""),
+                0 if success else 1,
+                include_handler_properties=handler_metrics,
+            )
 
     async def flush_metrics(self):
         await self.metrics.flush()

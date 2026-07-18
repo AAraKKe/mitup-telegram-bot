@@ -10,6 +10,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView
@@ -85,6 +86,7 @@ async def edit_description_meeting_message_handler(session: AsyncSession, update
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)
 
+        context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "description"})
         return ConversationHandler.END
 
 

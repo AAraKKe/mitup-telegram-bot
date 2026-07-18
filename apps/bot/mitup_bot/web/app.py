@@ -3,7 +3,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import assert_never
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from telegram.ext import Application
 
 from mitup_bot.config import RunModes
@@ -47,6 +47,9 @@ def build_webhook_lifespan(
         except Exception:
             metrics_client.emit(MetricKey.LIFESPAN_STARTUP_FAILED)
             log.exception("Lifespan startup failed in webhook mode")
+            # The re-raise aborts the process before any request-cycle flush could run, so the
+            # failure metric must be flushed here or it never reaches CloudWatch.
+            await metrics_client.flush()
             raise
 
         # Register the Patreon membership webhook after Telegram's. Unlike set_webhook this is fully
@@ -55,12 +58,14 @@ def build_webhook_lifespan(
         # set when Patreon is configured and a public domain exists (built in app.py).
         if patreon_webhook_url is not None:
             await patreon_webhooks.register_membership_webhook(patreon_webhook_url, metrics_client)
+        await metrics_client.flush()
 
         try:
             yield
         finally:
             await run_shutdown_step(ptb_app.stop, metrics_client, "ptb_app.stop")
             await run_shutdown_step(ptb_app.shutdown, metrics_client, "ptb_app.shutdown")
+            await metrics_client.flush()
 
     return lifespan
 
@@ -79,7 +84,11 @@ def build_polling_lifespan(
         except Exception:
             metrics_client.emit(MetricKey.LIFESPAN_STARTUP_FAILED)
             log.exception("Lifespan startup failed in polling mode")
+            # The re-raise aborts the process before any request-cycle flush could run, so the
+            # failure metric must be flushed here or it never reaches CloudWatch.
+            await metrics_client.flush()
             raise
+        await metrics_client.flush()
 
         try:
             yield
@@ -88,6 +97,7 @@ def build_polling_lifespan(
             await run_shutdown_step(ptb_app.updater.stop, metrics_client, "ptb_app.updater.stop")
             await run_shutdown_step(ptb_app.stop, metrics_client, "ptb_app.stop")
             await run_shutdown_step(ptb_app.shutdown, metrics_client, "ptb_app.shutdown")
+            await metrics_client.flush()
 
     return lifespan
 
@@ -125,5 +135,17 @@ def create_app(
 
     app.include_router(telegram.router)
     app.include_router(patreon.router)
+
+    @app.middleware("http")
+    async def flush_metrics_after_request(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        # Endpoint emissions only buffer inside the client; without a per-request flush they
+        # never reach CloudWatch and accumulate in memory for the process lifetime. The finally
+        # covers error responses and unhandled endpoint exceptions alike.
+        try:
+            return await call_next(request)
+        finally:
+            await metrics_client.flush()
 
     return app

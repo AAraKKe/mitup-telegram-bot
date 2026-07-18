@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.error import TelegramError
 
 from mitup_bot.config import Env
+from mitup_bot.custom_context import fault_fields_from_update
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     ContextPropertyNotSetError,
@@ -209,8 +210,14 @@ async def test_handle_error_for_uncaght_exception(context: StubMitupContext, met
         await error_handler.handler(context, RuntimeError(), Env.DEV)
         await context.metrics.flush()
 
-    # The dimensionless aggregate FAULT is emitted exactly once (the infra alarms read it).
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    # The dimensionless aggregate FAULT is emitted exactly once (the infra alarms read it),
+    # carrying the trigger context so the CloudWatch fault record is self-contained.
+    metrics.assert_emitted(
+        name=MetricKey.FAULT,
+        value=1,
+        times=1,
+        properties={"UpdatePayload": fault_fields_from_update(context.telegram_update)},
+    )
     # The prefixed fault is emitted once, carrying the handler identity as EMF properties.
     metrics.assert_emitted(
         name=MetricKey.FAULT.with_prefix("RuntimeError"),
@@ -234,6 +241,10 @@ async def test_handle_error_logs_the_exception(context: StubMitupContext):
     assert len(fault_logs) == 1
     assert fault_logs[0]["log_level"] == "error"
     assert fault_logs[0]["exc_info"] is error
+    # The failure log carries the trigger and its context so a fault is debuggable from the log
+    # alone (what the user sent or pressed, and who/where).
+    assert fault_logs[0]["update"] == fault_fields_from_update(context.telegram_update)
+    assert "trigger_text" in fault_logs[0]["update"] or "callback_data" in fault_logs[0]["update"]
 
 
 # --- Guard error handling ---

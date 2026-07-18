@@ -107,11 +107,13 @@ class QueuedApiCall:
 
     ``invoke`` is a zero-argument closure over plain data (chat ids, message ids, rendered
     view content) snapshotted at enqueue time — it must never touch the session or trigger
-    an ORM load when awaited.
+    an ORM load when awaited. ``payload`` is a loggable snapshot of what the call sends
+    (chat/message ids, text, markup) so a post-commit failure reports what it attempted.
     """
 
     name: str
     invoke: Callable[[], Coroutine[Any, Any, object]]
+    payload: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -154,14 +156,22 @@ class BotAdapter:
 
     @contextmanager
     def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
+        """Emit `<prefix>Time` plus a continuous 0/1 `<prefix>Fault` on exit, even when the timed
+        call raises, so latency series keep their failure samples and the fault series is alarmable."""
         start = perf_counter()
-        yield
-        elapsed = 1000 * (perf_counter() - start)
-        self._metrics.emit(
-            MetricKey.TIME.with_prefix(prefix, separator=""),
-            elapsed,
-            MetricUnit.MILLISECONDS,
-        )
+        success = False
+        try:
+            yield
+            success = True
+        finally:
+            elapsed = 1000 * (perf_counter() - start)
+            self._metrics.emit(
+                MetricKey.TIME.with_prefix(prefix, separator=""),
+                elapsed,
+                MetricUnit.MILLISECONDS,
+                properties={"Success": success},
+            )
+            self._metrics.emit(MetricKey.FAULT.with_prefix(prefix, separator=""), 0 if success else 1)
 
     def emit_metric(
         self,
@@ -210,6 +220,36 @@ async def handle_edit_errors(adapter: ContextOrBotAdapter):
             adapter.emit_metric(MetricKey.MESSAGE_DELETED)
             return
         raise
+
+
+def view_log_payload(view: MitupView) -> dict[str, Any]:
+    """Loggable snapshot of a rendered view — the full text plus the serialized markup.
+
+    Attached only to failure logs: happy-path log and metric lines stay lean, but when a send
+    fails the log must show everything the call tried to deliver (log retention owns the PII
+    lifecycle).
+    """
+    return {
+        "text": view.description.text,
+        "markup": view.markup.to_dict() if view.markup is not None else None,
+    }
+
+
+def edit_target_log_payload(target: tuple[int | None, int | None, str | None]) -> dict[str, Any]:
+    """Loggable identifiers of an edit target (chat, message, inline message)."""
+    chat_id, message_id, inline_message_id = target
+    return {"chat_id": chat_id, "message_id": message_id, "inline_message_id": inline_message_id}
+
+
+def meeting_edit_log_payload(edit: MeetingMessageEdit) -> dict[str, Any]:
+    """Loggable snapshot of a rendered meeting-message edit for failure diagnostics."""
+    return {
+        "chat_id": edit.chat_id,
+        "message_id": edit.message_id,
+        "inline_message_id": edit.inline_message_id,
+        "text": edit.text,
+        "markup": edit.reply_markup.to_dict() if edit.reply_markup is not None else None,
+    }
 
 
 def resolve_view(view: MitupView | FormattedText | str) -> MitupView:
@@ -404,27 +444,59 @@ class TelegramApi:
                 self._record_queued_failure(queued, exc)
 
     def _record_queued_failure(self, queued: QueuedApiCall, exc: Exception):
-        log.exception("Queued Telegram call failed after commit", queued_call=queued.name, exc_info=exc)
+        log.exception(
+            "Queued Telegram call failed after commit",
+            queued_call=queued.name,
+            payload=queued.payload,
+            exc_info=exc,
+        )
         # Mirror the error handler's fault shape: a per-error-type fault plus the aggregate.
         self.adapter.emit_metric(
             MetricKey.FAULT.with_prefix(type(exc).__name__), properties={"QueuedApiCall": queued.name}
         )
         self.adapter.emit_metric(MetricKey.FAULT, properties={"QueuedApiCall": queued.name})
 
-    def _enqueue(self, name: str, invoke: Callable[[], Coroutine[Any, Any, object]]):
+    def _enqueue(
+        self,
+        name: str,
+        invoke: Callable[[], Coroutine[Any, Any, object]],
+        payload: dict[str, Any] | None = None,
+    ):
         assert self._outbox is not None
-        self._outbox.calls.append(QueuedApiCall(name, invoke))
+        self._outbox.calls.append(QueuedApiCall(name, invoke, payload or {}))
 
     async def _call_or_enqueue[T](
-        self, name: str, invoke: Callable[[], Coroutine[Any, Any, T]], default_result: T
+        self,
+        name: str,
+        invoke: Callable[[], Coroutine[Any, Any, T]],
+        default_result: T,
+        payload: dict[str, Any] | None = None,
     ) -> T:
         """Shared mode branch for the public api methods: execute ``invoke`` immediately, or
         under capture enqueue it and return ``default_result``. Callers prepare ``invoke``
-        beforehand so validation and view rendering always happen at enqueue time."""
+        beforehand so validation and view rendering always happen at enqueue time; ``payload``
+        is the loggable snapshot of what the call sends, reported when it fails."""
         if self._outbox is not None:
-            self._enqueue(name, invoke)
+            self._enqueue(name, invoke, payload)
             return default_result
-        return await invoke()
+        return await self._invoke_logging_failure(name, invoke, payload)
+
+    async def _invoke_logging_failure[T](
+        self,
+        name: str,
+        invoke: Callable[[], Coroutine[Any, Any, T]],
+        payload: dict[str, Any] | None,
+    ) -> T:
+        """Await the call, logging the attempted payload on failure so a raised Telegram error
+        always shows what it tried to send. ``InactiveUserInteraction`` stays silent here — it
+        is an expected business signal already logged at its raise site."""
+        try:
+            return await invoke()
+        except InactiveUserInteraction:
+            raise
+        except Exception:
+            log.exception("Telegram call failed", telegram_call=name, payload=payload or {})
+            raise
 
     # -- Public api -------------------------------------------------------------------------
 
@@ -432,7 +504,10 @@ class TelegramApi:
         chat_id = get_update_guards().chat(update).id
         resolved = resolve_view(view)
         return await self._call_or_enqueue(
-            "send_message", partial(self._send_chat_message_now, chat_id, resolved), None
+            "send_message",
+            partial(self._send_chat_message_now, chat_id, resolved),
+            None,
+            {"chat_id": chat_id} | view_log_payload(resolved),
         )
 
     async def _send_chat_message_now(self, chat_id: int, view: MitupView) -> Message | None:
@@ -463,6 +538,7 @@ class TelegramApi:
                 view.markup,
             ),
             None,
+            {"chat_id": chat_id, "filename": view.document.filename, "caption": view.description.text},
         )
 
     async def _send_document_now(
@@ -488,7 +564,10 @@ class TelegramApi:
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
         resolved = resolve_view(view)
         return await self._call_or_enqueue(
-            "send_message_to_user", partial(self._send_user_message_now, user.tg_user_id, resolved), None
+            "send_message_to_user",
+            partial(self._send_user_message_now, user.tg_user_id, resolved),
+            None,
+            {"chat_id": user.tg_user_id} | view_log_payload(resolved),
         )
 
     async def _send_user_message_now(self, tg_user_id: int, view: MitupView) -> Message | None:
@@ -534,9 +613,11 @@ class TelegramApi:
                 # be silently lost. Callers that need them must opt into pre-commit execution.
                 raise ValueError("Result callbacks cannot run after commit; use context.api.immediate instead")
             for user, view in zip(users, views, strict=True):
+                resolved = resolve_view(view)
                 self._enqueue(
                     "send_messages_to_users",
-                    partial(self._send_user_message_now, user.tg_user_id, resolve_view(view)),
+                    partial(self._send_user_message_now, user.tg_user_id, resolved),
+                    {"chat_id": user.tg_user_id} | view_log_payload(resolved),
                 )
             return
 
@@ -585,7 +666,10 @@ class TelegramApi:
         resolved = resolve_view(view)
         target = edit_target(update)
         return await self._call_or_enqueue(
-            "edit_message", partial(self._edit_message_now, target, resolved), cast("Message | bool", False)
+            "edit_message",
+            partial(self._edit_message_now, target, resolved),
+            cast("Message | bool", False),
+            edit_target_log_payload(target) | view_log_payload(resolved),
         )
 
     async def _edit_message_now(
@@ -618,12 +702,20 @@ class TelegramApi:
         resolved = resolve_view(view)
         target: tuple[int | None, int | None, str | None] = (user.tg_user_id, message_id, None)
         return await self._call_or_enqueue(
-            "edit_message_for_user", partial(self._edit_message_now, target, resolved), cast("Message | bool", False)
+            "edit_message_for_user",
+            partial(self._edit_message_now, target, resolved),
+            cast("Message | bool", False),
+            edit_target_log_payload(target) | view_log_payload(resolved),
         )
 
     async def clear_reply_markup(self, update: Update):
         target = edit_target(update)
-        await self._call_or_enqueue("clear_reply_markup", partial(self._clear_reply_markup_now, target), None)
+        await self._call_or_enqueue(
+            "clear_reply_markup",
+            partial(self._clear_reply_markup_now, target),
+            None,
+            edit_target_log_payload(target),
+        )
 
     async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]):
         chat_id, message_id, inline_message_id = target
@@ -664,6 +756,7 @@ class TelegramApi:
             "answer_inline_query",
             partial(self._answer_inline_query_now, query.id, query.query, inline_results, tg_button, cache_time),
             None,
+            {"query_id": query.id, "query": query.query, "result_count": len(inline_results)},
         )
 
     async def _answer_inline_query_now(
@@ -690,7 +783,10 @@ class TelegramApi:
             raise CallbackQueryTextTooLong(_text)
         query = get_update_guards().valid_callback_query(update)
         await self._call_or_enqueue(
-            "answer_callback_query", partial(self._answer_callback_query_now, query.id, _text, show_alert), None
+            "answer_callback_query",
+            partial(self._answer_callback_query_now, query.id, _text, show_alert),
+            None,
+            {"query_id": query.id, "text": _text, "show_alert": show_alert},
         )
 
     async def _answer_callback_query_now(self, query_id: str, text: str, show_alert: bool):
@@ -812,9 +908,17 @@ class TelegramApi:
         """
         edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
         if self._outbox is not None:
-            self._enqueue("update_meeting_message", partial(self._queued_meeting_message_edit, edit, self._outbox))
+            self._enqueue(
+                "update_meeting_message",
+                partial(self._queued_meeting_message_edit, edit, self._outbox),
+                meeting_edit_log_payload(edit),
+            )
             return
-        await self._edit_meeting_message_now(edit)
+        await self._invoke_logging_failure(
+            "update_meeting_message",
+            partial(self._edit_meeting_message_now, edit),
+            meeting_edit_log_payload(edit),
+        )
 
     async def update_meeting_messages(
         self,

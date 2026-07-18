@@ -60,7 +60,7 @@ async def start_onboarding(
 
     await context.api.send_message(update=update, view=message)
 
-    context.put_feature_metric(Feature.NEW_LANDING)
+    log.info("Onboarding landing shown")
     return ConversationRegistrationProcessState.TIMEZONE
 
 
@@ -72,7 +72,7 @@ async def start_onboarding(
 async def registration_timezone_text_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState | int:
-    context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE)
+    context.put_feature_metric(Feature.SET_TIMEZONE, properties={"InputMethod": "message"})
 
     # Re-onboarding writes `user.settings.timezone`/`user.status` and reads `user.lang`; it never
     # traverses the meetups/joined_links collections, so skip loading them.
@@ -84,7 +84,9 @@ async def registration_timezone_text_message_handler(
 
         await context.api.send_message(update=update, view=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang))
 
-        context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR)
+        context.put_feature_metric(
+            Feature.SET_TIMEZONE, name=MetricKey.ERROR, value=1, properties={"InputMethod": "message"}
+        )
         return ConversationRegistrationProcessState.TIMEZONE
 
     user.settings.timezone = new_timezone
@@ -102,7 +104,9 @@ async def registration_timezone_text_message_handler(
     await context.api.send_message(update=update, view=view)
 
     context.put_feature_metric(Feature.NEW_USER_REGISTERED)
-    context.put_feature_metric(Feature.TIMEZONE_WITH_MESSAGE, name=MetricKey.ERROR, value=0)
+    context.put_feature_metric(
+        Feature.SET_TIMEZONE, name=MetricKey.ERROR, value=0, properties={"InputMethod": "message"}
+    )
     return ConversationHandler.END
 
 
@@ -114,7 +118,7 @@ async def registration_timezone_text_message_handler(
 async def registration_timezone_location_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationRegistrationProcessState | int:
-    context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION)
+    context.put_feature_metric(Feature.SET_TIMEZONE, properties={"InputMethod": "location"})
 
     # Re-onboarding writes `user.settings.timezone`/`user.status` and reads `user.lang`; it never
     # traverses the meetups/joined_links collections, so skip loading them.
@@ -126,7 +130,9 @@ async def registration_timezone_location_message_handler(
 
         await context.api.send_message(update=update, view=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang))
 
-        context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=1)
+        context.put_feature_metric(
+            Feature.SET_TIMEZONE, name=MetricKey.ERROR, value=1, properties={"InputMethod": "location"}
+        )
         return ConversationRegistrationProcessState.TIMEZONE
 
     user.settings.timezone = new_timezone
@@ -144,7 +150,9 @@ async def registration_timezone_location_message_handler(
     await context.api.send_message(update=update, view=view)
 
     context.put_feature_metric(Feature.NEW_USER_REGISTERED)
-    context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR, value=0)
+    context.put_feature_metric(
+        Feature.SET_TIMEZONE, name=MetricKey.ERROR, value=0, properties={"InputMethod": "location"}
+    )
     return ConversationHandler.END
 
 

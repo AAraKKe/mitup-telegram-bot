@@ -153,7 +153,8 @@ async def test_command_start_with_new_user(
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
-    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.NEW_LANDING)})
+    # The landing is log-only; no feature metric is emitted for it.
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SET_TIMEZONE)})
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(user=False)]), indirect=True)
@@ -163,7 +164,7 @@ async def test_command_stat_with_new_user_use_incorrect_user(
     with pytest.raises(EffectiveUserNotSet):
         await command_start_with_new_user(update, context)
 
-    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.NEW_LANDING)})
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SET_TIMEZONE)})
 
 
 @pytest.mark.parametrize("command", [command_start_with_existing_user, command_go_to_main_menu])

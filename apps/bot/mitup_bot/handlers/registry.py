@@ -2,7 +2,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum
+from enum import Enum, auto
 from time import perf_counter
 from warnings import filterwarnings
 
@@ -149,9 +149,18 @@ class HandlerWrapper:
         return isinstance(self.handler, ConversationHandler)
 
 
+class UnhandledHandlerId(HandlerId):
+    """Identity for the registry's own fallback handlers, which no feature package registers."""
+
+    CALLBACK_QUERY_FALLBACK = auto()
+
+
 async def callback_query_fallback(update: Update, context: TMitupContext):
     """Fallback callback query handler. This will be called when no other callback query handler is found."""
     callback_query = guards.callback_query(update)
+
+    # A user reached a button with no matching handler; the counter makes these visible in CloudWatch.
+    context.emit_metric(MetricKey.UNHANDLED_CALLBACK)
 
     # No need to create a message for this as there will be no transaltions. Before translations
     # are added all features should be finished.
@@ -337,8 +346,15 @@ class HandlersRegistry:
                 app.add_handler(handler=wrapper.handler, group=wrapper.group)
         # Add a fallback handler for any update that is not handled by any of the registered handlers
         # the intention is that the user gets a message saying that it is not implemented yet instead of
-        # the bot not responding at all.
-        app.add_handler(CallbackQueryHandler(callback=callback_query_fallback))
+        # the bot not responding at all. It goes through callback_with_metrics like every registered
+        # handler, so these interactions emit Fault/Time and get their metrics flushed.
+        app.add_handler(
+            CallbackQueryHandler(
+                callback=callback_with_metrics(
+                    UnhandledHandlerId.CALLBACK_QUERY_FALLBACK, "Callback", callback_query_fallback, cls.env
+                )
+            )
+        )
 
     @classmethod
     def get_handler(cls, key: HandlerId) -> BaseHandler[Update, MitupContext, object]:

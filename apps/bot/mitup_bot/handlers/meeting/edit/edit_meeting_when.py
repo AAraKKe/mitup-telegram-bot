@@ -5,6 +5,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingEditWhenMessages
 from mitup_bot.views import factory
@@ -76,6 +77,7 @@ async def callback_query_confirm_clear_times(session: AsyncSession, update: Upda
         current_message=meeting.message_from_update(update),
         skip_current=True,
     )
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "times_cleared"})
 
 
 @HandlersRegistry.register_callback_query(

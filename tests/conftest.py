@@ -355,7 +355,7 @@ def context(app: Application, update: Update, metrics_client: MetricsClient) -> 
 @pytest.fixture(autouse=True, scope="session")
 def configure_test_metrics():
     """Make sure metrics are always configured during test session"""
-    configure_emf_backend(MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False))
+    configure_emf_backend(MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT))
 
 
 @pytest.fixture

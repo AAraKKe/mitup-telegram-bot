@@ -15,7 +15,7 @@ from mitup_bot.handlers.meeting.create_meeting import (
     callback_query_create_meeting,
 )
 from mitup_bot.models import User
-from mitup_bot.monitoring import Feature
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
 from tests.helpers import StubMitupContext
@@ -61,7 +61,7 @@ async def test_cancel_meeting_calls_to_main_menu_view(  # Renamed for clarity
 
     context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     metrics.assert_emitted(
-        name="Cancel",
+        name=MetricKey.FEATURE_CANCELLED,
         value=1,
         dimensions={"Feature": str(Feature.CREATE_MEETING)},
     )

@@ -15,6 +15,16 @@ def make_test_metrics_client(base_dimensions: dict[str, str] | None = None) -> M
     return MetricsClient(NullBackend(), base_dimensions=base_dimensions, record_history=True)
 
 
+class FlushCountingBackend(NullBackend):
+    """NullBackend that counts flush() calls, for asserting flush wiring."""
+
+    def __init__(self):
+        self.flush_count = 0
+
+    async def flush(self):
+        self.flush_count += 1
+
+
 class MetricAssertions:
     """Helper for asserting metrics emitted by a MetricsClient in tests."""
 

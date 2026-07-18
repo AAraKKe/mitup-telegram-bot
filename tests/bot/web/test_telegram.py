@@ -10,6 +10,7 @@ from mitup_bot.config import RunModes
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.web.telegram import TELEGRAM_SECRET_HEADER
 from tests.helpers import MetricAssertions, build_ptb_app_mock, build_test_web_app, build_web_client
+from tests.helpers.monitoring import FlushCountingBackend
 
 SECRET = "test-secret"
 VALID_UPDATE_PAYLOAD = {"update_id": 1}
@@ -190,3 +191,39 @@ async def test_valid_json_but_invalid_update_returns_204_and_emits_malformed_met
     assert response.status_code == 204
     ptb_app.update_queue.put.assert_not_called()
     metrics.assert_emitted(name=MetricKey.WEBHOOK_MALFORMED_UPDATE, value=1)
+
+
+async def test_request_flushes_the_web_metrics_client(ptb_app: MagicMock):
+    backend = FlushCountingBackend()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=MetricsClient(backend),
+        run_mode=RunModes.WEBHOOK,
+    )
+
+    async with build_web_client(web_app) as client:
+        response = await client.post(
+            "/telegram",
+            json=VALID_UPDATE_PAYLOAD,
+            headers={TELEGRAM_SECRET_HEADER: SECRET},
+        )
+
+    assert response.status_code == 204
+    assert backend.flush_count == 1
+
+
+async def test_rejected_request_still_flushes_the_web_metrics_client(ptb_app: MagicMock):
+    backend = FlushCountingBackend()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=MetricsClient(backend),
+        run_mode=RunModes.WEBHOOK,
+    )
+
+    async with build_web_client(web_app) as client:
+        response = await client.post("/telegram", json=VALID_UPDATE_PAYLOAD)
+
+    assert response.status_code == 403
+    assert backend.flush_count == 1

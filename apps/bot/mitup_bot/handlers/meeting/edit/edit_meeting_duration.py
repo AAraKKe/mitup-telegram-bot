@@ -13,7 +13,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, build_datetime_link, render
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDurationMessages
@@ -213,6 +213,7 @@ async def save_end_datetime_and_finish(
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(meeting=meeting)
 
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "end_datetime"})
     cleanup_states(context)
     return ConversationHandler.END
 

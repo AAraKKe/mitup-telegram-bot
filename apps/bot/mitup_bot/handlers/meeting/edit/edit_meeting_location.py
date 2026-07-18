@@ -12,6 +12,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, CommonMessages, MeetingEditLocationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView, factory
@@ -191,6 +192,7 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(meeting=meeting)
 
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "location_name"})
     return ConversationHandler.END
 
 
@@ -231,6 +233,7 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(meeting=meeting)
 
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "location_coordinates"})
     return ConversationHandler.END
 
 

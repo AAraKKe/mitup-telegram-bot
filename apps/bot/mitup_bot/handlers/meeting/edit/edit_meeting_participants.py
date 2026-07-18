@@ -14,6 +14,7 @@ from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
+from mitup_bot.monitoring import Feature
 from mitup_bot.utils import CommonMessages, MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
@@ -120,6 +121,7 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
 
     await context.api.send_message(update=update, view=response_view)
 
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "max_participants"})
     return ConversationHandler.END
 
 
@@ -191,6 +193,7 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     await context.api.send_message(update=update, view=response_view)
     await context.api.update_meeting_messages(meeting=meeting)
 
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "max_participants"})
     return ConversationHandler.END
 
 

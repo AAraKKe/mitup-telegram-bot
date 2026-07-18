@@ -4,6 +4,7 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from structlog.testing import capture_logs
 from telegram import ChatMember, ChatMemberRestricted, Message, MessageEntity, Update
 from telegram.constants import ChatMemberStatus
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
@@ -33,11 +34,11 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView, ViewDocument
-from tests.helpers import make_test_metrics_client
+from tests.helpers import AnyFloat, make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions
 
@@ -1430,3 +1431,106 @@ async def test_is_chat_banned_degrades_to_false_on_error(telegram_api: TelegramA
     bot.get_chat_member.side_effect = error
 
     assert await telegram_api.is_chat_banned(chat_id=-100, tg_user_id=555) is False
+
+
+# ---------------------------------------------------------------------------
+# BotAdapter.with_time_metric
+# ---------------------------------------------------------------------------
+
+
+async def test_bot_adapter_time_metric_success_emits_time_and_fault_zero(
+    adapter: BotAdapter, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
+        pass
+
+    await api_metrics_client.flush()
+
+    api_metrics.assert_emitted(
+        name="TelegramApiTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+        properties={"Success": True},
+    )
+    api_metrics.assert_emitted(name="TelegramApiFault", value=0)
+
+
+async def test_bot_adapter_time_metric_emits_even_when_the_call_raises(
+    adapter: BotAdapter, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    with pytest.raises(TimedOut):
+        with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
+            raise TimedOut()
+
+    await api_metrics_client.flush()
+
+    api_metrics.assert_emitted(
+        name="TelegramApiTime",
+        value=AnyFloat(),
+        unit=MetricUnit.MILLISECONDS,
+        properties={"Success": False},
+    )
+    api_metrics.assert_emitted(name="TelegramApiFault", value=1)
+
+
+# ---------------------------------------------------------------------------
+# Failure-path payload logging
+# ---------------------------------------------------------------------------
+
+
+async def test_send_message_failure_logs_the_attempted_payload(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    view = MitupView(description="hello there", keyboard=[[ButtonConfig(text="Go", callback_data="cb")]])
+    bot.send_message.side_effect = BadRequest("Chat not found")
+
+    with capture_logs() as logs:
+        with pytest.raises(BadRequest):
+            await telegram_api.send_message(update, view)
+
+    failure_logs = [entry for entry in logs if entry["event"] == "Telegram call failed"]
+    assert len(failure_logs) == 1
+    assert failure_logs[0]["telegram_call"] == "send_message"
+    payload = failure_logs[0]["payload"]
+    assert payload["chat_id"] == 42
+    assert payload["text"] == "hello there"
+    assert view.markup is not None
+    assert payload["markup"] == view.markup.to_dict()
+
+
+async def test_blocked_user_send_is_not_logged_as_telegram_call_failure(telegram_api: TelegramApi, bot: AsyncMock):
+    bot.send_message.side_effect = Forbidden("blocked")
+    user = create_user(1)
+
+    with capture_logs() as logs:
+        with pytest.raises(InactiveUserInteraction):
+            await telegram_api.send_message_to_user(user, "hi")
+
+    assert not [entry for entry in logs if entry["event"] == "Telegram call failed"]
+
+
+async def test_capture_mode_enqueues_the_payload_snapshot(telegram_api: TelegramApi):
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    outbox = telegram_api.begin_capture()
+
+    await telegram_api.send_message(update, "hello")
+
+    telegram_api.end_capture()
+    assert outbox.calls[0].payload["chat_id"] == 42
+    assert outbox.calls[0].payload["text"] == "hello"
+
+
+async def test_execute_queued_failure_logs_the_attempted_payload(telegram_api: TelegramApi):
+    async def boom():
+        raise BadRequest("Chat not found")
+
+    attempted = {"chat_id": 7, "text": "queued text", "markup": None}
+    outbox = ApiOutbox(calls=[QueuedApiCall("send_message_to_user", boom, attempted)])
+
+    with capture_logs() as logs:
+        await telegram_api.execute_queued(outbox)
+
+    failure_logs = [entry for entry in logs if entry["event"] == "Queued Telegram call failed after commit"]
+    assert len(failure_logs) == 1
+    assert failure_logs[0]["payload"] == attempted

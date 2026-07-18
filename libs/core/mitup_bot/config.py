@@ -219,7 +219,6 @@ class MetricsConfig(BaseModel):
     # keeping it here for clarity and managing it ourselves
     namespace: str
     environment: MetricsEnv
-    flush_on_emission: bool = False
 
 
 class LimitsConfig(BaseModel):

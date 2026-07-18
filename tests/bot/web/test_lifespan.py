@@ -5,6 +5,7 @@ import pytest
 from mitup_bot.config import RunModes
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import MetricAssertions, build_test_web_app, lifespan_runner
+from tests.helpers.monitoring import FlushCountingBackend
 
 WEBHOOK_URL = "https://example.com/telegram"
 SECRET = "test-secret"
@@ -339,3 +340,67 @@ async def test_shutdown_failure_when_shutdown_raises_emits_metric(
         ...
 
     metrics.assert_emitted(name=MetricKey.LIFESPAN_SHUTDOWN_FAILED, value=1)
+
+
+@pytest.mark.parametrize(
+    "run_mode",
+    [RunModes.WEBHOOK, RunModes.POLLING],
+    ids=["webhook", "polling"],
+)
+async def test_lifespan_flushes_metrics_after_startup_and_shutdown(run_mode: RunModes):
+    backend = FlushCountingBackend()
+    ptb_app, _parent = build_tracked_ptb_app()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET if run_mode is RunModes.WEBHOOK else None,
+        metrics_client=MetricsClient(backend),
+        run_mode=run_mode,
+        webhook_url=WEBHOOK_URL if run_mode is RunModes.WEBHOOK else None,
+        max_connections=MAX_CONNECTIONS if run_mode is RunModes.WEBHOOK else None,
+    )
+
+    async with lifespan_runner(web_app):
+        assert backend.flush_count == 1
+
+    assert backend.flush_count == 2
+
+
+async def test_startup_failure_flushes_the_metric_before_propagating():
+    backend = FlushCountingBackend()
+    ptb_app, _parent = build_tracked_ptb_app()
+    ptb_app.initialize = AsyncMock(side_effect=RuntimeError("init boom"))
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=MetricsClient(backend),
+        run_mode=RunModes.WEBHOOK,
+        webhook_url=WEBHOOK_URL,
+        max_connections=MAX_CONNECTIONS,
+    )
+
+    with pytest.raises(RuntimeError, match="init boom"):
+        async with lifespan_runner(web_app):
+            pytest.fail("Lifespan startup should have raised")
+
+    assert backend.flush_count == 1
+
+
+async def test_polling_startup_failure_emits_metric_flushes_and_propagates(
+    metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    ptb_app, _parent = build_tracked_ptb_app()
+    ptb_app.updater.start_polling = AsyncMock(side_effect=RuntimeError("polling boom"))
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=None,
+        metrics_client=metrics_client,
+        run_mode=RunModes.POLLING,
+        webhook_url=None,
+        max_connections=None,
+    )
+
+    with pytest.raises(RuntimeError, match="polling boom"):
+        async with lifespan_runner(web_app):
+            pytest.fail("Lifespan startup should have raised")
+
+    metrics.assert_emitted(name=MetricKey.LIFESPAN_STARTUP_FAILED, value=1)

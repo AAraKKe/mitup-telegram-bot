@@ -11,7 +11,7 @@ from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
-from mitup_bot.monitoring.metric_keys import Feature
+from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
@@ -146,7 +146,7 @@ async def callback_query_cancel_meeting(update: Update, context: TMitupContext) 
     # Just send the user to the main menu
     await callback_query_main_menu(update, context)
 
-    context.put_feature_metric(Feature.CREATE_MEETING, name="Cancel")
+    context.put_feature_metric(Feature.CREATE_MEETING, name=MetricKey.FEATURE_CANCELLED)
     return ConversationHandler.END
 
 

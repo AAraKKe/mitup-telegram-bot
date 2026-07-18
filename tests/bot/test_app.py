@@ -57,7 +57,7 @@ def build_config(
             gmaps_timezone_key=SecretStr("timezone-key"),
         ),
         app=AppConfig(run_mode=run_mode),
-        metrics=MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT, flush_on_emission=False),
+        metrics=MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT),
         patreon=patreon,
     )
 

@@ -7,6 +7,7 @@ from telegram.error import BadRequest
 
 from mitup_bot import db, guards
 from mitup_bot.config import Env
+from mitup_bot.custom_context import fault_fields_from_update
 from mitup_bot.exceptions import ContextPropertyNotSetError, InactiveUserInteraction, UserPendingDeletion
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
@@ -147,8 +148,14 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # dimensionless — the handler identity rides as an EMF property — so the
     # dimensionless FAULT the infra alarms read is emitted exactly once per fault.
     error_class = error.__class__.__name__
-    context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1)
-    context.emit_metric(MetricKey.FAULT, 1)
+    # The failure path deliberately carries the trigger and its context (what the user did, plus
+    # who/where — see fault_fields_from_update): the lean happy-path properties are not enough to
+    # debug a real fault, and log retention owns the PII lifecycle. `UpdatePayload` is a distinct
+    # key so the lean `Update` property emitted by later metrics cannot overwrite it on the
+    # shared EMF logger before the flush.
+    update_payload = fault_fields_from_update(context.telegram_update) if context.telegram_update else None
+    context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1, properties={"UpdatePayload": update_payload})
+    context.emit_metric(MetricKey.FAULT, 1, properties={"UpdatePayload": update_payload})
 
     context.metrics.add_stack_trace()
 
@@ -156,7 +163,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # carries flow/handler/update_id/tg_user_id — the correlation the EMF Fault record lacks.
     # exc_info is passed explicitly rather than read from the ambient exception state, which the
     # awaits above may have replaced.
-    log.error("An error occurred while handling the update", exc_info=error)
+    log.error("An error occurred while handling the update", exc_info=error, update=update_payload)
 
     # Any fault leaves the user stranded mid-action with no feedback, so redirect them to the main
     # menu with the generic notice. The fault metrics above already recorded the fault for alarming;

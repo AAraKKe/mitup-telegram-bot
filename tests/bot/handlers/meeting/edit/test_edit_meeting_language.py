@@ -91,8 +91,8 @@ async def test_callback_set_meeting_language(
     # Verify meeting messages were updated
     context.api.assert_update_meeting_messages_called(meeting)
 
-    # Verify feature metric was emitted
-    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.MEETING_LANGUAGE_SET)})
+    # The language set is log-only; it emits no feature metric.
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.EDIT_MEETING)})
 
 
 @pytest.mark.parametrize(

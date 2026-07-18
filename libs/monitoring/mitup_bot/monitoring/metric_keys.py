@@ -169,22 +169,29 @@ class MetricKey(CamelCaseStrEnum):
     BROADCAST_DELIVERIES_RETRY_PENDING = auto()
     """Number of expired meetings whose permanent deletion failed (owner unreachable for the notice)"""
     MEETINGS_DELETION_FAILED = auto()
+    """A callback query reached the registry fallback — no registered handler matched it"""
+    UNHANDLED_CALLBACK = auto()
+    """A user cancelled a feature flow before completing it (emitted under the Feature dimension)"""
+    FEATURE_CANCELLED = auto()
+    """A multi-step flow was entered (emitted under the Feature dimension, e.g. the Patreon link funnel)"""
+    FLOW_STARTED = auto()
+    """A multi-step flow reached its success end (emitted under the Feature dimension)"""
+    FLOW_COMPLETED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
 
 
 class Feature(CamelCaseStrEnum):
-    TIMEZONE_WITH_MESSAGE = auto()
-    TIMEZONE_WITH_LOCATION = auto()
+    SET_TIMEZONE = auto()
     NEW_USER_REGISTERED = auto()
-    NEW_LANDING = auto()
     CREATE_MEETING = auto()
+    EDIT_MEETING = auto()
+    REACTIVATE_MEETING = auto()
     SHARE_MEETING = auto()
     JOIN_MEETING = auto()
     LEAVE_MEETING = auto()
-    KICK_OUT_PARTICIPANT = auto()
-    MEETING_LANGUAGE_SET = auto()
     INVITE_USERS = auto()
     ATTACH_TO_CHAT = auto()
     SEARCH_CHAT_MEETINGS = auto()
+    PATREON_LINK = auto()

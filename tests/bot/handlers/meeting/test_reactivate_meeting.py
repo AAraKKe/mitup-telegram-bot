@@ -8,11 +8,13 @@ from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import Meetup, User
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingLifecycleMessages, SupporterMessages
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
+    MetricAssertions,
     MockDbSession,
     UpdateRequest,
     call_handler,
@@ -40,6 +42,7 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
     user_with_settings: User,
     inactive_meeting: Meetup,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
@@ -55,6 +58,7 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
         update,
         meeting_views.edit_view(inactive_meeting).with_context(success_message),
     )
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.REACTIVATE_MEETING)})
 
 
 @pytest.mark.parametrize(

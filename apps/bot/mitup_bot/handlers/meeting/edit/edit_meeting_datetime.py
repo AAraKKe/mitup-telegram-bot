@@ -14,7 +14,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_datetime_link, render
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDateTimeMessages
@@ -317,6 +317,7 @@ async def handle_first_datetime_set(
         current_message=meeting.message_from_update(update),
         skip_current=True,
     )
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "datetime"})
     return ConversationMeetingState.EDIT_TIME
 
 
@@ -357,6 +358,7 @@ async def handle_datetime_update(
         current_message=meeting.message_from_update(update),
         skip_current=True,
     )
+    context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "datetime"})
     return ConversationMeetingState.EDIT_DATETIME
 
 
@@ -456,6 +458,7 @@ async def date_time_entity_message_handler(
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)
 
+        context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "datetime"})
         return ConversationHandler.END
 
 
@@ -514,6 +517,7 @@ async def set_time_message_handler(
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)
 
+        context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "datetime"})
         return ConversationHandler.END
 
 

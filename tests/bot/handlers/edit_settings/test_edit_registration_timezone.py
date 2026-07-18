@@ -53,8 +53,18 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
     assert user_with_settings.settings.timezone == cast(Message, update.effective_message).text
     context.api.assert_send_message_called(update, view)
     assert result == ConversationHandler.END
-    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
-    metrics.assert_emitted(name=MetricKey.ERROR, value=0, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
+    metrics.assert_emitted(
+        name=MetricKey.COUNT,
+        value=1,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"InputMethod": "message"},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        value=0,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"InputMethod": "message"},
+    )
     metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.NEW_USER_REGISTERED)})
 
 
@@ -85,8 +95,18 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
 
     context.api.assert_send_message_called(update, RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang))
     assert result == ConversationRegistrationProcessState.TIMEZONE
-    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
-    metrics.assert_emitted(name=MetricKey.ERROR, value=1, dimensions={"Feature": str(Feature.TIMEZONE_WITH_MESSAGE)})
+    metrics.assert_emitted(
+        name=MetricKey.COUNT,
+        value=1,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"InputMethod": "message"},
+    )
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        value=1,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"InputMethod": "message"},
+    )
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.NEW_USER_REGISTERED)})
 
 
