@@ -78,6 +78,7 @@ class ButtonMessages(MessageBase):
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
     PRIVACY = f"{Emojis.SHIELD} Privacy"
     PRIVACY_POLICY = f"{Emojis.SHIELD} Privacy policy"
+    OPEN_USER_GUIDE = f"{Emojis.BOOK} Open the user guide"
     EXPORT_MY_DATA = f"{Emojis.PACKAGE} Export my data"
     DELETE_MY_DATA = f"{Emojis.DELETE} Delete my data"
     WAITING_LIST = "Waiting list"
@@ -151,6 +152,15 @@ class ButtonMessages(MessageBase):
 
 class MainMenuMessages(MessageBase):
     DESCRIPTION = "Welcome to Mitup Bot!\n\nChoose one of the following options:"
+
+
+class HelpMessages(MessageBase):
+    DESCRIPTION = (
+        "<b>Help</b>\n\n"
+        "There are two ways to get help with Mitup. The user guide walks you through how Mitup "
+        "works, page by page, and is the best place to start. If you still have a question or need "
+        "to reach a person, email us at support@mitup.social."
+    )
 
 
 class MeetingListMessages(MessageBase):

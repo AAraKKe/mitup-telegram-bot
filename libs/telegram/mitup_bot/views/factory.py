@@ -11,6 +11,7 @@ from mitup_bot.utils import (
     AdminMessages,
     ButtonMessages,
     Emojis,
+    HelpMessages,
     Languages,
     MainMenuMessages,
     MeetingCreationMessages,
@@ -61,10 +62,7 @@ def main_menu_view(ctx: RenderContext, *, message: str | FormattedText | None = 
             ButtonConfig(text=ButtonMessages.SETTINGS.get_text(lang=lang), callback_data=cb.SETTINGS),
         ],
         [
-            ButtonConfig(
-                text=ButtonMessages.HELP.get_text(lang=lang),
-                url=docs_links.user_guide_url(),
-            ),
+            ButtonConfig(text=ButtonMessages.HELP.get_text(lang=lang), callback_data=cb.HELP),
             ButtonConfig(text=ButtonMessages.COLLABORATE.get_text(lang=lang), callback_data=cb.COLLABORATE),
         ],
     ]
@@ -124,6 +122,16 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
             ],
         ],
     )
+
+
+def help_view(ctx: RenderContext) -> MitupView:
+    lang = ctx.lang
+    return MitupView(
+        HelpMessages.DESCRIPTION.get(lang=lang),
+        [
+            [ButtonConfig(text=ButtonMessages.OPEN_USER_GUIDE.get_text(lang=lang), url=docs_links.user_guide_url())],
+        ],
+    ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
 
 def privacy_view(ctx: RenderContext) -> MitupView:

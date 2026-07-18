@@ -36,7 +36,7 @@ def configured_base_url(monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 def test_user_guide_url_builds_on_the_configured_base(configured_base_url: str):
-    assert docs_links.user_guide_url() == f"{configured_base_url}/user-guide/getting_started/"
+    assert docs_links.user_guide_url() == f"{configured_base_url}/user-guide/"
 
 
 def test_privacy_url_builds_on_the_configured_base(configured_base_url: str):
@@ -50,7 +50,7 @@ def test_default_base_url_is_the_production_site():
 def test_user_guide_url_defaults_to_the_production_site(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(docs_links.DocsState, "base_url", docs_links.DEFAULT_BASE_URL)
 
-    assert docs_links.user_guide_url() == "https://mitup.social/user-guide/getting_started/"
+    assert docs_links.user_guide_url() == "https://mitup.social/user-guide/"
 
 
 def test_privacy_url_defaults_to_the_production_site(monkeypatch: pytest.MonkeyPatch):

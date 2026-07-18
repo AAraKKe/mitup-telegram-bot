@@ -1012,3 +1012,9 @@ msgstr ""
 
 msgid "AdminMessages.BUTTON_BROADCAST"
 msgstr ""
+
+msgid "ButtonMessages.OPEN_USER_GUIDE"
+msgstr "📖 Abrir la guía de uso"
+
+msgid "HelpMessages.DESCRIPTION"
+msgstr "<b>Ayuda</b>\n\nHay dos formas de conseguir ayuda con Mitup. La guía de uso te explica cómo funciona Mitup, página a página, y es el mejor punto de partida. Si aún tienes alguna duda o necesitas hablar con una persona, escríbenos a support@mitup.social."

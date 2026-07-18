@@ -869,6 +869,12 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="show_joined_meetings",
     ),
+    Context(
+        handler_id=MainMenuHandlerId.SHOW_HELP_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.HELP),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="show_help",
+    ),
     # --- Collaborate handlers ---
     Context(
         handler_id=CollaborateHandlerId.SHOW,

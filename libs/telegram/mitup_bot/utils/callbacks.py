@@ -114,6 +114,7 @@ MAIN_MENU = CallbackData(entity="main_menu")
 SEND_MAIN_MENU = CallbackData(action="send", entity="main_menu")
 PAST_MEETINGS = CallbackData(entity="past_meetings")
 SETTINGS = CallbackData(entity="settings")
+HELP = CallbackData(entity="help")
 COLLABORATE = CallbackData(entity="collaborate")
 UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
 

@@ -1015,3 +1015,9 @@ msgstr ""
 
 msgid "ButtonMessages.OPEN_IN_MAPS"
 msgstr "📍 Abrir no mapa"
+
+msgid "ButtonMessages.OPEN_USER_GUIDE"
+msgstr "📖 Abrir o guia do usuário"
+
+msgid "HelpMessages.DESCRIPTION"
+msgstr "<b>Ajuda</b>\n\nHá duas formas de obter ajuda com o Mitup. O guia do usuário mostra como o Mitup funciona, página por página, e é o melhor ponto de partida. Se você ainda tiver uma dúvida ou precisar falar com uma pessoa, escreva para support@mitup.social."

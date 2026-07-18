@@ -985,3 +985,9 @@ msgstr "👥 Unisciti all'Hosts-Only Group"
 
 msgid "ButtonMessages.HOSTS_GROUP_OPEN"
 msgstr "👥 Apri l'Hosts-Only Group"
+
+msgid "ButtonMessages.OPEN_USER_GUIDE"
+msgstr "📖 Apri la guida"
+
+msgid "HelpMessages.DESCRIPTION"
+msgstr "<b>Aiuto</b>\n\nCi sono due modi per ottenere aiuto con Mitup. La guida ti spiega come funziona Mitup, pagina per pagina, ed è il punto di partenza migliore. Se hai ancora una domanda o vuoi parlare con una persona, scrivici a support@mitup.social."

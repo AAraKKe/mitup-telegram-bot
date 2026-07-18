@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-18 03:04\n"
+"PO-Revision-Date: 2026-07-18 14:12\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -76,6 +76,9 @@ msgstr "🛡️ Privacy"
 
 msgid "ButtonMessages.PRIVACY_POLICY"
 msgstr "🛡️ Privacy policy"
+
+msgid "ButtonMessages.OPEN_USER_GUIDE"
+msgstr "📖 Open the user guide"
 
 msgid "ButtonMessages.EXPORT_MY_DATA"
 msgstr "📦 Export my data"
@@ -232,6 +235,9 @@ msgstr "👥 Open the Hosts-Only Group"
 
 msgid "MainMenuMessages.DESCRIPTION"
 msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
+
+msgid "HelpMessages.DESCRIPTION"
+msgstr "<b>Help</b>\n\nThere are two ways to get help with Mitup. The user guide walks you through how Mitup works, page by page, and is the best place to start. If you still have a question or need to reach a person, email us at support@mitup.social."
 
 msgid "MeetingListMessages.ACTIVE_DESCRIPTION"
 msgstr "These are all your active meetings."

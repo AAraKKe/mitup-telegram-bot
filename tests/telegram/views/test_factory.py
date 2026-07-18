@@ -7,7 +7,7 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import parse_format_tags
-from mitup_bot.utils.messages import AdminMessages, ButtonMessages, PrivacyMessages
+from mitup_bot.utils.messages import AdminMessages, ButtonMessages, HelpMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 
 
@@ -157,16 +157,39 @@ def test_main_menu_view_appends_admin_button_for_admins(lang: str):
     assert view.keyboard[:-1] == factory.main_menu_view(RenderContext(lang=lang)).keyboard
 
 
-def test_main_menu_view_help_button_links_to_the_configured_docs_site(lang: str, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(docs_links.DocsState, "base_url", "https://staging.mitup.social")
-
+def test_main_menu_view_help_button_opens_the_help_screen(lang: str):
     view = factory.main_menu_view(RenderContext(lang=lang))
 
-    help_button = ButtonConfig(
-        text=ButtonMessages.HELP.get_text(lang=lang), url="https://staging.mitup.social/user-guide/getting_started/"
-    )
+    help_button = ButtonConfig(text=ButtonMessages.HELP.get_text(lang=lang), callback_data=cb.HELP)
     all_buttons = [button for row in view.keyboard for button in row]
     assert help_button in all_buttons
+
+
+def test_help_view(lang: str, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(docs_links.DocsState, "base_url", "https://staging.mitup.social")
+
+    view = factory.help_view(RenderContext(lang=lang))
+
+    expected_view = MitupView(
+        HelpMessages.DESCRIPTION.get(lang=lang),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.OPEN_USER_GUIDE.get_text(lang=lang),
+                    url="https://staging.mitup.social/user-guide/",
+                )
+            ],
+            [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)],
+        ],
+    )
+
+    assert expected_view == view
+
+
+def test_help_view_message_contains_the_support_email(lang: str):
+    view = factory.help_view(RenderContext(lang=lang))
+
+    assert "support@mitup.social" in view.description.text
 
 
 def test_settings_view_privacy_button_opens_the_privacy_screen(lang: str):

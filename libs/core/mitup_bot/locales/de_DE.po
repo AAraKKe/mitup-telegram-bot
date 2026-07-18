@@ -1015,3 +1015,9 @@ msgstr ""
 
 msgid "ButtonMessages.OPEN_IN_MAPS"
 msgstr "📍 In Karten öffnen"
+
+msgid "ButtonMessages.OPEN_USER_GUIDE"
+msgstr "📖 Handbuch öffnen"
+
+msgid "HelpMessages.DESCRIPTION"
+msgstr "<b>Hilfe</b>\n\nEs gibt zwei Wege, Hilfe zu Mitup zu bekommen. Das Handbuch erklärt dir Seite für Seite, wie Mitup funktioniert, und ist der beste Startpunkt. Wenn du danach noch eine Frage hast oder eine Person erreichen möchtest, schreib uns eine E-Mail an support@mitup.social."

@@ -9,7 +9,7 @@ links.
 
 BOT_DOMAIN_PREFIX = "bot."
 DEFAULT_BASE_URL = "https://mitup.social"
-USER_GUIDE_PATH = "/user-guide/getting_started/"
+USER_GUIDE_PATH = "/user-guide/"
 PRIVACY_PATH = "/faq/privacy/"
 
 
