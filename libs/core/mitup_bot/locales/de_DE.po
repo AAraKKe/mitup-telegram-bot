@@ -956,6 +956,9 @@ msgstr ""
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr ""
 
+msgid "CommonMessages.CONTEXT_LOST"
+msgstr "<b>Entschuldigung, wir haben den Faden verloren!</b>\n\nDer Bot hatte ein kurzes internes Update und hat vergessen, wo du gerade warst. Alles, was du gespeichert hast, ist sicher. Bitte starte über das Menü unten noch einmal das, was du gerade gemacht hast."
+
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
 

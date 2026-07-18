@@ -920,6 +920,9 @@ msgstr ""
 msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
 msgstr ""
 
+msgid "CommonMessages.CONTEXT_LOST"
+msgstr "<b>Oops, abbiamo perso il filo!</b>\n\nIl bot ha ricevuto un rapido aggiornamento interno e ha dimenticato a che punto eri arrivato. Tutto quello che avevi salvato è al sicuro. Ricomincia quello che stavi facendo dal menu qui sotto."
+
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per crearne un altro, oppure tocca Collabora nel menu principale per supportare Mitup e sbloccarne altri."
 

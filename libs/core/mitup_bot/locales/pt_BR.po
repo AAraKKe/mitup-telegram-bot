@@ -956,6 +956,9 @@ msgstr ""
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr ""
 
+msgid "CommonMessages.CONTEXT_LOST"
+msgstr "<b>Desculpe, perdemos o seu lugar!</b>\n\nO bot passou por uma rápida atualização interna e esqueceu onde você estava no processo. Tudo o que você salvou está seguro. Por favor, comece de novo o que você estava fazendo a partir do menu abaixo."
+
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
 

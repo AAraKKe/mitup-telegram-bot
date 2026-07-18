@@ -7,7 +7,7 @@ from telegram.error import BadRequest
 
 from mitup_bot import db, guards
 from mitup_bot.config import Env
-from mitup_bot.exceptions import GuardError, InactiveUserInteraction, UserPendingDeletion
+from mitup_bot.exceptions import ContextPropertyNotSetError, InactiveUserInteraction, UserPendingDeletion
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
@@ -85,25 +85,26 @@ async def resolve_lang(session: AsyncSession, update: Update | None) -> str:
     return TranslationEngine.FALLBACK_LANG
 
 
-async def send_guard_notification(context: TMitupContext, update: Update, lang: str):
+async def send_guard_notification(context: TMitupContext, update: Update, lang: str, message: CommonMessages):
     # This runs in the best-effort guard-error path (wrapped in try/except upstream), and both
     # update and context are available here, so an admin keeps seeing the Admin row on the redirect.
     view = factory.main_menu_view(
         RenderContext(lang=lang, is_admin=guards.is_admin(update, context)),
-        message=CommonMessages.UNEXPECTED_ERROR.get(lang=lang),
+        message=message.get(lang=lang),
     )
     if update.callback_query is not None:
         await context.api.answer_callback_query(update=update, text="", show_alert=False)
     await context.api.send_message(update=update, view=view)
 
 
-async def notify_guard_error(context: TMitupContext):
-    """Send the user back to the main menu after a guard failure; never raises.
+async def notify_guard_error(context: TMitupContext, message: CommonMessages = CommonMessages.UNEXPECTED_ERROR):
+    """Send the user back to the main menu with ``message``; never raises.
 
     This runs inside the last-resort error handler, so the whole path — lang resolution, view build,
     message render, callback answer and send — is best-effort. Any failure (missing chat, blocked bot,
     absent translation file, DB error) is swallowed and logged, since re-raising here would escape to
-    ``process_update`` as an unhandled second fault.
+    ``process_update`` as an unhandled second fault. Both the guard-error and context-loss paths reuse
+    it, passing the message that fits the situation.
     """
     update = context.telegram_update
     if update is None:
@@ -111,9 +112,9 @@ async def notify_guard_error(context: TMitupContext):
 
     try:
         lang = await resolve_lang(update)
-        await send_guard_notification(context, update, lang)
+        await send_guard_notification(context, update, lang, message)
     except Exception:
-        log.debug("Failed to deliver guard-error notification to the user.", exc_info=True)
+        log.debug("Failed to deliver the redirect notification to the user.", exc_info=True)
 
 
 async def handler(context: TMitupContext, error: Exception, env: Env):
@@ -132,6 +133,16 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
         await handle_pending_deletion_user(context, error)
         return
 
+    # Context loss is an expected consequence of holding conversation state in memory (a rolling
+    # deploy wipes user_data mid-flow, or flow-shaped input arrives with no active flow), not a code
+    # fault. It gets its own metric and bypasses the fault alarms below; the user is redirected to the
+    # main menu with a friendly note explaining their saved data is safe.
+    if isinstance(error, ContextPropertyNotSetError):
+        log.warning("Conversation context was lost while handling the update", exc_info=error)
+        context.emit_metric(MetricKey.CONTEXT_LOST, 1)
+        await notify_guard_error(context, CommonMessages.CONTEXT_LOST)
+        return
+
     # Emit an error-class-specific fault metric plus the general aggregate FAULT. Both are
     # dimensionless — the handler identity rides as an EMF property — so the
     # dimensionless FAULT the infra alarms read is emitted exactly once per fault.
@@ -147,7 +158,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # awaits above may have replaced.
     log.error("An error occurred while handling the update", exc_info=error)
 
-    # Guard failures are internal faults the user should not see silently: notify them and redirect
-    # to the main menu. The fault metric above already carries the per-guard suffix.
-    if isinstance(error, GuardError):
-        await notify_guard_error(context)
+    # Any fault leaves the user stranded mid-action with no feedback, so redirect them to the main
+    # menu with the generic notice. The fault metrics above already recorded the fault for alarming;
+    # this delivery is best-effort and never raises, so it cannot become a second fault.
+    await notify_guard_error(context)

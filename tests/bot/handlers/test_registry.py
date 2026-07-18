@@ -225,11 +225,16 @@ async def test_all_handlers_emit_handler_metrics(app: StubMitupApp, update: Upda
         with suppress(ApplicationHandlerStop):
             await wrapper.handler.handle_update(update, app, check_state, handler_context)
 
-    # Every handler emits exactly one dimensionless TIME and FAULT record (handler identity rides
-    # as an EMF property, so there is no separate per-handler-dimensioned copy — issue #205).
+    # Every handler emits exactly one dimensionless TIME record and one dimensionless outcome record
+    # (handler identity rides as an EMF property, so there is no separate per-handler-dimensioned
+    # copy — issue #205). The outcome is FAULT, except handlers whose in-memory conversation state
+    # was missing: the error handler reclassifies those to CONTEXT_LOST and the fault series stays
+    # silent. FAULT and CONTEXT_LOST together account for every handler exactly once.
     metrics = MetricAssertions(shared_client)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=valid_handlers)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=AnyFloat(), times=valid_handlers)
+    outcome_names = {str(MetricKey.FAULT), str(MetricKey.CONTEXT_LOST)}
+    outcome_records = [record for record in shared_client.records if record.name in outcome_names]
+    assert len(outcome_records) == valid_handlers
 
 
 # ---------------------------------------------------------------------------

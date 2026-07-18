@@ -6,6 +6,7 @@ from telegram.error import TelegramError
 from mitup_bot.config import Env
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
+    ContextPropertyNotSetError,
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
@@ -309,17 +310,94 @@ async def test_guard_error_uses_resolved_user_language(
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
 
-async def test_non_guard_error_emits_fault_but_does_not_notify(
+async def test_non_guard_error_emits_fault_and_notifies(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """A plain (non-guard) error still emits fault metrics but must NOT send any user-facing message."""
+    """A plain (non-guard) error still emits the full fault metrics AND redirects the user to the
+    main menu with the generic notice, since any fault otherwise strands them mid-action."""
+    # No user registered -> resolve_lang falls back to the project default language.
     await error_handler.handler(context, ValueError("boom"), Env.PROD)
     await context.metrics.flush()
 
     metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ValueError"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
-    context.api.assert_send_message_not_called()
-    context.api.assert_method_just_called("answer_callback_query", times=0)
+
+    fallback = TranslationEngine.FALLBACK_LANG
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback)
+    )
+    context.api.assert_send_message_called(context.telegram_update, expected_view)
+
+
+async def test_fault_notification_failure_does_not_raise(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """The post-fault user notification is best-effort: a delivery failure is swallowed, not re-raised
+    as a second fault, while the original fault metrics still land."""
+    context.api.mock_method("send_message").side_effect = TelegramError("send failed")
+
+    # Must not raise despite the failing delivery.
+    await error_handler.handler(context, ValueError("boom"), Env.PROD)
+    await context.metrics.flush()
+
+    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ValueError"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+
+
+# --- Context loss handling ---
+
+
+async def test_context_lost_notifies_user_and_emits_dedicated_metric(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A lost-context error is an expected state, not a fault: the user is redirected to the main menu
+    with the context-lost note, the dedicated CONTEXT_LOST metric fires, and no FAULT is emitted."""
+    # No user registered -> resolve_lang falls back to the project default language.
+    error = ContextPropertyNotSetError("User data 'meeting_id' requested but not set")
+
+    await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
+
+    fallback = TranslationEngine.FALLBACK_LANG
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback), message=CommonMessages.CONTEXT_LOST.get(lang=fallback)
+    )
+    context.api.assert_send_message_called(context.telegram_update, expected_view)
+
+
+async def test_context_lost_uses_resolved_user_language(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """The context-lost note renders in the effective user's language when they exist in the DB."""
+    user = create_user(id=1, tg_user_id=123, settings=create_settings(language="es"))
+    mock_session.add_user(user)
+
+    await error_handler.handler(
+        context, ContextPropertyNotSetError("User data 'meeting_id' requested but not set"), Env.PROD
+    )
+    await context.metrics.flush()
+
+    expected_view = factory.main_menu_view(RenderContext(lang="es"), message=CommonMessages.CONTEXT_LOST.get(lang="es"))
+    context.api.assert_send_message_called(context.telegram_update, expected_view)
+
+
+async def test_context_lost_logs_at_warning_without_fault_line(context: StubMitupContext):
+    """Context loss is logged as a warning and never produces the generic fault log line."""
+    error = ContextPropertyNotSetError("User data 'meeting_id' requested but not set")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+
+    event = "Conversation context was lost while handling the update"
+    warning_logs = [entry for entry in logs if entry["event"] == event]
+    assert len(warning_logs) == 1
+    assert warning_logs[0]["log_level"] == "warning"
+    assert warning_logs[0]["exc_info"] is error
+    assert not [entry for entry in logs if entry["event"] == "An error occurred while handling the update"]
 
 
 async def test_resolve_lang_returns_user_lang_when_user_exists(update: Update, mock_session: MockDbSession):

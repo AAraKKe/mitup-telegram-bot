@@ -192,6 +192,12 @@ class CommonMessages(MessageBase):
     DELETED_MEETING_ALERT = "This meeting has been deleted"
     # Generic error when an internal guard check fails
     UNEXPECTED_ERROR = "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
+    # Shown when in-memory conversation state was lost (e.g. after a rolling deploy mid-flow)
+    CONTEXT_LOST = (
+        "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you "
+        "were in the process. Everything you saved is safe. Please start what you were doing again from "
+        "the menu below."
+    )
 
 
 class SupporterMessages(MessageBase):

@@ -12,7 +12,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
-from mitup_bot.utils import ButtonMessages, MeetingEditLocationMessages
+from mitup_bot.utils import ButtonMessages, CommonMessages, MeetingEditLocationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView, factory
 
@@ -174,8 +174,12 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(
-            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
+        await context.api.send_message(
+            update=update,
+            view=factory.main_menu_view(
+                guards.render_context(user, update, context),
+                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
+            ),
         )
         return ConversationHandler.END
 
@@ -207,8 +211,12 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(
-            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
+        await context.api.send_message(
+            update=update,
+            view=factory.main_menu_view(
+                guards.render_context(user, update, context),
+                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
+            ),
         )
         return ConversationHandler.END
 
@@ -249,8 +257,12 @@ async def edit_coordinates_without_location(session: AsyncSession, update: Updat
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.edit_message(
-            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
+        await context.api.send_message(
+            update=update,
+            view=factory.main_menu_view(
+                guards.render_context(user, update, context),
+                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
+            ),
         )
         return ConversationHandler.END
 

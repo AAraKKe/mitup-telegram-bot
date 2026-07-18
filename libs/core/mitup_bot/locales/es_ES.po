@@ -956,6 +956,9 @@ msgstr ""
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
 msgstr ""
 
+msgid "CommonMessages.CONTEXT_LOST"
+msgstr "<b>¡Vaya, hemos perdido el hilo!</b>\n\nEl bot ha tenido una actualización interna rápida y ha olvidado en qué paso estabas. Todo lo que guardaste está a salvo. Por favor, vuelve a empezar lo que estabas haciendo desde el menú de abajo."
+
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
 

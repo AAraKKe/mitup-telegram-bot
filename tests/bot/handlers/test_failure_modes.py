@@ -1459,17 +1459,18 @@ async def test_callback_fails_when_missing_necessary_user_data(
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    # If context data is needed it should be validated before having to hit the database.
-    # The fault should happen before testing if any object exists in the db and, therefore,
-    # there is no need to add any.
-    # If this test fails because the an object is not found in the database, it means that the
-    # validation is not happening in the right place and the callback needs to be updated.
+    # Missing context data is validated before the handler touches the database, so no object needs
+    # seeding here. A miss is an expected consequence of in-memory conversation state, not a code
+    # fault: the global error handler reclassifies it to the dedicated CONTEXT_LOST metric and the
+    # fault series stays silent. If this test fails because an object is not found in the database,
+    # the validation is not happening in the right place and the callback needs to be updated.
     context, _ = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 

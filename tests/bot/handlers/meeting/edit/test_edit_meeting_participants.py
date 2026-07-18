@@ -15,7 +15,12 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages, SupporterMessages
+from mitup_bot.utils.messages import (
+    ButtonMessages,
+    CommonMessages,
+    MeetingEditParticipantsMessages,
+    SupporterMessages,
+)
 from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     AnyFloat,
@@ -557,7 +562,13 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_send_message_called(
+        update,
+        factory.main_menu_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -609,7 +620,13 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     assert meeting.max_members is None
     mock_session.assert_not_flushed()
     assert result is ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_send_message_called(
+        update,
+        factory.main_menu_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -716,14 +733,14 @@ def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
     [UpdateRequest(message_text="5")],
     indirect=True,
 )
-async def test_edit_meeting_max_participants_message_edits_to_main_menu_when_context_missing(
+async def test_edit_meeting_max_participants_message_sends_main_menu_when_context_missing(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
 ):
     """When no meeting_id is stored in context, edit_meeting_max_participants catches
-    ContextPropertyNotSetError, edits the message to the main menu view, and ends the conversation."""
+    ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
@@ -738,7 +755,10 @@ async def test_edit_meeting_max_participants_message_edits_to_main_menu_when_con
         assert "meeting_id" in caplog.text
 
     assert state == ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user.lang)))
+    context.api.assert_send_message_called(
+        update,
+        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -751,14 +771,14 @@ async def test_edit_meeting_max_participants_message_edits_to_main_menu_when_con
     [UpdateRequest(message_text="not a number")],
     indirect=True,
 )
-async def test_edit_meeting_wrong_max_participants_message_edits_to_main_menu_when_context_missing(
+async def test_edit_meeting_wrong_max_participants_message_sends_main_menu_when_context_missing(
     caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
 ):
     """When no meeting_id is stored in context, edit_meeting_wrong_max_participants catches
-    ContextPropertyNotSetError, edits the message to the main menu view, and ends the conversation."""
+    ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
@@ -773,4 +793,7 @@ async def test_edit_meeting_wrong_max_participants_message_edits_to_main_menu_wh
         assert "meeting_id" in caplog.text
 
     assert state == ConversationHandler.END
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user.lang)))
+    context.api.assert_send_message_called(
+        update,
+        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+    )

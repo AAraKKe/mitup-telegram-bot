@@ -102,9 +102,11 @@ async def test_stale_cancel_answer_callback_query_called_even_when_clear_markup_
     with mock.patch.object(MockApi, "clear_reply_markup", raising_clear):
         context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    # The alert must have been sent before clear_reply_markup was attempted
+    # The alert must have been sent before clear_reply_markup was attempted. The raised failure then
+    # reaches the global error handler, whose best-effort fault notification acknowledges the query a
+    # second time with an empty answer — hence two awaits, of which the alert is one.
     expected_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user_with_settings.lang)
-    context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
+    context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True, times=2)
 
 
 @pytest.mark.parametrize(

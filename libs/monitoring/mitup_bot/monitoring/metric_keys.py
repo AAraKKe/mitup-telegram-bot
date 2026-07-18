@@ -25,6 +25,10 @@ class MetricKey(CamelCaseStrEnum):
     ERROR = auto()
     """This is a metric to be emitted when there is a system fault, something that is not expected to happen."""
     FAULT = auto()
+    """Emitted when in-memory conversation state was lost (e.g. a rolling deploy wiped user_data
+    mid-flow, or flow-shaped input arrived with no active flow). Expected consequence of in-memory
+    state, not a code fault, so it carries its own metric and bypasses the fault alarms."""
+    CONTEXT_LOST = auto()
     """Metric to be emitted when the user tries to do an action with a meeting that does not belong to them."""
     MEETING_NOT_OWNED = auto()
     """Represents a message that has been deleted in Telegram and deleted from the database"""
