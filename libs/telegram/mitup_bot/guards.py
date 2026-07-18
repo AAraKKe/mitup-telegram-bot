@@ -82,16 +82,20 @@ def render_context(user: User, update: Update, context: TMitupContext) -> Render
     return RenderContext(lang=user.lang, is_admin=is_admin(update, context))
 
 
-async def current_user(update: Update, session: AsyncSession, *, load_collections: bool = True) -> User:
-    # `load_collections` forwards to `User.by_tg_user_id`: handlers that never traverse the user's
-    # meetups/joined_links (settings-only screens, the Collaborate menu, etc.) pass False at their
-    # entry point to skip the two selectin queries. It stays True by default so opting out is always
-    # a deliberate, audited per-call-site decision.
+async def current_user(
+    update: Update, session: AsyncSession, *, load_collections: bool = True, load_participants: bool = False
+) -> User:
+    # `load_collections`/`load_participants` forward to `User.by_tg_user_id`: pass
+    # `load_collections=False` on screens that never touch the user's meetups/joined_links, and
+    # `load_participants=True` on the handful that render a full meeting card off those collections.
+    # Both stay conservative by default so widening the load is a deliberate, per-call-site decision.
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
 
     # If we have an effective user, get the user from DB
-    if user := await User.by_tg_user_id(session, update.effective_user.id, load_collections=load_collections):
+    if user := await User.by_tg_user_id(
+        session, update.effective_user.id, load_collections=load_collections, load_participants=load_participants
+    ):
         # A user marked for deletion is rejected everywhere until the cleanup run purges the row;
         # the error handler answers the interaction with the standardized pending-deletion alert.
         if user.status is UserStatus.DELETION_REQUESTED:

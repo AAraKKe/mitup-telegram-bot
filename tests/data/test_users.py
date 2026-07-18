@@ -26,6 +26,13 @@ async def test_by_tg_user_id_must_exist_raises_when_not_found(mock_session: Mock
         await User.by_tg_user_id(mock_session, tg_user_id=999, must_exist=True)
 
 
+async def test_by_tg_user_id_rejects_participants_without_collections(mock_session: MockDbSession):
+    """`load_participants` extends the collection load, so it is meaningless without it — the invalid
+    combination is a caller bug and must fail loudly rather than silently skip the participant leaves."""
+    with pytest.raises(ValueError, match="load_participants"):
+        await User.by_tg_user_id(mock_session, tg_user_id=1, load_collections=False, load_participants=True)
+
+
 def test_display_name_is_plain_inline_name_for_free_user():
     user = create_user(id=1, username="alice", tg_user_id=997_701)
 

@@ -29,6 +29,14 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
     # lazy="selectin" on all three: the participant-name rendering in the view layer traverses
     # user, invited_by and meetup in plain Python, and implicit lazy loads raise MissingGreenlet
     # under the async engine.
+    #
+    # `meetup` is a special case: whenever a JoinedUsers is loaded as a participant it is reached
+    # via `Meetup.joined_links`, so this back-reference closes a load-path cycle and the selectin
+    # cascade stops before it — the attribute is left unloaded. It survives only because the
+    # many-to-one resolves through the session identity map: the parent meetup that produced this
+    # link is always already loaded in-session, so `link.meetup` returns it with no SQL. A render of
+    # a detached JoinedUsers whose meetup is not in the session would break this and must eager-load
+    # `meetup` explicitly.
     meetup: Meetup = Relationship(back_populates="joined_links", sa_relationship_kwargs={"lazy": "selectin"})
     user: User = Relationship(
         back_populates="joined_links",

@@ -66,6 +66,14 @@ async def notify_joined_link(link_id: int, api: TelegramApiWrapper) -> bool:
             log.info("Joined link no longer due for a notification, skipping", joined_link=link_id)
             return False
 
+        # This render reads only `link.user.lang` and `link.meetup.title`, both loaded (the JoinedUsers
+        # root loads `user` and `meetup` via mapper-level selectin). `link.meetup.joined_links` is NOT
+        # loaded: from a JoinedUsers root the cascade revisits the JoinedUsers mapper on
+        # `meetup -> joined_links` and stops, and unlike `meetup` this collection has no identity-map
+        # rescue — any access emits SQL and raises MissingGreenlet here. A future `update_meeting_messages`
+        # call (which iterates the participant list) must therefore chain
+        # `JoinedUsers.meetup -> Meetup.joined_links -> JoinedUsers.user`/`invited_by` onto this re-query
+        # first; the shared `USERS_TO_NOTIFY_STATEMENT` stays lean because `due_link_ids` only reads ids.
         view = MitupView(
             description=NotificationMessages.STARTING_SOON.get(lang=link.user.lang, meeting_title=link.meetup.title),
             keyboard=[],

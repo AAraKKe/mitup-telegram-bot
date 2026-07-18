@@ -69,6 +69,12 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
     if meeting is None:
         return
 
+    # The locked load ran with populate_existing, which re-hydrates the identity-mapped `user`
+    # (reached via owner/joined_links) and resets its lazy="raise" collections to unloaded. Re-load
+    # them so any later `own_meeting`/`joined_meeting` access is safe; the row lock is already held,
+    # so the re-read is race-safe.
+    await session.refresh(user, ["meetups", "joined_links"])
+
     # Rendered (and queued) before the rows are deleted below; the edits themselves run after
     # the deletion commits.
     await context.api.update_meeting_messages(meeting=meeting, was_deleted=True)

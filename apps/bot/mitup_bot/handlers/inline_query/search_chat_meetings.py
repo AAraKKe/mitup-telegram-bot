@@ -1,3 +1,6 @@
+from typing import Any, cast
+
+from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
@@ -29,7 +32,19 @@ async def search_chat_meetings(session: AsyncSession, update: Update, context: T
     query = valid_inline_query(update).query
     chat_instance = query.removeprefix(SEARCH_QUERY_PREFIX)
 
-    statement = select(Message).where(Message.chat_instance == chat_instance)
+    # Chain `meetup -> messages` explicitly: from a Message root the selectin cascade reaches the
+    # meetup but stops before `meetup.messages` (the Message mapper is revisited, closing a load-path
+    # cycle), leaving that collection unloaded. The inline render below does not touch it, but
+    # `Meetup.has_message`/`add_message` iterate it, so load it here to keep the meetings self-consistent.
+    statement = (
+        select(Message)
+        .where(Message.chat_instance == chat_instance)
+        .options(
+            selectinload(cast("QueryableAttribute[Any]", Message.meetup)).selectinload(
+                cast("QueryableAttribute[Any]", Meetup.messages)
+            )
+        )
+    )
     messages = (await session.exec(statement)).all()
 
     # Collect unique active meetings via the already-loaded relationship

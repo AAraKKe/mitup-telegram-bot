@@ -168,6 +168,12 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     if meeting is None:
         return ConversationHandler.END
 
+    # The locked load ran with populate_existing, which re-hydrates the identity-mapped `user`
+    # (reached via owner/joined_links) and resets its lazy="raise" collections to unloaded. Re-load
+    # them so any later `own_meeting`/`joined_meeting` access is safe; the row lock is already held,
+    # so the re-read is race-safe.
+    await session.refresh(user, ["meetups", "joined_links"])
+
     requested_max = int(cast(str, number))
 
     # A free owner is capped by the free-tier participant limit; reject anything above it and keep
@@ -200,6 +206,8 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
             meeting = await guards.user_owns_meeting(user, meeting_id, "Edit max participants", update, context)
             if meeting is None:
                 return ConversationHandler.END
+            # Default load is enough: this view reads only `meeting.lang` (the acting owner's
+            # language), never the participant list, so it needs no `load_participants`.
             response_view = edit_max_participants_view(meeting, fail=True)
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)

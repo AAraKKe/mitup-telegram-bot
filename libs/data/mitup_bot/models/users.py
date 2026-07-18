@@ -1,9 +1,11 @@
 import datetime as dt
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue
 from sqlalchemy.orm import QueryableAttribute, selectinload
+from sqlalchemy.orm.interfaces import LoaderOption
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -86,7 +88,7 @@ class User(BaseModel, SQLModel, table=True):
     # meetups and joined_links deliberately don't eager-load: doing so on every User would
     # recurse through Meetup.joined_links -> JoinedUsers.user -> User.meetups across the whole
     # social graph. They are only traversed on the *current* user, so `by_tg_user_id` loads them
-    # explicitly via selectinload options instead (freshly flushed users use session.refresh).
+    # explicitly via chained selectinload options instead (freshly flushed users use session.refresh).
     # lazy="raise": an unsanctioned unloaded access would otherwise emit a lazy SELECT, which
     # the async engine turns into a MissingGreenlet in production only. Raising a clear
     # InvalidRequestError instead makes the bad access deterministic and unit-test-visible.
@@ -110,35 +112,50 @@ class User(BaseModel, SQLModel, table=True):
     @overload
     @classmethod
     async def by_tg_user_id(
-        cls, session: AsyncSession, tg_user_id: int, must_exist: Literal[True], *, load_collections: bool = ...
+        cls,
+        session: AsyncSession,
+        tg_user_id: int,
+        must_exist: Literal[True],
+        *,
+        load_collections: bool = ...,
+        load_participants: bool = ...,
     ) -> Self: ...
 
     @overload
     @classmethod
     async def by_tg_user_id(
-        cls, session: AsyncSession, tg_user_id: int, must_exist: bool = ..., *, load_collections: bool = ...
+        cls,
+        session: AsyncSession,
+        tg_user_id: int,
+        must_exist: bool = ...,
+        *,
+        load_collections: bool = ...,
+        load_participants: bool = ...,
     ) -> Self | None: ...
 
     @classmethod
     async def by_tg_user_id(
-        cls, session: AsyncSession, tg_user_id: int, must_exist: bool = False, *, load_collections: bool = True
+        cls,
+        session: AsyncSession,
+        tg_user_id: int,
+        must_exist: bool = False,
+        *,
+        load_collections: bool = True,
+        load_participants: bool = False,
     ) -> Self | None:
-        # By default eagerly load the user's own meetings and memberships: handlers traverse them
-        # through `own_meeting`/`joined_meeting` and the list views, and the async engine cannot
-        # lazy-load on attribute access. Relationship-level selectin loading takes over from there.
-        #
-        # Pass `load_collections=False` for callers that only need the user's own columns (e.g. the
-        # Patreon OAuth callback): it skips those two selectin queries. Because `meetups` and
-        # `joined_links` are `lazy="raise"`, such an instance must NOT touch either collection — any
-        # access raises InvalidRequestError rather than silently emitting a query.
+        # The default loads the one-hop `meetups`/`joined_links` (plus `joined_links -> meetup`) that
+        # handlers and list views traverse. `load_participants=True` additionally spells out each
+        # meeting's `owner` and participant leaves; pass it only from handlers that render a full
+        # meeting card straight off these collections (the inline query), since selectin does not
+        # cascade through the user-rooted load cycle — see `user_collection_loaders` and the database
+        # skill. `load_collections=False` skips the collections entirely (they are `lazy="raise"`, so
+        # such an instance must not touch either).
+        if load_participants and not load_collections:
+            raise ValueError("load_participants=True requires load_collections=True")
+
         statement = select(cls).where(cls.tg_user_id == tg_user_id)
         if load_collections:
-            # cast: SQLModel types relationship class attributes as their instance values,
-            # not as the InstrumentedAttribute SQLAlchemy actually puts on the class.
-            statement = statement.options(
-                selectinload(cast("QueryableAttribute[Any]", cls.meetups)),
-                selectinload(cast("QueryableAttribute[Any]", cls.joined_links)),
-            )
+            statement = statement.options(*user_collection_loaders(participants=load_participants))
         if (found_user := (await session.exec(statement)).first()) is not None:
             return found_user
 
@@ -197,3 +214,39 @@ class User(BaseModel, SQLModel, table=True):
 
     def now_in_tz(self) -> dt.datetime:
         return self.datetime_in_tz(dt.datetime.now(dt.UTC))
+
+
+def as_loadable(relationship: Any) -> QueryableAttribute[Any]:
+    """Cast a SQLModel relationship attribute to the type `selectinload` expects.
+
+    SQLModel types relationship class attributes as their instance values, not as the
+    InstrumentedAttribute SQLAlchemy actually puts on the class; loader options need the latter.
+    """
+    return cast("QueryableAttribute[Any]", relationship)
+
+
+def user_collection_loaders(*, participants: bool) -> Sequence[LoaderOption]:
+    """Loader options for a user-rooted load of `meetups` and `joined_links`.
+
+    Selectin does not cascade through the User -> Meetup -> JoinedUsers -> User load-path cycle, so
+    each hop the views read must be named (see the database skill). Without `participants` (the
+    default): the one-hop collections plus `joined_links -> meetup` (the list screens read
+    `link.meetup.title`/`active`). With `participants`: additionally each meeting's `owner` and its
+    participants' `user`/`invited_by`, for the full meeting-card renderers.
+
+    The two roots double as builders for the shared Meetup leaves; SQLAlchemy loader options are
+    generative, so the branches off one root do not interfere — pinned by
+    `test_load_options_are_generative`.
+    """
+    meetups_root = selectinload(as_loadable(User.meetups))
+    joined_meetup_root = selectinload(as_loadable(User.joined_links)).selectinload(as_loadable(JoinedUsers.meetup))
+    options = [meetups_root, joined_meetup_root]
+    if participants:
+        for meetup_root in (meetups_root, joined_meetup_root):
+            joined_links_leaf = meetup_root.selectinload(as_loadable(Meetup.joined_links))
+            options += [
+                meetup_root.selectinload(as_loadable(Meetup.owner)),
+                joined_links_leaf.selectinload(as_loadable(JoinedUsers.user)),
+                joined_links_leaf.selectinload(as_loadable(JoinedUsers.invited_by)),
+            ]
+    return options
