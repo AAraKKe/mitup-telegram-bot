@@ -3,7 +3,13 @@ Appended automatically to every incident GitLab creates from a CloudWatch alert.
 Selected under Settings → Monitor → Incidents → Incident template. The dynamic context
 (which alarm, triggering children, state transition, links) lives in the alert description
 above this block — built by the alarm-action Lambda (apps/lambda-alarm).
+
+The /confidential quick action below executes on creation (and is stripped from the
+rendered description), restricting the incident to project members with Reporter+ —
+alarm details never become publicly visible on this public project.
 -->
+
+/confidential
 
 ---
 
