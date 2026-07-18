@@ -4,11 +4,11 @@ There are many ways to contribute, from reporting bugs and suggesting features t
 
 The full guides live in the documentation, published at [mitup.social](https://mitup.social):
 
-*   **[Setup guide](docs/contribute/setup.md):** how to set up your local development environment and run the bot.
-*   **[Making contributions](docs/contribute/making_contributions.md):** the whole process, from opening an issue to getting a merge request reviewed and merged.
-*   **[Testing and validation](docs/contribute/testing.md):** how to run formatting, linting, type-checking, and tests locally.
-*   **[Other ways to help](docs/collaborate/donation.md):** support the project financially, or [translate Mitup](docs/collaborate/translator.md) into your language.
-*   **[Code of conduct](docs/collaborate/code_of_conduct.md):** the community standards everyone taking part agrees to.
+* **[Setup guide](https://mitup.social/contribute/setup/):** set up your local development environment and run the bot.
+* **[Making contributions](https://mitup.social/contribute/making_contributions/):** the whole process, from opening an issue to getting a merge request reviewed and merged.
+* **[Testing and validation](https://mitup.social/contribute/testing/):** run formatting, linting, type-checking, and tests locally.
+* **[Other ways to help](https://mitup.social/collaborate/donation/):** support the project financially, or [translate Mitup](https://mitup.social/collaborate/translator/) into your language.
+* **[Code of conduct](https://mitup.social/collaborate/code_of_conduct/):** the community standards everyone taking part agrees to.
 
 ## Reporting issues
 

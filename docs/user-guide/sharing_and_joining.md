@@ -12,6 +12,8 @@ Your own copy of a meeting, the one in your chat with the bot, always carries a 
 
 The same card can go to as many chats as you like. Every copy points at the same meeting, so a join from any chat updates the participant count everywhere at once.
 
+Share is a shortcut for Telegram's inline mode: it fills in the bot query for you. You can reach the same card by typing `@mitupbot` in any chat's message box. See [using Mitup from any chat](inline_mode.md).
+
 ## The shared card
 
 Once a meeting lands in a chat, it arrives as a single message with its own buttons. Anyone in that chat can act on it without opening a private chat with the bot first.
@@ -139,7 +141,7 @@ Send the name, confirm, and that person joins the meeting as a plain name on the
 
     This meeting is now attached to this chat. It will be included in your search results when you look for meetings using the bot's inline mode.
 
-After that, anyone in the chat can pull the meeting back up by typing an inline query for the bot, without scrolling back to find the original message. The footnote under the card flips from *Make this meeting searchable in this chat* to a line confirming it's now searchable, and the button drops off since there's nothing left to do. Tapping it on a card that's already attached just tells you so.
+After that, anyone in the chat can pull the meeting back up through [Mitup's inline mode](inline_mode.md#meetings-in-this-chat), without scrolling back to find the original message. The footnote under the card flips from *Make this meeting searchable in this chat* to a line confirming it's now searchable, and the button drops off since there's nothing left to do. Tapping it on a card that's already attached tells you so.
 
 <div class="mitup-annotated">
   <div class="mitup-annotated__chat">

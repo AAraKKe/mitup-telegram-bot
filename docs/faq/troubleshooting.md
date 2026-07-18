@@ -35,3 +35,7 @@ Every meeting carries its own language, set by the person who created it. If the
 Only the owner of a meeting can edit it. If you joined a meeting someone else created, you can see it and change your own RSVP, but the title, time, location, and options belong to the owner.
 
 If you tap an edit action on a meeting you don't own, Mitup sends you back to the main menu instead. That's the expected outcome, not a failure. To run your own version, create a new meeting and invite the same people.
+
+## Still stuck
+
+If none of these matches what you're seeing, email [support@mitup.social](mailto:support@mitup.social). A screen recording of what happens helps a lot, since it shows the exact steps that led there.

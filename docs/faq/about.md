@@ -28,3 +28,7 @@ Mitup is a community project. Whether you write code, translate, or report bugs,
 * [Translate Mitup](../collaborate/translator.md): help bring the bot to your language on Crowdin.
 
 Everyone who takes part agrees to the [code of conduct](../collaborate/code_of_conduct.md).
+
+## Get in touch
+
+For anything that isn't a code contribution or a translation, email [support@mitup.social](mailto:support@mitup.social). Bugs and feature ideas are best filed as [an issue on GitLab](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues), where you can see what's already been reported.

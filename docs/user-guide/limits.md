@@ -14,7 +14,7 @@ The people who back Mitup are called Hosts, and each [tier](../collaborate/donat
 | How far ahead you can schedule | 90 days | 365 days | No limit |
 | Participants per meeting | 20 | No cap | No cap |
 
-The Brewer tier is a pure thank-you: it comes with the badge and the members-only group, and keeps the same limits as a free account.
+The Brewer tier is a pure thank-you: it comes with the badge and the Hosts-only group, and keeps the same limits as a free account.
 
 ## Active meetings
 
@@ -53,3 +53,7 @@ Once a meeting is full, further joins go to the [waiting list](meeting_settings.
 ## Raising the limits
 
 Back Mitup on Patreon and link your account through *♥ Collaborate*{.button-like} in the main menu. The higher limits switch on automatically, no matter whether you pledge first or link first. The [supporting Mitup](../collaborate/donation.md) page covers the tiers and how linking works.
+
+## Hosts-only group
+
+Every Host, from Brewer up, gets a seat in a private Telegram group. Open *♥ Collaborate*{.button-like} and tap the button to send a join request. It's approved for active Hosts and declined otherwise. If your support lapses you're removed from the group, and regaining it lets you rejoin from the same screen. The [supporting Mitup](../collaborate/donation.md#joining-the-hosts-only-group) page has the full walkthrough.

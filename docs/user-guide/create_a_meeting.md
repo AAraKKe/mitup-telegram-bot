@@ -75,8 +75,8 @@ Each button opens one part of the meeting:
 * *🅰️ Title*{.button-like}: change the meeting name.
 * *📄 Description*{.button-like}: add context, an agenda, or a what-to-bring note.
 * *🕒 When*{.button-like}: set the date, time, and duration. See [When: date, time, and duration](#when-date-time-and-duration).
-* *👥 Participants*{.button-like}: set a maximum, or leave it open. On a free account a meeting holds up to 20 people either way; see [limits](limits.md#participants-per-meeting).
-* *🗺️ Location*{.button-like}: give the place a name ("The Usual Pub", "Park Entrance by the Fountain", "Zoom Call Link") and, for a physical spot, the location you send.
+* *👥 Participants*{.button-like}: set a maximum, or leave it open. On a free account a meeting holds up to 20 people either way; see [limits](limits.md#participants-per-meeting). You can also take someone off the list from here; the bot asks you to confirm before removing them.
+* *🗺️ Location*{.button-like}: give the place a name, and for a physical spot, share the location too. See [Location](#location).
 * *🔣 Language*{.button-like}: choose the language the meeting is shared in. See [Meeting language](#meeting-language).
 * *⚙️ Settings*{.button-like}: four on/off options for this meeting, the [waiting list, public, open invitations, and incognito](meeting_settings.md).
 * *✅ Done*{.button-like}: leave the edit hub and show the finished meeting card.
@@ -144,6 +144,15 @@ Turn on *🔴 Lock on start*{.button-like} in the When menu and joining and leav
 !!! note "Lock needs a start time"
 
     Lock on start only appears once the meeting has a start time, since that's the moment the freeze begins. Clearing the times also clears the lock.
+
+## Location
+
+Open *🗺️ Location*{.button-like} in the edit hub and you get two ways to say where the meeting is:
+
+* *🅰️ Name*{.button-like}: type a place name. Anything works: "The Usual Pub", "Park Entrance by the Fountain", or a video-call link for a meeting that isn't anywhere physical.
+* *📍 Location*{.button-like}: share a map location from your phone. Tap the attachment icon, choose Location, and send any spot, not only where you are right now. This one is phone-only, since Telegram only offers location sharing on mobile.
+
+You can set just a name, just a location, or both. When you've shared a location, the meeting card carries an *📍 Open in Maps*{.button-like} button, so anyone looking at it can open the spot in their maps app.
 
 ## Meeting language
 
