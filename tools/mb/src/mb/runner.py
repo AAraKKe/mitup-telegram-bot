@@ -8,13 +8,15 @@ from . import console
 
 
 def repo_root() -> Path:
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return Path(result.stdout.strip())
+    """Workspace root: the ancestor of this file that holds `uv.lock`.
+
+    Resolved without git so mb works where the binary is absent (containers) or where
+    `.git` is a worktree pointer to a path that only exists on the host.
+    """
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / "uv.lock").is_file():
+            return candidate
+    raise RuntimeError(f"No uv.lock found in any parent of {Path(__file__).resolve()}.")
 
 
 def build_env(

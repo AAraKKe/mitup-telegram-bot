@@ -1,6 +1,7 @@
 services:
   run-tests:
     image: mitup-bot-dev
+    pull_policy: build
     build:
       dockerfile: ./dev/docker/Dockerfile.dev
     volumes:
@@ -12,6 +13,7 @@ services:
     # Intended only for local migrations
     &migrations-service
     image: mitup-bot-dev
+    pull_policy: build
     build:
       dockerfile: ./dev/docker/Dockerfile.dev
     depends_on:
@@ -69,6 +71,7 @@ services:
 
   mitup: &launch-bot
     image: mitup-bot-dev
+    pull_policy: build
     depends_on:
       postgres:
         condition: service_healthy
