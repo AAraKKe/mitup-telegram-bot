@@ -373,12 +373,22 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             raise
 
         if not response.is_success:
-            log.error(
-                "GitLab alert post failed",
-                status_code=response.status_code,
-                response_body=response.text,
-            )
-            response.raise_for_status()
+            is_recovery = alarm.alarm_data.state.value == "OK"
+            if is_recovery and response.status_code == 400:
+                # GitLab returns 400 when a recovery post carries no matching open alert to resolve
+                # (the alarm went straight to OK without ever firing). This is benign — nothing to do.
+                log.warning(
+                    "GitLab has no open alert to resolve for this recovery",
+                    status_code=response.status_code,
+                    response_body=response.text,
+                )
+            else:
+                log.error(
+                    "GitLab alert post failed",
+                    status_code=response.status_code,
+                    response_body=response.text,
+                )
+                response.raise_for_status()
 
         log.info("Alarm action completed", alarm_name=alarm.alarm_data.alarm_name)
 

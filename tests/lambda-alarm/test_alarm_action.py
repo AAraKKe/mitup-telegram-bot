@@ -367,6 +367,49 @@ def test_non_2xx_response_propagates(
             handler(metric_alarm_event(), None)
 
 
+def test_recovery_400_is_tolerated(
+    mock_fetch_credentials: mock.MagicMock,
+):
+    """A 400 to a recovery post (state == "OK") means GitLab has no open alert to resolve: the
+    handler logs a warning and completes successfully instead of raising."""
+    no_open_alert_response = mock.MagicMock(name="httpx.Response")
+    no_open_alert_response.is_success = False
+    no_open_alert_response.status_code = 400
+    no_open_alert_response.text = ""
+
+    event = metric_alarm_event()
+    event["alarmData"]["state"]["value"] = "OK"
+
+    with mock.patch("mitup_bot.lambdas.alarm_action.httpx.post", return_value=no_open_alert_response):
+        with capture_logs(processors=[merge_contextvars]) as logs:
+            result = handler(event, None)
+
+    no_open_alert_response.raise_for_status.assert_not_called()
+    assert result == {"status": "ok", "alarm": "bot-errors"}
+
+    warnings = [log for log in logs if log["event"] == "GitLab has no open alert to resolve for this recovery"]
+    assert len(warnings) == 1
+    assert warnings[0]["log_level"] == "warning"
+    assert warnings[0]["status_code"] == 400
+
+
+def test_alarm_400_still_propagates(
+    mock_fetch_credentials: mock.MagicMock,
+):
+    """A 400 to an ALARM-state post is a genuine failure and still raises via raise_for_status."""
+    failing_response = mock.MagicMock(name="httpx.Response")
+    failing_response.is_success = False
+    failing_response.status_code = 400
+    failing_response.text = "bad request"
+    failing_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "Bad request", request=mock.MagicMock(), response=failing_response
+    )
+
+    with mock.patch("mitup_bot.lambdas.alarm_action.httpx.post", return_value=failing_response):
+        with pytest.raises(httpx.HTTPStatusError):
+            handler(metric_alarm_event(), None)
+
+
 def test_request_error_propagates(
     mock_fetch_credentials: mock.MagicMock,
     mock_post: mock.MagicMock,
