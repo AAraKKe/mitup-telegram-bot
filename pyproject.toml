@@ -207,6 +207,10 @@ mitup-rails-migration = { workspace = true }
 # on PATH — exactly as the old root package did.
 [tool.uv]
 default-groups = ["dev", "tools", "workspace"]
+# Never resolve a release younger than 7 days — transitive dependencies included. Renovate's
+# minimumReleaseAge (renovate.json) gates only the version it deliberately bumps; this gates
+# every lock resolution. Keep both windows in sync.
+exclude-newer = "7 days ago"
 
 [dependency-groups]
 tools = ["mb"]
@@ -229,7 +233,7 @@ dev = [
     "pytest-xdist~=3.8.0",
     "pytest-dotenv~=0.5.2",
     "pytest-json-report~=1.5.0",
-    "ty==0.0.60",
+    "ty==0.0.58",
     "freezegun~=1.5.5",
     "ruff==0.15.0",
     "boto3~=1.34",

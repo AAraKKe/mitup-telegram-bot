@@ -13,6 +13,7 @@
     "type::dependency-upgrade"
   ],
   "configMigration": true,
+  "minimumReleaseAge": "7 days",
   "packageRules": [
     {
       "matchDatasources": [
