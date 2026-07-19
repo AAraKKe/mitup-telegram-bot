@@ -229,12 +229,16 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1))], indirect=True
 )
-async def test_edit_meeting_no_limit_participants_works(
+async def test_edit_meeting_no_limit_participants_reports_cap_for_capped_owner(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    """Clearing the limit as a capped owner stores None but confirms the plan's cap, since the
+    effective capacity clamps there rather than becoming unlimited."""
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
@@ -251,6 +255,35 @@ async def test_edit_meeting_no_limit_participants_works(
     mock_session.assert_not_flushed()
     assert not meeting.max_members
 
+    response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants="20")
+    )
+    context.api.assert_send_message_called(update, response_view)
+    assert result is ConversationHandler.END
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1))], indirect=True
+)
+async def test_edit_meeting_no_limit_participants_reports_no_limit_for_uncapped_owner(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """An uncapped (Gamemaster) owner clearing the limit gets the true no-limit confirmation."""
+    user_with_settings.supporter_level = supporter.SupporterLevel.HOST_2
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 10
+
+    context, result = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, handler_context=handler_context
+    )
+
+    assert not meeting.max_members
     response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
         MeetingEditParticipantsMessages.MAX_SUCCESS.get(
             max_participants=MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user_with_settings.lang)
@@ -803,3 +836,27 @@ async def test_edit_meeting_wrong_max_participants_message_sends_main_menu_when_
         update,
         factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
     )
+
+
+def test_edit_max_participants_view_capped_owner_shows_plan_max(
+    user_with_settings: User, monkeypatch: pytest.MonkeyPatch
+):
+    """A capped owner is offered the plan's maximum, never a false "No limit"."""
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
+    meeting = user_with_settings.meetups[0]
+
+    view = edit_max_participants_view(meeting)
+
+    assert view.description == MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED.get(lang=meeting.lang, cap=20)
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS.get_text(lang=meeting.lang, cap=20)
+
+
+def test_edit_max_participants_view_uncapped_owner_shows_no_limit(user_with_settings: User):
+    """An uncapped (Gamemaster) owner keeps the true no-limit prompt and button."""
+    user_with_settings.supporter_level = supporter.SupporterLevel.HOST_2
+    meeting = user_with_settings.meetups[0]
+
+    view = edit_max_participants_view(meeting)
+
+    assert view.description == MeetingEditParticipantsMessages.MAX_PROMPT.get(lang=meeting.lang)
+    assert view.keyboard[0][0].text == ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get_text(lang=meeting.lang)

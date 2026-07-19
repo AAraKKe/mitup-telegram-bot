@@ -167,6 +167,9 @@ msgstr "Límite de personas"
 msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
 msgstr "Sin límite"
 
+msgid "ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS"
+msgstr "Máx. (${cap})"
+
 msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Expulsar"
 
@@ -487,6 +490,9 @@ msgstr "Aquí podrás gestionar los participantes de la quedada: puedes establec
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
 msgstr "Envíame el número máximo de miembros permitidos en la quedada (debe ser un número superior a 0) o selecciona <i>Sin límite</i> para permitir un número ilimitado de participantes."
+
+msgid "MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED"
+msgstr "Envíame el número máximo de miembros permitidos en la quedada (debe ser un número mayor que 0) o pulsa <i>Máx. (${cap})</i> para permitir el máximo de tu plan, ${cap} participantes."
 
 msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
 msgstr "Se ha establecido correctamente un máximo de <b>${max_participants}</b> participantes"

@@ -1,3 +1,4 @@
+from mitup_bot import limits
 from mitup_bot.callback_data import MeetingCallbackData
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
@@ -56,16 +57,27 @@ def edit_participants_view(meeting: Meetup) -> MitupView:
 
 
 def edit_max_participants_view(meeting: Meetup, fail: bool = False) -> MitupView:
+    # A capped owner never gets "unlimited": clearing the limit resolves to the plan's cap
+    # (see Meetup.effective_max_members), so the prompt and the button state the cap instead
+    # of promising a no-limit meeting.
+    cap = limits.participant_capacity(meeting.owner)
+    if fail:
+        description = MeetingEditParticipantsMessages.MAX_INVALID.get(lang=meeting.lang)
+    elif cap is None:
+        description = MeetingEditParticipantsMessages.MAX_PROMPT.get(lang=meeting.lang)
+    else:
+        description = MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED.get(lang=meeting.lang, cap=cap)
+    limit_button_text = (
+        ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get_text(lang=meeting.lang)
+        if cap is None
+        else ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS.get_text(lang=meeting.lang, cap=cap)
+    )
     return MitupView(
-        description=(
-            MeetingEditParticipantsMessages.MAX_INVALID.get(lang=meeting.lang)
-            if fail
-            else MeetingEditParticipantsMessages.MAX_PROMPT.get(lang=meeting.lang)
-        ),
+        description=description,
         keyboard=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get_text(lang=meeting.lang),
+                    text=limit_button_text,
                     callback_data=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(meeting.db_id),
                 ),
                 ButtonConfig(

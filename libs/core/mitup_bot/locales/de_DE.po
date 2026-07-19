@@ -164,6 +164,9 @@ msgstr "Max. Teilnehmer"
 msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
 msgstr "Unbegrenzt"
 
+msgid "ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS"
+msgstr "Max. (${cap})"
+
 msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Rausschmeißen"
 
@@ -393,6 +396,9 @@ msgstr "Hier kannst du die Teilnehmer des Treffens verwalten: du kannst die maxi
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
 msgstr "Sende mir die maximale Anzahl der im Treffen zulässigen Mitglieder (muss eine Zahl größer als 0 sein) oder drücke auf <i>Unbegrenzt</i>, um eine unbegrenzte Anzahl von Teilnehmern zu erlauben."
+
+msgid "MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED"
+msgstr "Sende mir die maximale Teilnehmerzahl für das Treffen (muss eine Zahl größer als 0 sein) oder tippe auf <i>Max. (${cap})</i>, um das Maximum deines Plans von ${cap} Teilnehmern zu erlauben."
 
 msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
 msgstr "Die maximale Anzahl der Teilnehmer wurde auf <b>${max_participants}</b> eingestellt"

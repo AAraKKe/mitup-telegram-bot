@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
 
-from mitup_bot import guards
+from mitup_bot import guards, limits
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
@@ -115,9 +115,12 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
 
     meeting.max_members = None
 
-    no_limit_text = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user.lang)
+    # A capped owner's cleared limit resolves to the plan's cap (Meetup.effective_max_members),
+    # so the confirmation states that number rather than claiming no limit.
+    cap = limits.participant_capacity(meeting.owner)
+    limit_text = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user.lang) if cap is None else str(cap)
     response_view = edit_participants_view(meeting).with_context(
-        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=no_limit_text)
+        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=limit_text)
     )
 
     await context.api.send_message(update=update, view=response_view)

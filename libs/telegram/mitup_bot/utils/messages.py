@@ -112,6 +112,8 @@ class ButtonMessages(MessageBase):
     MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"
     MEETING_MAX_PARTICIPANTS = "Max participants"
     MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
+    # Replaces MEETING_NO_LIMIT_PARTICIPANTS for owners whose plan caps participant capacity.
+    MEETING_MAX_CAP_PARTICIPANTS = "Max (${cap})"
     MEETING_KICK_OUT = "Kick out"
     DELETE_DATE = f"{Emojis.DELETE} Delete date"
     DELETE_DURATION = f"{Emojis.DELETE} Delete duration"
@@ -595,6 +597,12 @@ class MeetingEditParticipantsMessages(MessageBase):
     MAX_PROMPT = (
         "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) "
         "or press in <i>No limit</i> to allow an unlimited number of participants."
+    )
+    # Shown instead of MAX_PROMPT when the owner's plan caps participant capacity: promising
+    # "unlimited" would be false, since the effective capacity clamps to the plan's cap.
+    MAX_PROMPT_CAPPED = (
+        "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) "
+        "or press <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
     )
     MAX_SUCCESS = "Max participants set to: <b>${max_participants}</b>"
     NO_LIMIT_LABEL = "No limit"
