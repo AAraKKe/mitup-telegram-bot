@@ -236,15 +236,31 @@ def test_invoke_lambda_fails_on_execution_and_error_is_logged(capsys: pytest.Cap
 
 def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
     family, image, role, task_arn = "MyTask", "MyNewImage", "SomeRoleArn", "MyTaskArn"
-    container_definitions = [{"image": "SomePreviousImage"}]
+    # A sidecar ahead of the app container mirrors the real task definitions, where an init
+    # container sits at index 0 and only the container named after the family takes the new image.
+    container_definitions = [
+        {"name": "init", "image": "InitImage"},
+        {"name": family, "image": "SomePreviousImage"},
+    ]
+    volumes = [{"name": "shared-volume", "host": {}}]
 
     context = DeploymentContext(
         describe_task_responses=[
             {
                 "taskDefinition": {
+                    "family": family,
                     "containerDefinitions": container_definitions,
                     "executionRoleArn": role,
+                    "taskRoleArn": "SomeTaskRoleArn",
+                    "networkMode": "bridge",
+                    "volumes": volumes,
+                    # Response-only metadata that RegisterTaskDefinition rejects:
                     "taskDefinitionArn": task_arn,
+                    "revision": 19,
+                    "status": "ACTIVE",
+                    "requiresAttributes": [{"name": "ecs.capability.task-iam-role"}],
+                    "compatibilities": ["EC2"],
+                    "registeredAt": "2026-01-01T00:00:00Z",
                 }
             }
         ],
@@ -260,8 +276,19 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
         result = deploy_ops.register_task_definition(ecs, family, image)
 
     context.assert_ecs_called("describe_task_definition", taskDefinition=family)
+    # The definition passes through wholesale — volumes, roles and network mode included, the
+    # response-only metadata stripped — with the new image only on the app container.
     context.assert_ecs_called(
-        "register_task_definition", family=family, containerDefinitions=container_definitions, executionRoleArn=role
+        "register_task_definition",
+        family=family,
+        containerDefinitions=[
+            {"name": "init", "image": "InitImage"},
+            {"name": family, "image": image},
+        ],
+        executionRoleArn=role,
+        taskRoleArn="SomeTaskRoleArn",
+        networkMode="bridge",
+        volumes=volumes,
     )
     assert result == task_arn
     output = combined(capsys)
@@ -271,7 +298,7 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
 
 def test_register_task_definition_when_failing(capsys: pytest.CaptureFixture[str]):
     family, image, role, task_arn = "MyTask", "MyNewImage", "SomeRoleArn", "MyTaskArn"
-    container_definitions = [{"image": "SomePreviousImage"}]
+    container_definitions = [{"name": family, "image": "SomePreviousImage"}]
 
     context = DeploymentContext(
         describe_task_responses=[
@@ -295,10 +322,10 @@ def test_register_task_definition_when_failing(capsys: pytest.CaptureFixture[str
     assert "✗ Error registering task definition for 'MyTask': [StatusCode: 404]" in output
 
 
-def task_definition_response_factory(container_definitions=True, execution_role=True):
-    response = {"taskDefinition": {}}
+def task_definition_response_factory(container_definitions=True, execution_role=True, container_name="MyTask"):
+    response: dict[str, dict[str, Any]] = {"taskDefinition": {"family": "MyTask"}}
     if container_definitions:
-        response["taskDefinition"]["containerDefinitions"] = [{"image": "MyNewImage"}]
+        response["taskDefinition"]["containerDefinitions"] = [{"name": container_name, "image": "MyNewImage"}]
     if execution_role:
         response["taskDefinition"]["executionRoleArn"] = "role"
     return response
@@ -323,6 +350,10 @@ def register_task_response_factory(status_code=True, revision=True, arn=True):
             "register_task_responses": [register_task_response_factory()],
         },
         {
+            "describe_task_responses": [task_definition_response_factory(container_name="sidecar-only")],
+            "register_task_responses": [register_task_response_factory()],
+        },
+        {
             "describe_task_responses": [task_definition_response_factory(execution_role=False)],
             "register_task_responses": [register_task_response_factory()],
         },
@@ -341,6 +372,7 @@ def register_task_response_factory(status_code=True, revision=True, arn=True):
     ],
     ids=[
         "missing_container_definitions",
+        "missing_app_container",
         "missing_execution_role",
         "missing_status_code",
         "missing_revision",

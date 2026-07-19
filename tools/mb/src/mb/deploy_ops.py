@@ -3,11 +3,12 @@ import json
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from typing import cast
 
 import boto3
 import typer
 from mypy_boto3_ecs import ECSClient
-from mypy_boto3_ecs.type_defs import ServiceDeploymentTypeDef
+from mypy_boto3_ecs.type_defs import RegisterTaskDefinitionRequestTypeDef, ServiceDeploymentTypeDef
 from mypy_boto3_lambda import LambdaClient
 from mypy_boto3_lambda.type_defs import FunctionConfigurationTypeDef
 
@@ -35,6 +36,21 @@ DEPLOYMENT_STATUS_STYLES = {
     "ROLLBACK_FAILED": "red",
 }
 LIFECYCLE_STAGE_STYLES = {"BAKE_TIME": "bold bright_blue"}
+
+# DescribeTaskDefinition returns these read-only metadata keys about the stored revision;
+# RegisterTaskDefinition rejects them, so they are stripped before re-registering.
+TASK_DEFINITION_RESPONSE_ONLY_KEYS = frozenset(
+    {
+        "compatibilities",
+        "deregisteredAt",
+        "registeredAt",
+        "registeredBy",
+        "requiresAttributes",
+        "revision",
+        "status",
+        "taskDefinitionArn",
+    }
+)
 
 
 def column_label(value: str) -> str:
@@ -124,21 +140,31 @@ def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> 
     console.info(f"Registering task definition {family!r}...")
     console.info(f"ECR image: {image}")
 
-    task_def = ecs_client.describe_task_definition(taskDefinition=family)
-    if (containers_definition := task_def["taskDefinition"].get("containerDefinitions")) is None:
+    task_def = ecs_client.describe_task_definition(taskDefinition=family)["taskDefinition"]
+    if (containers_definition := task_def.get("containerDefinitions")) is None:
         console.error(f"Task definition {family!r} does not have any container definitions")
         raise typer.Abort()
 
-    containers_definition[0]["image"] = image
-    if (execution_role := task_def["taskDefinition"].get("executionRoleArn")) is None:
+    # The application container is the one named after the family; the task definition also
+    # carries sidecars (e.g. the OpenTelemetry init container) whose images must stay untouched.
+    app_container = next((container for container in containers_definition if container.get("name") == family), None)
+    if app_container is None:
+        console.error(f"Task definition {family!r} does not have a container named {family!r}")
+        raise typer.Abort()
+    app_container["image"] = image
+
+    if task_def.get("executionRoleArn") is None:
         console.error(f"Task definition {family!r} does not have an execution role")
         raise typer.Abort()
 
-    response = ecs_client.register_task_definition(
-        family=family,
-        containerDefinitions=containers_definition,
-        executionRoleArn=execution_role,
+    # Re-register the described definition wholesale, minus the response-only metadata keys, so
+    # every setting beyond the image — volumes, networkMode, taskRoleArn — carries over. The cast
+    # is sound because the filtered description keys are a subset of the request shape.
+    request = cast(
+        "RegisterTaskDefinitionRequestTypeDef",
+        {key: value for key, value in task_def.items() if key not in TASK_DEFINITION_RESPONSE_ONLY_KEYS},
     )
+    response = ecs_client.register_task_definition(**request)
     if (status_code := response["ResponseMetadata"].get("HTTPStatusCode")) is None:
         console.error(f"Failed to get status code for registering task definition {family!r}")
         raise typer.Abort()
