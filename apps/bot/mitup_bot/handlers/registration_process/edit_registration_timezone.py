@@ -12,10 +12,9 @@ from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import PrivacyMessages, RegistrationMessages
-from mitup_bot.views import factory
 
 from .enums import REGISTRATION_HANDLERS_GROUP, ConversationRegistrationProcessState, RegistrationProcessHandlerId
-from .utils import claim_update, get_or_create_onboarding_user
+from .utils import claim_update, get_or_create_onboarding_user, registration_complete_view
 
 log = structlog.get_logger(__name__)
 
@@ -98,8 +97,7 @@ async def registration_timezone_text_message_handler(
     # is a no-op for them.
     user.status = UserStatus.MEMBER
 
-    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone, lang=user.lang)
-    view = factory.main_menu_view(guards.render_context(user, update, context)).with_context(message)
+    view = registration_complete_view(user, update, context)
 
     await context.api.send_message(update=update, view=view)
 
@@ -144,8 +142,7 @@ async def registration_timezone_location_message_handler(
     # is a no-op for them.
     user.status = UserStatus.MEMBER
 
-    message = RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=user.settings.timezone, lang=user.lang)
-    view = factory.main_menu_view(guards.render_context(user, update, context)).with_context(message)
+    view = registration_complete_view(user, update, context)
 
     await context.api.send_message(update=update, view=view)
 

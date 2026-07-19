@@ -201,7 +201,7 @@ msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Riattiva incontro"
 
 msgid "MainMenuMessages.DESCRIPTION"
-msgstr "Benvenuto in Mitup Bot!\n\nScegli una delle seguenti opzioni:"
+msgstr "Ti diamo il benvenuto su Mitup Bot!"
 
 msgid "SettingsMessages.DESCRIPTION"
 msgstr "Configura MitUp."
@@ -214,9 +214,6 @@ msgstr "Il tuo fuso orario è stato impostato a: <b>${timezone}</b>"
 
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Benvenuto in Mitup Bot ${first_name}!\n\nInizziamo impostando il tuo fuso orario. Inviami il nome della tua città o, per un risultato più accurato, la tua posizione premendo su 📎 e selezionando Posizione.\n\n<b>Importante</b>: non memorizziamo la tua posizione e questa informazione viene utilizzata solo per configurare il tuo fuso orario."
-
-msgid "RegistrationMessages.TIMEZONE_SUCCESS"
-msgstr "Il tuo fuso orario è ${timezone}"
 
 msgid "RegistrationMessages.TIMEZONE_FAIL"
 msgstr "Mi dispiace, non ho potuto impostare il tuo fuso orario. Per favore, riprova."
@@ -1003,3 +1000,9 @@ msgstr "Quella data è a più di ${days} giorni, il massimo che puoi pianificare
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
 msgstr "Quella data è a più di ${days} giorni, il massimo che pianifica il tuo piano Gamemaster. Invia di nuovo il titolo del tuo incontro con una data più vicina, oppure diventa Commissioner su Patreon per pianificare quanto lontano vuoi. Trovi tutti i dettagli in Collabora, qui sotto."
+
+msgid "RegistrationMessages.REGISTRATION_COMPLETE"
+msgstr "<b>Tutto pronto, ti diamo il benvenuto su Mitup!</b> Il tuo fuso orario è ${timezone} e il bot è pronto per te.\n\nTutto quello che ti serve per creare incontri e partecipare ad altri è nel menu qui sotto, e la ${user_guide} spiega come funziona tutto.\n\nSe Mitup ti aiuta a riunire le persone, puoi supportarlo quando vuoi tramite Collabora."
+
+msgid "RegistrationMessages.USER_GUIDE_LABEL"
+msgstr "guida utente"

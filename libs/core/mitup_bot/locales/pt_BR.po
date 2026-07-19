@@ -195,7 +195,7 @@ msgid "ButtonMessages.REACTIVATE_MEETING"
 msgstr "Reativar evento"
 
 msgid "MainMenuMessages.DESCRIPTION"
-msgstr "Bem-vindo ao Mitup Bot!\n\n"
+msgstr "Boas-vindas ao Mitup Bot!"
 "Escolha uma das opções abaixo:"
 
 msgid "SettingsMessages.DESCRIPTION"
@@ -212,9 +212,6 @@ msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Bem-vindo ao Mitup Bot ${first_name}!\n\n"
 "Vamos começar definindo seu fuso horário. Envie o nome da sua cidade ou, para um resultado mais preciso, sua localização pressionando em 📎 e selecionando Localização.\n\n"
 "<b>Importante</b>: não armazenamos sua localização e essa informação é usada apenas para configurar seu fuso horário."
-
-msgid "RegistrationMessages.TIMEZONE_SUCCESS"
-msgstr "Seu fuso horário está definido para ${timezone}"
 
 msgid "RegistrationMessages.TIMEZONE_FAIL"
 msgstr "Desculpe, não consegui definir seu fuso horário. Por favor, tente novamente."
@@ -1033,3 +1030,9 @@ msgstr "Essa data está a mais de ${days} dias, o máximo que você pode agendar
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
 msgstr "Essa data está a mais de ${days} dias, o máximo que seu plano Gamemaster agenda. Envie o título do seu evento novamente com uma data mais próxima, ou vire Commissioner no Patreon para agendar o quanto quiser. Você encontra todos os detalhes no Colabore, logo abaixo."
+
+msgid "RegistrationMessages.REGISTRATION_COMPLETE"
+msgstr "<b>Tudo pronto, boas-vindas ao Mitup!</b> Seu fuso horário é ${timezone} e o bot está pronto para você.\n\nTudo o que você precisa para criar eventos e participar de outros está no menu abaixo, e o ${user_guide} explica como tudo funciona.\n\nSe o Mitup ajudar você a reunir as pessoas, você pode apoiá-lo quando quiser pelo Colabore."
+
+msgid "RegistrationMessages.USER_GUIDE_LABEL"
+msgstr "guia do usuário"

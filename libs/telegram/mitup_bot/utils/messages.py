@@ -153,7 +153,8 @@ class ButtonMessages(MessageBase):
 
 
 class MainMenuMessages(MessageBase):
-    DESCRIPTION = "Welcome to Mitup Bot!\n\nChoose one of the following options:"
+    # No "choose an option" prompt: the keyboard below IS the menu, not a follow-up to the text.
+    DESCRIPTION = "Welcome to Mitup Bot!"
 
 
 class HelpMessages(MessageBase):
@@ -275,7 +276,18 @@ class RegistrationMessages(MessageBase):
         "<b>Important</b>: we do not store your location and this information is only used to "
         "configure your timezone."
     )
-    TIMEZONE_SUCCESS = "Your timezone is ${timezone}"
+    # Registration completion: IS the main-menu message (passed as `message=` to main_menu_view),
+    # so the Collaborate mention points at a button visible right below and no second welcome or
+    # menu prompt follows. `${user_guide}` receives a linked "user guide" label (USER_GUIDE_LABEL).
+    REGISTRATION_COMPLETE = (
+        "<b>You're all set, welcome to Mitup!</b> Your timezone is set to ${timezone} and the bot "
+        "is ready for you.\n\n"
+        "Everything you need to create meetings and join others is in the menu below, and the "
+        "${user_guide} explains how it all works.\n\n"
+        "If Mitup helps you bring people together, you can support it anytime through Collaborate."
+    )
+    # Label for the inline user-guide link embedded in REGISTRATION_COMPLETE.
+    USER_GUIDE_LABEL = "user guide"
     TIMEZONE_FAIL = "I'm sorry, I couldn't set your timezone. Please, try again."
     # Fallback shown during registration when a non-text, non-location message is sent
     TIMEZONE_INVALID_INPUT = "Please send your city name as text or share your location."

@@ -219,7 +219,7 @@ msgid "ButtonMessages.HOSTS_GROUP_OPEN"
 msgstr "👥 Abrir el Grupo solo para Hosts"
 
 msgid "MainMenuMessages.DESCRIPTION"
-msgstr "¡Bienvenido a MitUp Bot!\n\n"
+msgstr "¡Te damos la bienvenida a Mitup Bot!"
 "Elige una de las siguientes opciones:"
 
 msgid "SettingsMessages.DESCRIPTION"
@@ -236,9 +236,6 @@ msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "¡Bienvenido a MitUp Bot ${first_name}!\n\n"
 "Vamos a comenzar configurando tu zona horaria. Envíame el nombre de tu ciudad o, para un mejor resultado, tu ubicación tocando en 📎 y seleccionando Ubicación.\n\n"
 "<b>Importante</b>: no guardamos tu ubicación y solo se utiliza para encontrar la zona horaria."
-
-msgid "RegistrationMessages.TIMEZONE_SUCCESS"
-msgstr "¡Perfecto! Tu zona horaria es ${timezone}"
 
 msgid "RegistrationMessages.TIMEZONE_FAIL"
 msgstr "Lo siento, no pude establecer tu zona horaria. Por favor, inténtalo de nuevo."
@@ -1030,3 +1027,9 @@ msgstr "Esa fecha está a más de ${days} días, lo más lejos que puedes progra
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
 msgstr "Esa fecha está a más de ${days} días, lo más lejos que programa tu plan Gamemaster. Envía el título de tu quedada de nuevo con una fecha más cercana, o pásate a Commissioner en Patreon para programar tan lejos como quieras. Tienes todos los detalles en Colabora, justo debajo."
+
+msgid "RegistrationMessages.REGISTRATION_COMPLETE"
+msgstr "<b>¡Todo listo, te damos la bienvenida a Mitup!</b> Tu zona horaria es ${timezone} y el bot está preparado para ti.\n\nTodo lo que necesitas para crear quedadas y unirte a otras está en el menú de abajo, y la ${user_guide} explica cómo funciona todo.\n\nSi Mitup te ayuda a reunir a la gente, puedes apoyarlo cuando quieras desde Colabora."
+
+msgid "RegistrationMessages.USER_GUIDE_LABEL"
+msgstr "guía de usuario"

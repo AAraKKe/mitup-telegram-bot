@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-19 16:22\n"
+"PO-Revision-Date: 2026-07-19 16:41\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -237,7 +237,7 @@ msgid "ButtonMessages.HOSTS_GROUP_OPEN"
 msgstr "👥 Open the Hosts-Only Group"
 
 msgid "MainMenuMessages.DESCRIPTION"
-msgstr "Welcome to Mitup Bot!\n\nChoose one of the following options:"
+msgstr "Welcome to Mitup Bot!"
 
 msgid "HelpMessages.DESCRIPTION"
 msgstr "<b>Help</b>\n\nThere are two ways to get help with Mitup. The user guide walks you through how Mitup works, page by page, and is the best place to start. If you still have a question or need to reach a person, email us at support@mitup.social."
@@ -311,8 +311,11 @@ msgstr "Free meetings can host up to ${cap} participants. Send a lower number, o
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."
 
-msgid "RegistrationMessages.TIMEZONE_SUCCESS"
-msgstr "Your timezone is ${timezone}"
+msgid "RegistrationMessages.REGISTRATION_COMPLETE"
+msgstr "<b>You're all set, welcome to Mitup!</b> Your timezone is set to ${timezone} and the bot is ready for you.\n\nEverything you need to create meetings and join others is in the menu below, and the ${user_guide} explains how it all works.\n\nIf Mitup helps you bring people together, you can support it anytime through Collaborate."
+
+msgid "RegistrationMessages.USER_GUIDE_LABEL"
+msgstr "user guide"
 
 msgid "RegistrationMessages.TIMEZONE_FAIL"
 msgstr "I'm sorry, I couldn't set your timezone. Please, try again."

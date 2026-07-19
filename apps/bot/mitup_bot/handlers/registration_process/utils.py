@@ -6,9 +6,15 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ApplicationHandlerStop
 
+from mitup_bot import docs_links, guards
 from mitup_bot.exceptions import EffectiveUserNotSet
+from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Settings, User
 from mitup_bot.translations import locale_for_language_code
+from mitup_bot.utils.entities import Link, render
+from mitup_bot.utils.messages import RegistrationMessages
+from mitup_bot.views import factory
+from mitup_bot.views.mitup_view import MitupView
 
 
 def claim_update[**P](
@@ -55,3 +61,19 @@ async def get_or_create_onboarding_user(session: AsyncSession, update: Update) -
     )
     session.add(new_user)
     return new_user
+
+
+def registration_complete_view(user: User, update: Update, context: TMitupContext) -> MitupView:
+    """Main-menu view whose description is the registration-complete welcome.
+
+    One cohesive message: the welcome, the timezone confirmation, an inline link to the user
+    guide, and the Collaborate pointer, with the main-menu keyboard (Collaborate included)
+    directly below.
+    """
+    user_guide_link = render(
+        t"{Link(RegistrationMessages.USER_GUIDE_LABEL.get_text(lang=user.lang), docs_links.user_guide_url())}"
+    )
+    message = RegistrationMessages.REGISTRATION_COMPLETE.get(
+        timezone=user.settings.timezone, user_guide=user_guide_link, lang=user.lang
+    )
+    return factory.main_menu_view(guards.render_context(user, update, context), message=message)

@@ -189,7 +189,7 @@ msgid "ButtonMessages.MEETING_DURATION"
 msgstr "⌛ Treffendauer"
 
 msgid "MainMenuMessages.DESCRIPTION"
-msgstr "Willkommen bei Mitup Bot!\n\n"
+msgstr "Willkommen bei Mitup Bot!"
 "Wähle eine der folgenden Optionen:"
 
 msgid "SettingsMessages.DESCRIPTION"
@@ -206,9 +206,6 @@ msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Willkommen bei Mitup Bot ${first_name}!\n\n"
 "Beginnen wir mit der Einstellung deiner Zeitzone. Sende mir den Namen deiner Stadt oder, für ein genaueres Ergebnis, deinen Standort, indem du auf 📎 drückst und den Ort wählst.\n\n"
 "<b>Wichtig</b>: Wir speichern deinen Standort nicht und diese Information wird nur zur Konfiguration deiner Zeitzone verwendet."
-
-msgid "RegistrationMessages.TIMEZONE_SUCCESS"
-msgstr "Deine Zeitzone ist ${timezone}"
 
 msgid "RegistrationMessages.TIMEZONE_FAIL"
 msgstr "Es tut mir leid, ich konnte deine Zeitzone nicht festlegen. Bitte versuche es erneut."
@@ -1033,3 +1030,9 @@ msgstr "Dieses Datum liegt mehr als ${days} Tage voraus, weiter kannst du vorers
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
 msgstr "Dieses Datum liegt mehr als ${days} Tage voraus, weiter plant dein Gamemaster-Plan nicht. Sende den Titel deines Treffens noch einmal mit einem früheren Datum, oder werde Commissioner auf Patreon, um so weit zu planen, wie du möchtest. Alle Details findest du direkt unten unter Mithelfen."
+
+msgid "RegistrationMessages.REGISTRATION_COMPLETE"
+msgstr "<b>Alles bereit, willkommen bei Mitup!</b> Deine Zeitzone ist ${timezone} und der Bot ist startklar für dich.\n\nAlles, was du brauchst, um Treffen zu erstellen und anderen beizutreten, findest du im Menü unten, und die ${user_guide} erklärt, wie alles funktioniert.\n\nWenn Mitup dir hilft, Leute zusammenzubringen, kannst du es jederzeit über Mithelfen unterstützen."
+
+msgid "RegistrationMessages.USER_GUIDE_LABEL"
+msgstr "Anleitung"

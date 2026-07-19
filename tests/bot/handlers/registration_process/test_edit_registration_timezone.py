@@ -15,9 +15,21 @@ from mitup_bot.handlers.registration_process.enums import ConversationRegistrati
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import RegistrationMessages
+from mitup_bot.utils.entities import Link, render
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import StubMitupContext, UpdateRequest, claimed_state, create_user
 from tests.helpers.stub_db import MockDbSession
+
+
+def expected_registration_complete_view(timezone: str, lang: str) -> MitupView:
+    """Expected completion view built independently of the handler helper: the welcome as the
+    main-menu message with an inline user-guide link pointing at the production docs site."""
+    user_guide_link = render(
+        t"{Link(RegistrationMessages.USER_GUIDE_LABEL.get_text(lang=lang), 'https://mitup.social/user-guide/')}"
+    )
+    message = RegistrationMessages.REGISTRATION_COMPLETE.get(timezone=timezone, user_guide=user_guide_link, lang=lang)
+    return factory.main_menu_view(RenderContext(lang=lang), message=message)
 
 
 @pytest.fixture
@@ -71,9 +83,8 @@ async def test_registration_timezone_text_message_handler_sets_timezone_and_ends
 
     result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
-    view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone=update.effective_message.text, lang=user_with_settings.lang)
-    )
+    assert update.effective_message.text is not None
+    view = expected_registration_complete_view(update.effective_message.text, user_with_settings.lang)
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == update.effective_message.text
     context.api.assert_send_message_called(update, view)
@@ -112,9 +123,7 @@ async def test_registration_timezone_location_message_handler_sets_timezone_and_
 
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
-    view = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-        RegistrationMessages.TIMEZONE_SUCCESS.get(timezone="Europe/Madrid", lang=user_with_settings.lang)
-    )
+    view = expected_registration_complete_view("Europe/Madrid", user_with_settings.lang)
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == "Europe/Madrid"
     context.api.assert_send_message_called(update, view)
