@@ -24,7 +24,7 @@ from mitup_bot.views.collaborate import supporter_upsell_view
 
 from ..utils import scheduling_horizon_rejection
 from .enums import ConversationMeetingState, EditMeetingHandlerId
-from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, safe_anchor_date, to_utc
+from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, prepend_error, safe_anchor_date, to_utc
 
 # This module manages the start-time editing sub-flow for a meeting.
 #
@@ -86,14 +86,14 @@ def prepend_end_cleared_notice(*, lang: str, base_message: str | FormattedText) 
     return MeetingEditDateTimeMessages.END_CLEARED_BY_START.get(lang=lang).append("\n\n").append(base_message)
 
 
-async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting: Meetup) -> ConversationMeetingState:
-    lang = meeting.lang
-    context.store_meeting_id(ContextId.EDIT_MEETING_TIME, meeting.db_id)
-    context.store_on_exit(
-        ContextId.EDIT_MEETING_TIME,
-        MeetingEditDateTimeMessages.ON_EXIT.get(lang=lang),
-        cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
-    )
+def build_edit_time_prompt_view(meeting: Meetup, lang: str, *, error: str | FormattedText | None = None) -> MitupView:
+    """Build the start-time HH:MM prompt view (Cancel button).
+
+    A date-first flow (``meeting.datetime`` still unset) leads with the 23:59-default note. When
+    ``error`` is given it is prepended as a leading paragraph, so a message that failed validation
+    can be answered by resending this prompt with the error on top rather than a bare, button-less
+    error.
+    """
     description: str | FormattedText = CommonMessages.TIME_PROMPT.get(lang=lang)
     if meeting.datetime is None:
         description = (
@@ -101,7 +101,9 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
             .append("\n\n")
             .append(CommonMessages.TIME_PROMPT.get(lang=lang))
         )
-    view = MitupView(
+    if error is not None:
+        description = prepend_error(description, error)
+    return MitupView(
         description=description,
         keyboard=[
             [
@@ -112,7 +114,17 @@ async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting:
             ]
         ],
     )
-    await context.api.edit_message(update=update, view=view)
+
+
+async def show_edit_time_prompt(context: TMitupContext, update: Update, meeting: Meetup) -> ConversationMeetingState:
+    lang = meeting.lang
+    context.store_meeting_id(ContextId.EDIT_MEETING_TIME, meeting.db_id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_TIME,
+        MeetingEditDateTimeMessages.ON_EXIT.get(lang=lang),
+        cb.CANCEL_EDIT_START_TIME.with_id(meeting.db_id),
+    )
+    await context.api.edit_message(update=update, view=build_edit_time_prompt_view(meeting, lang))
     return ConversationMeetingState.EDIT_TIME
 
 
@@ -156,7 +168,15 @@ async def callback_query_date_time_entry(
     return ConversationMeetingState.EDIT_DATETIME
 
 
-def build_edit_datetime_entry_view(meeting: Meetup, lang: str, today: dt.date) -> MitupView:
+def build_edit_datetime_entry_view(
+    meeting: Meetup, lang: str, today: dt.date, *, error: str | FormattedText | None = None
+) -> MitupView:
+    """Build the start datetime entry view (Date / Time buttons + When back button).
+
+    When ``error`` is given it is prepended as a leading paragraph, so a message that failed
+    validation can be answered by resending this prompt with the error on top rather than a
+    bare, button-less error.
+    """
     meeting_id = meeting.db_id
     datetime_link = build_datetime_link()
     keyboard: list[list[ButtonConfig]] = [
@@ -171,8 +191,13 @@ def build_edit_datetime_entry_view(meeting: Meetup, lang: str, today: dt.date) -
             ),
         ],
     ]
+    description: str | FormattedText = MeetingEditDateTimeMessages.DESCRIPTION.get(
+        lang=lang, datetime_link=datetime_link
+    )
+    if error is not None:
+        description = prepend_error(description, error)
     return MitupView(
-        description=MeetingEditDateTimeMessages.DESCRIPTION.get(lang=lang, datetime_link=datetime_link),
+        description=description,
         keyboard=keyboard,
     ).with_back_button(ButtonMessages.WHEN, lang, cb.CANCEL_EDIT_START_TIME.with_id(meeting_id))
 
@@ -450,7 +475,7 @@ async def date_time_entity_message_handler(
     unix_time = date_entity.unix_time
     assert unix_time is not None, "date_time entity must carry unix_time"
 
-    with context.meeting_id(ContextId.EDIT_MEETING_TIME) as meeting_id:
+    with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
         meeting = await guards.meeting_accessible(
             session, current_user, meeting_id, "Set datetime from entity", update, context
@@ -460,7 +485,10 @@ async def date_time_entity_message_handler(
             return ConversationHandler.END
 
         if error := validate_start_datetime(unix_time, meeting, current_user.lang):
-            await context.api.send_message(update=update, view=error)
+            today = meeting.owner.now_in_tz().date()
+            await context.api.send_message(
+                update=update, view=build_edit_datetime_entry_view(meeting, current_user.lang, today, error=error)
+            )
             return ConversationMeetingState.EDIT_DATETIME
 
         # The horizon rejection is checked apart from the other validations so it can carry the
@@ -494,6 +522,7 @@ async def date_time_entity_message_handler(
         await context.api.update_meeting_messages(meeting=meeting)
 
         context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "datetime"})
+        cleanup_states(context)
         return ConversationHandler.END
 
 
@@ -508,30 +537,31 @@ async def set_time_message_handler(
 ) -> ConversationMeetingState | int:
     time_info = cast(Match, context.match).groupdict()
 
-    if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
+    with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        await context.api.send_message(
-            update=update,
-            view=CommonMessages.TIME_INVALID_VALUE.get(lang=current_user.lang),
-        )
-        context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
-        return ConversationMeetingState.EDIT_TIME
-
-    with context.meeting_id(ContextId.EDIT_MEETING_TIME) as meeting_id:
-        current_user = await guards.current_user(update, session)
-
-        user_time = dt.time(int(time_info["hour"]), int(time_info["minutes"]), tzinfo=current_user.settings.tz)
-
         meeting = await guards.meeting_accessible(session, current_user, meeting_id, "Set time", update, context)
 
         if meeting is None:
             return ConversationHandler.END
 
+        if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
+            await context.api.send_message(
+                update=update,
+                view=build_edit_time_prompt_view(
+                    meeting, current_user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=current_user.lang)
+                ),
+            )
+            context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
+            return ConversationMeetingState.EDIT_TIME
+
+        user_time = dt.time(int(time_info["hour"]), int(time_info["minutes"]), tzinfo=current_user.settings.tz)
         date_to_set = current_user.datetime_in_tz(meeting.datetime or dt.datetime.now(dt.UTC)).date()
         proposed_start = dt.datetime.combine(date_to_set, user_time).astimezone(dt.UTC)
 
         if error := validate_start_datetime(proposed_start, meeting, current_user.lang):
-            await context.api.send_message(update=update, view=error)
+            await context.api.send_message(
+                update=update, view=build_edit_time_prompt_view(meeting, current_user.lang, error=error)
+            )
             return ConversationMeetingState.EDIT_TIME
 
         meeting.datetime = proposed_start
@@ -553,20 +583,29 @@ async def set_time_message_handler(
         await context.api.update_meeting_messages(meeting=meeting)
 
         context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "datetime"})
+        cleanup_states(context)
         return ConversationHandler.END
 
 
-async def fallback_answer(session: AsyncSession, update: Update, context: TMitupContext) -> ConversationMeetingState:
-    current_user = await guards.current_user(update, session)
+async def fallback_answer(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationMeetingState | int:
+    with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
+        current_user = await guards.current_user(update, session)
+        meeting = await guards.meeting_accessible(
+            session, current_user, meeting_id, "Wrong time input", update, context
+        )
+        if meeting is None:
+            return ConversationHandler.END
 
-    await context.api.send_message(
-        update=update,
-        view=CommonMessages.TIME_INVALID_FORMAT.get(lang=current_user.lang),
-    )
-
-    context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
-
-    return ConversationMeetingState.EDIT_TIME
+        await context.api.send_message(
+            update=update,
+            view=build_edit_time_prompt_view(
+                meeting, current_user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=current_user.lang)
+            ),
+        )
+        context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
+        return ConversationMeetingState.EDIT_TIME
 
 
 @HandlersRegistry.register_message(
@@ -577,7 +616,7 @@ async def fallback_answer(session: AsyncSession, update: Update, context: TMitup
 @with_session
 async def wrong_message_sent_for_time(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationMeetingState:
+) -> ConversationMeetingState | int:
     return await fallback_answer(session, update, context)
 
 
@@ -589,23 +628,28 @@ async def wrong_message_sent_for_time(
 @with_session
 async def wrong_message_type_sent_for_time(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationMeetingState:
+) -> ConversationMeetingState | int:
     return await fallback_answer(session, update, context)
 
 
 async def datetime_state_fallback_answer(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationMeetingState:
-    current_user = await guards.current_user(update, session)
+) -> ConversationMeetingState | int:
+    with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
+        current_user = await guards.current_user(update, session)
+        meeting = await guards.meeting_accessible(
+            session, current_user, meeting_id, "Wrong datetime input", update, context
+        )
+        if meeting is None:
+            return ConversationHandler.END
 
-    await context.api.send_message(
-        update=update,
-        view=CommonMessages.DATETIME_INVALID.get(lang=current_user.lang, datetime_link=build_datetime_link()),
-    )
-
-    context.emit_metric(MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), 1)
-
-    return ConversationMeetingState.EDIT_DATETIME
+        today = meeting.owner.now_in_tz().date()
+        error = CommonMessages.DATETIME_INVALID.get(lang=current_user.lang, datetime_link=build_datetime_link())
+        await context.api.send_message(
+            update=update, view=build_edit_datetime_entry_view(meeting, current_user.lang, today, error=error)
+        )
+        context.emit_metric(MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), 1)
+        return ConversationMeetingState.EDIT_DATETIME
 
 
 @HandlersRegistry.register_message(
@@ -616,7 +660,7 @@ async def datetime_state_fallback_answer(
 @with_session
 async def datetime_wrong_text_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationMeetingState:
+) -> ConversationMeetingState | int:
     return await datetime_state_fallback_answer(session, update, context)
 
 
@@ -628,7 +672,7 @@ async def datetime_wrong_text_message_handler(
 @with_session
 async def datetime_wrong_message_type_handler(
     session: AsyncSession, update: Update, context: TMitupContext
-) -> ConversationMeetingState:
+) -> ConversationMeetingState | int:
     return await datetime_state_fallback_answer(session, update, context)
 
 

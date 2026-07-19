@@ -794,6 +794,9 @@ msgstr "Die Endzeit muss nach der Startzeit liegen."
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "Die Endzeit muss in der Zukunft liegen."
 
+msgid "MeetingEditDurationMessages.END_MAX_DURATION"
+msgstr "Ein Treffen kann maximal eine Woche dauern. Wähle eine Endzeit innerhalb einer Woche nach dem Start."
+
 msgid "ButtonMessages.WHEN"
 msgstr "🕒 Zeitpunkt"
 

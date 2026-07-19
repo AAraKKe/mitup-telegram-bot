@@ -803,6 +803,9 @@ msgstr "A hora de inicio debe estar no futuro."
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "A hora de remate debe estar no futuro."
 
+msgid "MeetingEditDurationMessages.END_MAX_DURATION"
+msgstr "Unha quedada pode durar como máximo unha semana. Axusta un remate no prazo dunha semana desde o inicio."
+
 msgid "ButtonMessages.WHEN"
 msgstr "🕒 Cando"
 

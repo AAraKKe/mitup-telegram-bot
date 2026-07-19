@@ -11,6 +11,7 @@ from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as build_entry_view
+from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_time_prompt_view
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
@@ -442,8 +443,13 @@ async def test_set_time_message_with_invalid_time(
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    # Message sent to retry
-    context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_VALUE.get(lang=user_with_settings.lang))
+    # Time prompt resent with the invalid-value notice on top, so the Cancel button stays reachable
+    context.api.assert_send_message_called(
+        update,
+        build_edit_time_prompt_view(
+            meeting, user_with_settings.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=user_with_settings.lang)
+        ),
+    )
 
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("InvalidTime"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
@@ -500,10 +506,18 @@ async def test_conversation_fallback_with_wrong_message_format(
     # Meeting id still in context
     assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME)
 
-    # Message sent to retry (EDIT_DATETIME state fallback)
+    # Entry prompt resent with the invalid-format notice on top, so the Date/Time buttons stay reachable
+    today = meeting.owner.now_in_tz().date()
     context.api.assert_send_message_called(
         update,
-        CommonMessages.DATETIME_INVALID.get(lang=user_with_settings.lang, datetime_link=build_datetime_link()),
+        build_entry_view(
+            meeting,
+            user_with_settings.lang,
+            today,
+            error=CommonMessages.DATETIME_INVALID.get(
+                lang=user_with_settings.lang, datetime_link=build_datetime_link()
+            ),
+        ),
         times=1,
     )
 
@@ -712,15 +726,29 @@ async def test_datetime_state_fallbacks(
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    """Plain text and non-text messages in EDIT_DATETIME state return an error and stay in EDIT_DATETIME."""
+    """Plain text and non-text messages in EDIT_DATETIME state resend the entry prompt (with the
+    invalid-format notice and Date/Time buttons) and stay in EDIT_DATETIME, so the user is not stranded."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(handler_id, handler_context=handler_context)
+    context, response = await call_handler(
+        handler_id, handler_context=handler_context, with_meeting_id={ContextId.EDIT_MEETING_TIME: 10}
+    )
 
     assert response == expected_state
+    today = meeting.owner.now_in_tz().date()
     context.api.assert_send_message_called(
         update,
-        CommonMessages.DATETIME_INVALID.get(lang=user_with_settings.lang, datetime_link=build_datetime_link()),
+        build_entry_view(
+            meeting,
+            user_with_settings.lang,
+            today,
+            error=CommonMessages.DATETIME_INVALID.get(
+                lang=user_with_settings.lang, datetime_link=build_datetime_link()
+            ),
+        ),
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
@@ -974,13 +1002,26 @@ async def test_wrong_time_format_fallback_sends_error_and_stays_in_edit_time(
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    """WRONG_TIME_FORMAT sends wrong time format error and stays in EDIT_TIME state."""
+    """WRONG_TIME_FORMAT resends the time prompt (with the wrong-format notice and Cancel button)
+    and stays in EDIT_TIME state, so the user is not stranded."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.WRONG_TIME_FORMAT, handler_context=handler_context)
+    context, response = await call_handler(
+        EditMeetingHandlerId.WRONG_TIME_FORMAT,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
 
     assert response == ConversationMeetingState.EDIT_TIME
-    context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_FORMAT.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(
+        update,
+        build_edit_time_prompt_view(
+            meeting, user_with_settings.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user_with_settings.lang)
+        ),
+    )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
 
 
@@ -996,13 +1037,26 @@ async def test_wrong_time_message_type_fallback_sends_error_and_stays_in_edit_ti
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    """WRONG_TIME_MESSAGE (non-text message) sends wrong time format error and stays in EDIT_TIME state."""
+    """WRONG_TIME_MESSAGE (non-text message) resends the time prompt (with the wrong-format notice
+    and Cancel button) and stays in EDIT_TIME state, so the user is not stranded."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, response = await call_handler(EditMeetingHandlerId.WRONG_TIME_MESSAGE, handler_context=handler_context)
+    context, response = await call_handler(
+        EditMeetingHandlerId.WRONG_TIME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
 
     assert response == ConversationMeetingState.EDIT_TIME
-    context.api.assert_send_message_called(update, CommonMessages.TIME_INVALID_FORMAT.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(
+        update,
+        build_edit_time_prompt_view(
+            meeting, user_with_settings.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user_with_settings.lang)
+        ),
+    )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
 
 
@@ -1205,8 +1259,15 @@ async def test_date_time_entity_in_past_sends_error_and_stays_in_edit_datetime(
     assert response == ConversationMeetingState.EDIT_DATETIME
     assert meeting.datetime == existing  # unchanged
     mock_session.assert_not_flushed()
+    today = meeting.owner.now_in_tz().date()
     context.api.assert_send_message_called(
-        update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
+        update,
+        build_entry_view(
+            meeting,
+            user_with_settings.lang,
+            today,
+            error=MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang),
+        ),
     )
 
 
@@ -1238,8 +1299,15 @@ async def test_date_time_entity_exactly_now_is_rejected(
 
     assert response == ConversationMeetingState.EDIT_DATETIME
     assert meeting.datetime == existing  # unchanged
+    today = meeting.owner.now_in_tz().date()
     context.api.assert_send_message_called(
-        update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
+        update,
+        build_entry_view(
+            meeting,
+            user_with_settings.lang,
+            today,
+            error=MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang),
+        ),
     )
 
 
@@ -1274,7 +1342,12 @@ async def test_set_time_in_past_sends_error_and_stays_in_edit_time(
     assert meeting.datetime == past_meeting  # unchanged
     mock_session.assert_not_flushed()
     context.api.assert_send_message_called(
-        update, MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang)
+        update,
+        build_edit_time_prompt_view(
+            meeting,
+            user_with_settings.lang,
+            error=MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=user_with_settings.lang),
+        ),
     )
 
 

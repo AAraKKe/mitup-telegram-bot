@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-19 18:11\n"
+"PO-Revision-Date: 2026-07-19 20:03\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -691,6 +691,9 @@ msgstr "The end time must be after the start time."
 
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "The end time must be in the future."
+
+msgid "MeetingEditDurationMessages.END_MAX_DURATION"
+msgstr "A meeting can last a week at most. Set an end within a week of the start."
 
 msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
 msgstr "The end date has been set to <b>${datetime}</b>. The time defaults to 23:59.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 23:59."

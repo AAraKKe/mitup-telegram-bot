@@ -794,6 +794,9 @@ msgstr "O horário de término deve ser após o horário de início."
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "O horário de término deve estar no futuro."
 
+msgid "MeetingEditDurationMessages.END_MAX_DURATION"
+msgstr "Um evento pode durar no máximo uma semana. Defina um término até uma semana do início."
+
 msgid "ButtonMessages.WHEN"
 msgstr "🕒 Quando"
 

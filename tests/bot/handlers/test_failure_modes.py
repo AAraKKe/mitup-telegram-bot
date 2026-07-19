@@ -170,19 +170,40 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.WRONG_TIME_FORMAT,
         update_request=UpdateRequest(message_text="12:00"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="wrong_time_format",
+        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.WRONG_TIME_FORMAT,
+        update_request=UpdateRequest(message_text="12:00"),
+        error_modes={ErrorMode.MISSING_USER_DATA},
         id="wrong_time_format",
     ),
     Context(
         handler_id=EditMeetingHandlerId.DATETIME_WRONG_TEXT_FORMAT,
         update_request=UpdateRequest(message_text="some text"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="datetime_wrong_text_format",
+        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATETIME_WRONG_TEXT_FORMAT,
+        update_request=UpdateRequest(message_text="some text"),
+        error_modes={ErrorMode.MISSING_USER_DATA},
         id="datetime_wrong_text_format",
     ),
     Context(
         handler_id=EditMeetingHandlerId.DATETIME_WRONG_MESSAGE,
         update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="datetime_wrong_message",
+        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DATETIME_WRONG_MESSAGE,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.MISSING_USER_DATA},
         id="datetime_wrong_message",
     ),
     # DATE_TIME_ENTITY_MESSAGE — requires a message with a date_time entity and a stored meeting id
@@ -668,13 +689,27 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.DURATION_END_WRONG_INPUT,
         update_request=UpdateRequest(message_text="some text"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="duration_end_wrong_input",
+        meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_END_WRONG_INPUT,
+        update_request=UpdateRequest(message_text="some text"),
+        error_modes={ErrorMode.MISSING_USER_DATA},
         id="duration_end_wrong_input",
     ),
     Context(
         handler_id=EditMeetingHandlerId.DURATION_END_TIME_WRONG_INPUT,
         update_request=UpdateRequest(message_text="bad time"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="duration_end_time_wrong_input",
+        meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DURATION_END_TIME_WRONG_INPUT,
+        update_request=UpdateRequest(message_text="bad time"),
+        error_modes={ErrorMode.MISSING_USER_DATA},
         id="duration_end_time_wrong_input",
     ),
     # Duration entity message handlers — require a message with a date_time entity
@@ -1096,7 +1131,14 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.WRONG_TIME_MESSAGE,
         update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="wrong_time_message",
+        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.WRONG_TIME_MESSAGE,
+        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
+        error_modes={ErrorMode.MISSING_USER_DATA},
         id="wrong_time_message",
     ),
     # --- Edit meeting location flow ---

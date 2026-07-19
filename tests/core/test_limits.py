@@ -178,3 +178,20 @@ def test_within_scheduling_horizon_reads_naive_datetime_as_utc(
     assert naive_on_horizon.tzinfo is None
     # Must not raise and must treat the value as UTC rather than local system time.
     assert limits.within_scheduling_horizon(user_with_settings, naive_on_horizon) is True
+
+
+def test_within_max_duration_boundary_is_allowed():
+    start = dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC)
+    exactly_one_week = start + limits.MEETING_MAX_DURATION
+    one_minute_beyond = exactly_one_week + dt.timedelta(minutes=1)
+    assert limits.within_max_duration(start, exactly_one_week) is True
+    assert limits.within_max_duration(start, one_minute_beyond) is False
+
+
+def test_within_max_duration_reads_naive_datetimes_as_utc():
+    # Naive values must not raise and must be measured as UTC, not local system time.
+    naive_start = dt.datetime(2026, 6, 15, 10, 0)
+    naive_end = dt.datetime(2026, 6, 22, 10, 0)
+    assert naive_start.tzinfo is None
+    assert limits.within_max_duration(naive_start, naive_end) is True
+    assert limits.within_max_duration(naive_start, naive_end + dt.timedelta(seconds=1)) is False

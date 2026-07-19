@@ -730,6 +730,7 @@ class MeetingEditDurationMessages(MessageBase):
     )
     END_BEFORE_START = "The end time must be after the start time."
     END_IN_PAST = "The end time must be in the future."
+    END_MAX_DURATION = "A meeting can last a week at most. Set an end within a week of the start."
     # Sets end date AND prompts for time
     END_DATE_ADDED_TIME_PROMPT = (
         "The end date has been set to <b>${datetime}</b>. "

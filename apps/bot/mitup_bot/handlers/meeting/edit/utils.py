@@ -6,6 +6,18 @@ from telegram.ext import filters
 from mitup_bot.custom_context import ContextId
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
+from mitup_bot.utils.entities import FormattedText
+
+
+def prepend_error(base: str | FormattedText, error: str | FormattedText) -> FormattedText:
+    """Prepend an error paragraph (error text, blank line) to a prompt body, preserving entities.
+
+    Used when a message-triggered edit fails validation: the prompt the user was answering is resent
+    with the error on top, so the prompt's buttons stay reachable instead of the user being stranded
+    with a bare error and no controls to continue.
+    """
+    prefix = error if isinstance(error, FormattedText) else FormattedText(error)
+    return prefix.append("\n\n").append(base)
 
 
 def to_utc(value: dt.datetime) -> dt.datetime:

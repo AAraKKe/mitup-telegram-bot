@@ -15,6 +15,8 @@ from mitup_bot import supporter
 if TYPE_CHECKING:
     from mitup_bot.models import User
 
+MEETING_MAX_DURATION = dt.timedelta(days=7)
+
 
 def active_meetings_cap(user: User) -> int | None:
     """Maximum active meetings the user may own, or None (unlimited) for the Organizer tier."""
@@ -73,3 +75,14 @@ def within_scheduling_horizon(user: User, when: dt.datetime) -> bool:
     picked_date = user.datetime_in_tz(aware).date()
     latest = user.now_in_tz().date() + dt.timedelta(days=days)
     return picked_date <= latest
+
+
+def within_max_duration(start: dt.datetime, end: dt.datetime) -> bool:
+    """Whether the span from `start` to `end` is at most `MEETING_MAX_DURATION`.
+
+    No tier lifts this cap, so it takes no `User`. Naive datetimes are read as UTC, matching how
+    meeting datetimes are persisted, so the delta is measured on comparable aware values.
+    """
+    start_utc = start if start.tzinfo else start.replace(tzinfo=dt.UTC)
+    end_utc = end if end.tzinfo else end.replace(tzinfo=dt.UTC)
+    return end_utc - start_utc <= MEETING_MAX_DURATION

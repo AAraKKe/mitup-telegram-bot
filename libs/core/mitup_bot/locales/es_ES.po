@@ -869,6 +869,9 @@ msgstr "La hora de finalización debe ser posterior a la hora de inicio."
 msgid "MeetingEditDurationMessages.END_IN_PAST"
 msgstr "La hora de finalización debe ser en el futuro."
 
+msgid "MeetingEditDurationMessages.END_MAX_DURATION"
+msgstr "Una quedada puede durar una semana como máximo. Establece un fin dentro de una semana del inicio."
+
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""
 
