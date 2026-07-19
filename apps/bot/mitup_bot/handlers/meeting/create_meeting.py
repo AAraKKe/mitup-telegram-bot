@@ -16,6 +16,7 @@ from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.collaborate import supporter_upsell_view
 
 from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
@@ -95,8 +96,8 @@ async def create_meeting_message_handler(
         if unix_time is not None:
             # A title-embedded date beyond the horizon keeps the user in TITLE to pick a nearer one
             # rather than silently dropping the date.
-            if rejection := scheduling_horizon_rejection(user, unix_time):
-                await context.api.send_message(update=update, view=rejection)
+            if rejection := scheduling_horizon_rejection(user, unix_time, title_flow=True):
+                await context.api.send_message(update=update, view=supporter_upsell_view(rejection, user.lang))
                 return ConversationMeetingState.TITLE
             meeting_datetime = unix_time
 

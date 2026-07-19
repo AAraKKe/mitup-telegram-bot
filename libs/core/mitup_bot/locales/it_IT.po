@@ -924,19 +924,19 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Oops, abbiamo perso il filo!</b>\n\nIl bot ha ricevuto un rapido aggiornamento interno e ha dimenticato a che punto eri arrivato. Tutto quello che avevi salvato è al sicuro. Ricomincia quello che stavi facendo dal menu qui sotto."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per crearne un altro, oppure tocca Collabora nel menu principale per supportare Mitup e sbloccarne altri."
+msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudi o elimina uno per crearne un altro, oppure diventa Host di Mitup su Patreon per sbloccarne altri. Trovi tutti i dettagli in Collabora, qui sotto."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Il tuo limite da Gamemaster è di ${cap} incontri attivi. Chiudi o elimina uno per crearne un altro, oppure tocca Collabora nel menu principale per diventare Commissioner e rimuovere il limite."
+msgstr "Il tuo piano Gamemaster ospita fino a ${cap} incontri attivi, grazie per sostenere Mitup! Chiudi o elimina uno per crearne un altro, oppure diventa Commissioner su Patreon per rimuovere il limite. Trovi tutti i dettagli in Collabora, qui sotto."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
-msgstr "Gli incontri gratuiti possono ospitare fino a ${cap} partecipanti. Imposta un limite inferiore, oppure tocca Collabora nel menu principale per supportare Mitup e ospitare altri."
+msgstr "Gli incontri gratuiti possono ospitare fino a ${cap} partecipanti. Invia un numero più basso, oppure diventa Host di Mitup su Patreon per ospitare incontri più grandi. Trovi tutti i dettagli in Collabora, qui sotto."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON"
-msgstr "Per ora puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina, oppure tocca Collabora nel menu principale per supportare Mitup e pianificare più lontano."
+msgstr "Per ora puoi pianificare incontri fino a ${days} giorni in anticipo. Scegli una data più vicina, oppure diventa Host di Mitup su Patreon per pianificare più lontano. Trovi tutti i dettagli in Collabora, qui sotto."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Il tuo piano da Gamemaster pianifica fino a ${days} giorni in anticipo. Scegli una data più vicina, oppure tocca Collabora nel menu principale per diventare Commissioner e rimuovere il limite."
+msgstr "Il tuo piano Gamemaster pianifica fino a ${days} giorni in anticipo, grazie per sostenere Mitup! Scegli una data più vicina, oppure diventa Commissioner su Patreon per pianificare quanto lontano vuoi. Trovi tutti i dettagli in Collabora, qui sotto."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>I tuoi vantaggi da Host sono in un periodo di tolleranza</b>\n\nNon siamo riusciti a confermare un contributo Patreon attivo sul tuo account, quindi i tuoi vantaggi da Host si disattiveranno tra una settimana. Se il tuo contributo è ancora attivo, non devi fare nulla e si rinnoverà automaticamente. Altrimenti, puoi sostenere di nuovo Mitup dal menu Collabora."
@@ -991,3 +991,9 @@ msgstr "📖 Apri la guida"
 
 msgid "HelpMessages.DESCRIPTION"
 msgstr "<b>Aiuto</b>\n\nCi sono due modi per ottenere aiuto con Mitup. La guida ti spiega come funziona Mitup, pagina per pagina, ed è il punto di partenza migliore. Se hai ancora una domanda o vuoi parlare con una persona, scrivici a support@mitup.social."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
+msgstr "Quella data è a più di ${days} giorni, il massimo che puoi pianificare per ora. Invia di nuovo il titolo del tuo incontro con una data più vicina, oppure diventa Host di Mitup su Patreon per pianificare più lontano. Trovi tutti i dettagli in Collabora, qui sotto."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
+msgstr "Quella data è a più di ${days} giorni, il massimo che pianifica il tuo piano Gamemaster. Invia di nuovo il titolo del tuo incontro con una data più vicina, oppure diventa Commissioner su Patreon per pianificare quanto lontano vuoi. Trovi tutti i dettagli in Collabora, qui sotto."

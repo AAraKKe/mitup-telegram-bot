@@ -20,6 +20,7 @@ from mitup_bot.utils.entities import EntityDateTime, FormattedText, build_dateti
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MeetingEditDateTimeMessages
 from mitup_bot.views import MitupView, factory
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.collaborate import supporter_upsell_view
 
 from ..utils import scheduling_horizon_rejection
 from .enums import ConversationMeetingState, EditMeetingHandlerId
@@ -436,8 +437,20 @@ async def date_time_entity_message_handler(
         if meeting is None:
             return ConversationHandler.END
 
-        if error := validate_start_datetime(unix_time, meeting, current_user.lang, check_horizon=True):
+        if error := validate_start_datetime(unix_time, meeting, current_user.lang):
             await context.api.send_message(update=update, view=error)
+            return ConversationMeetingState.EDIT_DATETIME
+
+        # The horizon rejection is checked apart from the other validations so it can carry the
+        # Collaborate button; a raised horizon is exactly what Collaborate offers. The back button
+        # re-renders the Date & Time entry screen the message was sent from.
+        if rejection := scheduling_horizon_rejection(meeting.owner, unix_time):
+            back_button = ButtonConfig(
+                text=ButtonMessages.DATE_TIME.back(lang=current_user.lang),
+                callback_data=cb.EDIT_MEETING.with_id(meeting.db_id),
+            )
+            view = supporter_upsell_view(rejection, current_user.lang).with_context_menu([[back_button]])
+            await context.api.send_message(update=update, view=view)
             return ConversationMeetingState.EDIT_DATETIME
 
         meeting.datetime = unix_time
@@ -611,6 +624,9 @@ HandlersRegistry.register_conversation_handler(
             EditMeetingHandlerId.DATETIME_WRONG_TEXT_FORMAT,
             EditMeetingHandlerId.DATETIME_WRONG_MESSAGE,
             EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
+            # Reachable from the beyond-horizon rejection's back button, which re-renders the
+            # entry screen without leaving the conversation.
+            EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
         ],
         ConversationMeetingState.EDIT_DATE: [
             EditMeetingHandlerId.DATE_CALLBACK,

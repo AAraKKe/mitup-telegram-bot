@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-18 14:12\n"
+"PO-Revision-Date: 2026-07-19 16:22\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -285,19 +285,25 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you were in the process. Everything you saved is safe. Please start what you were doing again from the menu below."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
-msgstr "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start another, or tap Collaborate in the main menu to support Mitup and unlock more."
+msgstr "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start another, or become a Mitup Host on Patreon to unlock more. Collaborate below has all the details."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Your Gamemaster limit is ${cap} active meetings. Wrap up or delete one to start another, or tap Collaborate in the main menu to go Commissioner and drop the cap."
+msgstr "Your Gamemaster plan hosts up to ${cap} active meetings, thanks for backing Mitup! Wrap up or delete one to start another, or go Commissioner on Patreon to remove the cap. Collaborate below has all the details."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON"
-msgstr "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap Collaborate in the main menu to support Mitup and schedule further out."
+msgstr "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or become a Mitup Host on Patreon to schedule further out. Collaborate below has all the details."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Your Gamemaster plan schedules up to ${days} days ahead. Pick an earlier date, or tap Collaborate in the main menu to go Commissioner and drop the limit."
+msgstr "Your Gamemaster plan schedules up to ${days} days ahead, thanks for backing Mitup! Pick an earlier date, or go Commissioner on Patreon to schedule as far out as you like. Collaborate below has all the details."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
+msgstr "That date is more than ${days} days ahead, the furthest you can schedule for now. Send your meeting title again with an earlier date, or become a Mitup Host on Patreon to schedule further out. Collaborate below has all the details."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
+msgstr "That date is more than ${days} days ahead, the furthest your Gamemaster plan schedules. Send your meeting title again with an earlier date, or go Commissioner on Patreon to schedule as far out as you like. Collaborate below has all the details."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
-msgstr "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in the main menu to support Mitup and host more."
+msgstr "Free meetings can host up to ${cap} participants. Send a lower number, or become a Mitup Host on Patreon to host bigger meetings. Collaborate below has all the details."
 
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."

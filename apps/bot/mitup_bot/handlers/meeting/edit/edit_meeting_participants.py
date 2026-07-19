@@ -18,6 +18,7 @@ from mitup_bot.monitoring import Feature
 from mitup_bot.utils import CommonMessages, MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
+from mitup_bot.views.collaborate import collaborate_button
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_max_participants_view, edit_participants_view
@@ -181,7 +182,10 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     # A free owner is capped by the free-tier participant limit; reject anything above it and keep
     # the conversation open so they can enter a valid number. Supporter owners set any limit.
     if rejection := participant_capacity_rejection(user, requested_max):
-        await context.api.send_message(update=update, view=edit_max_participants_view(meeting).with_context(rejection))
+        # The re-prompt carries a Collaborate button: a raised capacity is exactly what
+        # Collaborate offers.
+        view = edit_max_participants_view(meeting).with_context_menu([[collaborate_button(user.lang)]])
+        await context.api.send_message(update=update, view=view.with_context(rejection))
         return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
 
     meeting.max_members = requested_max

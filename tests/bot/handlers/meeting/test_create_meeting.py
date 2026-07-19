@@ -19,6 +19,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.collaborate import supporter_upsell_view
 from tests.helpers import (
     ConversationStep,
     ConversationTester,
@@ -446,7 +447,10 @@ async def test_create_meeting_title_blocked_at_cap_sends_message(
     assert len(mock_session.objects_added) == 0  # no meeting created
     context.api.assert_send_message_called(
         title_update,
-        SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+        supporter_upsell_view(
+            SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+            user_with_settings.lang,
+        ),
     )
 
 
@@ -476,7 +480,10 @@ async def test_create_meeting_title_date_beyond_horizon_stays_in_title(
     assert len(mock_session.objects_added) == 0  # no meeting created
     context.api.assert_send_message_called(
         title_update,
-        SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+        supporter_upsell_view(
+            SupporterMessages.SCHEDULING_HORIZON_TITLE.get_text(lang=user_with_settings.lang, days=31),
+            user_with_settings.lang,
+        ),
     )
 
 

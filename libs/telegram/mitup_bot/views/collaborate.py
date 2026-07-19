@@ -6,6 +6,18 @@ from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages, Suppor
 from mitup_bot.views.mitup_view import MitupView
 
 
+def collaborate_button(lang: str) -> ButtonConfig:
+    """Button opening the Collaborate screen, for upsell surfaces outside the main menu."""
+    return ButtonConfig(text=ButtonMessages.COLLABORATE.get_text(lang=lang), callback_data=cb.COLLABORATE)
+
+
+def supporter_upsell_view(text: str | FormattedText, lang: str) -> MitupView:
+    """Plan-limit notice sent as a message: the rejection text plus a Collaborate button, so the
+    user can act on the upsell right where they hit the limit instead of navigating to the main
+    menu first."""
+    return MitupView(description=text, keyboard=[[collaborate_button(lang)]])
+
+
 def link_confirmation_view(text: str | FormattedText, lang: str) -> MitupView:
     """DM sent back to the user after a successful Patreon link: the confirmation copy plus a
     Main-menu button so the user is never stranded on a button-less message."""

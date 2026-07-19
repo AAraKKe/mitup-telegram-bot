@@ -22,6 +22,7 @@ from mitup_bot.utils.messages import (
     SupporterMessages,
 )
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views.collaborate import collaborate_button
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -472,9 +473,14 @@ async def test_edit_max_participants_free_owner_over_cap_is_rejected(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
-    # The banner is addressed to the acting owner, so it renders in their language with the cap.
+    # The banner is addressed to the acting owner, so it renders in their language with the cap,
+    # and the re-prompt carries the Collaborate upsell button.
     rejection = SupporterMessages.PARTICIPANT_CAPACITY.get_text(lang=user_with_settings.lang, cap=20)
-    expected_view = edit_max_participants_view(meeting).with_context(rejection)
+    expected_view = (
+        edit_max_participants_view(meeting)
+        .with_context_menu([[collaborate_button(user_with_settings.lang)]])
+        .with_context(rejection)
+    )
 
     assert meeting.max_members == 5  # unchanged
     mock_session.assert_not_flushed()

@@ -211,34 +211,53 @@ class CommonMessages(MessageBase):
 
 
 class SupporterMessages(MessageBase):
-    """Plan-limit notices for free and Gamemaster users. All are shown as plain callback-query alerts
-    or short messages, so they must stay entity-free (no inline-formatting tags)."""
+    """Plan-limit notices for free and Gamemaster users. Every one is shown next to a Collaborate
+    button ("Collaborate below"), states what the user can do right now, and invites them to become
+    a Host on Patreon in an encouraging, thankful tone. They render as plain text in views and
+    alerts alike, so they must stay entity-free (no inline-formatting tags)."""
 
-    # Free user at the active-meetings cap: explain and point at Collaborate.
+    # Free user at the active-meetings cap.
     ACTIVE_MEETINGS_CAP = (
         "You've reached your limit of ${cap} active meetings. Wrap up or delete one to start "
-        "another, or tap Collaborate in the main menu to support Mitup and unlock more."
+        "another, or become a Mitup Host on Patreon to unlock more. Collaborate below has all "
+        "the details."
     )
-    # Gamemaster user at their raised cap: name the tier and point at Commissioner, which lifts it.
+    # Gamemaster user at their raised cap: thank them and point at Commissioner, which lifts it.
     ACTIVE_MEETINGS_CAP_PATRON = (
-        "Your Gamemaster limit is ${cap} active meetings. Wrap up or delete one to start another, "
-        "or tap Collaborate in the main menu to go Commissioner and drop the cap."
+        "Your Gamemaster plan hosts up to ${cap} active meetings, thanks for backing Mitup! Wrap "
+        "up or delete one to start another, or go Commissioner on Patreon to remove the cap. "
+        "Collaborate below has all the details."
     )
-    # Free user picking a start date beyond the horizon.
+    # Free user picking a start date beyond the horizon (calendar pick or a sent date while editing).
     SCHEDULING_HORIZON = (
-        "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or tap "
-        "Collaborate in the main menu to support Mitup and schedule further out."
+        "You can schedule meetings up to ${days} days ahead for now. Pick an earlier date, or "
+        "become a Mitup Host on Patreon to schedule further out. Collaborate below has all the "
+        "details."
     )
-    # Gamemaster user beyond their raised horizon: name the tier and point at Commissioner, which lifts it.
+    # Gamemaster user beyond their raised horizon: thank them and point at Commissioner.
     SCHEDULING_HORIZON_PATRON = (
-        "Your Gamemaster plan schedules up to ${days} days ahead. Pick an earlier date, or tap "
-        "Collaborate in the main menu to go Commissioner and drop the limit."
+        "Your Gamemaster plan schedules up to ${days} days ahead, thanks for backing Mitup! Pick "
+        "an earlier date, or go Commissioner on Patreon to schedule as far out as you like. "
+        "Collaborate below has all the details."
     )
-    # Free owner trying to set a participant limit above the free-tier capacity: explain and point at
-    # Collaborate. Gamemaster-tier owners are uncapped, so there is no Gamemaster counterpart.
+    # Free user whose new-meeting title embeds a date beyond the horizon: they stay in the title
+    # step, so the actionable step is resending the title.
+    SCHEDULING_HORIZON_TITLE = (
+        "That date is more than ${days} days ahead, the furthest you can schedule for now. Send "
+        "your meeting title again with an earlier date, or become a Mitup Host on Patreon to "
+        "schedule further out. Collaborate below has all the details."
+    )
+    # Gamemaster variant of the title-step horizon notice.
+    SCHEDULING_HORIZON_TITLE_PATRON = (
+        "That date is more than ${days} days ahead, the furthest your Gamemaster plan schedules. "
+        "Send your meeting title again with an earlier date, or go Commissioner on Patreon to "
+        "schedule as far out as you like. Collaborate below has all the details."
+    )
+    # Free owner trying to set a participant limit above the free-tier capacity. Gamemaster-tier
+    # owners are uncapped, so there is no Gamemaster counterpart.
     PARTICIPANT_CAPACITY = (
-        "Free meetings can host up to ${cap} participants. Set a lower limit, or tap Collaborate in "
-        "the main menu to support Mitup and host more."
+        "Free meetings can host up to ${cap} participants. Send a lower number, or become a Mitup "
+        "Host on Patreon to host bigger meetings. Collaborate below has all the details."
     )
 
 

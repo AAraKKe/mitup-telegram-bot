@@ -6,12 +6,14 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages, SupporterNotificationMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.collaborate import (
+    collaborate_button,
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
     collaborate_not_linked_view,
     collaborate_unavailable_view,
     hosts_group_readmitted_view,
     hosts_group_removed_view,
+    supporter_upsell_view,
 )
 
 AUTH_URL = "https://www.patreon.com/oauth2/authorize?state=abc"
@@ -19,6 +21,22 @@ PLEDGE_URL = "https://www.patreon.com/bePatron?c=12345"
 GROUP_URL = "https://t.me/+hostsonlyinvite"
 ACTIVE_MEETINGS = 7
 SCHEDULING_DAYS = 42
+
+
+def test_collaborate_button_opens_collaborate(lang: str):
+    button = collaborate_button(lang)
+
+    assert button == ButtonConfig(text=ButtonMessages.COLLABORATE.get_text(lang=lang), callback_data=cb.COLLABORATE)
+
+
+def test_supporter_upsell_view_carries_collaborate_button(lang: str):
+    view = supporter_upsell_view("You've hit a limit.", lang)
+    expected = MitupView(
+        description="You've hit a limit.",
+        keyboard=[[collaborate_button(lang)]],
+    )
+
+    assert view == expected
 
 
 def test_unavailable_view_has_no_link_button(lang: str):

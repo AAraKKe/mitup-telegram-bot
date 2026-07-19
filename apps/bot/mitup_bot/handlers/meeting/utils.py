@@ -11,6 +11,7 @@ from mitup_bot.models import User
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import ButtonMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views.collaborate import supporter_upsell_view
 
 
 def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:
@@ -46,7 +47,7 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
     `supporter_required` (pointing to Collaborate), while a Patron at the sanity cap gets a plain
     limit notice (the Organizer tier is uncapped and never reaches here). The notice rides a
     callback-query alert when one is present (the New Meeting button and the reactivation button) and
-    a sent message otherwise (the title-message creation path).
+    a sent message with a Collaborate button otherwise (the title-message creation path).
     """
     if not limits.at_active_meetings_cap(user):
         return False
@@ -69,22 +70,32 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
         message = (
             SupporterMessages.ACTIVE_MEETINGS_CAP if below_patron else SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON
         )
-        await context.api.send_message(update=update, view=message.get(lang=user.lang, cap=cap))
+        await context.api.send_message(
+            update=update, view=supporter_upsell_view(message.get(lang=user.lang, cap=cap), user.lang)
+        )
     return True
 
 
-def scheduling_horizon_rejection(user: User, when: dt.datetime) -> str | None:
+def scheduling_horizon_rejection(user: User, when: dt.datetime, *, title_flow: bool = False) -> str | None:
     """Plain-text rejection when `when` is beyond the user's scheduling horizon, else None.
 
-    The Patron tier raises the horizon; a below-Patron user is pointed at Collaborate. Returned as
-    plain text so it fits both a callback-query alert and a sent message.
+    The Patron tier raises the horizon; both tiers get the Collaborate upsell. `title_flow` picks
+    the title-step wording, whose actionable step is resending the title rather than picking a
+    date. Returned as plain text so it fits both a view description and an alert.
     """
     if limits.within_scheduling_horizon(user, when):
         return None
     days = limits.scheduling_horizon_days(user)
     assert days is not None, "within_scheduling_horizon is only False when a finite horizon applies"
     below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
-    message = SupporterMessages.SCHEDULING_HORIZON if below_patron else SupporterMessages.SCHEDULING_HORIZON_PATRON
+    if title_flow:
+        message = (
+            SupporterMessages.SCHEDULING_HORIZON_TITLE
+            if below_patron
+            else SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON
+        )
+    else:
+        message = SupporterMessages.SCHEDULING_HORIZON if below_patron else SupporterMessages.SCHEDULING_HORIZON_PATRON
     return message.get_text(lang=user.lang, days=days)
 
 

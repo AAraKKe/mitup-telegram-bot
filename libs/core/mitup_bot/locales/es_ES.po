@@ -960,19 +960,19 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>¡Vaya, hemos perdido el hilo!</b>\n\nEl bot ha tenido una actualización interna rápida y ha olvidado en qué paso estabas. Todo lo que guardaste está a salvo. Por favor, vuelve a empezar lo que estabas haciendo desde el menú de abajo."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para apoyar a Mitup y desbloquear más."
+msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o hazte Host de Mitup en Patreon para desbloquear más. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Tu límite como Gamemaster es de ${cap} quedadas activas. Cierra o elimina una para crear otra, o pulsa Colabora en el menú principal para pasarte a Commissioner y eliminar el límite."
+msgstr "Tu plan Gamemaster admite hasta ${cap} quedadas activas, ¡gracias por apoyar a Mitup! Cierra o elimina una para crear otra, o pásate a Commissioner en Patreon para eliminar el límite. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
-msgstr "Las quedadas gratuitas admiten hasta ${cap} participantes. Elige un límite menor, o pulsa Colabora en el menú principal para apoyar a Mitup y admitir más."
+msgstr "Las quedadas gratuitas admiten hasta ${cap} participantes. Envía un número menor, o hazte Host de Mitup en Patreon para organizar quedadas más grandes. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON"
-msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para apoyar a Mitup y programar más lejos."
+msgstr "Por ahora puedes programar quedadas hasta ${days} días por adelantado. Elige una fecha más cercana, o hazte Host de Mitup en Patreon para programar más lejos. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Tu plan Gamemaster te permite programar hasta ${days} días por adelantado. Elige una fecha más cercana, o pulsa Colabora en el menú principal para pasarte a Commissioner y eliminar el límite."
+msgstr "Tu plan Gamemaster programa hasta ${days} días por adelantado, ¡gracias por apoyar a Mitup! Elige una fecha más cercana, o pásate a Commissioner en Patreon para programar tan lejos como quieras. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Tus ventajas de Host están en periodo de gracia</b>\n\nNo hemos podido confirmar una aportación activa de Patreon en tu cuenta, así que tus ventajas de Host se desactivarán en una semana. Si tu aportación sigue activa, no tienes que hacer nada y se renovará automáticamente. Si no, puedes volver a apoyar a Mitup desde el menú Colabora."
@@ -1018,3 +1018,9 @@ msgstr "📖 Abrir la guía de uso"
 
 msgid "HelpMessages.DESCRIPTION"
 msgstr "<b>Ayuda</b>\n\nHay dos formas de conseguir ayuda con Mitup. La guía de uso te explica cómo funciona Mitup, página a página, y es el mejor punto de partida. Si aún tienes alguna duda o necesitas hablar con una persona, escríbenos a support@mitup.social."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
+msgstr "Esa fecha está a más de ${days} días, lo más lejos que puedes programar por ahora. Envía el título de tu quedada de nuevo con una fecha más cercana, o hazte Host de Mitup en Patreon para programar más lejos. Tienes todos los detalles en Colabora, justo debajo."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
+msgstr "Esa fecha está a más de ${days} días, lo más lejos que programa tu plan Gamemaster. Envía el título de tu quedada de nuevo con una fecha más cercana, o pásate a Commissioner en Patreon para programar tan lejos como quieras. Tienes todos los detalles en Colabora, justo debajo."

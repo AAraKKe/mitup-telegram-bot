@@ -960,19 +960,19 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Entschuldigung, wir haben den Faden verloren!</b>\n\nDer Bot hatte ein kurzes internes Update und hat vergessen, wo du gerade warst. Alles, was du gespeichert hast, ist sicher. Bitte starte über das Menü unten noch einmal das, was du gerade gemacht hast."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr freizuschalten."
+msgstr "Du hast dein Limit von ${cap} aktiven Treffen erreicht. Beende oder lösche eines, um ein weiteres zu starten, oder werde Mitup-Host auf Patreon, um mehr freizuschalten. Alle Details findest du direkt unten unter Mithelfen."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Dein Gamemaster-Limit beträgt ${cap} aktive Treffen. Beende oder lösche eines, um ein weiteres zu starten, oder tippe auf Mithelfen im Hauptmenü, um Commissioner zu werden und das Limit aufzuheben."
+msgstr "Dein Gamemaster-Plan erlaubt bis zu ${cap} aktive Treffen, danke, dass du Mitup unterstützt! Beende oder lösche eines, um ein weiteres zu starten, oder werde Commissioner auf Patreon, um das Limit aufzuheben. Alle Details findest du direkt unten unter Mithelfen."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
-msgstr "Kostenlose Treffen können bis zu ${cap} Teilnehmer aufnehmen. Setze ein niedrigeres Limit, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und mehr Teilnehmer zu hosten."
+msgstr "Kostenlose Treffen können bis zu ${cap} Teilnehmer aufnehmen. Sende eine niedrigere Zahl, oder werde Mitup-Host auf Patreon, um größere Treffen zu veranstalten. Alle Details findest du direkt unten unter Mithelfen."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON"
-msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Mitup zu unterstützen und noch weiter zu planen."
+msgstr "Du kannst Treffen vorerst bis zu ${days} Tage im Voraus planen. Wähle ein früheres Datum, oder werde Mitup-Host auf Patreon, um noch weiter zu planen. Alle Details findest du direkt unten unter Mithelfen."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Dein Gamemaster-Plan plant bis zu ${days} Tage im Voraus. Wähle ein früheres Datum, oder tippe auf Mithelfen im Hauptmenü, um Commissioner zu werden und das Limit aufzuheben."
+msgstr "Dein Gamemaster-Plan plant bis zu ${days} Tage im Voraus, danke, dass du Mitup unterstützt! Wähle ein früheres Datum, oder werde Commissioner auf Patreon, um so weit zu planen, wie du möchtest. Alle Details findest du direkt unten unter Mithelfen."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Deine Host-Vorteile sind in einer Kulanzfrist</b>\n\nWir konnten keinen aktiven Patreon-Beitrag auf deinem Konto bestätigen, daher werden deine Host-Vorteile in einer Woche deaktiviert. Wenn dein Beitrag noch aktiv ist, musst du nichts tun und er wird automatisch verlängert. Andernfalls kannst du Mitup über das Mithelfen-Menü erneut unterstützen."
@@ -1021,3 +1021,9 @@ msgstr "📖 Handbuch öffnen"
 
 msgid "HelpMessages.DESCRIPTION"
 msgstr "<b>Hilfe</b>\n\nEs gibt zwei Wege, Hilfe zu Mitup zu bekommen. Das Handbuch erklärt dir Seite für Seite, wie Mitup funktioniert, und ist der beste Startpunkt. Wenn du danach noch eine Frage hast oder eine Person erreichen möchtest, schreib uns eine E-Mail an support@mitup.social."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
+msgstr "Dieses Datum liegt mehr als ${days} Tage voraus, weiter kannst du vorerst nicht planen. Sende den Titel deines Treffens noch einmal mit einem früheren Datum, oder werde Mitup-Host auf Patreon, um noch weiter zu planen. Alle Details findest du direkt unten unter Mithelfen."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
+msgstr "Dieses Datum liegt mehr als ${days} Tage voraus, weiter plant dein Gamemaster-Plan nicht. Sende den Titel deines Treffens noch einmal mit einem früheren Datum, oder werde Commissioner auf Patreon, um so weit zu planen, wie du möchtest. Alle Details findest du direkt unten unter Mithelfen."

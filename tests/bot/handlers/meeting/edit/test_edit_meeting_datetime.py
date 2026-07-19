@@ -29,6 +29,7 @@ from mitup_bot.utils.messages import (
 )
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.collaborate import supporter_upsell_view
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -1412,6 +1413,50 @@ async def test_time_edit_on_grandfathered_far_future_meeting_is_not_blocked(
     # Time updated to 20:20 Madrid (19:20 UTC) while the far-future date is preserved.
     assert meeting.datetime == dt.datetime(2025, 6, 1, 18, 20, tzinfo=dt.UTC)
     context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+@pytest.mark.parametrize(
+    "update",
+    # date_time entity 60 days ahead of the frozen now — beyond the 31-day free horizon.
+    [datetime_entity_request(int(dt.datetime(2025, 3, 16, 12, 0, tzinfo=dt.UTC).timestamp()))],
+    indirect=True,
+)
+@freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
+async def test_date_time_entity_beyond_horizon_sends_upsell_and_stays_in_edit_datetime(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """date_time_entity_message_handler: a beyond-horizon entity sends the horizon rejection with
+    the Collaborate button and stays in EDIT_DATETIME."""
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_scheduling_horizon_days=31))
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TIME: 10},
+    )
+
+    assert response == ConversationMeetingState.EDIT_DATETIME
+    assert meeting.datetime is None  # not saved
+    mock_session.assert_not_flushed()
+    entry_back_button = ButtonConfig(
+        text=ButtonMessages.DATE_TIME.back(lang=user_with_settings.lang),
+        callback_data=cb.EDIT_MEETING.with_id(10),
+    )
+    context.api.assert_send_message_called(
+        update,
+        supporter_upsell_view(
+            SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+            user_with_settings.lang,
+        ).with_context_menu([[entry_back_button]]),
+    )
 
 
 # ---------------------------------------------------------------------------

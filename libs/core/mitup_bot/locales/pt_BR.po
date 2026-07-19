@@ -960,19 +960,19 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Desculpe, perdemos o seu lugar!</b>\n\nO bot passou por uma rápida atualização interna e esqueceu onde você estava no processo. Tudo o que você salvou está seguro. Por favor, comece de novo o que você estava fazendo a partir do menu abaixo."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
-msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para apoiar o Mitup e desbloquear mais."
+msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou torne-se Host do Mitup no Patreon para desbloquear mais. Você encontra todos os detalhes no Colabore, logo abaixo."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON"
-msgstr "Seu limite de Gamemaster é ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou toque em Colabore no menu principal para virar Commissioner e remover o limite."
+msgstr "Seu plano Gamemaster permite até ${cap} eventos ativos, agradecemos seu apoio ao Mitup! Encerre ou exclua um para criar outro, ou vire Commissioner no Patreon para remover o limite. Você encontra todos os detalhes no Colabore, logo abaixo."
 
 msgid "SupporterMessages.PARTICIPANT_CAPACITY"
-msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Defina um limite mais baixo, ou toque em Colabore no menu principal para apoiar o Mitup e hospedar mais."
+msgstr "Eventos gratuitos podem hospedar até ${cap} participantes. Envie um número menor, ou torne-se Host do Mitup no Patreon para hospedar eventos maiores. Você encontra todos os detalhes no Colabore, logo abaixo."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON"
-msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Escolha uma data mais próxima, ou toque em Colabore no menu principal para apoiar o Mitup e agendar mais para o futuro."
+msgstr "Você pode agendar eventos até ${days} dias no futuro por enquanto. Escolha uma data mais próxima, ou torne-se Host do Mitup no Patreon para agendar mais para o futuro. Você encontra todos os detalhes no Colabore, logo abaixo."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_PATRON"
-msgstr "Seu plano Gamemaster agenda eventos até ${days} dias no futuro. Escolha uma data mais próxima, ou toque em Colabore no menu principal para virar Commissioner e remover o limite."
+msgstr "Seu plano Gamemaster agenda até ${days} dias no futuro, agradecemos seu apoio ao Mitup! Escolha uma data mais próxima, ou vire Commissioner no Patreon para agendar o quanto quiser. Você encontra todos os detalhes no Colabore, logo abaixo."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Seus benefícios de Host estão em período de carência</b>\n\nNão conseguimos confirmar uma contribuição ativa no Patreon na sua conta, então seus benefícios de Host serão desativados em uma semana. Se sua contribuição ainda estiver ativa, não é preciso fazer nada e ela será renovada automaticamente. Caso contrário, você pode apoiar o Mitup novamente pelo menu Colabore."
@@ -1021,3 +1021,9 @@ msgstr "📖 Abrir o guia do usuário"
 
 msgid "HelpMessages.DESCRIPTION"
 msgstr "<b>Ajuda</b>\n\nHá duas formas de obter ajuda com o Mitup. O guia do usuário mostra como o Mitup funciona, página por página, e é o melhor ponto de partida. Se você ainda tiver uma dúvida ou precisar falar com uma pessoa, escreva para support@mitup.social."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
+msgstr "Essa data está a mais de ${days} dias, o máximo que você pode agendar por enquanto. Envie o título do seu evento novamente com uma data mais próxima, ou torne-se Host do Mitup no Patreon para agendar mais para o futuro. Você encontra todos os detalhes no Colabore, logo abaixo."
+
+msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
+msgstr "Essa data está a mais de ${days} dias, o máximo que seu plano Gamemaster agenda. Envie o título do seu evento novamente com uma data mais próxima, ou vire Commissioner no Patreon para agendar o quanto quiser. Você encontra todos os detalhes no Colabore, logo abaixo."
