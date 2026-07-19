@@ -70,19 +70,50 @@ def test_typecheck_echoes_version_then_covers_root_and_mb(recorder: CommandRecor
 def test_migrate_down_defaults_to_one_step(recorder: CommandRecorder):
     cli.invoke(app, ["db", "migrate", "down"])
 
-    assert recorder.commands == [["uv", "run", "alembic", "downgrade", "-1"]]
+    assert recorder.commands == [[*COMPOSE_MIGRATIONS_RUN, "uv", "run", "alembic", "downgrade", "-1"]]
+
+
+COMPOSE_MIGRATIONS_RUN = ["docker", "compose", "run", "--rm", "migrations-upgrade"]
 
 
 def test_migrate_down_accepts_a_step_count(recorder: CommandRecorder):
     cli.invoke(app, ["db", "migrate", "down", "3"])
 
-    assert recorder.commands == [["uv", "run", "alembic", "downgrade", "-3"]]
+    assert recorder.commands == [[*COMPOSE_MIGRATIONS_RUN, "uv", "run", "alembic", "downgrade", "-3"]]
 
 
 def test_migrate_up_defaults_to_head(recorder: CommandRecorder):
     cli.invoke(app, ["db", "migrate", "up"])
 
-    assert recorder.commands == [["uv", "run", "alembic", "upgrade", "head"]]
+    assert recorder.commands == [[*COMPOSE_MIGRATIONS_RUN, "uv", "run", "alembic", "upgrade", "head"]]
+
+
+def test_db_reset_drops_schema_then_migrates(recorder: CommandRecorder):
+    cli.invoke(app, ["db", "reset", "--yes"])
+
+    assert recorder.commands == [
+        [
+            "docker",
+            "compose",
+            "exec",
+            "postgres",
+            "psql",
+            "-U",
+            "mitupbot",
+            "-d",
+            "mitup",
+            "-c",
+            "DROP SCHEMA public CASCADE; CREATE SCHEMA public;",
+        ],
+        [*COMPOSE_MIGRATIONS_RUN, "uv", "run", "alembic", "upgrade", "head"],
+    ]
+
+
+def test_db_reset_without_confirmation_runs_nothing(recorder: CommandRecorder):
+    result = cli.invoke(app, ["db", "reset"], input="n\n")
+
+    assert result.exit_code != 0
+    assert recorder.commands == []
 
 
 def test_db_up_waits_for_health(recorder: CommandRecorder):

@@ -30,12 +30,14 @@ services:
       - MITUPBOT__DB__DATABASE=mitup
       - MITUPBOT__DB__URL=postgres
       - MITUPBOT__DB__PORT=5432
-    command: uv run mb db migrate up
+    # Alembic runs directly: `mb db migrate` itself wraps this service, so routing the service
+    # back through mb would try to reach docker from inside the container.
+    command: uv run alembic upgrade head
 
   migrations-downgrade:
     # Intended only for local migrations
     <<: *migrations-service
-    command: uv run mb db migrate down
+    command: uv run alembic downgrade -1
 
   postgres:
     image: postgres:18.4
