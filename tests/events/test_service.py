@@ -595,7 +595,7 @@ def test_cli_invokes_with_defaults():
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
-        mock_config.patreon = None
+        mock_config.patreon = create_patreon_config()
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
@@ -625,7 +625,7 @@ def test_cli_registers_the_outbox_reconciler():
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
-        mock_config.patreon = None
+        mock_config.patreon = create_patreon_config()
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
@@ -650,7 +650,7 @@ def test_cli_registers_the_update_guards():
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
-        mock_config.patreon = None
+        mock_config.patreon = create_patreon_config()
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
@@ -674,7 +674,7 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
     ):
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = True
-        mock_config.patreon = None
+        mock_config.patreon = create_patreon_config()
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, [])
@@ -700,7 +700,7 @@ def test_cli_passes_custom_intervals():
         patch("mitup_bot.events.service.asyncio.run") as mock_async_run,
     ):
         mock_config = MagicMock()
-        mock_config.patreon = None
+        mock_config.patreon = create_patreon_config()
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(
@@ -741,7 +741,7 @@ def test_cli_passes_custom_intervals():
         assert start_time_arg == 1.5
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def restore_patreon_state() -> Iterator[None]:
     """Save/restore the process-wide Patreon seams that ``configure_patreon`` mutates."""
     saved_config, saved_cipher = PatreonRuntime.config, TokenCipher.cipher
@@ -752,11 +752,8 @@ def restore_patreon_state() -> Iterator[None]:
         TokenCipher.cipher = saved_cipher
 
 
-def test_cli_configures_patreon_when_section_present(restore_patreon_state: None):
-    """A present [patreon] section installs the token cipher and the runtime config for the process.
-
-    Driven through the CLI (the no-section path is already exercised by the other cli tests, which
-    all set ``patreon = None``)."""
+def test_cli_configures_patreon():
+    """The [patreon] section installs the token cipher and the runtime config for the process."""
     runner = CliRunner()
     patreon_config = create_patreon_config()
 
@@ -794,7 +791,7 @@ def test_cli_env_option():
         patch("mitup_bot.events.service.asyncio.run"),
     ):
         mock_config = MagicMock()
-        mock_config.patreon = None
+        mock_config.patreon = create_patreon_config()
         mock_config_cls.return_value = mock_config
 
         result = runner.invoke(cli, ["--env", "prod"])

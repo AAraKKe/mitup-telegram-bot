@@ -11,7 +11,7 @@ The moving parts live in submodules so nothing but re-exports sits in this file:
 from mitup_bot.patreon import oauth
 from mitup_bot.patreon.client import PatreonClient, TokenPair
 from mitup_bot.patreon.models import IdentityResponse, MemberResource
-from mitup_bot.patreon.runtime import PatreonRuntime, configure, current_config, is_configured
+from mitup_bot.patreon.runtime import PatreonRuntime, configure, current_config
 
 __all__ = [
     "IdentityResponse",
@@ -21,6 +21,5 @@ __all__ = [
     "TokenPair",
     "configure",
     "current_config",
-    "is_configured",
     "oauth",
 ]

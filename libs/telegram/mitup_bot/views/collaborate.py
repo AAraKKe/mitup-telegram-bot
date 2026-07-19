@@ -1,7 +1,8 @@
+from mitup_bot import docs_links
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.entities import FormattedText, Link, render
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages, SupporterNotificationMessages
 from mitup_bot.views.mitup_view import MitupView
 
@@ -53,34 +54,32 @@ def hosts_group_removed_view(lang: str) -> MitupView:
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
 
-def collaborate_unavailable_view(lang: str) -> MitupView:
-    """Degraded screen shown when the bot runs without a ``[patreon]`` config section."""
-    return MitupView(
-        description=CollaborateMessages.UNAVAILABLE.get(lang=lang),
-        keyboard=[],
-    ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
+def limits_page_link(lang: str) -> FormattedText:
+    """Inline link to the docs limits page, which owns the per-tier perk details so tier changes
+    never require a chat-copy sweep."""
+    return render(t"{Link(CollaborateMessages.LIMITS_PAGE_LABEL.get_text(lang=lang), docs_links.limits_url())}")
 
 
-def collaborate_not_linked_view(
-    lang: str, authorization_url: str, active_meetings: int, scheduling_days: int
-) -> MitupView:
-    """Not-linked screen: supporter pitch plus the Patreon OAuth link button (a URL button)."""
+def collaborate_not_linked_view(lang: str, authorization_url: str) -> MitupView:
+    """Not-linked screen: the support pitch, inline links to the docs ways-to-support and limits
+    pages, plus the Patreon OAuth link button (a URL button)."""
+    collaborate_page = render(
+        t"{Link(CollaborateMessages.COLLABORATE_PAGE_LABEL.get_text(lang=lang), docs_links.collaborate_url())}"
+    )
     return MitupView(
         description=CollaborateMessages.NOT_LINKED.get(
-            lang=lang, active_meetings=active_meetings, scheduling_days=scheduling_days
+            lang=lang,
+            collaborate_page=collaborate_page,
+            limits_page=limits_page_link(lang),
         ),
         keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get_text(lang=lang), url=authorization_url)]],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
 
-def collaborate_linked_not_patron_view(
-    lang: str, pledge_url: str, active_meetings: int, scheduling_days: int
-) -> MitupView:
+def collaborate_linked_not_patron_view(lang: str, pledge_url: str) -> MitupView:
     """Linked-but-not-patron screen: become-a-patron link plus the Unlink button."""
     return MitupView(
-        description=CollaborateMessages.LINKED_NOT_PATRON.get(
-            lang=lang, active_meetings=active_meetings, scheduling_days=scheduling_days
-        ),
+        description=CollaborateMessages.LINKED_NOT_PATRON.get(lang=lang, limits_page=limits_page_link(lang)),
         keyboard=[
             [ButtonConfig(text=ButtonMessages.BECOME_PATRON.get_text(lang=lang), url=pledge_url)],
             [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get_text(lang=lang), callback_data=cb.UNLINK_PATREON)],

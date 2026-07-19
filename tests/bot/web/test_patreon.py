@@ -133,14 +133,6 @@ class FakePatreonClient:
         return self.identity
 
 
-async def test_callback_unconfigured_returns_service_unavailable(web_app: FastAPI):
-    async with build_web_client(web_app) as client:
-        response = await client.get("/patreon/callback", params={"code": "c", "state": "s"})
-
-    assert response.status_code == 503
-    assert "isn't switched on yet" in response.text
-
-
 async def test_callback_denied_consent_is_non_accusative(web_app: FastAPI, patreon_config: PatreonConfig):
     async with build_web_client(web_app) as client:
         response = await client.get("/patreon/callback", params={"error": "access_denied"})
@@ -197,14 +189,12 @@ async def test_bare_hit_is_logged_with_bare_landing_outcome(web_app: FastAPI, pa
     assert bare["has_error"] is False
 
 
-async def test_bare_hit_first_even_when_patreon_unconfigured(web_app: FastAPI):
-    # No patreon_config fixture: Patreon is switched off. A bare visit must not reveal that — it still
-    # gets the generic 404 landing, not the unconfigured page.
+async def test_bare_hit_gets_generic_landing(web_app: FastAPI):
+    # A bare visit (no Patreon params) gets the generic 404 landing that never mentions Patreon.
     async with build_web_client(web_app) as client:
         response = await client.get("/patreon/callback")
 
     assert response.status_code == 404
-    assert "isn't switched on yet" not in response.text.lower()
     assert "patreon" not in response.text.lower()
 
 
@@ -324,12 +314,6 @@ def test_callback_params_ignores_unknown_fields():
 
 def test_resolve_bare_hit_when_no_params():
     assert resolve_callback(PatreonCallbackParams()).outcome is CallbackOutcome.BARE
-
-
-def test_resolve_unconfigured_when_patreon_off():
-    # No patreon_config fixture: Patreon is switched off, but the params look like a redirect.
-    resolved = resolve_callback(PatreonCallbackParams(code="c", state="s"))
-    assert resolved.outcome is CallbackOutcome.UNCONFIGURED
 
 
 def test_resolve_patreon_error_carries_error(patreon_config: PatreonConfig):
@@ -648,9 +632,7 @@ async def test_link_refreshes_tapped_message_into_not_patron_view(
     api.assert_edit_message_for_user_called(
         user=user,
         message_id=TAPPED_MESSAGE_ID,
-        view=collaborate_linked_not_patron_view(
-            user.lang, oauth.campaign_pledge_url(patreon_config), PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
-        ),
+        view=collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(patreon_config)),
     )
     view = api.call_args("edit_message_for_user").kwargs["view"]
     assert "${" not in view.description.text

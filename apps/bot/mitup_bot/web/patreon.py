@@ -129,7 +129,6 @@ class CallbackOutcome(Enum):
     """How the callback inputs classify — decided once by ``resolve_callback``."""
 
     BARE = auto()
-    UNCONFIGURED = auto()
     PATREON_ERROR = auto()
     MISSING_PARAMS = auto()
     STATE_EXPIRED = auto()
@@ -162,8 +161,6 @@ def resolve_callback(params: Annotated[PatreonCallbackParams, Query()]) -> Resol
     """
     if not params.looks_like_patreon_redirect:
         return ResolvedCallback(CallbackOutcome.BARE)
-    if not patreon.is_configured():
-        return ResolvedCallback(CallbackOutcome.UNCONFIGURED)
     if params.error is not None:
         return ResolvedCallback(CallbackOutcome.PATREON_ERROR, error=params.error)
     if not params.has_required_params:
@@ -270,19 +267,6 @@ def bare_landing_page(bot_username: str | None) -> HTMLResponse:
     )
 
 
-def unconfigured_page(bot_username: str | None) -> HTMLResponse:
-    """Defensive: no valid link can exist without config, but the route is always registered."""
-    return failure_page(
-        "unconfigured",
-        "Patreon isn't available yet",
-        "Supporting Mitup through Patreon isn't switched on yet. Nothing went wrong on your end. "
-        "Please try again later.",
-        bot_username,
-        stage="entry",
-        status_code=503,
-    )
-
-
 def missing_params_page(params: PatreonCallbackParams, bot_username: str | None) -> HTMLResponse:
     """Partial Patreon hit: at least one of code/state present, but not both."""
     return failure_page(
@@ -350,8 +334,8 @@ async def patreon_callback(
             has_error=params.has_error,
         )
         # Funnel entry: any genuine Patreon redirect (consent granted or denied) counts as a link
-        # attempt; bare scanner hits and unconfigured environments do not.
-        if resolved.outcome not in (CallbackOutcome.BARE, CallbackOutcome.UNCONFIGURED):
+        # attempt; bare scanner hits do not.
+        if resolved.outcome is not CallbackOutcome.BARE:
             metrics_client.emit_feature(Feature.PATREON_LINK, name=MetricKey.FLOW_STARTED)
         return await render_resolved_callback(ptb_app, metrics_client, params, resolved)
 
@@ -376,8 +360,6 @@ def render_terminal_page(
     match resolved.outcome:
         case CallbackOutcome.BARE:
             return bare_landing_page(bot_username)
-        case CallbackOutcome.UNCONFIGURED:
-            return unconfigured_page(bot_username)
         case CallbackOutcome.PATREON_ERROR:
             assert resolved.error is not None, "PATREON_ERROR carries the error string"
             return patreon_error_page(resolved.error, bot_username)
@@ -570,15 +552,14 @@ async def refresh_tapped_message(
     if message_id is None:
         return
 
-    active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
-    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
-
     if outcome is LinkOutcome.LINKED_SUPPORTER:
+        active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
+        scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
         view = collaborate_linked_patron_view(user.lang, user.supporter_level, active_meetings, scheduling_days)
     else:
         config = patreon.current_config()
         pledge_url = oauth.campaign_pledge_url(config)
-        view = collaborate_linked_not_patron_view(user.lang, pledge_url, active_meetings, scheduling_days)
+        view = collaborate_linked_not_patron_view(user.lang, pledge_url)
 
     try:
         await api.edit_message_for_user(user, message_id, view)

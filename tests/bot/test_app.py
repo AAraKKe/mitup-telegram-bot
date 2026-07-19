@@ -38,6 +38,8 @@ def build_config(
     pool_metrics_enabled: bool = False,
     patreon: PatreonConfig | None = None,
 ) -> Config:
+    # The section is required on Config, so tests always get a valid default unless they
+    # pass their own.
     return Config(
         db=DbConfig(
             username="user",
@@ -58,7 +60,7 @@ def build_config(
         ),
         app=AppConfig(run_mode=run_mode),
         metrics=MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT),
-        patreon=patreon,
+        patreon=patreon or create_patreon_config(),
     )
 
 
@@ -217,7 +219,7 @@ def test_init_configures_metrics(patch_runtime_deps: RuntimeDeps):
     patch_runtime_deps.metrics.assert_called_once_with(runtime.config.metrics)
 
 
-def test_init_configures_patreon_when_section_present(patch_runtime_deps: RuntimeDeps):
+def test_init_configures_patreon(patch_runtime_deps: RuntimeDeps):
     patreon_config = create_patreon_config()
     config = build_config(patreon=patreon_config)
 
@@ -231,18 +233,6 @@ def test_init_configures_patreon_when_section_present(patch_runtime_deps: Runtim
     # The token cipher is seeded with the encryption key and the runtime holder gets the section.
     mock_encrypt.assert_called_once_with(patreon_config.encryption_key.get_secret_value())
     mock_configure.assert_called_once_with(patreon_config)
-
-
-def test_init_skips_patreon_when_section_absent(patch_runtime_deps: RuntimeDeps):
-    # build_config defaults patreon to None, so neither the cipher nor the holder is touched.
-    with (
-        mock.patch("mitup_bot.app.configure_token_encryption") as mock_encrypt,
-        mock.patch("mitup_bot.app.patreon.configure") as mock_configure,
-    ):
-        MitupRuntime(Env.DEV)
-
-    mock_encrypt.assert_not_called()
-    mock_configure.assert_not_called()
 
 
 # --- Build application ---

@@ -18,10 +18,6 @@ def reset_runtime() -> Iterator[None]:
         PatreonRuntime.config = saved
 
 
-def test_unconfigured_by_default():
-    assert runtime.is_configured() is False
-
-
 def test_current_config_raises_when_unconfigured():
     with pytest.raises(PatreonNotConfigured):
         runtime.current_config()
@@ -31,5 +27,4 @@ def test_configure_makes_config_available():
     config = create_patreon_config()
     runtime.configure(config)
 
-    assert runtime.is_configured() is True
     assert runtime.current_config() is config

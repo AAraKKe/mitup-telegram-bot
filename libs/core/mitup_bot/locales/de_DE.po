@@ -849,13 +849,10 @@ msgid "ButtonMessages.HOSTS_GROUP_OPEN"
 msgstr "👥 Hosts-Gruppe öffnen"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Unterstütze Mitup mit Patreon</b>\n\nMitup ist kostenlos. Wenn es dir hilft, Menschen zusammenzubringen, kannst du es auf Patreon unterstützen und als Dankeschön Host-Vorteile freischalten.\n\n<b>Als Gamemaster:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Commissioner:</b> alles unbegrenzt.\n\nVerbinde dein Patreon-Konto, um zu beginnen."
+msgstr "<b>Hilf mit, Mitup am Laufen zu halten</b>\n\nMitup wird von zwei Brüdern gebaut, nicht von einem großen Unternehmen, und ist für alle kostenlos. Deine Unterstützung bezahlt die Server, die Datenbank und die langen Debugging-Nächte. Jede Hilfe zählt: erzähl deinen Freunden von Mitup, übersetze, melde Fehler oder unterstütze das Projekt finanziell. Die Seite ${collaborate_page} auf unserer Website zeigt alle Wege mitzuhelfen.\n\nDer direkteste Weg zu helfen ist, Mitup-Host auf Patreon zu werden. Als Dankeschön bekommen Hosts ein Abzeichen neben ihrem Namen, eine Gruppe nur für Mitglieder und höhere Limits je nach Stufe: Brewer, Gamemaster oder Commissioner. Die Seite ${limits_page} zeigt, was jede Stufe freischaltet.\n\nVerknüpfe dein Patreon-Konto, um loszulegen, und danke, dass du da bist."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon-Konto verbunden</b>\n\nAlles erledigt. Du bist noch kein Host, daher sind deine Host-Vorteile noch nicht aktiv.\n\n<b>Als Gamemaster:</b> bis zu ${active_meetings} aktive Treffen gleichzeitig durchführen, bis zu ${scheduling_days} Tage im Voraus planen und unbegrenzte Teilnehmer pro Treffen einladen.\n\n<b>Als Commissioner:</b> alles unbegrenzt.\n\nWerde ein Host und deine Vorteile werden automatisch aktiviert, ohne dass du erneut verlinken musst."
-
-msgid "CollaborateMessages.UNAVAILABLE"
-msgstr "<b>Mithelfen</b>\n\nPatreon-Unterstützung ist noch nicht verfügbar. Schau bald wieder vorbei."
+msgstr "<b>Patreon-Konto verknüpft</b>\n\nAlles bereit, danke für den ersten Schritt! Du bist noch kein Host, deshalb sind deine Host-Vorteile noch aus.\n\nAls Dankeschön bekommen Hosts ein Abzeichen neben ihrem Namen, eine Gruppe nur für Mitglieder und höhere Limits je nach Stufe: Brewer, Gamemaster oder Commissioner. Die Seite ${limits_page} zeigt, was jede Stufe freischaltet.\n\nWerde Host und deine Vorteile schalten sich automatisch frei, ohne dass du dich neu verknüpfen musst."
 
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Dein Patreon-Konto wurde getrennt."
@@ -1036,3 +1033,9 @@ msgstr "<b>Alles bereit, willkommen bei Mitup!</b> Deine Zeitzone ist ${timezone
 
 msgid "RegistrationMessages.USER_GUIDE_LABEL"
 msgstr "Anleitung"
+
+msgid "CollaborateMessages.COLLABORATE_PAGE_LABEL"
+msgstr "Möglichkeiten zu helfen"
+
+msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
+msgstr "Limits und Host-Vorteile"

@@ -22,6 +22,7 @@ from mitup_bot.config import (
     TomlConfigProvider,
 )
 from mitup_bot.models.subscriptions import TokenCipher, configure_token_encryption
+from tests.helpers.fixtures import create_patreon_config
 
 TOML_CONTENT = """
 [db]
@@ -40,6 +41,8 @@ environment = "local"
 log_group = "LogGroup"
 """
 
+# Carries a full patreon section: the section is required, so the base working config
+# provides it the way prod does, through the env provider.
 CONFIG_FROM_ENV = {
     "db": {
         "password": "1234abc",
@@ -51,7 +54,22 @@ CONFIG_FROM_ENV = {
         "gmaps_geocode_key": "1a2b3c45d6e7f8g",
         "gmaps_timezone_key": "9h0i1j2k3l4m5n6o",
     },
+    "patreon": {
+        "client_id": "patreon-client-abc",
+        "client_secret": "patreon-secret-xyz",
+        # Numeric on purpose: the env provider hands this back as an int, exercising the
+        # coerce_numbers_to_str path on PatreonConfig.
+        "campaign_id": "1234567",
+        "redirect_uri": "https://bot.example/patreon/callback",
+        "creator_access_token": "seed-access-token",
+        "creator_refresh_token": "seed-refresh-token",
+        "state_secret": "fernet-state-key",
+        "encryption_key": "fernet-encryption-key",
+    },
 }
+
+# The same working env config without the patreon section, for the boot-requirement tests.
+CONFIG_FROM_ENV_WITHOUT_PATREON = {key: value for key, value in CONFIG_FROM_ENV.items() if key != "patreon"}
 
 FULL_PATREON_TOML_SECTION = """
 [patreon]
@@ -74,21 +92,6 @@ client_secret = "patreon-secret-xyz"
 EMPTY_PATREON_TOML_SECTION = """
 [patreon]
 """
-
-FULL_PATREON_ENV_SECTION = {
-    "patreon": {
-        "client_id": "patreon-client-abc",
-        "client_secret": "patreon-secret-xyz",
-        # Numeric on purpose: the env provider hands this back as an int, exercising the
-        # coerce_numbers_to_str path on PatreonConfig.
-        "campaign_id": "1234567",
-        "redirect_uri": "https://bot.example/patreon/callback",
-        "creator_access_token": "seed-access-token",
-        "creator_refresh_token": "seed-refresh-token",
-        "state_secret": "fernet-state-key",
-        "encryption_key": "fernet-encryption-key",
-    },
-}
 
 BROKEN_TOML_CONTENT = """
 [db]
@@ -152,16 +155,17 @@ def test_config_fails_with_missing_values(mock_toml_config: tuple[mock.Mock]):
     with pytest.raises(ValidationError) as exc_info:
         Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
-    # Assert that there are 2 errors for the missing pieces of db
-    assert len(exc_info.value.errors()) == 4
+    assert len(exc_info.value.errors()) == 5
     assert exc_info.value.errors()[0]["type"] == "missing"
     assert exc_info.value.errors()[1]["type"] == "missing"
     assert exc_info.value.errors()[2]["type"] == "missing"
     assert exc_info.value.errors()[3]["type"] == "enum"
+    assert exc_info.value.errors()[4]["type"] == "missing"
     assert exc_info.value.errors()[0]["loc"] == ("db", "username")
     assert exc_info.value.errors()[1]["loc"] == ("db", "password")
     assert exc_info.value.errors()[2]["loc"] == ("google_api", "gmaps_timezone_key")
     assert exc_info.value.errors()[3]["loc"] == ("metrics", "environment")
+    assert exc_info.value.errors()[4]["loc"] == ("patreon",)
 
     assert exc_info.value.title == "Config"
 
@@ -183,6 +187,7 @@ def build_config(*, concurrent_updates: int = 1, pool_size: int = 5, max_overflo
         ),
         app=AppConfig(run_mode=RunModes.POLLING),
         metrics=MetricsConfig(namespace="test", environment=MetricsEnv.STDOUT),
+        patreon=create_patreon_config(),
     )
 
 
@@ -321,18 +326,19 @@ def test_config_without_log_level_still_builds(
 
 @pytest.mark.parametrize(
     "mock_toml_config,mock_env_config",
-    ([TOML_CONTENT, CONFIG_FROM_ENV],),
+    ([TOML_CONTENT, CONFIG_FROM_ENV_WITHOUT_PATREON],),
     indirect=True,
     ids=["patreon_absent"],
 )
-def test_config_without_patreon_section_is_none(
+def test_config_without_patreon_section_fails_at_boot(
     mock_toml_config: tuple[mock.Mock],
     mock_env_config: None,
 ):
-    # The Patreon section is optional; the bot must boot with it entirely absent.
-    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+    # Patreon support is part of the product: a deployment without the section must not boot.
+    with pytest.raises(ValidationError) as exc_info:
+        Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
-    assert config.patreon is None
+    assert {error["loc"] for error in exc_info.value.errors()} == {("patreon",)}
 
 
 @pytest.mark.parametrize(
@@ -360,7 +366,7 @@ def test_full_patreon_section_from_toml_is_parsed(
 
 @pytest.mark.parametrize(
     "mock_toml_config,mock_env_config",
-    ([TOML_CONTENT, {**CONFIG_FROM_ENV, **FULL_PATREON_ENV_SECTION}],),
+    ([TOML_CONTENT, CONFIG_FROM_ENV],),
     indirect=True,
     ids=["patreon_via_env"],
 )
@@ -380,24 +386,25 @@ def test_full_patreon_section_from_env_is_parsed(
 
 @pytest.mark.parametrize(
     "mock_toml_config,mock_env_config",
-    ([TOML_CONTENT + EMPTY_PATREON_TOML_SECTION, CONFIG_FROM_ENV],),
+    ([TOML_CONTENT + EMPTY_PATREON_TOML_SECTION, CONFIG_FROM_ENV_WITHOUT_PATREON],),
     indirect=True,
     ids=["patreon_empty_section"],
 )
-def test_empty_patreon_section_is_treated_as_absent(
+def test_empty_patreon_section_fails_with_field_errors(
     mock_toml_config: tuple[mock.Mock],
     mock_env_config: None,
 ):
-    # An empty [patreon] header (the preemptive-section-with-env-overrides pattern) must read
-    # as absent rather than firing eight "field required" errors at boot.
-    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+    # An empty [patreon] header without env overrides names every missing field at boot.
+    with pytest.raises(ValidationError) as exc_info:
+        Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
-    assert config.patreon is None
+    assert all(error["type"] == "missing" for error in exc_info.value.errors())
+    assert len(exc_info.value.errors()) == 8
 
 
 @pytest.mark.parametrize(
     "mock_toml_config,mock_env_config",
-    ([TOML_CONTENT + PARTIAL_PATREON_TOML_SECTION, CONFIG_FROM_ENV],),
+    ([TOML_CONTENT + PARTIAL_PATREON_TOML_SECTION, CONFIG_FROM_ENV_WITHOUT_PATREON],),
     indirect=True,
     ids=["partial_patreon_toml"],
 )
@@ -417,7 +424,7 @@ def test_partial_patreon_section_from_toml_raises(
 
 @pytest.mark.parametrize(
     "mock_toml_config,mock_env_config",
-    ([TOML_CONTENT, {**CONFIG_FROM_ENV, "patreon": {"client_id": "patreon-client-abc"}}],),
+    ([TOML_CONTENT, {**CONFIG_FROM_ENV_WITHOUT_PATREON, "patreon": {"client_id": "patreon-client-abc"}}],),
     indirect=True,
     ids=["partial_patreon_env"],
 )

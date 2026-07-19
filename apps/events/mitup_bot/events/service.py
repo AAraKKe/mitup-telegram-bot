@@ -83,13 +83,8 @@ class IntervalsConfiguration:
 
 
 def configure_patreon(config: Config):
-    """Wire the token cipher and Patreon runtime for the events process when a section is present.
-
-    Lets the SUPPORTER_CHECK job decrypt/encrypt tokens and read the live config; a no-op otherwise,
-    keeping the process bootable without Patreon."""
-    if config.patreon is None:
-        log.info("Patreon section absent, skipping Patreon setup")
-        return
+    """Wire the token cipher and Patreon runtime for the events process, so the SUPPORTER_CHECK
+    job can decrypt/encrypt tokens and read the live config."""
     configure_token_encryption(*config.patreon.encryption_keys())
     patreon.configure(config.patreon)
 

@@ -567,19 +567,6 @@ async def test_process_all_isolates_a_failing_subscription():
 # ---------------------------------------------------------------------------
 
 
-async def test_run_noops_when_unconfigured(
-    mock_session: MockDbSession, api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
-):
-    def fail_construct(*args: object, **kwargs: object):
-        raise AssertionError("PatreonClient must not be constructed when unconfigured")
-
-    monkeypatch.setattr(supporter_check, "PatreonClient", fail_construct)
-
-    await supporter_check.run(api, metrics_client)
-
-    assert metrics_client.records == []
-
-
 async def test_run_happy_path_emits_creator_ttl_and_counters(
     mock_session: MockDbSession,
     api: MockApi,

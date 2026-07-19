@@ -77,12 +77,6 @@ async def register_membership_webhook(desired_uri: str, metrics_client: MetricsC
     metered but swallowed, because a registration failure must never abort bot startup. Called from the
     webhook lifespan after ``set_webhook``, only when Patreon is configured and a public domain exists.
     """
-    if not patreon.is_configured():
-        # Defensive: app.py only passes a URL when Patreon is configured, but keep the no-op local so a
-        # direct caller never trips current_config()'s raise into a spurious failure metric.
-        log.info("Patreon not configured, skipping webhook registration")
-        return
-
     with structlog.contextvars.bound_contextvars(flow=REGISTRATION_FLOW):
         try:
             config = patreon.current_config()

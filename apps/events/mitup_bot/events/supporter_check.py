@@ -281,14 +281,9 @@ async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int],
 async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     """Validate supporter memberships against Patreon and keep the creator token fresh.
 
-    No-ops cleanly when Patreon is unconfigured, so the bot can deploy before any credentials exist.
     Each subscription is handled in its own write lifecycle; a mid-run failure leaves earlier commits
     intact and re-nominates the rest next run. Emits the per-run outcome counters (COUNT, EventType
     base dimension only) before any failure raise so the series stay continuous."""
-    if not patreon.is_configured():
-        log.info("Patreon not configured, skipping supporter check")
-        return
-
     config = patreon.current_config()
     failures: list[str] = []
 

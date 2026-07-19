@@ -813,10 +813,10 @@ msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Scollega account Patreon"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Sostieni Mitup con Patreon</b>\n\nMitup è gratuito. Se ti aiuta a riunire la tua gente, puoi sostenerlo su Patreon e sbloccare i vantaggi da Host come ringraziamento.\n\n<b>Come Gamemaster:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita partecipanti senza limiti per ogni incontro.\n\n<b>Come Commissioner:</b> tutto senza limiti.\n\nCollega il tuo account Patreon per iniziare."
+msgstr "<b>Aiuta a tenere Mitup in piedi</b>\n\nMitup è costruito da una coppia di fratelli, non da una grande azienda, ed è gratuito per tutti. Il tuo sostegno paga i server, il database e le nottate di debugging. Ogni aiuto conta: parlare di Mitup ai tuoi amici, tradurre, segnalare errori o sostenere il progetto. La pagina ${collaborate_page} sul nostro sito racconta tutti i modi per dare una mano.\n\nIl modo più diretto di aiutare è diventare Host di Mitup su Patreon. Come ringraziamento, gli Host ricevono un badge accanto al nome, un gruppo riservato ai membri e limiti più alti a seconda del livello: Brewer, Gamemaster o Commissioner. La pagina ${limits_page} mostra cosa sblocca ogni livello.\n\nCollega il tuo account Patreon per iniziare, e grazie di essere qui."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Account Patreon collegato</b>\n\nTutto pronto. Non sei ancora un Host, quindi i tuoi vantaggi da Host sono ancora disattivati.\n\n<b>Come Gamemaster:</b> gestisci fino a ${active_meetings} incontri attivi contemporaneamente, pianifica fino a ${scheduling_days} giorni in anticipo e invita partecipanti senza limiti per ogni incontro.\n\n<b>Come Commissioner:</b> tutto senza limiti.\n\nDiventa un Host e i tuoi vantaggi si attiveranno automaticamente, senza bisogno di collegare di nuovo."
+msgstr "<b>Account Patreon collegato</b>\n\nTutto pronto, grazie per il primo passo! Non sei ancora Host, quindi i tuoi vantaggi da Host sono ancora disattivati.\n\nCome ringraziamento, gli Host ricevono un badge accanto al nome, un gruppo riservato ai membri e limiti più alti a seconda del livello: Brewer, Gamemaster o Commissioner. La pagina ${limits_page} mostra cosa sblocca ogni livello.\n\nDiventa Host e i tuoi vantaggi si attiveranno automaticamente, senza bisogno di collegare di nuovo."
 
 msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
 msgstr "<b>☕️ Sei un Brewer</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Brewer è visibile sul tuo profilo e il tuo supporto aiuta a mantenere Mitup attivo per tutti. Puoi scollegare il tuo account Patreon quando vuoi."
@@ -826,9 +826,6 @@ msgstr "<b>🎲 Sei un Gamemaster</b>\n\nGrazie per aver sostenuto Mitup. Il tuo
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
 msgstr "<b>🏆 Sei un Commissioner</b>\n\nGrazie per aver sostenuto Mitup. Il tuo badge da Commissioner è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno. Puoi scollegare il tuo account Patreon quando vuoi."
-
-msgid "CollaborateMessages.UNAVAILABLE"
-msgstr "<b>Collabora</b>\n\nIl supporto Patreon non è ancora disponibile. Torna presto."
 
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Il tuo account Patreon è stato scollegato."
@@ -1006,3 +1003,9 @@ msgstr "<b>Tutto pronto, ti diamo il benvenuto su Mitup!</b> Il tuo fuso orario 
 
 msgid "RegistrationMessages.USER_GUIDE_LABEL"
 msgstr "guida utente"
+
+msgid "CollaborateMessages.COLLABORATE_PAGE_LABEL"
+msgstr "modi per sostenere"
+
+msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
+msgstr "limiti e vantaggi Host"

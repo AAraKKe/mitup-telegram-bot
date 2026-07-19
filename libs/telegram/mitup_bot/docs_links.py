@@ -11,6 +11,8 @@ BOT_DOMAIN_PREFIX = "bot."
 DEFAULT_BASE_URL = "https://mitup.social"
 USER_GUIDE_PATH = "/user-guide/"
 PRIVACY_PATH = "/faq/privacy/"
+COLLABORATE_PATH = "/collaborate/donation/"
+LIMITS_PATH = "/user-guide/limits/"
 
 
 class DocsState:
@@ -45,3 +47,11 @@ def user_guide_url() -> str:
 
 def privacy_url() -> str:
     return f"{DocsState.base_url}{PRIVACY_PATH}"
+
+
+def collaborate_url() -> str:
+    return f"{DocsState.base_url}{COLLABORATE_PATH}"
+
+
+def limits_url() -> str:
+    return f"{DocsState.base_url}{LIMITS_PATH}"

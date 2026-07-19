@@ -59,14 +59,7 @@ class MitupRuntime:
         self.__setup_patreon()
 
     def __setup_patreon(self):
-        """Wire Patreon support when a ``[patreon]`` section is present; skip entirely otherwise.
-
-        The bot must stay fully bootable without Patreon configured, so both the token cipher and
-        the runtime config holder are only initialized when the optional section exists.
-        """
-        if self.config.patreon is None:
-            log.info("Patreon section absent, skipping Patreon setup")
-            return
+        """Wire the token cipher and the Patreon runtime holder from the required config section."""
         configure_token_encryption(*self.config.patreon.encryption_keys())
         patreon.configure(self.config.patreon)
 
@@ -126,14 +119,10 @@ class MitupRuntime:
         if self.config.bot.secret_token is None:
             raise ValueError("Secret token must be set when running with webhook")
 
-        # In webhook mode a public domain is guaranteed, so the Patreon membership webhook can be
-        # registered too — gated on Patreon being configured. Startup itself stays isolated from any
-        # registration failure (handled inside the lifespan); here we only decide whether to attempt it.
-        patreon_webhook_url = (
-            patreon_webhooks.webhook_uri(self.config.bot.domain, self.config.bot.port)
-            if patreon.is_configured()
-            else None
-        )
+        # In webhook mode a public domain is guaranteed, so the Patreon membership webhook is
+        # registered too. Startup itself stays isolated from any registration failure (handled
+        # inside the lifespan); here we only build the URL to attempt.
+        patreon_webhook_url = patreon_webhooks.webhook_uri(self.config.bot.domain, self.config.bot.port)
 
         return create_app(
             self.app,

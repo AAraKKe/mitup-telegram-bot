@@ -13,11 +13,11 @@ from mitup_bot.models import User
 from mitup_bot.patreon import PatreonRuntime, oauth
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import Link, render
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
-    collaborate_unavailable_view,
 )
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
@@ -85,20 +85,6 @@ def patron_caps(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
-async def test_collaborate_unavailable_when_patreon_unconfigured(
-    mock_session: MockDbSession,
-    update: Update,
-    handler_context: HandlerContext,
-    user_with_settings: User,
-):
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
-
-    context.api.assert_edit_message_called(update, collaborate_unavailable_view(user_with_settings.lang))
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
 async def test_collaborate_not_linked_offers_oauth_link(
     mock_session: MockDbSession,
     update: Update,
@@ -111,10 +97,16 @@ async def test_collaborate_not_linked_offers_oauth_link(
     context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
 
     view = context.api.call_args("edit_message").kwargs["view"]
+    collaborate_page = render(
+        t"{Link(CollaborateMessages.COLLABORATE_PAGE_LABEL.get_text(lang=user_with_settings.lang), 'https://mitup.social/collaborate/donation/')}"
+    )
+    limits_page = render(
+        t"{Link(CollaborateMessages.LIMITS_PAGE_LABEL.get_text(lang=user_with_settings.lang), 'https://mitup.social/user-guide/limits/')}"
+    )
     assert view.description == CollaborateMessages.NOT_LINKED.get(
         lang=user_with_settings.lang,
-        active_meetings=PATRON_ACTIVE_MEETINGS,
-        scheduling_days=PATRON_SCHEDULING_DAYS,
+        collaborate_page=collaborate_page,
+        limits_page=limits_page,
     )
     assert "${" not in view.description.text
     link_button = view.keyboard[0][0]
@@ -146,8 +138,6 @@ async def test_collaborate_linked_not_patron_view(
         collaborate_linked_not_patron_view(
             user_with_settings.lang,
             oauth.campaign_pledge_url(patreon_config),
-            PATRON_ACTIVE_MEETINGS,
-            PATRON_SCHEDULING_DAYS,
         ),
     )
 

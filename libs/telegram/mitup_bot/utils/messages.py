@@ -777,22 +777,34 @@ class NotificationMessages(MessageBase):
 
 class CollaborateMessages(MessageBase):
     # Collaborate view, shown when Patreon is configured and the account is not linked yet.
+    # `${collaborate_page}` receives a linked "ways to support" label (COLLABORATE_PAGE_LABEL).
     NOT_LINKED = (
-        "<b>Support Mitup with Patreon</b>\n\n"
-        "Mitup is free to use. If it helps you bring people together, you can back it on Patreon "
-        "and unlock Host perks as a thank you.\n\n"
-        "<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, "
-        "schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n"
-        "<b>As a Commissioner:</b> unlimited everything.\n\n"
-        "Link your Patreon account to get started."
+        "<b>Help keep Mitup running</b>\n\n"
+        "Mitup is built by a pair of brothers, not a big company, and it is free for everyone. "
+        "Your support is what pays for the servers, the database, and the late-night debugging. "
+        "Any help counts: telling your friends, translating, reporting bugs, or backing the "
+        "project. The ${collaborate_page} page on our website walks through every way to pitch "
+        "in.\n\n"
+        "The most direct way to help is becoming a Mitup Host on Patreon. As a thank you, Hosts "
+        "get a badge next to their name, a members-only group, and raised limits depending on "
+        "the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what each "
+        "tier unlocks.\n\n"
+        "Link your Patreon account to get started, and thank you for being here."
     )
+    # Label for the inline docs link embedded in NOT_LINKED.
+    COLLABORATE_PAGE_LABEL = "ways to support"
+    # Label for the inline docs link to the limits page, embedded in NOT_LINKED and
+    # LINKED_NOT_PATRON. The perks themselves live on that page, not in the chat copy, so tier
+    # changes never mean a copy-and-translation sweep here.
+    LIMITS_PAGE_LABEL = "limits and Host perks"
     # Collaborate view, shown when the account is linked but not an active Host of the campaign.
     LINKED_NOT_PATRON = (
         "<b>Patreon account linked</b>\n\n"
-        "You're all set. You're not a Host yet, so your Host perks are still off.\n\n"
-        "<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, "
-        "schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n"
-        "<b>As a Commissioner:</b> unlimited everything.\n\n"
+        "You're all set, thanks for taking the first step! You're not a Host yet, so your Host "
+        "perks are still off.\n\n"
+        "Hosts get a badge next to their name, a members-only group, and raised limits depending "
+        "on the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what "
+        "each tier unlocks.\n\n"
         "Become a Host and your perks turn on automatically, with no need to link again."
     )
     # Collaborate view, shown to a linked active Brewer.
@@ -815,8 +827,6 @@ class CollaborateMessages(MessageBase):
         "run as many meetings as you want, schedule them as far ahead as you need, "
         "and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
     )
-    # Collaborate view, shown when the bot runs without a [patreon] config section.
-    UNAVAILABLE = "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
     # Telegram message sent from the OAuth callback when the linked user is not a Host yet.

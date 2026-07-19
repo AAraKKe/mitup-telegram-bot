@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-19 16:41\n"
+"PO-Revision-Date: 2026-07-19 18:11\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -750,10 +750,16 @@ msgid "NotificationMessages.STARTED"
 msgstr "The meeting <b>${meeting_title}</b> has started!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Support Mitup with Patreon</b>\n\nMitup is free to use. If it helps you bring people together, you can back it on Patreon and unlock Host perks as a thank you.\n\n<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As a Commissioner:</b> unlimited everything.\n\nLink your Patreon account to get started."
+msgstr "<b>Help keep Mitup running</b>\n\nMitup is built by a pair of brothers, not a big company, and it is free for everyone. Your support is what pays for the servers, the database, and the late-night debugging. Any help counts: telling your friends, translating, reporting bugs, or backing the project. The ${collaborate_page} page on our website walks through every way to pitch in.\n\nThe most direct way to help is becoming a Mitup Host on Patreon. As a thank you, Hosts get a badge next to their name, a members-only group, and raised limits depending on the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what each tier unlocks.\n\nLink your Patreon account to get started, and thank you for being here."
+
+msgid "CollaborateMessages.COLLABORATE_PAGE_LABEL"
+msgstr "ways to support"
+
+msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
+msgstr "limits and Host perks"
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're all set. You're not a Host yet, so your Host perks are still off.\n\n<b>As a Gamemaster:</b> run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting.\n\n<b>As a Commissioner:</b> unlimited everything.\n\nBecome a Host and your perks turn on automatically, with no need to link again."
+msgstr "<b>Patreon account linked</b>\n\nYou're all set, thanks for taking the first step! You're not a Host yet, so your Host perks are still off.\n\nHosts get a badge next to their name, a members-only group, and raised limits depending on the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what each tier unlocks.\n\nBecome a Host and your perks turn on automatically, with no need to link again."
 
 msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
 msgstr "<b>☕️ You're a Brewer</b>\n\nThanks for backing Mitup. Your Brewer badge shows on your profile, and your support helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
@@ -763,9 +769,6 @@ msgstr "<b>🎲 You're a Gamemaster</b>\n\nThanks for backing Mitup. Your Gamema
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
 msgstr "<b>🏆 You're a Commissioner</b>\n\nThanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
-
-msgid "CollaborateMessages.UNAVAILABLE"
-msgstr "<b>Collaborate</b>\n\nPatreon support isn't available yet. Check back soon."
 
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Your Patreon account has been unlinked."

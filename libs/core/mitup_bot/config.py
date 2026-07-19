@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Protocol
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
@@ -276,8 +276,9 @@ class LimitsConfig(BaseModel):
 class PatreonConfig(BaseModel):
     """Patreon OAuth integration credentials.
 
-    Wired into `Config` as an optional section: the bot boots without a `[patreon]` block. Every
-    field is required, so a partially-filled section fails validation with pydantic's per-field
+    A required `Config` section: Patreon support is part of the product, so a deployment without a
+    `[patreon]` block (or the matching `MITUPBOT__PATREON__*` env vars) fails at boot. Every field
+    is required, so a partially-filled section fails validation with pydantic's per-field
     "field required" errors.
     """
 
@@ -379,27 +380,9 @@ class Config(BaseModel):
     metrics: MetricsConfig
     # Every field is defaulted, so the section is always present without any TOML entry.
     limits: LimitsConfig = Field(default_factory=LimitsConfig)
-    # First optional section: Patreon may be absent entirely during rollout. When present, every
-    # field is required, so pydantic rejects a partial section on its own.
-    patreon: PatreonConfig | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def treat_empty_patreon_section_as_absent(cls, data: Any) -> Any:
-        """Drop an empty `[patreon]` section so the optional `None` default applies.
-
-        This repo's TOML style ships empty sections that are filled by `MITUPBOT__*` env-var
-        overrides at deploy time (prod.toml carries an empty `[bot]` today). A preemptive empty
-        `[patreon]` header must therefore read as "absent", not as a fully-unset section — which
-        would otherwise fail with eight "field required" errors at boot. A partial section still
-        falls through to pydantic, which reports each missing key by name.
-        """
-        if not isinstance(data, dict):
-            return data
-        patreon = data.get("patreon")
-        if isinstance(patreon, dict) and not patreon:
-            return {key: value for key, value in data.items() if key != "patreon"}
-        return data
+    # Patreon support is part of the product: a missing or partial section fails at boot with
+    # pydantic's per-field errors instead of silently running a bot without a supporter funnel.
+    patreon: PatreonConfig
 
     @model_validator(mode="after")
     def validate_concurrency_fits_pool(self) -> Config:

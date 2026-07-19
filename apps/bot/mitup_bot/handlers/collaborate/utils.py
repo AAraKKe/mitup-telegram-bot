@@ -11,7 +11,6 @@ from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
     collaborate_not_linked_view,
-    collaborate_unavailable_view,
 )
 from mitup_bot.views.mitup_view import MitupView
 
@@ -54,27 +53,21 @@ async def hosts_group_button_state(context: TMitupContext, tg_user_id: int) -> t
 async def build_collaborate_view(
     session: AsyncSession, user: User, context: TMitupContext, message_id: int | None = None
 ) -> MitupView:
-    """Resolve which of the four Collaborate states the user is in and build its view.
+    """Resolve which of the three Collaborate states the user is in and build its view.
 
     ``message_id`` is the Collaborate message being rendered; it is threaded into the OAuth ``state``
     on the not-linked branch only, so the web callback can refresh that message after linking.
     """
-    if not patreon.is_configured():
-        return collaborate_unavailable_view(user.lang)
-
-    active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
-    scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
-
     config = patreon.current_config()
     subscription = await subscription_for_user(session, user)
     if subscription is None:
         authorization_url = oauth.authorization_url(config, user.tg_user_id, message_id)
-        return collaborate_not_linked_view(user.lang, authorization_url, active_meetings, scheduling_days)
+        return collaborate_not_linked_view(user.lang, authorization_url)
     if supporter.is_supporter(user.supporter_level):
+        active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
+        scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
         hosts_group_url, in_group = await hosts_group_button_state(context, user.tg_user_id)
         return collaborate_linked_patron_view(
             user.lang, user.supporter_level, active_meetings, scheduling_days, hosts_group_url, in_group
         )
-    return collaborate_linked_not_patron_view(
-        user.lang, oauth.campaign_pledge_url(config), active_meetings, scheduling_days
-    )
+    return collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(config))

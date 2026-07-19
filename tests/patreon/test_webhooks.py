@@ -190,17 +190,7 @@ async def test_ensure_webhook_patches_on_drift(mock_session: MockDbSession, patr
     assert existing_row.secret == "listed-secret"
 
 
-# --- register_membership_webhook: gating + failure isolation ---
-
-
-async def test_register_no_ops_when_unconfigured():
-    # No patreon_config fixture: Patreon is switched off.
-    client = make_test_metrics_client()
-    metrics = MetricAssertions(client)
-
-    await webhooks.register_membership_webhook(DESIRED_URI, client)
-
-    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_REGISTRATION_FAILED)
+# --- register_membership_webhook: failure isolation ---
 
 
 async def test_register_failure_is_isolated_and_metered(

@@ -3,6 +3,7 @@ import pytest
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import Link, render
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages, SupporterNotificationMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.collaborate import (
@@ -10,7 +11,6 @@ from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
     collaborate_not_linked_view,
-    collaborate_unavailable_view,
     hosts_group_readmitted_view,
     hosts_group_removed_view,
     supporter_upsell_view,
@@ -39,42 +39,35 @@ def test_supporter_upsell_view_carries_collaborate_button(lang: str):
     assert view == expected
 
 
-def test_unavailable_view_has_no_link_button(lang: str):
-    view = collaborate_unavailable_view(lang)
-    expected = MitupView(
-        description=CollaborateMessages.UNAVAILABLE.get(lang=lang),
-        keyboard=[],
-    ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
-
-    assert view == expected
-
-
 def test_not_linked_view_offers_link_button(lang: str):
-    view = collaborate_not_linked_view(lang, AUTH_URL, ACTIVE_MEETINGS, SCHEDULING_DAYS)
+    view = collaborate_not_linked_view(lang, AUTH_URL)
+    # The docs links are built independently of the view helper, pinning the production URLs.
+    collaborate_page = render(
+        t"{Link(CollaborateMessages.COLLABORATE_PAGE_LABEL.get_text(lang=lang), 'https://mitup.social/collaborate/donation/')}"
+    )
+    limits_page = render(
+        t"{Link(CollaborateMessages.LIMITS_PAGE_LABEL.get_text(lang=lang), 'https://mitup.social/user-guide/limits/')}"
+    )
     expected = MitupView(
         description=CollaborateMessages.NOT_LINKED.get(
-            lang=lang, active_meetings=ACTIVE_MEETINGS, scheduling_days=SCHEDULING_DAYS
+            lang=lang,
+            collaborate_page=collaborate_page,
+            limits_page=limits_page,
         ),
         keyboard=[[ButtonConfig(text=ButtonMessages.LINK_PATREON.get_text(lang=lang), url=AUTH_URL)]],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
     assert view == expected
-
-
-def test_not_linked_view_substitutes_patron_caps(lang: str):
-    view = collaborate_not_linked_view(lang, AUTH_URL, ACTIVE_MEETINGS, SCHEDULING_DAYS)
-
     assert "${" not in view.description.text
-    assert str(ACTIVE_MEETINGS) in view.description.text
-    assert str(SCHEDULING_DAYS) in view.description.text
 
 
 def test_linked_not_patron_view_offers_pledge_and_unlink(lang: str):
-    view = collaborate_linked_not_patron_view(lang, PLEDGE_URL, ACTIVE_MEETINGS, SCHEDULING_DAYS)
+    view = collaborate_linked_not_patron_view(lang, PLEDGE_URL)
+    limits_page = render(
+        t"{Link(CollaborateMessages.LIMITS_PAGE_LABEL.get_text(lang=lang), 'https://mitup.social/user-guide/limits/')}"
+    )
     expected = MitupView(
-        description=CollaborateMessages.LINKED_NOT_PATRON.get(
-            lang=lang, active_meetings=ACTIVE_MEETINGS, scheduling_days=SCHEDULING_DAYS
-        ),
+        description=CollaborateMessages.LINKED_NOT_PATRON.get(lang=lang, limits_page=limits_page),
         keyboard=[
             [ButtonConfig(text=ButtonMessages.BECOME_PATRON.get_text(lang=lang), url=PLEDGE_URL)],
             [ButtonConfig(text=ButtonMessages.UNLINK_PATREON.get_text(lang=lang), callback_data=cb.UNLINK_PATREON)],
@@ -82,14 +75,7 @@ def test_linked_not_patron_view_offers_pledge_and_unlink(lang: str):
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
     assert view == expected
-
-
-def test_linked_not_patron_view_substitutes_patron_caps(lang: str):
-    view = collaborate_linked_not_patron_view(lang, PLEDGE_URL, ACTIVE_MEETINGS, SCHEDULING_DAYS)
-
     assert "${" not in view.description.text
-    assert str(ACTIVE_MEETINGS) in view.description.text
-    assert str(SCHEDULING_DAYS) in view.description.text
 
 
 @pytest.mark.parametrize(
