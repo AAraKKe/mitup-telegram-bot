@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import migrate_ops, runner
+from . import compose, migrate_ops, runner
 
 app = typer.Typer(no_args_is_help=True, help="Local database lifecycle.")
 migrate_app = typer.Typer(no_args_is_help=True, help="Alembic migrations.")
@@ -53,18 +53,21 @@ def reset(yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip the confir
     exit_code = runner.run_step("Dropping the local database schema", drop_command)
     if exit_code != 0:
         raise typer.Exit(exit_code)
+    compose.ensure_uv_cache_volume()
     raise typer.Exit(runner.run_command(compose_alembic("upgrade", "head")))
 
 
 @migrate_app.command("up")
 def migrate_up(revision: Annotated[str, typer.Argument(help="Target revision (default: head).")] = "head"):
     """Upgrade the database schema."""
+    compose.ensure_uv_cache_volume()
     raise typer.Exit(runner.run_command(compose_alembic("upgrade", revision)))
 
 
 @migrate_app.command("down")
 def migrate_down(steps: Annotated[int, typer.Argument(min=1, help="Number of revisions to roll back.")] = 1):
     """Downgrade the database schema."""
+    compose.ensure_uv_cache_volume()
     raise typer.Exit(runner.run_command(compose_alembic("downgrade", f"-{steps}")))
 
 

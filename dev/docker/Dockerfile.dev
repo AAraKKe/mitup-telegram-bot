@@ -17,9 +17,12 @@ WORKDIR /bot
 RUN pip install --no-cache-dir uv
 
 # Keep the venv and download cache outside the bind-mounted project directory.
-# Both live under /.docker_uv: the venv maps to a per-checkout host folder (worktrees
-# on different branches can carry different locks), while the download cache maps to
-# the shared mitup-bot-uv-cache named volume, so a fresh worktree resolves its venv
-# from already-downloaded packages instead of fetching everything again.
+# Both live under /.docker_uv, each on its own named volume: the venv is per-checkout
+# (worktrees on different branches can carry different locks) while the download cache
+# is the shared mitup-bot-uv-cache volume, so a fresh worktree resolves its venv from
+# already-downloaded packages instead of fetching everything again. The two are separate
+# mounts, so uv cannot hardlink between them; copy mode makes that explicit instead of
+# warning about the fallback on every sync.
 ENV UV_PROJECT_ENVIRONMENT=/.docker_uv/venv \
-    UV_CACHE_DIR=/.docker_uv/cache
+    UV_CACHE_DIR=/.docker_uv/cache \
+    UV_LINK_MODE=copy

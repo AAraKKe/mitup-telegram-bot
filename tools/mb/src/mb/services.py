@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import runner
+from . import compose, runner
 
 run_app = typer.Typer(no_args_is_help=True, help="Run the bot or the recurrent-events worker.")
 docker_app = typer.Typer(no_args_is_help=True, help="Docker compose lifecycle.")
@@ -35,6 +35,7 @@ def bot(
 ):
     """Start the bot."""
     if docker:
+        compose.ensure_uv_cache_volume()
         service = "debug" if debug else "mitup"
         raise typer.Exit(runner.run_command(["docker", "compose", "up", service]))
     exit_code = runner.uv(*DEBUGPY_ARGS) if debug else runner.uv("python", "-m", BOT_MODULE, "launch")
@@ -48,6 +49,7 @@ def events(
 ):
     """Start the recurrent-events worker (extra args pass through)."""
     if docker:
+        compose.ensure_uv_cache_volume()
         raise typer.Exit(runner.run_command(["docker", "compose", "up", "events"]))
     raise typer.Exit(runner.uv("python", "-m", EVENTS_MODULE, "recurrent-events", *ctx.args))
 
@@ -55,6 +57,7 @@ def events(
 @docker_app.command()
 def up(services: Annotated[list[str] | None, typer.Argument(help="Services to start (default: all).")] = None):
     """Start compose services in the background."""
+    compose.ensure_uv_cache_volume()
     raise typer.Exit(runner.run_command(["docker", "compose", "up", "-d", *(services or [])]))
 
 

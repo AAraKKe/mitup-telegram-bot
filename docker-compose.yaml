@@ -6,7 +6,7 @@ services:
       dockerfile: ./dev/docker/Dockerfile.dev
     volumes:
       - .:/bot
-      - ./.docker_uv:/.docker_uv
+      - uv-venv:/.docker_uv/venv
       - uv-cache:/.docker_uv/cache
     command: uv run mb test
 
@@ -22,7 +22,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/bot
-      - ./.docker_uv:/.docker_uv
+      - uv-venv:/.docker_uv/venv
       - uv-cache:/.docker_uv/cache
     environment:
       - MITUPBOT__DB__USERNAME=mitupbot
@@ -86,7 +86,7 @@ services:
       - MITUPBOT__METRICS__NAMESPACE=MitupDocker
     volumes:
       - .:/bot
-      - ./.docker_uv:/.docker_uv
+      - uv-venv:/.docker_uv/venv
       - uv-cache:/.docker_uv/cache
     command: bash -c "uv run mb locales sync && uv run mb run bot"
 
@@ -113,8 +113,15 @@ services:
       - MITUPBOT__METRICS__NAMESPACE=MitupDocker/RecurrentEvents
 
 volumes:
-  # Shared across every checkout and worktree (the explicit name opts out of the
-  # per-project prefix), so a fresh worktree reuses already-downloaded packages and
-  # only fetches what its lock actually changed.
+  # Per-checkout venv (compose prefixes the volume with the project name, so every
+  # worktree keeps its own): a named volume lives on the Docker VM's native filesystem,
+  # where installing a few hundred MB of packages takes seconds instead of crawling
+  # through the macOS bind mount.
+  uv-venv:
+  # Shared across every checkout and worktree, so a fresh worktree resolves its venv
+  # from already-downloaded packages and only fetches what its lock actually changed.
+  # External because a compose-created volume belongs to one compose project and every
+  # other checkout warns about it; `mb` creates the volume on demand before compose runs.
   uv-cache:
     name: mitup-bot-uv-cache
+    external: true
