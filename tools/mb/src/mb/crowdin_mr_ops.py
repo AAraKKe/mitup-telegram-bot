@@ -3,8 +3,10 @@
 `mb locales create-mr` is the tail of the scheduled crowdin-pull job: after
 `mb locales pull` has refreshed the catalogs, it rebuilds the fixed MR branch from the
 checked-out HEAD, commits the catalog changes, and force-pushes with GitLab push options
-that create the merge request or update the open one in place. Labeling that MR with
-HOLD_LABEL pauses the job before it touches anything.
+that create the merge request or update the open one in place. The push only happens when
+the catalogs differ from what the remote branch already carries — an unchanged delta
+leaves the open MR untouched instead of piling identical commits onto it. Labeling that
+MR with HOLD_LABEL pauses the job before it touches anything.
 """
 
 import subprocess
@@ -51,6 +53,23 @@ def catalogs_changed() -> bool:
     return completed.returncode != 0
 
 
+def remote_branch_carries_catalogs() -> bool:
+    """The remote MR branch already holds exactly these catalogs.
+
+    Rebuilding the branch would only replace its commit with an identical-content one on
+    a newer base, spamming the open MR with update events — the caller skips the push.
+    """
+    fetched = subprocess.run(
+        ["git", "fetch", "origin", MR_BRANCH], cwd=runner.repo_root(), check=False, capture_output=True
+    )
+    if fetched.returncode != 0:
+        return False
+    completed = subprocess.run(
+        ["git", "diff", "--quiet", "FETCH_HEAD", "--", LOCALES_PATHSPEC], cwd=runner.repo_root(), check=False
+    )
+    return completed.returncode == 0
+
+
 def push_translations_branch(environment: dict[str, str]):
     committer_name, committer_email = token_identity(environment)
     git("config", "user.name", committer_name)
@@ -86,6 +105,9 @@ def create_translations_mr() -> int:
             return 0
         if not catalogs_changed():
             console.success("Catalogs already match the approved Crowdin translations.")
+            return 0
+        if remote_branch_carries_catalogs():
+            console.success(f"The pushed {MR_BRANCH} branch already carries these catalogs — leaving the MR untouched.")
             return 0
         push_translations_branch(environment)
     except httpx.HTTPError as error:

@@ -29,10 +29,12 @@ crowdin-push:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 # Merge approved Crowdin translations back into the catalogs and keep a single MR open with
-# the result. The branch is rebuilt from the schedule's HEAD every run, so the MR always
-# shows the current approved-vs-main delta and shrinks by itself when an approval is revoked.
-# Labeling the MR `crowdin::hold` pauses the sync (e.g. for manual pre-merge fixes on the
-# branch); remove the label to resume the hourly rebuilds.
+# the result. The branch is rebuilt from the schedule's HEAD whenever the approved-vs-main
+# delta differs from what the branch already carries, so the MR always shows the current
+# delta and shrinks by itself when an approval is revoked; runs that would reproduce the
+# branch byte-for-byte skip the push and leave the MR untouched. Labeling the MR
+# `crowdin::hold` pauses the sync (e.g. for manual pre-merge fixes on the branch); remove
+# the label to resume the hourly rebuilds.
 crowdin-pull:
   stage: build
   needs: []

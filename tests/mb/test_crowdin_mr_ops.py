@@ -63,20 +63,34 @@ def set_ci_env(monkeypatch: pytest.MonkeyPatch, **overrides: str | None):
 class GitRecorder:
     """Records the git argv of every subprocess.run without executing anything.
 
-    ``diff_returncode`` answers the ``git diff --quiet`` freshness probe (nonzero means
-    the catalogs changed); ``fail_on`` names a git subcommand that raises
-    CalledProcessError to simulate a push/commit failure.
+    ``diff_returncode`` answers the ``git diff --quiet`` freshness probe against HEAD
+    (nonzero means the catalogs changed); ``fetch_returncode`` answers the remote-branch
+    fetch (nonzero means the branch does not exist); ``remote_diff_returncode`` answers
+    the diff against the fetched branch (zero means the branch already carries the
+    catalogs); ``fail_on`` names a git subcommand that raises CalledProcessError to
+    simulate a push/commit failure.
     """
 
-    def __init__(self, diff_returncode: int = 1, fail_on: str | None = None):
+    def __init__(
+        self,
+        diff_returncode: int = 1,
+        fetch_returncode: int = 0,
+        remote_diff_returncode: int = 1,
+        fail_on: str | None = None,
+    ):
         self.calls: list[list[str]] = []
         self.diff_returncode = diff_returncode
+        self.fetch_returncode = fetch_returncode
+        self.remote_diff_returncode = remote_diff_returncode
         self.fail_on = fail_on
 
     def __call__(self, args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
         self.calls.append(list(args))
+        if args[1] == "fetch":
+            return subprocess.CompletedProcess(args, self.fetch_returncode)
         if args[1] == "diff":
-            return subprocess.CompletedProcess(args, self.diff_returncode)
+            returncode = self.remote_diff_returncode if "FETCH_HEAD" in args else self.diff_returncode
+            return subprocess.CompletedProcess(args, returncode)
         if self.fail_on is not None and self.fail_on in args:
             raise subprocess.CalledProcessError(returncode=128, cmd=list(args))
         return subprocess.CompletedProcess(args, 0)
@@ -222,6 +236,35 @@ def test_catalogs_changed_reads_diff_exit_code(monkeypatch: pytest.MonkeyPatch, 
     assert recorder.calls == [["git", "diff", "--quiet", "--", "libs/core/mitup_bot/locales/*.po"]]
 
 
+# --- remote_branch_carries_catalogs ---
+
+
+def test_remote_branch_carries_catalogs_true_when_content_matches(monkeypatch: pytest.MonkeyPatch):
+    recorder = GitRecorder(fetch_returncode=0, remote_diff_returncode=0)
+    install_git_recorder(monkeypatch, recorder)
+
+    assert crowdin_mr_ops.remote_branch_carries_catalogs() is True
+    assert recorder.calls == [
+        ["git", "fetch", "origin", "crowdin-translations"],
+        ["git", "diff", "--quiet", "FETCH_HEAD", "--", "libs/core/mitup_bot/locales/*.po"],
+    ]
+
+
+def test_remote_branch_carries_catalogs_false_when_content_differs(monkeypatch: pytest.MonkeyPatch):
+    recorder = GitRecorder(fetch_returncode=0, remote_diff_returncode=1)
+    install_git_recorder(monkeypatch, recorder)
+
+    assert crowdin_mr_ops.remote_branch_carries_catalogs() is False
+
+
+def test_remote_branch_carries_catalogs_false_when_branch_missing(monkeypatch: pytest.MonkeyPatch):
+    recorder = GitRecorder(fetch_returncode=128)
+    install_git_recorder(monkeypatch, recorder)
+
+    assert crowdin_mr_ops.remote_branch_carries_catalogs() is False
+    assert recorder.calls == [["git", "fetch", "origin", "crowdin-translations"]]  # no diff without a fetched branch
+
+
 # --- push_translations_branch ---
 
 
@@ -262,6 +305,8 @@ def drive_create_mr(
     *,
     hold_payload: Iterable[object] = (),
     diff_returncode: int = 1,
+    fetch_returncode: int = 0,
+    remote_diff_returncode: int = 1,
     fail_on: str | None = None,
     get_override: Callable[..., httpx.Response] | None = None,
 ) -> GitRecorder:
@@ -270,7 +315,12 @@ def drive_create_mr(
         monkeypatch.setattr(gitlab_client.httpx, "get", get_override)
     else:
         install_api_responses(monkeypatch, list(hold_payload))
-    recorder = GitRecorder(diff_returncode=diff_returncode, fail_on=fail_on)
+    recorder = GitRecorder(
+        diff_returncode=diff_returncode,
+        fetch_returncode=fetch_returncode,
+        remote_diff_returncode=remote_diff_returncode,
+        fail_on=fail_on,
+    )
     install_git_recorder(monkeypatch, recorder)
     return recorder
 
@@ -311,6 +361,26 @@ def test_create_translations_mr_no_changes_skips_push(
     assert crowdin_mr_ops.create_translations_mr() == 0
     assert [call for call in recorder.calls if call[1] == "push"] == []
     assert "Catalogs already match" in combined(capsys)
+
+
+def test_create_translations_mr_matching_remote_branch_skips_push(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    recorder = drive_create_mr(monkeypatch, hold_payload=[], diff_returncode=1, remote_diff_returncode=0)
+
+    assert crowdin_mr_ops.create_translations_mr() == 0
+    assert [call for call in recorder.calls if call[1] == "push"] == []
+    assert "already carries these catalogs" in combined(capsys)
+
+
+def test_create_translations_mr_missing_remote_branch_pushes(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    recorder = drive_create_mr(monkeypatch, hold_payload=[], diff_returncode=1, fetch_returncode=128)
+
+    assert crowdin_mr_ops.create_translations_mr() == 0
+    assert len([call for call in recorder.calls if call[1] == "push"]) == 1
+    assert "Force-pushed crowdin-translations" in combined(capsys)
 
 
 def test_create_translations_mr_http_error_exits_one(
