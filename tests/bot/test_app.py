@@ -141,7 +141,7 @@ def test_init_sets_registry_env(patch_runtime_deps: RuntimeDeps):
     assert patch_runtime_deps.registry.env is Env.PROD
 
 
-@pytest.mark.parametrize("env", [Env.DEV, Env.PROD, Env.SAMPLE], ids=["dev", "prod", "sample"])
+@pytest.mark.parametrize("env", [Env.DEV, Env.PROD], ids=["dev", "prod"])
 def test_init_calls_config_from_providers_with_toml_provider(env: Env, patch_runtime_deps: RuntimeDeps):
     MitupRuntime(env)
 
@@ -333,9 +333,8 @@ def restore_root_logging() -> Generator[None]:
     [
         (Env.DEV, structlog.dev.ConsoleRenderer),
         (Env.PROD, structlog.processors.JSONRenderer),
-        (Env.SAMPLE, structlog.processors.JSONRenderer),
     ],
-    ids=["dev", "prod", "sample"],
+    ids=["dev", "prod"],
 )
 def test_logging_installs_processor_formatter_handler_by_env(
     env: Env,
@@ -377,9 +376,8 @@ def test_httpx_logger_set_to_warning(
     [
         (Env.DEV, logging.DEBUG),
         (Env.PROD, logging.WARNING),
-        (Env.SAMPLE, logging.WARNING),
     ],
-    ids=["dev", "prod", "sample"],
+    ids=["dev", "prod"],
 )
 def test_ext_bot_logger_level_by_env(
     env: Env,

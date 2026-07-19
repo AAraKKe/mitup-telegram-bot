@@ -509,3 +509,35 @@ def test_patreon_encryption_keys_wire_a_rotation():
     # Fresh writes use the new primary key.
     rotated_ciphertext = TokenCipher.encrypt("token")
     assert Fernet(new_key).decrypt(rotated_ciphertext.encode()).decode() == "token"
+
+
+def provider_returning(data: dict[str, dict[str, object]]) -> mock.Mock:
+    provider = mock.Mock()
+    provider.get_config.return_value = data
+    return provider
+
+
+def test_db_from_providers_builds_only_the_db_section():
+    provider = provider_returning(
+        {"db": {"username": "someone", "password": "secret", "url": "localhost", "database": "mitup"}}
+    )
+
+    db_config = Config.db_from_providers(provider)
+
+    assert db_config.username == "someone"
+    assert db_config.password.get_secret_value() == "secret"
+    assert db_config.port == 5432
+
+
+def test_db_from_providers_first_provider_wins():
+    override = provider_returning({"db": {"password": "winner"}})
+    base = provider_returning(
+        {"db": {"username": "someone", "password": "loser", "url": "localhost", "database": "mitup"}}
+    )
+
+    assert Config.db_from_providers(override, base).password.get_secret_value() == "winner"
+
+
+def test_db_from_providers_missing_section_raises_with_setup_hint():
+    with pytest.raises(RuntimeError, match="uv run mb setup"):
+        Config.db_from_providers(provider_returning({}))

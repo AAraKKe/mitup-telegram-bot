@@ -11,7 +11,7 @@ from psycopg import sql
 from pydantic import BaseModel, ValidationError
 
 from mitup_bot.config import Config as MitupConfig
-from mitup_bot.config import DbConfig, Env, EnvVariablesConfigProvider, TomlConfigProvider
+from mitup_bot.config import DbConfig, Env, EnvVariablesConfigProvider
 from mitup_bot.db import build_db_url
 from mitup_bot.logging_config import Component, configure_logging
 
@@ -95,10 +95,11 @@ def bootstrap_app_role() -> None:
         log.error("App role name is invalid", app_role=username)
         raise ValueError(f"{APP_DB_USERNAME_ENV} must match {APP_ROLE_NAME_PATTERN.pattern}")
 
-    config = MitupConfig.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.SAMPLE))
+    # The Lambda environment carries the full MITUPBOT__DB__* set; only the db section is needed.
+    db_config = MitupConfig.db_from_providers(EnvVariablesConfigProvider())
 
     try:
-        with psycopg.connect(app_role_conninfo(config.db), autocommit=True) as connection:
+        with psycopg.connect(app_role_conninfo(db_config), autocommit=True) as connection:
             with connection.cursor() as cursor:
                 for statement in app_role_statements(username, password):
                     cursor.execute(statement)

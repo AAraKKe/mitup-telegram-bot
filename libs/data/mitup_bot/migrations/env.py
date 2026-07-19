@@ -11,10 +11,9 @@ from mitup_bot.models import users
 # access to the values within the .ini file in use.
 config = context.config
 
-# Load config from environment provider to get the db url
-# this can be overriden later in deployment pipelines
-# with proper environment configuration
-mitup_config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.SAMPLE))
+# Only the db section is needed here. Environment variables win over the local dev.toml, so
+# deployment pipelines and the db-test harness inject the real connection through MITUPBOT__DB__*.
+db_config = Config.db_from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -46,7 +45,7 @@ def run_migrations_offline():
 
     """
     context.configure(
-        url=build_db_url(mitup_config.db),
+        url=build_db_url(db_config),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -67,7 +66,7 @@ def run_migrations_online():
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        url=build_db_url(mitup_config.db),
+        url=build_db_url(db_config),
     )
 
     with connectable.connect() as connection:

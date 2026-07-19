@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 from importlib.resources import as_file, files
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
 import structlog
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
 
 from . import environments
 
@@ -24,9 +24,6 @@ log = structlog.get_logger(__name__)
 class Env(StrEnum):
     DEV = auto()
     PROD = auto()
-    # Sample environment to ensure config values even though
-    # they are not real
-    SAMPLE = auto()
 
 
 class MetricsEnv(StrEnum):
@@ -41,6 +38,26 @@ class MetricsEnv(StrEnum):
 class RunModes(StrEnum):
     POLLING = auto()
     WEBHOOK = auto()
+
+
+SampleValue = str | int | float | bool | list[int] | list[str]
+
+# urlsafe base64 of 32 zero bytes — a syntactically valid Fernet key, safe as a public placeholder.
+PLACEHOLDER_FERNET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
+
+@dataclass(frozen=True)
+class Sample:
+    """Dev-sample value for a config field, consumed by `mb setup` when generating or refreshing
+    `environments/dev.toml`.
+
+    Every required field must carry one so a full dev.toml can always be generated (`mb setup`
+    fails loudly otherwise); a defaulted field carries one only when the generated dev value
+    should differ from the model default. `comment` is emitted above the entry in the TOML.
+    """
+
+    value: SampleValue
+    comment: str | None = None
 
 
 class ConfigProvider(Protocol):
@@ -117,14 +134,22 @@ class EnvVariablesConfigProvider:
 
 
 class DbConfig(BaseModel):
-    username: str
-    password: SecretStr
-    url: str
-    database: str
+    username: Annotated[str, Sample("mitupbot")]
+    password: Annotated[SecretStr, Sample("12345pass")]
+    url: Annotated[
+        str,
+        Sample(
+            "postgres",
+            comment='"postgres" works when the bot runs inside docker compose. To run the bot on the host '
+            'instead, use url = "localhost" and port = 5444 (docker-compose.yaml maps host port 5444 to '
+            "the container's 5432).",
+        ),
+    ]
+    database: Annotated[str, Sample("mitup")]
     port: int = 5432
     # psycopg (v3) drives both the async bot engine and Alembic's sync migration engine.
     url_schema: str = "postgresql+psycopg"
-    engine_echo: bool = False
+    engine_echo: Annotated[bool, Sample(True)] = False
     # Connection pool sizing for the bot engine. Defaults mirror SQLAlchemy's own
     # (5 persistent + 10 overflow).
     pool_size: int = 5
@@ -137,7 +162,7 @@ class DbConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    run_mode: RunModes
+    run_mode: Annotated[RunModes, Sample("polling")]
     log_level: str = "INFO"
 
     @field_validator("log_level")
@@ -150,7 +175,7 @@ class AppConfig(BaseModel):
 
 
 class BotConfig(BaseModel):
-    token: SecretStr
+    token: Annotated[SecretStr, Sample("123456:paste-your-botfather-token", comment="Get a bot token from @BotFather.")]
     # These properties are needed when running with webhook
     domain: str | None = None
     # Port where Telegram should connect to. This is not the port in the host
@@ -210,15 +235,18 @@ class BotConfig(BaseModel):
 
 
 class GoogleApiConfig(BaseModel):
-    gmaps_geocode_key: SecretStr
-    gmaps_timezone_key: SecretStr
+    gmaps_geocode_key: Annotated[
+        SecretStr,
+        Sample("", comment="Empty keys let the bot boot; location and timezone features need real API keys."),
+    ]
+    gmaps_timezone_key: Annotated[SecretStr, Sample("")]
 
 
 class MetricsConfig(BaseModel):
     # Even though EMF configuration can be done through environment variables, we are
     # keeping it here for clarity and managing it ourselves
-    namespace: str
-    environment: MetricsEnv
+    namespace: Annotated[str, Sample("MitupBot")]
+    environment: Annotated[MetricsEnv, Sample("rich")]
 
 
 class LimitsConfig(BaseModel):
@@ -257,25 +285,38 @@ class PatreonConfig(BaseModel):
     # Patreon campaign/client IDs are numeric, so coerce them back to str instead of failing.
     model_config = ConfigDict(coerce_numbers_to_str=True)
 
-    client_id: str
-    client_secret: SecretStr
-    campaign_id: str
-    redirect_uri: str
+    client_id: Annotated[
+        str,
+        Sample(
+            "patreon_client_id",
+            comment="OAuth app credentials from https://www.patreon.com/portal/registration/register-clients",
+        ),
+    ]
+    client_secret: Annotated[SecretStr, Sample("patreon_client_secret")]
+    campaign_id: Annotated[str, Sample("1234567")]
+    redirect_uri: Annotated[str, Sample("https://your.bot.domain/patreon/callback")]
     # Seed value only. The daily refresh job persists the live creator token pair in
     # the DB, which is the source of truth after the first refresh — this seed is
     # re-adopted only when its value changes (fingerprint comparison), so rotating the
     # credential is just replacing the CI/SSM variable.
-    creator_access_token: SecretStr
+    creator_access_token: Annotated[SecretStr, Sample("patreon_creator_access_token")]
     # Seed value only, adopted together with `creator_access_token` (same fingerprint check).
-    creator_refresh_token: SecretStr
+    creator_refresh_token: Annotated[SecretStr, Sample("patreon_creator_refresh_token")]
     # Fernet key for the OAuth `state` parameter (carries the initiating tg_user_id, age-validated
     # against `oauth.STATE_TTL_SECONDS`).
-    state_secret: SecretStr
+    state_secret: Annotated[
+        SecretStr,
+        Sample(
+            PLACEHOLDER_FERNET_KEY,
+            comment="Syntactically valid placeholder Fernet keys. Generate real ones with "
+            "cryptography.fernet.Fernet.generate_key() before exercising Patreon flows.",
+        ),
+    ]
     # Fernet key(s) for encrypting Patreon tokens at rest in the DB. Kept separate from
     # `state_secret` so the two keys have a different blast radius. Accepts one or more keys
     # separated by commas and/or whitespace: the first is primary (encrypts new writes), the
     # rest only decrypt, so an operator sets `new,old` to rotate (see `encryption_keys`).
-    encryption_key: SecretStr
+    encryption_key: Annotated[SecretStr, Sample(PLACEHOLDER_FERNET_KEY)]
     # Per-request timeout (seconds) for the httpx client that talks to the Patreon API. Optional
     # with a sensible default so operators can tune it without a code change if Patreon is slow.
     request_timeout_seconds: float = 30.0
@@ -375,7 +416,7 @@ class Config(BaseModel):
         return self
 
     @staticmethod
-    def from_providers(*providers: ConfigProvider) -> Config:
+    def merged_provider_data(*providers: ConfigProvider) -> ConfigMap:
         data: ConfigMap = {}
 
         for provider in reversed(providers):
@@ -384,4 +425,23 @@ class Config(BaseModel):
                 data.setdefault(group, {})
                 data[group] |= config
 
-        return Config.model_validate(data)
+        return data
+
+    @staticmethod
+    def from_providers(*providers: ConfigProvider) -> Config:
+        return Config.model_validate(Config.merged_provider_data(*providers))
+
+    @staticmethod
+    def db_from_providers(*providers: ConfigProvider) -> DbConfig:
+        """Build only the `[db]` section, for processes that need a database connection but not
+        the full bot config (Alembic runs, the migrations Lambda)."""
+        data = Config.merged_provider_data(*providers)
+        try:
+            return DbConfig.model_validate(data.get("db", {}))
+        except ValidationError as error:
+            raise RuntimeError(
+                "Database configuration is missing or incomplete. Locally, generate "
+                "environments/dev.toml with `uv run mb setup --bot-token <token>` (or rerun plain "
+                "`uv run mb setup` to fill in missing options); in deployed environments set the "
+                f"MITUPBOT__DB__* variables.\n{error}"
+            ) from error

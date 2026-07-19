@@ -24,7 +24,7 @@ This means **environment variables override TOML file values**.
 
 ### `TomlConfigProvider`
 
-Reads `libs/core/mitup_bot/environments/{env}.toml` where `env` is a member of the `Env` enum (`DEV`, `PROD`, `SAMPLE`). TOML sections map to config groups.
+Reads `libs/core/mitup_bot/environments/{env}.toml` where `env` is a member of the `Env` enum (`DEV`, `PROD`). TOML sections map to config groups.
 
 ### `EnvVariablesConfigProvider`
 
@@ -66,9 +66,10 @@ Invariants spanning multiple sections live as `model_validator`s on `Config` its
 ## Adding a new config field
 
 1. Add the field to the appropriate Pydantic model in `config.py` (e.g., `BotConfig`, `DbConfig`). Use `SecretStr` for tokens, passwords, and API keys.
-2. Document the field in `sample.toml` (always, with its default noted). Fields with a safe default may be omitted from the other environment TOMLs — established practice for defaulted fields (`engine_echo`, the pool fields, `concurrent_updates`), and required when rollout happens via `MITUPBOT__` env-var overrides so revert stays config-only. Fields WITHOUT a safe default go in **all** TOMLs: `dev.toml`, `prod.toml`, `sample.toml`.
-3. Document the corresponding environment variable override if applicable.
-4. If adding an entirely new section, create a new Pydantic model and add it as a field on `Config`.
+2. Give every field **without** a safe default a `Sample` annotation (`Annotated[T, Sample(value, comment=...)]` in `config.py`) — `mb setup` generates and refreshes `dev.toml` from these markers and fails loudly on a required field that lacks one (`tests/mb/test_setup.py` guards this). A defaulted field carries a `Sample` only when the generated dev value should differ from the model default (e.g. `engine_echo`).
+3. Document the field with a `#` comment on the model — the config models in `config.py` are the full catalogue of options (linked from `mb setup`'s generated `dev.toml` and from `docs/contribute/setup.md`). Fields with a safe default may be omitted from the environment TOMLs — established practice for defaulted fields (`engine_echo`, the pool fields, `concurrent_updates`), and required when rollout happens via `MITUPBOT__` env-var overrides so revert stays config-only. Fields WITHOUT a safe default also go in `prod.toml`; developers pick them up locally by rerunning `uv run mb setup`, which adds missing required options to an existing `dev.toml` without touching values already set.
+4. Document the corresponding environment variable override if applicable.
+5. If adding an entirely new section, create a new Pydantic model and add it as a field on `Config`.
 
 ## Adding a new environment
 
@@ -82,8 +83,10 @@ The `Env` enum in `config.py` defines available environments. To add one:
 
 Sensitive values (`bot.token`, `db.password`, `google_api.*`) use Pydantic's `SecretStr`. Access the raw value via `.get_secret_value()`. Never log `SecretStr` fields directly — their `__str__` returns `"**********"`.
 
-## The `sample.toml` file
+## Generating and refreshing `dev.toml`
 
-`sample.toml` documents the full catalogue of config options (linked from `mb setup`'s generated `dev.toml` and from `docs/contribute/setup.md`) and is the TOML loaded for `Env.SAMPLE`, used by Alembic migrations (`libs/data/mitup_bot/migrations/env.py`) and by some tests. `uv run mb setup --bot-token <token>` generates `dev.toml` from its own built-in template (`tools/mb/src/mb/setup_env.py`), not by reading `sample.toml` — keep both the built-in template and `sample.toml` in sync whenever fields are added or removed, since neither is generated from the other.
+`uv run mb setup --bot-token <token>` generates the git-ignored `environments/dev.toml` from the `Sample` annotations on the config models (rendered by `tools/mb/src/mb/setup_env.py`). A plain `uv run mb setup` refreshes an existing `dev.toml` in place: it adds any missing required option with its sample value and never touches values already set.
 
-When using the `sample.toml` as a template, make sure to copy it before editing to a `dev.toml` that is not checked into version control. The `sample.toml` should never contain real secrets or environment-specific values.
+## Db-only config loading
+
+Processes that need a database connection but not the full bot config — the Alembic `env.py` in `libs/data/mitup_bot/migrations/` and the migrations Lambda — build just the `[db]` section with `Config.db_from_providers(*providers)`. It merges providers exactly like `from_providers` but validates only `DbConfig`, and raises a `RuntimeError` pointing at `uv run mb setup` and the `MITUPBOT__DB__*` variables when the section is missing or incomplete. Never load the full `Config` just to reach `config.db`: the full model requires every section, which such processes don't have.

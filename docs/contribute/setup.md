@@ -59,7 +59,7 @@ Write that token into your local development config:
 uv run mb setup --bot-token <token>
 ```
 
-This generates a `dev.toml` config file that Mitup reads when running locally. If it already exists, the command asks before overwriting; pass `--force` to skip the prompt. To try the broadcast features, add one or more `--admin-id <telegram-user-id>` options and the ids land in `bot.admin_tg_ids`. The full catalogue of config options lives in [`sample.toml`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/environments/sample.toml).
+This generates a `dev.toml` config file that Mitup reads when running locally. If it already exists, the command asks before overwriting; pass `--force` to skip the prompt. Rerun `uv run mb setup` without `--bot-token` whenever the project gains required config options: it adds any option your `dev.toml` is missing, with a sample value, and leaves every value you already set untouched. To try the broadcast features, add one or more `--admin-id <telegram-user-id>` options and the ids land in `bot.admin_tg_ids`. The full catalogue of config options lives on the config models in [`config.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/config.py).
 
 ## Set up your database
 

@@ -79,9 +79,8 @@ def test_installs_single_stream_handler_with_processor_formatter():
     [
         (Env.DEV, structlog.dev.ConsoleRenderer),
         (Env.PROD, structlog.processors.JSONRenderer),
-        (Env.SAMPLE, structlog.processors.JSONRenderer),
     ],
-    ids=["dev", "prod", "sample"],
+    ids=["dev", "prod"],
 )
 def test_final_renderer_depends_on_env(
     env: Env, expected_renderer: type[structlog.dev.ConsoleRenderer] | type[structlog.processors.JSONRenderer]
