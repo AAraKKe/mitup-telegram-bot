@@ -7,6 +7,7 @@ services:
     volumes:
       - .:/bot
       - ./.docker_uv:/.docker_uv
+      - uv-cache:/.docker_uv/cache
     command: uv run mb test
 
   migrations-upgrade:
@@ -22,6 +23,7 @@ services:
     volumes:
       - .:/bot
       - ./.docker_uv:/.docker_uv
+      - uv-cache:/.docker_uv/cache
     environment:
       - MITUPBOT__DB__USERNAME=mitupbot
       - MITUPBOT__DB__PASSWORD=12345pass
@@ -83,6 +85,7 @@ services:
     volumes:
       - .:/bot
       - ./.docker_uv:/.docker_uv
+      - uv-cache:/.docker_uv/cache
     command: bash -c "uv run mb locales sync && uv run mb run bot"
 
   debug:
@@ -106,3 +109,10 @@ services:
     environment:
       - MITUPBOT__METRICS__ENVIRONMENT=rich
       - MITUPBOT__METRICS__NAMESPACE=MitupDocker/RecurrentEvents
+
+volumes:
+  # Shared across every checkout and worktree (the explicit name opts out of the
+  # per-project prefix), so a fresh worktree reuses already-downloaded packages and
+  # only fetches what its lock actually changed.
+  uv-cache:
+    name: mitup-bot-uv-cache

@@ -17,7 +17,9 @@ WORKDIR /bot
 RUN pip install --no-cache-dir uv
 
 # Keep the venv and download cache outside the bind-mounted project directory.
-# Both live under /.docker_uv, which docker-compose maps to a host folder so
-# dependencies are installed on first run and reused across container restarts.
+# Both live under /.docker_uv: the venv maps to a per-checkout host folder (worktrees
+# on different branches can carry different locks), while the download cache maps to
+# the shared mitup-bot-uv-cache named volume, so a fresh worktree resolves its venv
+# from already-downloaded packages instead of fetching everything again.
 ENV UV_PROJECT_ENVIRONMENT=/.docker_uv/venv \
     UV_CACHE_DIR=/.docker_uv/cache
