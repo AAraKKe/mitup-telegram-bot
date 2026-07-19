@@ -1315,12 +1315,20 @@ async def test_set_date_beyond_horizon_shows_alert_and_stays_in_edit_date(
     assert response == ConversationMeetingState.EDIT_DATE
     assert meeting.datetime is None  # not saved
     mock_session.assert_not_flushed()
-    # The horizon alert is addressed to the acting user, so it renders in the owner's language
-    # (what scheduling_horizon_rejection uses), not the meeting's content language.
-    context.api.assert_answer_callback_query_called(
-        update=update,
-        text=SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
-        show_alert=True,
+    # The rejection replaces the calendar message in place: no alert, the Collaborate button, and
+    # a button back to the calendar. It renders in the owner's language (what
+    # scheduling_horizon_rejection uses), not the meeting's content language.
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    calendar_button = ButtonConfig(
+        text=ButtonMessages.DATE.back(lang=user_with_settings.lang),
+        callback_data=cb.EDIT_MEETING_DATE.with_id(10).with_date(dt.date(2025, 1, 15)),
+    )
+    context.api.assert_edit_message_called(
+        update,
+        supporter_upsell_view(
+            SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user_with_settings.lang, days=31),
+            user_with_settings.lang,
+        ).with_context_menu([[calendar_button]]),
     )
 
 

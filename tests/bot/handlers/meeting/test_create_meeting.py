@@ -12,6 +12,7 @@ from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback_query_create_meeting
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
+from mitup_bot.handlers.meeting.utils import main_menu_back_button
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils import MeetingCreationMessages, SupporterMessages
@@ -411,7 +412,8 @@ async def test_create_meeting_entry_blocked_at_cap_shows_upsell(
     mock_session: MockDbSession,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """The New Meeting button stops at the cap: an alert is shown and the conversation never starts."""
+    """The New Meeting button stops at the cap: the tapped message becomes the upsell view (no
+    alert) and the conversation never starts."""
     # The fixture owner already has two active meetings.
     monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_active_meetings=2))
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -421,10 +423,40 @@ async def test_create_meeting_entry_blocked_at_cap_shows_upsell(
     assert state == ConversationHandler.END
     assert context.user_data is not None
     assert ContextId.CREATE_MEETING not in context.user_data.registry  # flow not entered
-    context.api.assert_answer_callback_query_called(
-        update=update,
-        text=SupporterMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=2),
-        show_alert=True,
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_edit_message_called(
+        update,
+        supporter_upsell_view(
+            SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+            user_with_settings.lang,
+        ).with_context_menu([[main_menu_back_button(user_with_settings.lang)]]),
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CREATE_MEETING)], indirect=True)
+async def test_create_meeting_entry_blocked_at_patron_cap_shows_patron_notice(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A Gamemaster at their raised cap gets the Patron notice, edited in place with the
+    Collaborate button pointing at the Commissioner tier."""
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_active_meetings=1, patron_active_meetings=2))
+    user_with_settings.supporter_level = supporter.SupporterLevel.HOST_2
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    state = await callback_query_create_meeting(update, context)
+
+    assert state == ConversationHandler.END
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_edit_message_called(
+        update,
+        supporter_upsell_view(
+            SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON.get(lang=user_with_settings.lang, cap=2),
+            user_with_settings.lang,
+        ).with_context_menu([[main_menu_back_button(user_with_settings.lang)]]),
     )
 
 
@@ -450,7 +482,7 @@ async def test_create_meeting_title_blocked_at_cap_sends_message(
         supporter_upsell_view(
             SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
             user_with_settings.lang,
-        ),
+        ).with_context_menu([[main_menu_back_button(user_with_settings.lang)]]),
     )
 
 

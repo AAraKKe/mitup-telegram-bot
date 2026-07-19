@@ -48,20 +48,38 @@ log = structlog.get_logger(__name__)
 # --- Shared helpers ---
 
 
-def validate_start_datetime(
-    start_dt: dt.datetime, meeting: Meetup, lang: str, *, check_horizon: bool = False
-) -> str | None:
+def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -> str | None:
     """Return an error message string if start_dt is invalid, or None if valid.
 
-    Symmetric with ``validate_end_datetime`` in edit_meeting_duration.py. `check_horizon` is set only
-    when the user is picking a new date (calendar selection, date_time entity); it is left off for
-    time-only edits so a grandfathered far-future meeting can still have its time adjusted.
+    Symmetric with ``validate_end_datetime`` in edit_meeting_duration.py. The scheduling horizon is
+    not checked here: date-pick call sites check it separately so the rejection can carry the
+    Collaborate upsell, and time-only edits skip it entirely so a grandfathered far-future meeting
+    can still have its time adjusted.
     """
     if is_in_past(start_dt, meeting):
         return MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=lang)
-    if check_horizon and (rejection := scheduling_horizon_rejection(meeting.owner, start_dt)) is not None:
-        return rejection
     return None
+
+
+async def reject_beyond_horizon(context: TMitupContext, update: Update, meeting: Meetup, start_dt: dt.datetime) -> bool:
+    """Return True, having informed the owner, when start_dt is beyond their scheduling horizon.
+
+    The tapped calendar message is edited into the rejection carrying the Collaborate button and a
+    button back to the calendar, so the upsell replaces the screen instead of stacking an alert on
+    top of it; the conversation stays in EDIT_DATE, where the calendar button is handled.
+    """
+    rejection = scheduling_horizon_rejection(meeting.owner, start_dt)
+    if rejection is None:
+        return False
+    lang = meeting.owner.lang
+    today = meeting.owner.now_in_tz().date()
+    calendar_button = ButtonConfig(
+        text=ButtonMessages.DATE.back(lang=lang),
+        callback_data=cb.EDIT_MEETING_DATE.with_id(meeting.db_id).with_date(today),
+    )
+    view = supporter_upsell_view(rejection, lang).with_context_menu([[calendar_button]])
+    await context.api.edit_message(update=update, view=view)
+    return True
 
 
 def prepend_end_cleared_notice(*, lang: str, base_message: str | FormattedText) -> FormattedText:
@@ -273,8 +291,10 @@ async def handle_first_datetime_set(
     context: TMitupContext, update: Update, meeting: Meetup, cb_date: dt.date
 ) -> ConversationMeetingState:
     proposed_start = dt.datetime.combine(cb_date, dt.time(23, 59, tzinfo=meeting.timezone)).astimezone(dt.UTC)
-    if error := validate_start_datetime(proposed_start, meeting, meeting.lang, check_horizon=True):
+    if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
+        return ConversationMeetingState.EDIT_DATE
+    if await reject_beyond_horizon(context, update, meeting, proposed_start):
         return ConversationMeetingState.EDIT_DATE
 
     meeting.datetime = proposed_start
@@ -327,8 +347,10 @@ async def handle_datetime_update(
 ) -> ConversationMeetingState:
     local_time = to_utc(cast(dt.datetime, meeting.datetime)).astimezone(meeting.timezone).time()
     proposed_start = dt.datetime.combine(cb_date, local_time, tzinfo=meeting.timezone).astimezone(dt.UTC)
-    if error := validate_start_datetime(proposed_start, meeting, meeting.lang, check_horizon=True):
+    if error := validate_start_datetime(proposed_start, meeting, meeting.lang):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
+        return ConversationMeetingState.EDIT_DATE
+    if await reject_beyond_horizon(context, update, meeting, proposed_start):
         return ConversationMeetingState.EDIT_DATE
 
     meeting.datetime = proposed_start

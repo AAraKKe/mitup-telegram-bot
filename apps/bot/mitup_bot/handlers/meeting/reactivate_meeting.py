@@ -3,10 +3,11 @@ from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.db import with_session
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils import MeetingLifecycleMessages
+from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
 
@@ -31,8 +32,13 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
         return
 
     # Reactivating turns an inactive meeting active again, so it counts against the cap. The meeting
-    # being reactivated is inactive and therefore excluded from the count.
-    if await active_meetings_cap_reached(user, update, context):
+    # being reactivated is inactive and therefore excluded from the count. The back button targets
+    # the past-meetings list, where the reactivation buttons live.
+    past_meetings_button = ButtonConfig(
+        text=ButtonMessages.PAST_MEETINGS.back(lang=user.lang),
+        callback_data=cb.SHOW_PAST_MEETING_PAGE.with_id(1),
+    )
+    if await active_meetings_cap_reached(user, update, context, back_button=past_meetings_button):
         return
 
     # No for_update here: reactivation writes `active` unconditionally without reading any

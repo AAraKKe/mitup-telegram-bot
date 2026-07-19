@@ -3,7 +3,7 @@ from typing import assert_never
 
 from telegram import Update
 
-from mitup_bot import guards, limits, supporter
+from mitup_bot import limits, supporter
 from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
@@ -40,14 +40,15 @@ def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang
             assert_never(unreachable)
 
 
-async def active_meetings_cap_reached(user: User, update: Update, context: TMitupContext) -> bool:
+async def active_meetings_cap_reached(
+    user: User, update: Update, context: TMitupContext, *, back_button: ButtonConfig
+) -> bool:
     """Return True, having informed the user, when they are at their active-meetings cap; else False.
 
-    The Patron tier raises the cap: a below-Patron user at the free cap is shown the upsell via
-    `supporter_required` (pointing to Collaborate), while a Patron at the sanity cap gets a plain
-    limit notice (the Organizer tier is uncapped and never reaches here). The notice rides a
-    callback-query alert when one is present (the New Meeting button and the reactivation button) and
-    a sent message with a Collaborate button otherwise (the title-message creation path).
+    The Patron tier raises the cap; the Organizer tier is uncapped and never reaches here. The
+    notice always renders as a view carrying the Collaborate button plus `back_button`: a callback
+    trigger edits the tapped message in place, so the user is never left with a stale screen and an
+    alert, while a message trigger (the title-message creation path) sends the view as a reply.
     """
     if not limits.at_active_meetings_cap(user):
         return False
@@ -55,25 +56,18 @@ async def active_meetings_cap_reached(user: User, update: Update, context: TMitu
     cap = limits.active_meetings_cap(user)
     assert cap is not None, "at_active_meetings_cap is only True when a finite cap is reached"
     below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
+    message = SupporterMessages.ACTIVE_MEETINGS_CAP if below_patron else SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON
+    view = supporter_upsell_view(message.get(lang=user.lang, cap=cap), user.lang).with_context_menu([[back_button]])
     if update.callback_query is not None:
-        if below_patron:
-            await guards.supporter_required(
-                user, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.HOST_2, cap=cap
-            )
-        else:
-            await context.api.answer_callback_query(
-                update,
-                text=SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON.get_text(lang=user.lang, cap=cap),
-                show_alert=True,
-            )
+        await context.api.edit_message(update=update, view=view)
     else:
-        message = (
-            SupporterMessages.ACTIVE_MEETINGS_CAP if below_patron else SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON
-        )
-        await context.api.send_message(
-            update=update, view=supporter_upsell_view(message.get(lang=user.lang, cap=cap), user.lang)
-        )
+        await context.api.send_message(update=update, view=view)
     return True
+
+
+def main_menu_back_button(lang: str) -> ButtonConfig:
+    """Back-to-main-menu button for screens that replace a main-menu interaction."""
+    return ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)
 
 
 def scheduling_horizon_rejection(user: User, when: dt.datetime, *, title_flow: bool = False) -> str | None:

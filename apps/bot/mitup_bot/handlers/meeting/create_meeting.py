@@ -21,7 +21,7 @@ from mitup_bot.views.collaborate import supporter_upsell_view
 from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
 from .enums import ConversationMeetingState, MeetingHandlerId
-from .utils import active_meetings_cap_reached, scheduling_horizon_rejection
+from .utils import active_meetings_cap_reached, main_menu_back_button, scheduling_horizon_rejection
 
 
 class ValidTitleFilter(filters.MessageFilter):
@@ -50,7 +50,7 @@ async def callback_query_create_meeting(
 
     # Stop the common button path before the title prompt when the user is at their cap; the
     # title-message handler backstops the inline deep-link path, which never reaches here.
-    if await active_meetings_cap_reached(user, update, context):
+    if await active_meetings_cap_reached(user, update, context, back_button=main_menu_back_button(user.lang)):
         return ConversationHandler.END
 
     view = views.factory.create_meeting_view(
@@ -80,7 +80,7 @@ async def create_meeting_message_handler(
     user = await guards.current_user(update, session)
 
     # Backstops the inline deep-link creation path (the button path is already stopped at entry).
-    if await active_meetings_cap_reached(user, update, context):
+    if await active_meetings_cap_reached(user, update, context, back_button=main_menu_back_button(user.lang)):
         return ConversationHandler.END
 
     message = guards.message(update)

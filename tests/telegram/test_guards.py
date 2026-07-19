@@ -28,7 +28,6 @@ from mitup_bot.guards import (
     meeting_viewable,
     message,
     render_context,
-    supporter_required,
     user_language,
     user_owns_meeting,
     user_registered,
@@ -42,10 +41,9 @@ from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages, SupporterMessages
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingInviteMessages
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
@@ -612,43 +610,3 @@ async def test_user_owns_meeting_returns_none_silently_when_redirect_false(
     # No warning logged and no message sent because redirect is disabled
     assert "User tried" not in caplog.text
     context.api.assert_method_just_called("edit_message", times=0)
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
-@pytest.mark.parametrize("level", [SupporterLevel.HOST_2, SupporterLevel.HOST_3], ids=["patron", "organizer"])
-async def test_supporter_required_passes_user_meeting_minimum_through(
-    update: Update,
-    context: StubMitupContext,
-    user_with_settings: User,
-    level: SupporterLevel,
-):
-    user_with_settings.supporter_level = level
-
-    result = await supporter_required(
-        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.HOST_2, cap=5
-    )
-
-    assert result is user_with_settings
-    context.api.assert_method_just_called("answer_callback_query", times=0)
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.MAIN_MENU)], indirect=True)
-@pytest.mark.parametrize("level", [SupporterLevel.NONE, SupporterLevel.HOST_1], ids=["none", "supporter"])
-async def test_supporter_required_alerts_and_returns_none_below_minimum(
-    update: Update,
-    context: StubMitupContext,
-    user_with_settings: User,
-    level: SupporterLevel,
-):
-    user_with_settings.supporter_level = level
-
-    result = await supporter_required(
-        user_with_settings, update, context, SupporterMessages.ACTIVE_MEETINGS_CAP, minimum=SupporterLevel.HOST_2, cap=5
-    )
-
-    assert result is None
-    context.api.assert_answer_callback_query_called(
-        update=update,
-        text=SupporterMessages.ACTIVE_MEETINGS_CAP.get_text(lang=user_with_settings.lang, cap=5),
-        show_alert=True,
-    )
