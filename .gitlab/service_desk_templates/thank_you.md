@@ -1,12 +1,11 @@
-Hi there 👋,
+Hi there 👋
 
-Thanks for getting in touch with the Mitup project through our Service Desk!
+Thanks for reaching out to the Mitup team. Your message landed safely, and we've saved it as %{ISSUE_ID} so nothing gets lost.
 
-We've got your message and created ticket %{ISSUE_ID} to keep track of it.
-Someone from the team will take a look soon.
+Someone from the team will read it and get back to you soon. Need to add anything in the meantime? Just reply to this email and it'll join the conversation.
 
-If you want to adjust notifications for this ticket, you can do that [here](%{UNSUBSCRIBE_URL})
+Talk soon,
 
-Cheers,
+The Mitup team
 
-The Mitup Team 😊
+Want to change the notifications for this request? You can do that [here](%{UNSUBSCRIBE_URL}).

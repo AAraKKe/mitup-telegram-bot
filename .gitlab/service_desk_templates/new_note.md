@@ -1,8 +1,6 @@
-Hi again 👋,
+Hi again 👋
 
-Just letting you know there's an update on your Mitup Service Desk ticket %{ISSUE_ID}.
-
-Here's the latest comment:
+There's a new reply on your Mitup request (%{ISSUE_ID}):
 
 ---
 
@@ -10,8 +8,10 @@ Here's the latest comment:
 
 ---
 
-If you want to adjust notifications for this ticket, you can do that [here](%{UNSUBSCRIBE_URL})
+Anything to add? Just reply to this email and your response will join the thread.
 
-Cheers,
+Talk soon,
 
-The Mitup Team 😊
+The Mitup team
+
+Want to change the notifications for this request? You can do that [here](%{UNSUBSCRIBE_URL}).
