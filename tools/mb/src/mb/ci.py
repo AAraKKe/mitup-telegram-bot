@@ -3,7 +3,7 @@ from typing import Annotated
 
 import typer
 
-from . import commit_check, import_isolation, language_matrix, lock_check, runner, ty_ignores
+from . import commit_check, import_isolation, language_matrix, lock_check, lock_diff, runner, ty_ignores
 
 app = typer.Typer(no_args_is_help=True, help="CI checks (normally run by the pipeline).")
 
@@ -23,6 +23,12 @@ def check_commit(
 def check_lock():
     """Fail if uv.lock is out of date with any workspace pyproject.toml."""
     raise typer.Exit(lock_check.run_check(runner.repo_root()))
+
+
+@app.command("comment-lock-diff")
+def comment_lock_diff():
+    """Post or update the MR comment summarizing uv.lock package changes, transitive included."""
+    raise typer.Exit(lock_diff.comment_lock_diff())
 
 
 @app.command("check-ty-ignores")

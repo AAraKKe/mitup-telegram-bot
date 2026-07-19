@@ -28,6 +28,25 @@ validate-lock:
     - *skip-on-tags
     - when: on_success
 
+# Keep one self-updating MR comment listing every uv.lock package change — transitive
+# dependencies included, which the MR description (and Renovate) never mention. The comment is
+# found again by its marker on later pushes, so a rebuilt MR refreshes it in place instead of
+# stacking duplicates. `allow_failure`: a missing comment must never block the pipeline.
+# Needs the masked MITUP_GITLAB_TOKEN CI variable — a PAT of the Mitup GitLab Bot service
+# account (api scope; the account posts the MR notes).
+lock-diff-comment:
+  stage: pre-flight
+  needs: [{job: build-docker-ci, optional: true}]
+  allow_failure: true
+  script:
+    - uv run mb ci comment-lock-diff
+  rules:
+    - *skip-on-schedules
+    - *skip-on-tags
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - uv.lock
+
 # A visibility canary: proves the CI image resolves and times a cold `uv sync`. Nothing consumes
 # its output — it blocks nothing and its failure only warns.
 preparation:

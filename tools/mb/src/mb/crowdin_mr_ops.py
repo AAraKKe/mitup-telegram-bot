@@ -7,41 +7,28 @@ that create the merge request or update the open one in place. Labeling that MR 
 HOLD_LABEL pauses the job before it touches anything.
 """
 
-import os
 import subprocess
 
 import httpx
 
-from . import console, runner
+from . import ci_env, console, gitlab_client, runner
+from .ci_env import TOKEN_ENV_VAR
 
 MR_BRANCH = "crowdin-translations"
 HOLD_LABEL = "crowdin::hold"
 MR_TITLE = "🗣️ Update approved translations from Crowdin"
 LOCALES_PATHSPEC = "libs/core/mitup_bot/locales/*.po"
 
-# CI_JOB_TOKEN can neither read the merge-requests API nor push, hence the dedicated token.
-TOKEN_ENV_VAR = "CROWDIN_GIT_TOKEN"
 CI_ENV_VARS = ("CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH")
-REQUEST_TIMEOUT_S = 30.0
 
 
 def ci_environment() -> dict[str, str] | None:
-    values = {name: os.environ.get(name, "") for name in (TOKEN_ENV_VAR, *CI_ENV_VARS)}
-    if missing := [name for name, value in values.items() if not value]:
-        console.error(f"Missing environment variable(s) {', '.join(missing)} — create-mr runs inside GitLab CI.")
-        return None
-    return values
+    return ci_env.ci_environment(CI_ENV_VARS)
 
 
 def hold_requested(environment: dict[str, str]) -> bool:
-    response = httpx.get(
-        f"{environment['CI_API_V4_URL']}/projects/{environment['CI_PROJECT_ID']}/merge_requests",
-        params={"state": "opened", "source_branch": MR_BRANCH},
-        headers={"PRIVATE-TOKEN": environment[TOKEN_ENV_VAR]},
-        timeout=REQUEST_TIMEOUT_S,
-    )
-    response.raise_for_status()
-    return any(HOLD_LABEL in merge_request["labels"] for merge_request in response.json())
+    merge_requests = ci_env.api_from(environment).open_merge_requests(environment["CI_PROJECT_ID"], MR_BRANCH)
+    return any(HOLD_LABEL in merge_request["labels"] for merge_request in merge_requests)
 
 
 def token_identity(environment: dict[str, str]) -> tuple[str, str]:
@@ -51,13 +38,7 @@ def token_identity(environment: dict[str, str]) -> tuple[str, str]:
     commit's committer email belongs to the pushing user, so the commit must be authored
     as whoever owns the token.
     """
-    response = httpx.get(
-        f"{environment['CI_API_V4_URL']}/user",
-        headers={"PRIVATE-TOKEN": environment[TOKEN_ENV_VAR]},
-        timeout=REQUEST_TIMEOUT_S,
-    )
-    response.raise_for_status()
-    user = response.json()
+    user = ci_env.api_from(environment).current_user()
     return user["name"], user.get("commit_email") or user["email"]
 
 
@@ -108,7 +89,7 @@ def create_translations_mr() -> int:
             return 0
         push_translations_branch(environment)
     except httpx.HTTPError as error:
-        console.error(f"GitLab API error: {error}")
+        console.error(f"GitLab API error: {gitlab_client.describe_error(error)}")
         return 1
     except subprocess.CalledProcessError as error:
         # The failed argv may embed the push token — report only the exit code.

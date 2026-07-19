@@ -26,35 +26,41 @@ def configure_output(
     console.configure(plain=plain)
 
 
+QUALITY_PANEL = "Quality gates"
+ENVIRONMENT_PANEL = "Local environment"
+CONTENT_PANEL = "Content"
+SHIP_PANEL = "Ship"
+
 app.command(
     "test",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    rich_help_panel=QUALITY_PANEL,
 )(testing.test_command)
-app.command("validate")(validate.validate_command)
-app.command("setup")(setup_env.setup_command)
-app.command("release")(release.release_command)
+app.command("validate", rich_help_panel=QUALITY_PANEL)(validate.validate_command)
+app.command("setup", rich_help_panel=ENVIRONMENT_PANEL)(setup_env.setup_command)
+app.command("release", rich_help_panel=SHIP_PANEL)(release.release_command)
 
-app.add_typer(db.app, name="db")
-app.add_typer(services.run_app, name="run")
-app.add_typer(services.docker_app, name="docker")
-app.add_typer(locales.app, name="locales")
-app.add_typer(docs.app, name="docs")
+app.add_typer(db.app, name="db", rich_help_panel=ENVIRONMENT_PANEL)
+app.add_typer(services.run_app, name="run", rich_help_panel=ENVIRONMENT_PANEL)
+app.add_typer(services.docker_app, name="docker", rich_help_panel=ENVIRONMENT_PANEL)
+app.add_typer(locales.app, name="locales", rich_help_panel=CONTENT_PANEL)
+app.add_typer(docs.app, name="docs", rich_help_panel=CONTENT_PANEL)
 app.add_typer(ci.app, name="ci", hidden=True)
 
 
-@app.command()
+@app.command(rich_help_panel=QUALITY_PANEL)
 def fix():
     """Format the code and apply all safe and unsafe lint fixes."""
     raise typer.Exit(checks.run_fix())
 
 
-@app.command()
+@app.command(rich_help_panel=QUALITY_PANEL)
 def lint(fix_issues: Annotated[bool, typer.Option("--fix", help="Apply fixes instead of only reporting.")] = False):
     """Run the linter."""
     raise typer.Exit(checks.run_lint(fix=fix_issues))
 
 
-@app.command("format")
+@app.command("format", rich_help_panel=QUALITY_PANEL)
 def format_code(
     check: Annotated[bool, typer.Option("--check", help="Report formatting diffs without writing.")] = False,
 ):
@@ -62,13 +68,13 @@ def format_code(
     raise typer.Exit(checks.run_format(check=check))
 
 
-@app.command()
+@app.command(rich_help_panel=QUALITY_PANEL)
 def typecheck():
     """Type-check the project and the mb tool."""
     raise typer.Exit(checks.run_typecheck())
 
 
-@app.command()
+@app.command(rich_help_panel=SHIP_PANEL)
 def deploy(
     migrations_image: Annotated[
         str | None, typer.Option("--migrations-image", help="Uri of the migrations lambda image.")

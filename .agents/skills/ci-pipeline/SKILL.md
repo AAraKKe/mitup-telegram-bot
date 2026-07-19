@@ -71,6 +71,7 @@ interruptible`), so a force-push cancels the superseded pipeline's runs. The dep
 | Job | What it does |
 |-----|-------------|
 | `validate-lock` (`test.yml`) | `uv run mb ci check-lock` — fails when `uv.lock` has drifted from any workspace `pyproject.toml`. Sits in `pre-flight` (after the CI image exists, before `build`/`test`) so a stale lock short-circuits the pipeline before any translation build or the matrix runs |
+| `lock-diff-comment` (`test.yml`) | `uv run mb ci comment-lock-diff` — on MR pipelines whose diff touches `uv.lock`, posts an MR note listing every package change (transitive included, each flagged direct/transitive) and updates that same note on later pushes via its embedded marker. `allow_failure: true`; needs the masked `MITUP_GITLAB_TOKEN` CI variable — a PAT of the Mitup GitLab Bot service account |
 | `auto-format` (`update-renovate.yml`) | On `renovate/*` MR branches, runs `mb fix` and pushes a formatting-fix commit back to the branch |
 
 ## Build stage (`test.yml`)
@@ -199,8 +200,8 @@ Two jobs drive the Crowdin round-trip through `mb locales push` / `mb locales pu
   pulls approved translations, validates the catalogs, and runs `mb locales create-mr`
   (`tools/mb/src/mb/crowdin_mr_ops.py`), which — when the result differs from the scheduled
   ref — force-pushes the `crowdin-translations` branch with push options that create or update
-  a single open MR. Needs `CROWDIN_API_KEY` plus `CROWDIN_GIT_TOKEN` — a PAT of the
-  crowdin-sync service account (Developer on the project, `api` + `write_repository`).
+  a single open MR. Needs `CROWDIN_API_KEY` plus `MITUP_GITLAB_TOKEN` — a PAT of the
+  Mitup GitLab Bot service account (Developer on the project, `api` + `write_repository`).
   `create-mr` commits as the token's owner (fetched from `GET /user`) because the project's
   committer-email push rule rejects any identity the pushing user doesn't own — never
   hardcode a committer identity in a CI push job. Labeling the open MR `crowdin::hold` makes

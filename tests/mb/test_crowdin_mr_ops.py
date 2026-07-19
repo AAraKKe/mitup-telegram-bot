@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable
 import httpx
 import pytest
 
-from mb import console, crowdin_mr_ops, runner
+from mb import console, crowdin_mr_ops, gitlab_client, runner
 
 API_V4_URL = "https://gitlab.example/api/v4"
 PROJECT_ID = "724481"
@@ -25,7 +25,7 @@ TOKEN_USER = {
 }
 
 FULL_ENV = {
-    "CROWDIN_GIT_TOKEN": TOKEN,
+    "MITUP_GITLAB_TOKEN": TOKEN,
     "CI_API_V4_URL": API_V4_URL,
     "CI_PROJECT_ID": PROJECT_ID,
     "CI_SERVER_HOST": SERVER_HOST,
@@ -107,7 +107,7 @@ def install_api_responses(
             payload = mrs_payload
         return httpx.Response(200, json=payload, request=httpx.Request("GET", url))
 
-    monkeypatch.setattr(crowdin_mr_ops.httpx, "get", fake_get)
+    monkeypatch.setattr(gitlab_client.httpx, "get", fake_get)
     return seen
 
 
@@ -122,7 +122,7 @@ def test_ci_environment_returns_all_values(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.parametrize(
     "missing",
-    ["CROWDIN_GIT_TOKEN", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH"],
+    ["MITUP_GITLAB_TOKEN", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH"],
 )
 def test_ci_environment_reports_missing_variable(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], missing: str
@@ -172,7 +172,7 @@ def test_hold_requested_false_when_no_open_mr(monkeypatch: pytest.MonkeyPatch):
 
 def test_hold_requested_raises_on_error_status(monkeypatch: pytest.MonkeyPatch):
     request = httpx.Request("GET", f"{API_V4_URL}/projects/{PROJECT_ID}/merge_requests")
-    monkeypatch.setattr(crowdin_mr_ops.httpx, "get", lambda *a, **k: httpx.Response(500, request=request))
+    monkeypatch.setattr(gitlab_client.httpx, "get", lambda *a, **k: httpx.Response(500, request=request))
 
     with pytest.raises(httpx.HTTPStatusError):
         crowdin_mr_ops.hold_requested(FULL_ENV)
@@ -200,7 +200,7 @@ def test_token_identity_falls_back_to_email(monkeypatch: pytest.MonkeyPatch, com
 
 def test_token_identity_raises_on_error_status(monkeypatch: pytest.MonkeyPatch):
     request = httpx.Request("GET", f"{API_V4_URL}/user")
-    monkeypatch.setattr(crowdin_mr_ops.httpx, "get", lambda *a, **k: httpx.Response(401, request=request))
+    monkeypatch.setattr(gitlab_client.httpx, "get", lambda *a, **k: httpx.Response(401, request=request))
 
     with pytest.raises(httpx.HTTPStatusError):
         crowdin_mr_ops.token_identity(FULL_ENV)
@@ -267,7 +267,7 @@ def drive_create_mr(
 ) -> GitRecorder:
     set_ci_env(monkeypatch)
     if get_override is not None:
-        monkeypatch.setattr(crowdin_mr_ops.httpx, "get", get_override)
+        monkeypatch.setattr(gitlab_client.httpx, "get", get_override)
     else:
         install_api_responses(monkeypatch, list(hold_payload))
     recorder = GitRecorder(diff_returncode=diff_returncode, fail_on=fail_on)
@@ -287,10 +287,10 @@ def test_create_translations_mr_happy_path_pushes(monkeypatch: pytest.MonkeyPatc
 def test_create_translations_mr_missing_env_exits_one(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
-    set_ci_env(monkeypatch, CROWDIN_GIT_TOKEN=None)
+    set_ci_env(monkeypatch, MITUP_GITLAB_TOKEN=None)
 
     assert crowdin_mr_ops.create_translations_mr() == 1
-    assert "CROWDIN_GIT_TOKEN" in combined(capsys)
+    assert "MITUP_GITLAB_TOKEN" in combined(capsys)
 
 
 def test_create_translations_mr_hold_leaves_branch_untouched(
