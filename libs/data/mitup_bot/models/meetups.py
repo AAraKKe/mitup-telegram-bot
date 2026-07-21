@@ -292,7 +292,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         session: AsyncSession,
         meetup_id: int,
         must_exist: Literal[True],
-        include_inactive: bool = False,
+        include_inactive: bool = True,
         *,
         for_update: bool = False,
     ) -> Self: ...  # pragma: no cover
@@ -304,7 +304,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         session: AsyncSession,
         meetup_id: int,
         must_exist: bool = ...,
-        include_inactive: bool = False,
+        include_inactive: bool = True,
         *,
         for_update: bool = False,
     ) -> Self | None: ...  # pragma: no cover

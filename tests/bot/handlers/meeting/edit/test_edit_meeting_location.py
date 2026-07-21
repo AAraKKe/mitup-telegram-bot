@@ -10,7 +10,7 @@ from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_location_view
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import Meetup, MeetupLocation, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditLocationMessages
@@ -682,3 +682,33 @@ async def test_edit_location_coordinates_message_ends_when_user_does_not_own_mee
 
     assert state == ConversationHandler.END
     context.api.assert_method_just_called("edit_message", times=1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)
+async def test_edit_location_coordinates_message_mutates_reloaded_meeting(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """The coordinate write and fan-out must land on the meeting-rooted Meetup.by_id reload, not on
+    the user-rooted guard result whose participant leaves are unloaded under the async engine."""
+    user, user_rooted_meeting = owner_with_meeting(meeting_id=1)
+    # A distinct Meetup instance shares the same id: user_owns_meeting resolves the user-rooted one,
+    # while Meetup.by_id resolves this session-loaded one. Only the reload must be mutated.
+    reloaded_meeting = create_meetup(id=1, location=MeetupLocation(name="Session Location"))
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(reloaded_meeting)
+
+    context, result = await call_handler(
+        EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
+    )
+
+    assert reloaded_meeting.location.coordinates == (123.4, 567.8)
+    assert user_rooted_meeting.location.coordinates is None
+    expected_view = edit_location_view(reloaded_meeting).with_context(
+        MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user.lang)
+    )
+    context.api.assert_send_message_called(update, expected_view)
+    assert result is ConversationHandler.END

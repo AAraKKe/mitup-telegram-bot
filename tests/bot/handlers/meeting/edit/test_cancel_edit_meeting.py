@@ -56,6 +56,26 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
     context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
+@pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(123))]), indirect=True)
+async def test_cancel_edit_meeting_silent_when_full_meeting_not_found(
+    mock_session: MockDbSession, update: Update, meeting: Meetup, handler_context: HandlerContext
+):
+    """The user owns the meeting (guard passes off user.meetups) but the meeting-rooted reload
+    returns None, so the handler ends the conversation without rendering the edit view."""
+    # Register only the owner so user_owns_meeting passes; the meeting is NOT added to the session,
+    # so the Meetup.by_id reload returns None.
+    mock_session.add_object(meeting.owner, "tg_user_id")
+
+    context, result = await call_handler(
+        EditMeetingHandlerId.CANCEL,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123},
+    )
+
+    assert result is ConversationHandler.END
+    context.api.assert_method_just_called("edit_message", times=0)
+
+
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(999))]), indirect=True)
 async def test_cancel_edit_meeting_returns_end_when_user_does_not_own_meeting(
     mock_session: MockDbSession,
