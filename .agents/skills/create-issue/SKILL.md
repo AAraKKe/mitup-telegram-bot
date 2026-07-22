@@ -55,3 +55,19 @@ EOF
 ```
 
 Output the issue URL returned by `glab`.
+
+## Step 6 — Materialize dependencies as issue links
+
+An ordering relationship that only exists as prose in a description ("depends on #N", "after #N", "part 2 of…") is invisible to GitLab's boards and blocked-issue indicators. Whenever the new issue depends on another issue, blocks another issue, or is part of a sequenced plan (including other issues created in the same batch), create the corresponding **blocking links** — never leave the relationship as prose only.
+
+`glab` has no subcommand for issue links; use the API. The project's tier supports blocking links:
+
+```bash
+# BLOCKER blocks BLOCKED — run once per relationship
+glab api "projects/:id/issues/BLOCKER_IID/links" --method POST \
+  -f target_project_id=PROJECT_ID -f target_issue_iid=BLOCKED_IID -f link_type=blocks
+```
+
+- Always phrase links in the `blocks` direction (create them from the blocker's endpoint); `is_blocked_by` from the other end produces the same link, so pick one convention and keep it.
+- When creating several issues of a plan in one sitting, add the links right after the last issue is created, then verify with `glab api "projects/:id/issues/IID/links"`.
+- Only link true ordering constraints. "Related but independent" work stays unlinked (or use `link_type=relates_to` if the connection is worth surfacing).
