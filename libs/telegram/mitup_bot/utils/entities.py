@@ -117,6 +117,7 @@ def shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
         offset=entity.offset + offset,
         length=entity.length,
         url=entity.url,
+        custom_emoji_id=entity.custom_emoji_id,
         unix_time=entity.unix_time,
         date_time_format=entity.date_time_format,
     )
@@ -234,11 +235,14 @@ def render(template: Template) -> FormattedText:
 
 
 TELEGRAM_DATETIME_LINK_URL = "https://telegram.org/blog/member-tags-disable-sharing-and-more#time-and-date-formatting"
+# Kept out of the t-string below: a quoted literal (with its apostrophe) inside a same-quoted
+# interpolation is valid Python but derails regex-based highlighters for the rest of the file.
+TELEGRAM_DATETIME_LINK_TEXT = "Telegram's date & time formatting"
 
 
 def build_datetime_link() -> FormattedText:
     """Build the `FormattedText` for Telegram's date & time formatting help link."""
-    return render(t"{Link("Telegram's date & time formatting", TELEGRAM_DATETIME_LINK_URL)}")
+    return render(t"{Link(TELEGRAM_DATETIME_LINK_TEXT, TELEGRAM_DATETIME_LINK_URL)}")
 
 
 # --- parse_format_tags() ---
@@ -282,7 +286,8 @@ class OpenTag:
 
     offset: int
     entity_type: str | None
-    url: str | None
+    url: str | None = None
+    custom_emoji_id: str | None = None
 
 
 def parse_tag_attributes(attrs: str) -> dict[str, str]:
@@ -290,22 +295,26 @@ def parse_tag_attributes(attrs: str) -> dict[str, str]:
     return {m.group(1).lower(): m.group(2) if m.group(2) is not None else m.group(3) for m in ATTR_RE.finditer(attrs)}
 
 
-def resolve_open_tag(tag: str, attrs: str) -> tuple[str | None, str | None]:
-    """Map an opening tag and its attributes to an entity type and optional URL.
+def resolve_open_tag(tag: str, attrs: str, offset: int) -> OpenTag:
+    """Resolve an opening tag and its attributes into the `OpenTag` to track.
 
-    Returns `(None, None)` for tags that carry no entity — an unknown tag, an
-    `<a>` without `href`, or a `<span>` that is not a `tg-spoiler` — so the tag
-    is stripped from the output without producing an entity.
+    Tags that carry no entity — an unknown tag, an `<a>` without `href`, a
+    `<span>` that is not a `tg-spoiler`, or a `<tg-emoji>` without `emoji-id` —
+    resolve with `entity_type=None`, so the tag is stripped from the output
+    without producing an entity.
     """
     match tag:
         case "a":
             href = parse_tag_attributes(attrs).get("href")
-            return (MessageEntity.TEXT_LINK, href) if href else (None, None)
+            return OpenTag(offset, MessageEntity.TEXT_LINK if href else None, url=href)
         case "span":
             classes = parse_tag_attributes(attrs).get("class", "").split()
-            return (MessageEntity.SPOILER, None) if "tg-spoiler" in classes else (None, None)
+            return OpenTag(offset, MessageEntity.SPOILER if "tg-spoiler" in classes else None)
+        case "tg-emoji":
+            emoji_id = parse_tag_attributes(attrs).get("emoji-id")
+            return OpenTag(offset, MessageEntity.CUSTOM_EMOJI if emoji_id else None, custom_emoji_id=emoji_id)
         case _:
-            return STYLE_MAP.get(tag), None
+            return OpenTag(offset, STYLE_MAP.get(tag))
 
 
 def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) -> FormattedText:
@@ -313,8 +322,9 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
 
     Supports the Telegram HTML subset: `<b>`/`<strong>`, `<i>`/`<em>`,
     `<u>`/`<ins>`, `<s>`/`<strike>`/`<del>`, `<code>`, `<pre>`, `<blockquote>`,
-    `<spoiler>`/`<tg-spoiler>`/`<span class="tg-spoiler">`, and
-    `<a href="…">` links. Variable placeholders use `${varname}` syntax.
+    `<spoiler>`/`<tg-spoiler>`/`<span class="tg-spoiler">`,
+    `<tg-emoji emoji-id="…">` custom emoji, and `<a href="…">` links.
+    Variable placeholders use `${varname}` syntax.
 
     Substitution values may be plain `str` or `FormattedText`.  When a
     `FormattedText` value is substituted its entities are preserved with
@@ -356,10 +366,17 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         open_tag = active.pop(tag, None)
         if open_tag is None or open_tag.entity_type is None:
             return
-        entity_type = open_tag.entity_type
         length = utf16_offset - open_tag.offset
         if length > 0:
-            entities.append(MessageEntity(type=entity_type, offset=open_tag.offset, length=length, url=open_tag.url))
+            entities.append(
+                MessageEntity(
+                    type=open_tag.entity_type,
+                    offset=open_tag.offset,
+                    length=length,
+                    url=open_tag.url,
+                    custom_emoji_id=open_tag.custom_emoji_id,
+                )
+            )
 
     for m in TOKEN_RE.finditer(text):
         flush_literal(text[cursor : m.start()])
@@ -369,9 +386,82 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         elif m.group("close"):
             close_tag(m.group("tag"))
         else:
-            entity_type, url = resolve_open_tag(m.group("tag"), m.group("attrs"))
-            active[m.group("tag")] = OpenTag(utf16_offset, entity_type, url)
+            active[m.group("tag")] = resolve_open_tag(m.group("tag"), m.group("attrs"), utf16_offset)
 
     flush_literal(text[cursor:])
     entities.sort(key=lambda e: (e.offset, e.type))
     return FormattedText(plain, entities)
+
+
+# --- serialize_entities() ---
+
+# Entity type → tag emitted by `serialize_entities`. Only these types survive
+# serialization; every other entity is dropped and its text stays unstyled.
+ENTITY_TAG_MAP: dict[str, str] = {
+    MessageEntity.BOLD: "b",
+    MessageEntity.ITALIC: "i",
+    MessageEntity.UNDERLINE: "u",
+    MessageEntity.STRIKETHROUGH: "s",
+    MessageEntity.SPOILER: "tg-spoiler",
+    MessageEntity.CUSTOM_EMOJI: "tg-emoji",
+}
+
+
+def is_serializable_entity(entity: MessageEntity) -> bool:
+    if entity.type == MessageEntity.CUSTOM_EMOJI:
+        return entity.custom_emoji_id is not None
+    return entity.type in ENTITY_TAG_MAP
+
+
+def open_tag_markup(entity: MessageEntity) -> str:
+    if entity.type == MessageEntity.CUSTOM_EMOJI:
+        assert entity.custom_emoji_id is not None, "filtered by is_serializable_entity"
+        return f'<tg-emoji emoji-id="{html.escape(entity.custom_emoji_id)}">'
+    return f"<{ENTITY_TAG_MAP[entity.type]}>"
+
+
+def serialize_entities(text: str, entities: list[MessageEntity]) -> str:
+    """Render *(text, entities)* as a tag-annotated string for `parse_format_tags`.
+
+    The capture-side inverse of `parse_format_tags`: literal text is
+    HTML-escaped so user-typed markup (`<b>`, `&amp;`, `<3`, …) round-trips as
+    literal characters, and entity spans are wrapped in the tags listed in
+    `ENTITY_TAG_MAP`; entities of any other type are dropped with their text
+    kept unstyled. Entities nest by sorting on `(offset, -length)`; an entity
+    that partially overlaps an already-open span without nesting inside it is
+    dropped — the earlier-starting entity wins. Telegram never sends partially
+    overlapping entities, so that rule is purely defensive.
+    """
+    encoded = text.encode("utf-16-le")
+    parts: list[str] = []
+    open_spans: list[tuple[int, str]] = []  # (end offset, tag name), innermost last
+    cursor = 0
+
+    def flush_until(end: int):
+        nonlocal cursor
+        parts.append(html.escape(encoded[cursor * 2 : end * 2].decode("utf-16-le")))
+        cursor = end
+
+    def close_spans_ending_by(offset: int):
+        while open_spans and open_spans[-1][0] <= offset:
+            end, tag = open_spans.pop()
+            flush_until(end)
+            parts.append(f"</{tag}>")
+
+    for entity in sorted(filter(is_serializable_entity, entities), key=lambda e: (e.offset, -e.length)):
+        close_spans_ending_by(entity.offset)
+        end = entity.offset + entity.length
+        if open_spans and end > open_spans[-1][0]:
+            continue
+        flush_until(entity.offset)
+        parts.append(open_tag_markup(entity))
+        open_spans.append((end, ENTITY_TAG_MAP[entity.type]))
+
+    close_spans_ending_by(utf16_len(text))
+    flush_until(utf16_len(text))
+    return "".join(parts)
+
+
+def strip_tags(tagged: str) -> str:
+    """Return the visible plain text of a tag-annotated string."""
+    return parse_format_tags(tagged, {}).text

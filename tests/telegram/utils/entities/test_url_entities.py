@@ -92,6 +92,24 @@ def test_formatted_text_prepend_preserves_url_on_link_entity():
     assert result.entities[0].offset == 7  # "prefix " = 7 UTF-16 code units
 
 
+def test_formatted_text_prepend_preserves_custom_emoji_id():
+    e = MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="777")
+    ft = FormattedText("😀", [e])
+    result = ft.prepend("hey ")
+    assert len(result.entities) == 1
+    assert result.entities[0].offset == 4  # "hey " = 4 UTF-16 code units
+    assert result.entities[0].custom_emoji_id == "777"
+
+
+def test_formatted_text_append_preserves_custom_emoji_id():
+    suffix_entity = MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="777")
+    result = FormattedText("hey ").append(FormattedText("😀", [suffix_entity]))
+    assert result.text == "hey 😀"
+    assert len(result.entities) == 1
+    assert result.entities[0].offset == 4
+    assert result.entities[0].custom_emoji_id == "777"
+
+
 def test_formatted_text_prepend_no_entities():
     ft = FormattedText("hello")
     result = ft.prepend("Say: ")
@@ -149,6 +167,15 @@ def test_formatted_text_join_accepts_plain_strings():
     result = FormattedText.join(" | ", ["foo", "bar"])
     assert result.text == "foo | bar"
     assert result.entities == []
+
+
+def test_formatted_text_join_preserves_custom_emoji_id():
+    emoji_entity = MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="777")
+    result = FormattedText.join(" ", [FormattedText("hi"), FormattedText("😀", [emoji_entity])])
+    assert result.text == "hi 😀"
+    assert len(result.entities) == 1
+    assert result.entities[0].offset == 3  # "hi " = 3 UTF-16 code units
+    assert result.entities[0].custom_emoji_id == "777"
 
 
 # ---------------------------------------------------------------------------

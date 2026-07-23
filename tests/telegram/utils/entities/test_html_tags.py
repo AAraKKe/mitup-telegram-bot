@@ -288,3 +288,44 @@ def test_parse_format_tags_substitution_value_is_not_unescaped():
     result = parse_format_tags("value ${payload}", {"payload": "a &amp; b"})
     assert result.text == "value a &amp; b"
     assert result.entities == []
+
+
+# ---------------------------------------------------------------------------
+# parse_format_tags() — <tg-emoji emoji-id="…"> custom emoji
+# ---------------------------------------------------------------------------
+
+
+def test_parse_format_tags_tg_emoji_basic():
+    result = parse_format_tags('<tg-emoji emoji-id="5368324170671202286">👍</tg-emoji>', {})
+    assert result.text == "👍"
+    assert len(result.entities) == 1
+    entity = result.entities[0]
+    assert entity.type == "custom_emoji"
+    assert entity.offset == 0
+    assert entity.length == 2  # 👍 is outside the BMP → 2 UTF-16 code units
+    assert entity.custom_emoji_id == "5368324170671202286"
+
+
+def test_parse_format_tags_tg_emoji_nested_inside_bold():
+    result = parse_format_tags('<b>hi <tg-emoji emoji-id="42">😀</tg-emoji></b>', {})
+    assert result.text == "hi 😀"
+    bold_entity = next(e for e in result.entities if e.type == "bold")
+    emoji_entity = next(e for e in result.entities if e.type == "custom_emoji")
+    assert bold_entity.offset == 0
+    assert bold_entity.length == 5  # "hi " = 3, 😀 = 2
+    assert emoji_entity.offset == 3
+    assert emoji_entity.length == 2
+    assert emoji_entity.custom_emoji_id == "42"
+
+
+def test_parse_format_tags_tg_emoji_without_id_dropped():
+    # A <tg-emoji> with no emoji-id carries no entity; the tag is stripped but text stays.
+    result = parse_format_tags("<tg-emoji>😀</tg-emoji>", {})
+    assert result.text == "😀"
+    assert result.entities == []
+
+
+def test_parse_format_tags_tg_emoji_empty_id_dropped():
+    result = parse_format_tags('<tg-emoji emoji-id="">😀</tg-emoji>', {})
+    assert result.text == "😀"
+    assert result.entities == []
