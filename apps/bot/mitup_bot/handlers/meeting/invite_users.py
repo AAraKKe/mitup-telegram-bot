@@ -16,6 +16,7 @@ from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.factory import confirmation_view, main_menu_view
+from mitup_bot.views.meeting_text import rich_title
 
 from .enums import ConversationInviteState, MeetingHandlerId
 
@@ -207,7 +208,7 @@ async def invite_users_name_message_handler(
 
         context.store_text(ContextId.INVITE_USERS, invited_user_name)
         message = MeetingInviteMessages.CONFIRMATION.get(
-            lang=user.lang, name=invited_user_name, meeting_title=meeting.title
+            lang=user.lang, name=invited_user_name, meeting_title=rich_title(meeting)
         )
 
         view = confirmation_view(
@@ -266,7 +267,9 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             context.clean_user_data([ContextId.INVITE_USERS])
             return ConversationHandler.END
 
-        message = MeetingInviteMessages.SUCCESS.get(lang=user.lang, name=invited_user_name, meeting_title=meeting.title)
+        message = MeetingInviteMessages.SUCCESS.get(
+            lang=user.lang, name=invited_user_name, meeting_title=rich_title(meeting)
+        )
         await context.api.edit_message(
             update=update, view=meeting_views.view_for(meeting, user).with_context(message=message)
         )

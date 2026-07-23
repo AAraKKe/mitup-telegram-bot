@@ -2,7 +2,8 @@ import logging
 import re
 
 import pytest
-from telegram import Update
+from telegram import MessageEntity, Update
+from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData
@@ -11,16 +12,28 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_title import (
     edit_title_prompt_view,
     edit_title_rich_message_handler,
 )
-from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState
+from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Settings, User
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditContentMessages
+from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import rich_title
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import MetricAssertions, StubMitupContext, create_meetup
+from tests.helpers import (
+    HandlerContext,
+    MetricAssertions,
+    StubMitupApp,
+    StubMitupContext,
+    UpdateRequest,
+    call_handler,
+    create_meetup,
+)
 from tests.helpers.stub_db import MockDbSession
+
+CUSTOM_EMOJI_ID = "5368324170671202286"
 
 
 async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store_meeting_id(
@@ -117,3 +130,43 @@ async def test_edit_title_rich_message_reprompts_and_keeps_state(
     # The meeting id survives so a following plain-text title still updates the meeting.
     assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(
+            message_text="Raid night 😀",
+            entities=[
+                MessageEntity(type=MessageEntity.BOLD, offset=0, length=4),
+                MessageEntity(type=MessageEntity.CUSTOM_EMOJI, offset=11, length=2, custom_emoji_id=CUSTOM_EMOJI_ID),
+            ],
+        )
+    ],
+    indirect=True,
+)
+async def test_edit_title_message_dual_writes_and_renders_rich_success(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+):
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.TITLE_MESSAGE,
+        handler_context=HandlerContext(update=update, app=app, metrics_client=metrics_client),
+        with_meeting_id={ContextId.EDIT_MEETING_TITLE: meeting.db_id},
+    )
+
+    assert meeting.title == "Raid night 😀"
+    assert meeting.title_tagged == f'<b>Raid</b> night <tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">😀</tg-emoji>'
+
+    view = meeting_views.edit_view(meeting).with_context(
+        MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))
+    )
+    context.api.assert_send_message_called(update, view)
+    assert state == ConversationHandler.END

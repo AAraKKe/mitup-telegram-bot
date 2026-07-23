@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from string.templatelib import Interpolation, Template
 
@@ -50,6 +50,13 @@ class FormattedText:
         offset = utf16_len(self._text)
         shifted_suffix = [shift_entity(e, offset) for e in suffix_entities]
         return FormattedText(self._text + suffix_text, self._entities + shifted_suffix)
+
+    def wrap(self, entity_type: str) -> FormattedText:
+        """Return a new `FormattedText` with one *entity_type* entity spanning the whole text."""
+        if not self._text:
+            return self
+        spanning = MessageEntity(type=entity_type, offset=0, length=utf16_len(self._text))
+        return FormattedText(self._text, [spanning, *self._entities])
 
     @classmethod
     def join(cls, separator: str, parts: Iterable[str | FormattedText]) -> FormattedText:
@@ -420,7 +427,7 @@ def open_tag_markup(entity: MessageEntity) -> str:
     return f"<{ENTITY_TAG_MAP[entity.type]}>"
 
 
-def serialize_entities(text: str, entities: list[MessageEntity]) -> str:
+def serialize_entities(text: str, entities: Sequence[MessageEntity]) -> str:
     """Render *(text, entities)* as a tag-annotated string for `parse_format_tags`.
 
     The capture-side inverse of `parse_format_tags`: literal text is

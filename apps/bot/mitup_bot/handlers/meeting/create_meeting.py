@@ -16,8 +16,9 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import build_datetime_link
+from mitup_bot.utils.entities import build_datetime_link, serialize_entities
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views import meeting_text
 from mitup_bot.views.collaborate import supporter_upsell_view
 
 from ..command_enums import CommandsId
@@ -113,13 +114,14 @@ async def create_meeting_message_handler(
         incognito=user.settings.default_incognito,
         lock_on_start=user.settings.default_lock_on_start,
     )
+    meetup.set_title(title, serialize_entities(title, message.entities))
     session.add(meetup)
     await session.flush()
     # A freshly flushed instance has never loaded its joined_links collection, and the async
     # engine cannot lazy-load it when the view renders below — load it explicitly.
     await session.refresh(meetup, ["joined_links"])
 
-    success_message = MeetingCreationMessages.SUCCESS.get(title=meetup.title, lang=user.lang)
+    success_message = MeetingCreationMessages.SUCCESS.get(title=meeting_text.rich_title(meetup), lang=user.lang)
     view = meeting_views.edit_view(meetup).with_context(success_message)
     await context.api.send_message(update=update, view=view)
     context.put_feature_metric(Feature.CREATE_MEETING)

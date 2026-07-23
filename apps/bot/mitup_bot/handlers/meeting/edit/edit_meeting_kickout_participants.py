@@ -10,6 +10,7 @@ from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
+from mitup_bot.views.meeting_text import rich_title
 
 from .enums import EditMeetingHandlerId
 from .views import edit_participants_view, kick_out_users_view
@@ -102,7 +103,7 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
 
     participant_name = participant.user.inline_name
     confirmation_message = MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION.get(
-        lang=current_user.lang, participant=participant_name, meeting_title=meeting.title
+        lang=current_user.lang, participant=participant_name, meeting_title=rich_title(meeting)
     )
     confirmation_callback_data = cb.CONFIRM_KICK_OUT.with_ids(meeting_id=meeting.db_id, id=callback_data.id)
     decline_callback_data = cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=meeting.db_id, id=1)

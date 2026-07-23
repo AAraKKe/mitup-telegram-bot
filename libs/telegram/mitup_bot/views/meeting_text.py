@@ -4,16 +4,33 @@ import urllib.parse
 from string.templatelib import Template
 from typing import TYPE_CHECKING
 
+from telegram import MessageEntity
+
 from mitup_bot.utils import (
     ButtonMessages,
     Emojis,
     MeetingDisplayMessages,
     MeetingEditParticipantsMessages,
 )
-from mitup_bot.utils.entities import Bold, EntityDateTime, FormattedText, render
+from mitup_bot.utils.entities import EntityDateTime, FormattedText, parse_format_tags, render
 
 if TYPE_CHECKING:
     from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation
+
+
+def rich_title(meeting: Meetup) -> FormattedText:
+    """Meeting title with the owner's formatting and custom-emoji entities restored."""
+    return parse_format_tags(meeting.tagged_title, {})
+
+
+def rich_description(meeting: Meetup) -> FormattedText | None:
+    """Meeting description with its entities restored; None mirrors an unset or empty
+    description so callers keep their placeholder branches."""
+    if not meeting.description:
+        return None
+    tagged = meeting.tagged_description
+    assert tagged is not None, "tagged_description is set whenever description is"
+    return parse_format_tags(tagged, {})
 
 
 def participant_name(link: JoinedUsers) -> FormattedText:
@@ -174,13 +191,14 @@ def datetime_section(meeting: Meetup) -> Template:
 
 
 def meeting_message(meeting: Meetup) -> FormattedText:
-    description = meeting.description or MeetingDisplayMessages.DESCRIPTION_NOT_SET.get(lang=meeting.lang)
+    description = rich_description(meeting) or MeetingDisplayMessages.DESCRIPTION_NOT_SET.get(lang=meeting.lang)
     created_by = MeetingDisplayMessages.CREATED_BY.get(lang=meeting.lang, owner=meeting.owner.display_name)
     location = location_description(meeting.location, lang=meeting.lang)
     datetime_part = datetime_section(meeting)
     participants_part = participants_text_with_list(meeting)
+    title = rich_title(meeting).wrap(MessageEntity.BOLD)
     return render(
-        t"{Bold(meeting.title)} ({created_by})\n\n"
+        t"{title} ({created_by})\n\n"
         t"--- {Emojis.DESCRIPTION} {description}\n"
         t"{datetime_part}"
         t"--- {Emojis.MAP} {location}\n"
@@ -195,7 +213,7 @@ def inline_message(meeting: Meetup) -> FormattedText:
     """
     created_by = MeetingDisplayMessages.CREATED_BY.get(lang=meeting.lang, owner=meeting.owner.display_name)
     description_section: Template | str = (
-        t"\n--- {Emojis.DESCRIPTION} {meeting.description}" if meeting.description else ""
+        t"\n--- {Emojis.DESCRIPTION} {description}" if (description := rich_description(meeting)) else ""
     )
     location_section: Template | str = (
         ""
@@ -203,19 +221,18 @@ def inline_message(meeting: Meetup) -> FormattedText:
         else t"\n--- {Emojis.MAP} {location_description(meeting.location, lang=meeting.lang)}\n"
     )
     participants_part = participants_text(meeting)
+    title = rich_title(meeting).wrap(MessageEntity.BOLD)
     if meeting.datetime is not None:
         datetime_part = datetime_section(meeting)
         return render(
-            t"{Bold(meeting.title)} ({created_by})"
+            t"{title} ({created_by})"
             t"{description_section}"
             t"\n{datetime_part}"
             t"{location_section}"
             t"--- {Emojis.JOINED} {participants_part}"
         )
     return render(
-        t"{Bold(meeting.title)} ({created_by})"
-        t"{description_section}{location_section}"
-        t"\n--- {Emojis.JOINED} {participants_part}"
+        t"{title} ({created_by}){description_section}{location_section}\n--- {Emojis.JOINED} {participants_part}"
     )
 
 

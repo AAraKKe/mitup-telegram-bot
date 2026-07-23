@@ -15,16 +15,16 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import serialize_entities
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import rich_description
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 
 
 def edit_description_prompt_view(meeting: Meetup, lang: str) -> MitupView:
-    description = (
-        meeting.description if meeting.description else MeetingDisplayMessages.DESCRIPTION_EMPTY.get(lang=lang)
-    )
+    description = rich_description(meeting) or MeetingDisplayMessages.DESCRIPTION_EMPTY.get(lang=lang)
     return MitupView(
         MeetingEditContentMessages.DESCRIPTION_PROMPT.get(lang=lang, description=description),
         keyboard=[
@@ -77,14 +77,15 @@ async def callback_query_edit_meeting_description(session: AsyncSession, update:
 @HandlersRegistry.register_message(EditMeetingHandlerId.DESCRIPTION_MESSAGE, filters.TEXT, bindable=False)
 @with_session(write=True)
 async def edit_description_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
-    assert update.effective_message is not None
+    message = update.effective_message
+    assert message is not None and message.text is not None
 
     with context.meeting_id(ContextId.EDIT_MEETING_DESCRIPTION) as meeting_id:
         meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
-        meeting.description = update.effective_message.text
+        meeting.set_description(message.text, serialize_entities(message.text, message.entities))
 
         view = meeting_views.edit_view(meeting).with_context(
-            MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=meeting.description)
+            MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=rich_description(meeting))
         )
         await context.api.send_message(update=update, view=view)
         await context.api.update_meeting_messages(meeting=meeting)

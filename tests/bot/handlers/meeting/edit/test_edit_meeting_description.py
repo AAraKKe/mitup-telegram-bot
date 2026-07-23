@@ -4,7 +4,8 @@ from collections.abc import Callable
 from typing import cast
 
 import pytest
-from telegram import CallbackQuery, Update
+from telegram import CallbackQuery, MessageEntity, Update
+from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData
@@ -16,12 +17,21 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_description import (
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
-from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
+from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import rich_description
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import HandlerContext, MetricAssertions, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import (
+    HandlerContext,
+    MetricAssertions,
+    StubMitupApp,
+    StubMitupContext,
+    UpdateRequest,
+    call_handler,
+)
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -137,3 +147,40 @@ async def test_edit_description_rich_message_reprompts_and_keeps_state(
     assert state == ConversationMeetingState.EDIT_DESCRIPTION
     assert context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id == 1
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(
+            message_text="Bring snacks & drinks",
+            entities=[MessageEntity(type=MessageEntity.ITALIC, offset=6, length=6)],
+        )
+    ],
+    indirect=True,
+)
+async def test_edit_description_message_dual_writes_and_renders_rich_success(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+):
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DESCRIPTION_MESSAGE,
+        handler_context=HandlerContext(update=update, app=app, metrics_client=metrics_client),
+        with_meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: meeting.db_id},
+    )
+
+    assert meeting.description == "Bring snacks & drinks"
+    assert meeting.description_tagged == "Bring <i>snacks</i> &amp; drinks"
+
+    view = meeting_views.edit_view(meeting).with_context(
+        MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=rich_description(meeting))
+    )
+    context.api.assert_send_message_called(update, view)
+    assert state == ConversationHandler.END

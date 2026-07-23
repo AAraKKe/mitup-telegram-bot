@@ -11,6 +11,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
+from mitup_bot.views.meeting_text import rich_title
 
 log = structlog.get_logger(__name__)
 
@@ -66,8 +67,8 @@ async def notify_joined_link(link_id: int, api: TelegramApiWrapper) -> bool:
             log.info("Joined link no longer due for a notification, skipping", joined_link=link_id)
             return False
 
-        # This render reads only `link.user.lang` and `link.meetup.title`, both loaded (the JoinedUsers
-        # root loads `user` and `meetup` via mapper-level selectin). `link.meetup.joined_links` is NOT
+        # This render reads only `link.user.lang` and the title columns of `link.meetup`, both loaded
+        # (the JoinedUsers root loads `user` and `meetup` via mapper-level selectin). `link.meetup.joined_links` is NOT
         # loaded: from a JoinedUsers root the cascade revisits the JoinedUsers mapper on
         # `meetup -> joined_links` and stops, and unlike `meetup` this collection has no identity-map
         # rescue — any access emits SQL and raises MissingGreenlet here. A future `update_meeting_messages`
@@ -75,7 +76,9 @@ async def notify_joined_link(link_id: int, api: TelegramApiWrapper) -> bool:
         # `JoinedUsers.meetup -> Meetup.joined_links -> JoinedUsers.user`/`invited_by` onto this re-query
         # first; the shared `USERS_TO_NOTIFY_STATEMENT` stays lean because `due_link_ids` only reads ids.
         view = MitupView(
-            description=NotificationMessages.STARTING_SOON.get(lang=link.user.lang, meeting_title=link.meetup.title),
+            description=NotificationMessages.STARTING_SOON.get(
+                lang=link.user.lang, meeting_title=rich_title(link.meetup)
+            ),
             keyboard=[],
         )
         await api.send_message_to_user(link.user, view)

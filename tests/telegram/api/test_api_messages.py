@@ -2,7 +2,7 @@ from typing import cast
 from unittest import mock
 
 import pytest
-from telegram import Update
+from telegram import MessageEntity, Update
 from telegram.error import BadRequest
 
 from mitup_bot.api_wrapper import (
@@ -15,6 +15,7 @@ from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import AnyFloat, StubMitupContext, create_meetup
@@ -320,3 +321,78 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
     assert edit.call_count == 2
 
     await assert_time_metric_emitted(context, metrics, times=2)  # one metric per edit call
+
+
+CUSTOM_EMOJI_ENTITY = MessageEntity(type=MessageEntity.CUSTOM_EMOJI, offset=0, length=2, custom_emoji_id="123456")
+BOLD_ENTITY = MessageEntity(type=MessageEntity.BOLD, offset=3, length=4)
+
+
+async def test_send_message_retries_without_custom_emoji_on_rejection(context: StubMitupContext, update: Update):
+    context.bot.send_message.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+    view = MitupView(FormattedText("😀 bold", [CUSTOM_EMOJI_ENTITY, BOLD_ENTITY]), [])
+
+    await context.api.send_message(update=update, view=view)
+
+    assert context.bot.send_message.call_count == 2
+    retry_kwargs = context.bot.send_message.call_args_list[1].kwargs
+    assert retry_kwargs["entities"] == [BOLD_ENTITY]
+    assert retry_kwargs["text"] == "😀 bold"
+
+
+async def test_send_message_retry_sends_no_entities_when_only_custom_emoji(context: StubMitupContext, update: Update):
+    context.bot.send_message.side_effect = [BadRequest("can't parse custom emoji entity"), None]
+    view = MitupView(FormattedText("😀", [CUSTOM_EMOJI_ENTITY]), [])
+
+    await context.api.send_message(update=update, view=view)
+
+    assert context.bot.send_message.call_count == 2
+    assert context.bot.send_message.call_args_list[1].kwargs["entities"] is None
+
+
+async def test_send_message_does_not_retry_when_error_is_not_about_custom_emoji(
+    context: StubMitupContext, update: Update
+):
+    context.bot.send_message.side_effect = BadRequest("Chat not found")
+    view = MitupView(FormattedText("😀", [CUSTOM_EMOJI_ENTITY]), [])
+
+    with pytest.raises(BadRequest):
+        await context.api.send_message(update=update, view=view)
+
+    assert context.bot.send_message.call_count == 1
+
+
+async def test_send_message_does_not_retry_without_custom_emoji_entities(context: StubMitupContext, update: Update):
+    context.bot.send_message.side_effect = BadRequest("Custom emoji entities are not allowed")
+    view = MitupView(FormattedText("no emoji", [MessageEntity(type=MessageEntity.BOLD, offset=0, length=2)]), [])
+
+    with pytest.raises(BadRequest):
+        await context.api.send_message(update=update, view=view)
+
+    assert context.bot.send_message.call_count == 1
+
+
+async def test_edit_message_retries_without_custom_emoji_on_rejection(context: StubMitupContext, update: Update):
+    context.bot.edit_message_text.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+    view = MitupView(FormattedText("😀 bold", [CUSTOM_EMOJI_ENTITY, BOLD_ENTITY]), [])
+
+    await context.api.edit_message(update=update, view=view)
+
+    assert context.bot.edit_message_text.call_count == 2
+    assert context.bot.edit_message_text.call_args_list[1].kwargs["entities"] == [BOLD_ENTITY]
+
+
+async def test_update_meeting_messages_retries_without_custom_emoji_on_rejection(
+    user_with_settings: User, context: StubMitupContext
+):
+    meeting = create_meetup(id=123, owner=user_with_settings, title="Party 😀")
+    meeting.title_tagged = 'Party <tg-emoji emoji-id="123456">😀</tg-emoji>'
+    meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
+
+    edit: mock.MagicMock = context.bot.edit_message_text
+    edit.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+
+    await context.api.update_meeting_messages(meeting=meeting)
+
+    assert edit.call_count == 2
+    retry_entities = edit.call_args_list[1].kwargs["entities"]
+    assert all(entity.type != MessageEntity.CUSTOM_EMOJI for entity in retry_entities)

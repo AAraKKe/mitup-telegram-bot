@@ -1,9 +1,10 @@
 import datetime as dt
+import html
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
-from sqlalchemy import JSON, BigInteger, Column, DateTime, FetchedValue
+from sqlalchemy import JSON, BigInteger, Column, DateTime, FetchedValue, Text
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -48,6 +49,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
     owner_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
     title: str = Field(nullable=False)
+    title_tagged: str | None = Field(default=None, sa_type=Text)
     waiting_list: bool = Field(nullable=False)
     public: bool = Field(nullable=False)
     allow_invitation: bool = Field(nullable=False)
@@ -57,6 +59,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     started_notification_sent: bool = Field(nullable=False, default=False)
     lock_on_start: bool = Field(nullable=False, default=False)
     description: str | None = None
+    description_tagged: str | None = Field(default=None, sa_type=Text)
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(
         default=None,
@@ -92,6 +95,36 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     def is_owned_by(self, user: User) -> bool:
         return self.owner.db_id == user.db_id
+
+    def set_title(self, text: str, tagged: str):
+        """Set the title from user input: visible plain text plus its tag-annotated form.
+
+        The two columns must always change together, so every title write goes through here —
+        `tagged` comes from `serialize_entities(text, entities)` in the capturing handler.
+        """
+        self.title = text
+        self.title_tagged = tagged
+
+    def set_description(self, text: str, tagged: str):
+        """Set the description from user input; the dual-write counterpart of `set_title`."""
+        self.description = text
+        self.description_tagged = tagged
+
+    @property
+    def tagged_title(self) -> str:
+        """Tag-annotated title for entity-carrying renders.
+
+        A row written without a tagged copy falls back to the escaped plain title — the same
+        transformation as the backfill — so tag-lookalike text a user typed stays literal.
+        """
+        return self.title_tagged if self.title_tagged is not None else html.escape(self.title)
+
+    @property
+    def tagged_description(self) -> str | None:
+        """Tag-annotated description, with the same escape fallback as `tagged_title`."""
+        if self.description_tagged is not None:
+            return self.description_tagged
+        return html.escape(self.description) if self.description is not None else None
 
     @property
     def n_participants(self) -> int:

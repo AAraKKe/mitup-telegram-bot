@@ -16,6 +16,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import MitupView
+from mitup_bot.views.meeting_text import rich_title
 
 log = structlog.get_logger(__name__)
 
@@ -58,7 +59,7 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
             MitupView(
                 description=NotificationMessages.DELETION_WARNING.get(
                     lang=meetup.lang,
-                    meeting_title=meetup.title,
+                    meeting_title=rich_title(meetup),
                     days_until_deletion=7,
                     past_meetings_button=ButtonMessages.PAST_MEETINGS.get(lang=meetup.user_language),
                     reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.get(lang=meetup.user_language),
@@ -105,7 +106,7 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         users.append(meetup.owner)
         views.append(
             MitupView(
-                description=NotificationMessages.DELETED.get(lang=meetup.lang, meeting_title=meetup.title),
+                description=NotificationMessages.DELETED.get(lang=meetup.lang, meeting_title=rich_title(meetup)),
                 keyboard=[],
             )
         )

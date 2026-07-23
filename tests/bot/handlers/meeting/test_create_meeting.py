@@ -22,6 +22,7 @@ from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.collaborate import supporter_upsell_view
+from mitup_bot.views.meeting_text import rich_title
 from tests.helpers import (
     ConversationStep,
     ConversationTester,
@@ -272,6 +273,44 @@ async def test_meeting_creation_with_date_entity_without_unix_time_preserves_tit
     assert new_meeting.title == "Board meeting tomorrow"
     # datetime was NOT set because unix_time was absent in to_dict().
     assert new_meeting.datetime is None
+
+
+# ---------------------------------------------------------------------------
+# create_meeting_message_handler — formatting entities: dual-write + rich success card
+# ---------------------------------------------------------------------------
+
+
+async def test_meeting_creation_with_formatting_entities_dual_writes_title(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    metrics_client: MetricsClient,
+):
+    """Formatting and custom-emoji entities in the title land in the tagged column while the
+    plain column keeps the visible text, and the success card renders the rich title."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    custom_emoji_id = "5368324170671202286"
+    entities = [
+        MessageEntity(type=MessageEntity.BOLD, offset=0, length=4),
+        MessageEntity(type=MessageEntity.CUSTOM_EMOJI, offset=11, length=2, custom_emoji_id=custom_emoji_id),
+    ]
+    title_update = make_message_update("Raid night 😀", entities=entities)
+
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    context, _ = await call_handler(
+        MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
+        handler_context=ctx,
+    )
+
+    assert len(mock_session.objects_added) == 1
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    assert new_meeting.title == "Raid night 😀"
+    assert new_meeting.title_tagged == f'<b>Raid</b> night <tg-emoji emoji-id="{custom_emoji_id}">😀</tg-emoji>'
+
+    message = MeetingCreationMessages.SUCCESS.get(title=rich_title(new_meeting), lang=user_with_settings.lang)
+    view = meeting_views.edit_view(new_meeting).with_context(message)
+    context.api.assert_send_message_called(title_update, view)
 
 
 # ---------------------------------------------------------------------------

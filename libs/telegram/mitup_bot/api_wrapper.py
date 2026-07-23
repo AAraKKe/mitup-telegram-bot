@@ -44,6 +44,7 @@ from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import rich_title
 
 TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
@@ -54,6 +55,9 @@ MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Chat not found"),
 ]
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
+# Sending custom_emoji entities requires the bot owner's Telegram Premium; when that lapses
+# Telegram rejects the whole call. Matched conservatively: only errors that name the entity.
+CUSTOM_EMOJI_REJECTION_PATTERN = re.compile(r"custom[ _]emoji", re.IGNORECASE)
 
 log = structlog.get_logger(__name__)
 
@@ -220,6 +224,23 @@ async def handle_edit_errors(adapter: ContextOrBotAdapter):
             adapter.emit_metric(MetricKey.MESSAGE_DELETED)
             return
         raise
+
+
+async def retry_without_custom_emoji[T](
+    send: Callable[[Sequence[MessageEntity] | None], Coroutine[Any, Any, T]],
+    entities: Sequence[MessageEntity] | None,
+) -> T:
+    """Run *send* with *entities*; when Telegram rejects the custom emoji in them, retry once
+    with only the custom_emoji entities stripped so the message still goes out with fallback
+    glyphs and its remaining formatting."""
+    try:
+        return await send(entities)
+    except BadRequest as error:
+        stripped = [entity for entity in entities or [] if entity.type != MessageEntity.CUSTOM_EMOJI]
+        if len(stripped) == len(entities or []) or not CUSTOM_EMOJI_REJECTION_PATTERN.search(error.message):
+            raise
+        log.warning("Custom emoji rejected by Telegram, retrying without them", error=error.message)
+        return await send(stripped or None)
 
 
 def view_log_payload(view: MitupView) -> dict[str, Any]:
@@ -512,12 +533,15 @@ class TelegramApi:
 
     async def _send_chat_message_now(self, chat_id: int, view: MitupView) -> Message | None:
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            return await self.adapter.bot.send_message(
-                chat_id=chat_id,
-                text=view.description.text,
-                entities=view.description.entities or None,
-                reply_markup=view.markup,
-                disable_web_page_preview=True,
+            return await retry_without_custom_emoji(
+                lambda entities: self.adapter.bot.send_message(
+                    chat_id=chat_id,
+                    text=view.description.text,
+                    entities=entities,
+                    reply_markup=view.markup,
+                    disable_web_page_preview=True,
+                ),
+                view.description.entities or None,
             )
 
     async def send_document(self, update: Update, view: MitupView) -> Message | None:
@@ -573,12 +597,15 @@ class TelegramApi:
     async def _send_user_message_now(self, tg_user_id: int, view: MitupView) -> Message | None:
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             try:
-                return await self.adapter.bot.send_message(
-                    chat_id=tg_user_id,
-                    text=view.description.text,
-                    entities=view.description.entities or None,
-                    reply_markup=view.markup,
-                    disable_web_page_preview=True,
+                return await retry_without_custom_emoji(
+                    lambda entities: self.adapter.bot.send_message(
+                        chat_id=tg_user_id,
+                        text=view.description.text,
+                        entities=entities,
+                        reply_markup=view.markup,
+                        disable_web_page_preview=True,
+                    ),
+                    view.description.entities or None,
                 )
             except Forbidden as e:
                 log.warning("User has blocked the bot", tg_user_id=tg_user_id)
@@ -654,7 +681,7 @@ class TelegramApi:
     ):
         users = [link.user for link in joined_users if link.invited_by is None]
         views_to_send = [
-            MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(lang=user.lang, meeting_title=meeting.title)
+            MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(lang=user.lang, meeting_title=rich_title(meeting))
             for user in users
         ]
         await self.send_messages_to_users(
@@ -678,14 +705,17 @@ class TelegramApi:
         chat_id, message_id, inline_message_id = target
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             async with handle_edit_errors(adapter=self.adapter):
-                return await self.adapter.bot.edit_message_text(
-                    text=view.description.text,
-                    entities=view.description.entities or None,
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    inline_message_id=inline_message_id,
-                    reply_markup=view.markup,
-                    disable_web_page_preview=True,
+                return await retry_without_custom_emoji(
+                    lambda entities: self.adapter.bot.edit_message_text(
+                        text=view.description.text,
+                        entities=entities,
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        inline_message_id=inline_message_id,
+                        reply_markup=view.markup,
+                        disable_web_page_preview=True,
+                    ),
+                    view.description.entities or None,
                 )
         return False
 
@@ -860,14 +890,17 @@ class TelegramApi:
         to the caller."""
         with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
             try:
-                await self.adapter.bot.edit_message_text(
-                    text=edit.text,
-                    entities=edit.entities,
-                    chat_id=edit.chat_id,
-                    message_id=edit.message_id,
-                    inline_message_id=edit.inline_message_id,
-                    reply_markup=edit.reply_markup,
-                    disable_web_page_preview=True,
+                await retry_without_custom_emoji(
+                    lambda entities: self.adapter.bot.edit_message_text(
+                        text=edit.text,
+                        entities=entities,
+                        chat_id=edit.chat_id,
+                        message_id=edit.message_id,
+                        inline_message_id=edit.inline_message_id,
+                        reply_markup=edit.reply_markup,
+                        disable_web_page_preview=True,
+                    ),
+                    edit.entities,
                 )
             except BadRequest as e:
                 # Sometimes the message does not need to be updated but we don't know that in

@@ -10,6 +10,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
+from mitup_bot.views.meeting_text import rich_title
 
 log = structlog.get_logger(__name__)
 
@@ -56,7 +57,7 @@ async def notify_meeting_started(meetup_id: int, api: TelegramApiWrapper) -> int
         ]
         for link in participants:
             view = MitupView(
-                description=NotificationMessages.STARTED.get(lang=link.user.lang, meeting_title=meeting.title),
+                description=NotificationMessages.STARTED.get(lang=link.user.lang, meeting_title=rich_title(meeting)),
                 keyboard=[],
             )
             await api.send_message_to_user(link.user, view)
