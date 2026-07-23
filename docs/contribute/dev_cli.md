@@ -88,6 +88,6 @@ uv run mb docs build        # build the static site
 
 A pre-commit hook runs `mb docs build` whenever you touch `docs/` or `zensical.toml`, so a broken build never reaches a merge request.
 
-## Deploy and CI
+## CI checks
 
-Two groups you rarely run by hand. `mb deploy` pushes the four app images, updates both Lambdas, and rolls out the two ECS services in one command; the pipeline drives it. `mb ci` holds the checks the pipeline runs, such as the commit-message format check, the lock-file check, and the language-matrix check. You can run any of them locally to reproduce a CI failure, but the hooks and pipeline invoke them for you.
+Deploys are maintainer-only and run from CI, so `mb deploy` is not part of the contributor loop. `mb ci` holds the checks the pipeline runs, such as the commit-message format check, the lock-file check, and the language-matrix check. You can run any of them locally to reproduce a red pipeline job.

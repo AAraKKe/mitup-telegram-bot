@@ -22,12 +22,14 @@ uv installs the right Python version for you the first time you sync, so you don
 
 ## Clone and bootstrap
 
-Clone the repository from the [public repo](https://gitlab.com/meetupbot/mitup-telegram-bot):
+External contributors work from a fork. Fork the repository into your own namespace on GitLab, then clone the fork:
 
 ```bash
-git clone git@gitlab.com:meetupbot/mitup-telegram-bot.git
+git clone git@gitlab.com:<your-namespace>/mitup-telegram-bot.git
 cd mitup-telegram-bot
 ```
+
+The rest of this page is the same whether you cloned a fork or the main repository.
 
 Create the environment and install the git hooks in one step:
 
@@ -59,7 +61,7 @@ Write that token into your local development config:
 uv run mb setup --bot-token <token>
 ```
 
-This generates a `dev.toml` config file that Mitup reads when running locally. If it already exists, the command asks before overwriting; pass `--force` to skip the prompt. Rerun `uv run mb setup` without `--bot-token` whenever the project gains required config options: it adds any option your `dev.toml` is missing, with a sample value, and leaves every value you already set untouched. To try the broadcast features, add one or more `--admin-id <telegram-user-id>` options and the ids land in `bot.admin_tg_ids`. The full catalogue of config options lives on the config models in [`config.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/config.py).
+This generates a `dev.toml` config file that Mitup reads when running locally. If it already exists, the command asks before overwriting; pass `--force` to skip the prompt. Rerun `uv run mb setup` without `--bot-token` whenever the project gains required config options: it adds any option your `dev.toml` is missing, with a sample value, and leaves every value you already set untouched. Passing `--admin-id` sets up the admin-only broadcast feature. The full catalogue of config options lives on the config models in [`config.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/core/mitup_bot/config.py).
 
 ## Set up your database
 

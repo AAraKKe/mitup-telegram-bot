@@ -149,6 +149,13 @@ Match the words the bot itself uses. These apply to the user-facing pages (see a
   * **Do:** `Open [@mitupbot](https://t.me/mitupbot) and start a conversation.`
   * This is separate from the `mitupbot` alias used inside chat showcases (see the chat-showcase rules), which is a plain header label, not a link.
 
+## Contributor vs maintainer content
+
+The developer handbook under `docs/contribute/` is written for an external contributor. It documents only what a contributor can do and needs to know.
+
+* **Maintainer-only operations never get a how-to here.** Releases, deploys, prod configuration, CI enforcement internals, and project administration are maintainer work. At most, state the boundary in one line so the reader knows the edge exists (`deploys run from CI and are maintainer-only`), then stop. No walkthrough, no command, no step list for the maintainer side.
+* **Never enumerate a collection that lives in a config file.** Commit types, labels, and supported languages all live in their own files and drift the moment you copy them into prose. Link the source of truth and name a couple of examples instead of pasting the table.
+
 ## Headings
 
 * Sentence case (see anti-pattern 1).

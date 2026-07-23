@@ -33,11 +33,11 @@ Most handlers share the same failure paths: the user is not found, the meeting d
 
 ## Database integration tests
 
-Most tests run against a mock session. The tests under [`tests/models/db_behavior/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tests/models/db_behavior) run against a real Postgres instance that `testcontainers` spins up for the run, so they need Docker running locally. They're skipped during a normal `mb test` run and only execute under the `--db` flag:
+Most tests run against a mock session. The tests under [`tests/data/db_behavior/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tests/data/db_behavior) run against a real Postgres instance that `testcontainers` spins up for the run, so they need Docker running locally. They're skipped during a normal `mb test` run and only execute under the `--db` flag:
 
 ```bash
 uv run mb test --db
-uv run mb test --db tests/models/db_behavior -k cascades -v
+uv run mb test --db tests/data/db_behavior -k cascades -v
 ```
 
 ## The suite runs once per language in CI

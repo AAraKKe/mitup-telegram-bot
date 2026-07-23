@@ -54,7 +54,7 @@ Each `apps/` member carries its own `Dockerfile`, built from the repo root so th
 | [`apps/lambda-migrations`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/apps/lambda-migrations/Dockerfile) | `mitup-lambda-migrations-app` | A Lambda that applies Alembic migrations on deploy. |
 | [`apps/lambda-alarm`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/apps/lambda-alarm/Dockerfile) | `mitup-lambda-alarm-app` | A Lambda that forwards CloudWatch alarms to GitLab. |
 
-Each image resolves only its own member's locked dependency closure, so the alarm Lambda never carries PTB and the migrations Lambda never carries the web stack. `uv run mb deploy` pushes the four image URIs, updates both Lambdas, and rolls out the two ECS services.
+Each image resolves only its own member's locked dependency closure, so the alarm Lambda never carries PTB and the migrations Lambda never carries the web stack.
 
 !!! tip "Golden rules"
 
