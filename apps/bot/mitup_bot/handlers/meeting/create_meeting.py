@@ -9,6 +9,8 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.personal_filters import RichMessageFilter
+from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
@@ -140,6 +142,22 @@ async def create_meeting_invalid_title_message_handler(
     return ConversationMeetingState.TITLE
 
 
+@HandlersRegistry.register_message(
+    MeetingHandlerId.CREATE_MEETING_RICH_MESSAGE,
+    RichMessageFilter(),
+    bindable=False,
+)
+@with_session
+async def create_meeting_rich_message_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationMeetingState:
+    user = await guards.current_user(update, session, load_collections=False)
+    ctx = guards.render_context(user, update, context)
+    view = views.factory.create_meeting_view(ctx, datetime_link=build_datetime_link())
+    await reply_rich_message_not_supported(ctx, update, context, view)
+    return ConversationMeetingState.TITLE
+
+
 @HandlersRegistry.register_callback_query(
     MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK, callback_data=cb.CANCEL_CREATE_MEETING, bindable=False
 )
@@ -164,6 +182,7 @@ HandlersRegistry.register_conversation_handler(
         ],
     },
     fallbacks=[
+        MeetingHandlerId.CREATE_MEETING_RICH_MESSAGE,  # rich messages get their own reply and keep the user in TITLE
         MeetingHandlerId.CREATE_MEETING_INVALID_TITLE_MESSAGE,  # must come before MESSAGE_WITHOUT_TEXT
         MessagesId.MESSAGE_WITHOUT_TEXT,
     ],

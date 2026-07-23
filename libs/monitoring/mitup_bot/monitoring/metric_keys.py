@@ -195,3 +195,4 @@ class Feature(CamelCaseStrEnum):
     ATTACH_TO_CHAT = auto()
     SEARCH_CHAT_MEETINGS = auto()
     PATREON_LINK = auto()
+    RICH_MESSAGE = auto()

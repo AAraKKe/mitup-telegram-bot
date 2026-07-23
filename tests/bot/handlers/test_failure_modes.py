@@ -879,6 +879,43 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="message_without_text",
     ),
+    Context(
+        handler_id=MessagesId.MESSAGE_RICH,
+        update_request=UpdateRequest(rich_message=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="rich_message",
+    ),
+    # --- Per-conversation rich message fallbacks ---
+    Context(
+        handler_id=MeetingHandlerId.CREATE_MEETING_RICH_MESSAGE,
+        update_request=UpdateRequest(rich_message=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="create_meeting_rich_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.TITLE_RICH_MESSAGE,
+        update_request=UpdateRequest(rich_message=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_title_rich_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DESCRIPTION_RICH_MESSAGE,
+        update_request=UpdateRequest(rich_message=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_description_rich_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.LOCATION_NAME_RICH_MESSAGE,
+        update_request=UpdateRequest(rich_message=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="edit_location_name_rich_message",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TIMEZONE_RICH_MESSAGE,
+        update_request=UpdateRequest(rich_message=True),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_timezone_rich_message",
+    ),
     # --- Main menu handlers ---
     Context(
         handler_id=MainMenuHandlerId.MAIN_MENU_CALLBACK,

@@ -211,6 +211,13 @@ class CommonMessages(MessageBase):
         "were in the process. Everything you saved is safe. Please start what you were doing again from "
         "the menu below."
     )
+    # Shown when a user sends a Telegram rich message where plain text input is expected
+    # (title/description prompts). The bot cannot use rich content yet.
+    RICH_MESSAGE_NOT_SUPPORTED = (
+        "<b>That's a rich message!</b>\n\nI can tell you sent one, but I can't work with rich messages "
+        "just yet. Support is coming with the v2.0 update, and I'll announce it here when it arrives, so "
+        "keep an eye out. For now, send your text as a plain message and we'll keep going."
+    )
 
 
 class SupporterMessages(MessageBase):

@@ -7,17 +7,22 @@ from telegram.ext import ConversationHandler
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
+from mitup_bot.handlers.meeting.edit.edit_meeting_location import (
+    edit_location_name_prompt_view,
+    edit_location_name_rich_message_handler,
+)
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_location_view
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, MeetupLocation, User
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditLocationMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
+    StubMitupContext,
     UpdateRequest,
     call_handler,
     create_meetup,
@@ -712,3 +717,25 @@ async def test_edit_location_coordinates_message_mutates_reloaded_meeting(
     )
     context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationHandler.END
+
+
+async def test_edit_location_name_rich_message_reprompts_and_keeps_state(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    assert context.user_data is not None
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, 1)
+
+    state = await edit_location_name_rich_message_handler(update, context)
+
+    expected = edit_location_name_prompt_view(1, user_with_settings.lang).with_context(
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+    )
+    context.api.assert_send_message_called(update, expected)
+    assert state == ConversationMeetingState.EDIT_LOCATION_NAME
+    assert context.user_data.registry[ContextId.EDIT_MEETING_LOCATION_NAME].meeting_id == 1
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})

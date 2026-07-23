@@ -16,6 +16,7 @@ class EditSettingsHandlerId(HandlerId):
     TIMEZONE_CALLBACK = auto()
     TIMEZONE_MESSAGE_WITH_TEXT = auto()
     TIMEZONE_MESSAGE_WITH_LOCATION = auto()
+    TIMEZONE_RICH_MESSAGE = auto()
     TIMEZONE_CONVERSATION = auto()
     CANCEL = auto()
 

@@ -1,9 +1,13 @@
+from types import SimpleNamespace
+from typing import cast
+
 import pytest
 from sqlmodel import select
-from telegram import Update
+from telegram import Message, Update
 
 from mitup_bot import guards
 from mitup_bot.handlers import PositiveNumberFilter
+from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from tests.helpers import UpdateRequest, create_user
@@ -76,3 +80,23 @@ def test_positive_number_filter_with_wrong_messages(update: Update):
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="1234")], indirect=True)
 def test_positive_number_filter_with_positive_number(update: Update):
     assert PositiveNumberFilter().filter(update) is True
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(rich_message=True)], indirect=True)
+def test_rich_message_filter_matches_api_kwargs_rich_message(update: Update):
+    # The rich payload lands in `api_kwargs` under the pinned PTB, which has no `rich_message` field.
+    assert update.effective_message is not None
+    assert RichMessageFilter().filter(update.effective_message) is True
+
+
+def test_rich_message_filter_matches_promoted_attribute():
+    # Once a PTB upgrade promotes `rich_message` to a real attribute, the filter must still match
+    # even with empty `api_kwargs`.
+    message = SimpleNamespace(rich_message={"kind": "rich"}, api_kwargs={})
+    assert RichMessageFilter().filter(cast(Message, message)) is True
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="hello")], indirect=True)
+def test_rich_message_filter_rejects_plain_text(update: Update):
+    assert update.effective_message is not None
+    assert RichMessageFilter().filter(update.effective_message) is False

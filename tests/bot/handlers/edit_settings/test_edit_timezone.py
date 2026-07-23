@@ -10,16 +10,18 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.edit_settings.edit_timezone import (
     callback_query_timezone,
     settings_timezone_location_message_handler,
+    settings_timezone_rich_message_handler,
     settings_timezone_text_message_handler,
 )
 from mitup_bot.handlers.edit_settings.entry import callback_query_settings
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
-from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
+from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.utils import ButtonMessages, CommonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView, RenderContext, factory
-from tests.helpers import StubMitupContext, UpdateRequest
+from tests.helpers import MetricAssertions, StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -210,3 +212,25 @@ async def test_edit_timezone_location_log_excludes_coordinates(
     )
     context.api.assert_send_message_called(update, view)
     assert result == ConversationSettingsState.TIMEZONE
+
+
+async def test_settings_timezone_rich_message_reprompts_and_keeps_state(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    state = await settings_timezone_rich_message_handler(update, context)
+
+    message = SettingsMessages.TIMEZONE_PROMPT.get(
+        lang=user_with_settings.lang, timezone=user_with_settings.settings.timezone
+    )
+    expected = factory.change_settings_element_view(
+        RenderContext(lang=user_with_settings.lang), message=message
+    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(update, expected)
+    assert state == ConversationSettingsState.TIMEZONE
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})

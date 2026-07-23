@@ -9,11 +9,13 @@ class EditMeetingHandlerId(HandlerId):
     # Edit meeting title
     TITLE_CALLBACK = auto()
     TITLE_MESSAGE = auto()
+    TITLE_RICH_MESSAGE = auto()
     TITLE_CONVERSATION = auto()
 
     # Edit meeting description
     DESCRIPTION_CALLBACK = auto()
     DESCRIPTION_MESSAGE = auto()
+    DESCRIPTION_RICH_MESSAGE = auto()
     DESCRIPTION_CONVERSATION = auto()
 
     # Edit meeting participants
@@ -34,6 +36,7 @@ class EditMeetingHandlerId(HandlerId):
     LOCATION_CANCEL_CALLBACK = auto()
     LOCATION_NAME_CONVERSATION = auto()
     LOCATION_NAME_MESSAGE = auto()
+    LOCATION_NAME_RICH_MESSAGE = auto()
     LOCATION_COORDINATES_CALLBACK = auto()
     LOCATION_COORDINATES_CONVERSATION = auto()
     LOCATION_COORDINATES_MESSAGE = auto()

@@ -8,14 +8,20 @@ from telegram import CallbackQuery, Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.handlers.meeting.edit.edit_meeting_description import callback_query_edit_meeting_description
+from mitup_bot.handlers.meeting.edit.edit_meeting_description import (
+    callback_query_edit_meeting_description,
+    edit_description_prompt_view,
+    edit_description_rich_message_handler,
+)
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
+from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler
+from tests.helpers import HandlerContext, MetricAssertions, StubMitupContext, UpdateRequest, call_handler
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -107,3 +113,27 @@ async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_lo
 
     assert "User tried 'Edit description' with a meeting that does not exist." in caplog.text
     assert " Meeting id: 123, user id: 1" in caplog.text
+
+
+async def test_edit_description_rich_message_reprompts_and_keeps_state(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    assert context.user_data is not None
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting, "id")
+    context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, 1)
+
+    state = await edit_description_rich_message_handler(update, context)
+
+    expected = edit_description_prompt_view(meeting, user_with_settings.lang).with_context(
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+    )
+    context.api.assert_send_message_called(update, expected)
+    assert state == ConversationMeetingState.EDIT_DESCRIPTION
+    assert context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id == 1
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})

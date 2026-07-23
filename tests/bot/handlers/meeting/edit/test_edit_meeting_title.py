@@ -6,14 +6,20 @@ from telegram import Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData
-from mitup_bot.handlers.meeting.edit.edit_meeting_title import callback_query_edit_meeting_title
+from mitup_bot.handlers.meeting.edit.edit_meeting_title import (
+    callback_query_edit_meeting_title,
+    edit_title_prompt_view,
+    edit_title_rich_message_handler,
+)
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Settings, User
+from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import StubMitupContext, create_meetup
+from tests.helpers import MetricAssertions, StubMitupContext, create_meetup
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -86,3 +92,28 @@ async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_wa
 
     assert "ser tried 'Edit title' with a meeting that does not belong to them." in caplog.text
     assert " Meeting id: 123, user id: 1" in caplog.text
+
+
+async def test_edit_title_rich_message_reprompts_and_keeps_state(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    assert context.user_data is not None
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting, "id")
+    context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
+
+    state = await edit_title_rich_message_handler(update, context)
+
+    expected = edit_title_prompt_view(meeting, user_with_settings.lang).with_context(
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+    )
+    context.api.assert_send_message_called(update, expected)
+    assert state == ConversationMeetingState.EDIT_TITLE
+    # The meeting id survives so a following plain-text title still updates the meeting.
+    assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})

@@ -6,13 +6,14 @@ from telegram import Update
 from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handlers.meeting.edit.edit_meeting_description import edit_description_meeting_message_handler
 from mitup_bot.handlers.meeting.edit.edit_meeting_title import edit_title_meeting_message_handler
-from mitup_bot.handlers.messages import filter_messages_without_text
+from mitup_bot.handlers.messages import filter_messages_without_text, rich_message_handler
 from mitup_bot.models import User
-from mitup_bot.utils import MeetingEditContentMessages
+from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.utils import CommonMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
-from tests.helpers import StubMitupContext, UpdateRequest
+from tests.helpers import MetricAssertions, StubMitupContext, UpdateRequest
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -90,6 +91,30 @@ async def test_filter_messages_without_text_shows_main_menu_when_no_on_exit_is_s
     await filter_messages_without_text(update, context)
 
     assert context.user_data.registry == {}
+
+
+async def test_rich_message_handler_replies_with_main_menu_and_emits_metric(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    metrics: MetricAssertions,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    assert context.user_data is not None
+    context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
+
+    result = await rich_message_handler(update, context)
+
+    # Idle path: the not-supported notice rides on top of the main menu so the user is never stranded.
+    expected = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+    )
+    context.api.assert_send_message_called(update, expected)
+    assert result is None
+    assert context.user_data.registry == {}
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})
 
 
 async def test_filter_messages_without_text_shows_on_exit_prompt_when_active_context_has_on_exit(

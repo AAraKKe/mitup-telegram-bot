@@ -962,6 +962,9 @@ msgstr ""
 msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Opa, perdemos o fío!</b>\n\nO bot tivo unha actualización interna rápida e esqueceu en que punto do proceso estabas. Todo o que gardaches está a salvo. Por favor, comeza de novo o que estabas a facer desde o menú de abaixo."
 
+msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
+msgstr "<b>Iso é unha mensaxe enriquecida!</b>\n\nVexo que enviaches unha, pero aínda non podo traballar con mensaxes enriquecidas. A compatibilidade chega coa actualización v2.0, e anunciarei acó cando chegue, así que atende. Pola agora, envía o teu texto como unha mensaxe normal e seguiremos."
+
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Alcanzaches o teu límite de ${cap} quedadas activas. Pecha ou elimina unha para crear outra, ou faite Host de Mitup en Patreon para desbloquear máis. Tes todos os detalles en Colabora, xusto debaixo."
 

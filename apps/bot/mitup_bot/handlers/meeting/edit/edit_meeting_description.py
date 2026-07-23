@@ -6,7 +6,9 @@ from mitup_bot import guards
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
@@ -17,6 +19,23 @@ from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
+
+
+def edit_description_prompt_view(meeting: Meetup, lang: str) -> MitupView:
+    description = (
+        meeting.description if meeting.description else MeetingDisplayMessages.DESCRIPTION_EMPTY.get(lang=lang)
+    )
+    return MitupView(
+        MeetingEditContentMessages.DESCRIPTION_PROMPT.get(lang=lang, description=description),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.CANCEL.get_text(lang=lang),
+                    callback_data=cb.EDIT_MEETING_CANCEL.with_id(meeting.db_id),
+                )
+            ]
+        ],
+    )
 
 
 @HandlersRegistry.register_callback_query(
@@ -50,23 +69,7 @@ async def callback_query_edit_meeting_description(session: AsyncSession, update:
         cb.EDIT_MEETING_CANCEL.with_id(callback_data.id),
     )
 
-    description = (
-        meeting.description if meeting.description else MeetingDisplayMessages.DESCRIPTION_EMPTY.get(lang=user.lang)
-    )
-    await context.api.edit_message(
-        update=update,
-        view=MitupView(
-            MeetingEditContentMessages.DESCRIPTION_PROMPT.get(lang=user.lang, description=description),
-            keyboard=[
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.CANCEL.get_text(lang=user.lang),
-                        callback_data=cb.EDIT_MEETING_CANCEL.with_id(callback_data.id),
-                    )
-                ]
-            ],
-        ),
-    )
+    await context.api.edit_message(update=update, view=edit_description_prompt_view(meeting, user.lang))
 
     return ConversationMeetingState.EDIT_DESCRIPTION
 
@@ -90,6 +93,19 @@ async def edit_description_meeting_message_handler(session: AsyncSession, update
         return ConversationHandler.END
 
 
+@HandlersRegistry.register_message(EditMeetingHandlerId.DESCRIPTION_RICH_MESSAGE, RichMessageFilter(), bindable=False)
+@with_session
+async def edit_description_rich_message_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationMeetingState:
+    user = await guards.current_user(update, session, load_collections=False)
+    ctx = guards.render_context(user, update, context)
+    with context.meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, ensure_clean=False) as meeting_id:
+        meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
+    await reply_rich_message_not_supported(ctx, update, context, edit_description_prompt_view(meeting, user.lang))
+    return ConversationMeetingState.EDIT_DESCRIPTION
+
+
 HandlersRegistry.register_conversation_handler(
     EditMeetingHandlerId.DESCRIPTION_CONVERSATION,
     entry_points_handler_names=[EditMeetingHandlerId.DESCRIPTION_CALLBACK],
@@ -99,5 +115,5 @@ HandlersRegistry.register_conversation_handler(
             EditMeetingHandlerId.CANCEL,
         ],
     },
-    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
+    fallbacks=[EditMeetingHandlerId.DESCRIPTION_RICH_MESSAGE, MessagesId.MESSAGE_WITHOUT_TEXT],
 )

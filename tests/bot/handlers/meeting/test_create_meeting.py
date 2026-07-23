@@ -15,8 +15,9 @@ from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHa
 from mitup_bot.handlers.meeting.utils import main_menu_back_button
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils import MeetingCreationMessages, SupporterMessages
+from mitup_bot.utils import CommonMessages, MeetingCreationMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
 from mitup_bot.views import meeting as meeting_views
@@ -80,6 +81,36 @@ async def test_meeting_creation_successful(
     message = MeetingCreationMessages.SUCCESS.get(title=new_meeting.title, lang=user_with_settings.lang)
     view = meeting_views.edit_view(new_meeting).with_context(message)
     title_step.context.api.assert_send_message_called(title_step.context.get_update(), view)
+
+
+async def test_rich_message_keeps_create_meeting_in_title_then_title_creates(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    conversation: ConversationTester,
+):
+    """A rich message sent while entering a title is answered with the not-supported reply and keeps
+    the user in TITLE, so a following plain-text title still creates the meeting."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    steps = [
+        ConversationStep.callback(cb.CREATE_MEETING, expected_state=ConversationMeetingState.TITLE),
+        ConversationStep(input=UpdateRequest(rich_message=True), expected_state=ConversationMeetingState.TITLE),
+        ConversationStep.message("My real title"),
+    ]
+
+    result = await conversation.run(handler_id=MeetingHandlerId.CREATE_MEETING_CONVERSATION, steps=steps)
+
+    # The rich step re-prompts the creation view with the not-supported notice on top and creates nothing.
+    rich_step = result.get_step(1)
+    expected_rich_view = views_factory.create_meeting_view(
+        RenderContext(lang=user_with_settings.lang), datetime_link=build_datetime_link()
+    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang))
+    rich_step.context.api.assert_send_message_called(rich_step.context.get_update(), expected_rich_view)
+
+    # The subsequent plain-text title creates the meeting.
+    assert len(mock_session.objects_added) == 1
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    assert new_meeting.title == "My real title"
 
 
 async def test_meeting_creation_cancelled(

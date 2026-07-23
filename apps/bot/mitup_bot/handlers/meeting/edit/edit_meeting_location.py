@@ -8,7 +8,9 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup
@@ -21,6 +23,20 @@ from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_location_view
 
 log = structlog.get_logger(__name__)
+
+
+def edit_location_name_prompt_view(meeting_id: int, lang: str) -> MitupView:
+    return MitupView(
+        description=MeetingEditLocationMessages.NAME_PROMPT.get(lang=lang),
+        keyboard=[
+            [
+                ButtonConfig(
+                    text=ButtonMessages.CANCEL.get_text(lang=lang),
+                    callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(meeting_id),
+                )
+            ]
+        ],
+    )
 
 
 @HandlersRegistry.register_callback_query(
@@ -79,20 +95,7 @@ async def callback_edit_meeting_location_name(session: AsyncSession, update: Upd
         cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
     )
 
-    await context.api.send_message(
-        update=update,
-        view=MitupView(
-            description=MeetingEditLocationMessages.NAME_PROMPT.get(lang=user.lang),
-            keyboard=[
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.CANCEL.get_text(lang=user.lang),
-                        callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(callback_data.id),
-                    )
-                ]
-            ],
-        ),
-    )
+    await context.api.send_message(update=update, view=edit_location_name_prompt_view(callback_data.id, user.lang))
 
     return ConversationMeetingState.EDIT_LOCATION_NAME
 
@@ -276,6 +279,19 @@ async def edit_coordinates_without_location(session: AsyncSession, update: Updat
     return ConversationMeetingState.EDIT_LOCATION_COORDIANTES
 
 
+@HandlersRegistry.register_message(EditMeetingHandlerId.LOCATION_NAME_RICH_MESSAGE, RichMessageFilter(), bindable=False)
+@with_session
+async def edit_location_name_rich_message_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationMeetingState:
+    user = await guards.current_user(update, session, load_collections=False)
+    ctx = guards.render_context(user, update, context)
+    with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, ensure_clean=False) as meeting_id:
+        view = edit_location_name_prompt_view(meeting_id, user.lang)
+    await reply_rich_message_not_supported(ctx, update, context, view)
+    return ConversationMeetingState.EDIT_LOCATION_NAME
+
+
 HandlersRegistry.register_conversation_handler(
     EditMeetingHandlerId.LOCATION_NAME_CONVERSATION,
     entry_points_handler_names=[EditMeetingHandlerId.LOCATION_NAME_CALLBACK],
@@ -285,7 +301,7 @@ HandlersRegistry.register_conversation_handler(
             EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK,
         ],
     },
-    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
+    fallbacks=[EditMeetingHandlerId.LOCATION_NAME_RICH_MESSAGE, MessagesId.MESSAGE_WITHOUT_TEXT],
 )
 
 

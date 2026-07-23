@@ -9,7 +9,9 @@ from mitup_bot import guards, timezone_api, views
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.handlers.messages import MessagesId
+from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import ButtonMessages, RegistrationMessages, SettingsMessages
@@ -119,6 +121,19 @@ async def settings_timezone_location_message_handler(session: AsyncSession, upda
     return ConversationHandler.END
 
 
+@HandlersRegistry.register_message(EditSettingsHandlerId.TIMEZONE_RICH_MESSAGE, RichMessageFilter(), bindable=False)
+@with_session
+async def settings_timezone_rich_message_handler(
+    session: AsyncSession, update: Update, context: TMitupContext
+) -> ConversationSettingsState:
+    user = await guards.current_user(update, session, load_collections=False)
+    ctx = guards.render_context(user, update, context)
+    message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
+    view = views.factory.change_settings_element_view(ctx, message=message)
+    await reply_rich_message_not_supported(ctx, update, context, view)
+    return ConversationSettingsState.TIMEZONE
+
+
 HandlersRegistry.register_conversation_handler(
     EditSettingsHandlerId.TIMEZONE_CONVERSATION,
     entry_points_handler_names=[EditSettingsHandlerId.TIMEZONE_CALLBACK],
@@ -129,5 +144,5 @@ HandlersRegistry.register_conversation_handler(
             EditSettingsHandlerId.CANCEL,
         ],
     },
-    fallbacks=[MessagesId.MESSAGE_WITHOUT_TEXT],
+    fallbacks=[EditSettingsHandlerId.TIMEZONE_RICH_MESSAGE, MessagesId.MESSAGE_WITHOUT_TEXT],
 )

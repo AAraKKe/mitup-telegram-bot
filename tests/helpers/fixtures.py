@@ -70,6 +70,7 @@ class UpdateRequest:
     from_bot_chat: bool = True
     chat_join_request: bool = False
     language_code: str | None = None
+    rich_message: bool = False
 
 
 def create_meetup(
@@ -363,6 +364,23 @@ def create_update(
             username=user.username,
             language_code=request.language_code,
         )
+
+    if request.rich_message:
+        # A Bot API rich message has no `text`; its payload lands in the message's `api_kwargs`.
+        # Building it through `Update.de_json` populates `api_kwargs` the way a real update would.
+        payload = {
+            "update_id": DEFAULT_MESSAGE_ID,
+            "message": {
+                "message_id": DEFAULT_MESSAGE_ID,
+                "date": int(DEFAULT_TEST_DATE.timestamp()),
+                "chat": chat.to_dict(),
+                "from": user.to_dict(),
+                "rich_message": {"kind": "rich"},
+            },
+        }
+        rich_update = Update.de_json(payload, None)
+        assert rich_update is not None
+        return rich_update
 
     if request.command:
         bot_command = request.command if isinstance(request.command, str) else "test_command"
