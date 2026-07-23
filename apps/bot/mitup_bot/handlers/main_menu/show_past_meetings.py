@@ -20,7 +20,7 @@ async def show_past_meetings_page(user: User, page_number: int, update: Update, 
 
     if buttons := [
         ButtonConfig(
-            text=str(meeting.title),
+            text=meeting.plain_title,
             callback_data=cb.SHOW_PAST_MEETING.with_page(meeting.db_id, page_number),
         )
         for meeting in past_meetings

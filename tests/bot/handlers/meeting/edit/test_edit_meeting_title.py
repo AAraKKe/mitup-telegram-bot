@@ -145,7 +145,7 @@ async def test_edit_title_rich_message_reprompts_and_keeps_state(
     ],
     indirect=True,
 )
-async def test_edit_title_message_dual_writes_and_renders_rich_success(
+async def test_edit_title_message_stores_tagged_title_and_renders_rich_success(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -162,8 +162,9 @@ async def test_edit_title_message_dual_writes_and_renders_rich_success(
         with_meeting_id={ContextId.EDIT_MEETING_TITLE: meeting.db_id},
     )
 
-    assert meeting.title == "Raid night 😀"
-    assert meeting.title_tagged == f'<b>Raid</b> night <tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">😀</tg-emoji>'
+    assert meeting.title == f'<b>Raid</b> night <tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">😀</tg-emoji>'
+    assert meeting.plain_title == "Raid night 😀"
+    assert meeting.title_tagged is None
 
     view = meeting_views.edit_view(meeting).with_context(
         MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))

@@ -105,7 +105,7 @@ async def create_meeting_message_handler(
             meeting_datetime = unix_time
 
     meetup = Meetup(
-        title=title,
+        title=serialize_entities(title, message.entities),
         owner=user,
         datetime=meeting_datetime,
         waiting_list=user.settings.default_waiting_list,
@@ -114,7 +114,6 @@ async def create_meeting_message_handler(
         incognito=user.settings.default_incognito,
         lock_on_start=user.settings.default_lock_on_start,
     )
-    meetup.set_title(title, serialize_entities(title, message.entities))
     session.add(meetup)
     await session.flush()
     # A freshly flushed instance has never loaded its joined_links collection, and the async

@@ -276,18 +276,18 @@ async def test_meeting_creation_with_date_entity_without_unix_time_preserves_tit
 
 
 # ---------------------------------------------------------------------------
-# create_meeting_message_handler — formatting entities: dual-write + rich success card
+# create_meeting_message_handler — formatting entities: tagged storage + rich success card
 # ---------------------------------------------------------------------------
 
 
-async def test_meeting_creation_with_formatting_entities_dual_writes_title(
+async def test_meeting_creation_with_formatting_entities_stores_tagged_title(
     user_with_settings: User,
     mock_session: MockDbSession,
     app: Application,
     metrics_client: MetricsClient,
 ):
-    """Formatting and custom-emoji entities in the title land in the tagged column while the
-    plain column keeps the visible text, and the success card renders the rich title."""
+    """Formatting and custom-emoji entities in the title land in the title column in tagged
+    form, the visible text derives from it, and the success card renders the rich title."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     custom_emoji_id = "5368324170671202286"
@@ -305,8 +305,9 @@ async def test_meeting_creation_with_formatting_entities_dual_writes_title(
 
     assert len(mock_session.objects_added) == 1
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
-    assert new_meeting.title == "Raid night 😀"
-    assert new_meeting.title_tagged == f'<b>Raid</b> night <tg-emoji emoji-id="{custom_emoji_id}">😀</tg-emoji>'
+    assert new_meeting.title == f'<b>Raid</b> night <tg-emoji emoji-id="{custom_emoji_id}">😀</tg-emoji>'
+    assert new_meeting.plain_title == "Raid night 😀"
+    assert new_meeting.title_tagged is None
 
     message = MeetingCreationMessages.SUCCESS.get(title=rich_title(new_meeting), lang=user_with_settings.lang)
     view = meeting_views.edit_view(new_meeting).with_context(message)

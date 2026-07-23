@@ -11,6 +11,8 @@ from string.templatelib import Interpolation, Template
 
 from telegram import MessageEntity
 
+from mitup_bot.format_tags import TOKEN_RE
+
 
 class FormattedText:
     """Immutable plain-text + entity pair for Telegram messages.
@@ -254,17 +256,6 @@ def build_datetime_link() -> FormattedText:
 
 # --- parse_format_tags() ---
 
-# A tag is `<name attr="value" ...>` or a closing `</name>`; attributes are
-# optional `name="value"` (or single-quoted) pairs. The variable alternative
-# stays byte-identical to the original so `${var}` substitution is unchanged.
-# Tag names require a leading letter, so `<3`, a bare `<`, and `<https://…>`
-# never match and are preserved verbatim.
-TOKEN_RE = re.compile(
-    r"<(?P<close>/?)(?P<tag>[a-z][a-z-]*)"
-    r"""(?P<attrs>(?:\s+[a-zA-Z-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*>"""
-    r"|\$\{(?P<var>\w+)\}"
-)
-
 # Tag name → Telegram entity type. `<a>` (link) and `<span>` (spoiler) depend on
 # their attributes and are resolved in `resolve_open_tag` instead.
 STYLE_MAP: dict[str, str] = {
@@ -467,8 +458,3 @@ def serialize_entities(text: str, entities: Sequence[MessageEntity]) -> str:
     close_spans_ending_by(utf16_len(text))
     flush_until(utf16_len(text))
     return "".join(parts)
-
-
-def strip_tags(tagged: str) -> str:
-    """Return the visible plain text of a tag-annotated string."""
-    return parse_format_tags(tagged, {}).text

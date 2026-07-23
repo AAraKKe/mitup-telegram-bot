@@ -26,10 +26,8 @@ def rich_title(meeting: Meetup) -> FormattedText:
 def rich_description(meeting: Meetup) -> FormattedText | None:
     """Meeting description with its entities restored; None mirrors an unset or empty
     description so callers keep their placeholder branches."""
-    if not meeting.description:
+    if not (tagged := meeting.tagged_description):
         return None
-    tagged = meeting.tagged_description
-    assert tagged is not None, "tagged_description is set whenever description is"
     return parse_format_tags(tagged, {})
 
 

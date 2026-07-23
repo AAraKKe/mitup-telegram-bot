@@ -281,7 +281,7 @@ def inline_view(meeting: Meetup, *, chat_instance: str | None = None) -> MitupIn
             is_locked_and_in_progress=meeting.lock_on_start and meeting.is_in_progress,
         ),
         id=str(meeting.db_id),
-        title=str(meeting.title),
+        title=meeting.plain_title,
         inline_description=inline_query_message(meeting),
     )
     if meeting.is_in_progress:

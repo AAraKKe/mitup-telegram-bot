@@ -1,7 +1,8 @@
 import pytest
 from telegram import MessageEntity
 
-from mitup_bot.utils.entities import FormattedText, parse_format_tags, serialize_entities, strip_tags
+from mitup_bot.format_tags import strip_format_tags
+from mitup_bot.utils.entities import FormattedText, parse_format_tags, serialize_entities
 
 # ---------------------------------------------------------------------------
 # serialize_entities() — literal text escaping
@@ -173,21 +174,10 @@ def test_serialize_round_trip_escaped_markup_inside_entity():
 
 
 # ---------------------------------------------------------------------------
-# strip_tags()
+# strip_format_tags() parity
 # ---------------------------------------------------------------------------
 
 
-def test_strip_tags_returns_visible_text():
-    assert strip_tags('<b>Hi</b> <a href="https://x.io">there</a>') == "Hi there"
-
-
-def test_strip_tags_tg_emoji_keeps_fallback_emoji():
-    assert strip_tags('<tg-emoji emoji-id="42">😀</tg-emoji> hi') == "😀 hi"
-
-
-def test_strip_tags_plain_text_unchanged():
-    assert strip_tags("no tags here") == "no tags here"
-
-
-def test_strip_tags_decodes_character_references():
-    assert strip_tags("fish &amp; chips") == "fish & chips"
+def test_strip_format_tags_matches_parser_visible_text():
+    tagged = '<b>Hi</b> &amp; &lt;3 <tg-emoji emoji-id="42">😀</tg-emoji> ${name} <span class="tg-spoiler">s</span>'
+    assert strip_format_tags(tagged) == parse_format_tags(tagged, {}).text

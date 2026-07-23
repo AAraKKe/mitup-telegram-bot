@@ -26,14 +26,14 @@ async def callback_query_show_meetings(session: AsyncSession, update: Update, co
     user = await guards.current_user(update, session)
     active_meetings = [meetup for meetup in user.meetups if meetup.active]
     user_meetings = sorted(
-        (meeting for meeting in active_meetings if meeting.title and meeting.title.strip()),
+        (meeting for meeting in active_meetings if meeting.plain_title.strip()),
         key=lambda meeting: meeting.db_id,
     )
     page_number = PaginatedMitupView.clamp_page(callback_data.id, len(user_meetings))
 
     if user_meetings_buttons := [
         ButtonConfig(
-            text=str(meeting.title),
+            text=meeting.plain_title,
             callback_data=cb.SHOW_MEETING.with_page(meeting.db_id, page_number, MeetingListSource.ACTIVE),
         )
         for meeting in user_meetings

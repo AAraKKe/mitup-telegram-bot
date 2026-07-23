@@ -1,5 +1,4 @@
 import datetime as dt
-import html
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
@@ -10,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import limits
 from mitup_bot.exceptions import MeetupNotFound
+from mitup_bot.format_tags import strip_format_tags
 from mitup_bot.keyboards import Keyboard
 from mitup_bot.models import Message
 
@@ -48,7 +48,11 @@ class Meetup(BaseModel, SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
     owner_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
+    # `title` and `description` store the tag-annotated form (see `set_title`); plain visible
+    # text is derived via `plain_title` / `plain_description`, never stored.
     title: str = Field(nullable=False)
+    # No code reads or writes the `*_tagged` columns; the fields exist only so the model
+    # matches the live schema.
     title_tagged: str | None = Field(default=None, sa_type=Text)
     waiting_list: bool = Field(nullable=False)
     public: bool = Field(nullable=False)
@@ -96,35 +100,38 @@ class Meetup(BaseModel, SQLModel, table=True):
     def is_owned_by(self, user: User) -> bool:
         return self.owner.db_id == user.db_id
 
-    def set_title(self, text: str, tagged: str):
-        """Set the title from user input: visible plain text plus its tag-annotated form.
+    def set_title(self, tagged: str):
+        """Set the title from user input.
 
-        The two columns must always change together, so every title write goes through here —
-        `tagged` comes from `serialize_entities(text, entities)` in the capturing handler.
+        Every title write goes through here — `tagged` comes from
+        `serialize_entities(text, entities)` in the capturing handler, so the stored value is
+        always tag-annotated and the plain text stays derivable via `plain_title`.
         """
-        self.title = text
-        self.title_tagged = tagged
+        self.title = tagged
 
-    def set_description(self, text: str, tagged: str):
-        """Set the description from user input; the dual-write counterpart of `set_title`."""
-        self.description = text
-        self.description_tagged = tagged
+    def set_description(self, tagged: str):
+        """Set the description from user input; the counterpart of `set_title`."""
+        self.description = tagged
 
     @property
     def tagged_title(self) -> str:
-        """Tag-annotated title for entity-carrying renders.
-
-        A row written without a tagged copy falls back to the escaped plain title — the same
-        transformation as the backfill — so tag-lookalike text a user typed stays literal.
-        """
-        return self.title_tagged if self.title_tagged is not None else html.escape(self.title)
+        """Tag-annotated title for entity-carrying renders."""
+        return self.title
 
     @property
     def tagged_description(self) -> str | None:
-        """Tag-annotated description, with the same escape fallback as `tagged_title`."""
-        if self.description_tagged is not None:
-            return self.description_tagged
-        return html.escape(self.description) if self.description is not None else None
+        """Tag-annotated description for entity-carrying renders, or None when unset."""
+        return self.description
+
+    @property
+    def plain_title(self) -> str:
+        """Visible plain text of the title for tag-free contexts (button labels, exports)."""
+        return strip_format_tags(self.title)
+
+    @property
+    def plain_description(self) -> str | None:
+        """Visible plain text of the description, or None when unset."""
+        return strip_format_tags(self.description) if self.description is not None else None
 
     @property
     def n_participants(self) -> int:
@@ -289,17 +296,18 @@ class Meetup(BaseModel, SQLModel, table=True):
     @property
     def short_description(self) -> str | None:
         """A version of the meeting description used when showing the meeting on an inline query"""
-        if self.description is None:
+        description = self.plain_description
+        if description is None:
             return
-        if len(self.description) <= 30:
-            return self.description
+        if len(description) <= 30:
+            return description
 
-        is_word_cuttoff = self.description[30] != " " and self.description[29] != " "
+        is_word_cuttoff = description[30] != " " and description[29] != " "
         if is_word_cuttoff:
-            cut_description = self.description[:30].split(" ")[:-1]
+            cut_description = description[:30].split(" ")[:-1]
             return f"{' '.join(cut_description)} ..."
 
-        cut_description = " ".join(self.description[:30].rstrip().split(" "))
+        cut_description = " ".join(description[:30].rstrip().split(" "))
         return f"{cut_description} ..."
 
     @property

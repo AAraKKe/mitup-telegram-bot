@@ -79,7 +79,7 @@ async def edit_title_meeting_message_handler(session: AsyncSession, update: Upda
 
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:
         meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
-        meeting.set_title(message.text, serialize_entities(message.text, message.entities))
+        meeting.set_title(serialize_entities(message.text, message.entities))
 
         view = meeting_views.edit_view(meeting).with_context(
             MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))

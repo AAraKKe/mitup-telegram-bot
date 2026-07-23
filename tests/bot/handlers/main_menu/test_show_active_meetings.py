@@ -51,7 +51,7 @@ async def test_show_meetings_use_correct_view(
     await callback_query_show_meetings(update, context)
 
     user_meetings_buttons: list[ButtonConfig] = [
-        ButtonConfig(text=str(meeting.title), callback_data=cb.SHOW_MEETING.with_id(meeting.db_id))
+        ButtonConfig(text=meeting.plain_title, callback_data=cb.SHOW_MEETING.with_id(meeting.db_id))
         for meeting in user_with_settings.meetups
         if meeting.active
     ]
@@ -166,11 +166,7 @@ async def test_show_meetings_skips_meetings_with_blank_titles(
     blank_title: str,
     meeting_id: int,
 ):
-    """Active meetings whose title is blank or whitespace-only must not appear as buttons.
-
-    This is the guard added in Phase 2 to handle legacy meetings created when the title
-    could be stripped to an empty string by the old date-entity logic.
-    """
+    """Active meetings whose title is blank or whitespace-only must not appear as buttons."""
     mock_session.add_object(user_with_settings, "tg_user_id")
     valid_meeting = create_meetup(22, title="Valid meeting")
     blank_meeting = create_meetup(meeting_id, title=blank_title)
@@ -181,7 +177,7 @@ async def test_show_meetings_skips_meetings_with_blank_titles(
     # Only the meeting with a non-blank title should appear as a button.
     expected_buttons = [
         ButtonConfig(
-            text=str(valid_meeting.title),
+            text=valid_meeting.plain_title,
             callback_data=cb.SHOW_MEETING.with_id(valid_meeting.db_id),
         )
     ]
@@ -230,5 +226,38 @@ async def test_show_meetings_falls_back_to_no_meetings_view_when_all_titles_are_
             lang=user_with_settings.lang,
             new_meeting_button=ButtonMessages.NEW_MEETING.get(lang=user_with_settings.lang),
         ),
+    )
+    context.api.assert_edit_message_called(update, expected_view)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1))], indirect=True
+)
+async def test_show_meetings_button_labels_strip_title_tags(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    tagged_meeting = create_meetup(30, title="<b>Raid</b> &amp; chill")
+    user_with_settings.meetups = [tagged_meeting]
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    expected_view = PaginatedMitupView(
+        description=MeetingListMessages.ACTIVE_DESCRIPTION.get(lang=user_with_settings.lang),
+        buttons=[ButtonConfig(text="Raid & chill", callback_data=cb.SHOW_MEETING.with_id(tagged_meeting.db_id))],
+        page_number=1,
+        navigation_callback_data=cb.SHOW_ACTIVE_MEETING_PAGE,
+    ).with_context_menu(
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.MAIN_MENU.back(lang=user_with_settings.lang),
+                    callback_data=cb.MAIN_MENU,
+                )
+            ]
+        ]
     )
     context.api.assert_edit_message_called(update, expected_view)

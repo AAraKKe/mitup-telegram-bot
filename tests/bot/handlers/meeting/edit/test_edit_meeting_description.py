@@ -159,7 +159,7 @@ async def test_edit_description_rich_message_reprompts_and_keeps_state(
     ],
     indirect=True,
 )
-async def test_edit_description_message_dual_writes_and_renders_rich_success(
+async def test_edit_description_message_stores_tagged_description_and_renders_rich_success(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -176,8 +176,9 @@ async def test_edit_description_message_dual_writes_and_renders_rich_success(
         with_meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: meeting.db_id},
     )
 
-    assert meeting.description == "Bring snacks & drinks"
-    assert meeting.description_tagged == "Bring <i>snacks</i> &amp; drinks"
+    assert meeting.description == "Bring <i>snacks</i> &amp; drinks"
+    assert meeting.plain_description == "Bring snacks & drinks"
+    assert meeting.description_tagged is None
 
     view = meeting_views.edit_view(meeting).with_context(
         MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=rich_description(meeting))

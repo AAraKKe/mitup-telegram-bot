@@ -60,7 +60,7 @@ async def test_show_meetings_use_correct_view(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK, handler_context=handler_context)
 
     user_meetings_buttons: list[ButtonConfig] = [
-        ButtonConfig(text=str(link.meetup.title), callback_data=cb.SHOW_MEETING.with_id(link.meetup.db_id))
+        ButtonConfig(text=link.meetup.plain_title, callback_data=cb.SHOW_MEETING.with_id(link.meetup.db_id))
         for link in user_with_settings.joined_links
     ]
 
@@ -203,7 +203,7 @@ async def test_show_meetings_filters_out_inactive_meetings(
         description=MeetingListMessages.JOINED_DESCRIPTION.get(lang=user_with_settings.lang),
         buttons=[
             ButtonConfig(
-                text=str(active_meetup.title),
+                text=active_meetup.plain_title,
                 callback_data=cb.SHOW_MEETING.with_id(active_meetup.db_id),
             )
         ],

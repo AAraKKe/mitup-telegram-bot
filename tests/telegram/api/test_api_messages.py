@@ -384,8 +384,7 @@ async def test_edit_message_retries_without_custom_emoji_on_rejection(context: S
 async def test_update_meeting_messages_retries_without_custom_emoji_on_rejection(
     user_with_settings: User, context: StubMitupContext
 ):
-    meeting = create_meetup(id=123, owner=user_with_settings, title="Party 😀")
-    meeting.title_tagged = 'Party <tg-emoji emoji-id="123456">😀</tg-emoji>'
+    meeting = create_meetup(id=123, owner=user_with_settings, title='Party <tg-emoji emoji-id="123456">😀</tg-emoji>')
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
 
     edit: mock.MagicMock = context.bot.edit_message_text

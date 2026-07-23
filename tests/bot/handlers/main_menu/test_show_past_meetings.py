@@ -43,7 +43,7 @@ async def test_show_past_meetings_entry_shows_correct_view(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     expected_buttons = [
-        ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
+        ButtonConfig(text=m.plain_title, callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
     ]
     expected_view = PaginatedMitupView(
         description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user_with_settings.lang),
@@ -77,7 +77,7 @@ async def test_show_past_meetings_page_navigation_shows_correct_view(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK, handler_context=handler_context)
 
     expected_buttons = [
-        ButtonConfig(text=str(m.title), callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
+        ButtonConfig(text=m.plain_title, callback_data=cb.SHOW_PAST_MEETING.with_id(m.db_id)) for m in past_meetings
     ]
     expected_view = PaginatedMitupView(
         description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user_with_settings.lang),
@@ -159,7 +159,7 @@ async def test_show_past_meetings_excludes_active_meetings(
 
     expected_view = PaginatedMitupView(
         description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user_with_settings.lang),
-        buttons=[ButtonConfig(text=str(past.title), callback_data=cb.SHOW_PAST_MEETING.with_id(past.db_id))],
+        buttons=[ButtonConfig(text=past.plain_title, callback_data=cb.SHOW_PAST_MEETING.with_id(past.db_id))],
         page_number=1,
         navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
     ).with_context_menu(

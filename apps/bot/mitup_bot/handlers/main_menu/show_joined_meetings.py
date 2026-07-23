@@ -32,7 +32,7 @@ async def callback_query_show_joined_meetings(session: AsyncSession, update: Upd
 
     if user_meetings_buttons := [
         ButtonConfig(
-            text=str(meeting.title),
+            text=meeting.plain_title,
             callback_data=cb.SHOW_MEETING.with_page(meeting.db_id, page_number, MeetingListSource.JOINED),
         )
         for meeting in joined_meetings

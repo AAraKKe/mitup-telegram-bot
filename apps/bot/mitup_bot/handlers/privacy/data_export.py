@@ -94,8 +94,8 @@ def settings_section(settings: Settings) -> dict[str, Any]:
 
 def owned_meeting_section(meeting: Meetup) -> dict[str, Any]:
     return {
-        "title": meeting.title,
-        "description": meeting.description,
+        "title": meeting.plain_title,
+        "description": meeting.plain_description,
         "start_datetime": iso_utc(meeting.datetime),
         "end_datetime": iso_utc(meeting.end_datetime),
         "created_time": iso_utc(meeting.created_time),
@@ -115,7 +115,7 @@ def owned_meeting_section(meeting: Meetup) -> dict[str, Any]:
 
 def joined_meeting_section(link: JoinedUsers) -> dict[str, Any]:
     return {
-        "meeting_title": link.meetup.title,
+        "meeting_title": link.meetup.plain_title,
         "meeting_start_datetime": iso_utc(link.meetup.datetime),
         "organizer": link.meetup.owner.display_name,
         "joined_time": iso_utc(link.created_time),

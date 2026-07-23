@@ -82,7 +82,7 @@ async def edit_description_meeting_message_handler(session: AsyncSession, update
 
     with context.meeting_id(ContextId.EDIT_MEETING_DESCRIPTION) as meeting_id:
         meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
-        meeting.set_description(message.text, serialize_entities(message.text, message.entities))
+        meeting.set_description(serialize_entities(message.text, message.entities))
 
         view = meeting_views.edit_view(meeting).with_context(
             MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=rich_description(meeting))
