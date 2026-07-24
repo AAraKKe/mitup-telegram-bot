@@ -178,7 +178,6 @@ async def test_edit_description_message_stores_tagged_description_and_renders_ri
 
     assert meeting.description == "Bring <i>snacks</i> &amp; drinks"
     assert meeting.plain_description == "Bring snacks & drinks"
-    assert meeting.description_tagged is None
 
     view = meeting_views.edit_view(meeting).with_context(
         MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=rich_description(meeting))

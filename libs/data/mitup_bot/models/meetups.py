@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
-from sqlalchemy import JSON, BigInteger, Column, DateTime, FetchedValue, Text
+from sqlalchemy import JSON, BigInteger, Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -51,9 +51,6 @@ class Meetup(BaseModel, SQLModel, table=True):
     # `title` and `description` store the tag-annotated form (see `set_title`); plain visible
     # text is derived via `plain_title` / `plain_description`, never stored.
     title: str = Field(nullable=False)
-    # No code reads or writes the `*_tagged` columns; the fields exist only so the model
-    # matches the live schema.
-    title_tagged: str | None = Field(default=None, sa_type=Text)
     waiting_list: bool = Field(nullable=False)
     public: bool = Field(nullable=False)
     allow_invitation: bool = Field(nullable=False)
@@ -63,7 +60,6 @@ class Meetup(BaseModel, SQLModel, table=True):
     started_notification_sent: bool = Field(nullable=False, default=False)
     lock_on_start: bool = Field(nullable=False, default=False)
     description: str | None = None
-    description_tagged: str | None = Field(default=None, sa_type=Text)
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(
         default=None,

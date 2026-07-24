@@ -164,7 +164,6 @@ async def test_edit_title_message_stores_tagged_title_and_renders_rich_success(
 
     assert meeting.title == f'<b>Raid</b> night <tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">😀</tg-emoji>'
     assert meeting.plain_title == "Raid night 😀"
-    assert meeting.title_tagged is None
 
     view = meeting_views.edit_view(meeting).with_context(
         MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))

@@ -307,7 +307,6 @@ async def test_meeting_creation_with_formatting_entities_stores_tagged_title(
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
     assert new_meeting.title == f'<b>Raid</b> night <tg-emoji emoji-id="{custom_emoji_id}">😀</tg-emoji>'
     assert new_meeting.plain_title == "Raid night 😀"
-    assert new_meeting.title_tagged is None
 
     message = MeetingCreationMessages.SUCCESS.get(title=rich_title(new_meeting), lang=user_with_settings.lang)
     view = meeting_views.edit_view(new_meeting).with_context(message)

@@ -55,11 +55,10 @@ def register_due_meetings(mock_session: MockDbSession, *meetings: Meetup, still_
 def test_meetings_to_notify_started_query(mock_session: MockDbSession):
     """The statement must only select active meetings with datetime <= now and not yet notified."""
     expected_query = (
-        "SELECT meetups.id, meetups.owner_id, meetups.title, meetups.title_tagged, meetups.waiting_list,"
+        "SELECT meetups.id, meetups.owner_id, meetups.title, meetups.waiting_list,"
         " meetups.public, meetups.allow_invitation, meetups.incognito,"
         " meetups.expiration_notification_sent, meetups.end_datetime,"
         " meetups.started_notification_sent, meetups.lock_on_start, meetups.description,"
-        " meetups.description_tagged,"
         " meetups.created_time, meetups.updated_time, meetups.expiration_time,"
         " meetups.datetime, meetups.max_members, meetups.language, meetups.location,"
         " meetups.active\n"

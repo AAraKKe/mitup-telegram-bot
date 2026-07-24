@@ -17,7 +17,6 @@ def test_set_title_stores_tagged_form_in_title_column():
     meetup.set_title(serialize_entities(text, entities))
 
     assert meetup.title == f'<b>Raid</b> night <tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">😀</tg-emoji>'
-    assert meetup.title_tagged is None
     assert meetup.plain_title == text
 
 
@@ -29,7 +28,6 @@ def test_set_description_stores_tagged_form_in_description_column():
     meetup.set_description(serialize_entities(text, entities))
 
     assert meetup.description == "Bring <i>snacks</i> &amp; drinks"
-    assert meetup.description_tagged is None
     assert meetup.plain_description == text
 
 
