@@ -26,6 +26,30 @@ class Env(StrEnum):
     PROD = auto()
 
 
+# Names the environment for processes that take no `--env` option — the Alembic `env.py`, which is
+# invoked by Alembic itself and cannot be handed one. The apps select their environment with `--env`.
+MITUP_ENV_VAR = "MITUP_ENV"
+
+
+def env_from_environment() -> Env:
+    """Resolve the environment from `MITUP_ENV`, defaulting to `Env.DEV` for local development.
+
+    An unrecognised value is a deployment misconfiguration: it raises instead of silently falling
+    back to dev, which would point a deployed process at the wrong `environments/<env>.toml`.
+    """
+    raw_env = os.environ.get(MITUP_ENV_VAR)
+    if raw_env is None:
+        return Env.DEV
+
+    try:
+        return Env(raw_env)
+    except ValueError as error:
+        known = ", ".join(env.value for env in Env)
+        raise ValueError(
+            f"{MITUP_ENV_VAR}={raw_env!r} is not a known environment (expected one of: {known})"
+        ) from error
+
+
 class MetricsEnv(StrEnum):
     # The values are obtained from the EMF configuration. We are using CLOUDWATCH and STDOUT to make it clear
     # what are we using but they are referred to as default and local

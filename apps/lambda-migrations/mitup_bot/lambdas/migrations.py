@@ -10,12 +10,15 @@ from alembic.config import Config
 from psycopg import sql
 from pydantic import BaseModel, ValidationError
 
+from mitup_bot.config import MITUP_ENV_VAR, DbConfig, Env, EnvVariablesConfigProvider
 from mitup_bot.config import Config as MitupConfig
-from mitup_bot.config import DbConfig, Env, EnvVariablesConfigProvider
 from mitup_bot.db import build_db_url
 from mitup_bot.logging_config import Component, configure_logging
 
 log = structlog.get_logger(__name__)
+
+# This Lambda is deployed to production only; nothing about an invocation can change that.
+LAMBDA_ENV = Env.PROD
 
 APP_DB_USERNAME_ENV = "MITUP_APP_DB_USERNAME"
 APP_DB_PASSWORD_ENV = "MITUP_APP_DB_PASSWORD"
@@ -116,7 +119,9 @@ def run_migrations(event: dict[str, Any], context: Any) -> int:
     Invokes Alembic programmatically — equivalent to the CLI but usable from a Lambda handler.
     See: https://alembic.sqlalchemy.org/en/latest/api/commands.html
     """
-    configure_logging(Env.PROD, Component.LAMBDA, os.environ.get("LOG_LEVEL", "INFO"))
+    # Alembic's `env.py` runs inside this process and reads MITUP_ENV to pick its config providers.
+    os.environ[MITUP_ENV_VAR] = LAMBDA_ENV
+    configure_logging(LAMBDA_ENV, Component.LAMBDA, os.environ.get("LOG_LEVEL", "INFO"))
 
     try:
         event_object = MigrationEvent.model_validate(event)

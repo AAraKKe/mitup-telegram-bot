@@ -71,6 +71,10 @@ Invariants spanning multiple sections live as `model_validator`s on `Config` its
 4. Document the corresponding environment variable override if applicable.
 5. If adding an entirely new section, create a new Pydantic model and add it as a field on `Config`.
 
+## Selecting the environment
+
+The apps take an explicit `--env` option. Processes that cannot be handed one — the Alembic `env.py`, which Alembic itself invokes — call `env_from_environment()`, which reads the `MITUP_ENV` variable (`MITUP_ENV_VAR` in `config.py`) and defaults to `Env.DEV`, so local runs pick up `dev.toml` with nothing set. A value outside the `Env` enum raises rather than falling back to dev. The migrations Lambda sets `MITUP_ENV` to its own environment before invoking Alembic, so the deployed run reads `prod.toml` instead of a `dev.toml` that is not packaged in the image.
+
 ## Adding a new environment
 
 The `Env` enum in `config.py` defines available environments. To add one:

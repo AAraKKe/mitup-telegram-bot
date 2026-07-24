@@ -1,3 +1,4 @@
+import os
 from collections.abc import Generator
 from types import SimpleNamespace
 from unittest import mock
@@ -8,7 +9,7 @@ from pydantic import ValidationError
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
-from mitup_bot.config import DbConfig, Env
+from mitup_bot.config import MITUP_ENV_VAR, DbConfig, Env
 from mitup_bot.lambdas.migrations import (
     APP_DB_PASSWORD_ENV,
     APP_DB_USERNAME_ENV,
@@ -39,6 +40,16 @@ def mock_configure_logging() -> Generator[mock.MagicMock]:
     """
     with mock.patch("mitup_bot.lambdas.migrations.configure_logging") as mocked:
         yield mocked
+
+
+@pytest.fixture(autouse=True)
+def dev_environment_variable(monkeypatch: pytest.MonkeyPatch):
+    """Seed MITUP_ENV with the local-development value for every test in this module.
+
+    `run_migrations` overwrites the variable in the real process environment; going through
+    monkeypatch keeps that assignment from leaking into the rest of the session.
+    """
+    monkeypatch.setenv(MITUP_ENV_VAR, Env.DEV)
 
 
 def test_upgrade():
@@ -103,6 +114,22 @@ def test_configures_logging_before_migration_work(
             run_migrations({"action": "upgrade", "revision": "myRevision"}, None)
 
     assert [call[0] for call in manager.mock_calls] == ["configure_logging", "upgrade"]
+
+
+def test_sets_prod_environment_before_alembic_runs():
+    """Alembic's env.py runs in this same process and reads MITUP_ENV to choose its config
+    providers, so the variable must already say prod when the alembic command starts — whatever
+    the surrounding environment said (the fixture seeds dev)."""
+    environment_during_upgrade: list[str | None] = []
+
+    with mock.patch("mitup_bot.lambdas.migrations.command") as mock_command:
+        mock_command.upgrade.side_effect = lambda *_unused: environment_during_upgrade.append(
+            os.environ.get(MITUP_ENV_VAR)
+        )
+        with mock.patch("mitup_bot.lambdas.migrations.Config"):
+            run_migrations({"action": "upgrade", "revision": "head"}, None)
+
+    assert environment_during_upgrade == [Env.PROD]
 
 
 def test_wrong_event_fails():

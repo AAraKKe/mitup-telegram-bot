@@ -8,6 +8,7 @@ from sqlalchemy import URL
 
 from mitup_bot import db
 from mitup_bot.config import (
+    MITUP_ENV_VAR,
     AppConfig,
     BotConfig,
     Config,
@@ -20,6 +21,7 @@ from mitup_bot.config import (
     PatreonConfig,
     RunModes,
     TomlConfigProvider,
+    env_from_environment,
 )
 from mitup_bot.models.subscriptions import TokenCipher, configure_token_encryption
 from tests.helpers.fixtures import create_patreon_config
@@ -548,3 +550,27 @@ def test_db_from_providers_first_provider_wins():
 def test_db_from_providers_missing_section_raises_with_setup_hint():
     with pytest.raises(RuntimeError, match="uv run mb setup"):
         Config.db_from_providers(provider_returning({}))
+
+
+def test_env_from_environment_defaults_to_dev(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv(MITUP_ENV_VAR, raising=False)
+
+    assert env_from_environment() is Env.DEV
+
+
+@pytest.mark.parametrize("env", list(Env))
+def test_env_from_environment_reads_every_known_environment(monkeypatch: pytest.MonkeyPatch, env: Env):
+    monkeypatch.setenv(MITUP_ENV_VAR, env.value)
+
+    assert env_from_environment() is env
+
+
+def test_env_from_environment_rejects_unknown_value(monkeypatch: pytest.MonkeyPatch):
+    """An unknown value names the variable and the accepted environments, so a deployed process
+    fails with a fixable message instead of quietly loading the dev TOML."""
+    monkeypatch.setenv(MITUP_ENV_VAR, "staging")
+
+    with pytest.raises(ValueError, match="MITUP_ENV='staging' is not a known environment") as exc_info:
+        env_from_environment()
+
+    assert "dev, prod" in str(exc_info.value)

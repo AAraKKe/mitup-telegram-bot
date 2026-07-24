@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from mitup_bot.config import Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
+from mitup_bot.config import Config, EnvVariablesConfigProvider, TomlConfigProvider, env_from_environment
 from mitup_bot.db import build_db_url
 from mitup_bot.models import users
 
@@ -11,9 +11,9 @@ from mitup_bot.models import users
 # access to the values within the .ini file in use.
 config = context.config
 
-# Only the db section is needed here. Environment variables win over the local dev.toml, so
+# Only the db section is needed here. Environment variables win over the environment TOML, so
 # deployment pipelines and the db-test harness inject the real connection through MITUPBOT__DB__*.
-db_config = Config.db_from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+db_config = Config.db_from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(env_from_environment()))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
