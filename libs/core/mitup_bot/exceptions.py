@@ -115,11 +115,6 @@ class IncorrectTimezoneKeyError(RuntimeError):
         super().__init__("Timezone key is not set correctly.")
 
 
-class IncorrectCoordinatesError(ValueError):
-    def __init__(self):
-        super().__init__("The latitude and longitude are not set correctly")
-
-
 class GeocodeClientNotConfiguredError(RuntimeError):
     def __init__(self):
         super().__init__("The geocode client must be configured before using it.")

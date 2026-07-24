@@ -44,6 +44,22 @@ def get_location_from_api():
         yield location_patch
 
 
+@pytest.fixture
+def geocode_client():
+    with mock.patch("mitup_bot.timezone_api.geocode_client") as client_factory_mock:
+        client_mock = mock.MagicMock()
+        client_factory_mock.return_value = client_mock
+        yield client_mock
+
+
+@pytest.fixture
+def timezone_client():
+    with mock.patch("mitup_bot.timezone_api.timezone_client") as client_factory_mock:
+        client_mock = mock.MagicMock()
+        client_factory_mock.return_value = client_mock
+        yield client_mock
+
+
 @pytest.mark.parametrize(
     "update",
     [
@@ -107,6 +123,65 @@ async def test_registration_timezone_text_message_handler_stays_in_timezone_stat
         update,
         RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
     )
+    assert result == ConversationRegistrationProcessState.TIMEZONE
+
+
+# ---------------------------------------------------------------------------
+# Unresolvable input through the real timezone_api
+#
+# These exercise the handlers against `mitup_bot.timezone_api` itself with only the
+# Google clients stubbed, so the None contract between the two layers is covered.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="Hii")], indirect=True)
+async def test_registration_timezone_text_handler_reprompts_when_google_geocodes_nothing(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    geocode_client: mock.MagicMock,
+    timezone_client: mock.MagicMock,
+):
+    """Chatter typed at the timezone prompt gets the friendly retry, never a raised error."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    original_timezone = user_with_settings.settings.timezone
+    geocode_client.geocode.return_value = []
+
+    result = await claimed_state(registration_timezone_text_message_handler(update, context))
+
+    context.api.assert_send_message_called(
+        update,
+        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
+    )
+    geocode_client.geocode.assert_called_once_with("Hii")
+    timezone_client.timezone.assert_not_called()
+    assert user_with_settings.settings.timezone == original_timezone
+    assert result == ConversationRegistrationProcessState.TIMEZONE
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(location=Location(longitude=-118.2437, latitude=34.0522))], indirect=True
+)
+async def test_registration_timezone_location_handler_reprompts_when_google_maps_no_zone(
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    timezone_client: mock.MagicMock,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    original_timezone = user_with_settings.settings.timezone
+    timezone_client.timezone.return_value = None
+
+    result = await claimed_state(registration_timezone_location_message_handler(update, context))
+
+    context.api.assert_send_message_called(
+        update,
+        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
+    )
+    timezone_client.timezone.assert_called_once_with((34.0522, -118.2437))
+    assert user_with_settings.settings.timezone == original_timezone
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
 

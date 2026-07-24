@@ -7,7 +7,6 @@ from mitup_bot.config import GoogleApiConfig
 from mitup_bot.exceptions import (
     GeocodeClientAlreadyInitializedError,
     GeocodeClientNotConfiguredError,
-    IncorrectCoordinatesError,
     IncorrectGeocodeKeyError,
     IncorrectKeyError,
     IncorrectTimezoneKeyError,
@@ -71,33 +70,21 @@ def configure(config: GoogleApiConfig):
 
 
 def get_timezone_by_address(address: str, context: TMitupContext) -> str | None:
-    """
-    Retrieves the timezone ID for a given address.
+    """Return the timezone ID for an address, or None when the address cannot be resolved.
 
-    Args:
-        address (str): The address for which to retrieve the timezone.
-
-    Returns:
-        str: The timezone ID.
-
+    None means the user's input is unusable and they should be asked to try again; a Google-side
+    failure (quota, auth, upstream) raises instead, because that is an operator problem.
     """
 
     location = get_coordinates(address, context)
+    if location is None:
+        return None
 
     return get_timezone_by_location(location.lat, location.lng, context)
 
 
-def get_timezone_by_location(latitude: float, longitude: float, context: TMitupContext) -> str:
-    """
-    Get the timezone by location coordinates.
-
-    Args:
-        latitude (float): The latitude of the location.
-        longitude (float): The longitude of the location.
-
-    Returns:
-        str: The timezone ID of the location.
-    """
+def get_timezone_by_location(latitude: float, longitude: float, context: TMitupContext) -> str | None:
+    """Return the timezone ID for a coordinate pair, or None when Google maps it to no zone."""
 
     try:
         with context.with_time_metric("GoogleTimeZoneApi"):
@@ -112,21 +99,13 @@ def get_timezone_by_location(latitude: float, longitude: float, context: TMitupC
         context.emit_metric(
             MetricKey.ERROR.with_prefix("InvalidGoogleTimezoneResponse"), include_handler_properties=False
         )
-        raise IncorrectCoordinatesError()
+        return None
 
     return timezone["timeZoneId"]
 
 
-def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation:
-    """
-    Retrieves the coordinates (latitude and longitude) of a given address.
-
-    Args:
-        address (str): The address to retrieve the coordinates for.
-
-    Returns:
-        dict[str, float]: A dictionary containing the latitude and longitude coordinates.
-    """
+def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation | None:
+    """Return the coordinates of an address, or None when Google returns no or unparseable results."""
 
     try:
         with context.with_time_metric("GoogleGeocodeApi"):
@@ -138,10 +117,10 @@ def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation:
         # log line preserves what Google actually answered.
         log.warning("Google geocode API call failed", exc_info=e)
         raise IncorrectGeocodeKeyError() from e
-    except (IndexError, ValidationError) as e:
+    except IndexError, ValidationError:
         context.emit_metric(
             MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), include_handler_properties=False
         )
-        raise IncorrectCoordinatesError() from e
+        return None
 
     return geocode_result.geometry.location

@@ -11,7 +11,6 @@ from mitup_bot.config import GoogleApiConfig
 from mitup_bot.exceptions import (
     GeocodeClientAlreadyInitializedError,
     GeocodeClientNotConfiguredError,
-    IncorrectCoordinatesError,
     IncorrectGeocodeKeyError,
     IncorrectKeyError,
     IncorrectTimezoneKeyError,
@@ -139,14 +138,15 @@ def test_get_timezone_by_address_raises_with_missing_timezone_client(
     assert_time_metrics_emitted(context, metrics, "GoogleGeocodeApiTime")
 
 
-def test_get_timezone_by_address_handles_geocode_failure(
+def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
     timezone_client, geocode_client, context: StubMitupContext, metrics: MetricAssertions
 ):
+    """Text that Google cannot geocode is a user-input problem: None, so callers can re-prompt."""
     geocode_client.geocode.return_value = []
 
-    with pytest.raises(IncorrectCoordinatesError):
-        timezone_api.get_timezone_by_address("New York", context)
+    assert timezone_api.get_timezone_by_address("Hii", context) is None
 
+    timezone_client.timezone.assert_not_called()
     asyncio.run(context.metrics.flush())
     metrics.assert_emitted(
         name=MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), value=1, unit=MetricUnit.COUNT
@@ -198,11 +198,17 @@ def test_get_coordinates_raise_incorrect_geocode_key_error(geocode_client, conte
     assert warnings[0]["exc_info"] is error
 
 
-def test_get_timezone_by_location_raises_incorrect_coordinates_error(timezone_client, context: StubMitupContext):
+def test_get_timezone_by_location_returns_none_when_coordinates_map_to_no_zone(
+    timezone_client, context: StubMitupContext, metrics: MetricAssertions
+):
     timezone_client.timezone.return_value = None
 
-    with pytest.raises(IncorrectCoordinatesError):
-        timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+    assert timezone_api.get_timezone_by_location(34.0522, -118.2437, context) is None
+
+    asyncio.run(context.metrics.flush())
+    metrics.assert_emitted(
+        name=MetricKey.ERROR.with_prefix("InvalidGoogleTimezoneResponse"), value=1, unit=MetricUnit.COUNT
+    )
 
 
 def test_get_coordinates_raises_with_missing_geocode_client(context: StubMitupContext):
@@ -210,11 +216,25 @@ def test_get_coordinates_raises_with_missing_geocode_client(context: StubMitupCo
         timezone_api.get_coordinates("New York", context)
 
 
-def test_get_coordinates_logs_warning_on_failure(geocode_client, context: StubMitupContext, metrics: MetricAssertions):
+def test_get_coordinates_returns_none_when_no_results(
+    geocode_client, context: StubMitupContext, metrics: MetricAssertions
+):
     geocode_client.geocode.return_value = []
 
-    with pytest.raises(IncorrectCoordinatesError):
-        timezone_api.get_coordinates("Invalid address", context)
+    assert timezone_api.get_coordinates("Invalid address", context) is None
+
+    asyncio.run(context.metrics.flush())
+    metrics.assert_emitted(
+        name=MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), value=1, unit=MetricUnit.COUNT
+    )
+
+
+def test_get_coordinates_returns_none_when_response_shape_is_unparseable(
+    geocode_client, context: StubMitupContext, metrics: MetricAssertions
+):
+    geocode_client.geocode.return_value = [{"geometry": {"location": {"lat": "not-a-number"}}}]
+
+    assert timezone_api.get_coordinates("New York", context) is None
 
     asyncio.run(context.metrics.flush())
     metrics.assert_emitted(
