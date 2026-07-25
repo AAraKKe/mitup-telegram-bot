@@ -13,6 +13,7 @@ literal string rather than routed through ``MetricKey`` (whose CamelCase folding
 
 import datetime as dt
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Protocol
 
@@ -64,6 +65,10 @@ SUBSCRIPTION_FAULTS_METRIC = "PatreonSubscriptionFaults"
 DUE_SUBSCRIPTIONS_PROCESSED_METRIC = "PatreonDueSubscriptionsProcessed"
 ACTIVE_PATRONS_METRIC = "PatreonActivePatrons"
 
+# Machine-readable reason on the log line for a run that reconciled nothing, so log queries key on a
+# field rather than on the event text.
+ABORT_REASON_CREATOR_TOKEN_UNUSABLE = "creator_token_unusable"
+
 
 class DueOutcome(Enum):
     """What a due subscription's grace-flow pass did, so ``run`` can aggregate lifecycle counts."""
@@ -81,6 +86,35 @@ class LevelSyncOutcome(Enum):
     DOWNGRADED = auto()
     UNCHANGED = auto()
     SKIPPED = auto()
+
+
+@dataclass
+class RunTally:
+    """What one run did, aggregated for the outcome counters and the completion log.
+
+    The defaults describe a run that reconciled nothing, so the counters can be emitted from any exit
+    path — including an abort before the sweep starts — and every series lands a datapoint."""
+
+    due_outcomes: list[DueOutcome] = field(default_factory=list)
+    sync_outcomes: list[LevelSyncOutcome] = field(default_factory=list)
+    failures: list[str] = field(default_factory=list)
+    active_patrons: int = 0
+
+    def count_due(self, outcome: DueOutcome) -> int:
+        return sum(1 for candidate in self.due_outcomes if candidate is outcome)
+
+    def count_synced(self, outcome: LevelSyncOutcome) -> int:
+        return sum(1 for candidate in self.sync_outcomes if candidate is outcome)
+
+    def emit_counters(self, metrics: MetricsClient):
+        metrics.emit(GRACE_EXTENDED_METRIC, self.count_due(DueOutcome.EXTENDED), MetricUnit.COUNT)
+        metrics.emit(GRACE_STARTED_METRIC, self.count_due(DueOutcome.GRACE_STARTED), MetricUnit.COUNT)
+        metrics.emit(SUPPORT_LOST_METRIC, self.count_due(DueOutcome.SUPPORT_LOST), MetricUnit.COUNT)
+        metrics.emit(UPGRADES_METRIC, self.count_synced(LevelSyncOutcome.UPGRADED), MetricUnit.COUNT)
+        metrics.emit(DOWNGRADES_METRIC, self.count_synced(LevelSyncOutcome.DOWNGRADED), MetricUnit.COUNT)
+        metrics.emit(SUBSCRIPTION_FAULTS_METRIC, len(self.failures), MetricUnit.COUNT)
+        metrics.emit(DUE_SUBSCRIPTIONS_PROCESSED_METRIC, len(self.due_outcomes), MetricUnit.COUNT)
+        metrics.emit(ACTIVE_PATRONS_METRIC, self.active_patrons, MetricUnit.COUNT)
 
 
 # Supporters keep their perks for a week past each unconfirmed checkpoint, so a lapsed or
@@ -120,29 +154,43 @@ def days_until(expiration: dt.datetime) -> float:
     return (expiration - dt.datetime.now(dt.UTC)).total_seconds() / dt.timedelta(days=1).total_seconds()
 
 
-async def refresh_creator_token(client: TokenRefresher, config: PatreonConfig, metrics: MetricsClient) -> str | None:
+@dataclass(frozen=True, slots=True)
+class CreatorTokenRefresh:
+    """Outcome of one creator-token refresh.
+
+    ``access_token`` is ``None`` when Patreon rejected the refresh; ``ttl_days`` then carries what is
+    left on the stored pair (0.0 when none is stored) instead of the fresh token's lifetime."""
+
+    access_token: str | None
+    ttl_days: float
+
+
+async def refresh_creator_token(
+    client: TokenRefresher, config: PatreonConfig, metrics: MetricsClient
+) -> CreatorTokenRefresh:
     """Adopt-or-refresh the creator token, persist it, emit its TTL, and return the fresh access token.
 
-    Returns ``None`` when the refresh is rejected with ``invalid_grant``: that cannot be auto-healed
-    (recovery is re-seeding from the developer portal), so it logs an error and lets the declining
-    TTL metric drive the alarm rather than raising."""
+    Comes back with no access token when the refresh is rejected with ``invalid_grant``: that cannot be
+    auto-healed (recovery is re-seeding from the developer portal), so it logs an error and lets the
+    declining TTL metric drive the alarm rather than raising."""
     state = await load_creator_state(config, seed_fingerprint(config))
     try:
         pair = await client.refresh(state.pair)
     except PatreonTokenRevoked:
         log.error("Patreon creator token refresh rejected with invalid_grant, re-seed required")
         fallback = state.fallback_expiration
-        metrics.emit(CREATOR_TOKEN_TTL_METRIC, days_until(fallback) if fallback else 0.0, MetricUnit.NONE)
+        stored_ttl_days = days_until(fallback) if fallback else 0.0
+        metrics.emit(CREATOR_TOKEN_TTL_METRIC, stored_ttl_days, MetricUnit.NONE)
         # This branch returns without raising, so the framework Fault never fires for it — this
-        # counter (plus the declining TTL) is the creator failure's only CloudWatch trace.
+        # counter and the declining TTL are what mark the creator failure itself in CloudWatch.
         metrics.emit(CREATOR_REFRESH_FAULTS_METRIC, 1, MetricUnit.COUNT)
-        return None
+        return CreatorTokenRefresh(access_token=None, ttl_days=stored_ttl_days)
     await store_creator_token(pair, state.fingerprint)
     ttl_days = days_until(pair.expires_at)
     metrics.emit(CREATOR_TOKEN_TTL_METRIC, ttl_days, MetricUnit.NONE)
     metrics.emit(CREATOR_REFRESH_FAULTS_METRIC, 0, MetricUnit.COUNT)
     log.info("Patreon creator token refreshed", ttl_days=ttl_days)
-    return pair.access_token
+    return CreatorTokenRefresh(access_token=pair.access_token, ttl_days=ttl_days)
 
 
 async def active_patreon_amounts(client: CampaignMemberReader, access_token: str) -> dict[str, int]:
@@ -278,64 +326,73 @@ async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int],
     return results
 
 
-async def run(api: TelegramApiWrapper, metrics: MetricsClient):
-    """Validate supporter memberships against Patreon and keep the creator token fresh.
+async def reconcile_memberships(api: TelegramApiWrapper, metrics: MetricsClient, tally: RunTally) -> bool:
+    """Refresh the creator token, sweep the campaign roster, and reconcile every linked member,
+    recording each pass's outcomes and failures in ``tally``.
 
-    Each subscription is handled in its own write lifecycle; a mid-run failure leaves earlier commits
-    intact and re-nominates the rest next run. Emits the per-run outcome counters (COUNT, EventType
-    base dimension only) before any failure raise so the series stay continuous."""
+    Returns False when an unusable creator token stopped the run before any membership was looked at."""
     config = patreon.current_config()
-    failures: list[str] = []
-
     async with PatreonClient(config) as client:
-        creator_access_token = await refresh_creator_token(client, config, metrics)
-        if creator_access_token is None:
-            # No usable creator token means no member list; the TTL alarm already covers this.
-            return
-        active_amounts = await active_patreon_amounts(client, creator_access_token)
+        refresh = await refresh_creator_token(client, config, metrics)
+        if refresh.access_token is None:
+            # Re-seeding from the developer portal is the only recovery, and the TTL alarm breaches
+            # only once the stored token decays past its threshold, days later — so this line and the
+            # zero counters are what mark a run that reconciled nothing.
+            log.error(
+                "Supporter check aborted before reconciling any membership",
+                reason=ABORT_REASON_CREATOR_TOKEN_UNUSABLE,
+                creator_token_ttl_days=refresh.ttl_days,
+            )
+            return False
+
+        active_amounts = await active_patreon_amounts(client, refresh.access_token)
+        tally.active_patrons = len(active_amounts)
         log.info("Fetched active Patreon members", count=len(active_amounts))
 
         due_ids = await nominate(DUE_SUBSCRIPTIONS)
         log.info("Nominated due subscriptions", count=len(due_ids))
-        due_outcomes = await process_all(
+        tally.due_outcomes = await process_all(
             lambda subscription_id: process_due_subscription(subscription_id, active_amounts, api),
             due_ids,
-            failures,
+            tally.failures,
         )
         live_ids = await nominate(LIVE_LINKED_SUBSCRIPTIONS)
         log.info("Nominated live linked subscriptions", count=len(live_ids))
-        sync_outcomes = await process_all(
+        tally.sync_outcomes = await process_all(
             lambda subscription_id: sync_subscription_level(subscription_id, active_amounts, config, api),
             live_ids,
-            failures,
+            tally.failures,
         )
+    return True
 
-    extended = sum(1 for outcome in due_outcomes if outcome is DueOutcome.EXTENDED)
-    grace_started = sum(1 for outcome in due_outcomes if outcome is DueOutcome.GRACE_STARTED)
-    support_lost = sum(1 for outcome in due_outcomes if outcome is DueOutcome.SUPPORT_LOST)
-    upgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.UPGRADED)
-    downgraded = sum(1 for outcome in sync_outcomes if outcome is LevelSyncOutcome.DOWNGRADED)
 
-    metrics.emit(GRACE_EXTENDED_METRIC, extended, MetricUnit.COUNT)
-    metrics.emit(GRACE_STARTED_METRIC, grace_started, MetricUnit.COUNT)
-    metrics.emit(SUPPORT_LOST_METRIC, support_lost, MetricUnit.COUNT)
-    metrics.emit(UPGRADES_METRIC, upgraded, MetricUnit.COUNT)
-    metrics.emit(DOWNGRADES_METRIC, downgraded, MetricUnit.COUNT)
-    metrics.emit(SUBSCRIPTION_FAULTS_METRIC, len(failures), MetricUnit.COUNT)
-    metrics.emit(DUE_SUBSCRIPTIONS_PROCESSED_METRIC, len(due_outcomes), MetricUnit.COUNT)
-    metrics.emit(ACTIVE_PATRONS_METRIC, len(active_amounts), MetricUnit.COUNT)
+async def run(api: TelegramApiWrapper, metrics: MetricsClient):
+    """Validate supporter memberships against Patreon and keep the creator token fresh.
 
-    if failures:
-        raise RuntimeError(f"Supporter check failed for {len(failures)} subscriptions. Check logs for details.")
+    Each subscription is handled in its own write lifecycle; a mid-run failure leaves earlier commits
+    intact and re-nominates the rest next run. The per-run outcome counters (COUNT, EventType base
+    dimension only) are emitted in a ``finally``, so an aborting or raising run still lands zeros and
+    the series stay continuous."""
+    tally = RunTally()
+    reconciled = False
+    try:
+        reconciled = await reconcile_memberships(api, metrics, tally)
+    finally:
+        tally.emit_counters(metrics)
+
+    if tally.failures:
+        raise RuntimeError(f"Supporter check failed for {len(tally.failures)} subscriptions. Check logs for details.")
+    if not reconciled:
+        return
 
     log.info(
         "supporter check complete",
-        due_processed=len(due_outcomes),
-        extended=extended,
-        grace_started=grace_started,
-        support_lost=support_lost,
-        upgraded=upgraded,
-        downgraded=downgraded,
-        active_patrons=len(active_amounts),
-        subscription_faults=len(failures),
+        due_processed=len(tally.due_outcomes),
+        extended=tally.count_due(DueOutcome.EXTENDED),
+        grace_started=tally.count_due(DueOutcome.GRACE_STARTED),
+        support_lost=tally.count_due(DueOutcome.SUPPORT_LOST),
+        upgraded=tally.count_synced(LevelSyncOutcome.UPGRADED),
+        downgraded=tally.count_synced(LevelSyncOutcome.DOWNGRADED),
+        active_patrons=tally.active_patrons,
+        subscription_faults=len(tally.failures),
     )

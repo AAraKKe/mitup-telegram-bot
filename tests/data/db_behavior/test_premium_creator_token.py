@@ -77,9 +77,9 @@ async def read_single_row() -> PatreonCreatorToken:
 async def test_adopt_persists_encrypted_seed_pair(clean_creator_tokens: None):
     config = create_patreon_config()
 
-    token = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
+    refresh = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
 
-    assert token == "creator-access-seed-new"
+    assert refresh.access_token == "creator-access-seed-new"
     row = await read_single_row()
     # Decrypted round-trip through the EncryptedToken column matches the rotated seed pair.
     assert row.access_token == "creator-access-seed-new"
@@ -107,9 +107,9 @@ async def test_matching_fingerprint_refreshes_db_pair_in_place(clean_creator_tok
         await session.flush()
         original_id = (await session.exec(select(PatreonCreatorToken))).one().db_id
 
-    token = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
+    refresh = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
 
-    assert token == "db-access-new"
+    assert refresh.access_token == "db-access-new"
     row = await read_single_row()
     assert row.db_id == original_id  # updated in place, not a second row
     assert row.access_token == "db-access-new"
@@ -128,10 +128,10 @@ async def test_changed_seed_reseeds_and_rotates_fingerprint(clean_creator_tokens
             )
         )
 
-    token = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
+    refresh = await supporter_check.refresh_creator_token(RotatingClient(), config, MetricsClient(NullBackend()))
 
     # The seed changed, so the config pair is adopted and the stored fingerprint rotates to it.
-    assert token == "creator-access-seed-new"
+    assert refresh.access_token == "creator-access-seed-new"
     row = await read_single_row()
     assert row.access_token == "creator-access-seed-new"
     assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)

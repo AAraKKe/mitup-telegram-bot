@@ -176,9 +176,9 @@ async def test_creator_token_adopted_when_no_row(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     client = FakePatreonClient()
 
-    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
+    refresh = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
-    assert access_token == "creator-access-seed-new"
+    assert refresh.access_token == "creator-access-seed-new"
     # The seed pair was the one refreshed, and a fresh row was stored with the seed fingerprint.
     assert client.refresh_calls[0].refresh_token == "creator-refresh-seed"
     stored = next(obj for obj in mock_session.objects_added if isinstance(obj, PatreonCreatorToken))
@@ -202,11 +202,11 @@ async def test_creator_token_db_pair_wins_when_fingerprint_matches(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient()
 
-    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
+    refresh = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     # The stored pair (fresher than the seed) is refreshed and updated in place; no adopt happens.
     assert client.refresh_calls[0].refresh_token == "db-refresh"
-    assert access_token == "db-access-new"
+    assert refresh.access_token == "db-access-new"
     assert row.access_token == "db-access-new"
     assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)
     mock_session.assert_not_added()
@@ -219,11 +219,11 @@ async def test_creator_token_reseeded_on_fingerprint_mismatch(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient()
 
-    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
+    refresh = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     # A changed seed means an operator re-seed: the config pair is adopted and the fingerprint rotates.
     assert client.refresh_calls[0].refresh_token == "creator-refresh-seed"
-    assert access_token == "creator-access-seed-new"
+    assert refresh.access_token == "creator-access-seed-new"
     assert row.seed_fingerprint == supporter_check.seed_fingerprint(config)
 
 
@@ -238,10 +238,11 @@ async def test_creator_token_invalid_grant_emits_fallback_ttl(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
     client = FakePatreonClient(revoked_refresh_tokens=frozenset({"db-refresh"}))
 
-    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
+    refresh = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
     # No auto-heal: the token is not returned and the declining stored TTL is what drives the alarm.
-    assert access_token is None
+    assert refresh.access_token is None
+    assert refresh.ttl_days == pytest.approx(5, abs=0.01)
     creator_ttls = [
         record for record in metrics_client.records if record.name == supporter_check.CREATOR_TOKEN_TTL_METRIC
     ]
@@ -255,9 +256,10 @@ async def test_creator_token_invalid_grant_without_row_emits_zero_ttl(
     mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
     client = FakePatreonClient(revoked_refresh_tokens=frozenset({"creator-refresh-seed"}))
 
-    access_token = await supporter_check.refresh_creator_token(client, config, metrics_client)
+    refresh = await supporter_check.refresh_creator_token(client, config, metrics_client)
 
-    assert access_token is None
+    assert refresh.access_token is None
+    assert refresh.ttl_days == 0.0
     metrics.assert_emitted(name=supporter_check.CREATOR_TOKEN_TTL_METRIC, value=0.0, unit=MetricUnit.NONE)
 
 
@@ -566,6 +568,19 @@ async def test_process_all_isolates_a_failing_subscription():
 # run(): orchestration
 # ---------------------------------------------------------------------------
 
+# The per-run outcome counters the module contracts to emit on every exit path, zeros included.
+PER_RUN_COUNTERS = (
+    supporter_check.GRACE_EXTENDED_METRIC,
+    supporter_check.GRACE_STARTED_METRIC,
+    supporter_check.SUPPORT_LOST_METRIC,
+    supporter_check.UPGRADES_METRIC,
+    supporter_check.DOWNGRADES_METRIC,
+    supporter_check.SUBSCRIPTION_FAULTS_METRIC,
+    supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC,
+    supporter_check.ACTIVE_PATRONS_METRIC,
+)
+ABORT_EVENT = "Supporter check aborted before reconciling any membership"
+
 
 async def test_run_happy_path_emits_creator_ttl_and_counters(
     mock_session: MockDbSession,
@@ -639,6 +654,21 @@ async def test_run_logs_summary_on_success(
     assert summary["subscription_faults"] == 0
 
 
+def stub_unusable_creator_token(
+    mock_session: MockDbSession, config: PatreonConfig, monkeypatch: pytest.MonkeyPatch, *, stored_ttl_days: int = 5
+) -> FakePatreonClient:
+    """Arrange a run whose stored creator pair Patreon rejects with ``invalid_grant``."""
+    row = create_patreon_creator_token(
+        refresh_token="db-refresh",
+        token_expiration=dt.datetime.now(dt.UTC) + dt.timedelta(days=stored_ttl_days),
+        seed_fingerprint=supporter_check.seed_fingerprint(config),
+    )
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
+    client = FakePatreonClient(revoked_refresh_tokens=frozenset({"db-refresh"}))
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
+    return client
+
+
 async def test_run_stops_after_creator_invalid_grant(
     mock_session: MockDbSession,
     api: MockApi,
@@ -648,22 +678,53 @@ async def test_run_stops_after_creator_invalid_grant(
     monkeypatch: pytest.MonkeyPatch,
 ):
     configure(config)
-    row = create_patreon_creator_token(
-        refresh_token="db-refresh", seed_fingerprint=supporter_check.seed_fingerprint(config)
-    )
-    mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
-    client = FakePatreonClient(revoked_refresh_tokens=frozenset({"db-refresh"}))
-    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
+    client = stub_unusable_creator_token(mock_session, config, monkeypatch)
 
     await supporter_check.run(api, metrics_client)
 
     # No member fetch: the run bailed out on the unrecoverable creator token.
     assert client.members_access_token is None
-    # The creator-fault counter is this branch's only CloudWatch trace (it returns without raising).
     metrics.assert_emitted(name=supporter_check.CREATOR_REFRESH_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
-    # Downstream outcome counters never ran, so they are absent (not zeroed) this run.
-    emitted_names = {record.name for record in metrics_client.records}
-    assert supporter_check.GRACE_STARTED_METRIC not in emitted_names
+
+
+@pytest.mark.parametrize("counter", PER_RUN_COUNTERS)
+async def test_run_emits_zero_counters_when_creator_token_is_unusable(
+    counter: str,
+    mock_session: MockDbSession,
+    api: MockApi,
+    config: PatreonConfig,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """An aborted run still lands every per-run counter as a zero, so no series goes dark."""
+    configure(config)
+    stub_unusable_creator_token(mock_session, config, monkeypatch)
+
+    await supporter_check.run(api, metrics_client)
+
+    metrics.assert_emitted(name=counter, value=0, unit=MetricUnit.COUNT)
+
+
+async def test_run_logs_abort_reason_when_creator_token_is_unusable(
+    mock_session: MockDbSession,
+    api: MockApi,
+    config: PatreonConfig,
+    metrics_client: MetricsClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    configure(config)
+    stub_unusable_creator_token(mock_session, config, monkeypatch, stored_ttl_days=5)
+
+    with capture_logs() as logs:
+        await supporter_check.run(api, metrics_client)
+
+    abort = next(entry for entry in logs if entry["event"] == ABORT_EVENT)
+    assert abort["log_level"] == "error"
+    assert abort["reason"] == supporter_check.ABORT_REASON_CREATOR_TOKEN_UNUSABLE
+    assert abort["creator_token_ttl_days"] == pytest.approx(5, abs=0.01)
+    # Nothing was reconciled, so the run must not claim it completed a pass.
+    assert not [entry for entry in logs if entry["event"] == "supporter check complete"]
 
 
 async def test_run_raises_when_a_subscription_fails(
@@ -695,6 +756,32 @@ async def test_run_raises_when_a_subscription_fails(
     metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
     # The per-subscription fault count is emitted before the raise: N failures land as a datapoint.
     metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
+
+
+async def test_run_emits_counters_when_the_member_sweep_raises(
+    mock_session: MockDbSession,
+    api: MockApi,
+    config: PatreonConfig,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A run that dies inside the sweep still lands every counter: the emission sits in a ``finally``."""
+    configure(config)
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
+    client = FakePatreonClient(members=(active_member("patreon-1"),))
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
+
+    async def boom(client: FakePatreonClient, access_token: str) -> dict[str, int]:
+        raise RuntimeError("patreon is down")
+
+    monkeypatch.setattr(supporter_check, "active_patreon_amounts", boom)
+
+    with pytest.raises(RuntimeError, match="patreon is down"):
+        await supporter_check.run(api, metrics_client)
+
+    for counter in PER_RUN_COUNTERS:
+        metrics.assert_emitted(name=counter, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_counts_lifecycle_transitions(
