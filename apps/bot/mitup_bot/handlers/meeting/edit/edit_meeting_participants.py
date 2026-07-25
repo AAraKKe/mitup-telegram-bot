@@ -124,6 +124,7 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
     )
 
     await context.api.send_message(update=update, view=response_view)
+    await context.api.update_meeting_messages(meeting=meeting)
 
     context.put_feature_metric(Feature.EDIT_MEETING, properties={"EditedField": "max_participants"})
     return ConversationHandler.END

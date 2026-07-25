@@ -11,7 +11,7 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view, edit_participants_view
-from mitup_bot.models import User
+from mitup_bot.models import Message, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
@@ -291,6 +291,52 @@ async def test_edit_meeting_no_limit_participants_reports_no_limit_for_uncapped_
     )
     context.api.assert_send_message_called(update, response_view)
     assert result is ConversationHandler.END
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1))], indirect=True
+)
+async def test_no_limit_participants_updates_shared_meeting_messages(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The cap is part of what every shared card shows, so clearing it fans out to the tracked
+    meeting messages instead of only refreshing the owner's bot chat."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting)
+    meeting.max_members = 5
+    meeting.messages.append(Message(message_id=111, chat_id=222, meetup=meeting))
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, handler_context=handler_context
+    )
+
+    context.api.assert_update_meeting_messages_called(meeting)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="4")], indirect=True)
+async def test_max_participants_message_updates_shared_meeting_messages(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Setting a numeric cap fans out to the tracked meeting messages, matching the no-limit path."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting)
+    meeting.messages.append(Message(message_id=111, chat_id=222, meetup=meeting))
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
+    )
+
+    context.api.assert_update_meeting_messages_called(meeting)
 
 
 @pytest.mark.parametrize(
