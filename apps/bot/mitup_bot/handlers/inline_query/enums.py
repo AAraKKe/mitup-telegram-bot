@@ -10,3 +10,4 @@ class InlineQueryId(HandlerId):
     SHARE_MEETING = auto()
     LOAD_CHAT_MEETINGS = auto()
     SEARCH_CHAT_MEETINGS = auto()
+    SHARED_MEETING = auto()

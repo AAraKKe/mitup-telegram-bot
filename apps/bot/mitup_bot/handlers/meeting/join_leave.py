@@ -170,6 +170,13 @@ async def handle_join_leave_operation(
         # joined_meeting in the operations) to unloaded. Re-load them; the row lock is already
         # held, so the re-read is race-safe.
         await session.refresh(user, ["meetups", "joined_links"])
+
+        # Authorize before anything is rendered or written: the meeting id arrives in client-supplied
+        # callback data, and both the message tracking below and update_meeting_messages would
+        # otherwise push this meeting's card into whichever chat the caller tapped from.
+        if not await guards.meeting_interaction_allowed(session, user, meeting, update, context):
+            return
+
         if not meeting.active:
             await context.api.edit_message(
                 update=update,
@@ -194,6 +201,8 @@ async def handle_join_leave_operation(
                 update, meeting, meeting_views.keyboard_for_update(update, meeting, user)
             )
             meeting.messages.append(current_message)
+        else:
+            current_message.capture_chat_instance(update)
 
         # Execute core operation
         notification_key = await operation(meeting, user)

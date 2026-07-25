@@ -4,7 +4,17 @@ from unittest import mock
 
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
-from telegram import CallbackQuery, Chat, ChatJoinRequest, InlineQuery, Location, Message, MessageEntity, Update
+from telegram import (
+    CallbackQuery,
+    Chat,
+    ChatJoinRequest,
+    ChosenInlineResult,
+    InlineQuery,
+    Location,
+    Message,
+    MessageEntity,
+    Update,
+)
 from telegram import User as TgUser
 from telegram.ext import Application, ApplicationBuilder, ContextTypes, ExtBot
 
@@ -28,6 +38,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.supporter import SupporterLevel
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
+    DEFAULT_INLINE_MESSAGE_ID,
     DEFAULT_MESSAGE_ID,
     DEFAULT_TEST_DATE,
     DEFAULT_TG_USER_PARAMS,
@@ -52,6 +63,8 @@ class UpdateRequest:
         inline_query (str, optional): The inline query string. Defaults to "".
         chat_join_request (bool, optional): When True the update carries a ChatJoinRequest built from the
             fixture's chat and user. Defaults to False.
+        chosen_inline_result (str | None, optional): The id of the inline result the user picked. When set,
+            the update carries a ChosenInlineResult for it, sent as ``inline_message_id``. Defaults to None.
         language_code (str | None, optional): When set, overrides the sender's Telegram ``language_code``
             (the IETF BCP-47 client-language tag). Defaults to None, leaving the fixture user's value.
     """
@@ -66,7 +79,8 @@ class UpdateRequest:
     command: str | bool = False
     command_args: str | None = None
     inline_query: str | InlineQuery = ""
-    inline_message_id: str = "some_inline_message_id"
+    inline_message_id: str | None = DEFAULT_INLINE_MESSAGE_ID
+    chosen_inline_result: str | None = None
     from_bot_chat: bool = True
     chat_join_request: bool = False
     language_code: str | None = None
@@ -418,6 +432,16 @@ def create_update(
         return Update(
             DEFAULT_MESSAGE_ID,
             chat_join_request=ChatJoinRequest(chat=chat, from_user=user, date=DEFAULT_TEST_DATE, user_chat_id=user.id),
+        )
+    if request.chosen_inline_result is not None:
+        return Update(
+            DEFAULT_MESSAGE_ID,
+            chosen_inline_result=ChosenInlineResult(
+                result_id=request.chosen_inline_result,
+                from_user=user,
+                query=request.chosen_inline_result,
+                inline_message_id=request.inline_message_id,
+            ),
         )
     if request.inline_query:
         if isinstance(request.inline_query, InlineQuery):

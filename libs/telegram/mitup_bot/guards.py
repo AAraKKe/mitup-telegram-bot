@@ -3,7 +3,7 @@ from typing import cast
 import structlog
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram import CallbackQuery, Chat, InlineQuery, Message, Update
+from telegram import CallbackQuery, Chat, ChosenInlineResult, InlineQuery, Message, Update
 from telegram import User as TgUser
 
 from mitup_bot.callback_data import (
@@ -18,6 +18,7 @@ from mitup_bot.callback_data import (
 )
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
+    ChosenInlineResultNotSet,
     EffectiveChatNotSet,
     EffectiveMessageNotSet,
     EffectiveUserNotSet,
@@ -30,12 +31,13 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, User
+from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MessageBase
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MessageBase
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import MitupView
 
@@ -215,6 +217,13 @@ def callback_query(update: Update) -> CallbackQuery:
     return update.callback_query
 
 
+def chosen_inline_result(update: Update) -> ChosenInlineResult:
+    if update.chosen_inline_result is None:
+        raise ChosenInlineResultNotSet(update)
+
+    return update.chosen_inline_result
+
+
 async def user_owns_meeting(
     user: User,
     meeting_id: int,
@@ -367,6 +376,67 @@ async def meeting_viewable(
         return meeting
 
     return await user_owns_meeting(user, meeting_id, action, update, context)
+
+
+async def meeting_interaction_allowed(
+    session: AsyncSession,
+    user: User,
+    meeting: Meetup,
+    update: Update,
+    context: TMitupContext,
+) -> bool:
+    """Return whether `user` may act on `meeting` through the message this update came from.
+
+    Callback data is supplied by the client: a modified Telegram app can send any `data` bytes for
+    any message the bot posted, so a meeting id read out of it proves nothing on its own. What the
+    client cannot choose is where the tap happened — Telegram fills in the message coordinates
+    (`chat_id`/`message_id`, `inline_message_id`, `chat_instance`) itself, which is what the
+    message-bound arms below stand on.
+
+    The caller is allowed when the meeting is public, when they own it, when they already have a
+    membership (including the waiting list), when they invited somebody into it, when the tapped
+    message is a tracked message of this meeting, when the meeting already has a tracked message in
+    this chat, or when the tapped shared card is claimed by this meeting.
+
+    The claim on a shared card is recorded when the card is sent, by the `chosen_inline_result`
+    handler — so a card that no meeting claims authorizes nothing: an attacker can share a card of
+    their own at will, and honouring an unclaimed inline message would let them borrow it to act on
+    any meeting id they can guess.
+
+    Rejections are answered with the deleted-meeting copy, so a denial reveals nothing about the
+    meeting's state — only that the id resolves, which sequential ids give away anyway.
+    """
+    meeting_id = meeting.db_id
+    if (
+        meeting.public
+        or user.own_meeting(meeting_id)
+        or user.joined_meeting(meeting_id)
+        or meeting.has_invited_participant(user.db_id)
+    ):
+        return True
+
+    if meeting.message_from_update(update) is not None:
+        return True
+
+    query = update.callback_query
+
+    chat_instance = query.chat_instance if query else None
+    if chat_instance is not None and any(message.chat_instance == chat_instance for message in meeting.messages):
+        return True
+
+    inline_message_id = query.inline_message_id if query else None
+    if inline_message_id is not None:
+        claimed_by = await MessageModel.meetup_id_for_inline_message(session, inline_message_id)
+        if claimed_by == meeting_id:
+            return True
+
+    await context.api.answer_callback_query(
+        update=update,
+        text=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang),
+        show_alert=True,
+    )
+    context.emit_metric(MetricKey.UNAUTHORIZED_MEETING_CALLBACK, include_handler_properties=False)
+    return False
 
 
 async def user_registered(

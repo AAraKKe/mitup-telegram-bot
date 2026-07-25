@@ -17,6 +17,7 @@ A handler is an async function decorated with a `HandlersRegistry` registration 
 | `register_callback_query` | Handles button presses (inline keyboard callbacks) |
 | `register_conversation_handler` | Multi-step conversation with states and fallbacks |
 | `register_inline_handler` | Handles inline queries |
+| `register_chosen_inline_result` | Handles the result a user picked from an answered inline query (`pattern` matches `result_id`) |
 
 Every registration method requires a `handler_id` argument — a `HandlerId` enum member that uniquely identifies the handler.
 
@@ -179,6 +180,6 @@ Fetch the user early in the handler — before branching on meeting existence �
 
 ## `chat_instance`
 
-`chat_instance` is a **required** field on every `CallbackQuery`. In this project it is only **stored** on `Message` records for inline (shared) messages (see `Message.from_update` in `models/messages.py`). For bot-chat callback queries the value exists but is not persisted.
+`chat_instance` is a **required** field on every `CallbackQuery`. In this project it is only **stored** on `Message` records for inline (shared) messages (see `Message.from_update` and `Message.capture_chat_instance` in `models/messages.py` — the latter fills it in on a card that was tracked at share time, when no chat was known yet). For bot-chat callback queries the value exists but is not persisted.
 
 Access it via `update.callback_query.chat_instance`.

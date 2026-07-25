@@ -12,6 +12,7 @@ DEFAULT_TEST_DATE = dt.datetime(2023, 1, 1, 12, 00, tzinfo=dt.UTC)
 DEFAULT_USER_ID = 123
 DEFAULT_CHAT_ID = 123
 DEFAULT_MESSAGE_ID = 123
+DEFAULT_INLINE_MESSAGE_ID = "some_inline_message_id"
 
 
 class _TgUserParams(TypedDict):

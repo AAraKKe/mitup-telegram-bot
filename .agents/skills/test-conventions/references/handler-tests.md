@@ -130,3 +130,13 @@ UpdateRequest(from_bot_chat=False)  # Uses inline_message_id instead of effectiv
 ```
 
 Defaults: `chat_instance="someinstance"`, `inline_message_id="some_inline_message_id"`.
+
+A handler acting on a meeting from a shared card is authorized by `guards.meeting_interaction_allowed`,
+which requires the card to be claimed for that meeting. Seed the claim with the `claim_shared_card`
+factory fixture (typed `ClaimSharedCard`) whenever the acting user neither owns nor has joined the
+meeting — without it the tap is refused with the deleted-meeting alert:
+
+```python
+async def test_x(stranger_meeting: Meetup, claim_shared_card: ClaimSharedCard):
+    claim_shared_card(stranger_meeting)
+```

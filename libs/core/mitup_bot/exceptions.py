@@ -66,6 +66,11 @@ class CallbackQueryNotSet(GuardError):
         super().__init__(f"Expected callback data in Telegram Update not available: {update.to_json()}")
 
 
+class ChosenInlineResultNotSet(GuardError):
+    def __init__(self, update: Update):
+        super().__init__(f"Expected chosen inline result in Telegram Update not available: {update.to_json()}")
+
+
 class InvalidUserData(RuntimeError): ...  # pragma: no cover
 
 

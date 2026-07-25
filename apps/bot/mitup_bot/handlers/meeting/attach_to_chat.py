@@ -34,6 +34,11 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
     user = await guards.current_user(update, session)
 
     if meeting := await Meetup.by_id(session, data.id):
+        # Authorize before the chat_instance is captured: attaching makes the meeting inline-searchable
+        # for everyone in that chat, and the meeting id arrives in client-supplied callback data.
+        if not await guards.meeting_interaction_allowed(session, user, meeting, update, context):
+            return
+
         chat_instance = update.callback_query.chat_instance if update.callback_query else None
         already_attached = is_already_attached(meeting, chat_instance)
 
@@ -42,8 +47,8 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
                 update, meeting, meeting_views.keyboard_for_update(update, meeting, user)
             )
             meeting.messages.append(current_message)
-        elif current_message.chat_instance is None and chat_instance:
-            current_message.chat_instance = chat_instance
+        else:
+            current_message.capture_chat_instance(update)
 
         # Not defensive: the broadcast payload snapshots message.id at enqueue time, and a
         # freshly appended Message only gets one from this flush (needed for the dead-message

@@ -619,6 +619,20 @@ def test_getting_message_from_update_returns_none_if_not_found(update: Update, m
     assert meeting.message_from_update(update) is None
 
 
+@pytest.mark.parametrize("update", [UpdateRequest(message=True, callback_query=False)], indirect=True)
+def test_getting_message_from_update_does_not_match_across_chats(update: Update, meeting: Meetup):
+    """Message ids are only unique per chat, so the same id in another chat is a different message."""
+    assert update.effective_message is not None
+    Message(
+        id=123,
+        message_id=update.effective_message.message_id,
+        chat_id=update.effective_message.chat_id + 1,
+        meetup=meeting,
+    )
+
+    assert meeting.message_from_update(update) is None
+
+
 def test_getting_message_from_update_returns_none_message_is_not_in_update(meeting: Meetup):
     assert meeting.message_from_update(Update(123)) is None
 

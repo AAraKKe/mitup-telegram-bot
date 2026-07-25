@@ -21,6 +21,7 @@ from tests.helpers import (
     UpdateRequest,
     assert_locked_meetup_select,
     call_handler,
+    create_joined_link,
     create_meetup,
     create_user,
     integrity_error,
@@ -46,6 +47,23 @@ def setup_db(mock_session: MockDbSession, user: User, meeting: Meetup):
     mock_session.add_user(user)
     mock_session.add_object(meeting, "id")
     user.meetups.append(meeting)
+
+
+def setup_inviter(mock_session: MockDbSession, user: User, meeting: Meetup, owner_id: int) -> User:
+    """Wire `user` up as the acting inviter, owning the meeting or merely participating in it.
+
+    A non-owner only reaches the invite button in their bot chat by holding the meeting card there,
+    which the joined-meetings screen renders for participants, so the non-owner case joins them to
+    the meeting instead of leaving them unrelated to it.
+    """
+    if owner_id == 123:
+        owner = user
+    else:
+        owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
+        mock_session.add_user(user)
+        create_joined_link(user=user, meetup=meeting)
+    setup_db(mock_session, owner, meeting)
+    return owner
 
 
 @pytest.mark.parametrize(
@@ -188,12 +206,7 @@ async def test_cancel_name_request(
     owner_id: int,
     meeting: Meetup,
 ):
-    if owner_id == 123:
-        owner = user_with_settings
-    else:
-        owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
-        mock_session.add_user(user_with_settings)
-    setup_db(mock_session, owner, meeting)
+    setup_inviter(mock_session, user_with_settings, meeting, owner_id)
 
     # These are the steps for the conversation when cancelling the name request
     steps = [
@@ -238,12 +251,7 @@ async def test_complete_user_invitation(
     owner_id: int,
     meeting: Meetup,
 ):
-    if owner_id == 123:
-        owner = user_with_settings
-    else:
-        owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
-        mock_session.add_user(user_with_settings)
-    setup_db(mock_session, owner, meeting)
+    setup_inviter(mock_session, user_with_settings, meeting, owner_id)
 
     # These are the steps for the full conversation of inviting a user
     steps = [
@@ -268,9 +276,10 @@ async def test_complete_user_invitation(
 
     confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
 
-    # The meeting now has one invited user
-    assert len(meeting.joined_links) == 1
-    invited_link = meeting.joined_links[0]
+    # The meeting now has one invited user, alongside whatever membership the inviter already had
+    invited_links = [link for link in meeting.joined_links if link.invited_by is not None]
+    assert len(invited_links) == 1
+    invited_link = invited_links[0]
     assert invited_link.user.first_name == "Bruce Wayne"
     assert invited_link.invited_by is not None
     assert invited_link.invited_by.id == user_with_settings.id
@@ -366,12 +375,7 @@ async def test_invite_user_decline_confirmation(
     owner_id: int,
     meeting: Meetup,
 ):
-    if owner_id == 123:
-        owner = user_with_settings
-    else:
-        owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
-        mock_session.add_user(user_with_settings)
-    setup_db(mock_session, owner, meeting)
+    setup_inviter(mock_session, user_with_settings, meeting, owner_id)
 
     # These are the steps for the conversation when declining the confirmation
     steps = [
@@ -403,7 +407,7 @@ async def test_invite_user_decline_confirmation(
     )
 
     # The meeting has no invited users
-    assert len(meeting.joined_links) == 0
+    assert [link for link in meeting.joined_links if link.invited_by is not None] == []
     # The user data has been cleared
     assert cancel_context.user_data is not None
     assert len(cancel_context.user_data.registry) == 0

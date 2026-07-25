@@ -11,7 +11,7 @@ from .stub_bot import StubBot
 
 if TYPE_CHECKING:  # pragma: no cover
     from mitup_bot.config import BotConfig
-    from mitup_bot.models import Broadcast, User
+    from mitup_bot.models import Broadcast, Meetup, Message, User
 
 StubMitupContext = MitupContext[StubBot, MockApi]
 """MitupContext type for testing purposes"""
@@ -46,6 +46,16 @@ class RegisterAuthorDrafts(Protocol):
     """Factory-fixture callable that seeds the draft-sweep query with an author's DRAFT broadcasts."""
 
     def __call__(self, author_tg_id: int, drafts: tuple[Broadcast, ...]) -> None: ...
+
+
+class ClaimSharedCard(Protocol):
+    """Factory-fixture callable that tracks a meeting card as shared through inline mode.
+
+    Reproduces what the chosen-inline-result handler records when a user picks the card, which is
+    what authorizes later interactions with it.
+    """
+
+    def __call__(self, meeting: Meetup, inline_message_id: str = ...) -> Message: ...
 
 
 class StashBotConfig(Protocol):

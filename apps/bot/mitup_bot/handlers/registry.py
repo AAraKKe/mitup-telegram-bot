@@ -16,6 +16,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ChatJoinRequestHandler,
     ChatMemberHandler,
+    ChosenInlineResultHandler,
     CommandHandler,
     ConversationHandler,
     InlineQueryHandler,
@@ -476,6 +477,49 @@ class HandlersRegistry:
             cls.handlers[handler_id] = HandlerWrapper(
                 handler=ChatJoinRequestHandler(
                     callback=callback_with_metrics(handler_id, "ChatJoinRequest", callback, cls.env),
+                    block=block,
+                ),
+                bindable=bindable,
+                group=group,
+            )
+
+            return callback
+
+        return wrapper
+
+    @classmethod
+    def register_chosen_inline_result(
+        cls,
+        handler_id: HandlerId,
+        bindable: bool = True,
+        group: int = 0,
+        block: bool = True,
+        pattern: str | None = None,
+    ) -> Callable[[HandlerCallback], HandlerCallback]:
+        """
+        Decorator used to register a callback for a ChosenInlineResultHandler.
+
+        ``chosen_inline_result`` updates arrive when a user picks one of the results the bot answered
+        an inline query with and Telegram sends it. They belong to Telegram's default update set, so
+        registering this handler requires no change to the webhook's ``allowed_updates``; Telegram
+        only emits them while inline feedback is enabled for the bot in @BotFather.
+
+        ``pattern`` is matched against ``ChosenInlineResult.result_id``, the id the bot itself put on
+        the answered result.
+
+        For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.choseninlineresulthandler.html
+        """  # noqa: E501
+
+        def wrapper(
+            callback: HandlerCallback,
+        ) -> HandlerCallback:
+            if handler_id in cls.handlers:
+                raise HandlerRegisteredError(handler_id)
+
+            cls.handlers[handler_id] = HandlerWrapper(
+                handler=ChosenInlineResultHandler(
+                    callback=callback_with_metrics(handler_id, "ChosenInlineResult", callback, cls.env),
+                    pattern=pattern,
                     block=block,
                 ),
                 bindable=bindable,

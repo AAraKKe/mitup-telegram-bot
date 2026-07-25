@@ -39,6 +39,7 @@ Decorate the function with the matching `HandlersRegistry` method. The registry 
 | Button press | `register_callback_query` |
 | Text or media message | `register_message` |
 | Inline query | `register_inline_handler` |
+| Inline result picked | `register_chosen_inline_result` |
 | Bot blocked / unblocked | `register_chat_member` |
 | Multi-step flow | `register_conversation_handler` |
 

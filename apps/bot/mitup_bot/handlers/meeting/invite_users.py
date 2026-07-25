@@ -57,6 +57,7 @@ async def ensure_meeting_still_allows_invitations(
     meeting_id: int,
     on_callback: bool = True,
     for_update: bool = False,
+    authorize_caller: bool = False,
 ) -> Meetup | None:
     """
     Ensure that the meeting still allows invitations.
@@ -65,6 +66,12 @@ async def ensure_meeting_still_allows_invitations(
     The confirm step passes `for_update=True` so the fullness check and the membership insert
     happen under the per-meeting row lock; the earlier conversation steps only pre-validate and
     must not hold the lock across the user's typing.
+
+    `authorize_caller` runs `guards.meeting_interaction_allowed` before any state of the meeting is
+    revealed, and belongs on the entry point, where the meeting id comes straight from client-supplied
+    callback data. The steps that follow read the id back from the caller's own conversation state, so
+    they inherit the entry point's decision and must leave it False — the message they arrive on is
+    the bot-chat prompt, which is never a tracked message of the meeting.
     """
     meeting = await Meetup.by_id(session, meeting_id, include_inactive=False, for_update=for_update)
     update = context.get_update()
@@ -81,6 +88,12 @@ async def ensure_meeting_still_allows_invitations(
         message = MeetingInviteMessages.MEETING_NOT_FOUND if on_callback else MeetingInviteMessages.MEETING_LOST_RETRY
 
         await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
+        context.clean_user_data([ContextId.INVITE_USERS])
+        return None
+
+    if authorize_caller and not await guards.meeting_interaction_allowed(session, user, meeting, update, context):
+        # Answered by the guard. Returning here keeps the capacity and invitation-setting alerts
+        # below out of reach, so they cannot be used to read the state of an arbitrary meeting.
         context.clean_user_data([ContextId.INVITE_USERS])
         return None
 
@@ -114,7 +127,9 @@ async def callback_query_invite_users(
     if user is None:
         return ConversationHandler.END
 
-    meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id, on_callback=True)
+    meeting = await ensure_meeting_still_allows_invitations(
+        session, context, user, meeting_id, on_callback=True, authorize_caller=True
+    )
     if meeting is None:
         return ConversationHandler.END
 
@@ -233,6 +248,18 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
         cb.CONFIRM_INVITE_USER.parse(context.match), MeetingHandlerId.INVITE_USERS_CONFIRM_CALLBACK
     )
     meeting_id = callback_data.id
+
+    with context.meeting_id(ContextId.INVITE_USERS, ensure_clean=False) as authorized_meeting_id:
+        if meeting_id != authorized_meeting_id:
+            # The confirm button carries a client-supplied meeting id, so it is only honoured while it
+            # still names the meeting authorized when this conversation was entered. Without this the
+            # conversation state of any meeting could be redirected onto an arbitrary one.
+            await context.api.answer_callback_query(
+                update, text=MeetingInviteMessages.MEETING_NOT_FOUND.get(lang=user.lang), show_alert=True
+            )
+            context.clean_user_data([ContextId.INVITE_USERS])
+            context.emit_metric(MetricKey.UNAUTHORIZED_MEETING_CALLBACK, include_handler_properties=False)
+            return ConversationHandler.END
 
     with context.text(ContextId.INVITE_USERS, ensure_clean=True) as invited_user_name:
         meeting = await ensure_meeting_still_allows_invitations(

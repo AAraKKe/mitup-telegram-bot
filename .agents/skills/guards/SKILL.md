@@ -35,6 +35,7 @@ All guards that take a `session` are async — `await` them.
 | `chat` | `(update)` | `Chat` | `EffectiveChatNotSet` |
 | `callback_query` | `(update)` | `CallbackQuery` | `CallbackQueryNotSet` |
 | `valid_inline_query` | `(update)` | `InlineQuery` | `InlineQueryNotSetError` |
+| `chosen_inline_result` | `(update)` | `ChosenInlineResult` | `ChosenInlineResultNotSet` |
 
 <note>`valid_callback_query` is an internal variant used by `api_wrapper.py`. Use `callback_query` in handlers.</note>
 
@@ -56,6 +57,7 @@ All guards that take a `session` are async — `await` them.
 |----------|-----------|---------|--------|
 | `meeting_accessible` | `(session, user, meeting_id, action, update, context, custom_keyboard=None, for_update=False)` | `Meetup \| None` | — (handles redirect internally) |
 | `meeting_viewable` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
+| `meeting_interaction_allowed` | `(session, user, meeting, update, context)` | `bool` | — (answers with the deleted-meeting alert) |
 | `user_owns_meeting` | `(user, meeting_id, action, update, context, redirect=True)` | `Meetup \| None` | — (handles redirect internally) |
 
 Use `meeting_accessible` for all handlers that require **ownership** of a meeting from the bot chat (not inline). It handles three cases internally: meeting not found → "meeting deleted" message; meeting inactive + owner → reactivation prompt; non-owner → redirect to main menu. When `None` is returned, the handler must return immediately.
@@ -63,6 +65,16 @@ Use `meeting_accessible` for all handlers that require **ownership** of a meetin
 Pass `for_update=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. See the `database` skill's "Per-meeting row locks" section for the full convention.
 
 Use `meeting_viewable` for handlers that only need to **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list. It behaves like `meeting_accessible` for the not-found and inactive-owner cases, but a non-owner who has *joined* an active meeting is allowed through so the caller can render `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Non-owners are still redirected to the main menu for meetings they neither own nor joined, and for inactive meetings (only the owner can reactivate).
+
+Use `meeting_interaction_allowed` in every handler that acts on a meeting reachable from outside the
+bot chat (join, leave, attach-to-chat, invite). The meeting id arrives in client-supplied callback
+data, so it proves nothing on its own: the guard authorizes the *message the tap came from*, which
+Telegram fills in. It allows public meetings, owners, members (waiting list included), inviters, a
+tracked message of this meeting, a meeting already tracked in this chat, and a shared card claimed by
+this meeting. A shared card is claimed when it is sent, by the `chosen_inline_result` handler — an
+unclaimed inline message authorizes nothing, since anyone can produce one by sharing a card of their
+own. Call it before any write or render, and return immediately when it is `False` (it has already
+answered the caller with the deleted-meeting alert).
 
 `user_owns_meeting` is a lower-level guard that skips the not-found and inactive checks. Use it only when those cases are handled separately.
 

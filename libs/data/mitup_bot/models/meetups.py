@@ -190,6 +190,14 @@ class Meetup(BaseModel, SQLModel, table=True):
     def has_participant(self, user_id: int) -> bool:
         return any(link.user.db_id == user_id for link in self.joined_links)
 
+    def has_invited_participant(self, user_id: int) -> bool:
+        """Return True when the user brought someone into this meeting through the invite flow.
+
+        An inviter is a stakeholder without being a participant: the invite flow leaves them holding
+        the meeting card in their bot chat, so they keep acting on a meeting they never joined.
+        """
+        return any(link.invited_by is not None and link.invited_by.id == user_id for link in self.joined_links)
+
     def remove_participant(self, participant: JoinedUsers) -> list[JoinedUsers]:
         """
         Remove a participant from the meeting. If there are users in the waiting list, they will be promoted to the
@@ -267,7 +275,16 @@ class Meetup(BaseModel, SQLModel, table=True):
         None if the message does not exist.
         """
         if eff_message := update.effective_message:
-            return next((message for message in self.messages if message.message_id == eff_message.message_id), None)
+            # Matched on (chat_id, message_id): message ids are only unique within a chat, so an
+            # id-only match would link this meeting to an unrelated chat's message.
+            return next(
+                (
+                    message
+                    for message in self.messages
+                    if message.message_id == eff_message.message_id and message.chat_id == eff_message.chat_id
+                ),
+                None,
+            )
         if update.callback_query and update.callback_query.inline_message_id:
             return next(
                 (

@@ -84,6 +84,7 @@ async def test_something(update: Update, ...):
 | `inline_message_id` | `str` | `"some_inline_message_id"` | Inline message ID |
 | `from_bot_chat` | `bool` | `True` | `False` for inline/shared messages |
 | `chat_join_request` | `bool` | `False` | Build a `ChatJoinRequest` update from the fixture's chat and user |
+| `chosen_inline_result` | `str \| None` | `None` | Result id the user picked; builds a `ChosenInlineResult` update for it |
 
 ### New Telegram update types go through the shared fixture
 

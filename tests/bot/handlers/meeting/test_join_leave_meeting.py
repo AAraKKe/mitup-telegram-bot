@@ -21,6 +21,7 @@ from tests.helpers import (
     integrity_error,
 )
 from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.types import ClaimSharedCard
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
@@ -200,18 +201,24 @@ async def test_join_with_existing_message_does_not_create_new_one(
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(123))], indirect=True)
+# from_bot_chat=False: the joining user neither owns nor has joined this private meeting, so the
+# card can only have reached them as a shared (inline) message.
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.JOIN.with_id(123), from_bot_chat=False)], indirect=True
+)
 async def test_user_cannot_join_if_the_meeting_is_full(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     metrics: MetricAssertions,
+    claim_shared_card: ClaimSharedCard,
 ):
     owner = User(first_name="Owner", tg_user_id=1, settings=Settings())
     meeting = create_meetup(id=123, title="My Meeting", max_members=1, waiting_list=False, owner=owner)
     JoinedUsers(user=owner, meetup=meeting)
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(meeting)
+    claim_shared_card(meeting)
 
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
@@ -255,14 +262,20 @@ async def test_user_join_for_non_existing_meeting(
     )
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
+# from_bot_chat=False: an unregistered user has no bot chat holding this meeting, so the card can
+# only have reached them as a shared (inline) message.
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.JOIN.with_id(1), from_bot_chat=False)], indirect=True
+)
 async def test_non_existent_user_joins_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    claim_shared_card: ClaimSharedCard,
 ):
     # User is not in the database but meeting is
     mock_session.add_object(user_with_settings.meetups[0])
+    claim_shared_card(user_with_settings.meetups[0])
 
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
@@ -367,14 +380,20 @@ async def test_user_leaves_meeting(
     )
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1))], indirect=True)
+# from_bot_chat=False: an unregistered user has no bot chat holding this meeting, so the card can
+# only have reached them as a shared (inline) message.
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1), from_bot_chat=False)], indirect=True
+)
 async def test_non_existing_user_leaves_meeting(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
+    claim_shared_card: ClaimSharedCard,
 ):
     # User is not in the database but meeting is
     mock_session.add_object(user_with_settings.meetups[0])
+    claim_shared_card(user_with_settings.meetups[0])
 
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 

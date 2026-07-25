@@ -35,6 +35,9 @@ class MetricKey(CamelCaseStrEnum):
     MESSAGE_DELETED = auto()
     """This metrics is emitted when someone interacts with a message of a meeting that should not be available."""
     STALE_MEETING_MESSAGE = auto()
+    """Emitted when a callback carries a meeting id the caller has no claim on. Callback data is
+    client-supplied, so this counts rejected attempts to act on an arbitrary meeting."""
+    UNAUTHORIZED_MEETING_CALLBACK = auto()
     """Metric emitted when a MEMBER user has been detected as unreachable and transitioned to LEFT."""
     INACTIVE_USER_SET = auto()
     """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""

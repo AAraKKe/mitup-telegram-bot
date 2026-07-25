@@ -15,6 +15,7 @@ from tests.helpers import (
     create_meetup,
     create_user,
 )
+from tests.helpers.types import ClaimSharedCard
 
 
 @pytest.fixture
@@ -25,7 +26,11 @@ def full_meeting():
     return meeting
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(123))], indirect=True)
+# from_bot_chat=False: the joining user neither owns nor has joined this private meeting, so the
+# card can only have reached them as a shared (inline) message.
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.JOIN.with_id(123), from_bot_chat=False)], indirect=True
+)
 @pytest.mark.parametrize(
     "is_full,response",
     [[True, MeetingJoinMessages.JOIN_FULL_WAITING_LIST], [False, MeetingJoinMessages.JOIN_SUCCESS]],
@@ -38,10 +43,12 @@ async def test_user_joins_waiting_list_with_full_meeting(
     handler_context: HandlerContext,
     is_full: bool,
     response: MeetingJoinMessages,
+    claim_shared_card: ClaimSharedCard,
 ):
     full_meeting.max_members = 1 if is_full else 2
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(full_meeting)
+    claim_shared_card(full_meeting)
 
     # Before calling the handler, the meeting has no user joined and messages registered
     assert len(full_meeting.joined_links) == 1

@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, BigInteger, Column
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.keyboards import Keyboard
@@ -44,6 +45,43 @@ class Message(BaseModel, SQLModel, table=True):
 
     def __eq__(self, other: object) -> bool:
         return hash(self) == hash(other) if isinstance(other, Message) else NotImplemented
+
+    @classmethod
+    async def meetup_id_for_inline_message(cls, session: AsyncSession, inline_message_id: str) -> int | None:
+        """Return the meeting this shared (inline) message is tracked for, or None when untracked.
+
+        `inline_message_id` is globally unique, so the lookup needs no further scoping.
+        """
+        statement = select(cls).where(cls.inline_message_id == inline_message_id)
+        message = (await session.exec(statement)).first()
+        return message.meetup_id if message else None
+
+    @classmethod
+    def for_shared_card(cls, inline_message_id: str, meeting: Meetup, keyboard: Keyboard) -> Message:
+        """Create the tracked message for a meeting card sent through inline mode.
+
+        A card is addressed by `inline_message_id` alone; the chat it landed in stays unknown until
+        somebody interacts with it, which is what `capture_chat_instance` is for.
+
+        Keyboard selection is view-layer work — build it with `views.meeting.inline_view`.
+        """
+        return cls.model_validate(
+            {
+                "inline_message_id": inline_message_id,
+                "meetup_id": meeting.db_id,
+                "buttons": MessageButtons(keyboard=keyboard),
+            }
+        )
+
+    def capture_chat_instance(self, update: Update) -> None:
+        """Store the chat a shared card lives in, which only an interaction with the card reveals.
+
+        Mirrors `from_update`: the chat instance is stored for inline (shared) messages only, since
+        that is what makes a meeting resolvable by `search_chat_meetings`.
+        """
+        query = update.callback_query
+        if self.chat_instance is None and query is not None and query.inline_message_id is not None:
+            self.chat_instance = query.chat_instance
 
     @classmethod
     def from_update(cls, update: Update, meeting: Meetup, keyboard: Keyboard) -> Message:

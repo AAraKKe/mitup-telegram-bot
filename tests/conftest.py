@@ -15,24 +15,26 @@ from mitup_bot import api_guards, db, reconcile
 from mitup_bot.bot_cli import cli as bot_cli
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.models import Meetup, MeetupLocation, Settings
+from mitup_bot.models import Message as MessageModel
 from mitup_bot.models import User as UserModel
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.monitoring.backend import configure_emf_backend
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
+    DEFAULT_INLINE_MESSAGE_ID,
     DEFAULT_MESSAGE_ID,
     DEFAULT_TEST_DATE,
     DEFAULT_TG_USER_PARAMS,
 )
 from tests.helpers.context import build_context
 from tests.helpers.conversation import ConversationTester
-from tests.helpers.fixtures import UpdateRequest, create_meetup, create_test_app, create_update
+from tests.helpers.fixtures import UpdateRequest, create_meetup, create_message, create_test_app, create_update
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 from tests.helpers.stub_db import MockDbSession
+from tests.helpers.types import ClaimSharedCard, StubMitupContext
 from tests.helpers.types import CliRunner as TypeRunner
-from tests.helpers.types import StubMitupContext
 
 
 def pytest_addoption(parser: pytest.Parser):
@@ -188,6 +190,24 @@ def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
             yield mocked_session
             # Unset the module level sessionmaker for the next test
             db.__sessionmaker = None
+
+
+@pytest.fixture
+def claim_shared_card(mock_session: MockDbSession) -> ClaimSharedCard:
+    """Track a meeting card as shared, the way the chosen-inline-result handler does when it is sent.
+
+    The claim is what `guards.meeting_interaction_allowed` reads to authorize a tap on a shared card,
+    so any test acting on a card from outside the bot chat needs the card claimed first. It is
+    registered both on the meeting and as the row the guard's lookup returns.
+    """
+
+    def claim(meeting: Meetup, inline_message_id: str = DEFAULT_INLINE_MESSAGE_ID) -> MessageModel:
+        message = create_message(inline_message_id=inline_message_id, meetup_id=meeting.db_id)
+        meeting.messages.append(message)
+        mock_session.add_object(message, "inline_message_id")
+        return message
+
+    return claim
 
 
 @pytest.fixture(scope="session")
