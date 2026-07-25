@@ -1070,8 +1070,11 @@ msgstr "📍 In Karten öffnen"
 msgid "ButtonMessages.OPEN_USER_GUIDE"
 msgstr "📖 Handbuch öffnen"
 
+msgid "ButtonMessages.JOIN_COMMUNITY_GROUP"
+msgstr "👥 Der Community-Gruppe beitreten"
+
 msgid "HelpMessages.DESCRIPTION"
-msgstr "<b>Hilfe</b>\n\nEs gibt zwei Wege, Hilfe zu Mitup zu bekommen. Das Handbuch erklärt dir Seite für Seite, wie Mitup funktioniert, und ist der beste Startpunkt. Wenn du danach noch eine Frage hast oder eine Person erreichen möchtest, schreib uns eine E-Mail an support@mitup.social."
+msgstr "<b>Hilfe</b>\n\nDrei Wege, Hilfe zu Mitup zu bekommen:\n\n📖 Das Handbuch führt dich Seite für Seite durch jeden Bildschirm. Der beste Einstieg.\n\n👥 Die Community-Gruppe steht allen offen, die Mitup nutzen. Komm rein und frag, was du willst.\n\n✉️ Für alles Persönliche schreib an support@mitup.social. Eine Person liest deine Nachricht."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
 msgstr "Dieses Datum liegt mehr als ${days} Tage voraus, weiter kannst du vorerst nicht planen. Sende den Titel deines Treffens noch einmal mit einem früheren Datum, oder werde Mitup-Host auf Patreon, um noch weiter zu planen. Alle Details findest du direkt unten unter Mithelfen."

@@ -1028,8 +1028,11 @@ msgstr "👥 Apri l'Hosts-Only Group"
 msgid "ButtonMessages.OPEN_USER_GUIDE"
 msgstr "📖 Apri la guida"
 
+msgid "ButtonMessages.JOIN_COMMUNITY_GROUP"
+msgstr "👥 Unisciti al gruppo della community"
+
 msgid "HelpMessages.DESCRIPTION"
-msgstr "<b>Aiuto</b>\n\nCi sono due modi per ottenere aiuto con Mitup. La guida ti spiega come funziona Mitup, pagina per pagina, ed è il punto di partenza migliore. Se hai ancora una domanda o vuoi parlare con una persona, scrivici a support@mitup.social."
+msgstr "<b>Aiuto</b>\n\nCi sono tre modi per ottenere aiuto con Mitup:\n\n📖 La guida ti spiega ogni schermata, pagina per pagina. Il punto di partenza migliore.\n\n👥 Il gruppo della community è aperto a chiunque usi Mitup. Entra e chiedi quello che vuoi.\n\n✉️ Per qualsiasi cosa privata, scrivi a support@mitup.social. Una persona la legge."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
 msgstr "Quella data è a più di ${days} giorni, il massimo che puoi pianificare per ora. Invia di nuovo il titolo del tuo incontro con una data più vicina, oppure diventa Host di Mitup su Patreon per pianificare più lontano. Trovi tutti i dettagli in Collabora, qui sotto."

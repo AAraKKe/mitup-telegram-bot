@@ -51,7 +51,7 @@ Available actions:
 * *💾 Your past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
 * *👥 Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find a meeting you were sent but can't locate the original message. You can view these but not edit them.
 * *⚙️ Settings*{.button-like}: Configure Mitup. See [Settings](settings.md).
-* *❓ Help*{.button-like}: Opens the [user guide](index.md) on this site in your browser.
+* *❓ Help*{.button-like}: The three ways to get help. Buttons for *📖 Open the user guide*{.button-like} and *👥 Join the community group*{.button-like}, plus the support email address in the message itself.
 * *♥ Collaborate*{.button-like}: Support Mitup on Patreon and link your Patreon account, which switches on your Host badge and higher limits. See [supporting Mitup](../collaborate/donation.md) and [limits and Host perks](limits.md).
 
 !!! info "Meeting lifecycle"

@@ -31,4 +31,10 @@ Everyone who takes part agrees to the [code of conduct](../collaborate/code_of_c
 
 ## Get in touch
 
-For anything that isn't a code contribution or a translation, email [support@mitup.social](mailto:support@mitup.social). Bugs and feature ideas are best filed as [an issue on GitLab](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues), where you can see what's already been reported.
+There are three places to go, depending on what you're after.
+
+* The [user guide](../user-guide/index.md) covers every screen the bot shows you, page by page. It answers most questions on its own, so it's the place to start.
+* Email [support@mitup.social](mailto:support@mitup.social) for anything you'd rather ask privately, or when the guide leaves you stuck.
+* The [community group on Telegram](https://t.me/mitupgroup) is the open group for people who use Mitup.
+
+Bugs and feature ideas are best filed as [an issue on GitLab](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues), where you can see what's already been reported.

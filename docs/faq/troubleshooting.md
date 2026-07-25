@@ -39,3 +39,5 @@ If you tap an edit action on a meeting you don't own, Mitup sends you back to th
 ## Still stuck
 
 If none of these matches what you're seeing, email [support@mitup.social](mailto:support@mitup.social). A screen recording of what happens helps a lot, since it shows the exact steps that led there.
+
+Not sure whether what you're seeing is meant to work that way? You can ask that in the [community group on Telegram](https://t.me/mitupgroup) too, if you'd rather ask in public than write an email.

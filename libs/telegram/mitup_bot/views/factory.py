@@ -39,6 +39,9 @@ LANGUAGE_BUTTONS = {
     "it_IT": Languages.ITALIAN,
 }
 
+# Public Telegram handle of the community group, identical in every environment
+COMMUNITY_GROUP_URL = "https://t.me/mitupgroup"
+
 
 def main_menu_back_rows(lang: str) -> Keyboard:
     """The single "Back to main menu" row a screen falls back to when it navigates nowhere else."""
@@ -136,6 +139,9 @@ def help_view(ctx: RenderContext) -> MitupView:
         HelpMessages.DESCRIPTION.get(lang=lang),
         [
             [ButtonConfig(text=ButtonMessages.OPEN_USER_GUIDE.get_text(lang=lang), url=docs_links.user_guide_url())],
+            [
+                ButtonConfig(text=ButtonMessages.JOIN_COMMUNITY_GROUP.get_text(lang=lang), url=COMMUNITY_GROUP_URL),
+            ],
         ],
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 

@@ -79,6 +79,7 @@ class ButtonMessages(MessageBase):
     PRIVACY = f"{Emojis.SHIELD} Privacy"
     PRIVACY_POLICY = f"{Emojis.SHIELD} Privacy policy"
     OPEN_USER_GUIDE = f"{Emojis.BOOK} Open the user guide"
+    JOIN_COMMUNITY_GROUP = f"{Emojis.PEOPLE} Join the community group"
     EXPORT_MY_DATA = f"{Emojis.PACKAGE} Export my data"
     DELETE_MY_DATA = f"{Emojis.DELETE} Delete my data"
     WAITING_LIST = "Waiting list"
@@ -168,11 +169,14 @@ class MainMenuMessages(MessageBase):
 
 
 class HelpMessages(MessageBase):
+    # The email is written bare: Telegram auto-links it, and mailto: URLs are rejected on
+    # inline-keyboard buttons, so it cannot become a button like the other two channels.
     DESCRIPTION = (
         "<b>Help</b>\n\n"
-        "There are two ways to get help with Mitup. The user guide walks you through how Mitup "
-        "works, page by page, and is the best place to start. If you still have a question or need "
-        "to reach a person, email us at support@mitup.social."
+        "Three ways to get help with Mitup:\n\n"
+        f"{Emojis.BOOK} The user guide walks through every screen, page by page. The best place to start.\n\n"
+        f"{Emojis.PEOPLE} The community group is open to anyone who uses Mitup. Come in and ask anything.\n\n"
+        f"{Emojis.MAIL} For anything private, write to support@mitup.social. A person reads it."
     )
 
 

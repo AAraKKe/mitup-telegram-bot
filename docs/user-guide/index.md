@@ -22,4 +22,6 @@ You don't have to read it front to back. Start with [Getting started](getting_st
 
 !!! note "Something not covered here?"
 
-    If you hit a question this guide doesn't answer, email [support@mitup.social](mailto:support@mitup.social). A person reads it.
+    If you hit a question this guide doesn't answer, email
+    [support@mitup.social](mailto:support@mitup.social). A person reads it. You can also bring it to
+    the [community group on Telegram](https://t.me/mitupgroup) and ask in the open.

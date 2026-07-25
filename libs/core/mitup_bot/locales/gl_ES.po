@@ -77,6 +77,9 @@ msgstr "🛡️ Política de privacidade"
 msgid "ButtonMessages.OPEN_USER_GUIDE"
 msgstr "📖 Abrir a guía de uso"
 
+msgid "ButtonMessages.JOIN_COMMUNITY_GROUP"
+msgstr "👥 Unirse ao grupo da comunidade"
+
 msgid "ButtonMessages.EXPORT_MY_DATA"
 msgstr "📦 Exportar os meus datos"
 
@@ -202,7 +205,7 @@ msgstr "Dámosche a benvida a Mitup Bot!"
 "Escolle unha das seguintes opcións:"
 
 msgid "HelpMessages.DESCRIPTION"
-msgstr "<b>Axuda</b>\n\nHai dúas formas de conseguir axuda con Mitup. A guía de uso explícache como funciona Mitup, páxina a páxina, e é o mellor punto de partida. Se aínda tes algunha dúbida ou necesitas falar cunha persoa, escríbenos a support@mitup.social."
+msgstr "<b>Axuda</b>\n\nTres formas de conseguir axuda con Mitup:\n\n📖 A guía de uso explícache cada pantalla, páxina a páxina. O mellor punto de partida.\n\n👥 O grupo da comunidade está aberto a calquera que use Mitup. Entra e pregunta o que queiras.\n\n✉️ Para calquera cousa privada, escribe a support@mitup.social. Unha persoa le a mensaxe."
 
 msgid "SettingsMessages.DESCRIPTION"
 msgstr "Configura MitUp."

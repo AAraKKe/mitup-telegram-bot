@@ -28,4 +28,4 @@ When translating:
 
 Every new language lets another group of friends use Mitup in the words they already speak. Your work is what grows the community beyond the languages it covers today.
 
-Have questions? Join the [community chat](https://t.me/mitup_community).
+Have questions about a string or a term? The [community group on Telegram](https://t.me/mitupgroup) is open to anyone using Mitup, translation questions included.

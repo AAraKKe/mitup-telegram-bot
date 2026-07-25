@@ -1058,8 +1058,11 @@ msgstr "📍 Abrir no mapa"
 msgid "ButtonMessages.OPEN_USER_GUIDE"
 msgstr "📖 Abrir o guia do usuário"
 
+msgid "ButtonMessages.JOIN_COMMUNITY_GROUP"
+msgstr "👥 Entrar no grupo da comunidade"
+
 msgid "HelpMessages.DESCRIPTION"
-msgstr "<b>Ajuda</b>\n\nHá duas formas de obter ajuda com o Mitup. O guia do usuário mostra como o Mitup funciona, página por página, e é o melhor ponto de partida. Se você ainda tiver uma dúvida ou precisar falar com uma pessoa, escreva para support@mitup.social."
+msgstr "<b>Ajuda</b>\n\nTrês formas de obter ajuda com o Mitup:\n\n📖 O guia do usuário percorre cada tela, página por página. O melhor lugar para começar.\n\n👥 O grupo da comunidade está aberto a qualquer pessoa que usa o Mitup. Entre e pergunte o que quiser.\n\n✉️ Para algo privado, escreva para support@mitup.social. Uma pessoa lê."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
 msgstr "Essa data está a mais de ${days} dias, o máximo que você pode agendar por enquanto. Envie o título do seu evento novamente com uma data mais próxima, ou torne-se Host do Mitup no Patreon para agendar mais para o futuro. Você encontra todos os detalhes no Colabore, logo abaixo."

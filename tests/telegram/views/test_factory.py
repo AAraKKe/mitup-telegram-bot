@@ -179,11 +179,27 @@ def test_help_view(lang: str, monkeypatch: pytest.MonkeyPatch):
                     url="https://staging.mitup.social/user-guide/",
                 )
             ],
+            [
+                ButtonConfig(
+                    text=ButtonMessages.JOIN_COMMUNITY_GROUP.get_text(lang=lang),
+                    url="https://t.me/mitupgroup",
+                )
+            ],
             [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)],
         ],
     )
 
     assert expected_view == view
+
+
+def test_help_view_links_to_the_community_group(lang: str):
+    view = factory.help_view(RenderContext(lang=lang))
+
+    community_button = ButtonConfig(
+        text=ButtonMessages.JOIN_COMMUNITY_GROUP.get_text(lang=lang), url=factory.COMMUNITY_GROUP_URL
+    )
+    all_buttons = [button for row in view.keyboard for button in row]
+    assert community_button in all_buttons
 
 
 def test_help_view_message_contains_the_support_email(lang: str):

@@ -35,6 +35,7 @@ class Emojis(Enum):
     TOOLS = "🛠️"
     HELP = "❓"
     BOOK = "📖"
+    MAIL = "✉️"
     HEART = "♥"
     DONATE = "💶"
     # Per-tier supporter badges: coffee, dice, and trophy.
