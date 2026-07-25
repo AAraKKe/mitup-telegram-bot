@@ -71,9 +71,9 @@ All guards that take a `session` are async — `await` them.
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
 | `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` |
-| `shared_meeting` | `(session, user, meeting_id, action, update, *, lock=False, require_active=True)` | `Meetup` | `SharedMeetingGoneError`, `SharedMeetingDeniedError`, `SharedMeetingFinishedError` |
+| `shared_meeting` | `(session, user: User \| None, meeting_id, action, update, *, lock=False, require_active=True)` | `Meetup` | `SharedMeetingGoneError`, `SharedMeetingDeniedError`, `SharedMeetingFinishedError` |
 | `conversation_meeting` | `(session, user, meeting_id, action, *, lock=False)` | `Meetup` | `MeetingGoneError` |
-| `meeting_interaction_allowed` | `(session, user, meeting, update)` | `bool` | — (a predicate; `shared_meeting` raises on `False`) |
+| `meeting_interaction_allowed` | `(session, user: User \| None, meeting, update)` | `bool` | — (a predicate; `shared_meeting` raises on `False`) |
 
 All three guards raise instead of returning `None` and render nothing themselves — the global error handler owns every screen. Pick by where the caller reached the meeting from:
 
@@ -96,11 +96,18 @@ The guard never returns `None` and never renders: it either hands back a meeting
 
 Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_JOINED` for screens that only **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list, where the caller renders `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Use `OWNER_OR_PUBLIC` for the inline share query, the one surface where being public is itself the permission. Use `OWNER_ANY_STATE` on the surfaces that render inactive meetings themselves — the past-meetings screens, reactivation, and the delete flows — where the reactivation prompt would replace the screen the user asked for.
 
-#### A caller without an account
+#### A caller without an account (`meeting`, `OWNER_OR_PUBLIC`)
+
+Two guards accept a caller with no account; this is the first. `shared_meeting` has its own section
+under "Shared surfaces", and the two share a resolution recipe: resolve the acting user with
+`User.by_tg_user_id` instead of `guards.current_user`, collapse a `DELETION_REQUESTED` user to
+`None` so a dying account decides nothing, and let the rejections carry
+`TranslationEngine.FALLBACK_LANG`, since there is no account to read a language preference from. No
+account is ever created for such a caller.
 
 `OWNER_OR_PUBLIC` is the only profile that accepts `user=None`, and the signature enforces it: the guard is overloaded so a `User | None` argument type-checks on that profile alone, while every other profile still demands a `User`. Pass `None` when the acting Telegram user has no row — the share query resolves the sharer with `User.by_tg_user_id` instead of `guards.current_user`, since a public meeting card offers its Share button to every reader of the chat, and it collapses a `DELETION_REQUESTED` user to `None` too so a dying account shares nothing of its own.
 
-Such a caller owns nothing: every ownership test short-circuits, so an inactive meeting and a non-public one both come back as `MeetingNotOwnedError` and the only way past the guard is the meeting's own `public` flag. Their rejections carry `TranslationEngine.FALLBACK_LANG`, since there is no account to read a language preference from — a registered sharer's rejection still carries their own language, and the error handler renders the unavailable card off `error.lang` either way. `MeetingGoneError` and `MeetingNotOwnedError` therefore take `user_db_id: int | None` and name an anonymous caller in their message; `MeetingInactiveOwnerError` keeps `int`, since only an owner can reach it.
+Such a caller owns nothing: every ownership test short-circuits, so an inactive meeting and a non-public one both come back as `MeetingNotOwnedError` and the only way past the guard is the meeting's own `public` flag. A registered sharer's rejection still carries their own language, and the error handler renders the unavailable card off `error.lang` either way. `MeetingGoneError` and `MeetingNotOwnedError` take `user_db_id: int | None` and name an anonymous caller in their message; `MeetingInactiveOwnerError` keeps `int`, since only an owner can reach it.
 
 ### Rejections
 
@@ -141,6 +148,30 @@ included), inviters, a tracked message of this meeting, a meeting already tracke
 shared card claimed by this meeting. A shared card is claimed when it is sent, by the
 `chosen_inline_result` handler — an unclaimed inline message authorizes nothing, since anyone can
 produce one by sharing a card of their own.
+
+#### A caller without an account (`shared_meeting`)
+
+The second of the two guards that accept one, on the same resolution recipe as `OWNER_OR_PUBLIC`
+above — read that section first for the part both share.
+
+`shared_meeting` accepts `user=None` only when the call passes `allow_anonymous=True`. Unlike
+`meeting` it carries no access-profile to key an overload on, so the opt-in *is* the discriminator:
+the overloads type-check a `User | None` on that shape alone, and join, leave and the invite entry
+point keep their `User` guarantee without doing anything. The flag widens the type only — it changes
+no branch inside the guard. Set it where a surface means to serve a caller with no account, which
+also makes that capability visible at the call site instead of only in the signature.
+
+The three user-rooted arms of `meeting_interaction_allowed` (owns it, has a membership, invited
+somebody) short-circuit for them, leaving the meeting's `public` flag and the message-bound arms —
+so an anonymous caller gets through on "you are tapping a real card this meeting claims" and nothing
+else. All three `SharedMeetingError` subclasses take `user_db_id: int | None` to name them.
+
+Attach-to-chat is the surface that relies on this — the "Make it searchable" button renders on every
+card that is not already searchable, so the caller is whoever received it.
+`views.meeting.keyboard_for_update` takes `User | None` for the same reason and gives an anonymous
+caller the participant's keyboard, since they own nothing. Join and leave still resolve a `User`:
+they register a `JOINED_ONLY` row for an unregistered caller, because joining is an act of the
+person, not of the chat.
 
 Business rules are **not** guard material and stay in the handler: capacity, waiting-list and
 invitation-setting decisions (`join_allowed`, `allow_invitation`, `lock_on_start`) run on the meeting

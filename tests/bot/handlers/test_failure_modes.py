@@ -356,7 +356,7 @@ CONTEXTS = [
         update_request=UpdateRequest(
             callback_query=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(MEETING_ID_NOT_FOUND, 1)
         ),
-        error_modes={ErrorMode.MEETING_NOT_FOUND},
+        error_modes={ErrorMode.MEETING_NOT_FOUND, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_participants_kick_out",
     ),
     Context(
@@ -370,13 +370,13 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(MEETING_ID_NOT_OWNED, 1)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_participants_kick_out",
     ),
     Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_ACTION_CONFIRM_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.CONFIRM_KICK_OUT.with_ids(MEETING_ID_NOT_OWNED, 1)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_participants_kick_out_confirm",
     ),
     Context(
@@ -496,7 +496,7 @@ CONTEXTS = [
     Context(
         handler_id=MeetingHandlerId.SHOW_MEETING_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(MEETING_ID_INACTIVE)),
-        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER, ErrorMode.USER_NOT_FOUND},
         id="show_inactive_meeting",
         reactivation_back_keyboard_factory=lambda lang: [
             [
@@ -522,13 +522,13 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.EDIT,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
-        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER, ErrorMode.USER_NOT_FOUND},
         id="edit_inactive_meeting",
     ),
     Context(
         handler_id=EditMeetingHandlerId.TITLE_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TITLE.with_id(MEETING_ID_INACTIVE)),
-        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER, ErrorMode.USER_NOT_FOUND},
         id="edit_inactive_meeting_title",
     ),
     Context(
@@ -843,7 +843,10 @@ CONTEXTS = [
     # --- Documented exclusions ---
     #
     # Handlers whose "user not found" path is intentionally not a guard fault, so no ErrorMode
-    # applies to them:
+    # applies to them. Leaving USER_NOT_FOUND off a handler is a claim, not an omission:
+    # `test_handler_does_not_fault_when_user_is_not_found` runs every handler listed here with no
+    # user row and asserts no UserNotFound fault, so a handler that starts requiring an account
+    # fails there instead of quietly losing its coverage. The notes below say why each one belongs.
     #   - CommandsId.START_WITH_EXISTING_USER: gates on guards.member_user, which returns None
     #     instead of raising — an unknown user gets a silent END with no fault
     #     (guards.current_user only runs after the MEMBER check succeeded, so its UserNotFound
@@ -864,6 +867,13 @@ CONTEXTS = [
     #     reaches guards.meeting with no user. A user marked for deletion is collapsed to the same
     #     anonymous caller instead of raising, so neither USER_NOT_FOUND nor USER_PENDING_DELETION
     #     applies. Both are covered in tests/bot/handlers/inline_query/test_share_meeting.py.
+    #   - MeetingHandlerId.ATTACH_TO_CHAT: the "Make it searchable" button renders on every card the
+    #     meeting was shared into, so the caller resolves optionally and an unregistered one is a
+    #     valid case that reaches guards.shared_meeting with no user. A user marked for deletion is
+    #     collapsed to the same anonymous caller instead of raising, so neither USER_NOT_FOUND nor
+    #     USER_PENDING_DELETION applies. Both are covered in
+    #     tests/bot/handlers/meeting/test_attach_to_chat.py. It still declares
+    #     MALFORMED_CALLBACK_DATA below, which the guard raises before the caller is resolved.
     #
     # --- /start and registration-process handlers ---
     Context(
@@ -1387,6 +1397,27 @@ def handler_stop_for_accessing_meeting_not_owned_factory() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_NOT_OWNED in context.error_modes]
 
 
+def handler_tolerates_unregistered_user() -> list[Context]:
+    """One context per handler that declares `USER_NOT_FOUND` in none of its contexts.
+
+    The complement of `handler_stops_when_user_not_found`, so the two together cover the registry:
+    omitting the mode has to mean the handler serves a caller with no account, not that nobody
+    checked. Without this pair a handler that starts faulting on a missing user is caught only if
+    somebody remembers to declare the mode, which is the same as not being caught.
+
+    Grouped by handler rather than taken per context, because a handler carries several contexts —
+    the inactive-meeting and not-owned variants among them — and the acting user is the same in all
+    of them. One context per handler is enough to withhold that user, and picking the first keeps
+    the parametrization stable as variants are added.
+    """
+    declares_it = {context.handler_id for context in CONTEXTS if ErrorMode.USER_NOT_FOUND in context.error_modes}
+    first_per_handler: dict[HandlerId, Context] = {}
+    for context in CONTEXTS:
+        if context.handler_id not in declares_it:
+            first_per_handler.setdefault(context.handler_id, context)
+    return list(first_per_handler.values())
+
+
 def handler_stops_when_user_not_found() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.USER_NOT_FOUND in context.error_modes]
 
@@ -1597,6 +1628,31 @@ async def test_callback_fails_when_user_is_not_found(
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+
+
+@pytest.mark.parametrize(
+    "test_context, update",
+    [pytest.param(context, context.update_request, id=context.id) for context in handler_tolerates_unregistered_user()],
+    indirect=["update"],
+)
+async def test_handler_does_not_fault_when_user_is_not_found(
+    mock_session: MockDbSession,
+    test_context: Context,
+    update: Update,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A context that does not declare `USER_NOT_FOUND` must genuinely tolerate a caller with no row.
+
+    Only the `UserNotFound` fault is asserted against: the acting user is the single thing this test
+    withholds, so any other fault belongs to the mode that declares it, not here.
+    """
+    make_admin_if_gated(handler_context, test_context)
+    await call_handler(
+        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
+    )
+
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"))
 
 
 @pytest.mark.parametrize(

@@ -337,16 +337,17 @@ def build_inline_keyboard(
     return keyboard
 
 
-def keyboard_for_update(update: Update, meeting: Meetup, user: User) -> Keyboard:
+def keyboard_for_update(update: Update, meeting: Meetup, user: User | None) -> Keyboard:
     """Choose the keyboard to store for the message this update points at.
 
     Shared (inline) messages get the inline keyboard, rebuilt with the chat_instance once it is
-    known. Bot-chat messages only show the edit controls when the user owns the meeting.
+    known. Bot-chat messages only show the edit controls when the user owns the meeting; a caller
+    with no account owns nothing, so they get the participant's keyboard.
     """
     if update.callback_query and update.callback_query.inline_message_id:
         return inline_view(meeting, chat_instance=update.callback_query.chat_instance).keyboard
     if update.effective_message:
-        if user.own_meeting(meeting.db_id):
+        if user is not None and user.own_meeting(meeting.db_id):
             return main_view(meeting).keyboard
         return external_view(meeting).keyboard
     return inline_view(meeting).keyboard

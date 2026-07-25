@@ -155,16 +155,19 @@ class SharedMeetingError(MeetingAccessError):
     shared into. The card is the whole screen, so these rejections are answered on the card itself
     rather than with one of the bot-chat screens the other ``MeetingAccessError`` subclasses stand
     for; the error handler owns that shape.
+
+    Holding the card is the only prerequisite for tapping it, so the caller may have no account at
+    all: ``user_db_id`` is ``None`` for them and the message names them as anonymous.
     """
 
 
 class SharedMeetingGoneError(SharedMeetingError):
     """The meeting behind the tapped card no longer resolves to a row, so the card is out of date."""
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str):
         super().__init__(
             f"User tried {action!r} from a card whose meeting does not exist. "
-            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,
@@ -178,10 +181,10 @@ class SharedMeetingFinishedError(SharedMeetingError):
     reader of that chat sees, and the card is written in the meeting's language.
     """
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str):
         super().__init__(
             f"User tried {action!r} from a card whose meeting has finished. "
-            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,
@@ -191,10 +194,10 @@ class SharedMeetingFinishedError(SharedMeetingError):
 class SharedMeetingDeniedError(SharedMeetingError):
     """The tapped message gives the caller no claim on the meeting the callback data names."""
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str):
         super().__init__(
             f"User tried {action!r} from a message that does not authorize them on that meeting. "
-            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,

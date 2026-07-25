@@ -4,7 +4,8 @@ from telegram import Update
 from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup, Message
+from mitup_bot.models import Meetup, Message, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingAttachMessages
 from mitup_bot.utils import callbacks as cb
@@ -29,16 +30,34 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
 
     This captures the chat_instance from the callback query and associates it with the
     meeting message, making the meeting searchable in that chat via inline mode.
+
+    The button rides on every card the meeting was shared into, so the caller may be any Telegram
+    user, with or without a mitup profile: what the tap decides is whether the meeting is findable
+    in that chat, and whoever taps it already holds the card. No account is created for them.
     """
     data = guards.valid_callback_data(cb.ATTACH_TO_CHAT.parse(context.match), MeetingHandlerId.ATTACH_TO_CHAT)
     # load_collections: `keyboard_for_update` picks the owner or the external keyboard via
-    # `user.own_meeting`.
-    user = await guards.current_user(update, session, load_collections=True)
+    # `user.own_meeting` when the tap comes from a bot-chat message.
+    user = (
+        await User.by_tg_user_id(session, update.effective_user.id, load_collections=True)
+        if update.effective_user
+        else None
+    )
+    if user is not None and user.status is UserStatus.DELETION_REQUESTED:
+        # A dying account decides nothing here: the attachment belongs to the chat, so treat them
+        # as the anonymous caller the surface already allows.
+        user = None
 
     # require_active: a finished meeting stays worth finding in the chat it happened in, so the
     # attachment is offered for whatever state the meeting is in.
     meeting = await guards.shared_meeting(
-        session, user, data.id, "attach a meeting to a chat", update, require_active=False
+        session,
+        user,
+        data.id,
+        "attach a meeting to a chat",
+        update,
+        allow_anonymous=True,
+        require_active=False,
     )
 
     chat_instance = update.callback_query.chat_instance if update.callback_query else None

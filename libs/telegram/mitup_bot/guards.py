@@ -372,7 +372,7 @@ async def meeting(
 
 async def meeting_interaction_allowed(
     session: AsyncSession,
-    user: User,
+    user: User | None,
     meeting: Meetup,
     update: Update,
 ) -> bool:
@@ -390,6 +390,11 @@ async def meeting_interaction_allowed(
     this chat, or when the tapped shared card is claimed by this meeting. Every one of those reads
     is rooted at the meeting, so `user` needs no loaded collections here.
 
+    `user` is `None` when the Telegram user tapping has no account. They own nothing, hold no
+    membership and have invited nobody, so the three user-rooted arms short-circuit and the only
+    ways past are the meeting's own `public` flag and the message-bound arms — which is exactly the
+    "you are tapping a real card this meeting claims" test.
+
     The claim on a shared card is recorded when the card is sent, by the `chosen_inline_result`
     handler — so a card that no meeting claims authorizes nothing: an attacker can share a card of
     their own at will, and honouring an unclaimed inline message would let them borrow it to act on
@@ -399,11 +404,11 @@ async def meeting_interaction_allowed(
     is answered with.
     """
     meeting_id = meeting.db_id
-    if (
-        meeting.public
-        or meeting.is_owned_by(user)
-        or meeting.has_participant(user.db_id)
-        or meeting.has_invited_participant(user.db_id)
+    if meeting.public:
+        return True
+
+    if user is not None and (
+        meeting.is_owned_by(user) or meeting.has_participant(user.db_id) or meeting.has_invited_participant(user.db_id)
     ):
         return True
 
@@ -425,6 +430,21 @@ async def meeting_interaction_allowed(
     return False
 
 
+@overload
+async def shared_meeting(
+    session: AsyncSession,
+    user: User | None,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    *,
+    allow_anonymous: Literal[True],
+    lock: bool = False,
+    require_active: bool = True,
+) -> Meetup: ...
+
+
+@overload
 async def shared_meeting(
     session: AsyncSession,
     user: User,
@@ -432,6 +452,20 @@ async def shared_meeting(
     action: str,
     update: Update,
     *,
+    allow_anonymous: bool = ...,
+    lock: bool = False,
+    require_active: bool = True,
+) -> Meetup: ...
+
+
+async def shared_meeting(
+    session: AsyncSession,
+    user: User | None,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    *,
+    allow_anonymous: bool = False,
     lock: bool = False,
     require_active: bool = True,
 ) -> Meetup:
@@ -451,21 +485,31 @@ async def shared_meeting(
     - the meeting is no longer active — `SharedMeetingFinishedError`, unless `require_active` is
       False, which is for the surfaces that stay useful on a finished meeting.
 
+    `allow_anonymous=True` is what lets `user` be `None`, and the signature enforces it: only that
+    call shape type-checks a `User | None`, so a surface that means to serve a caller with no account
+    says so here and every other one keeps its `User` guarantee. Holding the card is the whole
+    prerequisite for tapping it, and the decision this guard takes for such a caller is the
+    message-bound one. Their rejections carry the fallback language, since there is no account to
+    read a preference from, and name an anonymous caller. The flag widens the type only — a `None`
+    user takes the same path whatever it is set to.
+
     Pass `lock=True` from the participant- or capacity-mutating callers, as for `meeting`. The locked
     load resets the acting user's `meetups`/`joined_links` to unloaded; the guard itself needs
     neither, so a caller that reads them re-loads them after this returns.
     """
     found_meeting = await Meetup.by_id(session, meeting_id, for_update=lock)
+    lang = user.lang if user else TranslationEngine.FALLBACK_LANG
+    user_db_id = user.db_id if user else None
 
     if found_meeting is None:
-        raise SharedMeetingGoneError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+        raise SharedMeetingGoneError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
 
     if not await meeting_interaction_allowed(session, user, found_meeting, update):
-        raise SharedMeetingDeniedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+        raise SharedMeetingDeniedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
 
     if require_active and not found_meeting.active:
         raise SharedMeetingFinishedError(
-            meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=found_meeting.lang
+            meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=found_meeting.lang
         )
 
     return found_meeting

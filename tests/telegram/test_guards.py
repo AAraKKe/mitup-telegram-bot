@@ -56,9 +56,10 @@ from tests.helpers import (
     create_joined_link,
     create_meetup,
     create_member,
+    create_message,
     create_user,
 )
-from tests.helpers.constants import DEFAULT_USER_ID
+from tests.helpers.constants import DEFAULT_INLINE_MESSAGE_ID, DEFAULT_USER_ID
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -716,6 +717,129 @@ async def test_shared_meeting_returns_inactive_meeting_when_active_is_not_requir
     )
 
     assert result == inactive_meeting
+
+
+# --- Shared surfaces: a caller without an account ------------------------------------------------
+
+INLINE_TAP = UpdateRequest(callback_query=cb.ATTACH_TO_CHAT.with_id(7), from_bot_chat=False)
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_meeting_interaction_allowed_accepts_a_claimed_card_without_an_account(
+    mock_session: MockDbSession,
+    update: Update,
+):
+    """The claim recorded when the card was sent is what authorizes a tap by a caller with no row."""
+    meeting = create_meetup(id=7, owner=other_owner(), title="Private")
+    mock_session.add_object(
+        create_message(inline_message_id=DEFAULT_INLINE_MESSAGE_ID, meetup_id=7), "inline_message_id"
+    )
+
+    assert await guards.meeting_interaction_allowed(mock_session, None, meeting, update) is True
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_meeting_interaction_allowed_accepts_a_public_meeting_without_an_account(
+    mock_session: MockDbSession,
+    update: Update,
+):
+    meeting = create_meetup(id=7, owner=other_owner(), title="Open to all", public=True)
+
+    assert await guards.meeting_interaction_allowed(mock_session, None, meeting, update) is True
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_meeting_interaction_allowed_denies_an_unclaimed_card_without_an_account(
+    mock_session: MockDbSession,
+    update: Update,
+):
+    """Every user-rooted arm short-circuits with no caller, so an unclaimed card is all that is left.
+
+    Producing one costs an attacker a single share of a meeting of their own, so it must authorize
+    nothing — and with no account there is no ownership or membership to fall back on either.
+    """
+    meeting = create_meetup(id=7, owner=other_owner(), title="Private")
+
+    assert await guards.meeting_interaction_allowed(mock_session, None, meeting, update) is False
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_shared_meeting_returns_the_meeting_for_a_caller_without_an_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    update: Update,
+):
+    """Holding the card is the whole prerequisite for tapping it, account or no account."""
+    meeting = create_meetup(id=7, owner=other_owner(), title="Shared")
+    meeting.messages.append(create_message(inline_message_id=DEFAULT_INLINE_MESSAGE_ID, meetup_id=7))
+    mock_session.add_object(meeting)
+
+    result = await guards.shared_meeting(
+        mock_session, None, 7, "attach a meeting to a chat", update, allow_anonymous=True
+    )
+
+    assert result == meeting
+    assert_renders_nothing(context)
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_shared_meeting_raises_denied_for_a_caller_without_an_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    update: Update,
+):
+    """The message-bound arms are the only ones an anonymous caller can pass, and this one fails."""
+    mock_session.add_object(create_meetup(id=7, owner=other_owner(), title="Private"))
+
+    with pytest.raises(SharedMeetingDeniedError) as raised:
+        await guards.shared_meeting(mock_session, None, 7, "attach a meeting to a chat", update, allow_anonymous=True)
+
+    error = raised.value
+    # There is no account to read a language preference from, and none to name in the log line.
+    assert error.lang == TranslationEngine.FALLBACK_LANG
+    assert (
+        str(error) == "User tried 'attach a meeting to a chat' from a message that does not authorize "
+        "them on that meeting. Meeting id: 7, user id: anonymous"
+    )
+    assert_renders_nothing(context)
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_shared_meeting_raises_gone_for_a_caller_without_an_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    update: Update,
+):
+    with pytest.raises(SharedMeetingGoneError) as raised:
+        await guards.shared_meeting(mock_session, None, 999, "attach a meeting to a chat", update, allow_anonymous=True)
+
+    error = raised.value
+    assert error.lang == TranslationEngine.FALLBACK_LANG
+    assert (
+        str(error) == "User tried 'attach a meeting to a chat' from a card whose meeting does not exist. "
+        "Meeting id: 999, user id: anonymous"
+    )
+    assert_renders_nothing(context)
+
+
+@pytest.mark.parametrize("update", [INLINE_TAP], indirect=True)
+async def test_shared_meeting_raises_finished_for_a_caller_without_an_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    update: Update,
+):
+    """The banner replaces the card, so it stays in the meeting's language even with no caller."""
+    inactive_meeting = create_meetup(id=7, owner=other_owner(), title="Finished", active=False)
+    inactive_meeting.messages.append(create_message(inline_message_id=DEFAULT_INLINE_MESSAGE_ID, meetup_id=7))
+    mock_session.add_object(inactive_meeting)
+
+    with pytest.raises(SharedMeetingFinishedError) as raised:
+        await guards.shared_meeting(mock_session, None, 7, "join or leave a meeting", update, allow_anonymous=True)
+
+    error = raised.value
+    assert error.lang == inactive_meeting.lang
+    assert "user id: anonymous" in str(error)
+    assert_renders_nothing(context)
 
 
 async def test_conversation_meeting_returns_the_meeting_the_flow_carries(
