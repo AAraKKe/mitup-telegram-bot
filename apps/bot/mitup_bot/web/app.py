@@ -128,7 +128,9 @@ def create_app(
         case _ as unreachable:
             assert_never(unreachable)
 
-    app = FastAPI(lifespan=lifespan)
+    # This app is a public webhook receiver, so the interactive docs and the schema they read stay
+    # off: they would publish a machine-readable inventory of every route to anonymous callers.
+    app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.ptb_app = ptb_app
     app.state.secret_token = secret_token
     app.state.metrics_client = metrics_client

@@ -1,5 +1,4 @@
 import json
-import secrets
 from typing import Annotated, Any
 
 import structlog
@@ -10,6 +9,7 @@ from telegram.ext import Application
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application, get_webhook_secret
+from mitup_bot.web.utils import secret_header_matches
 
 log = structlog.get_logger(__name__)
 
@@ -30,7 +30,7 @@ def validate_secret(
     but never the received token.
     """
     received = request.headers.get(TELEGRAM_SECRET_HEADER)
-    if expected_secret is None or received is None or not secrets.compare_digest(received, expected_secret):
+    if not secret_header_matches(received, expected_secret):
         metrics_client.emit(MetricKey.WEBHOOK_FORBIDDEN)
         client_host = request.client.host if request.client is not None else "unknown"
         log.warning("Rejected webhook request, invalid or missing secret header", client_host=client_host)

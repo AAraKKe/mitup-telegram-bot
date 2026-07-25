@@ -148,6 +148,25 @@ async def test_wrong_secret_different_length_returns_403_and_emits_forbidden_met
     metrics.assert_emitted(name=MetricKey.WEBHOOK_FORBIDDEN, value=1)
 
 
+async def test_non_ascii_secret_header_returns_403_and_emits_forbidden_metric(
+    web_app: FastAPI, ptb_app: MagicMock, metrics: MetricAssertions
+):
+    # The ASGI layer decodes header values as latin-1, so a byte >= 0x80 reaches the endpoint
+    # as a non-ASCII str — the one input a str-level compare_digest cannot handle (TypeError).
+    # Any unauthenticated caller can send it, so it must land on the same 403 plus rejection
+    # metric as any other wrong secret, never on a 500 that skips the observability entirely.
+    async with build_web_client(web_app) as client:
+        response = await client.post(
+            "/telegram",
+            json=VALID_UPDATE_PAYLOAD,
+            headers=[(TELEGRAM_SECRET_HEADER.encode(), b"test-secre\xff")],
+        )
+
+    assert response.status_code == 403
+    ptb_app.update_queue.put.assert_not_called()
+    metrics.assert_emitted(name=MetricKey.WEBHOOK_FORBIDDEN, value=1)
+
+
 async def test_malformed_json_body_returns_204_and_emits_malformed_metric(
     web_app: FastAPI, ptb_app: MagicMock, metrics: MetricAssertions
 ):

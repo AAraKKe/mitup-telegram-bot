@@ -53,6 +53,7 @@ from mitup_bot.views.collaborate import (
     link_confirmation_view,
 )
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
+from mitup_bot.web.utils import secret_header_matches
 
 log = structlog.get_logger(__name__)
 
@@ -667,10 +668,10 @@ def verify_signature(secret: str | None, raw_body: bytes, signature: str | None)
     A missing secret (no webhook registered yet) or a missing header fails closed. MD5 is not our
     choice — it is the algorithm Patreon signs deliveries with — so this is not a security downgrade.
     """
-    if secret is None or signature is None:
+    if secret is None:
         return False
     expected = hmac.new(secret.encode(), raw_body, hashlib.md5).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    return secret_header_matches(signature, expected)
 
 
 def target_level(trigger: str | None, member: MemberResource, config: PatreonConfig) -> SupporterLevel:

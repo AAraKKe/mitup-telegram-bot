@@ -114,6 +114,8 @@ def member_resource(patreon_user_id: str = "patreon-1", *, active: bool = True, 
         (SECRET, "deadbeef", False),
         (SECRET, None, False),
         (None, sign(SECRET, b"body"), False),
+        # Header bytes >= 0x80 arrive latin-1-decoded; rejecting them must not raise.
+        (SECRET, "deadbee\xff", False),
     ],
 )
 def test_verify_signature(secret: str | None, signature: str | None, ok: bool):
@@ -232,6 +234,31 @@ async def test_bad_signature_returns_403_without_processing(
     # A rejected delivery never reaches the signature-valid 0-baseline or the downstream series.
     metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
     metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED)
+
+
+async def test_non_ascii_signature_header_returns_403_and_emits_forbidden_metric(
+    endpoint_app: tuple[FastAPI, MetricAssertions], monkeypatch: pytest.MonkeyPatch
+):
+    # A signature byte >= 0x80 reaches verify_signature latin-1-decoded, as a non-ASCII str —
+    # the one input a str-level compare_digest cannot handle (TypeError). Verification runs
+    # ahead of the try block that meters faults, so this has to be rejected as a plain bad
+    # signature: 403 plus FORBIDDEN, never a 500 that emits nothing.
+    app, metrics = endpoint_app
+    monkeypatch.setattr(web_patreon.webhooks, "load_webhook_secret", AsyncMock(return_value=SECRET))
+    apply_mock = AsyncMock()
+    monkeypatch.setattr(web_patreon, "apply_membership_event", apply_mock)
+
+    body = json.dumps(member_dict()).encode()
+    async with build_web_client(app) as client:
+        response = await client.post(
+            "/patreon/webhook",
+            content=body,
+            headers=[(b"X-Patreon-Signature", b"\xffnot-the-signature"), (b"X-Patreon-Event", b"members:update")],
+        )
+
+    assert response.status_code == 403
+    apply_mock.assert_not_awaited()
+    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=1)
 
 
 async def test_missing_signature_header_returns_403(
