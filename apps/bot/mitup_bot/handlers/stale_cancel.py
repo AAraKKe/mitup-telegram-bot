@@ -30,7 +30,7 @@ class StaleCancelHandlerId(HandlerId):
 @with_session
 async def callback_query_stale_cancel(session: AsyncSession, update: Update, context: TMitupContext):
     # Only reads `user.lang` for the alert text; never traverses the meetups/joined_links collections.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
 
     alert_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user.lang)
     await context.api.answer_callback_query(update, text=alert_text, show_alert=True)

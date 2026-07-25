@@ -156,8 +156,8 @@ def pending_patreon_link_section(pending: PatreonPendingLink) -> dict[str, Any]:
 async def build_user_export(session: AsyncSession, user: User) -> dict[str, Any]:
     """Assemble the full export envelope for `user`.
 
-    Loads every traversal itself, so `user` may be a lean `load_collections=False`
-    instance. Joins to the user's own meetings are omitted from `joined_meetings`:
+    Loads every traversal itself, so `user` needs none of its collections loaded.
+    Joins to the user's own meetings are omitted from `joined_meetings`:
     those meetings already appear in full under `meetings`.
     """
     meetings = (await session.exec(owned_meetings_statement(user))).all()

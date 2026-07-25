@@ -3,6 +3,7 @@ from typing import cast
 
 import pytest
 from sqlalchemy import Engine
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
@@ -117,17 +118,22 @@ async def test_participant_rejoin_survives_locked_meeting_load(db_session: Async
         )
 
 
-async def test_meeting_guard_under_lock_returns_meeting_for_owner(db_session: AsyncSession, app: Application):
-    """`guards.meeting(..., lock=True)` must survive its own populate_existing collateral.
+async def test_meeting_guard_under_lock_leaves_user_collections_unloaded(db_session: AsyncSession, app: Application):
+    """`guards.meeting(..., lock=True)` resolves the meeting without paying for the user's collections.
 
     The locked load re-hydrates the identity-mapped owner and resets their `lazy="raise"`
-    collections, so the guard re-loads them before returning. Without that refresh every locked
-    caller (kickout, edit participants, invite confirm) would crash on the first `own_meeting` /
-    `joined_meeting` read in the handler body, exactly like the join path in issue #207.
+    collections, and the guard does not put them back: every check it makes reads the meeting's own
+    owner and participant rows, and no locking caller (kickout, edit participants, invite confirm)
+    traverses `user.meetups` / `user.joined_links`. A locking handler that does need them re-loads
+    them itself, the way the join path above does.
     """
     async with AsyncSession(async_engine(db_session)) as session:
         meeting = await seed_owned_meeting(session)
+        # Loaded with the collections, so the assertions below measure what the guard does to them
+        # rather than a user that never carried them.
         owner = await User.by_tg_user_id(session, OWNER_TG_USER_ID, must_exist=True)
+        assert owner.own_meeting(meeting.db_id) is not None
+        assert owner.joined_meeting(meeting.db_id) is None
 
         tg_owner = TgUser(id=OWNER_TG_USER_ID, first_name="LLU Owner", is_bot=False)
         update = create_update(
@@ -142,6 +148,10 @@ async def test_meeting_guard_under_lock_returns_meeting_for_owner(db_session: As
 
         assert guarded_meeting is not None
         assert guarded_meeting.db_id == meeting.db_id
-        # The guard leaves the collections loaded for the handler body that follows it.
-        assert owner.own_meeting(meeting.db_id) is not None
-        assert owner.joined_meeting(meeting.db_id) is None
+        # Ownership is decided off the meeting the guard loaded, which is why the guard needs none
+        # of the collections the locked load just reset.
+        assert guarded_meeting.is_owned_by(owner)
+        with pytest.raises(InvalidRequestError):
+            _ = owner.meetups
+        with pytest.raises(InvalidRequestError):
+            _ = owner.joined_links

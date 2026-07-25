@@ -26,7 +26,7 @@ class MessagesId(HandlerId):
 async def filter_messages_without_text(session: AsyncSession, update: Update, context: TMitupContext):
     # Reads only `user.lang` for the interrupted/main-menu views; never traverses the
     # meetups/joined_links collections.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
 
     if on_exit := context.get_active_on_exit():
@@ -51,7 +51,7 @@ async def rich_message_handler(session: AsyncSession, update: Update, context: T
     # handlers sort first in the group, so this global handler fires only when no conversation is
     # active. Reply with the not-supported notice on top of the main menu so the user is never
     # stranded, and clear any leftover user data.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
     context.clean_all_user_data()
     await reply_rich_message_not_supported(ctx, update, context, factory.main_menu_view(ctx))

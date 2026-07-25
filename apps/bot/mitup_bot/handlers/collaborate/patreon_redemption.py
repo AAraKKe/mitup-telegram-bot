@@ -214,7 +214,7 @@ async def callback_query_confirm_patreon_link(session: AsyncSession, update: Upd
     valid = guards.valid_code_callback_data(
         cb.CONFIRM_PATREON_LINK.parse(context.match), CollaborateHandlerId.PATREON_LINK_CONFIRM
     )
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
 
     confirmed = await pending_links.consume_pending_link(session, valid.code, user.tg_user_id)
     if confirmed is None:
@@ -305,7 +305,7 @@ async def callback_query_decline_patreon_link(session: AsyncSession, update: Upd
     instead of a single-target one. The person who declined is not stranded, because the claim
     predicate admits the same sender again — re-tapping their own link re-opens this prompt.
     """
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     await context.api.edit_message(update=update, view=patreon_link_declined_view(user.lang))
     context.put_feature_metric(Feature.PATREON_LINK, name=MetricKey.FEATURE_CANCELLED)
     log.info("Patreon link confirmation declined", flow=patreon_link.LINK_FLOW, stage="prompt", outcome="declined")

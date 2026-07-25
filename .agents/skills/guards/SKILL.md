@@ -18,12 +18,27 @@ Guards live in `libs/telegram/mitup_bot/guards.py`. They validate handler inputs
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `current_user` | `(update, session)` | `User` | `UserNotFound` (caught by global error handler) |
+| `current_user` | `(update, session, *, load_collections=False)` | `User` | `UserNotFound` (caught by global error handler) |
 | `member_user` | `(update, session)` | `User \| None` (only when status is MEMBER) | — |
 | `user_language` | `(update, session)` | `str` (lang code or fallback) | — |
 | `user_registered` | `(update, session, context, alert_message)` | `User \| None` | — (answers callback query with alert) |
 
 Use `current_user` for all handlers that require an authenticated user. Use `user_registered` only when an unauthenticated user is a valid, non-fatal case (e.g. inline query handlers). `member_user` gates `/start` routing between the member flow and re-onboarding.
+
+### `load_collections`
+
+`current_user` returns the user with `meetups` and `joined_links` **unloaded**. Almost every screen acts on a single meeting it resolves through `guards.meeting`, which is meeting-rooted and hands back a fully hydrated meeting — so the user's own collections are dead weight there, and the same holds for `guards.meeting_interaction_allowed`, whose every check is rooted at the meeting too.
+
+Pass `load_collections=True` only where the handler (or something it calls or renders) actually traverses them, and put a one-line comment above the call naming what does the traversal. The traversals that exist today:
+
+- `user.meetups` / `user.joined_links` directly — the active, past and joined meeting lists.
+- `limits.at_active_meetings_cap`, via `handlers/meeting/utils.active_meetings_cap_reached` — meeting creation and reactivation.
+- `user.own_meeting` — `views.meeting.keyboard_for_update` (join/leave, attach-to-chat) and the invite flow's abort branch.
+- `user.joined_meeting` — the join operation's already-joined check.
+
+Both collections are `lazy="raise"`, so a missing opt-in raises `InvalidRequestError` rather than emitting silent I/O — but only on a session-bound instance, which means the `db_test` suite catches it and `MockDbSession` unit tests do not. Decide the opt-in by reading the call graph, not by waiting for a red test.
+
+For a handler that renders a full meeting card straight off those collections, `guards.current_user` is not enough: call `User.by_tg_user_id(..., load_collections=True, load_participants=True)` directly (see the `database` skill). The inline query is the only such caller.
 
 All guards that take a `session` are async — `await` them.
 
@@ -72,7 +87,7 @@ Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_
 
 A non-owner is logged and counted on the `MeetingNotOwned` error metric before the main-menu redirect; the deleted-meeting and reactivation screens emit no such metric.
 
-Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read, and re-loads the user's `meetups`/`joined_links` afterwards (the locked load resets them). Read-only handlers must leave it `False`. See the `database` skill's "Per-meeting row locks" section for the full convention.
+Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. The locked load resets the acting user's `meetups`/`joined_links` to unloaded, so a handler that both locks and opted into the collections must re-load them itself. See the `database` skill's "Per-meeting row locks" section for the full convention.
 
 Use `meeting_interaction_allowed` in every handler that acts on a meeting reachable from outside the
 bot chat (join, leave, attach-to-chat, invite). The meeting id arrives in client-supplied callback

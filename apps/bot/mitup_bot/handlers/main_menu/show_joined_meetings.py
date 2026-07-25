@@ -23,7 +23,8 @@ async def callback_query_show_joined_meetings(session: AsyncSession, update: Upd
         cb.SHOW_JOINED_MEETINGS_PAGE.parse(context.match), MainMenuHandlerId.SHOW_JOINED_MEETINGS_CALLBACK
     )
 
-    user = await guards.current_user(update, session)
+    # load_collections: the list is built straight off `user.joined_links` and each link's meetup.
+    user = await guards.current_user(update, session, load_collections=True)
     joined_meetings = sorted(
         (link.meetup for link in user.joined_links if link.meetup.active),
         key=lambda meetup: meetup.db_id,

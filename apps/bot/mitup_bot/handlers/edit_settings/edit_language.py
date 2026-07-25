@@ -17,7 +17,7 @@ from .enums import EditSettingsHandlerId
 @with_session
 async def callback_query_timezone(session: AsyncSession, update: Update, context: TMitupContext):
     # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
 
     view = views.factory.settings_set_language_view(guards.render_context(user, update, context))
 
@@ -27,7 +27,7 @@ async def callback_query_timezone(session: AsyncSession, update: Update, context
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_LANGUAGE)
 @with_session
 async def callback_query_set_timezone(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
 
     language_id = guards.valid_callback_data(
         cb.SET_LANGUAGE.parse(context.match), EditSettingsHandlerId.SET_LANGUAGE_CALLBACK

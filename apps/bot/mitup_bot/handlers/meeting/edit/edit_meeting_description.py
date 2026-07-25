@@ -99,7 +99,7 @@ async def edit_description_meeting_message_handler(session: AsyncSession, update
 async def edit_description_rich_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
     with context.meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, ensure_clean=False) as meeting_id:
         meeting = await Meetup.by_id(session, meeting_id, must_exist=True)

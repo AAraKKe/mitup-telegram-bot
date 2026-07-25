@@ -76,14 +76,6 @@ async def ensure_meeting_still_allows_invitations(
     meeting = await Meetup.by_id(session, meeting_id, include_inactive=False, for_update=for_update)
     update = context.get_update()
 
-    if for_update and meeting is not None:
-        # The locked load ran with populate_existing, which re-hydrates the identity-mapped `user`
-        # (reached via owner/joined_links) and resets its lazy="raise" collections to unloaded. Re-load
-        # them so any later `own_meeting`/`joined_meeting` access is safe; the row lock is already held,
-        # so the re-read is race-safe. The lock-free callers (abort flow) keep the collections they
-        # already loaded, so only the locked path needs this.
-        await session.refresh(user, ["meetups", "joined_links"])
-
     if meeting is None:
         message = MeetingInviteMessages.MEETING_NOT_FOUND if on_callback else MeetingInviteMessages.MEETING_LOST_RETRY
 
@@ -165,7 +157,8 @@ async def abort_invitation(
     ``callback_data`` is the callback-data class each registration is bound to, so parsing stays in
     sync with the registration even if a call site switches to a different class.
     """
-    user = await guards.current_user(update, session)
+    # load_collections: the owner branch below is decided with `user.own_meeting`.
+    user = await guards.current_user(update, session, load_collections=True)
 
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])

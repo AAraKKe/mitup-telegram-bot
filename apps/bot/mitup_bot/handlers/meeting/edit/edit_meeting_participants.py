@@ -222,8 +222,8 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
             )
             if meeting is None:
                 return ConversationHandler.END
-            # Default load is enough: this view reads only `meeting.lang` (the acting owner's
-            # language), never the participant list, so it needs no `load_participants`.
+            # This view reads only `meeting.lang` (the acting owner's language), never the
+            # participant list.
             response_view = edit_max_participants_view(meeting, fail=True)
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)

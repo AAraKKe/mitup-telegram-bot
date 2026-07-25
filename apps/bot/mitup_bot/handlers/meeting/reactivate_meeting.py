@@ -24,7 +24,8 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
         cb.REACTIVATE_MEETING.parse(context.match), MeetingHandlerId.REACTIVATE_MEETING_CALLBACK
     )
 
-    user = await guards.current_user(update, session)
+    # load_collections: the cap check below counts the user's active meetings off `user.meetups`.
+    user = await guards.current_user(update, session, load_collections=True)
 
     # No lock here: reactivation writes `active` unconditionally without reading any participant or
     # capacity state, and the flush-time UPDATE takes the row lock on its own. A join that grabs the

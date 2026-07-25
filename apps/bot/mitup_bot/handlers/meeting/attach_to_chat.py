@@ -31,7 +31,9 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
     meeting message, making the meeting searchable in that chat via inline mode.
     """
     data = guards.valid_callback_data(cb.ATTACH_TO_CHAT.parse(context.match), MeetingHandlerId.ATTACH_TO_CHAT)
-    user = await guards.current_user(update, session)
+    # load_collections: `keyboard_for_update` picks the owner or the external keyboard via
+    # `user.own_meeting`.
+    user = await guards.current_user(update, session, load_collections=True)
 
     if meeting := await Meetup.by_id(session, data.id):
         # Authorize before the chat_instance is captured: attaching makes the meeting inline-searchable

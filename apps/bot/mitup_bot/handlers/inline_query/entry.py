@@ -77,10 +77,7 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
     TODO: Right now we are only allowing existing users to share a meeting. We should allow non-existing users to
     share a meeting as well when public meeting feature is implemented.
     """
-    # Reads `user.lang` and passes the user to `meeting.is_owned_by`, which compares `user.db_id`
-    # against the meeting's own owner — neither touches the user's meetups/joined_links collections,
-    # so skip loading them.
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
     meeting_id = await shareable_meeting_id(update, context)
     if meeting_id is None:
         return

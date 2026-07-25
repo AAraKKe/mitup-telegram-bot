@@ -23,7 +23,8 @@ async def callback_query_show_meetings(session: AsyncSession, update: Update, co
         cb.SHOW_ACTIVE_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_MEETINGS_CALLBACK
     )
 
-    user = await guards.current_user(update, session)
+    # load_collections: the list is built straight off `user.meetups`.
+    user = await guards.current_user(update, session, load_collections=True)
     active_meetings = [meetup for meetup in user.meetups if meetup.active]
     user_meetings = sorted(
         (meeting for meeting in active_meetings if meeting.plain_title.strip()),

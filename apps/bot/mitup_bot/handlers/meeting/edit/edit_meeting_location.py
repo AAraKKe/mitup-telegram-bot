@@ -291,7 +291,7 @@ async def edit_coordinates_without_location(session: AsyncSession, update: Updat
 async def edit_location_name_rich_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
     with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, ensure_clean=False) as meeting_id:
         view = edit_location_name_prompt_view(meeting_id, user.lang)

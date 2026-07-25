@@ -18,7 +18,7 @@ from .utils import build_collaborate_view, subscription_for_user
 async def callback_query_collaborate(session: AsyncSession, update: Update, context: TMitupContext):
     # `build_collaborate_view` reads `user.lang`/`user.id`/`user.tg_user_id`/`user.supporter_level`
     # only (never the meetups/joined_links collections), so skip loading them.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     view = await build_collaborate_view(session, user, context)
     await context.api.edit_message(update=update, view=view)
 
@@ -29,7 +29,7 @@ async def callback_query_unlink_patreon(session: AsyncSession, update: Update, c
     # Reads/writes `user.supporter_level` and passes the user to `subscription_for_user`/
     # `build_collaborate_view`, both of which touch only scalar columns — never the
     # meetups/joined_links collections, so skip loading them.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
 
     subscription = await subscription_for_user(session, user)
     if subscription is not None:

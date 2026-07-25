@@ -85,20 +85,18 @@ def render_context(user: User, update: Update, context: TMitupContext) -> Render
     return RenderContext(lang=user.lang, is_admin=is_admin(update, context))
 
 
-async def current_user(
-    update: Update, session: AsyncSession, *, load_collections: bool = True, load_participants: bool = False
-) -> User:
-    # `load_collections`/`load_participants` forward to `User.by_tg_user_id`: pass
-    # `load_collections=False` on screens that never touch the user's meetups/joined_links, and
-    # `load_participants=True` on the handful that render a full meeting card off those collections.
-    # Both stay conservative by default so widening the load is a deliberate, per-call-site decision.
+async def current_user(update: Update, session: AsyncSession, *, load_collections: bool = False) -> User:
+    # `load_collections` forwards to `User.by_tg_user_id`. The default loads no collections: the vast
+    # majority of screens act on a single meeting they resolve through `guards.meeting`, so paying for
+    # the user's meetups/joined_links everywhere would be waste. The screens that do traverse them
+    # (the meeting lists, and the paths reading `own_meeting`/`joined_meeting`) pass
+    # `load_collections=True` and say at the call site what reads them. Both collections are
+    # `lazy="raise"`, so a missing opt-in surfaces as an `InvalidRequestError` rather than silent I/O.
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
 
     # If we have an effective user, get the user from DB
-    if user := await User.by_tg_user_id(
-        session, update.effective_user.id, load_collections=load_collections, load_participants=load_participants
-    ):
+    if user := await User.by_tg_user_id(session, update.effective_user.id, load_collections=load_collections):
         # A user marked for deletion is rejected everywhere until the cleanup run purges the row;
         # the error handler answers the interaction with the standardized pending-deletion alert.
         if user.status is UserStatus.DELETION_REQUESTED:
@@ -347,14 +345,11 @@ async def meeting(
 
     Participant- or capacity-mutating callers must pass `lock=True` so the meetup row (the
     per-meeting mutex) is locked before any capacity/waiting-list read, and so the ownership check
-    itself runs on the locked row. The guard then re-loads the user's collections, which the locked
-    load's `populate_existing` resets to unloaded; the row lock is already held, so the re-read is
-    race-safe. Parameter mechanics such as `custom_keyboard` are documented in the guards skill.
+    itself runs on the locked row. Every decision the guard makes is meeting-rooted, so it never
+    touches `user.meetups`/`user.joined_links`. Parameter mechanics such as `custom_keyboard` are
+    documented in the guards skill.
     """
     found_meeting = await Meetup.by_id(session, meeting_id, for_update=lock)
-
-    if lock and found_meeting is not None:
-        await session.refresh(user, ["meetups", "joined_links"])
 
     if access is MeetingAccess.OWNER_ANY_STATE:
         if found_meeting is None or not found_meeting.is_owned_by(user):
@@ -405,7 +400,8 @@ async def meeting_interaction_allowed(
     The caller is allowed when the meeting is public, when they own it, when they already have a
     membership (including the waiting list), when they invited somebody into it, when the tapped
     message is a tracked message of this meeting, when the meeting already has a tracked message in
-    this chat, or when the tapped shared card is claimed by this meeting.
+    this chat, or when the tapped shared card is claimed by this meeting. Every one of those reads
+    is rooted at the meeting, so `user` needs no loaded collections here.
 
     The claim on a shared card is recorded when the card is sent, by the `chosen_inline_result`
     handler — so a card that no meeting claims authorizes nothing: an attacker can share a card of
@@ -418,8 +414,8 @@ async def meeting_interaction_allowed(
     meeting_id = meeting.db_id
     if (
         meeting.public
-        or user.own_meeting(meeting_id)
-        or user.joined_meeting(meeting_id)
+        or meeting.is_owned_by(user)
+        or meeting.has_participant(user.db_id)
         or meeting.has_invited_participant(user.db_id)
     ):
         return True
@@ -453,18 +449,15 @@ async def user_registered(
     session: AsyncSession,
     context: TMitupContext,
     alert_message: MessageBase,
-    *,
-    load_collections: bool = True,
 ) -> User | None:
     """
     Context manager that yields the current user if they are subscribed to the bot.
     If the user is not subscribed, the callback query is answered with an allert showing the `alert_message`.
 
-    `load_collections` forwards to `current_user`; leave it True unless the caller has verified it
-    never traverses the user's meetups/joined_links (see `current_user`).
+    The user comes back with no collections loaded, like `current_user`'s default.
     """
     try:
-        return await current_user(update, session, load_collections=load_collections)
+        return await current_user(update, session)
     except UserNotFound as e:
         user = cast(TgUser, update.effective_user)  # We know the user exists here
         if update.callback_query is None:

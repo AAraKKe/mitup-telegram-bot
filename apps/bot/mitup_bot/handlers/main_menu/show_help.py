@@ -15,7 +15,7 @@ from .enums import MainMenuHandlerId
 async def callback_query_help(session: AsyncSession, update: Update, context: TMitupContext):
     # The help screen renders only `user.lang`; it never traverses the meetups/joined_links
     # collections, so skip loading them.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     view = views.factory.help_view(guards.render_context(user, update, context))
 
     await context.api.edit_message(update=update, view=view)

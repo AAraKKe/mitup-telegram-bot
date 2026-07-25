@@ -3,7 +3,7 @@ from telegram import Update
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
-from mitup_bot.models import JoinedUsers, Settings, User, utils
+from mitup_bot.models import JoinedUsers, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
@@ -18,6 +18,7 @@ from tests.helpers import (
     call_handler,
     create_meetup,
     create_message,
+    create_user,
     integrity_error,
 )
 from tests.helpers.monitoring import MetricAssertions
@@ -213,7 +214,9 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     metrics: MetricAssertions,
     claim_shared_card: ClaimSharedCard,
 ):
-    owner = User(first_name="Owner", tg_user_id=1, settings=Settings())
+    # The owner carries an id like any meeting loaded from the database: the authorization guard
+    # decides ownership and membership off the meeting's own owner and participant rows.
+    owner = create_user(id=500, tg_user_id=1, first_name="Owner")
     meeting = create_meetup(id=123, title="My Meeting", max_members=1, waiting_list=False, owner=owner)
     JoinedUsers(user=owner, meetup=meeting)
     mock_session.add_object(user_with_settings, query_field="tg_user_id")

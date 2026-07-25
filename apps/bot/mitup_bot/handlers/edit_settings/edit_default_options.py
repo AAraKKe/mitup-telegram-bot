@@ -18,7 +18,7 @@ from .entry import EditSettingsHandlerId
 async def callback_query_edit_default_meeting_options(session: AsyncSession, update: Update, context: TMitupContext):
     # Settings-only: `default_meeting_settings_view` renders `user.settings` and never the
     # meetups/joined_links collections, so skip loading them.
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
 
     await context.api.edit_message(
         update=update,
@@ -31,7 +31,7 @@ async def callback_query_edit_default_meeting_options(session: AsyncSession, upd
 )
 @with_session
 async def callback_query_toggle_default_waiting_list(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
     user.settings.default_waiting_list = not user.settings.default_waiting_list
     await session.flush()
 
@@ -44,7 +44,7 @@ async def callback_query_toggle_default_waiting_list(session: AsyncSession, upda
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.SET_DEFAULT_PUBLIC, callback_data=cb.SET_DEFAULT_PUBLIC)
 @with_session
 async def callback_query_toggle_default_public(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
     user.settings.default_public = not user.settings.default_public
     await session.flush()
 
@@ -59,7 +59,7 @@ async def callback_query_toggle_default_public(session: AsyncSession, update: Up
 )
 @with_session
 async def callback_query_toggle_default_invitations(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
     user.settings.default_allow_invitation = not user.settings.default_allow_invitation
     await session.flush()
 
@@ -74,7 +74,7 @@ async def callback_query_toggle_default_invitations(session: AsyncSession, updat
 )
 @with_session
 async def callback_query_toggle_default_incognito(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
     user.settings.default_incognito = not user.settings.default_incognito
     await session.flush()
 
@@ -89,7 +89,7 @@ async def callback_query_toggle_default_incognito(session: AsyncSession, update:
 )
 @with_session
 async def callback_query_toggle_default_lock_on_start(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await current_user(update, session, load_collections=False)
+    user = await current_user(update, session)
     user.settings.default_lock_on_start = not user.settings.default_lock_on_start
     await session.flush()
 

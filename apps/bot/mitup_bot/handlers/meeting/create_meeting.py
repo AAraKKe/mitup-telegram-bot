@@ -49,7 +49,8 @@ class ValidTitleFilter(filters.MessageFilter):
 async def callback_query_create_meeting(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    user = await guards.current_user(update, session)
+    # load_collections: the cap check counts the user's active meetings off `user.meetups`.
+    user = await guards.current_user(update, session, load_collections=True)
 
     # Stop the common button path before the title prompt when the user is at their cap; the
     # title-message handler backstops the inline deep-link path, which never reaches here.
@@ -80,7 +81,8 @@ async def callback_query_create_meeting(
 async def create_meeting_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
-    user = await guards.current_user(update, session)
+    # load_collections: the cap check counts the user's active meetings off `user.meetups`.
+    user = await guards.current_user(update, session, load_collections=True)
 
     # Backstops the inline deep-link creation path (the button path is already stopped at entry).
     if await active_meetings_cap_reached(user, update, context, back_button=main_menu_back_button(user.lang)):
@@ -152,7 +154,7 @@ async def create_meeting_invalid_title_message_handler(
 async def create_meeting_rich_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
     view = views.factory.create_meeting_view(ctx, datetime_link=build_datetime_link())
     await reply_rich_message_not_supported(ctx, update, context, view)

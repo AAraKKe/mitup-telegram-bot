@@ -54,7 +54,8 @@ async def show_past_meetings_page(user: User, page_number: int, update: Update, 
 )
 @with_session
 async def callback_query_show_past_meetings(session: AsyncSession, update: Update, context: TMitupContext):
-    user = await guards.current_user(update, session)
+    # load_collections: `show_past_meetings_page` filters `user.meetups`.
+    user = await guards.current_user(update, session, load_collections=True)
     await show_past_meetings_page(user, 1, update, context)
 
 
@@ -66,5 +67,6 @@ async def callback_query_show_past_meeting_page(session: AsyncSession, update: U
     callback_data = guards.valid_callback_data(
         cb.SHOW_PAST_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK
     )
-    user = await guards.current_user(update, session)
+    # load_collections: `show_past_meetings_page` filters `user.meetups`.
+    user = await guards.current_user(update, session, load_collections=True)
     await show_past_meetings_page(user, callback_data.id, update, context)

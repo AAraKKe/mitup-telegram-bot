@@ -30,7 +30,9 @@ async def join_meetup(session: AsyncSession, update: Update, context: TMitupCont
     If the user is not registered we should ask the user to register by opening a chat with the bot first.
     """
     try:
-        user = await guards.current_user(update, session)
+        # load_collections: the join checks the existing membership via `user.joined_meeting`, and
+        # `keyboard_for_update` reads `user.own_meeting`.
+        user = await guards.current_user(update, session, load_collections=True)
         await user_joins_meeting(session, update, context, user)
     except UserNotFound:
         await handle_non_existing_user_join(session, update, context)
@@ -111,7 +113,9 @@ async def leave_meetup(session: AsyncSession, update: Update, context: TMitupCon
     to register by opening a chat with the bot first.
     """
     try:
-        user = await guards.current_user(update, session)
+        # load_collections: `keyboard_for_update` reads `user.own_meeting`, and the shared
+        # join/leave path re-loads both collections under the row lock.
+        user = await guards.current_user(update, session, load_collections=True)
         await user_leaves_meeting(session, update, context, user)
     except UserNotFound:
         await handle_non_existing_user_leave(session, update, context)

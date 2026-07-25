@@ -21,7 +21,7 @@ async def callback_query_send_main_menu(session: AsyncSession, update: Update, c
 
     # The main menu renders only `user.lang` and the admin flag; it never traverses the
     # meetups/joined_links collections, so skip loading them.
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     view = views.factory.main_menu_view(guards.render_context(user, update, context))
 
     await context.api.send_message(update=update, view=view)

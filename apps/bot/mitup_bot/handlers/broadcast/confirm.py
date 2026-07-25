@@ -24,7 +24,7 @@ async def callback_query_confirm_broadcast(session: AsyncSession, update: Update
     ).id
     # Reads only `operator.tg_user_id`/`operator.lang`; never traverses the meetups/joined_links
     # collections.
-    operator = await guards.current_user(update, session, load_collections=False)
+    operator = await guards.current_user(update, session)
 
     broadcast = await load_draft(session, broadcast_id, operator.tg_user_id)
     if broadcast is None:
@@ -50,7 +50,7 @@ async def callback_query_confirm_broadcast(session: AsyncSession, update: Update
 async def callback_query_cancel_broadcast(session: AsyncSession, update: Update, context: TMitupContext) -> int:
     # Reads only `operator.tg_user_id`/`operator.lang`; never traverses the meetups/joined_links
     # collections.
-    operator = await guards.current_user(update, session, load_collections=False)
+    operator = await guards.current_user(update, session)
 
     # The entry-prompt Cancel button carries no id (no draft exists yet), while the preview Cancel
     # button carries the draft id. Parse leniently so both paths land here: only delete when a draft

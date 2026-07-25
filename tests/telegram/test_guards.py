@@ -229,16 +229,17 @@ async def test_meeting_returns_meeting_owned_by_user(
     context.api.assert_send_message_not_called()
 
 
-async def test_meeting_reloads_user_collections_under_lock(
+async def test_meeting_touches_no_user_collections_under_lock(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
     user_with_settings: User,
 ):
-    """A locked load runs with populate_existing, which resets the user's lazy="raise" collections.
+    """Locking costs nothing on the acting user.
 
-    The guard re-loads them under the row lock it already holds, so the handler body that follows
-    can still read `user.meetups` / `user.joined_links`.
+    Every decision the guard makes is rooted at the meeting, so it neither reads nor re-loads
+    `user.meetups` / `user.joined_links` — a handler that wants them across the locked load
+    re-loads them itself.
     """
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
@@ -246,7 +247,7 @@ async def test_meeting_reloads_user_collections_under_lock(
     result = await guards.meeting(mock_session, user_with_settings, 1, "Test method", update, context, lock=True)
 
     assert result == user_with_settings.meetups[0]
-    mock_session.refresh.assert_awaited_once_with(user_with_settings, ["meetups", "joined_links"])
+    mock_session.refresh.assert_not_awaited()
 
 
 @pytest.mark.parametrize("keyboard", BACK_KEYBOARDS, ids=["without_custom_keyboard", "with_custom_keyboard"])

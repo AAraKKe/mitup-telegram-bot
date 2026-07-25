@@ -43,7 +43,7 @@ async def existing_user_start(
     Every branch reads `user.lang` and nothing that traverses the meetups/joined_links collections,
     so the user is loaded without them.
     """
-    user = await guards.current_user(update, session, load_collections=False)
+    user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
 
     if payload is not None and payload.kind == INLINE_KIND:
