@@ -7,6 +7,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.utils import RecoveryReason
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
@@ -44,10 +45,15 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
             cb.EDIT_MEETING_CANCEL.parse(context.match), EditMeetingHandlerId.CANCEL
         ).id
     except MalformedCallbackData as exc:
-        # If we cannot get a meeting_id from callback something went wrong.
-        # Cleanup, log error and end possible conversation
+        # Callback data is client-supplied, so a cancel button can arrive without the meeting it
+        # refers to. There is no edit screen to return to, so the flow is closed and the user lands
+        # on the main menu — a recovered interaction, not a fault.
         cleanup_states(context)
-        log.error("Malformed callback data while cancelling meeting edit", exc_info=exc)
+        log.warning(
+            "Malformed callback data while cancelling meeting edit",
+            exc_info=exc,
+            reason=RecoveryReason.MALFORMED_CALLBACK_DATA.value,
+        )
         await context.api.edit_message(
             update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
         )

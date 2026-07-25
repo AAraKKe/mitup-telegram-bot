@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from structlog.testing import capture_logs
 from telegram import Location, Update
 from telegram.ext import ConversationHandler
 
@@ -24,6 +25,7 @@ from tests.helpers import (
     HandlerContext,
     StubMitupContext,
     UpdateRequest,
+    assert_context_lost_logged,
     call_handler,
     create_meetup,
     create_member,
@@ -380,7 +382,6 @@ async def test_edit_location_name_message_works(
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="My Location")], indirect=True)
 async def test_edit_location_name_message_fails_if_context_not_saved(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -390,11 +391,11 @@ async def test_edit_location_name_message_fails_if_context_not_saved(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_NAME_MESSAGE, handler_context=handler_context
         )
-        assert "User data 'meeting_id' requested but not set" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_LOCATION_NAME)
 
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
@@ -437,7 +438,6 @@ async def test_edit_location_coordinates_message_works(
 
 @pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)
 async def test_edit_location_coordinates_message_fails_if_context_not_saved(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -447,11 +447,11 @@ async def test_edit_location_coordinates_message_fails_if_context_not_saved(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE, handler_context=handler_context
         )
-        assert "User data 'meeting_id' requested but not set" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
     assert meeting.location.coordinates is None
     mock_session.assert_not_flushed()
@@ -501,7 +501,6 @@ async def test_edit_location_coordinates_message_with_wrong_message(
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="Message instead of coordinates")], indirect=True)
 async def test_edit_location_coordinates_message_with_wrong_message_fails_without_context(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -511,11 +510,11 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE, handler_context=handler_context
         )
-        assert "User data 'meeting_id' requested but not set" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
     assert result is ConversationHandler.END
     context.api.assert_send_message_called(
@@ -546,7 +545,7 @@ async def test_cancel_edit_meeting_location_property_works(
 
 
 # ---------------------------------------------------------------------------
-# LOCATION_NAME_MESSAGE — ContextPropertyNotSetError path (line 178-180)
+# LOCATION_NAME_MESSAGE — ContextPropertyNotSetError path
 # ---------------------------------------------------------------------------
 
 
@@ -556,25 +555,29 @@ async def test_cancel_edit_meeting_location_property_works(
     indirect=True,
 )
 async def test_edit_location_name_message_sends_main_menu_when_context_missing(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When no meeting_id is stored in context, edit_meeting_location_name catches
-    ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
+    ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation.
+
+    The loss is an expected state, so it is logged as a warning and counted on the ContextLost
+    series the central error handler feeds — not on the fault series."""
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, state = await call_handler(
             EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
             handler_context=handler_context,
         )
-        assert any(r.levelno == logging.ERROR for r in caplog.records)
-        assert "meeting_id" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_LOCATION_NAME)
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
@@ -584,7 +587,7 @@ async def test_edit_location_name_message_sends_main_menu_when_context_missing(
 
 
 # ---------------------------------------------------------------------------
-# LOCATION_COORDINATES_WRONG_MESSAGE — ContextPropertyNotSetError path (line 209-213)
+# LOCATION_COORDINATES_WRONG_MESSAGE — ContextPropertyNotSetError path
 # ---------------------------------------------------------------------------
 
 
@@ -594,10 +597,10 @@ async def test_edit_location_name_message_sends_main_menu_when_context_missing(
     indirect=True,
 )
 async def test_edit_location_coordinates_wrong_message_sends_main_menu_when_context_missing(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When no meeting_id is stored in context, edit_coordinates_without_location catches
     ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
@@ -606,13 +609,14 @@ async def test_edit_location_coordinates_wrong_message_sends_main_menu_when_cont
     mock_session.add_object(meeting)
 
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, state = await call_handler(
             EditMeetingHandlerId.LOCATION_COORDINATES_WRONG_MESSAGE,
             handler_context=handler_context,
         )
-        assert any(r.levelno == logging.ERROR for r in caplog.records)
-        assert "meeting_id" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_LOCATION_COORDINATES)
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
@@ -622,7 +626,7 @@ async def test_edit_location_coordinates_wrong_message_sends_main_menu_when_cont
 
 
 # ---------------------------------------------------------------------------
-# LOCATION_COORDINATES_MESSAGE — ContextPropertyNotSetError path (line 209-213)
+# LOCATION_COORDINATES_MESSAGE — ContextPropertyNotSetError path
 # ---------------------------------------------------------------------------
 
 
@@ -632,10 +636,10 @@ async def test_edit_location_coordinates_wrong_message_sends_main_menu_when_cont
     indirect=True,
 )
 async def test_edit_location_coordinates_message_sends_main_menu_when_context_missing(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When no meeting_id is stored in context, edit_meeting_location_coordinates catches
     ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
@@ -644,13 +648,14 @@ async def test_edit_location_coordinates_message_sends_main_menu_when_context_mi
     mock_session.add_object(meeting)
 
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, state = await call_handler(
             EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
             handler_context=handler_context,
         )
-        assert any(r.levelno == logging.ERROR for r in caplog.records)
-        assert "meeting_id" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_LOCATION_COORDINATES)
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(

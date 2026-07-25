@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from structlog.testing import capture_logs
 from telegram import Update
 from telegram.ext import ConversationHandler
 
@@ -27,6 +28,7 @@ from tests.helpers import (
     AnyFloat,
     HandlerContext,
     UpdateRequest,
+    assert_context_lost_logged,
     assert_locked_meetup_select,
     call_handler,
     create_meetup,
@@ -628,7 +630,6 @@ async def test_edit_max_participants_patron_owner_over_cap_is_accepted(
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="420")], indirect=True)
 async def test_edit_max_participants_message_fails_if_context_not_saved(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -638,11 +639,11 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, result = await call_handler(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE, handler_context=handler_context
         )
-        assert "User data 'meeting_id' requested but not set" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
     assert meeting.location.name is None
     mock_session.assert_not_flushed()
@@ -688,7 +689,6 @@ async def test_edit_meeting_wrong_max_participants_works(
 
 @pytest.mark.parametrize("update", [(UpdateRequest(message_text="no number today"))], indirect=True)
 async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -698,11 +698,11 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, result = await call_handler(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE, handler_context=handler_context
         )
-        assert "User data 'meeting_id' requested but not set" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
     assert meeting.max_members is None
     mock_session.assert_not_flushed()
@@ -814,7 +814,7 @@ def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
 
 
 # ---------------------------------------------------------------------------
-# PARTICIPANTS_MAXIMUM_MESSAGE — ContextPropertyNotSetError path (line 156-160)
+# PARTICIPANTS_MAXIMUM_MESSAGE — ContextPropertyNotSetError path
 # ---------------------------------------------------------------------------
 
 
@@ -824,25 +824,29 @@ def test_edit_meeting_participants_view_with_participants_shows_kick_out_button(
     indirect=True,
 )
 async def test_edit_meeting_max_participants_message_sends_main_menu_when_context_missing(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When no meeting_id is stored in context, edit_meeting_max_participants catches
-    ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
+    ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation.
+
+    The loss is an expected state, so it is logged as a warning and counted on the ContextLost
+    series the central error handler feeds — not on the fault series."""
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, state = await call_handler(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
             handler_context=handler_context,
         )
-        assert any(r.levelno == logging.ERROR for r in caplog.records)
-        assert "meeting_id" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
@@ -852,7 +856,7 @@ async def test_edit_meeting_max_participants_message_sends_main_menu_when_contex
 
 
 # ---------------------------------------------------------------------------
-# PARTICIPANTS_MAXIMUM_WRONG_MESSAGE — ContextPropertyNotSetError path (line 186-191)
+# PARTICIPANTS_MAXIMUM_WRONG_MESSAGE — ContextPropertyNotSetError path
 # ---------------------------------------------------------------------------
 
 
@@ -862,10 +866,10 @@ async def test_edit_meeting_max_participants_message_sends_main_menu_when_contex
     indirect=True,
 )
 async def test_edit_meeting_wrong_max_participants_message_sends_main_menu_when_context_missing(
-    caplog: pytest.LogCaptureFixture,
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
+    metrics: MetricAssertions,
 ):
     """When no meeting_id is stored in context, edit_meeting_wrong_max_participants catches
     ContextPropertyNotSetError, sends the main menu view as a new message, and ends the conversation."""
@@ -874,13 +878,14 @@ async def test_edit_meeting_wrong_max_participants_message_sends_main_menu_when_
     mock_session.add_object(meeting)
 
     # Do NOT pass with_meeting_id so ContextPropertyNotSetError is raised.
-    with caplog.at_level(logging.ERROR):
+    with capture_logs() as logs:
         context, state = await call_handler(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
             handler_context=handler_context,
         )
-        assert any(r.levelno == logging.ERROR for r in caplog.records)
-        assert "meeting_id" in caplog.text
+    assert_context_lost_logged(logs, ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+    metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(

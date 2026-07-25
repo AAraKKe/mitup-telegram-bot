@@ -1,4 +1,3 @@
-import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -10,18 +9,16 @@ from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.handlers.registry import HandlersRegistry
-from mitup_bot.handlers.utils import reply_rich_message_not_supported
+from mitup_bot.handlers.utils import recover_from_lost_context, reply_rich_message_not_supported
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils import ButtonMessages, CommonMessages, MeetingEditLocationMessages
+from mitup_bot.utils import ButtonMessages, MeetingEditLocationMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import MitupView, factory
+from mitup_bot.views import MitupView
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_location_view
-
-log = structlog.get_logger(__name__)
 
 
 def edit_location_name_prompt_view(meeting_id: int, lang: str) -> MitupView:
@@ -174,16 +171,7 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
                 access=guards.MeetingAccess.OWNER_ANY_STATE,
             )
     except ContextPropertyNotSetError as exc:
-        # If the meeting id is not set, we should not be here
-        log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.send_message(
-            update=update,
-            view=factory.main_menu_view(
-                guards.render_context(user, update, context),
-                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
-            ),
-        )
-        return ConversationHandler.END
+        return await recover_from_lost_context(update, context, user, exc, ContextId.EDIT_MEETING_LOCATION_NAME)
 
     meeting.location.name = location_name
 
@@ -215,16 +203,7 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
                 access=guards.MeetingAccess.OWNER_ANY_STATE,
             )
     except ContextPropertyNotSetError as exc:
-        # If the meeting id is not set, we should not be here
-        log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.send_message(
-            update=update,
-            view=factory.main_menu_view(
-                guards.render_context(user, update, context),
-                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
-            ),
-        )
-        return ConversationHandler.END
+        return await recover_from_lost_context(update, context, user, exc, ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
     assert tg_location is not None, "the LOCATION filter this handler is registered with guarantees the location"
 
@@ -261,16 +240,7 @@ async def edit_coordinates_without_location(session: AsyncSession, update: Updat
                 ],
             )
     except ContextPropertyNotSetError as exc:
-        # If the meeting id is not set, we should not be here
-        log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.send_message(
-            update=update,
-            view=factory.main_menu_view(
-                guards.render_context(user, update, context),
-                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
-            ),
-        )
-        return ConversationHandler.END
+        return await recover_from_lost_context(update, context, user, exc, ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
     await context.api.send_message(update=update, view=view)
     return ConversationMeetingState.EDIT_LOCATION_COORDIANTES

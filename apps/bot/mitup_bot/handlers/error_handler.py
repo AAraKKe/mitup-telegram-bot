@@ -21,6 +21,7 @@ from mitup_bot.exceptions import (
     SharedMeetingGoneError,
     UserPendingDeletion,
 )
+from mitup_bot.handlers.utils import CONTEXT_LOST_EVENT, RecoveryReason
 from mitup_bot.keyboards import Keyboard
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
@@ -288,7 +289,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # fault. It gets its own metric and bypasses the fault alarms below; the user is redirected to the
     # main menu with a friendly note explaining their saved data is safe.
     if isinstance(error, ContextPropertyNotSetError):
-        log.warning("Conversation context was lost while handling the update", exc_info=error)
+        log.warning(CONTEXT_LOST_EVENT, exc_info=error, reason=RecoveryReason.CONVERSATION_CONTEXT_MISSING.value)
         context.emit_metric(MetricKey.CONTEXT_LOST, 1)
         await notify_guard_error(context, CommonMessages.CONTEXT_LOST)
         return

@@ -1,6 +1,5 @@
 from typing import cast
 
-import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -12,17 +11,15 @@ from mitup_bot.exceptions import ContextPropertyNotSetError
 from mitup_bot.handlers.meeting.utils import participant_capacity_rejection
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.utils import recover_from_lost_context
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.monitoring import Feature
-from mitup_bot.utils import CommonMessages, MeetingEditParticipantsMessages
+from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import factory
 from mitup_bot.views.collaborate import collaborate_button
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_max_participants_view, edit_participants_view
-
-log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -154,15 +151,7 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
                 lock=True,
             )
     except ContextPropertyNotSetError as exc:
-        log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.send_message(
-            update=update,
-            view=factory.main_menu_view(
-                guards.render_context(user, update, context),
-                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
-            ),
-        )
-        return ConversationHandler.END
+        return await recover_from_lost_context(update, context, user, exc, ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
     requested_max = int(cast(str, number))
 
@@ -209,15 +198,7 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
             # participant list.
             response_view = edit_max_participants_view(meeting, fail=True)
     except ContextPropertyNotSetError as exc:
-        log.error("Meeting id not set in context", exc_info=exc)
-        await context.api.send_message(
-            update=update,
-            view=factory.main_menu_view(
-                guards.render_context(user, update, context),
-                message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
-            ),
-        )
-        return ConversationHandler.END
+        return await recover_from_lost_context(update, context, user, exc, ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
     await context.api.send_message(update=update, view=response_view)
 
