@@ -302,11 +302,9 @@ async def test_set_end_date_first_time_defaults_to_2359(
         handler_context=handler_context,
     )
 
-    # end_datetime should be set (23:59 in user TZ on 2026-06-15)
-    assert meeting.end_datetime is not None
+    # The UTC owner picks Jun 15, so the default end lands at 23:59 UTC that day.
+    assert meeting.end_datetime == dt.datetime(2026, 6, 15, 23, 59, tzinfo=dt.UTC)
     assert state == ConversationMeetingState.EDIT_END_TIME
-    mock_session.assert_added(meeting)
-    mock_session.assert_flushed()
 
 
 @pytest.mark.parametrize(
@@ -370,7 +368,6 @@ async def test_update_existing_end_date_valid(
     # existing 11:30 end time is kept and only the date moves to Jun 16.
     assert meeting.end_datetime == dt.datetime(2026, 6, 16, 11, 30, tzinfo=dt.UTC)
     assert state == ConversationMeetingState.EDIT_END_DATETIME
-    mock_session.assert_flushed()
 
 
 @pytest.mark.parametrize(

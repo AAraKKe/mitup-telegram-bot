@@ -410,7 +410,7 @@ async def callback_query_back_to_end_datetime(
 @HandlersRegistry.register_callback_query(
     EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK, callback_data=cb.SET_MEETING_END_DATE, bindable=False
 )
-@with_session
+@with_session(write=True)
 async def callback_query_duration_end_set_date(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
@@ -437,10 +437,6 @@ async def callback_query_duration_end_set_date(
             return ConversationMeetingState.EDIT_END_DATE
 
         meeting.end_datetime = proposed_end
-        session.add(meeting)
-        # Mid-conversation step with no broadcast: flush so a constraint error surfaces
-        # here, before the next prompt renders (plain mode, not write mode).
-        await session.flush()
 
         return await show_end_time_prompt(context, update, meeting)
 
@@ -455,9 +451,6 @@ async def callback_query_duration_end_set_date(
         return ConversationMeetingState.EDIT_END_DATE
 
     meeting.end_datetime = proposed_end
-    session.add(meeting)
-    # Same rationale as above: fail before rendering the next prompt (plain mode).
-    await session.flush()
 
     return await show_end_datetime_entry(context, update, meeting, user.lang)
 
