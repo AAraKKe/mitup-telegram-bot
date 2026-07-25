@@ -21,6 +21,7 @@ from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.handlers.command_enums import CommandsId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
+from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
@@ -35,6 +36,7 @@ from mitup_bot.monitoring import MetricKey, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -908,14 +910,16 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.TITLE_RICH_MESSAGE,
         update_request=UpdateRequest(rich_message=True),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
         id="edit_title_rich_message",
+        meeting_id={ContextId.EDIT_MEETING_TITLE: MEETING_ID_NOT_OWNED},
     ),
     Context(
         handler_id=EditMeetingHandlerId.DESCRIPTION_RICH_MESSAGE,
         update_request=UpdateRequest(rich_message=True),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
         id="edit_description_rich_message",
+        meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: MEETING_ID_NOT_OWNED},
     ),
     Context(
         handler_id=EditMeetingHandlerId.LOCATION_NAME_RICH_MESSAGE,
@@ -1211,6 +1215,28 @@ CONTEXTS = [
         error_modes={ErrorMode.MISSING_USER_DATA},
         id="wrong_time_message",
     ),
+    # --- Inline query ---
+    Context(
+        handler_id=InlineQueryId.SHARE_MEETING,
+        update_request=UpdateRequest(inline_query=str(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="inline_share_meeting",
+    ),
+    # --- Edit meeting title and description content steps ---
+    Context(
+        handler_id=EditMeetingHandlerId.TITLE_MESSAGE,
+        update_request=UpdateRequest(message_text="A new title"),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_title_message",
+        meeting_id={ContextId.EDIT_MEETING_TITLE: MEETING_ID_NOT_OWNED},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DESCRIPTION_MESSAGE,
+        update_request=UpdateRequest(message_text="A new description"),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_description_message",
+        meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: MEETING_ID_NOT_OWNED},
+    ),
     # --- Edit meeting location flow ---
     Context(
         handler_id=EditMeetingHandlerId.LOCATION_CALLBACK,
@@ -1239,8 +1265,10 @@ CONTEXTS = [
     Context(
         handler_id=EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
         update_request=UpdateRequest(message_text="Some place"),
-        error_modes={ErrorMode.USER_NOT_FOUND},
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
         id="edit_meeting_location_name_message",
+        meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: MEETING_ID_NOT_OWNED},
+        shows_deleted_message_when_not_found=False,
     ),
     Context(
         handler_id=EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
@@ -1374,12 +1402,20 @@ def handler_shows_reactivation_prompt_for_inactive_meeting() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_INACTIVE_OWNER in context.error_modes]
 
 
-def assert_rejection_screen(context: StubMitupContext, update: Update, view: MitupView):
+def assert_rejection_screen(context: StubMitupContext, update: Update, view: MitupView, *, lang: str):
     """Assert the rejection screen reached the user in the shape this update can carry.
 
     A callback query replaces the screen the button sits on; a message update has no message of
-    ours to replace, so the rejection arrives as a fresh reply.
+    ours to replace, so the rejection arrives as a fresh reply. An inline query can only carry
+    results and answers every rejection with the same unavailable card, so `view` does not apply
+    there and `lang` is what picks the screen.
     """
+    if update.inline_query is not None:
+        context.api.assert_answer_inline_query_called(
+            update, results=[meeting_views.unavailable_inline_view(lang)], cache_time=0
+        )
+        return
+
     if update.callback_query is not None:
         context.api.assert_edit_message_called(update, view)
         context.api.assert_send_message_not_called()
@@ -1435,7 +1471,12 @@ async def test_handler_rejects_meeting_not_owned(
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
-    assert_rejection_screen(context, update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    assert_rejection_screen(
+        context,
+        update,
+        factory.main_menu_view(RenderContext(lang=user_with_settings.lang)),
+        lang=user_with_settings.lang,
+    )
 
 
 @pytest.mark.parametrize(
@@ -1484,6 +1525,7 @@ async def test_handler_rejects_meeting_that_is_gone(
             description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user_with_settings.lang),
             keyboard=keyboard,
         ),
+        lang=user_with_settings.lang,
     )
 
 
@@ -1565,7 +1607,11 @@ async def test_handler_rejects_user_pending_deletion(
     # An expected business state, not a fault: the dedicated error-handler branch answers the
     # interaction before any fault metric is emitted.
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
-    if update.callback_query is not None:
+    if update.inline_query is not None:
+        # An inline query can only be answered with results, and a dying account surfaces none.
+        context.api.assert_answer_inline_query_called(update, results=[], cache_time=0)
+        context.api.assert_send_message_not_called()
+    elif update.callback_query is not None:
         context.api.assert_answer_callback_query_called(
             update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=marked_user.lang), show_alert=True
         )
@@ -1646,6 +1692,7 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
         factory.reactivation_prompt_view(
             RenderContext(lang=user_with_settings.lang), meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
         ),
+        lang=user_with_settings.lang,
     )
 
 
@@ -1682,4 +1729,9 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
-    assert_rejection_screen(context, update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    assert_rejection_screen(
+        context,
+        update,
+        factory.main_menu_view(RenderContext(lang=user_with_settings.lang)),
+        lang=user_with_settings.lang,
+    )

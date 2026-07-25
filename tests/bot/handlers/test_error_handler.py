@@ -19,6 +19,9 @@ from mitup_bot.exceptions import (
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
+    SharedMeetingDeniedError,
+    SharedMeetingFinishedError,
+    SharedMeetingGoneError,
     UserNotFound,
     UserPendingDeletion,
 )
@@ -32,7 +35,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
+from mitup_bot.utils.messages import CommonMessages, MeetingDisplayMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
@@ -374,6 +377,68 @@ async def test_meeting_inactive_owner_is_a_plain_screen(
 
     metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
     assert [entry for entry in logs if entry["log_level"] == "warning"] == []
+
+
+# --- Shared-surface rejections ---
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A card that outlived its meeting is replaced by the deleted banner, on its own counter."""
+    error = SharedMeetingGoneError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_edit_message_called(
+        context.telegram_update, MeetingDisplayMessages.DELETED_BANNER.get(lang="en")
+    )
+    metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [entry["event"] for entry in warnings] == []
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_shared_meeting_finished_replaces_the_card_with_the_finished_banner(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """The banner is the whole screen: the card carries no buttons once the meeting has run."""
+    error = SharedMeetingFinishedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="es")
+
+    await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_edit_message_called(
+        context.telegram_update,
+        MitupView(description=MeetingDisplayMessages.FINISHED_BANNER.get(lang="es"), keyboard=[]),
+    )
+    metrics.assert_not_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
+    metrics.assert_not_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A denial leaves the card alone and says nothing about the meeting beyond the deleted copy."""
+    error = SharedMeetingDeniedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get(lang="en"), show_alert=True
+    )
+    context.api.assert_edit_message_not_called()
+    metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [entry["event"] for entry in warnings] == [str(error)]
 
 
 async def test_meeting_rejection_suppresses_delivery_failures(app: StubMitupApp, mock_session: MockDbSession):

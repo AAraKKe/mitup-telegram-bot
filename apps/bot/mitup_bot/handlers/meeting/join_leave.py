@@ -11,10 +11,9 @@ from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, Message, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
+from mitup_bot.monitoring import Feature
+from mitup_bot.utils import MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import MeetingHandlerId
@@ -165,62 +164,39 @@ async def handle_join_leave_operation(
 ):
     """Handle common infrastructure for meeting operations (join/leave)."""
     data = guards.valid_callback_data(cb.JOIN.parse(context.match), MeetingHandlerId.JOIN)
-    # for_update: both operations read capacity/waiting-list state and mutate participants, so
-    # the meetup row must be locked before the first read to serialize cross-user races.
-    if meeting := await Meetup.by_id(session, data.id, for_update=True):
-        # The locked load ran with populate_existing, which re-hydrates every entity its selectin
-        # cascade touches — including `user` when they own or participate in this meeting —
-        # resetting the lazy="raise" collections read below (own_meeting via keyboard_for_update,
-        # joined_meeting in the operations) to unloaded. Re-load them; the row lock is already
-        # held, so the re-read is race-safe.
-        await session.refresh(user, ["meetups", "joined_links"])
+    # lock: both operations read capacity/waiting-list state and mutate participants, so the meetup
+    # row must be locked before the first read to serialize cross-user races.
+    meeting = await guards.shared_meeting(session, user, data.id, "join or leave a meeting", update, lock=True)
 
-        # Authorize before anything is rendered or written: the meeting id arrives in client-supplied
-        # callback data, and both the message tracking below and update_meeting_messages would
-        # otherwise push this meeting's card into whichever chat the caller tapped from.
-        if not await guards.meeting_interaction_allowed(session, user, meeting, update, context):
-            return
+    # The guard's locked load ran with populate_existing, which re-hydrates every entity its selectin
+    # cascade touches — including `user` when they own or participate in this meeting — resetting the
+    # lazy="raise" collections read below (own_meeting via keyboard_for_update, joined_meeting in the
+    # operations) to unloaded. Re-load them; the row lock is already held, so the re-read is race-safe.
+    await session.refresh(user, ["meetups", "joined_links"])
 
-        if not meeting.active:
-            await context.api.edit_message(
-                update=update,
-                view=MitupView(
-                    description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang),
-                    keyboard=[],
-                ),
-            )
-            return
+    if meeting.lock_on_start and meeting.is_in_progress:
+        await context.api.answer_callback_query(
+            update=update,
+            text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
+            show_alert=True,
+        )
+        return
 
-        if meeting.lock_on_start and meeting.is_in_progress:
-            await context.api.answer_callback_query(
-                update=update,
-                text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
-                show_alert=True,
-            )
-            return
-
-        # Common message handling
-        if (current_message := meeting.message_from_update(update)) is None:
-            current_message = Message.from_update(
-                update, meeting, meeting_views.keyboard_for_update(update, meeting, user)
-            )
-            meeting.messages.append(current_message)
-        else:
-            current_message.capture_chat_instance(update)
-
-        # Execute core operation
-        notification_key = await operation(meeting, user)
-
-        if with_notification:
-            await context.api.answer_callback_query(
-                update=update,
-                text=notification_key.get(lang=user.lang),
-                show_alert=False,
-            )
-
-        await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
+    # Common message handling
+    if (current_message := meeting.message_from_update(update)) is None:
+        current_message = Message.from_update(update, meeting, meeting_views.keyboard_for_update(update, meeting, user))
+        meeting.messages.append(current_message)
     else:
-        # The meeting was not found, update the message to inform the user
-        # This should never happen because when the meeting is deleted all messages are updated
-        await context.api.edit_message(update=update, view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang))
-        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_properties=False)
+        current_message.capture_chat_instance(update)
+
+    # Execute core operation
+    notification_key = await operation(meeting, user)
+
+    if with_notification:
+        await context.api.answer_callback_query(
+            update=update,
+            text=notification_key.get(lang=user.lang),
+            show_alert=False,
+        )
+
+    await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)

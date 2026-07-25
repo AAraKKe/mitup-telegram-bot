@@ -70,10 +70,18 @@ All guards that take a `session` are async — `await` them.
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` (all rendered by the global error handler) |
-| `meeting_interaction_allowed` | `(session, user, meeting, update, context)` | `bool` | — (answers with the deleted-meeting alert) |
+| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` |
+| `shared_meeting` | `(session, user, meeting_id, action, update, *, lock=False, require_active=True)` | `Meetup` | `SharedMeetingGoneError`, `SharedMeetingDeniedError`, `SharedMeetingFinishedError` |
+| `conversation_meeting` | `(session, user, meeting_id, action, *, lock=False)` | `Meetup` | `MeetingGoneError` |
+| `meeting_interaction_allowed` | `(session, user, meeting, update)` | `bool` | — (a predicate; `shared_meeting` raises on `False`) |
 
-`guards.meeting` is the single meeting guard for the bot chat (not inline). It resolves the meeting through `Meetup.by_id` and returns **its own** meeting-rooted instance, whose participant leaves (owner, joined links' `user`/`invited_by`) are hydrated — so handlers render straight off the guard result and never re-load. Ownership is decided on that loaded row via `Meetup.is_owned_by`.
+All three guards raise instead of returning `None` and render nothing themselves — the global error handler owns every screen. Pick by where the caller reached the meeting from:
+
+- **`meeting`** — the ownership-rooted surfaces the user reaches through their own bot chat.
+- **`shared_meeting`** — the any-user surfaces reached by tapping a meeting card, which may sit in any chat the meeting was shared into (join, leave, attach-to-chat, the invite entry point).
+- **`conversation_meeting`** — the later steps of a flow, where the id comes back from the caller's own conversation state and the entry point already decided access.
+
+`guards.meeting` resolves the meeting through `Meetup.by_id` and returns **its own** meeting-rooted instance, whose participant leaves (owner, joined links' `user`/`invited_by`) are hydrated — so handlers render straight off the guard result and never re-load. Ownership is decided on that loaded row via `Meetup.is_owned_by`.
 
 The guard never returns `None` and never renders: it either hands back a meeting or raises, so callers use the result directly and carry no `if meeting is None` stanza. It takes no `update` for the same reason — the exception carries what the renderer needs (see "Rejections" below).
 
@@ -83,13 +91,14 @@ The guard never returns `None` and never renders: it either hands back a meeting
 |---|---|---|---|
 | `OWNER` (default) | the owner of an active meeting | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
 | `OWNER_OR_JOINED` | the owner, plus anyone who joined the active meeting (waiting list included) | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
+| `OWNER_OR_PUBLIC` | the owner, plus anyone at all when the active meeting is public | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
 | `OWNER_ANY_STATE` | the owner, whatever the meeting's state | `MeetingNotOwnedError`, as for a meeting the caller does not own | returned to the caller |
 
-Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_JOINED` for screens that only **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list, where the caller renders `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Use `OWNER_ANY_STATE` on the surfaces that render inactive meetings themselves — the past-meetings screens, reactivation, and the delete flows — where the reactivation prompt would replace the screen the user asked for.
+Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_JOINED` for screens that only **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list, where the caller renders `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Use `OWNER_OR_PUBLIC` for the inline share query, the one surface where being public is itself the permission. Use `OWNER_ANY_STATE` on the surfaces that render inactive meetings themselves — the past-meetings screens, reactivation, and the delete flows — where the reactivation prompt would replace the screen the user asked for.
 
 ### Rejections
 
-The three rejections all subclass `MeetingAccessError` (itself a `GuardError`) and carry `meeting_id`, `action` and `lang`. `MeetingGoneError` and `MeetingInactiveOwnerError` also carry the back-navigation `keyboard`; `MeetingNotOwnedError` does not, since its screen is the main menu, which navigates on its own. The error handler owns every screen they produce and picks the reply shape from the update — callback query → edit in place, message → fresh reply, inline query → the unavailable card. See the `error-handling` skill for that branch.
+Every rejection subclasses `MeetingAccessError` (itself a `GuardError`) and carries `meeting_id`, `action` and `lang`. `MeetingGoneError` and `MeetingInactiveOwnerError` also carry the back-navigation `keyboard`; the others do not, since their screens navigate on their own. The error handler owns every screen they produce. For the bot-chat rejections it picks the reply shape from the update — callback query → edit in place, message → fresh reply, inline query → the unavailable card. The `SharedMeetingError` subclasses answer on the card instead, whatever the update looks like. See the `error-handling` skill for both branches.
 
 `action` is a short free-text description of what the user was doing. It is not user-facing: it names the attempt in the exception message and in the warning line the error handler logs.
 
@@ -97,17 +106,47 @@ A non-owner is logged and counted on the `MeetingNotOwned` error metric; the del
 
 Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. The locked load resets the acting user's `meetups`/`joined_links` to unloaded, so a handler that both locks and opted into the collections must re-load them itself. See the `database` skill's "Per-meeting row locks" section for the full convention.
 
-Use `meeting_interaction_allowed` in every handler that acts on a meeting reachable from outside the
-bot chat (join, leave, attach-to-chat, invite). The meeting id arrives in client-supplied callback
-data, so it proves nothing on its own: the guard authorizes the *message the tap came from*, which
-Telegram fills in. It allows public meetings, owners, members (waiting list included), inviters, a
-tracked message of this meeting, a meeting already tracked in this chat, and a shared card claimed by
-this meeting. A shared card is claimed when it is sent, by the `chosen_inline_result` handler — an
-unclaimed inline message authorizes nothing, since anyone can produce one by sharing a card of their
-own. Call it before any write or render, and return immediately when it is `False` (it has already
-answered the caller with the deleted-meeting alert).
-
 `custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from. It travels to the renderer on the exception, so the guard never builds a screen itself.
+
+### Shared surfaces
+
+`guards.shared_meeting` is the single guard for the surfaces a user reaches by tapping a meeting card,
+whatever chat it sits in. Use it in every handler that acts on such a card (join, leave,
+attach-to-chat, the invite entry point) and nowhere else. It decides three things in this order:
+
+1. **Does the meeting resolve?** No → `SharedMeetingGoneError`. The card is stale: the error handler
+   replaces it with the deleted banner and counts it on `STALE_MEETING_MESSAGE`.
+2. **Does the tapped message authorize this caller?** No → `SharedMeetingDeniedError`, answered with
+   the deleted-meeting alert over the untouched card and counted on `UNAUTHORIZED_MEETING_CALLBACK`.
+   Decided before the meeting's state is read, so a denial discloses nothing about it.
+3. **Is the meeting still active?** No → `SharedMeetingFinishedError`, which replaces the card with
+   the finished banner in the *meeting's* language, since the card is what every reader of that chat
+   sees. Pass `require_active=False` on the surfaces that stay useful on a finished meeting
+   (attach-to-chat), which then skip this step.
+
+`lock=True` works as it does for `meeting`, with the same consequence: the locked load resets the
+acting user's `meetups`/`joined_links` to unloaded, and a handler that reads them re-loads them after
+the guard returns.
+
+Step 2 is `meeting_interaction_allowed`, available on its own as a predicate. The meeting id arrives
+in client-supplied callback data, so it proves nothing: what the predicate authorizes is the *message
+the tap came from*, which Telegram fills in. It allows public meetings, owners, members (waiting list
+included), inviters, a tracked message of this meeting, a meeting already tracked in this chat, and a
+shared card claimed by this meeting. A shared card is claimed when it is sent, by the
+`chosen_inline_result` handler — an unclaimed inline message authorizes nothing, since anyone can
+produce one by sharing a card of their own.
+
+Business rules are **not** guard material and stay in the handler: capacity, waiting-list and
+invitation-setting decisions (`join_allowed`, `allow_invitation`, `lock_on_start`) run on the meeting
+the guard hands back.
+
+### Conversation steps
+
+`guards.conversation_meeting` is for the steps after a flow's entry point, where the meeting id comes
+back from the caller's own conversation state and carries the authorization the entry point already
+made. It re-reads the meeting and raises `MeetingGoneError` when it has been deleted **or**
+deactivated while the user was typing — the same rejection for both, since neither can be written to.
+No access decision is re-taken. Pass `lock=True` from the step that commits the flow's write.
 
 ## Usage pattern
 
@@ -126,5 +165,5 @@ A rejection aborts the handler mid-body, so anything that must happen regardless
 ## Failure mode registration
 
 <critical_rules>
-  <rule>If a handler uses any of `current_user`, `meeting`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/bot/handlers/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
+  <rule>If a handler uses any of `current_user`, `meeting`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/bot/handlers/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass. Handlers whose meeting comes from conversation state declare the id the guard will resolve with the `meeting_id` field.</rule>
 </critical_rules>

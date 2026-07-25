@@ -35,6 +35,9 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
 
+    # The handler resolves the acting user to decide, through `guards.meeting`, that the meeting the
+    # conversation carries is theirs to edit.
+    mock_session.add_object(user_with_settings, "tg_user_id")
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting, "id")
 
@@ -60,6 +63,9 @@ async def test_edit_description_message_handler_update_the_description_and_send_
     assert context.user_data is not None
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, 1)
 
+    # The handler resolves the acting user to decide, through `guards.meeting`, that the meeting the
+    # conversation carries is theirs to edit.
+    mock_session.add_object(user_with_settings, "tg_user_id")
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting, "id")
 

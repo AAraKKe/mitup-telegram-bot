@@ -13,7 +13,6 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, CommonMessages, MeetingEditLocationMessages
 from mitup_bot.utils import callbacks as cb
@@ -160,13 +159,20 @@ async def callback_edit_meeting_location_coordinates(session: AsyncSession, upda
 )
 @with_session(write=True)
 async def edit_meeting_location_name(session: AsyncSession, update: Update, context: TMitupContext):
-    assert update.effective_message is not None
+    location_name = guards.message(update).text
 
     user = await guards.current_user(update, session)
 
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME) as meeting_id:
-            meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
+            meeting = await guards.meeting(
+                session,
+                user,
+                meeting_id,
+                "Edit location name",
+                context,
+                access=guards.MeetingAccess.OWNER_ANY_STATE,
+            )
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)
@@ -179,7 +185,7 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
         )
         return ConversationHandler.END
 
-    meeting.location.name = update.effective_message.text
+    meeting.location.name = location_name
 
     response_view = edit_location_view(meeting).with_context(
         MeetingEditLocationMessages.NAME_SUCCESS.get(name=meeting.location.name)
@@ -194,7 +200,7 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
 @HandlersRegistry.register_message(EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE, filters.LOCATION, bindable=False)
 @with_session(write=True)
 async def edit_meeting_location_coordinates(session: AsyncSession, update: Update, context: TMitupContext):
-    assert update.effective_message is not None
+    tg_location = guards.message(update).location
 
     user = await guards.current_user(update, session)
 
@@ -220,8 +226,7 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
         )
         return ConversationHandler.END
 
-    tg_location = update.effective_message.location
-    assert tg_location is not None
+    assert tg_location is not None, "the LOCATION filter this handler is registered with guarantees the location"
 
     meeting.location.coordinates = (tg_location.longitude, tg_location.latitude)
 

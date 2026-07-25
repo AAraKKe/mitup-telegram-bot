@@ -10,9 +10,9 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.monitoring import Feature, MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
-from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
+from mitup_bot.utils import MeetingDisplayMessages, MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import RenderContext
+from mitup_bot.views import MitupView, RenderContext
 from mitup_bot.views import factory as views_factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
@@ -131,8 +131,8 @@ async def test_invite_with_id_of_meeting_does_not_exist(
     user_with_settings: User,
     mock_session: MockDbSession,
 ):
+    """The invite button on a card whose meeting is gone gets the same answer join and leave give it."""
     mock_session.add_user(user_with_settings)
-    # Should return None and end conversation and answer with alert saying that the meeting no longer exists
     steps = [
         ConversationStep.callback(cb.INVITE.with_id(MEETING_ID)),
     ]
@@ -142,11 +142,11 @@ async def test_invite_with_id_of_meeting_does_not_exist(
         steps=steps,
     )
 
-    result.last_context.api.assert_answer_callback_query_called(
+    result.last_context.api.assert_edit_message_called(
         update=result.last_context.get_update(),
-        text=MeetingInviteMessages.MEETING_NOT_FOUND.get(lang=user_with_settings.lang),
-        show_alert=True,
+        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
     )
+    MetricAssertions(result.last_context.metrics).assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
 
 
 async def test_invite_users_ask_for_name(
@@ -507,31 +507,12 @@ def deacivate_meeting(meeting: Meetup):
             [None, disable_invitations, None],
             MeetingInviteMessages.INVITES_DISABLED,
         ],
-        [
-            [
-                ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
-                ConversationStep.message("Bruce Wayne"),
-            ],
-            [deacivate_meeting, None],
-            MeetingInviteMessages.MEETING_LOST_RETRY,
-        ],
-        [
-            [
-                ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
-                ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.CONFIRMATION),
-                ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID)),
-            ],
-            [None, deacivate_meeting, None],
-            MeetingInviteMessages.MEETING_LOST_RETRY,
-        ],
     ],
     ids=[
         "full_on_name_entry",
         "disabled_on_name_entry",
         "full_on_confirmation",
         "disabled_on_confirmation",
-        "inactive_on_name_entry",
-        "inactive_on_confirmation",
     ],
 )
 async def test_meeting_does_not_accept_invitations_after_conversation_started(
@@ -576,6 +557,87 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 
 
 @pytest.mark.parametrize(
+    "steps, deactivate_after_step",
+    [
+        [
+            [
+                ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
+                ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.NAME),
+            ],
+            0,
+        ],
+        [
+            [
+                ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
+                ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.CONFIRMATION),
+                ConversationStep.callback(
+                    cb.CONFIRM_INVITE_USER.with_id(MEETING_ID), expected_state=ConversationInviteState.CONFIRMATION
+                ),
+            ],
+            1,
+        ],
+    ],
+    ids=["inactive_on_name_entry", "inactive_on_confirmation"],
+)
+async def test_meeting_disappears_mid_conversation(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    conversation: ConversationTester,
+    meeting: Meetup,
+    steps: list[ConversationStep],
+    deactivate_after_step: int,
+):
+    """A meeting that stops existing while the invite flow runs is answered by the deleted-meeting screen.
+
+    The remaining steps read the meeting id back from the caller's own conversation state, so the
+    rejection is the bot-chat one rather than the stale-card banner: a message step has no message of
+    ours to replace and gets a fresh reply, the confirmation callback replaces the screen it sits on.
+
+    The rejection aborts the step, so it returns no state and the conversation stays where it was —
+    what every guard exception does. The screen it lands on navigates out of the flow.
+    """
+    setup_db(mock_session, user_with_settings, meeting)
+    steps[deactivate_after_step].after = partial(deacivate_meeting, meeting)
+
+    result = await conversation.run(handler_id=MeetingHandlerId.INVITE_USERS_CONVERSATION, steps=steps)
+
+    final_context = result.last_context
+    update = final_context.get_update()
+    expected_view = views_factory.deleted_meeting_view(RenderContext(lang=user_with_settings.lang))
+    if update.callback_query is not None:
+        final_context.api.assert_edit_message_called(update=update, view=expected_view)
+    else:
+        final_context.api.assert_send_message_called(update=update, view=expected_view)
+
+    assert len(meeting.joined_links) == 0
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(callback_query=cb.INVITE.with_id(MEETING_ID), from_bot_chat=False),
+    ],
+    indirect=True,
+)
+async def test_invite_on_finished_meeting_replaces_the_card(
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    meeting: Meetup,
+):
+    """A card whose meeting has finished is replaced by the finished banner, as join and leave do."""
+    setup_db(mock_session, user_with_settings, meeting)
+    deacivate_meeting(meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_CONVERSATION, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=MitupView(description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang), keyboard=[]),
+    )
+
+
+@pytest.mark.parametrize(
     "update",
     [
         UpdateRequest(callback_query=cb.INVITE.with_id(MEETING_ID), from_bot_chat=False),
@@ -587,12 +649,10 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
     [
         [disable_invitations, MeetingInviteMessages.INVITES_DISABLED],
         [fill_meeting, MeetingInviteMessages.MEETING_FULL],
-        [deacivate_meeting, MeetingInviteMessages.MEETING_NOT_FOUND],
     ],
     ids=[
         "invitations_disabled",
         "meeting_full",
-        "meeting_inactive",
     ],
 )
 async def test_meeting_not_allowing_invitations_on_callback_query(
@@ -640,7 +700,6 @@ async def test_abort_invitation_when_meeting_no_longer_allows_invitations(
     meeting: Meetup,
     handler_id: MeetingHandlerId,
     owner_id: int,
-    monkeypatch: pytest.MonkeyPatch,
 ):
     """When the meeting can no longer be invited into, even an owner lands on the main menu.
 
@@ -654,18 +713,11 @@ async def test_abort_invitation_when_meeting_no_longer_allows_invitations(
         owner = create_user(id=owner_id, tg_user_id=owner_id, first_name="Other owner")
         mock_session.add_user(user_with_settings)
     setup_db(mock_session, owner, meeting)
+    deacivate_meeting(meeting)
 
     # Make the "even an owner" claim explicit rather than incidental: the by_owner case must
     # genuinely own the meeting, and the by_other_user case must not.
     assert (user_with_settings.own_meeting(MEETING_ID) is not None) is (owner_id == 123)
-
-    async def _always_none(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr(
-        "mitup_bot.handlers.meeting.invite_users.ensure_meeting_still_allows_invitations",
-        _always_none,
-    )
 
     context, _ = await call_handler(handler_id, handler_context=handler_context)
 

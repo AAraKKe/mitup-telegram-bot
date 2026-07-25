@@ -28,9 +28,12 @@ Raised by functions in `guards.py` when handler inputs are invalid. These are th
 | `UserNotFound` | `current_user()` | Telegram user not in the database |
 | `MeetupNotFound` | `Meetup.by_id(must_exist=True)` | Meeting ID doesn't exist (raised directly in edit handlers, not from a guard) |
 | `MalformedCallbackData` | `valid_callback_data()`, `valid_meeting_callback_data()` | Callback data missing required `id` |
-| `MeetingGoneError` | `meeting()` | The addressed meeting does not resolve to a row |
+| `MeetingGoneError` | `meeting()`, `conversation_meeting()` | The addressed meeting does not resolve to a row |
 | `MeetingNotOwnedError` | `meeting()` | The caller holds none of the access the requested profile lets through |
 | `MeetingInactiveOwnerError` | `meeting()` | The owner addressed a meeting of theirs that is no longer active |
+| `SharedMeetingGoneError` | `shared_meeting()` | The meeting behind the tapped card no longer exists |
+| `SharedMeetingDeniedError` | `shared_meeting()` | The tapped message gives the caller no claim on that meeting |
+| `SharedMeetingFinishedError` | `shared_meeting()` | The meeting behind the tapped card is no longer active |
 | `EffectiveUserNotSet` | `current_user()` | Telegram update has no `effective_user` |
 | `EffectiveChatNotSet` | `chat()` | Telegram update has no `effective_chat` |
 | `EffectiveMessageNotSet` | `message()` | Telegram update has no `effective_message` |
@@ -93,9 +96,9 @@ The `private` flag distinguishes private chat errors (where we should mark inact
 
 ### Meeting guard rejections
 
-The three `MeetingAccessError` subclasses (see the table above) are answered by `handle_meeting_access_error()` and never reach the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, and the back-navigation `keyboard` — so no DB round-trip happens here. `guards.meeting` renders nothing itself.
+Every `MeetingAccessError` subclass (see the table above) is answered by `handle_meeting_access_error()` and never reaches the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, and the back-navigation `keyboard` — so no DB round-trip happens here. The guards render nothing themselves.
 
-The reply shape comes from the update, not from the exception:
+For the bot-chat rejections the reply shape comes from the update, not from the exception:
 
 | Update | Reply |
 |---|---|
@@ -103,7 +106,17 @@ The reply shape comes from the update, not from the exception:
 | message | `send_message` — there is no message of ours to replace |
 | inline query | `answer_inline_query` with `meeting.unavailable_inline_view` |
 
-Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch emits `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `ERROR/MeetingNotOwned`; `MeetingGoneError` logs the warning only; `MeetingInactiveOwnerError` does neither, since offering an owner the reactivation prompt says nothing about their intent.
+The `SharedMeetingError` subclasses come from a tap on a meeting card that may sit in any chat, so they answer on the card whatever the update looks like, in `deliver_shared_meeting_answer()`:
+
+| Rejection | Reply | Counter |
+|---|---|---|
+| `SharedMeetingGoneError` | `edit_message` with the deleted banner — the card is out of date | `STALE_MEETING_MESSAGE` |
+| `SharedMeetingFinishedError` | `edit_message` with the finished banner, in the meeting's language | — |
+| `SharedMeetingDeniedError` | `answer_callback_query` alert with the deleted-meeting copy; the card is left alone | `UNAUTHORIZED_MEETING_CALLBACK` |
+
+`SHARED_MEETING_METRICS` maps the rejection type to its counter; a rejection absent from it emits none.
+
+Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch emits `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `ERROR/MeetingNotOwned`; `MeetingGoneError` and `SharedMeetingDeniedError` log the warning only; `MeetingInactiveOwnerError`, `SharedMeetingGoneError` and `SharedMeetingFinishedError` do neither, since a stale card and the reactivation prompt say nothing about the caller's intent.
 
 Delivery is best-effort, like every other render in this module: an exception raised while answering has no handler left above it and would reach `process_update` as a second, unhandled fault.
 

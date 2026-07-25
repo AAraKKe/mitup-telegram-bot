@@ -50,58 +50,25 @@ async def send_request_for_invite_name(context: TMitupContext, user: User, meeti
     await context.api.send_message_to_user(user=user, view=view)
 
 
-async def ensure_meeting_still_allows_invitations(
-    session: AsyncSession,
-    context: TMitupContext,
-    user: User,
-    meeting_id: int,
-    on_callback: bool = True,
-    for_update: bool = False,
-    authorize_caller: bool = False,
-) -> Meetup | None:
+def invitations_open(meeting: Meetup) -> bool:
+    """Whether `meeting` still takes guests: it has a free spot and its owner still accepts additions."""
+    return meeting.join_allowed() and meeting.allow_invitation
+
+
+async def ensure_invitations_open(context: TMitupContext, user: User, meeting: Meetup) -> bool:
+    """Report whether `meeting` still takes guests, alerting the caller with the reason when it does not.
+
+    The two business rules are the flow's own, not a matter of access: whoever got this far may act on
+    the meeting, and what stops them is the meeting being full or its guest list being closed. A
+    rejection ends the flow, so the conversation state goes with it.
     """
-    Ensure that the meeting still allows invitations.
-    If not, alert the user and return None.
+    if invitations_open(meeting):
+        return True
 
-    The confirm step passes `for_update=True` so the fullness check and the membership insert
-    happen under the per-meeting row lock; the earlier conversation steps only pre-validate and
-    must not hold the lock across the user's typing.
-
-    `authorize_caller` runs `guards.meeting_interaction_allowed` before any state of the meeting is
-    revealed, and belongs on the entry point, where the meeting id comes straight from client-supplied
-    callback data. The steps that follow read the id back from the caller's own conversation state, so
-    they inherit the entry point's decision and must leave it False — the message they arrive on is
-    the bot-chat prompt, which is never a tracked message of the meeting.
-    """
-    meeting = await Meetup.by_id(session, meeting_id, include_inactive=False, for_update=for_update)
-    update = context.get_update()
-
-    if meeting is None:
-        message = MeetingInviteMessages.MEETING_NOT_FOUND if on_callback else MeetingInviteMessages.MEETING_LOST_RETRY
-
-        await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
-        context.clean_user_data([ContextId.INVITE_USERS])
-        return None
-
-    if authorize_caller and not await guards.meeting_interaction_allowed(session, user, meeting, update, context):
-        # Answered by the guard. Returning here keeps the capacity and invitation-setting alerts
-        # below out of reach, so they cannot be used to read the state of an arbitrary meeting.
-        context.clean_user_data([ContextId.INVITE_USERS])
-        return None
-
-    if not meeting.join_allowed():
-        message = MeetingInviteMessages.MEETING_FULL
-        await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
-        context.clean_user_data([ContextId.INVITE_USERS])
-        return None
-
-    if not meeting.allow_invitation:
-        message = MeetingInviteMessages.INVITES_DISABLED
-        await context.api.answer_callback_query(update, text=message.get(lang=user.lang), show_alert=True)
-        context.clean_user_data([ContextId.INVITE_USERS])
-        return None
-
-    return meeting
+    message = MeetingInviteMessages.INVITES_DISABLED if meeting.join_allowed() else MeetingInviteMessages.MEETING_FULL
+    await context.api.answer_callback_query(context.get_update(), text=message.get(lang=user.lang), show_alert=True)
+    context.clean_user_data([ContextId.INVITE_USERS])
+    return False
 
 
 @HandlersRegistry.register_callback_query(
@@ -119,10 +86,14 @@ async def callback_query_invite_users(
     if user is None:
         return ConversationHandler.END
 
-    meeting = await ensure_meeting_still_allows_invitations(
-        session, context, user, meeting_id, on_callback=True, authorize_caller=True
-    )
-    if meeting is None:
+    # Cleared before the guard so a rejection cannot leave a previous attempt's meeting id behind for
+    # the steps below; the ids this attempt needs are stored further down.
+    context.clean_user_data([ContextId.INVITE_USERS])
+
+    # The entry point is a tap on a shared card, so the id is client-supplied and the guard decides
+    # both that the meeting is there and that the tapped message gives the caller a claim on it.
+    meeting = await guards.shared_meeting(session, user, meeting_id, "invite users to a meeting", update)
+    if not await ensure_invitations_open(context, user, meeting):
         return ConversationHandler.END
 
     if update.effective_chat is None:
@@ -166,9 +137,11 @@ async def abort_invitation(
     message = MeetingInviteMessages.CANCELED.get(lang=user.lang)
 
     meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
-    meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id)
+    # An optional lookup, not an access check: it only picks the screen the cancellation lands on, and
+    # the owner branch below re-decides ownership. A meeting that is gone simply falls to the menu.
+    meeting = await Meetup.by_id(session, meeting_id, include_inactive=False)
 
-    if meeting is not None and user.own_meeting(meeting_id):
+    if meeting is not None and invitations_open(meeting) and user.own_meeting(meeting_id):
         view = meeting_views.view_for(meeting, user).with_context(message=message)
     else:
         view = main_menu_view(guards.render_context(user, update, context), message=message)
@@ -205,9 +178,9 @@ async def invite_users_name_message_handler(
         return ConversationHandler.END
 
     with context.meeting_id(ContextId.INVITE_USERS, ensure_clean=False) as meeting_id:
-        meeting = await ensure_meeting_still_allows_invitations(session, context, user, meeting_id, on_callback=False)
-        if meeting is None:
-            # If the user cannot continue mid conversation, go back to the main menu
+        meeting = await guards.conversation_meeting(session, user, meeting_id, "invite users to a meeting")
+        if not await ensure_invitations_open(context, user, meeting):
+            # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(
                 update=update,
                 view=main_menu_view(guards.render_context(user, update, context)),
@@ -255,20 +228,20 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             return ConversationHandler.END
 
     with context.text(ContextId.INVITE_USERS, ensure_clean=True) as invited_user_name:
-        meeting = await ensure_meeting_still_allows_invitations(
-            session, context, user, meeting_id, on_callback=False, for_update=True
-        )
-        if meeting is None:
-            # If the user cannot continue mid conversation, go back to the main menu
+        # lock: the fullness check and the membership insert below must happen under the per-meeting
+        # row lock. The earlier steps only pre-validate and must not hold it across the user's typing.
+        meeting = await guards.conversation_meeting(session, user, meeting_id, "invite users to a meeting", lock=True)
+        if not await ensure_invitations_open(context, user, meeting):
+            # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(
                 update=update,
                 view=main_menu_view(guards.render_context(user, update, context)),
             )
             return ConversationHandler.END
 
-        # ensure_meeting_still_allows_invitations validated join_allowed under the per-meeting
-        # row lock we still hold, so add_participant cannot come back empty here — a None from
-        # racy_flush can only mean the uniqueness constraint rejected a duplicate membership.
+        # ensure_invitations_open validated join_allowed under the per-meeting row lock we still
+        # hold, so add_participant cannot come back empty here — a None from racy_flush can only
+        # mean the uniqueness constraint rejected a duplicate membership.
         invited_user = User(first_name=invited_user_name, tg_user_id=-1, status=UserStatus.JOINED_ONLY)
         joined_link = await racy_flush(
             session,

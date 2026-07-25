@@ -70,11 +70,13 @@ async def callback_query_edit_meeting_title(session: AsyncSession, update: Updat
 @HandlersRegistry.register_message(EditMeetingHandlerId.TITLE_MESSAGE, filters.TEXT, bindable=False)
 @with_session(write=True)
 async def edit_title_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
-    message = update.effective_message
-    assert message is not None and message.text is not None
+    message = guards.message(update)
+    assert message.text is not None, "the TEXT filter this handler is registered with guarantees the text"
+
+    user = await guards.current_user(update, session)
 
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:
-        meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
+        meeting = await guards.meeting(session, user, meeting_id, "Edit title", context)
         meeting.set_title(serialize_entities(message.text, message.entities))
 
         view = meeting_views.edit_view(meeting).with_context(
@@ -95,7 +97,7 @@ async def edit_title_rich_message_handler(
     user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE, ensure_clean=False) as meeting_id:
-        meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
+        meeting = await guards.meeting(session, user, meeting_id, "Edit title", context)
     await reply_rich_message_not_supported(ctx, update, context, edit_title_prompt_view(meeting, user.lang))
     return ConversationMeetingState.EDIT_TITLE
 

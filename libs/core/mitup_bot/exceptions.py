@@ -133,6 +133,59 @@ class MeetingInactiveOwnerError(MeetingAccessError):
         )
 
 
+class SharedMeetingError(MeetingAccessError):
+    """Base class for the answers ``guards.shared_meeting`` gives a caller it stops.
+
+    A shared surface is reached by tapping a meeting card, which may sit in any chat the meeting was
+    shared into. The card is the whole screen, so these rejections are answered on the card itself
+    rather than with one of the bot-chat screens the other ``MeetingAccessError`` subclasses stand
+    for; the error handler owns that shape.
+    """
+
+
+class SharedMeetingGoneError(SharedMeetingError):
+    """The meeting behind the tapped card no longer resolves to a row, so the card is out of date."""
+
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+        super().__init__(
+            f"User tried {action!r} from a card whose meeting does not exist. "
+            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+        )
+
+
+class SharedMeetingFinishedError(SharedMeetingError):
+    """The meeting behind the tapped card is no longer active.
+
+    Carries the meeting's language, not the caller's: the banner replaces the card, which every
+    reader of that chat sees, and the card is written in the meeting's language.
+    """
+
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+        super().__init__(
+            f"User tried {action!r} from a card whose meeting has finished. "
+            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+        )
+
+
+class SharedMeetingDeniedError(SharedMeetingError):
+    """The tapped message gives the caller no claim on the meeting the callback data names."""
+
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+        super().__init__(
+            f"User tried {action!r} from a message that does not authorize them on that meeting. "
+            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+        )
+
+
 class InvalidUserData(RuntimeError): ...  # pragma: no cover
 
 

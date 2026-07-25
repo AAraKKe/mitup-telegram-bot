@@ -19,6 +19,9 @@ from mitup_bot.exceptions import (
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
+    SharedMeetingDeniedError,
+    SharedMeetingFinishedError,
+    SharedMeetingGoneError,
     UserNotFound,
     UserPendingDeletion,
 )
@@ -464,6 +467,191 @@ async def test_meeting_any_state_raises_not_owned_when_meeting_is_not_the_users(
     error = raised.value
     assert "User tried 'Show past meeting' with a meeting that does not belong to them. " in str(error)
     assert "Meeting id: 999, user id: 1" in str(error)
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_returns_public_meeting_of_somebody_else(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """The share surface lets a public meeting through for anyone, owner or not."""
+    public_meeting = create_meetup(id=42, owner=other_owner(), title="Open to all", public=True)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(public_meeting)
+
+    result = await guards.meeting(
+        mock_session,
+        user_with_settings,
+        42,
+        "share meeting",
+        context,
+        access=MeetingAccess.OWNER_OR_PUBLIC,
+    )
+
+    assert result == public_meeting
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_raises_not_owned_for_private_meeting_of_somebody_else(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(id=42, owner=other_owner(), title="Private"))
+
+    with pytest.raises(MeetingNotOwnedError):
+        await guards.meeting(
+            mock_session,
+            user_with_settings,
+            42,
+            "share meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_PUBLIC,
+        )
+
+    assert_renders_nothing(context)
+
+
+# --- Shared surfaces ------------------------------------------------------------------------------
+
+
+async def test_shared_meeting_returns_the_meeting_the_tapped_card_authorizes(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+    update: Update,
+):
+    """The owner tapping their own card gets the meeting back, hydrated by the guard's own load."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    result = await guards.shared_meeting(mock_session, user_with_settings, 1, "join or leave a meeting", update)
+
+    assert result == user_with_settings.meetups[0]
+    assert_renders_nothing(context)
+
+
+async def test_shared_meeting_touches_no_user_collections_under_lock(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+):
+    """Every decision is meeting-rooted, so locking never re-loads the acting user's collections."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    await guards.shared_meeting(mock_session, user_with_settings, 1, "join or leave a meeting", update, lock=True)
+
+    mock_session.refresh.assert_not_awaited()
+
+
+async def test_shared_meeting_raises_gone_when_the_card_outlived_its_meeting(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+    update: Update,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    with pytest.raises(SharedMeetingGoneError) as raised:
+        await guards.shared_meeting(mock_session, user_with_settings, 999, "join or leave a meeting", update)
+
+    error = raised.value
+    assert str(error) == (
+        "User tried 'join or leave a meeting' from a card whose meeting does not exist. Meeting id: 999, user id: 1"
+    )
+    assert (error.meeting_id, error.action, error.lang) == (999, "join or leave a meeting", user_with_settings.lang)
+    assert_renders_nothing(context)
+
+
+async def test_shared_meeting_raises_denied_before_reading_the_meeting_state(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+    update: Update,
+):
+    """A caller with no claim is stopped by the denial, even when the meeting is also inactive.
+
+    The order matters: were the state checked first, the finished banner would tell a stranger that
+    the id they guessed names a meeting that ran.
+    """
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(id=999, owner=other_owner(), title="Not yours", active=False))
+
+    with pytest.raises(SharedMeetingDeniedError) as raised:
+        await guards.shared_meeting(mock_session, user_with_settings, 999, "join or leave a meeting", update)
+
+    assert "from a message that does not authorize them on that meeting" in str(raised.value)
+    assert_renders_nothing(context)
+
+
+async def test_shared_meeting_raises_finished_for_an_inactive_meeting_the_caller_may_reach(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+    update: Update,
+):
+    inactive_meeting = create_meetup(id=5, owner=user_with_settings, active=False)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    with pytest.raises(SharedMeetingFinishedError) as raised:
+        await guards.shared_meeting(mock_session, user_with_settings, 5, "join or leave a meeting", update)
+
+    # The banner replaces the card, which is written in the meeting's language, not the caller's.
+    assert raised.value.lang == inactive_meeting.lang
+    assert_renders_nothing(context)
+
+
+async def test_shared_meeting_returns_inactive_meeting_when_active_is_not_required(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+):
+    """Attach-to-chat stays useful on a finished meeting, so it opts out of the state check."""
+    inactive_meeting = create_meetup(id=5, owner=user_with_settings, active=False)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    result = await guards.shared_meeting(
+        mock_session, user_with_settings, 5, "attach a meeting to a chat", update, require_active=False
+    )
+
+    assert result == inactive_meeting
+
+
+async def test_conversation_meeting_returns_the_meeting_the_flow_carries(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    result = await guards.conversation_meeting(mock_session, user_with_settings, 1, "invite users to a meeting")
+
+    assert result == user_with_settings.meetups[0]
+    assert_renders_nothing(context)
+
+
+@pytest.mark.parametrize("registered", [True, False], ids=["deactivated", "deleted"])
+async def test_conversation_meeting_raises_gone_when_the_meeting_stopped_being_reachable(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+    registered: bool,
+):
+    """A meeting deactivated while the user typed is rejected exactly like a deleted one."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    if registered:
+        mock_session.add_object(create_meetup(id=999, owner=user_with_settings, active=False))
+
+    with pytest.raises(MeetingGoneError) as raised:
+        await guards.conversation_meeting(mock_session, user_with_settings, 999, "invite users to a meeting")
+
+    assert raised.value.keyboard is None
     assert_renders_nothing(context)
 
 

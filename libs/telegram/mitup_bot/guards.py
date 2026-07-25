@@ -30,6 +30,9 @@ from mitup_bot.exceptions import (
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
+    SharedMeetingDeniedError,
+    SharedMeetingFinishedError,
+    SharedMeetingGoneError,
     UserNotFound,
     UserPendingDeletion,
 )
@@ -42,7 +45,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import MeetingDisplayMessages, MessageBase
+from mitup_bot.utils.messages import MessageBase
 from mitup_bot.views import RenderContext
 
 log = structlog.get_logger(__name__)
@@ -246,16 +249,17 @@ def chosen_inline_result(update: Update) -> ChosenInlineResult:
 class MeetingAccess(Enum):
     """Which callers `meeting` lets through, and which rejection stops the rest.
 
-    `OWNER` and `OWNER_OR_JOINED` are the live-meeting profiles: a meeting that no longer exists
-    raises `MeetingGoneError`, and an inactive one raises `MeetingInactiveOwnerError` for its owner
-    and `MeetingNotOwnedError` for everybody else. `OWNER_ANY_STATE` is for the surfaces that render
-    inactive meetings themselves (the past-meetings screens, reactivation, the delete flows): the
-    meeting's state is never an obstacle there, and a meeting that cannot be resolved is rejected
-    exactly like one the caller does not own.
+    `OWNER`, `OWNER_OR_JOINED` and `OWNER_OR_PUBLIC` are the live-meeting profiles: a meeting that no
+    longer exists raises `MeetingGoneError`, and an inactive one raises `MeetingInactiveOwnerError`
+    for its owner and `MeetingNotOwnedError` for everybody else. `OWNER_ANY_STATE` is for the surfaces
+    that render inactive meetings themselves (the past-meetings screens, reactivation, the delete
+    flows): the meeting's state is never an obstacle there, and a meeting that cannot be resolved is
+    rejected exactly like one the caller does not own.
     """
 
     OWNER = auto()
     OWNER_OR_JOINED = auto()
+    OWNER_OR_PUBLIC = auto()
     OWNER_ANY_STATE = auto()
 
 
@@ -317,9 +321,12 @@ async def meeting(
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
         return found_meeting
 
-    # The not-owned counter tracks ownership decisions, so a participant reaching a meeting they do
-    # not own leaves the series untouched.
+    # The not-owned counter tracks ownership decisions, so a caller reaching a meeting they do not
+    # own through one of the wider profiles leaves the series untouched.
     if access is MeetingAccess.OWNER_OR_JOINED and found_meeting.has_participant(user.db_id):
+        return found_meeting
+
+    if access is MeetingAccess.OWNER_OR_PUBLIC and found_meeting.public:
         return found_meeting
 
     raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
@@ -330,7 +337,6 @@ async def meeting_interaction_allowed(
     user: User,
     meeting: Meetup,
     update: Update,
-    context: TMitupContext,
 ) -> bool:
     """Return whether `user` may act on `meeting` through the message this update came from.
 
@@ -351,8 +357,8 @@ async def meeting_interaction_allowed(
     their own at will, and honouring an unclaimed inline message would let them borrow it to act on
     any meeting id they can guess.
 
-    Rejections are answered with the deleted-meeting copy, so a denial reveals nothing about the
-    meeting's state — only that the id resolves, which sequential ids give away anyway.
+    This is the predicate on its own; `shared_meeting` turns a `False` into the rejection the caller
+    is answered with.
     """
     meeting_id = meeting.db_id
     if (
@@ -378,13 +384,72 @@ async def meeting_interaction_allowed(
         if claimed_by == meeting_id:
             return True
 
-    await context.api.answer_callback_query(
-        update=update,
-        text=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang),
-        show_alert=True,
-    )
-    context.emit_metric(MetricKey.UNAUTHORIZED_MEETING_CALLBACK, include_handler_properties=False)
     return False
+
+
+async def shared_meeting(
+    session: AsyncSession,
+    user: User,
+    meeting_id: int,
+    action: str,
+    update: Update,
+    *,
+    lock: bool = False,
+    require_active: bool = True,
+) -> Meetup:
+    """Return the meeting the caller tapped a card for, or raise the rejection that answers the card.
+
+    The single guard for the any-user surfaces — join, leave, attach-to-chat and the invite entry
+    point — where the meeting is reached from a card that may sit in any chat it was shared into,
+    and the caller needs no relationship with the meeting to have tapped it. `action` and the
+    `SharedMeetingError` payload work exactly as they do for `meeting`; the error handler owns every
+    screen, so this guard renders nothing and takes no `context`.
+
+    The three rejections, in the order they are decided:
+
+    - the meeting does not resolve — `SharedMeetingGoneError`, the card is stale;
+    - the tapped message gives the caller no claim on it — `SharedMeetingDeniedError`, decided before
+      the meeting's state is read so a denial discloses nothing about it;
+    - the meeting is no longer active — `SharedMeetingFinishedError`, unless `require_active` is
+      False, which is for the surfaces that stay useful on a finished meeting.
+
+    Pass `lock=True` from the participant- or capacity-mutating callers, as for `meeting`. The locked
+    load resets the acting user's `meetups`/`joined_links` to unloaded; the guard itself needs
+    neither, so a caller that reads them re-loads them after this returns.
+    """
+    found_meeting = await Meetup.by_id(session, meeting_id, for_update=lock)
+
+    if found_meeting is None:
+        raise SharedMeetingGoneError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+
+    if not await meeting_interaction_allowed(session, user, found_meeting, update):
+        raise SharedMeetingDeniedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+
+    if require_active and not found_meeting.active:
+        raise SharedMeetingFinishedError(
+            meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=found_meeting.lang
+        )
+
+    return found_meeting
+
+
+async def conversation_meeting(
+    session: AsyncSession, user: User, meeting_id: int, action: str, *, lock: bool = False
+) -> Meetup:
+    """Return the active meeting an in-flight conversation is about, or raise `MeetingGoneError`.
+
+    The id comes from the caller's own conversation state, so it already carries whatever
+    authorization the entry point made and no access decision is re-taken here. What can still change
+    while the user types is the meeting itself: this re-reads it and rejects a meeting that has since
+    been deleted or deactivated, so no step writes to one that is no longer there.
+
+    Pass `lock=True` from the step that commits the flow's write, as for `meeting`: the row lock is
+    then held from this read through the capacity decision and the insert that follows it.
+    """
+    found_meeting = await Meetup.by_id(session, meeting_id, include_inactive=False, for_update=lock)
+    if found_meeting is None:
+        raise MeetingGoneError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+    return found_meeting
 
 
 async def user_registered(

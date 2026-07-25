@@ -61,8 +61,8 @@ async def test_unregistered_join_registers_user_and_creates_membership(
     async with AsyncSession(async_engine(db_session)) as session:
         owner = User(first_name="RDU Owner", tg_user_id=OWNER_TG_USER_ID, settings=Settings())
         # public: the joiner owns no relationship with this meeting and, in the bot-chat variant,
-        # taps no tracked message, so a private meeting would be refused by
-        # `guards.meeting_interaction_allowed` before the collections under test are ever read.
+        # taps no tracked message, so a private meeting would be refused by `guards.shared_meeting`
+        # before the collections under test are ever read.
         meeting = Meetup(
             title="RDU Meeting",
             waiting_list=False,

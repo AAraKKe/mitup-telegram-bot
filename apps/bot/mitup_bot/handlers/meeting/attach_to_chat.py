@@ -5,8 +5,8 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, Message
-from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.utils import MeetingAttachMessages, MeetingDisplayMessages
+from mitup_bot.monitoring import Feature
+from mitup_bot.utils import MeetingAttachMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
 
@@ -35,40 +35,32 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
     # `user.own_meeting`.
     user = await guards.current_user(update, session, load_collections=True)
 
-    if meeting := await Meetup.by_id(session, data.id):
-        # Authorize before the chat_instance is captured: attaching makes the meeting inline-searchable
-        # for everyone in that chat, and the meeting id arrives in client-supplied callback data.
-        if not await guards.meeting_interaction_allowed(session, user, meeting, update, context):
-            return
+    # require_active: a finished meeting stays worth finding in the chat it happened in, so the
+    # attachment is offered for whatever state the meeting is in.
+    meeting = await guards.shared_meeting(
+        session, user, data.id, "attach a meeting to a chat", update, require_active=False
+    )
 
-        chat_instance = update.callback_query.chat_instance if update.callback_query else None
-        already_attached = is_already_attached(meeting, chat_instance)
+    chat_instance = update.callback_query.chat_instance if update.callback_query else None
+    already_attached = is_already_attached(meeting, chat_instance)
 
-        if (current_message := meeting.message_from_update(update)) is None:
-            current_message = Message.from_update(
-                update, meeting, meeting_views.keyboard_for_update(update, meeting, user)
-            )
-            meeting.messages.append(current_message)
-        else:
-            current_message.capture_chat_instance(update)
-
-        # Not defensive: the broadcast payload snapshots message.id at enqueue time, and a
-        # freshly appended Message only gets one from this flush (needed for the dead-message
-        # reconcile if Telegram reports the message gone during the fan-out).
-        await session.flush()
-
-        alert = MeetingAttachMessages.ALREADY_ENABLED_ALERT if already_attached else MeetingAttachMessages.ENABLED_ALERT
-        await context.api.answer_callback_query(
-            update=update,
-            text=alert.get(),
-            show_alert=True,
-        )
-
-        await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
-        context.put_feature_metric(Feature.ATTACH_TO_CHAT)
+    if (current_message := meeting.message_from_update(update)) is None:
+        current_message = Message.from_update(update, meeting, meeting_views.keyboard_for_update(update, meeting, user))
+        meeting.messages.append(current_message)
     else:
-        await context.api.edit_message(
-            update=update,
-            view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang),
-        )
-        context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, include_handler_properties=False)
+        current_message.capture_chat_instance(update)
+
+    # Not defensive: the broadcast payload snapshots message.id at enqueue time, and a
+    # freshly appended Message only gets one from this flush (needed for the dead-message
+    # reconcile if Telegram reports the message gone during the fan-out).
+    await session.flush()
+
+    alert = MeetingAttachMessages.ALREADY_ENABLED_ALERT if already_attached else MeetingAttachMessages.ENABLED_ALERT
+    await context.api.answer_callback_query(
+        update=update,
+        text=alert.get(),
+        show_alert=True,
+    )
+
+    await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
+    context.put_feature_metric(Feature.ATTACH_TO_CHAT)

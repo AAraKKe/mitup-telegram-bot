@@ -15,6 +15,10 @@ from mitup_bot.exceptions import (
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
+    SharedMeetingDeniedError,
+    SharedMeetingError,
+    SharedMeetingFinishedError,
+    SharedMeetingGoneError,
     UserPendingDeletion,
 )
 from mitup_bot.mitup_types import TMitupContext
@@ -22,7 +26,7 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
+from mitup_bot.utils.messages import CommonMessages, MeetingDisplayMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 
@@ -36,6 +40,13 @@ SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
         # This happens when a message is deleted
         "Message to edit not found",
     }
+}
+
+# The shared-surface rejections that carry a counter of their own. A card whose meeting is finished
+# is a normal state transition and has none.
+SHARED_MEETING_METRICS: dict[type, MetricKey] = {
+    SharedMeetingGoneError: MetricKey.STALE_MEETING_MESSAGE,
+    SharedMeetingDeniedError: MetricKey.UNAUTHORIZED_MEETING_CALLBACK,
 }
 
 
@@ -83,13 +94,44 @@ def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupV
     return factory.main_menu_view(ctx)
 
 
+async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, error: SharedMeetingError):
+    """Answer a tap on a meeting card the caller can no longer act through.
+
+    A denial leaves the card alone and says so in an alert: it is answered with the deleted-meeting
+    copy, so a rejection reveals nothing about the meeting's state — only that the id resolves, which
+    sequential ids give away anyway. The other two rejections mean the card itself is out of date, so
+    it is replaced by the banner naming the state its meeting is in.
+    """
+    if isinstance(error, SharedMeetingDeniedError):
+        await context.api.answer_callback_query(
+            update=update,
+            text=MeetingDisplayMessages.DELETED_BANNER.get(lang=error.lang),
+            show_alert=True,
+        )
+        return
+
+    if isinstance(error, SharedMeetingFinishedError):
+        await context.api.edit_message(
+            update=update,
+            view=MitupView(description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=error.lang), keyboard=[]),
+        )
+        return
+
+    await context.api.edit_message(update=update, view=MeetingDisplayMessages.DELETED_BANNER.get(lang=error.lang))
+
+
 async def deliver_meeting_access_screen(context: TMitupContext, update: Update, error: MeetingAccessError):
     """Send the rejection screen in the shape this update can carry.
 
-    A callback query replaces the screen the button sits on. A message update has no message of ours
-    to replace, so the rejection arrives as a fresh reply. An inline query can only carry results, so
-    it is answered with the unavailable card.
+    A shared surface answers on the card that was tapped, whatever the update looks like. Everywhere
+    else the shape follows the update: a callback query replaces the screen the button sits on, a
+    message update has no message of ours to replace so the rejection arrives as a fresh reply, and
+    an inline query can only carry results, so it is answered with the unavailable card.
     """
+    if isinstance(error, SharedMeetingError):
+        await deliver_shared_meeting_answer(context, update, error)
+        return
+
     if update.inline_query is not None:
         await context.api.answer_inline_query(
             update=update, results=[meeting_views.unavailable_inline_view(error.lang)], cache_time=0
@@ -108,13 +150,14 @@ async def handle_meeting_access_error(context: TMitupContext, error: MeetingAcce
 
     Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces,
     not a code fault: the rejection is counted on its own series and the interaction ends on
-    `FAULT=0`, exactly like a handler that ran to completion. Only the two rejections that say
-    something about the caller's intent are logged; the reactivation prompt is a normal screen.
+    `FAULT=0`, exactly like a handler that ran to completion. Only the rejections that say something
+    about the caller's intent are logged; the reactivation prompt and the finished-card banner are
+    normal screens.
 
     Delivery is best-effort, like every other render in this module: an exception raised here has no
     handler left above it and would reach `process_update` as a second, unhandled fault.
     """
-    if isinstance(error, MeetingGoneError | MeetingNotOwnedError):
+    if isinstance(error, MeetingGoneError | MeetingNotOwnedError | SharedMeetingDeniedError):
         log.warning(str(error))
 
     update = context.telegram_update
@@ -125,6 +168,8 @@ async def handle_meeting_access_error(context: TMitupContext, error: MeetingAcce
 
     if isinstance(error, MeetingNotOwnedError):
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
+    if (shared_metric := SHARED_MEETING_METRICS.get(type(error))) is not None:
+        context.emit_metric(shared_metric, include_handler_properties=False)
     context.emit_metric(MetricKey.FAULT, 0)
 
     try:

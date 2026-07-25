@@ -1,12 +1,12 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
+from mitup_bot import guards
 from mitup_bot.db import with_session
-from mitup_bot.guards import current_user, shareable_meeting_id
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
 from mitup_bot.translations import TranslationEngine
@@ -77,17 +77,17 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
     TODO: Right now we are only allowing existing users to share a meeting. We should allow non-existing users to
     share a meeting as well when public meeting feature is implemented.
     """
-    user = await current_user(update, session)
-    meeting_id = await shareable_meeting_id(update, context)
+    user = await guards.current_user(update, session)
+    meeting_id = await guards.shareable_meeting_id(update, context)
     if meeting_id is None:
         return
 
-    meeting = await Meetup.by_id(session, meeting_id)
+    # A meeting the caller may not put on a card — gone, finished, or somebody else's and not
+    # public — is rejected by the guard, and the error handler answers the query with the
+    # unavailable card that every one of those cases shows.
+    meeting = await guards.meeting(
+        session, user, meeting_id, "share meeting", context, access=guards.MeetingAccess.OWNER_OR_PUBLIC
+    )
 
-    if meeting and meeting.active and (meeting.public or meeting.is_owned_by(user)):
-        results = [meeting_views.inline_view(meeting)]
-        context.put_feature_metric(Feature.SHARE_MEETING)
-    else:
-        results = [meeting_views.unavailable_inline_view(user.lang)]
-
-    await context.api.answer_inline_query(update=update, results=results, cache_time=0)
+    context.put_feature_metric(Feature.SHARE_MEETING)
+    await context.api.answer_inline_query(update=update, results=[meeting_views.inline_view(meeting)], cache_time=0)
