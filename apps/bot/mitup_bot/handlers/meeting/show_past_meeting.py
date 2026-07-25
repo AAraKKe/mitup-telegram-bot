@@ -51,17 +51,14 @@ async def callback_query_delete_past_meeting(session: AsyncSession, update: Upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(
+    await guards.meeting(
         session,
         user,
         callback_data.id,
         "Delete past meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meeting is None:
-        return
 
     await context.api.edit_message(
         update=update,
@@ -90,12 +87,9 @@ async def callback_query_show_past_meeting(session: AsyncSession, update: Update
         user,
         callback_data.id,
         "Show past meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meeting is None:
-        return
 
     await context.api.edit_message(update=update, view=past_meeting_view(meeting, user, callback_data.page))
 
@@ -118,12 +112,9 @@ async def callback_query_confirm_delete_past_meeting(session: AsyncSession, upda
         user,
         callback_data.id,
         "Confirm delete past meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meeting is None:
-        return
 
     # Rendered (and queued) before the row is deleted below; the edits themselves run after
     # the deletion commits.
@@ -163,11 +154,8 @@ async def callback_query_decline_delete_past_meeting(session: AsyncSession, upda
         user,
         callback_data.id,
         "Decline delete past meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meeting is None:
-        return
 
     await context.api.edit_message(update=update, view=past_meeting_view(meeting, user, callback_data.page))

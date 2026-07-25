@@ -41,12 +41,8 @@ async def edit_meeting_kickout_participants(session: AsyncSession, update: Updat
         current_user,
         callback_data.meeting_id,
         "Kick out participants view",
-        update,
         context,
     )
-
-    if meeting is None:
-        return
 
     participants = [participant for participant in meeting.participants if participant.user.db_id != current_user.db_id]
 
@@ -89,12 +85,8 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
         current_user,
         callback_data.meeting_id,
         "Kick out participant",
-        update,
         context,
     )
-
-    if meeting is None:
-        return
 
     participant = meeting.participant(callback_data.id)
     if participant is None:
@@ -151,13 +143,9 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
         current_user,
         callback_data.meeting_id,
         "Kick out participant confirm",
-        update,
         context,
         lock=True,
     )
-
-    if meeting is None:
-        return
 
     participant = meeting.participant(callback_data.id)
 

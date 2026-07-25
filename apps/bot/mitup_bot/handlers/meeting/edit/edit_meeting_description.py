@@ -55,12 +55,8 @@ async def callback_query_edit_meeting_description(session: AsyncSession, update:
         user,
         callback_data.id,
         "Edit description",
-        update,
         context,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     context.store_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION, callback_data.id)
     context.store_on_exit(

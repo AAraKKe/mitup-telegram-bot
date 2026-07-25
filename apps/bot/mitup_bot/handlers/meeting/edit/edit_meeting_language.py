@@ -26,10 +26,7 @@ async def callback_edit_meeting_language(session: AsyncSession, update: Update, 
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting(session, user, valid_data.id, "Edit meeting language", update, context)
-
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, valid_data.id, "Edit meeting language", context)
 
     await context.api.edit_message(
         update=update,
@@ -47,10 +44,7 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting(session, user, valid_data.meeting_id, "Set meeting language", update, context)
-
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, valid_data.meeting_id, "Set meeting language", context)
 
     # Edit the meeting language and also all the keyboard markups for any of the shared messages
     # This is needed because the keyboard markup is stored in the database to ensure it is accessible

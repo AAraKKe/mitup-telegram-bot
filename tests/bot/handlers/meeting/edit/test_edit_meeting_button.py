@@ -1,10 +1,9 @@
-import logging
 import re
 
 import pytest
 from telegram import Update
 
-from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.exceptions import MalformedCallbackData, MeetingNotOwnedError
 from mitup_bot.handlers.meeting.edit.entry import callback_query_edit_meeting
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
@@ -33,15 +32,12 @@ async def test_edit_meeting_callback_fails_on_malformed_data(
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
-async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
+async def test_edit_meeting_stops_for_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
 ):
-    caplog.set_level(logging.WARNING)
-
     match = re.match(cb.EDIT_MEETING.pattern, "edit;meeting:111")
     assert match is not None
 
@@ -51,10 +47,12 @@ async def test_edit_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(meeting)
 
-    await callback_query_edit_meeting(update, context)
+    with pytest.raises(MeetingNotOwnedError) as raised:
+        await callback_query_edit_meeting(update, context)
 
-    assert "User tried 'Edit meeting' with a meeting that does not belong to them. " in caplog.text
-    assert "Meeting id: 111, user id: 1" in caplog.text
+    assert "User tried 'Edit meeting' with a meeting that does not belong to them. " in str(raised.value)
+    assert "Meeting id: 111, user id: 1" in str(raised.value)
+    context.api.assert_edit_message_not_called()
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)

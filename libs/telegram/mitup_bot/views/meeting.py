@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.utils import (
     ButtonMessages,
+    InlineQueryMessages,
     MeetingAttachMessages,
     MeetingDisplayMessages,
     MeetingEditSettingsMessages,
@@ -287,6 +288,21 @@ def inline_view(meeting: Meetup, *, chat_instance: str | None = None) -> MitupIn
     if meeting.is_in_progress:
         view.with_context(MeetingDisplayMessages.IN_PROGRESS_BANNER.get(lang=meeting.lang))
     return view.with_footnote(footnote)
+
+
+def unavailable_inline_view(lang: str) -> MitupInlineView:
+    """Inline placeholder shown when a shared meeting is cancelled or inaccessible.
+
+    Telegram requires every inline query to be answered; returning this result keeps the
+    picker from stalling silently when the meeting behind a stale share button is gone.
+    """
+    return MitupInlineView(
+        description=InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE.get(lang=lang),
+        keyboard=[],
+        id="meeting_unavailable",
+        title=InlineQueryMessages.MEETING_UNAVAILABLE_TITLE.get(lang=lang),
+        inline_description=InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION.get(lang=lang),
+    )
 
 
 def build_inline_keyboard(

@@ -29,17 +29,14 @@ async def callback_query_delete_meeting(session: AsyncSession, update: Update, c
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(
+    await guards.meeting(
         session,
         user,
         callback_data.id,
         "Delete meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meeting is None:
-        return
 
     await context.api.edit_message(
         update=update,
@@ -72,13 +69,10 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
         user,
         callback_data.id,
         "Confirm delete meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
         lock=True,
     )
-    if meeting is None:
-        return
 
     # Rendered (and queued) before the rows are deleted below; the edits themselves run after
     # the deletion commits.
@@ -114,9 +108,7 @@ async def callback_query_decline_delete_meeting(session: AsyncSession, update: U
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, callback_data.id, "Decline delete meeting", update, context)
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, callback_data.id, "Decline delete meeting", context)
 
     await context.api.edit_message(
         update=update,

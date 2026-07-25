@@ -3,25 +3,9 @@ from typing import cast
 
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
-from mitup_bot.utils import ButtonMessages, InlineQueryMessages
-from mitup_bot.views import MitupInlineView
+from mitup_bot.utils import ButtonMessages
 
 from .enums import SEARCH_QUERY_PREFIX
-
-
-def meeting_unavailable_view(lang: str) -> MitupInlineView:
-    """Inline placeholder shown when a shared meeting is cancelled or inaccessible.
-
-    Telegram requires every inline query to be answered; returning this result keeps the
-    picker from stalling silently when the meeting behind a stale share button is gone.
-    """
-    return MitupInlineView(
-        description=InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE.get(lang=lang),
-        keyboard=[],
-        id="meeting_unavailable",
-        title=InlineQueryMessages.MEETING_UNAVAILABLE_TITLE.get(lang=lang),
-        inline_description=InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION.get(lang=lang),
-    )
 
 
 def search_chat_meetings_button(*, lang: str, chat_instance: str) -> ButtonConfig:

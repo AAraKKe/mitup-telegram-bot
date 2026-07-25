@@ -27,13 +27,10 @@ async def callback_query_show_meeting(session: AsyncSession, update: Update, con
         user,
         callback_data.id,
         "Show meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_OR_JOINED,
         custom_keyboard=[[meeting_list_button(callback_data.source, callback_data.page, user.lang)]],
     )
-    if meeting is None:
-        return
 
     back_button = meeting_detail_back_button(callback_data.source, callback_data.page, user.lang)
     await context.api.edit_message(update=update, view=meeting_views.view_for(meeting, user, back_button=back_button))

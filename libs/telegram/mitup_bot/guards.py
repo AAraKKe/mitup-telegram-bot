@@ -27,11 +27,14 @@ from mitup_bot.exceptions import (
     EffectiveUserNotSet,
     InlineQueryNotSetError,
     MalformedCallbackData,
+    MeetingGoneError,
+    MeetingInactiveOwnerError,
+    MeetingNotOwnedError,
     UserNotFound,
     UserPendingDeletion,
 )
 from mitup_bot.handler_id import HandlerId
-from mitup_bot.keyboards import ButtonConfig, Keyboard
+from mitup_bot.keyboards import Keyboard
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
@@ -39,10 +42,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingDisplayMessages, MessageBase
-from mitup_bot.views import RenderContext, factory
-from mitup_bot.views.mitup_view import MitupView
+from mitup_bot.utils.messages import MeetingDisplayMessages, MessageBase
+from mitup_bot.views import RenderContext
 
 log = structlog.get_logger(__name__)
 
@@ -243,13 +244,13 @@ def chosen_inline_result(update: Update) -> ChosenInlineResult:
 
 
 class MeetingAccess(Enum):
-    """Which callers `meeting` lets through, and how it answers the ones it stops.
+    """Which callers `meeting` lets through, and which rejection stops the rest.
 
     `OWNER` and `OWNER_OR_JOINED` are the live-meeting profiles: a meeting that no longer exists
-    gets the deleted-meeting notice, and an inactive one gets the reactivation prompt for its owner
-    and the main-menu redirect for everybody else. `OWNER_ANY_STATE` is for the surfaces that render
+    raises `MeetingGoneError`, and an inactive one raises `MeetingInactiveOwnerError` for its owner
+    and `MeetingNotOwnedError` for everybody else. `OWNER_ANY_STATE` is for the surfaces that render
     inactive meetings themselves (the past-meetings screens, reactivation, the delete flows): the
-    meeting's state is never an obstacle there, and a meeting that cannot be resolved is answered
+    meeting's state is never an obstacle there, and a meeting that cannot be resolved is rejected
     exactly like one the caller does not own.
     """
 
@@ -258,90 +259,25 @@ class MeetingAccess(Enum):
     OWNER_ANY_STATE = auto()
 
 
-async def notify_meeting_not_owned(
-    user: User,
-    meeting_id: int,
-    action: str,
-    update: Update,
-    context: TMitupContext,
-):
-    """Warn, count the rejection and send the user back to the main menu."""
-    message = (
-        f"User tried {action!r} with a meeting that does not belong to them. "
-        f"Meeting id: {meeting_id}, user id: {user.db_id}"
-    )
-    log.warning(message)
-    context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
-    await context.api.edit_message(update=update, view=factory.main_menu_view(render_context(user, update, context)))
-
-
-async def show_reactivation_prompt(
-    user: User,
-    meeting_id: int,
-    update: Update,
-    context: TMitupContext,
-    custom_keyboard: Keyboard | None,
-):
-    """Edit the current message to show the reactivation prompt for an inactive meeting owned by the user."""
-    await context.api.edit_message(
-        update=update,
-        view=factory.reactivation_prompt_view(
-            render_context(user, update, context),
-            meeting_id=meeting_id,
-            back_rows=custom_keyboard,
-        ),
-    )
-
-
-async def notify_meeting_removed(
-    user: User,
-    meeting_id: int,
-    action: str,
-    update: Update,
-    context: TMitupContext,
-    custom_keyboard: Keyboard | None,
-):
-    """Warn and edit the current message to inform the user the meeting no longer exists."""
-    message = (
-        f"User tried {action!r} with a meeting that does not exist. Meeting id: {meeting_id}, user id: {user.db_id}"
-    )
-    log.warning(message)
-
-    await context.api.edit_message(
-        update=update,
-        view=MitupView(
-            description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user.settings.language),
-            keyboard=custom_keyboard
-            or [
-                [
-                    ButtonConfig(
-                        text=f"{ButtonMessages.MAIN_MENU.back(lang=user.settings.language)}",
-                        callback_data=cb.MAIN_MENU,
-                    )
-                ]
-            ],
-        ),
-    )
-
-
 async def meeting(
     session: AsyncSession,
     user: User,
     meeting_id: int,
     action: str,
-    update: Update,
     context: TMitupContext,
     *,
     access: MeetingAccess = MeetingAccess.OWNER,
     lock: bool = False,
     custom_keyboard: Keyboard | None = None,
-) -> Meetup | None:
-    """Return the meeting the user may act on through the bot chat, or None once the caller has
-    been told why they cannot — on which handlers must bail immediately.
+) -> Meetup:
+    """Return the meeting the user may act on through the bot chat, or raise the rejection that
+    says why they cannot — on which the handler is over and the error handler answers the caller.
 
     The returned instance is always the guard's own meeting-rooted load, so its participant leaves
     (owner, joined links' user/invited_by) are hydrated and any renderer can traverse them under the
-    async engine. `access` selects who gets through and which screen the rest are answered with.
+    async engine. `access` selects who gets through and which `MeetingAccessError` stops the rest;
+    each of those carries the screen's language and back-navigation rows, so the guard renders
+    nothing itself and needs no `update`.
 
     Participant- or capacity-mutating callers must pass `lock=True` so the meetup row (the
     per-meeting mutex) is locked before any capacity/waiting-list read, and so the ownership check
@@ -353,21 +289,29 @@ async def meeting(
 
     if access is MeetingAccess.OWNER_ANY_STATE:
         if found_meeting is None or not found_meeting.is_owned_by(user):
-            await notify_meeting_not_owned(user, meeting_id, action, update, context)
-            return None
+            raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
         return found_meeting
 
     if found_meeting is None:
-        await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
-        return None
+        raise MeetingGoneError(
+            meeting_id=meeting_id,
+            action=action,
+            user_db_id=user.db_id,
+            lang=user.lang,
+            keyboard=custom_keyboard,
+        )
 
     if not found_meeting.active:
         if found_meeting.is_owned_by(user):
-            await show_reactivation_prompt(user, meeting_id, update, context, custom_keyboard)
-        else:
-            await notify_meeting_not_owned(user, meeting_id, action, update, context)
-        return None
+            raise MeetingInactiveOwnerError(
+                meeting_id=meeting_id,
+                action=action,
+                user_db_id=user.db_id,
+                lang=user.lang,
+                keyboard=custom_keyboard,
+            )
+        raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
 
     if found_meeting.is_owned_by(user):
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
@@ -378,8 +322,7 @@ async def meeting(
     if access is MeetingAccess.OWNER_OR_JOINED and found_meeting.has_participant(user.db_id):
         return found_meeting
 
-    await notify_meeting_not_owned(user, meeting_id, action, update, context)
-    return None
+    raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
 
 
 async def meeting_interaction_allowed(

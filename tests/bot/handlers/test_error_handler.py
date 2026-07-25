@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.error import TelegramError
 
 from mitup_bot.config import Env
-from mitup_bot.custom_context import fault_fields_from_update
+from mitup_bot.custom_context import BOT_CONFIG_KEY, fault_fields_from_update
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
     ContextPropertyNotSetError,
@@ -15,6 +15,10 @@ from mitup_bot.exceptions import (
     InactiveUserInteraction,
     InlineQueryNotSetError,
     MalformedCallbackData,
+    MeetingAccessError,
+    MeetingGoneError,
+    MeetingInactiveOwnerError,
+    MeetingNotOwnedError,
     UserNotFound,
     UserPendingDeletion,
 )
@@ -22,21 +26,26 @@ from mitup_bot.handlers import error_handler
 from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.registry import callback_with_metrics
+from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
+from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
-from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     MockDbSession,
     StubMitupApp,
     StubMitupContext,
     UpdateRequest,
     build_context,
+    create_bot_config,
     create_settings,
     create_user,
 )
+from tests.helpers.constants import DEFAULT_USER_ID
 from tests.helpers.fixtures import create_update
 from tests.helpers.monitoring import MetricAssertions
 
@@ -200,6 +209,200 @@ async def test_pending_deletion_returns_early_when_no_update(app: StubMitupApp, 
     context.api.assert_method_just_called("answer_callback_query", times=0)
 
 
+# --- Meeting guard rejections ---
+
+BACK_ROWS: Keyboard = [[ButtonConfig(text="Back to the list", callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1))]]
+
+
+def meeting_rejections() -> list[tuple[MeetingAccessError, MitupView]]:
+    """Every rejection `guards.meeting` raises, paired with the screen that answers it."""
+    ctx = RenderContext(lang="en")
+    return [
+        (
+            MeetingGoneError(meeting_id=7, action="Edit title", user_db_id=1, lang="en", keyboard=BACK_ROWS),
+            factory.deleted_meeting_view(ctx, back_rows=BACK_ROWS),
+        ),
+        (
+            MeetingGoneError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"),
+            factory.deleted_meeting_view(ctx),
+        ),
+        (
+            MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"),
+            factory.main_menu_view(ctx),
+        ),
+        (
+            MeetingInactiveOwnerError(meeting_id=7, action="Edit title", user_db_id=1, lang="en", keyboard=BACK_ROWS),
+            factory.reactivation_prompt_view(ctx, meeting_id=7, back_rows=BACK_ROWS),
+        ),
+        (
+            MeetingInactiveOwnerError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"),
+            factory.reactivation_prompt_view(ctx, meeting_id=7),
+        ),
+    ]
+
+
+REJECTION_PARAMS = [
+    pytest.param(error, view, id=f"{type(error).__name__}{'_with_back_rows' if error.keyboard else ''}")
+    for error, view in meeting_rejections()
+]
+
+
+@pytest.mark.parametrize("error, expected_view", REJECTION_PARAMS)
+async def test_meeting_rejection_edits_the_message_for_callback_queries(
+    app: StubMitupApp, mock_session: MockDbSession, error: MeetingAccessError, expected_view: MitupView
+):
+    """A tapped button is answered in place, so the rejection replaces the screen it came from."""
+    context = build_callback_context(app)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_edit_message_called(context.telegram_update, expected_view)
+    context.api.assert_send_message_not_called()
+
+
+@pytest.mark.parametrize("error, expected_view", REJECTION_PARAMS)
+async def test_meeting_rejection_replies_to_message_updates(
+    app: StubMitupApp, mock_session: MockDbSession, error: MeetingAccessError, expected_view: MitupView
+):
+    """A message update has no message of ours to replace, so the rejection is a fresh reply."""
+    context = build_message_context(app)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_send_message_called(context.telegram_update, expected_view)
+    context.api.assert_edit_message_not_called()
+
+
+@pytest.mark.parametrize("error, expected_view", REJECTION_PARAMS)
+async def test_meeting_rejection_answers_inline_queries_with_the_unavailable_card(
+    app: StubMitupApp, mock_session: MockDbSession, error: MeetingAccessError, expected_view: MitupView
+):
+    """An inline query can only carry results, so every rejection becomes the unavailable card."""
+    context = build_inline_context(app)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_answer_inline_query_called(
+        context.telegram_update, results=[meeting_views.unavailable_inline_view("en")], cache_time=0
+    )
+    context.api.assert_send_message_not_called()
+    context.api.assert_edit_message_not_called()
+
+
+async def test_meeting_rejection_renders_in_the_language_the_error_carries(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    """The guard puts the acting user's language on the exception, sparing the renderer a DB round-trip."""
+    context = build_callback_context(app)
+
+    await error_handler.handler(
+        context, MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="es"), Env.PROD
+    )
+
+    context.api.assert_edit_message_called(context.telegram_update, factory.main_menu_view(RenderContext(lang="es")))
+
+
+async def test_meeting_rejection_keeps_the_admin_row_for_admins(app: StubMitupApp, mock_session: MockDbSession):
+    """The redirect is built for the acting user, so an admin still sees the Admin row on it."""
+    context = build_callback_context(app)
+    context.bot_data[BOT_CONFIG_KEY] = create_bot_config([DEFAULT_USER_ID])
+
+    await error_handler.handler(
+        context, MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"), Env.PROD
+    )
+
+    context.api.assert_edit_message_called(
+        context.telegram_update, factory.main_menu_view(RenderContext(lang="en", is_admin=True))
+    )
+
+
+@pytest.mark.parametrize("error, expected_view", REJECTION_PARAMS)
+async def test_meeting_rejection_closes_the_interaction_without_a_fault(
+    context: StubMitupContext,
+    mock_session: MockDbSession,
+    metrics: MetricAssertions,
+    error: MeetingAccessError,
+    expected_view: MitupView,
+):
+    """A stale button is an expected outcome: the interaction ends on FAULT=0, like a completed handler."""
+    await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix(type(error).__name__), value=1)
+
+
+async def test_meeting_not_owned_is_counted_and_logged(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """The ownership rejection keeps its own counter and its warning line, both emitted here."""
+    error = MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [entry["event"] for entry in warnings] == [str(error)]
+
+
+async def test_meeting_gone_is_logged_without_touching_the_ownership_counter(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    error = MeetingGoneError(meeting_id=7, action="Edit title", user_db_id=1, lang="en")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [entry["event"] for entry in warnings] == [str(error)]
+
+
+async def test_meeting_inactive_owner_is_a_plain_screen(
+    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """Offering an owner the reactivation prompt says nothing about their intent: no warning, no counter."""
+    error = MeetingInactiveOwnerError(meeting_id=7, action="Edit title", user_db_id=1, lang="en")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    assert [entry for entry in logs if entry["log_level"] == "warning"] == []
+
+
+async def test_meeting_rejection_suppresses_delivery_failures(app: StubMitupApp, mock_session: MockDbSession):
+    """Delivery is best-effort: a failing edit must not escape as a second, unhandled fault."""
+    context = build_callback_context(app)
+    context.api.mock_method("edit_message").side_effect = TelegramError("edit failed")
+
+    # Must not raise a second exception.
+    await error_handler.handler(
+        context, MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"), Env.PROD
+    )
+
+
+async def test_meeting_rejection_returns_early_when_no_update(app: StubMitupApp, mock_session: MockDbSession):
+    """With no telegram update there is nothing to answer, and the branch is a no-op."""
+    context = build_message_context(app)
+    # telegram_update is typed Update, but production reads it as Update | None and short-circuits on
+    # None. Forcing None here is the only way to exercise that branch; it is an intentional test-only
+    # violation, not a ty false positive, so it is exempted from requiring a tracking issue.
+    context.telegram_update = None  # ty: ignore[invalid-assignment]  # nolink: intentional — exercising the None short-circuit branch
+
+    await error_handler.handler(
+        context, MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"), Env.PROD
+    )
+
+    context.api.assert_method_just_called("send_message", times=0)
+    context.api.assert_edit_message_not_called()
+
+
 async def test_handle_error_for_uncaght_exception(context: StubMitupContext, metrics: MetricAssertions):
     context.prepare_handler_metrics({"Handler": "SomeHandler", "HandlerType": "Callback"})
 
@@ -260,6 +463,10 @@ ALL_GUARD_ERRORS = [
     CallbackQueryNotSet,
     MalformedCallbackData,
     InlineQueryNotSetError,
+    MeetingAccessError,
+    MeetingGoneError,
+    MeetingNotOwnedError,
+    MeetingInactiveOwnerError,
 ]
 
 

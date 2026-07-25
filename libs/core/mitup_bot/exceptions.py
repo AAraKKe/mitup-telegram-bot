@@ -7,6 +7,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
     from mitup_bot.callback_data import CallbackData
     from mitup_bot.handler_id import HandlerId
+    from mitup_bot.keyboards import Keyboard
 
 
 class HandlerRegisteredError(AttributeError):
@@ -69,6 +70,67 @@ class CallbackQueryNotSet(GuardError):
 class ChosenInlineResultNotSet(GuardError):
     def __init__(self, update: Update):
         super().__init__(f"Expected chosen inline result in Telegram Update not available: {update.to_json()}")
+
+
+class MeetingAccessError(GuardError):
+    """Base class for the answers ``guards.meeting`` gives a caller it stops.
+
+    Each subclass names one reason and stands for one screen; the error handler owns the rendering
+    and picks the reply shape the update can carry. The payload is everything that renderer needs
+    without a second DB round-trip: the meeting the caller addressed, the action they attempted
+    (which the log line and the exception message name), the language to render in, and the
+    back-navigation row(s) the screen offers.
+    """
+
+    def __init__(self, message: str, *, meeting_id: int, action: str, lang: str, keyboard: Keyboard | None = None):
+        self.meeting_id = meeting_id
+        self.action = action
+        self.lang = lang
+        self.keyboard = keyboard
+        super().__init__(message)
+
+
+class MeetingGoneError(MeetingAccessError):
+    """The meeting the caller addressed does not resolve to a row."""
+
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str, keyboard: Keyboard | None = None):
+        super().__init__(
+            f"User tried {action!r} with a meeting that does not exist. "
+            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+            keyboard=keyboard,
+        )
+
+
+class MeetingNotOwnedError(MeetingAccessError):
+    """The caller holds none of the access the requested profile lets through.
+
+    Carries no keyboard: the screen is the main menu, which navigates on its own.
+    """
+
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+        super().__init__(
+            f"User tried {action!r} with a meeting that does not belong to them. "
+            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+        )
+
+
+class MeetingInactiveOwnerError(MeetingAccessError):
+    """The owner addressed a meeting of theirs that is no longer active."""
+
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str, keyboard: Keyboard | None = None):
+        super().__init__(
+            f"User tried {action!r} with an inactive meeting they own. Meeting id: {meeting_id}, user id: {user_db_id}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+            keyboard=keyboard,
+        )
 
 
 class InvalidUserData(RuntimeError): ...  # pragma: no cover

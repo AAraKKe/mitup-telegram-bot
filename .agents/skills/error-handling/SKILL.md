@@ -28,6 +28,9 @@ Raised by functions in `guards.py` when handler inputs are invalid. These are th
 | `UserNotFound` | `current_user()` | Telegram user not in the database |
 | `MeetupNotFound` | `Meetup.by_id(must_exist=True)` | Meeting ID doesn't exist (raised directly in edit handlers, not from a guard) |
 | `MalformedCallbackData` | `valid_callback_data()`, `valid_meeting_callback_data()` | Callback data missing required `id` |
+| `MeetingGoneError` | `meeting()` | The addressed meeting does not resolve to a row |
+| `MeetingNotOwnedError` | `meeting()` | The caller holds none of the access the requested profile lets through |
+| `MeetingInactiveOwnerError` | `meeting()` | The owner addressed a meeting of theirs that is no longer active |
 | `EffectiveUserNotSet` | `current_user()` | Telegram update has no `effective_user` |
 | `EffectiveChatNotSet` | `chat()` | Telegram update has no `effective_chat` |
 | `EffectiveMessageNotSet` | `message()` | Telegram update has no `effective_message` |
@@ -87,6 +90,22 @@ Never add try/except blocks in handlers for either case.
 - A user's account is deleted (raises `BadRequest` with "not found")
 
 The `private` flag distinguishes private chat errors (where we should mark inactive) from group chat errors (where we should not). The `TelegramApi` methods in `api_wrapper.py` raise `InactiveUserInteraction` with the appropriate `private` value.
+
+### Meeting guard rejections
+
+The three `MeetingAccessError` subclasses (see the table above) are answered by `handle_meeting_access_error()` and never reach the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, and the back-navigation `keyboard` — so no DB round-trip happens here. `guards.meeting` renders nothing itself.
+
+The reply shape comes from the update, not from the exception:
+
+| Update | Reply |
+|---|---|
+| callback query | `edit_message` — the screen the button sits on is replaced |
+| message | `send_message` — there is no message of ours to replace |
+| inline query | `answer_inline_query` with `meeting.unavailable_inline_view` |
+
+Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch emits `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `ERROR/MeetingNotOwned`; `MeetingGoneError` logs the warning only; `MeetingInactiveOwnerError` does neither, since offering an owner the reactivation prompt says nothing about their intent.
+
+Delivery is best-effort, like every other render in this module: an exception raised while answering has no handler left above it and would reach `process_update` as a second, unhandled fault.
 
 ### Fault metrics
 

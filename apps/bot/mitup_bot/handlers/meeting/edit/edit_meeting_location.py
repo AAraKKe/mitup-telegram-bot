@@ -55,12 +55,8 @@ async def callback_edit_meeting_location(session: AsyncSession, update: Update, 
         user,
         callback_data.id,
         "Edit location",
-        update,
         context,
     )
-
-    if meeting is None:
-        return
 
     await context.api.edit_message(update=update, view=edit_location_view(meeting))
 
@@ -76,18 +72,14 @@ async def callback_edit_meeting_location_name(session: AsyncSession, update: Upd
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(
+    await guards.meeting(
         session,
         user,
         callback_data.id,
         "Edit location name",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     # Lets keep track of the meeting we are asking the name of the location for
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, callback_data.id)
@@ -128,18 +120,14 @@ async def callback_edit_meeting_location_coordinates(session: AsyncSession, upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(
+    await guards.meeting(
         session,
         user,
         callback_data.id,
         "Edit location coordinates",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     # Lets keep track of the meeting we are asking the name of the location for
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES, callback_data.id)
@@ -217,12 +205,9 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
                 user,
                 meeting_id,
                 "Edit location coordinates",
-                update,
                 context,
                 access=guards.MeetingAccess.OWNER_ANY_STATE,
             )
-            if meeting is None:
-                return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)

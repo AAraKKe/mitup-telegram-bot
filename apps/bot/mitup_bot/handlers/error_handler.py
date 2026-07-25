@@ -8,13 +8,23 @@ from telegram.error import BadRequest
 from mitup_bot import db, guards
 from mitup_bot.config import Env
 from mitup_bot.custom_context import fault_fields_from_update
-from mitup_bot.exceptions import ContextPropertyNotSetError, InactiveUserInteraction, UserPendingDeletion
+from mitup_bot.exceptions import (
+    ContextPropertyNotSetError,
+    InactiveUserInteraction,
+    MeetingAccessError,
+    MeetingGoneError,
+    MeetingInactiveOwnerError,
+    MeetingNotOwnedError,
+    UserPendingDeletion,
+)
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import CommonMessages, PrivacyMessages
-from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 
 console = Console()
 
@@ -62,6 +72,65 @@ async def handle_pending_deletion_user(context: TMitupContext, error: UserPendin
             )
     except Exception:
         log.debug("Failed to deliver the pending-deletion notice to the user.", exc_info=True)
+
+
+def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupView:
+    """Build the screen that answers a meeting rejection, one per rejection reason."""
+    if isinstance(error, MeetingGoneError):
+        return factory.deleted_meeting_view(ctx, back_rows=error.keyboard)
+    if isinstance(error, MeetingInactiveOwnerError):
+        return factory.reactivation_prompt_view(ctx, meeting_id=error.meeting_id, back_rows=error.keyboard)
+    return factory.main_menu_view(ctx)
+
+
+async def deliver_meeting_access_screen(context: TMitupContext, update: Update, error: MeetingAccessError):
+    """Send the rejection screen in the shape this update can carry.
+
+    A callback query replaces the screen the button sits on. A message update has no message of ours
+    to replace, so the rejection arrives as a fresh reply. An inline query can only carry results, so
+    it is answered with the unavailable card.
+    """
+    if update.inline_query is not None:
+        await context.api.answer_inline_query(
+            update=update, results=[meeting_views.unavailable_inline_view(error.lang)], cache_time=0
+        )
+        return
+
+    view = meeting_access_view(error, RenderContext(lang=error.lang, is_admin=guards.is_admin(update, context)))
+    if update.callback_query is not None:
+        await context.api.edit_message(update=update, view=view)
+    else:
+        await context.api.send_message(update=update, view=view)
+
+
+async def handle_meeting_access_error(context: TMitupContext, error: MeetingAccessError):
+    """Answer a caller `guards.meeting` stopped, and close the interaction as a completed one.
+
+    Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces,
+    not a code fault: the rejection is counted on its own series and the interaction ends on
+    `FAULT=0`, exactly like a handler that ran to completion. Only the two rejections that say
+    something about the caller's intent are logged; the reactivation prompt is a normal screen.
+
+    Delivery is best-effort, like every other render in this module: an exception raised here has no
+    handler left above it and would reach `process_update` as a second, unhandled fault.
+    """
+    if isinstance(error, MeetingGoneError | MeetingNotOwnedError):
+        log.warning(str(error))
+
+    update = context.telegram_update
+    if update is None:
+        # No update means no interaction: there is nothing to answer, and the metric properties are
+        # read off the update.
+        return
+
+    if isinstance(error, MeetingNotOwnedError):
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
+    context.emit_metric(MetricKey.FAULT, 0)
+
+    try:
+        await deliver_meeting_access_screen(context, update, error)
+    except Exception:
+        log.debug("Failed to deliver the meeting rejection screen to the user.", exc_info=True)
 
 
 def should_ignore_error(error: Exception) -> bool:
@@ -132,6 +201,12 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
     # the fault metrics below.
     if isinstance(error, UserPendingDeletion):
         await handle_pending_deletion_user(context, error)
+        return
+
+    # The meeting guard's rejections carry their own screen, so they are answered here and stop
+    # before the fault metrics below.
+    if isinstance(error, MeetingAccessError):
+        await handle_meeting_access_error(context, error)
         return
 
     # Context loss is an expected consequence of holding conversation state in memory (a rolling

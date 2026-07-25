@@ -143,7 +143,7 @@ async def test_meeting_guard_under_lock_leaves_user_collections_unloaded(db_sess
         context = build_context(update, app)
 
         guarded_meeting = await guards.meeting(
-            session, owner, meeting.db_id, "Edit no limit participants", update, context, lock=True
+            session, owner, meeting.db_id, "Edit no limit participants", context, lock=True
         )
 
         assert guarded_meeting is not None

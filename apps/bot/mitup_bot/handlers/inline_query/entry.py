@@ -16,7 +16,7 @@ from mitup_bot.views import InlineResultsButton, MitupInlineView
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import InlineQueryId
-from .utils import meeting_unavailable_view, sort_meetings
+from .utils import sort_meetings
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW, pattern=r"^\s*$")
@@ -88,6 +88,6 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
         results = [meeting_views.inline_view(meeting)]
         context.put_feature_metric(Feature.SHARE_MEETING)
     else:
-        results = [meeting_unavailable_view(user.lang)]
+        results = [meeting_views.unavailable_inline_view(user.lang)]
 
     await context.api.answer_inline_query(update=update, results=results, cache_time=0)

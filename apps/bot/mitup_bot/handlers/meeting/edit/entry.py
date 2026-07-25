@@ -25,10 +25,7 @@ async def callback_query_edit_meeting(session: AsyncSession, update: Update, con
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, callback_data.id, "Edit meeting", update, context)
-
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit meeting", context)
 
     # Only allow editing the meeting if the meeting belongs to the user
     await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
@@ -61,12 +58,9 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
         user,
         meeting_id,
         "Cancel edit meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meetup is None:
-        return ConversationHandler.END
 
     await context.api.edit_message(update=update, view=meeting_views.edit_view(meetup))
 

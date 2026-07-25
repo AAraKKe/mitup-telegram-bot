@@ -52,12 +52,8 @@ async def callback_query_edit_meeting_title(session: AsyncSession, update: Updat
         user,
         meeting_id,
         "Edit title",
-        update,
         context,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, meeting_id)
     context.store_on_exit(

@@ -41,11 +41,8 @@ async def callback_edit_meeting_participants(session: AsyncSession, update: Upda
         user,
         callback_data.id,
         "Edit participants",
-        update,
         context,
     )
-    if meeting is None:
-        return
 
     await context.api.edit_message(update=update, view=edit_participants_view(meeting))
 
@@ -66,12 +63,8 @@ async def callback_edit_meeting_max_participants(session: AsyncSession, update: 
         user,
         callback_data.id,
         "Edit max participants",
-        update,
         context,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     context.store_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, callback_data.id)
     context.store_on_exit(
@@ -104,13 +97,9 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
         user,
         callback_data.id,
         "Edit no limit participants",
-        update,
         context,
         lock=True,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     meeting.max_members = None
 
@@ -160,13 +149,10 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
                 user,
                 meeting_id,
                 "Edit max participants",
-                update,
                 context,
                 access=guards.MeetingAccess.OWNER_ANY_STATE,
                 lock=True,
             )
-            if meeting is None:
-                return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
         log.error("Meeting id not set in context", exc_info=exc)
         await context.api.send_message(
@@ -216,12 +202,9 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
                 user,
                 meeting_id,
                 "Edit max participants",
-                update,
                 context,
                 access=guards.MeetingAccess.OWNER_ANY_STATE,
             )
-            if meeting is None:
-                return ConversationHandler.END
             # This view reads only `meeting.lang` (the acting owner's language), never the
             # participant list.
             response_view = edit_max_participants_view(meeting, fail=True)

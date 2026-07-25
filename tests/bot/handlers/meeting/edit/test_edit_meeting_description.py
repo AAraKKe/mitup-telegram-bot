@@ -1,4 +1,3 @@
-import logging
 import re
 from collections.abc import Callable
 from typing import cast
@@ -8,7 +7,7 @@ from telegram import CallbackQuery, MessageEntity, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.exceptions import MalformedCallbackData, MeetingGoneError
 from mitup_bot.handlers.meeting.edit.edit_meeting_description import (
     callback_query_edit_meeting_description,
     edit_description_prompt_view,
@@ -103,26 +102,25 @@ async def test_callback_query_edit_meeting_description_fails_without_callback_qu
         await callback_query_edit_meeting_description(update, context)
 
 
-async def test_edit_meeting_decription_does_nothing_for_meeting_not_owned_and_logs_warning(
+async def test_edit_meeting_description_stops_for_meeting_that_is_gone(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
     meeting: Meetup,
 ):
-    caplog.set_level(logging.WARNING)
-
     match = re.match(cb.EDIT_MEETING_DESCRIPTION.pattern, "edit;meet_desc:123")
     assert match is not None
 
     context.matches = [match]
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    await callback_query_edit_meeting_description(update, context)
+    with pytest.raises(MeetingGoneError) as raised:
+        await callback_query_edit_meeting_description(update, context)
 
-    assert "User tried 'Edit description' with a meeting that does not exist." in caplog.text
-    assert " Meeting id: 123, user id: 1" in caplog.text
+    assert "User tried 'Edit description' with a meeting that does not exist." in str(raised.value)
+    assert " Meeting id: 123, user id: 1" in str(raised.value)
+    context.api.assert_edit_message_not_called()
 
 
 async def test_edit_description_rich_message_reprompts_and_keeps_state(

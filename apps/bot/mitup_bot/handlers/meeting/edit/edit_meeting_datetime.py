@@ -145,10 +145,7 @@ async def callback_query_date_time_entry(
     )
 
     user = await guards.current_user(update, session)
-    if (
-        meeting := await guards.meeting(session, user, callback_data.id, "Edit date and time", update, context)
-    ) is None:
-        return None
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit date and time", context)
 
     meeting_id = meeting.db_id
     lang = user.lang
@@ -215,14 +212,12 @@ async def callback_query_cancel_start_time(session: AsyncSession, update: Update
     )
 
     user = await guards.current_user(update, session)
-    if (
-        meeting := await guards.meeting(session, user, callback_data.id, "Cancel start time edit", update, context)
-    ) is None:
-        cleanup_states(context)
-        return ConversationHandler.END
+    # The flow is over either way, so its state is dropped before the guard can abort the handler.
+    cleanup_states(context)
+
+    meeting = await guards.meeting(session, user, callback_data.id, "Cancel start time edit", context)
 
     await context.api.edit_message(update=update, view=meeting_views.when_view(meeting))
-    cleanup_states(context)
     return ConversationHandler.END
 
 
@@ -241,8 +236,7 @@ async def callback_query_edit_meeting_date(
     )
 
     user = await guards.current_user(update, session)
-    if (meeting := await guards.meeting(session, user, callback_data.id, "Edit date", update, context)) is None:
-        return None
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit date", context)
 
     now_in_user_timezone = meeting.owner.now_in_tz()
     today_in_user_timezone = now_in_user_timezone.date()
@@ -291,10 +285,7 @@ async def callback_query_back_to_edit_datetime(
     )
 
     user = await guards.current_user(update, session)
-    if (
-        meeting := await guards.meeting(session, user, callback_data.id, "Back to edit datetime", update, context)
-    ) is None:
-        return None
+    meeting = await guards.meeting(session, user, callback_data.id, "Back to edit datetime", context)
 
     today = meeting.owner.now_in_tz().date()
     await context.api.edit_message(update=update, view=build_edit_datetime_entry_view(meeting, user.lang, today))
@@ -412,8 +403,7 @@ async def callback_query_set_meeting_date(
     )
 
     user = await guards.current_user(update, session)
-    if (meeting := await guards.meeting(session, user, callback_data.id, "Edit date", update, context)) is None:
-        return ConversationHandler.END
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit date", context)
 
     if meeting.datetime is None:
         return await handle_first_datetime_set(context, update, meeting, callback_data.date)
@@ -440,12 +430,8 @@ async def callback_query_set_meeting_time(
         user,
         callback_data.id,
         "Edit time",
-        update,
         context,
     )
-
-    if meeting is None:
-        return ConversationHandler.END
 
     return await show_edit_time_prompt(context, update, meeting)
 
@@ -467,10 +453,7 @@ async def date_time_entity_message_handler(
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting(session, current_user, meeting_id, "Set datetime from entity", update, context)
-
-        if meeting is None:
-            return ConversationHandler.END
+        meeting = await guards.meeting(session, current_user, meeting_id, "Set datetime from entity", context)
 
         if error := validate_start_datetime(unix_time, meeting, current_user.lang):
             today = meeting.owner.now_in_tz().date()
@@ -527,10 +510,7 @@ async def set_time_message_handler(
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting(session, current_user, meeting_id, "Set time", update, context)
-
-        if meeting is None:
-            return ConversationHandler.END
+        meeting = await guards.meeting(session, current_user, meeting_id, "Set time", context)
 
         if not 0 <= int(time_info["hour"]) < 24 or not 0 <= int(time_info["minutes"]) < 60:
             await context.api.send_message(
@@ -580,9 +560,7 @@ async def fallback_answer(
 ) -> ConversationMeetingState | int:
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting(session, current_user, meeting_id, "Wrong time input", update, context)
-        if meeting is None:
-            return ConversationHandler.END
+        meeting = await guards.meeting(session, current_user, meeting_id, "Wrong time input", context)
 
         await context.api.send_message(
             update=update,
@@ -623,9 +601,7 @@ async def datetime_state_fallback_answer(
 ) -> ConversationMeetingState | int:
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting(session, current_user, meeting_id, "Wrong datetime input", update, context)
-        if meeting is None:
-            return ConversationHandler.END
+        meeting = await guards.meeting(session, current_user, meeting_id, "Wrong datetime input", context)
 
         today = meeting.owner.now_in_tz().date()
         error = CommonMessages.DATETIME_INVALID.get(lang=current_user.lang, datetime_link=build_datetime_link())

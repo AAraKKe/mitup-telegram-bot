@@ -1,4 +1,3 @@
-import logging
 import re
 
 import pytest
@@ -6,7 +5,7 @@ from telegram import MessageEntity, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import ContextId
-from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.exceptions import MalformedCallbackData, MeetingNotOwnedError
 from mitup_bot.handlers.meeting.edit.edit_meeting_title import (
     callback_query_edit_meeting_title,
     edit_title_prompt_view,
@@ -82,15 +81,12 @@ async def test_callback_query_edit_meeting_title_fails_without_callback_query_da
         await callback_query_edit_meeting_title(update, context)
 
 
-async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_warning(
+async def test_edit_meeting_title_stops_for_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
 ):
-    caplog.set_level(logging.WARNING)
-
     match = re.match(cb.EDIT_MEETING_TITLE.pattern, "edit;meet_title:123")
     assert match is not None
 
@@ -101,10 +97,12 @@ async def test_edit_meeting_title_does_nothing_for_meeting_not_owned_and_logs_wa
 
     mock_session.add_object(meeting)
 
-    await callback_query_edit_meeting_title(update, context)
+    with pytest.raises(MeetingNotOwnedError) as raised:
+        await callback_query_edit_meeting_title(update, context)
 
-    assert "ser tried 'Edit title' with a meeting that does not belong to them." in caplog.text
-    assert " Meeting id: 123, user id: 1" in caplog.text
+    assert "ser tried 'Edit title' with a meeting that does not belong to them." in str(raised.value)
+    assert " Meeting id: 123, user id: 1" in str(raised.value)
+    context.api.assert_edit_message_not_called()
 
 
 async def test_edit_title_rich_message_reprompts_and_keeps_state(

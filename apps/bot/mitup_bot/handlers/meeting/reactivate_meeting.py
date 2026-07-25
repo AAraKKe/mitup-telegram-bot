@@ -35,12 +35,9 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
         user,
         callback_data.id,
         "Reactivate meeting",
-        update,
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
-    if meeting is None:
-        return
 
     # Reactivating turns an inactive meeting active again, so it counts against the cap. The meeting
     # being reactivated is inactive and therefore excluded from the count. The back button targets

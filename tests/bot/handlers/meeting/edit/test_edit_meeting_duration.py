@@ -796,7 +796,7 @@ async def test_duration_end_time_callback_meeting_not_accessible(
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """DURATION_END_TIME_CALLBACK returns END when meeting is not accessible."""
+    """DURATION_END_TIME_CALLBACK is aborted by the guard when the meeting is not accessible."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
@@ -805,7 +805,7 @@ async def test_duration_end_time_callback_meeting_not_accessible(
         EditMeetingHandlerId.DURATION_END_TIME_CALLBACK, handler_context=handler_context
     )
 
-    assert state == ConversationHandler.END
+    assert state is None
 
 
 # ---------------------------------------------------------------------------

@@ -213,7 +213,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, handler_context=handler_context
         )
 
-        assert result is ConversationHandler.END
+        assert result is None
         assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -437,7 +437,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
             EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, handler_context=handler_context
         )
 
-        assert result is ConversationHandler.END
+        assert result is None
         assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -723,13 +723,13 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="5")], indirect=True)
-async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
+async def test_edit_max_participants_message_stops_when_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """A meeting owned by somebody else ends the conversation."""
+    """A meeting owned by somebody else stops the handler before any state is returned."""
     not_owned_meeting = create_meetup(id=99, title="Not Owned", owner=create_member(id=2, tg_user_id=456))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)
@@ -740,9 +740,11 @@ async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 99},
     )
 
-    assert state == ConversationHandler.END
-    # Meeting not owned — redirected to main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    assert state is None
+    # Meeting not owned — redirected to main menu. A message update has no message of ours to
+    # replace, so the redirect arrives as a fresh reply.
+    context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_edit_message_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -751,13 +753,13 @@ async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="not a number")], indirect=True)
-async def test_edit_wrong_max_participants_returns_end_when_meeting_not_owned(
+async def test_edit_wrong_max_participants_stops_when_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """A meeting owned by somebody else ends the conversation from the wrong-input handler too."""
+    """A meeting owned by somebody else stops the wrong-input handler too."""
     not_owned_meeting = create_meetup(id=99, title="Not Owned", owner=create_member(id=2, tg_user_id=456))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)
@@ -768,9 +770,10 @@ async def test_edit_wrong_max_participants_returns_end_when_meeting_not_owned(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 99},
     )
 
-    assert state == ConversationHandler.END
-    # Meeting not owned — redirected to main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    assert state is None
+    # Meeting not owned — redirected to main menu, as a fresh reply to the message update.
+    context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_edit_message_not_called()
 
 
 def test_edit_meeting_participants_view_without_participants():

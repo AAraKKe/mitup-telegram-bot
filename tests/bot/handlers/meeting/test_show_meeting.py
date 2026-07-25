@@ -5,7 +5,7 @@ import pytest
 from telegram import Update
 
 from mitup_bot.callback_data import MeetingListSource
-from mitup_bot.exceptions import MalformedCallbackData
+from mitup_bot.exceptions import MalformedCallbackData, MeetingNotOwnedError
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.meeting.show_meeting import callback_query_show_meeting
 from mitup_bot.handlers.meeting.utils import meeting_detail_back_button
@@ -13,7 +13,6 @@ from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
@@ -69,15 +68,12 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
     context.api.assert_edit_message_called(update, expected_view)
 
 
-async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
+async def test_show_meeting_stops_for_meeting_not_owned(
     mock_session: MockDbSession,
     update: Update,
     context: StubMitupContext,
-    caplog: pytest.LogCaptureFixture,
     user_with_settings: User,
 ):
-    caplog.set_level(logging.WARNING)
-
     match = re.match(cb.SHOW_MEETING.pattern, "show;meeting:4")  # Target meeting ID 4
     assert match is not None
 
@@ -95,17 +91,17 @@ async def test_show_meeting_does_nothing_for_meeting_not_owned_and_logs_warning(
     other_meeting = create_meetup(id=4, owner=other_user, title="Other's Meeting")
     mock_session.add_object(other_meeting)
 
-    await callback_query_show_meeting(update, context)
+    with pytest.raises(MeetingNotOwnedError) as raised:
+        await callback_query_show_meeting(update, context)
 
-    # Ensure that the only message sent was the edit for the main menu to avoid information flow
-    context.api.assert_edit_message_called(
-        update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)), times=1
-    )
+    # Nothing about the meeting reaches the user: the rejection carries only the main-menu redirect,
+    # which the error handler renders.
+    context.api.assert_edit_message_not_called()
     context.api.assert_send_message_not_called()
-    assert (
+    assert str(raised.value) == (
         "User tried 'Show meeting' with a meeting that does not belong to them. "
         f"Meeting id: 4, user id: {user_with_settings.id}"
-    ) in caplog.text
+    )
 
 
 async def test_show_meeting_renders_external_view_for_joined_but_not_owned_meeting(

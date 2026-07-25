@@ -22,9 +22,7 @@ async def callback_query_when_entry(session: AsyncSession, update: Update, conte
     ).id
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, meeting_id, "edit_meeting_when", update, context)
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, meeting_id, "edit_meeting_when", context)
 
     await context.api.edit_message(update=update, view=meeting_views.when_view(meeting))
 
@@ -39,9 +37,7 @@ async def callback_query_clear_times(session: AsyncSession, update: Update, cont
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, callback_data.id, "clear_times", update, context)
-    if meeting is None:
-        return
+    await guards.meeting(session, user, callback_data.id, "clear_times", context)
 
     view = factory.confirmation_view(
         guards.render_context(user, update, context),
@@ -62,9 +58,7 @@ async def callback_query_confirm_clear_times(session: AsyncSession, update: Upda
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, callback_data.id, "confirm_clear_times", update, context)
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, callback_data.id, "confirm_clear_times", context)
 
     meeting.datetime = None
     meeting.end_datetime = None
@@ -90,9 +84,7 @@ async def callback_query_decline_clear_times(session: AsyncSession, update: Upda
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, callback_data.id, "decline_clear_times", update, context)
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, callback_data.id, "decline_clear_times", context)
 
     view = meeting_views.when_view(meeting).with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user.lang))
     await context.api.edit_message(update=update, view=view)
@@ -108,9 +100,7 @@ async def callback_query_set_lock_on_start(session: AsyncSession, update: Update
     ).id
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting(session, user, meeting_id, "set_lock_on_start", update, context)
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, meeting_id, "set_lock_on_start", context)
 
     meeting.lock_on_start = not meeting.lock_on_start
 

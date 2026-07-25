@@ -27,17 +27,15 @@ async def callback_query_edit_meeting_settings(session: AsyncSession, update: Up
         cb.EDIT_MEETING_SETTINGS.parse(context.match), EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK
     ).id
 
-    if (
-        meeting := await guards.meeting(
-            session=session,
-            user=user,
-            meeting_id=meeting_id,
-            action="edit_meeting_settings",
-            update=update,
-            context=context,
-        )
-    ) is not None:
-        await context.api.edit_message(update=update, view=meeting_views.settings_view(meeting))
+    meeting = await guards.meeting(
+        session=session,
+        user=user,
+        meeting_id=meeting_id,
+        action="edit_meeting_settings",
+        context=context,
+    )
+
+    await context.api.edit_message(update=update, view=meeting_views.settings_view(meeting))
 
 
 @asynccontextmanager
@@ -48,33 +46,29 @@ async def toggle_meeting_setting(
     handler_id: EditMeetingHandlerId,
     callback_data: cb.CallbackData,
     return_view: Callable[[Meetup], MitupView],
-) -> AsyncGenerator[Meetup | None]:
+) -> AsyncGenerator[Meetup]:
     user = await guards.current_user(update, session)
 
     meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
 
-    if (
-        meeting := await guards.meeting(
-            session=session,
-            user=user,
-            meeting_id=meeting_id,
-            action=handler_id.name,
-            update=update,
-            context=context,
-        )
-    ) is not None:
-        yield meeting
+    meeting = await guards.meeting(
+        session=session,
+        user=user,
+        meeting_id=meeting_id,
+        action=handler_id.name,
+        context=context,
+    )
 
-        await context.api.edit_message(update=update, view=return_view(meeting))
-        # Update all messages to ensure any visible message contains the new changes but skip current one
-        # to stay in the current sub-screen view.
-        await context.api.update_meeting_messages(
-            meeting=meeting,
-            current_message=meeting.message_from_update(update),
-            skip_current=True,
-        )
-    else:
-        yield None
+    yield meeting
+
+    await context.api.edit_message(update=update, view=return_view(meeting))
+    # Update all messages to ensure any visible message contains the new changes but skip current one
+    # to stay in the current sub-screen view.
+    await context.api.update_meeting_messages(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
 
 
 def create_meeting_settings_toggle_handler(
@@ -94,8 +88,6 @@ def create_meeting_settings_toggle_handler(
             callback_data=callback_data,
             return_view=return_view,
         ) as meeting:
-            if meeting is None:
-                return
             setattr(meeting, attribute, not getattr(meeting, attribute))
 
     return handler

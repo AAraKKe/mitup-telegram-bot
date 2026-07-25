@@ -208,8 +208,8 @@ async def test_edit_location_name_not_owned(
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_NAME_CALLBACK, handler_context=handler_context
         )
-        # If the meeting id is not found, check we have ended the conversation
-        assert result is ConversationHandler.END
+        # The guard rejection aborts the handler, so it returns no conversation state.
+        assert result is None
         assert "User tried 'Edit location name' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -305,8 +305,8 @@ async def test_edit_location_coordinates_not_owned(
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, handler_context=handler_context
         )
-        # If the meeting id is not found, check we have ended the conversation
-        assert result is ConversationHandler.END
+        # The guard rejection aborts the handler, so it returns no conversation state.
+        assert result is None
         assert "User tried 'Edit location coordinates' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -670,25 +670,27 @@ async def test_edit_location_coordinates_message_sends_main_menu_when_context_mi
     [UpdateRequest(location=Location(longitude=1.0, latitude=2.0))],
     indirect=True,
 )
-async def test_edit_location_coordinates_message_ends_when_user_does_not_own_meeting(
+async def test_edit_location_coordinates_message_stops_when_user_does_not_own_meeting(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
 ):
-    """A meeting the user does not own redirects to the main menu and ends the conversation."""
+    """A meeting the user does not own redirects to the main menu and aborts the handler."""
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    # Pass with_meeting_id=999 — user only owns meeting 1, so guard returns None.
+    # Pass with_meeting_id=999 — user only owns meeting 1, so the guard rejects the caller.
     context, state = await call_handler(
         EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
         handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 999},
     )
 
-    assert state == ConversationHandler.END
-    context.api.assert_method_just_called("edit_message", times=1)
+    assert state is None
+    # A message update carries no message of ours to replace, so the redirect is a fresh reply.
+    context.api.assert_method_just_called("send_message", times=1)
+    context.api.assert_edit_message_not_called()
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)

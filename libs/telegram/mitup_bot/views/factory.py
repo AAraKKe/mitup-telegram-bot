@@ -10,6 +10,7 @@ from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import (
     AdminMessages,
     ButtonMessages,
+    CommonMessages,
     Emojis,
     HelpMessages,
     Languages,
@@ -348,6 +349,21 @@ def conversation_interrupted_view(
     return MitupView(
         message,
         [[ButtonConfig(text=ButtonMessages.CANCEL.get_text(lang=ctx.lang), callback_data=cancel_callback)]],
+    )
+
+
+def deleted_meeting_view(ctx: RenderContext, *, back_rows: Keyboard | None = None) -> MitupView:
+    """
+    View shown to a user who acts on a meeting that no longer exists.
+
+    If `back_rows` is provided it is used as the back-navigation row(s). Otherwise a single
+    "Back to main menu" row is rendered.
+    """
+    lang = ctx.lang
+    return MitupView(
+        description=CommonMessages.DELETED_MEETING_ALERT.get(lang=lang),
+        keyboard=back_rows
+        or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]],
     )
 
 

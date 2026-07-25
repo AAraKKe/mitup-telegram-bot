@@ -70,22 +70,30 @@ All guards that take a `session` are async — `await` them.
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `meeting` | `(session, user, meeting_id, action, update, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
+| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` (all rendered by the global error handler) |
 | `meeting_interaction_allowed` | `(session, user, meeting, update, context)` | `bool` | — (answers with the deleted-meeting alert) |
 
-`guards.meeting` is the single meeting guard for the bot chat (not inline). It resolves the meeting through `Meetup.by_id` and returns **its own** meeting-rooted instance, whose participant leaves (owner, joined links' `user`/`invited_by`) are hydrated — so handlers render straight off the guard result and never re-load. Ownership is decided on that loaded row via `Meetup.is_owned_by`. When `None` is returned, the handler must return immediately: the guard has already answered the user.
+`guards.meeting` is the single meeting guard for the bot chat (not inline). It resolves the meeting through `Meetup.by_id` and returns **its own** meeting-rooted instance, whose participant leaves (owner, joined links' `user`/`invited_by`) are hydrated — so handlers render straight off the guard result and never re-load. Ownership is decided on that loaded row via `Meetup.is_owned_by`.
 
-`access` selects who gets through and which screen everybody else is answered with:
+The guard never returns `None` and never renders: it either hands back a meeting or raises, so callers use the result directly and carry no `if meeting is None` stanza. It takes no `update` for the same reason — the exception carries what the renderer needs (see "Rejections" below).
+
+`access` selects who gets through and which rejection stops everybody else:
 
 | `MeetingAccess` | Lets through | Meeting not found | Inactive meeting |
 |---|---|---|---|
-| `OWNER` (default) | the owner of an active meeting | "meeting deleted" message | owner → reactivation prompt; anyone else → main menu |
-| `OWNER_OR_JOINED` | the owner, plus anyone who joined the active meeting (waiting list included) | "meeting deleted" message | owner → reactivation prompt; anyone else → main menu |
-| `OWNER_ANY_STATE` | the owner, whatever the meeting's state | main menu, as for a meeting the caller does not own | returned to the caller |
+| `OWNER` (default) | the owner of an active meeting | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
+| `OWNER_OR_JOINED` | the owner, plus anyone who joined the active meeting (waiting list included) | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
+| `OWNER_ANY_STATE` | the owner, whatever the meeting's state | `MeetingNotOwnedError`, as for a meeting the caller does not own | returned to the caller |
 
 Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_JOINED` for screens that only **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list, where the caller renders `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Use `OWNER_ANY_STATE` on the surfaces that render inactive meetings themselves — the past-meetings screens, reactivation, and the delete flows — where the reactivation prompt would replace the screen the user asked for.
 
-A non-owner is logged and counted on the `MeetingNotOwned` error metric before the main-menu redirect; the deleted-meeting and reactivation screens emit no such metric.
+### Rejections
+
+The three rejections all subclass `MeetingAccessError` (itself a `GuardError`) and carry `meeting_id`, `action` and `lang`. `MeetingGoneError` and `MeetingInactiveOwnerError` also carry the back-navigation `keyboard`; `MeetingNotOwnedError` does not, since its screen is the main menu, which navigates on its own. The error handler owns every screen they produce and picks the reply shape from the update — callback query → edit in place, message → fresh reply, inline query → the unavailable card. See the `error-handling` skill for that branch.
+
+`action` is a short free-text description of what the user was doing. It is not user-facing: it names the attempt in the exception message and in the warning line the error handler logs.
+
+A non-owner is logged and counted on the `MeetingNotOwned` error metric; the deleted-meeting and reactivation screens emit no such metric, and the reactivation prompt is not logged at all. A caller who gets through an ownership check emits the same metric with value `0`, so the series carries both outcomes.
 
 Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. The locked load resets the acting user's `meetups`/`joined_links` to unloaded, so a handler that both locks and opted into the collections must re-load them itself. See the `database` skill's "Per-meeting row locks" section for the full convention.
 
@@ -99,7 +107,7 @@ unclaimed inline message authorizes nothing, since anyone can produce one by sha
 own. Call it before any write or render, and return immediately when it is `False` (it has already
 answered the caller with the deleted-meeting alert).
 
-`custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from.
+`custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from. It travels to the renderer on the exception, so the guard never builds a screen itself.
 
 ## Usage pattern
 
@@ -109,11 +117,11 @@ answered the caller with the deleted-meeting alert).
 async def show(session: AsyncSession, update: Update, context: TMitupContext):
     meeting_id = guards.valid_callback_data(cb.MY_CALLBACK.parse(context.match), MyHandlerId.SHOW).id
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting(session, user, meeting_id, "show meeting", update, context)
-    if meeting is None:
-        return
+    meeting = await guards.meeting(session, user, meeting_id, "show meeting", context)
     # ... proceed with meeting
 ```
+
+A rejection aborts the handler mid-body, so anything that must happen regardless of the outcome — clearing conversation state, for instance — runs **before** the guard. A conversation handler that is aborted this way returns no state, which leaves the user in the state they were already in; that is what every other guard exception does too.
 
 ## Failure mode registration
 

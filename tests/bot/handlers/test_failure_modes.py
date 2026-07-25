@@ -38,6 +38,7 @@ from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
+    StubMitupContext,
     UpdateRequest,
     call_handler,
     create_bot_config,
@@ -1373,6 +1374,20 @@ def handler_shows_reactivation_prompt_for_inactive_meeting() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_INACTIVE_OWNER in context.error_modes]
 
 
+def assert_rejection_screen(context: StubMitupContext, update: Update, view: MitupView):
+    """Assert the rejection screen reached the user in the shape this update can carry.
+
+    A callback query replaces the screen the button sits on; a message update has no message of
+    ours to replace, so the rejection arrives as a fresh reply.
+    """
+    if update.callback_query is not None:
+        context.api.assert_edit_message_called(update, view)
+        context.api.assert_send_message_not_called()
+    else:
+        context.api.assert_send_message_called(update, view)
+        context.api.assert_edit_message_not_called()
+
+
 def assert_handler_metrics(
     metrics: MetricAssertions,
     *,
@@ -1398,7 +1413,7 @@ def assert_handler_metrics(
     ],
     indirect=["update"],
 )
-async def test_callback_fails_when_meeting_not_accessible(
+async def test_handler_rejects_meeting_not_owned(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
@@ -1409,15 +1424,18 @@ async def test_callback_fails_when_meeting_not_accessible(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED, owner=other_owner()))
 
-    context, _ = await call_handler(
+    context, result = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
+    # The rejection aborts the handler, so it produces no conversation state: whatever state the
+    # user was in is the state they stay in, exactly like every other guard exception.
+    assert result is None
     # MeetingNotOwned error metric is emitted
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    assert_rejection_screen(context, update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize(
@@ -1429,7 +1447,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     ],
     indirect=["update"],
 )
-async def test_callback_fails_when_meeting_not_found(
+async def test_handler_rejects_meeting_that_is_gone(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
@@ -1439,10 +1457,11 @@ async def test_callback_fails_when_meeting_not_found(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    context, _ = await call_handler(
+    context, result = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
+    assert result is None
     extra = (
         test_context.extra_metrics_not_found
         if not isinstance(test_context.extra_metrics_not_found, _Unset)
@@ -1458,7 +1477,8 @@ async def test_callback_fails_when_meeting_not_found(
             )
         ]
     ]
-    context.api.assert_edit_message_called(
+    assert_rejection_screen(
+        context,
         update,
         MitupView(
             description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user_with_settings.lang),
@@ -1608,10 +1628,11 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(
+    context, result = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
+    assert result is None
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
 
     back_rows = (
@@ -1619,7 +1640,8 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
         if test_context.reactivation_back_keyboard_factory
         else None
     )
-    context.api.assert_edit_message_called(
+    assert_rejection_screen(
+        context,
         update,
         factory.reactivation_prompt_view(
             RenderContext(lang=user_with_settings.lang), meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
@@ -1648,10 +1670,11 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 
-    context, _ = await call_handler(
+    context, result = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
+    assert result is None
     extra = (
         test_context.extra_metrics_non_owner_inactive
         if not isinstance(test_context.extra_metrics_non_owner_inactive, _Unset)
@@ -1659,4 +1682,4 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     )
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
-    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    assert_rejection_screen(context, update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
