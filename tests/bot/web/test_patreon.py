@@ -1,7 +1,8 @@
 import contextlib
 import datetime as dt
-from collections.abc import Callable, Iterator
-from unittest.mock import AsyncMock, MagicMock
+import re
+from collections.abc import AsyncIterator, Iterator
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -9,63 +10,61 @@ from freezegun import freeze_time
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 from structlog.typing import EventDict
-from telegram.error import BadRequest
 
-from mitup_bot import patreon, supporter
-from mitup_bot.config import LimitsConfig, PatreonConfig, RunModes
+from mitup_bot import patreon
+from mitup_bot.config import PatreonConfig, RunModes
 from mitup_bot.exceptions import PatreonApiError
-from mitup_bot.hosts_group import HostsGroupState
-from mitup_bot.models import SupporterSubscription
-from mitup_bot.models.users import UserStatus
+from mitup_bot.models import PatreonPendingLink
 from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth
-from mitup_bot.patreon.models import IdentityData, IdentityResponse
-from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
-from mitup_bot.views.collaborate import (
-    collaborate_linked_not_patron_view,
-    collaborate_linked_patron_view,
-    hosts_group_readmitted_view,
-    link_confirmation_view,
-)
+from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth, pairing
+from mitup_bot.patreon.models import IdentityAttributes, IdentityData, IdentityResponse
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
     CallbackOutcome,
-    LinkOutcome,
     PatreonCallbackParams,
     ResolvedCallback,
-    link_patreon_account,
     resolve_callback,
-    upsert_subscription,
 )
 from tests.helpers import (
     MetricAssertions,
-    MockApi,
     build_ptb_app_mock,
     build_test_web_app,
     build_web_client,
     create_patreon_config,
-    create_supporter_subscription,
-    create_user,
     make_test_metrics_client,
 )
 from tests.helpers.stub_db import MockDbSession
 
 BOT_USERNAME = "MitupTestBot"
-TAPPED_MESSAGE_ID = 4242
-PATRON_ACTIVE_MEETINGS = 12
-PATRON_SCHEDULING_DAYS = 200
 
 
 @pytest.fixture
-def patron_caps(monkeypatch: pytest.MonkeyPatch):
-    """Pin the Patron-tier caps so the refreshed Collaborate copy renders deterministic numbers."""
-    config = LimitsConfig(
-        patron_active_meetings=PATRON_ACTIVE_MEETINGS,
-        patron_scheduling_horizon_days=PATRON_SCHEDULING_DAYS,
-    )
-    monkeypatch.setattr(supporter.PolicyState, "config", config)
+def staging_session(monkeypatch: pytest.MonkeyPatch) -> MockDbSession:
+    """Swap ``db.begin`` for one yielding a mock session, so the callback's staging write runs
+    against the stub instead of a real transaction. Returns the session so a test can read the
+    ``PatreonPendingLink`` the callback added."""
+    session = MockDbSession()
+
+    @contextlib.asynccontextmanager
+    async def fake_begin() -> AsyncIterator[MockDbSession]:
+        yield session
+
+    monkeypatch.setattr("mitup_bot.db.begin", fake_begin)
+    return session
+
+
+def staged_link(session: MockDbSession) -> PatreonPendingLink:
+    """The single pending link the callback staged."""
+    staged = [obj for obj in session.objects_added if isinstance(obj, PatreonPendingLink)]
+    assert len(staged) == 1, f"expected exactly one staged pending link, got {len(staged)}"
+    return staged[0]
+
+
+def rendered_pairing_code(response_text: str) -> str:
+    """The pairing code the result page rendered, read back out of the deep-link button."""
+    match = re.search(rf"\?start={pairing.PAIRING_DEEP_LINK_PREFIX}_([A-Za-z0-9_-]+)", response_text)
+    assert match is not None, "the result page did not render a pairing deep link"
+    return match.group(1)
 
 
 def one_log(logs: list[EventDict], event: str) -> EventDict:
@@ -112,7 +111,7 @@ class FakePatreonClient:
     """Stand-in for PatreonClient that skips the network; exchange is configurable. The success
     tests mock link_patreon_account, so the identity content is not asserted here."""
 
-    identity = IdentityResponse(data=IdentityData(id="patreon-1"))
+    identity = IdentityResponse(data=IdentityData(id="patreon-1", attributes=IdentityAttributes(full_name="Ada L")))
     exchange_error: Exception | None = None
 
     def __init__(self, config: object, *, transport: object = None):
@@ -210,10 +209,10 @@ async def test_unknown_query_params_still_hit_bare_landing_without_422(web_app: 
 
 async def test_callback_expired_state_prompts_retry(web_app: FastAPI, patreon_config: PatreonConfig):
     with freeze_time("2026-07-05 12:00:00"):
-        state = oauth.encode_state(patreon_config, 997_620)
+        state = oauth.encode_state(patreon_config)
 
-    # 80 minutes later: past the 1h TTL.
-    with freeze_time("2026-07-05 13:20:00"):
+    # 20 minutes later: past the 15-minute TTL.
+    with freeze_time("2026-07-05 12:20:00"):
         async with build_web_client(web_app) as client:
             response = await client.get("/patreon/callback", params={"code": "c", "state": state})
 
@@ -236,7 +235,7 @@ async def test_callback_patreon_error_renders_retry(
 ):
     FakePatreonClient.exchange_error = PatreonApiError("boom")
     monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
-    state = oauth.encode_state(patreon_config, 997_621)
+    state = oauth.encode_state(patreon_config)
 
     async with build_web_client(web_app) as client:
         response = await client.get("/patreon/callback", params={"code": "c", "state": state})
@@ -245,36 +244,90 @@ async def test_callback_patreon_error_renders_retry(
     assert response.status_code == 502
 
 
-@pytest.mark.parametrize(
-    "outcome, status, needle",
-    [
-        (LinkOutcome.LINKED_SUPPORTER, 200, "all set"),
-        (LinkOutcome.LINKED_NO_PATRON, 200, "connected"),
-        (LinkOutcome.UNKNOWN_USER, 400, "couldn't find your mitup account"),
-        (LinkOutcome.ALREADY_LINKED_ELSEWHERE, 409, "already linked"),
-        (LinkOutcome.PENDING_DELETION, 403, "scheduled for deletion"),
-    ],
-)
-async def test_callback_outcome_pages_render_expected_content(
+# --- The consent leg stages a pairing code and grants nothing ---
+
+
+async def test_successful_consent_stages_a_pending_link_and_renders_its_code(
     web_app: FastAPI,
     patreon_config: PatreonConfig,
     monkeypatch: pytest.MonkeyPatch,
-    outcome: LinkOutcome,
-    status: int,
-    needle: str,
+    staging_session: MockDbSession,
 ):
     FakePatreonClient.exchange_error = None
     monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
-    link_mock = AsyncMock(return_value=outcome)
-    monkeypatch.setattr(web_patreon, "link_patreon_account", link_mock)
-    state = oauth.encode_state(patreon_config, 997_622)
+    state = oauth.encode_state(patreon_config)
 
     async with build_web_client(web_app) as client:
         response = await client.get("/patreon/callback", params={"code": "the-code", "state": state})
 
-    assert response.status_code == status
-    assert needle in response.text.lower()
-    link_mock.assert_awaited_once()
+    assert response.status_code == 200
+    pending = staged_link(staging_session)
+    assert pending.patreon_user_id == "patreon-1"
+    # The display name is what lets the confirmation prompt name the account in words.
+    assert pending.patreon_full_name == "Ada L"
+    # The browser leg cannot know who will redeem, so it leaves the claimer for Telegram to fill in.
+    assert pending.claimed_tg_user_id is None
+    # The page shows the code whose hash was stored, and stores nothing that reveals it.
+    assert pairing.hash_pairing_code(rendered_pairing_code(response.text)) == pending.code_hash
+
+
+async def test_consent_page_offers_a_deep_link_and_a_typable_fallback(
+    web_app: FastAPI,
+    patreon_config: PatreonConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_session: MockDbSession,
+):
+    FakePatreonClient.exchange_error = None
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+    state = oauth.encode_state(patreon_config)
+
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback", params={"code": "the-code", "state": state})
+
+    code = rendered_pairing_code(response.text)
+    assert f'href="https://t.me/{BOT_USERNAME}?start={pairing.PAIRING_DEEP_LINK_PREFIX}_{code}"' in response.text
+    # Selectable fallback for anyone whose browser will not hand the deep link to Telegram.
+    assert f'<p class="code">/start {pairing.PAIRING_DEEP_LINK_PREFIX}_{code}</p>' in response.text
+    assert "finish" in response.text.lower()
+
+
+async def test_consent_page_never_names_a_telegram_account(
+    web_app: FastAPI,
+    patreon_config: PatreonConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_session: MockDbSession,
+):
+    # The browser leg learns no Telegram identity, so the page it renders cannot address one. This
+    # is what makes the page safe to be looked at by whoever completed the consent.
+    FakePatreonClient.exchange_error = None
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+    state = oauth.encode_state(patreon_config)
+
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback", params={"code": "the-code", "state": state})
+
+    assert "your own telegram account" in response.text.lower()
+    assert "nothing is connected until you do it" in response.text.lower()
+
+
+async def test_two_consents_stage_two_independent_codes(
+    web_app: FastAPI,
+    patreon_config: PatreonConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_session: MockDbSession,
+):
+    FakePatreonClient.exchange_error = None
+    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
+
+    async with build_web_client(web_app) as client:
+        first = await client.get(
+            "/patreon/callback", params={"code": "c1", "state": oauth.encode_state(patreon_config)}
+        )
+        second = await client.get(
+            "/patreon/callback", params={"code": "c2", "state": oauth.encode_state(patreon_config)}
+        )
+
+    assert rendered_pairing_code(first.text) != rendered_pairing_code(second.text)
 
 
 # --- Input classification: PatreonCallbackParams + resolve_callback ---
@@ -329,11 +382,11 @@ def test_resolve_missing_params_when_state_absent(patreon_config: PatreonConfig)
 
 def test_resolve_state_expired_carries_age(patreon_config: PatreonConfig):
     with freeze_time("2026-07-05 12:00:00"):
-        state = oauth.encode_state(patreon_config, 997_670)
-    with freeze_time("2026-07-05 13:20:00"):
+        state = oauth.encode_state(patreon_config)
+    with freeze_time("2026-07-05 12:20:00"):
         resolved = resolve_callback(PatreonCallbackParams(code="c", state=state))
     assert resolved.outcome is CallbackOutcome.STATE_EXPIRED
-    assert resolved.state_age_seconds == pytest.approx(80 * 60, abs=2)
+    assert resolved.state_age_seconds == pytest.approx(20 * 60, abs=2)
 
 
 def test_resolve_state_invalid_never_raises(patreon_config: PatreonConfig):
@@ -342,13 +395,12 @@ def test_resolve_state_invalid_never_raises(patreon_config: PatreonConfig):
     assert resolved.outcome is CallbackOutcome.STATE_INVALID
 
 
-def test_resolve_valid_carries_tg_user_id_and_credentials(patreon_config: PatreonConfig):
-    state = oauth.encode_state(patreon_config, 997_671)
-    resolved = resolve_callback(PatreonCallbackParams(code="the-code", state=state))
+def test_resolve_valid_carries_only_the_authorization_code(patreon_config: PatreonConfig):
+    # A resolved callback exposes no Telegram identity because the state never carried one.
+    resolved = resolve_callback(PatreonCallbackParams(code="the-code", state=oauth.encode_state(patreon_config)))
     assert resolved.outcome is CallbackOutcome.VALID
-    assert resolved.tg_user_id == 997_671
     assert resolved.code == "the-code"
-    assert resolved.state == state
+    assert not any(field.startswith("tg_") or field == "message_id" for field in vars(resolved))
 
 
 def test_render_terminal_page_rejects_valid_outcome():
@@ -389,10 +441,10 @@ async def test_callback_entry_and_missing_params_are_logged(web_app: FastAPI, pa
 
 async def test_callback_state_expired_logs_age_ttl_and_no_skew(web_app: FastAPI, patreon_config: PatreonConfig):
     with freeze_time("2026-07-05 12:00:00"):
-        state = oauth.encode_state(patreon_config, 997_620)
+        state = oauth.encode_state(patreon_config)
 
-    # 80 minutes later: well past the 1h TTL, so slow-consent rather than clock skew.
-    with freeze_time("2026-07-05 13:20:00"):
+    # 20 minutes later: well past the 15-minute TTL, so slow consent rather than clock skew.
+    with freeze_time("2026-07-05 12:20:00"):
         with capture_logs(processors=[merge_contextvars]) as logs:
             async with build_web_client(web_app) as client:
                 await client.get("/patreon/callback", params={"code": "c", "state": state})
@@ -400,15 +452,15 @@ async def test_callback_state_expired_logs_age_ttl_and_no_skew(web_app: FastAPI,
     failure = one_log(logs, "Patreon callback did not complete")
     assert failure["stage"] == "decode_state"
     assert failure["outcome"] == "state_expired"
-    assert failure["state_age_seconds"] == pytest.approx(80 * 60, abs=2)
-    assert failure["state_ttl_seconds"] == 3600
+    assert failure["state_age_seconds"] == pytest.approx(20 * 60, abs=2)
+    assert failure["state_ttl_seconds"] == 900
     assert failure["clock_skew_suspected"] is False
 
 
 async def test_callback_clock_skew_is_flagged_when_age_below_ttl(web_app: FastAPI, patreon_config: PatreonConfig):
     # A token minted "ahead" of the validating clock is rejected as expired with an age under the TTL.
     with freeze_time("2026-07-05 12:10:00"):
-        state = oauth.encode_state(patreon_config, 997_621)
+        state = oauth.encode_state(patreon_config)
 
     with freeze_time("2026-07-05 12:00:00"):
         with capture_logs(processors=[merge_contextvars]) as logs:
@@ -425,7 +477,7 @@ async def test_callback_token_exchange_failure_logs_stage_and_error_type(
 ):
     FakePatreonClient.exchange_error = PatreonApiError("boom")
     monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
-    state = oauth.encode_state(patreon_config, 997_622)
+    state = oauth.encode_state(patreon_config)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         async with build_web_client(web_app) as client:
@@ -436,20 +488,20 @@ async def test_callback_token_exchange_failure_logs_stage_and_error_type(
     exchange_log = one_log(logs, "Patreon token or identity exchange failed")
     assert exchange_log["stage"] == "token_exchange"
     assert exchange_log["error_type"] == "PatreonApiError"
-    assert exchange_log["tg_user_id"] == 997_622
 
     failure = one_log(logs, "Patreon callback did not complete")
     assert failure["outcome"] == "patreon_api_error"
-    assert failure["tg_user_id"] == 997_622
 
 
-async def test_callback_logs_identity_fetch_before_persist(
-    web_app: FastAPI, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
+async def test_callback_logs_identity_fetch_then_staging(
+    web_app: FastAPI,
+    patreon_config: PatreonConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_session: MockDbSession,
 ):
     FakePatreonClient.exchange_error = None
     monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
-    monkeypatch.setattr(web_patreon, "link_patreon_account", AsyncMock(return_value=LinkOutcome.LINKED_NO_PATRON))
-    state = oauth.encode_state(patreon_config, 997_623)
+    state = oauth.encode_state(patreon_config)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         async with build_web_client(web_app) as client:
@@ -460,7 +512,15 @@ async def test_callback_logs_identity_fetch_before_persist(
     assert identity_log["stage"] == "identity_fetch"
     assert identity_log["patreon_user_id"] == "patreon-1"
     assert identity_log["is_active_member"] is False
-    assert identity_log["tg_user_id"] == 997_623
+
+    staged = one_log(logs, "Pending Patreon link staged")
+    assert staged["stage"] == "stage_pending_link"
+    assert staged["outcome"] == "pending_link_staged"
+    assert staged["patreon_user_id"] == "patreon-1"
+    assert staged["has_display_name"] is True
+    assert staged["expires_in_seconds"] == pairing.PAIRING_CODE_TTL_SECONDS
+    # No log line on this path can name a Telegram user, because the flow never learns one.
+    assert all("tg_user_id" not in entry for entry in logs)
 
 
 # --- Branded template rendering (the pages are filled from templates/patreon_result.html) ---
@@ -484,7 +544,7 @@ def test_render_result_page_fills_branded_template():
     assert '<a class="cta" href="https://t.me/MitupBot">Open Mitup</a>' in body
 
 
-def test_render_result_page_omits_return_link_without_username():
+def test_render_result_page_omits_the_bot_link_without_a_username():
     response = web_patreon.render_result_page("T", "M", None)
 
     body = bytes(response.body).decode()
@@ -492,418 +552,51 @@ def test_render_result_page_omits_return_link_without_username():
     assert "<h1>T</h1>" in body
 
 
-# --- Unit-level coverage of the persistence helpers (mock session, no live DB) ---
-# The db_behavior suite proves these against real Postgres, but those tests are db-gated and don't
-# feed the unit coverage job; these mock-session tests exercise the same branches for coverage.
+def test_pairing_actions_escape_the_rendered_markup():
+    # The code alphabet is base64url and the username comes from Telegram, but the escaping is the
+    # template's guarantee rather than an assumption about its inputs.
+    actions = web_patreon.pairing_actions('bot"><script>', "a-code")
 
+    assert "<script>" not in actions
+    assert "&lt;script&gt;" in actions
 
-@pytest.fixture
-def patch_begin_write(monkeypatch: pytest.MonkeyPatch) -> Callable[[MockDbSession], None]:
-    """Return a helper that swaps ``db.begin_write`` for one yielding the given mock session, so
-    ``link_patreon_account`` runs its body against the stub instead of a real transaction."""
 
-    def patch(session: MockDbSession):
-        @contextlib.asynccontextmanager
-        async def fake_begin_write(api: object):
-            yield session
+def test_pairing_actions_fall_back_to_the_command_without_a_username():
+    # With no bot username there is no deep link to build, but the code must still be reachable.
+    actions = web_patreon.pairing_actions(None, "a-code")
 
-        monkeypatch.setattr("mitup_bot.db.begin_write", fake_begin_write)
-
-    return patch
-
-
-async def test_link_new_patron_grants_premium(patch_begin_write: Callable[[MockDbSession], None]):
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_650)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(
-            api, 997_650, patreon_user_id="p-650", supporter_level=SupporterLevel.HOST_2
-        )
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    assert user.supporter_level is SupporterLevel.HOST_2
-    added = [obj for obj in session.objects_added if isinstance(obj, SupporterSubscription)]
-    assert len(added) == 1
-    assert added[0].patreon_user_id == "p-650"
-    assert added[0].support_expiration is not None
-    api.assert_method_just_called("send_message_to_user", times=1)
-    # Linking as an active Patron must DM the Patron unlock message specifically, proving the OAuth
-    # callback wires the resulting tier through unlocked_for. The DM carries a Main-menu button.
-    api.assert_send_message_to_user_called(
-        user=user,
-        view=link_confirmation_view(SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang), user.lang),
-    )
-
-    linked = one_log(logs, "Patreon account linked")
-    assert linked["flow"] == "patreon_oauth_callback"
-    assert linked["stage"] == "persist"
-    assert linked["outcome"] == "linked_supporter"
-    assert linked["tg_user_id"] == 997_650
-    assert linked["patreon_user_id"] == "p-650"
-    assert linked["supporter_level"] == "host_2"
-
-
-async def test_link_new_non_patron_stores_without_premium(patch_begin_write: Callable[[MockDbSession], None]):
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_651)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    outcome = await link_patreon_account(api, 997_651, patreon_user_id="p-651", supporter_level=SupporterLevel.NONE)
-
-    assert outcome is LinkOutcome.LINKED_NO_PATRON
-    assert user.supporter_level is SupporterLevel.NONE
-    added = [obj for obj in session.objects_added if isinstance(obj, SupporterSubscription)]
-    assert len(added) == 1
-    assert added[0].support_expiration is None
-    api.assert_method_just_called("send_message_to_user", times=1)
-
-
-async def test_confirmation_dm_carries_main_menu_button(patch_begin_write: Callable[[MockDbSession], None]):
-    # The confirmation DM must not strand the user on a button-less message: it carries the shared
-    # link_confirmation_view, whose only row is a Main-menu button.
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_655)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    await link_patreon_account(api, 997_655, patreon_user_id="p-655", supporter_level=SupporterLevel.NONE)
-
-    view = api.call_args("send_message_to_user").kwargs["view"]
-    assert view == link_confirmation_view(CollaborateMessages.LINK_CONFIRMED_NO_PATRON.get(lang=user.lang), user.lang)
-    main_menu_button = view.keyboard[-1][0]
-    assert main_menu_button.callback_data == cb.MAIN_MENU
-
-
-async def test_link_refreshes_tapped_message_into_patron_view(
-    patch_begin_write: Callable[[MockDbSession], None], patron_caps: None
-):
-    # A Patron re-links from the Collaborate menu: the tapped message is edited in place into the
-    # linked-patron view, addressed by (user, message_id).
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_656)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    outcome = await link_patreon_account(
-        api, 997_656, patreon_user_id="p-656", supporter_level=SupporterLevel.HOST_2, message_id=TAPPED_MESSAGE_ID
-    )
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    assert user.supporter_level is SupporterLevel.HOST_2
-    api.assert_edit_message_for_user_called(
-        user=user,
-        message_id=TAPPED_MESSAGE_ID,
-        view=collaborate_linked_patron_view(
-            user.lang, SupporterLevel.HOST_2, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
-        ),
-    )
-    # The refreshed screen uses the Patron-tier message with its caps substituted, not a generic one.
-    view = api.call_args("edit_message_for_user").kwargs["view"]
-    assert view.description == CollaborateMessages.LINKED_PATRON_PATRON.get(
-        lang=user.lang, active_meetings=PATRON_ACTIVE_MEETINGS, scheduling_days=PATRON_SCHEDULING_DAYS
-    )
-    assert "${" not in view.description.text
-
-
-async def test_link_refreshes_tapped_message_into_not_patron_view(
-    patch_begin_write: Callable[[MockDbSession], None], patreon_config: PatreonConfig, patron_caps: None
-):
-    # A non-patron links: the tapped message is refreshed into the linked-but-not-patron view, which
-    # needs the campaign pledge url — so the refresh resolves the live Patreon config.
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_657)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    outcome = await link_patreon_account(
-        api, 997_657, patreon_user_id="p-657", supporter_level=SupporterLevel.NONE, message_id=TAPPED_MESSAGE_ID
-    )
-
-    assert outcome is LinkOutcome.LINKED_NO_PATRON
-    api.assert_edit_message_for_user_called(
-        user=user,
-        message_id=TAPPED_MESSAGE_ID,
-        view=collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(patreon_config)),
-    )
-    view = api.call_args("edit_message_for_user").kwargs["view"]
-    assert "${" not in view.description.text
-
-
-async def test_link_without_message_id_skips_refresh(patch_begin_write: Callable[[MockDbSession], None]):
-    # A state minted before message-id threading carries no message id, so the flow still links and
-    # DMs but never attempts to refresh a message it cannot address.
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_658)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    outcome = await link_patreon_account(api, 997_658, patreon_user_id="p-658", supporter_level=SupporterLevel.HOST_2)
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    api.assert_method_just_called("send_message_to_user", times=1)
-    api.assert_method_just_called("edit_message_for_user", times=0)
-
-
-async def test_link_refresh_failure_is_swallowed(patch_begin_write: Callable[[MockDbSession], None]):
-    # The tapped message may have been deleted or aged out of the edit window. A failing refresh must
-    # never break the link or the confirmation DM — the outcome and the DM still stand.
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_659)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    api.mock_method("edit_message_for_user").side_effect = BadRequest("Message to edit not found")
-
-    with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(
-            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.HOST_2, message_id=TAPPED_MESSAGE_ID
-        )
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    api.assert_method_just_called("send_message_to_user", times=1)
-    api.assert_method_just_called("edit_message_for_user", times=1)
-    swallowed = one_log(logs, "Could not refresh the tapped Collaborate message after linking")
-    assert swallowed["stage"] == "refresh_message"
-    assert swallowed["message_id"] == TAPPED_MESSAGE_ID
-
-
-async def test_link_unknown_user_returns_unknown(patch_begin_write: Callable[[MockDbSession], None]):
-    session = MockDbSession()  # the user is intentionally not registered
-    patch_begin_write(session)
-
-    api = MockApi()
-    with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(
-            api, 997_659, patreon_user_id="p-659", supporter_level=SupporterLevel.HOST_2
-        )
-
-    assert outcome is LinkOutcome.UNKNOWN_USER
-    assert not session.objects_added
-    api.assert_method_just_called("send_message_to_user", times=0)
-
-    warning = one_log(logs, "Patreon callback for an unknown Telegram user")
-    assert warning["flow"] == "patreon_oauth_callback"
-    assert warning["stage"] == "persist"
-    assert warning["outcome"] == "unknown_user"
-
-
-async def test_link_rejected_when_account_claimed_elsewhere(patch_begin_write: Callable[[MockDbSession], None]):
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_652)
-    session.add_object(user, "tg_user_id")
-    # A subscription for the same Patreon account already belongs to a different user.
-    other = create_supporter_subscription(user_id=2, patreon_user_id="p-shared")
-    session.add_object(other, "patreon_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(
-            api, 997_652, patreon_user_id="p-shared", supporter_level=SupporterLevel.HOST_2
-        )
-
-    assert outcome is LinkOutcome.ALREADY_LINKED_ELSEWHERE
-    assert user.supporter_level is SupporterLevel.NONE
-    assert not any(isinstance(obj, SupporterSubscription) for obj in session.objects_added)
-    api.assert_method_just_called("send_message_to_user", times=0)
-
-    warning = one_log(logs, "Patreon account already linked to another Telegram user")
-    assert warning["flow"] == "patreon_oauth_callback"
-    assert warning["stage"] == "persist"
-    assert warning["outcome"] == "already_linked_elsewhere"
-
-
-async def test_link_rejected_when_user_pending_deletion(patch_begin_write: Callable[[MockDbSession], None]):
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_660, status=UserStatus.DELETION_REQUESTED)
-    session.add_object(user, "tg_user_id")
-    # The user already had a link before requesting deletion; completing an old OAuth URL during
-    # the mark-to-purge window must not refresh it either.
-    existing = create_supporter_subscription(user_id=user.db_id, patreon_user_id="p-old")
-    session.add_object(existing, "user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    with capture_logs(processors=[merge_contextvars]) as logs:
-        outcome = await link_patreon_account(
-            api, 997_660, patreon_user_id="p-660", supporter_level=SupporterLevel.HOST_2
-        )
-
-    assert outcome is LinkOutcome.PENDING_DELETION
-    assert user.supporter_level is SupporterLevel.NONE
-    assert existing.patreon_user_id == "p-old"
-    assert not session.objects_added
-    api.assert_method_just_called("send_message_to_user", times=0)
-    api.assert_method_just_called("edit_message_for_user", times=0)
-
-    warning = one_log(logs, "Patreon callback for a user pending deletion")
-    assert warning["flow"] == "patreon_oauth_callback"
-    assert warning["stage"] == "persist"
-    assert warning["outcome"] == "pending_deletion"
-    assert warning["tg_user_id"] == 997_660
-
-
-async def test_upsert_creates_subscription_when_absent():
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_653)
-
-    subscription = await upsert_subscription(session, user, "p-653")
-
-    assert subscription in session.objects_added
-    assert subscription.user_id == user.db_id
-    assert subscription.patreon_user_id == "p-653"
-
-
-async def test_upsert_updates_in_place():
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_654)
-    existing = create_supporter_subscription(
-        user_id=user.db_id,
-        patreon_user_id="p-old",
-    )
-    session.add_object(existing, "user_id")
-
-    result = await upsert_subscription(session, user, "p-654")
-
-    assert result is existing
-    assert existing not in session.objects_added  # updated in place, not recreated
-    assert existing.patreon_user_id == "p-654"
-
-
-# --- Hosts-only group re-admit on (re)link ---
-
-HOSTS_GROUP_CHAT_ID = -1001234567890
-HOSTS_GROUP_INVITE_URL = "https://t.me/+hostsonly"
-
-
-@pytest.fixture
-def reset_hosts_group() -> Iterator[None]:
-    saved_chat_id = HostsGroupState.chat_id
-    saved_invite_url = HostsGroupState.invite_url
-    HostsGroupState.chat_id = None
-    HostsGroupState.invite_url = None
-    try:
-        yield
-    finally:
-        HostsGroupState.chat_id = saved_chat_id
-        HostsGroupState.invite_url = saved_invite_url
-
-
-def sent_views(api: MockApi) -> list[object]:
-    """The views passed to every send_message_to_user call, so a test can check whether a specific
-    DM (e.g. the readmission notice) was among them without counting the confirmation DM."""
-    return [call.kwargs["view"] for call in api.call_args_list("send_message_to_user")]
-
-
-async def test_link_supporter_readmits_banned_host_with_dm(
-    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
-):
-    """A returning host who was banned is unbanned and sent the welcome-back view: the readmission
-    copy with a Join button (the group is configured) plus a Main-menu button."""
-    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
-    HostsGroupState.invite_url = HOSTS_GROUP_INVITE_URL
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_660)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    api.register_on_method("is_chat_banned", return_value=True)
-    outcome = await link_patreon_account(api, 997_660, patreon_user_id="p-660", supporter_level=SupporterLevel.HOST_2)
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    api.assert_method_just_called("unban_chat_member", times=1)
-    assert api.call_args("unban_chat_member").kwargs == {
-        "chat_id": HOSTS_GROUP_CHAT_ID,
-        "tg_user_id": 997_660,
-        "only_if_banned": True,
-    }
-    assert hosts_group_readmitted_view(user.lang, HOSTS_GROUP_INVITE_URL) in sent_views(api)
-
-
-async def test_link_supporter_unbans_first_time_linker_without_dm(
-    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
-):
-    """A first-time linker was never banned: the unban is idempotent and no readmission DM is sent."""
-    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_660)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    # is_chat_banned defaults to False: the user was never in the group.
-    outcome = await link_patreon_account(api, 997_660, patreon_user_id="p-660", supporter_level=SupporterLevel.HOST_2)
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    api.assert_method_just_called("unban_chat_member", times=1)
-    assert hosts_group_readmitted_view(user.lang, HostsGroupState.invite_url) not in sent_views(api)
-
-
-async def test_link_non_patron_does_not_readmit(
-    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
-):
-    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_661)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    outcome = await link_patreon_account(api, 997_661, patreon_user_id="p-661", supporter_level=SupporterLevel.NONE)
-
-    assert outcome is LinkOutcome.LINKED_NO_PATRON
-    api.assert_method_just_called("unban_chat_member", times=0)
-
-
-async def test_link_supporter_noop_when_hosts_group_unconfigured(
-    patch_begin_write: Callable[[MockDbSession], None], reset_hosts_group: None
-):
-    # reset_hosts_group leaves chat_id None: linking as a supporter never touches the group.
-    session = MockDbSession()
-    user = create_user(id=1, tg_user_id=997_662)
-    session.add_object(user, "tg_user_id")
-    patch_begin_write(session)
-
-    api = MockApi()
-    outcome = await link_patreon_account(api, 997_662, patreon_user_id="p-662", supporter_level=SupporterLevel.HOST_2)
-
-    assert outcome is LinkOutcome.LINKED_SUPPORTER
-    api.assert_method_just_called("unban_chat_member", times=0)
-    api.mock_method("is_chat_banned").assert_not_called()
+    assert 'class="cta"' not in actions
+    assert f'<p class="code">/start {pairing.PAIRING_DEEP_LINK_PREFIX}_a-code</p>' in actions
 
 
 # --- Patreon link funnel metrics ---
 
 
-async def test_callback_funnel_emits_started_and_completed_on_link(
-    ptb_app: MagicMock, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
+async def test_callback_funnel_counts_started_only_until_telegram_confirms(
+    ptb_app: MagicMock,
+    patreon_config: PatreonConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_session: MockDbSession,
 ):
+    # A completed consent is only half the funnel now: the browser leg counts as started, and
+    # FLOW_COMPLETED is emitted by the redemption handler once the code lands in Telegram. The gap
+    # between the two is what measures drop-off at the hand-off.
     metrics_client = make_test_metrics_client()
     metrics = MetricAssertions(metrics_client)
     web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
     FakePatreonClient.exchange_error = None
     monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
-    monkeypatch.setattr(web_patreon, "link_patreon_account", AsyncMock(return_value=LinkOutcome.LINKED_SUPPORTER))
-    state = oauth.encode_state(patreon_config, 997_630)
+    state = oauth.encode_state(patreon_config)
 
     async with build_web_client(web_app) as client:
         response = await client.get("/patreon/callback", params={"code": "c", "state": state})
 
     assert response.status_code == 200
     metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
-    metrics.assert_emitted(name=MetricKey.FLOW_COMPLETED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
+    metrics.assert_emitted(
+        name=MetricKey.PATREON_LINK_STAGED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)}
+    )
+    metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 
 
 async def test_callback_funnel_denied_consent_counts_started_only(ptb_app: MagicMock, patreon_config: PatreonConfig):
@@ -913,24 +606,6 @@ async def test_callback_funnel_denied_consent_counts_started_only(ptb_app: Magic
 
     async with build_web_client(web_app) as client:
         await client.get("/patreon/callback", params={"error": "access_denied"})
-
-    metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
-    metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
-
-
-async def test_callback_funnel_unlinked_outcome_does_not_count_completed(
-    ptb_app: MagicMock, patreon_config: PatreonConfig, monkeypatch: pytest.MonkeyPatch
-):
-    metrics_client = make_test_metrics_client()
-    metrics = MetricAssertions(metrics_client)
-    web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
-    FakePatreonClient.exchange_error = None
-    monkeypatch.setattr(web_patreon, "PatreonClient", FakePatreonClient)
-    monkeypatch.setattr(web_patreon, "link_patreon_account", AsyncMock(return_value=LinkOutcome.UNKNOWN_USER))
-    state = oauth.encode_state(patreon_config, 997_631)
-
-    async with build_web_client(web_app) as client:
-        await client.get("/patreon/callback", params={"code": "c", "state": state})
 
     metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)

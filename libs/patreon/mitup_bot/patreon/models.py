@@ -73,8 +73,16 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class IdentityAttributes(BaseModel):
+    """The ``fields[user]`` selection on ``/identity``. Everything is optional: Patreon omits an
+    attribute the account has not set, and an absent display name must degrade rather than raise."""
+
+    full_name: str | None = None
+
+
 class IdentityData(BaseModel):
     id: str
+    attributes: IdentityAttributes = Field(default_factory=IdentityAttributes)
 
 
 class IdentityResponse(BaseModel):
@@ -86,6 +94,11 @@ class IdentityResponse(BaseModel):
     @property
     def patreon_user_id(self) -> str:
         return self.data.id
+
+    @property
+    def full_name(self) -> str | None:
+        """The account's display name, or None when Patreon does not report one."""
+        return self.data.attributes.full_name
 
     def is_active_member_of(self, campaign_id: str) -> bool:
         return any(member.is_active_patron_of(campaign_id) for member in self.included)

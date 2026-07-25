@@ -7,6 +7,7 @@ from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.patreon import pending_links
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView
 
@@ -65,9 +66,20 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
             await api.send_message_to_user(user, farewell)
 
         user_ids = inactive_user_ids | {user.db_id for user in marked_users}
+        # Pending Patreon links carry no foreign key to users, so deleting the user cascades nothing
+        # into them. A purge has to name them itself or a deletion request would leave behind a row
+        # pairing the requester's Telegram id with their Patreon account.
+        purged_pending_links = await pending_links.delete_pending_links_for_users(
+            session, [user.tg_user_id for user in marked_users]
+        )
         await session.exec(delete(User).where(col(User.id).in_(user_ids)))
+        # Rows nobody ever claimed have no user to be purged alongside, so this sweep is the only
+        # thing that ever erases them.
+        swept_pending_links = await pending_links.delete_finished_pending_links(session)
 
     metrics.emit(MetricKey.INACTIVE_USERS_DELETED, len(inactive_user_ids), MetricUnit.COUNT)
+    metrics.emit(MetricKey.PATREON_PENDING_LINKS_DELETED, purged_pending_links + swept_pending_links, MetricUnit.COUNT)
     # Privacy purges are far too sparse for a useful CloudWatch series; the searchable log
     # carries the same information.
-    log.info("Deletion-requested users purged", count=len(marked_users))
+    log.info("Deletion-requested users purged", count=len(marked_users), pending_links=purged_pending_links)
+    log.info("Finished Patreon pending links swept", count=swept_pending_links)

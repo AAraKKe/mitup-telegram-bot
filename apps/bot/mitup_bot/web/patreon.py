@@ -2,56 +2,56 @@
 
 Patreon redirects the user's browser here after the consent screen, so unlike ``/telegram`` this
 route renders HTML for a human and deep-links back to the bot chat. It owns its own DB and api
-plumbing: there is no per-request session dependency, so it builds an api from the PTB bot and runs
-the write plus the confirmation send through ``db.begin_write`` (capture, commit, drain).
+plumbing: there is no per-request session dependency, so it opens its own transaction and builds an
+api from the PTB bot for the webhook route.
+
+The callback grants nothing. A browser can prove which Patreon account consented but not whose
+Telegram account is behind it, and the consent URL is transferable, so the endpoint parks the proven
+identity as a pending link and renders a pairing code. The link is completed in the bot, against the
+account that sends the code (see :mod:`mitup_bot.patreon_link`).
 
 The page markup lives in ``templates/patreon_result.html`` (a Mitup-branded shell filled via
 ``string.Template``); only the per-outcome title and message live here. This copy is intentionally
 plain, hardcoded English rather than going through the message/translation pipeline: the pages render
 in a browser with no ``lang`` context (the failure pages fire before we can even resolve the user),
-and there is no gettext catalog for HTML. The Telegram confirmation the user receives back in the
-chat *does* go through the translated pipeline. Every failure render is logged with enough context to
-trace a support question back to its cause.
+and there is no gettext catalog for HTML. The Telegram messages the user receives back in the chat
+*do* go through the translated pipeline. Every failure render is logged with enough context to trace
+a support question back to its cause.
 """
 
 import base64
 import datetime as dt
 import hashlib
 import hmac
+import html
 import uuid
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from string import Template
-from typing import Annotated, assert_never
+from typing import Annotated
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import Application
 
-from mitup_bot import db, hosts_group, patreon, supporter
+from mitup_bot import db, patreon, supporter
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonStateExpired, PatreonStateInvalid, PatreonTokenRevoked
 from mitup_bot.models import SupporterSubscription, User
-from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
-from mitup_bot.patreon import PatreonClient, oauth, webhooks
+from mitup_bot.patreon import PatreonClient, oauth, pairing, webhooks
 from mitup_bot.patreon.client import MEMBER_DELETE_TRIGGER
 from mitup_bot.patreon.models import MemberResource, WebhookMemberPayload
+from mitup_bot.patreon.pending_links import stage_pending_link
+from mitup_bot.patreon_link import SUPPORT_GRACE_DAYS, readmit_to_hosts_group
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
-from mitup_bot.views.collaborate import (
-    collaborate_linked_not_patron_view,
-    collaborate_linked_patron_view,
-    hosts_group_readmitted_view,
-    link_confirmation_view,
-)
+from mitup_bot.utils.messages import SupporterNotificationMessages
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
 from mitup_bot.web.utils import secret_header_matches
 
@@ -62,10 +62,6 @@ log = structlog.get_logger(__name__)
 OAUTH_FLOW = "patreon_oauth_callback"
 
 router = APIRouter()
-
-# A freshly linked patron gets support immediately with a short runway; the daily job
-# extends it while the pledge stays active and lets it lapse otherwise.
-SUPPORT_GRACE_DAYS = 7
 
 RESULT_TEMPLATE = Template((Path(__file__).parent / "templates" / "patreon_result.html").read_text(encoding="utf-8"))
 
@@ -78,16 +74,6 @@ LOGO_IMG = f'<img class="logo" src="data:image/png;base64,{base64.b64encode(LOGO
 
 # Reused across the failure pages: every one points the user back to the same in-bot button.
 RETRY_HINT = "Head back to Mitup and tap Link Patreon account in the Collaborate menu"
-
-
-class LinkOutcome(Enum):
-    """Result of persisting the link, used to pick the browser page shown to the user."""
-
-    LINKED_SUPPORTER = auto()
-    LINKED_NO_PATRON = auto()
-    UNKNOWN_USER = auto()
-    ALREADY_LINKED_ELSEWHERE = auto()
-    PENDING_DELETION = auto()
 
 
 class PatreonCallbackParams(BaseModel):
@@ -139,17 +125,16 @@ class CallbackOutcome(Enum):
 
 @dataclass(frozen=True)
 class ResolvedCallback:
-    """A classified callback plus the diagnostics each arm needs to log and render."""
+    """A classified callback plus the diagnostics each arm needs to log and render.
+
+    Nothing here identifies a Telegram user: the OAuth leg is anonymous, so the only thing the
+    callback learns about identity is the Patreon one it fetches with ``code``.
+    """
 
     outcome: CallbackOutcome
-    tg_user_id: int | None = None
-    # The Collaborate message the user tapped, carried through the OAuth state so the linked view can
-    # refresh it. Optional: states minted before message-id threading decode to None (see oauth).
-    message_id: int | None = None
     error: str | None = None
     state_age_seconds: int | None = None
     code: str | None = None
-    state: str | None = None
 
 
 def resolve_callback(params: Annotated[PatreonCallbackParams, Query()]) -> ResolvedCallback:
@@ -170,29 +155,51 @@ def resolve_callback(params: Annotated[PatreonCallbackParams, Query()]) -> Resol
 
 
 def resolve_state(code: str | None, state: str | None) -> ResolvedCallback:
-    """Decode the ``state`` token into a VALID outcome, or classify the decode failure by age."""
+    """Check the ``state`` token into a VALID outcome, or classify the failure by age."""
     assert code is not None and state is not None, "has_required_params guarantees both are set"
     config = patreon.current_config()
     try:
-        decoded = oauth.decode_state(config, state)
+        oauth.validate_state(config, state)
     except PatreonStateExpired as expired:
         return ResolvedCallback(CallbackOutcome.STATE_EXPIRED, state_age_seconds=round(expired.age_seconds))
     except PatreonStateInvalid:
         return ResolvedCallback(CallbackOutcome.STATE_INVALID)
-    return ResolvedCallback(
-        CallbackOutcome.VALID,
-        tg_user_id=decoded.tg_user_id,
-        message_id=decoded.message_id,
-        code=code,
-        state=state,
+    return ResolvedCallback(CallbackOutcome.VALID, code=code)
+
+
+def render_result_page(
+    title: str, message: str, bot_username: str | None, *, actions: str | None = None, status_code: int = 200
+) -> HTMLResponse:
+    """Fill the branded result template with the given title/message and the call to action below it.
+
+    ``actions`` is ready-to-embed markup for pages that need more than a plain link home (the pairing
+    page renders a deep link plus the code). Everything it interpolates must already be escaped by its
+    builder. Without it the page falls back to a bare "Open Mitup" link, omitted when the bot username
+    is unknown so the card is never left with a dead button.
+    """
+    if actions is None:
+        actions = f'<a class="cta" href="https://t.me/{bot_username}">Open Mitup</a>' if bot_username else ""
+    page = RESULT_TEMPLATE.substitute(title=title, message=message, actions=actions, logo=LOGO_IMG)
+    return HTMLResponse(content=page, status_code=status_code)
+
+
+def pairing_actions(bot_username: str | None, code: str) -> str:
+    """The pairing page's call to action: the deep-link button plus the code as selectable text.
+
+    The button is what nearly everyone uses, but deep links do not survive every browser (in-app
+    webviews in particular), so the equivalent command is spelled out underneath for anyone who has
+    to type it into the chat by hand. Both are escaped: the code is base64url and the username is
+    Telegram-controlled, but escaping keeps the guarantee at the template rather than in an argument.
+    """
+    command = html.escape(f"/start {pairing.PAIRING_DEEP_LINK_PREFIX}_{code}")
+    if bot_username is None:
+        return f'<p class="code-hint">Send this to the Mitup bot to finish:</p><p class="code">{command}</p>'
+    link = html.escape(pairing.pairing_deep_link(bot_username, code), quote=True)
+    return (
+        f'<a class="cta" href="{link}">Finish in Telegram</a>'
+        '<p class="code-hint">If the button does not open Telegram, send this to the bot instead:</p>'
+        f'<p class="code">{command}</p>'
     )
-
-
-def render_result_page(title: str, message: str, bot_username: str | None, *, status_code: int = 200) -> HTMLResponse:
-    """Fill the branded result template with the given title/message and a link back to the bot."""
-    return_link = f'<a class="cta" href="https://t.me/{bot_username}">Open Mitup</a>' if bot_username else ""
-    html = RESULT_TEMPLATE.substitute(title=title, message=message, return_link=return_link, logo=LOGO_IMG)
-    return HTMLResponse(content=html, status_code=status_code)
 
 
 def failure_page(
@@ -344,14 +351,12 @@ async def patreon_callback(
 async def render_resolved_callback(
     ptb_app: Application, metrics_client: MetricsClient, params: PatreonCallbackParams, resolved: ResolvedCallback
 ) -> HTMLResponse:
-    """Run the side-effecting VALID path (token exchange + link), or render a terminal page."""
+    """Run the side-effecting VALID path (token exchange + staging), or render a terminal page."""
     if resolved.outcome is not CallbackOutcome.VALID:
         return render_terminal_page(params, resolved, ptb_app.bot.username)
 
-    assert resolved.tg_user_id is not None and resolved.code is not None, "VALID carries tg_user_id and code"
-    # The initiator is now known; every later line carries it.
-    structlog.contextvars.bind_contextvars(tg_user_id=resolved.tg_user_id)
-    return await exchange_and_link(ptb_app, metrics_client, resolved.tg_user_id, resolved.code, resolved.message_id)
+    assert resolved.code is not None, "VALID carries the authorization code"
+    return await exchange_and_stage(ptb_app, metrics_client, resolved.code)
 
 
 def render_terminal_page(
@@ -375,13 +380,13 @@ def render_terminal_page(
             raise AssertionError("VALID is handled by render_resolved_callback, never reaches here")
 
 
-async def exchange_and_link(
-    ptb_app: Application, metrics_client: MetricsClient, tg_user_id: int, code: str, message_id: int | None
-) -> HTMLResponse:
-    """Exchange the code, read the user's identity, and persist the link.
+async def exchange_and_stage(ptb_app: Application, metrics_client: MetricsClient, code: str) -> HTMLResponse:
+    """Exchange the authorization code, read the Patreon identity, and park it as a pending link.
 
-    ``message_id`` is the Collaborate message the user tapped (None for states minted before
-    message-id threading); it is passed on so the linked view can refresh that message.
+    This is where the flow deliberately stops short of granting anything. The identity is proven, but
+    the browser holding it is not proof of a Telegram account, so the result is a pairing code shown
+    on the page and nothing else. Staging needs no Telegram fan-out, so it runs in a plain
+    transaction rather than the write lifecycle.
     """
     bot_username = ptb_app.bot.username
     config = patreon.current_config()
@@ -419,233 +424,32 @@ async def exchange_and_link(
         supporter_level=level.value,
     )
 
-    api = build_api(BotAdapter(ptb_app.bot, metrics_client))
-    outcome = await link_patreon_account(
-        api, tg_user_id, patreon_user_id=identity.patreon_user_id, supporter_level=level, message_id=message_id
-    )
-    if outcome in (LinkOutcome.LINKED_SUPPORTER, LinkOutcome.LINKED_NO_PATRON):
-        metrics_client.emit_feature(Feature.PATREON_LINK, name=MetricKey.FLOW_COMPLETED)
-    return result_page_for(outcome, bot_username)
-
-
-async def readmit_to_hosts_group(api: TelegramApiWrapper, user: User):
-    """Lift any hosts-only group ban so a re-activated host can request to join again.
-
-    Idempotent: ``unban_chat_member(only_if_banned=True)`` is a no-op when the user was never banned.
-    The readmission DM is sent only when the user was actually banned, so a first-time linker (who runs
-    this path too) is not told they were welcomed back. The banned status is read before the unban,
-    since after it the user is no longer banned. A no-op when the feature is unconfigured; the api
-    wrapper swallows Telegram failures."""
-    chat_id = hosts_group.chat_id()
-    if chat_id is None:
-        return
-    was_banned = await api.is_chat_banned(chat_id, user.tg_user_id)
-    await api.unban_chat_member(chat_id, user.tg_user_id, only_if_banned=True)
-    if was_banned:
-        await api.send_message_to_user(user, hosts_group_readmitted_view(user.lang, hosts_group.invite_url()))
-        log.info("Re-admitted host to the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
-
-
-async def link_patreon_account(
-    api: TelegramApiWrapper,
-    tg_user_id: int,
-    *,
-    patreon_user_id: str,
-    supporter_level: SupporterLevel,
-    message_id: int | None = None,
-) -> LinkOutcome:
-    """Upsert the subscription and, on success, queue the confirmation message to the user.
-
-    A re-link updates the existing row in place, so the user never has to unlink first. The write
-    and the send run inside ``begin_write`` so the message drains only after the row is committed.
-
-    When ``message_id`` is set (the Collaborate message the user tapped, threaded through the OAuth
-    state), the original message is refreshed into the linked view once the transaction has
-    committed — best-effort, so a failed refresh never affects the link or the confirmation DM.
-    """
-    async with db.begin_write(api) as session:
-        # The callback only needs the user's own columns (id, lang, supporter_level);
-        # load_collections=False skips the meetups/joined_links selectin queries. Do not touch those.
-        user = await User.by_tg_user_id(session, tg_user_id, load_collections=False)
-        if user is None:
-            log.warning(
-                "Patreon callback for an unknown Telegram user",
-                flow=OAUTH_FLOW,
-                stage="persist",
-                outcome=LinkOutcome.UNKNOWN_USER.name.lower(),
-                tg_user_id=tg_user_id,
-            )
-            return LinkOutcome.UNKNOWN_USER
-
-        # A previously-minted OAuth URL can be completed during the mark-to-purge window; the
-        # dying account must not gain a subscription row or a supporter level.
-        if user.status is UserStatus.DELETION_REQUESTED:
-            log.warning(
-                "Patreon callback for a user pending deletion",
-                flow=OAUTH_FLOW,
-                stage="persist",
-                outcome=LinkOutcome.PENDING_DELETION.name.lower(),
-                tg_user_id=tg_user_id,
-            )
-            return LinkOutcome.PENDING_DELETION
-
-        claimed_elsewhere = (
-            await session.exec(
-                select(SupporterSubscription).where(SupporterSubscription.patreon_user_id == patreon_user_id)
-            )
-        ).first()
-        if claimed_elsewhere is not None and claimed_elsewhere.user_id != user.db_id:
-            log.warning(
-                "Patreon account already linked to another Telegram user",
-                flow=OAUTH_FLOW,
-                stage="persist",
-                outcome=LinkOutcome.ALREADY_LINKED_ELSEWHERE.name.lower(),
-                patreon_user_id=patreon_user_id,
-                tg_user_id=tg_user_id,
-                linked_user_id=claimed_elsewhere.user_id,
-            )
-            return LinkOutcome.ALREADY_LINKED_ELSEWHERE
-
-        subscription = await upsert_subscription(session, user, patreon_user_id)
-
-        if supporter.is_supporter(supporter_level):
-            user.supporter_level = supporter_level
-            subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
-            message = SupporterNotificationMessages.unlocked_for(supporter_level)
-            outcome = LinkOutcome.LINKED_SUPPORTER
-        else:
-            user.supporter_level = SupporterLevel.NONE
-            subscription.support_expiration = None
-            message = CollaborateMessages.LINK_CONFIRMED_NO_PATRON
-            outcome = LinkOutcome.LINKED_NO_PATRON
-
-        log.info(
-            "Patreon account linked",
-            flow=OAUTH_FLOW,
-            stage="persist",
-            outcome=outcome.name.lower(),
-            tg_user_id=tg_user_id,
-            patreon_user_id=patreon_user_id,
-            supporter_level=supporter_level.value,
+    async with db.begin() as session:
+        pairing_code = await stage_pending_link(
+            session,
+            patreon_user_id=identity.patreon_user_id,
+            patreon_full_name=identity.full_name,
+            supporter_level=level,
         )
-        # The confirmation DM carries a Main-menu button so the user is never stranded on a
-        # button-less message. expire_on_commit=False keeps `user` readable after the block below.
-        await api.send_message_to_user(user, link_confirmation_view(message.get(lang=user.lang), user.lang))
-        linked_user = user
-
-    # The transaction has committed; refreshing the tapped message is a best-effort UI touch-up that
-    # must never fail the link or the DM, so it runs out here (immediate mode) rather than enqueued.
-    if outcome is LinkOutcome.LINKED_SUPPORTER:
-        await readmit_to_hosts_group(api, linked_user)
-    await refresh_tapped_message(api, linked_user, message_id, outcome)
-    return outcome
-
-
-async def refresh_tapped_message(
-    api: TelegramApiWrapper, user: User, message_id: int | None, outcome: LinkOutcome
-) -> None:
-    """Edit the original Collaborate message the user tapped into its now-linked view.
-
-    Best-effort: the message may have been deleted or aged out of Telegram's edit window, so any
-    failure is logged and swallowed. A ``None`` ``message_id`` (state minted before message-id
-    threading) skips the refresh entirely. Only the linked outcomes reach here.
-    """
-    if message_id is None:
-        return
-
-    if outcome is LinkOutcome.LINKED_SUPPORTER:
-        active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
-        scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
-        view = collaborate_linked_patron_view(user.lang, user.supporter_level, active_meetings, scheduling_days)
-    else:
-        config = patreon.current_config()
-        pledge_url = oauth.campaign_pledge_url(config)
-        view = collaborate_linked_not_patron_view(user.lang, pledge_url)
-
-    try:
-        await api.edit_message_for_user(user, message_id, view)
-    except Exception:
-        log.warning(
-            "Could not refresh the tapped Collaborate message after linking",
-            flow=OAUTH_FLOW,
-            stage="refresh_message",
-            outcome=outcome.name.lower(),
-            tg_user_id=user.tg_user_id,
-            message_id=message_id,
-        )
-        return
-
+    metrics_client.emit_feature(Feature.PATREON_LINK, name=MetricKey.PATREON_LINK_STAGED)
     log.info(
-        "Refreshed the tapped Collaborate message after linking",
-        flow=OAUTH_FLOW,
-        stage="refresh_message",
-        outcome=outcome.name.lower(),
-        tg_user_id=user.tg_user_id,
-        message_id=message_id,
+        "Pending Patreon link staged",
+        stage="stage_pending_link",
+        outcome="pending_link_staged",
+        patreon_user_id=identity.patreon_user_id,
+        # Whether the confirmation prompt will be able to name the account or fall back to its id.
+        has_display_name=identity.full_name is not None,
+        supporter_level=level.value,
+        expires_in_seconds=pairing.PAIRING_CODE_TTL_SECONDS,
     )
-
-
-async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> SupporterSubscription:
-    """Create the user's subscription row, or update the existing one in place.
-
-    A re-link updates the existing row, so a returning user never has to unlink first.
-    """
-    subscription = (
-        await session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user.db_id))
-    ).first()
-    if subscription is None:
-        subscription = SupporterSubscription(user_id=user.db_id, patreon_user_id=patreon_user_id)
-        session.add(subscription)
-        return subscription
-
-    subscription.patreon_user_id = patreon_user_id
-    return subscription
-
-
-def result_page_for(outcome: LinkOutcome, bot_username: str | None) -> HTMLResponse:
-    match outcome:
-        case LinkOutcome.LINKED_SUPPORTER:
-            return render_result_page(
-                "You're all set",
-                "Your Patreon account is connected and your supporter perks are active. "
-                "Head back to Mitup to keep going.",
-                bot_username,
-            )
-        case LinkOutcome.LINKED_NO_PATRON:
-            return render_result_page(
-                "Account connected",
-                "Your Patreon account is connected. Become a patron to unlock your supporter perks, "
-                "then head back to Mitup.",
-                bot_username,
-            )
-        case LinkOutcome.UNKNOWN_USER:
-            # link_patreon_account already logged this with the tg_user_id, so just render.
-            return render_result_page(
-                "We couldn't find your Mitup account",
-                f"We couldn't match this to a Mitup account, so nothing was connected. {RETRY_HINT} to start again.",
-                bot_username,
-                status_code=400,
-            )
-        case LinkOutcome.ALREADY_LINKED_ELSEWHERE:
-            # link_patreon_account already logged this with the tg_user_id and the linked user id.
-            return render_result_page(
-                "This Patreon is already linked",
-                "This Patreon account is already connected to a different Mitup account. If that wasn't "
-                "you, please reach out and we'll help sort it out.",
-                bot_username,
-                status_code=409,
-            )
-        case LinkOutcome.PENDING_DELETION:
-            # link_patreon_account already logged this with the tg_user_id, so just render.
-            return render_result_page(
-                "This Mitup account is being deleted",
-                "Your Mitup account is scheduled for deletion, so nothing was connected. Once the "
-                "deletion completes you can start fresh by sending the /start command to the bot.",
-                bot_username,
-                status_code=403,
-            )
-        case _ as unreachable:
-            assert_never(unreachable)
+    return render_result_page(
+        "One more step",
+        "Your Patreon account checked out. To finish, open Mitup and confirm from your own Telegram "
+        "account. That last step is what tells us which Mitup account to connect, so nothing is "
+        "connected until you do it. The link below works once and expires shortly.",
+        bot_username,
+        actions=pairing_actions(bot_username, pairing_code),
+    )
 
 
 PATREON_SIGNATURE_HEADER = "X-Patreon-Signature"

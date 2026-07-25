@@ -50,6 +50,19 @@
     border-radius: 10px;
   }
   .cta:hover { background: var(--mitup-blue-deep); }
+  .code-hint { margin-top: 1.5rem; font-size: .85rem; }
+  .code {
+    margin-top: .5rem;
+    padding: .7rem .9rem;
+    background: var(--mitup-paper);
+    border: 1px solid var(--mitup-line);
+    border-radius: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .8rem;
+    color: var(--mitup-ink);
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
   footer { padding: 1.5rem 2rem; text-align: center; color: var(--mitup-ink-2); font-size: .85rem; }
 </style>
 </head>
@@ -59,7 +72,7 @@
     <div class="card">
       <h1>$title</h1>
       <p>$message</p>
-      $return_link
+      $actions
     </div>
   </main>
   <footer>Mitup — bring your people together</footer>

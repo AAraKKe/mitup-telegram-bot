@@ -815,6 +815,12 @@ msgstr "💶 Diventa Host"
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Scollega account Patreon"
 
+msgid "ButtonMessages.CONFIRM_PATREON_LINK"
+msgstr "Collega questo account"
+
+msgid "ButtonMessages.DECLINE_PATREON_LINK"
+msgstr "Non ora"
+
 msgid "CollaborateMessages.NOT_LINKED"
 msgstr "<b>Aiuta a tenere Mitup in piedi</b>\n\nMitup è costruito da una coppia di fratelli, non da una grande azienda, ed è gratuito per tutti. Il tuo sostegno paga i server, il database e le nottate di debugging. Ogni aiuto conta: parlare di Mitup ai tuoi amici, tradurre, segnalare errori o sostenere il progetto. La pagina ${collaborate_page} sul nostro sito racconta tutti i modi per dare una mano.\n\nIl modo più diretto di aiutare è diventare Host di Mitup su Patreon. Come ringraziamento, gli Host ricevono un badge accanto al nome, un gruppo riservato ai membri e limiti più alti a seconda del livello: Brewer, Gamemaster o Commissioner. La pagina ${limits_page} mostra cosa sblocca ogni livello.\n\nCollega il tuo account Patreon per iniziare, e grazie di essere qui."
 
@@ -835,6 +841,33 @@ msgstr "Il tuo account Patreon è stato scollegato."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Account Patreon collegato</b>\n\nSei collegato. Diventa un Host per sbloccare i tuoi vantaggi da Host. Si attiveranno automaticamente una volta che il tuo contributo è attivo."
+
+msgid "CollaborateMessages.LINK_CONFIRM"
+msgstr "<b>${patreon_name}</b>\n\nQuesto è l'account Patreon che questo link collegherebbe a Mitup.\n\nDovresti vedere questo messaggio solo subito dopo aver autorizzato tu stesso Mitup su Patreon. Se non l'hai appena fatto, è arrivato in questa chat il link di qualcun altro.\n\nQuindi collegalo solo se riconosci il nome, e tocca Non ora se non ti dice nulla. In ogni caso non cambia niente finché non confermi."
+
+msgid "CollaborateMessages.LINK_CONFIRM_REPLACES"
+msgstr "<b>${patreon_name}</b>\n\nQuesto è l'account Patreon che questo link collegherebbe a Mitup, e in questo momento è collegato un account Patreon diverso.\n\nOggi sei un ${current_tier}. Collegare questo significa rinunciarci: il tuo badge da ${current_tier} e i limiti più alti si disattivano, e l'account Patreon con cui sostieni davvero Mitup smette di contare, anche se continui a pagarlo.\n\nDovresti vedere questo messaggio solo subito dopo aver autorizzato tu stesso Mitup su Patreon. Se non l'hai appena fatto, è arrivato in questa chat il link di qualcun altro, e confermare ti costerebbe i tuoi vantaggi da ${current_tier} per niente.\n\nQuindi fallo solo se riconosci il nome qui sopra come il tuo Patreon. Tocca Non ora e non cambia nulla."
+
+msgid "CollaborateMessages.LINK_DECLINED"
+msgstr "<b>Non è stato collegato nulla</b>\n\nNessun account Patreon è stato collegato e sul tuo account non è cambiato niente. Puoi collegare il tuo account Patreon quando vuoi da Collabora."
+
+msgid "CollaborateMessages.TIER_NAME_HOST_1"
+msgstr "Brewer"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_2"
+msgstr "Gamemaster"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_3"
+msgstr "Commissioner"
+
+msgid "CollaborateMessages.LINK_NEEDS_SETUP"
+msgstr "<b>Prima finisci di configurare Mitup</b>\n\nInvia /start per configurare il tuo account, poi tocca di nuovo il link di conferma per collegare il tuo account Patreon. Il link resta valido ancora per qualche minuto."
+
+msgid "CollaborateMessages.LINK_CODE_NOT_VALID"
+msgstr "<b>Questo link di conferma non funziona più</b>\n\nI link di conferma si usano una sola volta e scadono in fretta, e questo è ormai scaduto. Sul tuo account non è cambiato niente. Apri Collabora per collegare di nuovo il tuo account Patreon e riceverai un link nuovo."
+
+msgid "CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE"
+msgstr "<b>Quell'account Patreon è già collegato</b>\n\nUn account Patreon può sostenere un solo account Mitup alla volta, e questo è collegato a un altro account Mitup, quindi qui non è cambiato niente. Se anche quell'altro account è tuo, apri Collabora lì e scollegalo prima, poi conferma di nuovo da questa chat. Se non è tuo, scrivici e lo risolviamo insieme a te."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""

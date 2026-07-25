@@ -5,6 +5,7 @@ from typing import Any, overload
 from unittest import mock
 
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.dml import UpdateBase
 from sqlalchemy.sql.expression import GenerativeSelect, SelectBase
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -87,7 +88,7 @@ class MockDbSession(mock.MagicMock):
             self.__last_id += 1
             obj.id = self.__last_id
 
-    def __exec_side_effect(self, statement: SelectBase) -> Result | None:
+    def __exec_side_effect(self, statement: SelectBase | UpdateBase) -> Result | None:
         # Participant-mutating paths load the meeting with by_id(for_update=True), while the
         # registry is keyed on the plain SELECT registered by add_object — so key the lookup on
         # a copy of the statement with its FOR UPDATE clause cleared. SQLAlchemy exposes no
@@ -219,7 +220,7 @@ class MockDbSession(mock.MagicMock):
             raise ValueError(f"The object {obj!r} is already registered!")
         self.statements_registry[statement_str] = Result(results=(obj,))
 
-    def add_objects_with_statement(self, statement: SelectBase, objects: tuple[Any, ...]):
+    def add_objects_with_statement(self, statement: SelectBase | UpdateBase, objects: tuple[Any, ...]):
         statement_str = str(statement.compile(compile_kwargs={"literal_binds": True}))
         if statement_str in self.statements_registry:
             raise ValueError(f"The statement {statement_str!r} is already registered!")

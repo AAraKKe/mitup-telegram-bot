@@ -14,6 +14,7 @@ __all__ = (
     "BroadcastDeliveryStatus",
     "SupporterSubscription",
     "PatreonCreatorToken",
+    "PatreonPendingLink",
     "PatreonWebhook",
     "configure_token_encryption",
 )
@@ -21,7 +22,13 @@ __all__ = (
 from .messages import Message, MessageButtons
 from .meetups import Meetup, MeetupLocation
 from .joined_users import JoinedUsers
-from .subscriptions import PatreonCreatorToken, PatreonWebhook, SupporterSubscription, configure_token_encryption
+from .subscriptions import (
+    PatreonCreatorToken,
+    PatreonPendingLink,
+    PatreonWebhook,
+    SupporterSubscription,
+    configure_token_encryption,
+)
 from .settings import Settings
 from .users import User
 from .broadcasts import Broadcast, BroadcastDelivery, BroadcastDeliveryStatus, BroadcastMessage, BroadcastStatus

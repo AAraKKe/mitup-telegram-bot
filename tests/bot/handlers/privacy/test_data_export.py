@@ -2,7 +2,8 @@ import datetime as dt
 import json
 
 from mitup_bot.handlers.privacy import data_export
-from mitup_bot.models import User
+from mitup_bot.models import PatreonPendingLink, User
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers.fixtures import (
     create_joined_link,
     create_meetup,
@@ -134,6 +135,34 @@ async def test_export_includes_the_patreon_link_when_present(mock_session: MockD
     assert export["patreon"]["support_expiration"] == "2026-12-31T00:00:00+00:00"
 
 
+async def test_export_includes_a_pending_patreon_confirmation(mock_session: MockDbSession):
+    # A claimed pending link is attributable data about this user for as long as it exists, so the
+    # access right covers it. The pairing code is absent because only its hash is ever stored.
+    exporter = create_user(id=1, tg_user_id=EXPORTER_TG_USER_ID)
+    pending = PatreonPendingLink(
+        code_hash="a" * 64,
+        patreon_user_id="patreon-pending",
+        patreon_full_name="Ada Lovelace",
+        supporter_level=SupporterLevel.HOST_2,
+        expiration=dt.datetime(2026, 7, 25, 12, 15, tzinfo=dt.UTC),
+        claimed_tg_user_id=EXPORTER_TG_USER_ID,
+    )
+    mock_session.add_objects_with_statement(data_export.pending_links_statement(exporter), (pending,))
+
+    export = await data_export.build_user_export(mock_session, exporter)
+
+    assert export["pending_patreon_links"] == [
+        {
+            "patreon_user_id": "patreon-pending",
+            "patreon_display_name": "Ada Lovelace",
+            "claimed_time": None,
+            "expiration": "2026-07-25T12:15:00+00:00",
+            "confirmed": False,
+        }
+    ]
+    assert "a" * 64 not in json.dumps(export)
+
+
 async def test_export_omits_joins_to_the_users_own_meetings(mock_session: MockDbSession):
     own_meeting = create_meetup(id=10, title="Own Meeting")
     exporter = create_user(id=1, tg_user_id=EXPORTER_TG_USER_ID, owned_meetings=[own_meeting])
@@ -155,6 +184,7 @@ async def test_export_for_a_user_with_no_activity(mock_session: MockDbSession):
     assert export["meetings"] == []
     assert export["joined_meetings"] == []
     assert export["patreon"] is None
+    assert export["pending_patreon_links"] == []
     document, _ = data_export.export_document(export)
     assert json.loads(document) == export
 

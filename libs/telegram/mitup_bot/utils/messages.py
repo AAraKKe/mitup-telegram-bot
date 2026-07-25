@@ -142,6 +142,11 @@ class ButtonMessages(MessageBase):
     LINK_PATREON = f"{Emojis.HEART} Link Patreon account"
     BECOME_PATRON = f"{Emojis.DONATE} Become a Host"
     UNLINK_PATREON = "Unlink Patreon account"
+    # The link-confirmation pair. The confirming label names the act rather than reading as the
+    # flow's natural "next", so tapping it is a decision instead of a reflex, and the declining
+    # label is a neutral way out rather than one that sounds like abandoning setup.
+    CONFIRM_PATREON_LINK = "Connect this account"
+    DECLINE_PATREON_LINK = "Not now"
     HOSTS_GROUP_JOIN = f"{Emojis.PEOPLE} Join the Hosts-Only Group"
     HOSTS_GROUP_OPEN = f"{Emojis.PEOPLE} Open the Hosts-Only Group"
 
@@ -837,11 +842,82 @@ class CollaborateMessages(MessageBase):
     )
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
-    # Telegram message sent from the OAuth callback when the linked user is not a Host yet.
+    # Telegram message sent after redemption when the linked user is not a Host yet.
     LINK_CONFIRMED_NO_PATRON = (
         "<b>Patreon account linked</b>\n\n"
         "You're connected. Become a Host to unlock your Host perks. They'll switch on automatically "
         "once your pledge is active."
+    )
+    # Link-confirmation prompt, shown when a pairing code is presented and the account has no
+    # Patreon connected. The Patreon display name leads on its own line and in bold, because a
+    # recognised name is what makes a genuine link confirmable at a glance.
+    #
+    # The name alone cannot carry the check, though: an attacker picks their own Patreon display
+    # name, so "do you recognise this?" is a question they can answer for the reader. The sentence
+    # about having just approved on Patreon is the one fact in the prompt they cannot forge -- in
+    # the forwarded-link case the reader never went to Patreon at all, because the attacker did.
+    #
+    # Note the register throughout: "this Patreon account", never "your Patreon account" -- calling
+    # it theirs pre-frames a stranger's account as the reader's own and undoes the whole check.
+    LINK_CONFIRM = (
+        "<b>${patreon_name}</b>\n\n"
+        "That is the Patreon account this link would connect to Mitup.\n\n"
+        "You should only be seeing this straight after approving Mitup on Patreon yourself. If you "
+        "didn't just do that, somebody else's link reached this chat.\n\n"
+        "So connect it only if you recognise the name, and tap Not now if it means nothing to you. "
+        "Nothing changes either way until you confirm."
+    )
+    # Same prompt for an account that already has a different Patreon connected. This is the
+    # destructive case: confirming replaces a real link, so the copy names the tier being given up
+    # rather than describing the mechanism.
+    LINK_CONFIRM_REPLACES = (
+        "<b>${patreon_name}</b>\n\n"
+        "That is the Patreon account this link would connect to Mitup, and a different Patreon "
+        "account is connected right now.\n\n"
+        "You are a ${current_tier} today. Connecting this one gives that up: your ${current_tier} "
+        "badge and raised limits switch off, and the Patreon account you actually back Mitup with "
+        "stops counting, even though you keep paying for it.\n\n"
+        "You should only be seeing this straight after approving Mitup on Patreon yourself. If you "
+        "didn't just do that, somebody else's link reached this chat, and confirming would cost you "
+        "your ${current_tier} perks for nothing.\n\n"
+        "So do this only if you recognise the name above as your own Patreon. Tap Not now and "
+        "nothing changes."
+    )
+    # Shown after declining the prompt, so the outcome is stated rather than left to inference.
+    LINK_DECLINED = (
+        "<b>Nothing connected</b>\n\n"
+        "No Patreon account was connected and nothing on your account changed. You can link your "
+        "own Patreon account any time from Collaborate."
+    )
+    # Bare tier names, substituted into the replacement warning so a Host reads the name of the
+    # thing they would be giving up. Brand terms: identical in every language, never translated.
+    TIER_NAME_HOST_1 = "Brewer"
+    TIER_NAME_HOST_2 = "Gamemaster"
+    TIER_NAME_HOST_3 = "Commissioner"
+    # Shown when a pairing code arrives from someone who has not finished setting Mitup up. The
+    # pending link is left untouched, so the same link still works once they are set up.
+    LINK_NEEDS_SETUP = (
+        "<b>Finish setting up Mitup first</b>\n\n"
+        "Send /start to set up your account, then tap the confirmation link again to connect your "
+        "Patreon account. The link stays valid for a few more minutes."
+    )
+    # Telegram message sent when a confirmation link is tapped but its code cannot be redeemed:
+    # expired, already used, or never issued. All three read the same on purpose, so guessing a code
+    # learns nothing about whether it exists.
+    LINK_CODE_NOT_VALID = (
+        "<b>This confirmation link no longer works</b>\n\n"
+        "Confirmation links can be used once and expire quickly, and this one is past that. Nothing "
+        "changed on your account. Open Collaborate to link your Patreon account again and you'll get "
+        "a fresh link."
+    )
+    # Telegram message sent when the Patreon account behind the confirmation link already backs a
+    # different Mitup account.
+    LINK_ALREADY_LINKED_ELSEWHERE = (
+        "<b>That Patreon account is already connected</b>\n\n"
+        "A Patreon account can back one Mitup account at a time, and this one is connected to another "
+        "Mitup account, so nothing changed here. If that other account is also yours, open Collaborate "
+        "there and unlink it first, then confirm again from this chat. If it isn't yours, get in touch "
+        "and we'll sort it out with you."
     )
 
     @classmethod
@@ -859,6 +935,24 @@ class CollaborateMessages(MessageBase):
                 return cls.LINKED_PATRON_ORGANIZER
             case SupporterLevel.NONE:
                 raise ValueError("No status message exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    @classmethod
+    def tier_name_for(cls, level: SupporterLevel) -> CollaborateMessages:
+        """The bare tier name, for substituting into copy that has to name a tier.
+
+        NONE never reaches here: it is only used by the replacement warning, which is shown solely
+        to a user who currently holds a paying tier."""
+        match level:
+            case SupporterLevel.HOST_1:
+                return cls.TIER_NAME_HOST_1
+            case SupporterLevel.HOST_2:
+                return cls.TIER_NAME_HOST_2
+            case SupporterLevel.HOST_3:
+                return cls.TIER_NAME_HOST_3
+            case SupporterLevel.NONE:
+                raise ValueError("No tier name exists for the NONE tier")
             case _ as unreachable:
                 assert_never(unreachable)
 

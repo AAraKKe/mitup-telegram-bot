@@ -28,7 +28,6 @@ from tests.helpers import (
     create_supporter_subscription,
 )
 from tests.helpers.api import MockApi
-from tests.helpers.constants import DEFAULT_MESSAGE_ID
 from tests.helpers.stub_db import MockDbSession
 
 PATRON_ACTIVE_MEETINGS = 12
@@ -111,11 +110,11 @@ async def test_collaborate_not_linked_offers_oauth_link(
     assert "${" not in view.description.text
     link_button = view.keyboard[0][0]
     assert link_button.url.startswith("https://www.patreon.com/oauth2/authorize")
+    # The button anyone can be handed carries a state that identifies nobody: it validates, and
+    # that is all it does.
     state = parse_qs(urlparse(link_button.url).query)["state"][0]
-    decoded = oauth.decode_state(patreon_config, state)
-    assert decoded.tg_user_id == user_with_settings.tg_user_id
-    # The tapped message id is threaded into the OAuth state so the web callback can refresh it.
-    assert decoded.message_id == DEFAULT_MESSAGE_ID
+    oauth.validate_state(patreon_config, state)
+    assert str(user_with_settings.tg_user_id) not in link_button.url
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)

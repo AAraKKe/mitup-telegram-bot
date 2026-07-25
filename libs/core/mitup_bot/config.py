@@ -327,8 +327,8 @@ class PatreonConfig(BaseModel):
     creator_access_token: Annotated[SecretStr, Sample("patreon_creator_access_token")]
     # Seed value only, adopted together with `creator_access_token` (same fingerprint check).
     creator_refresh_token: Annotated[SecretStr, Sample("patreon_creator_refresh_token")]
-    # Fernet key for the OAuth `state` parameter (carries the initiating tg_user_id, age-validated
-    # against `oauth.STATE_TTL_SECONDS`).
+    # Fernet key for the OAuth `state` parameter (an anonymous nonce, age-validated against
+    # `oauth.STATE_TTL_SECONDS`).
     state_secret: Annotated[
         SecretStr,
         Sample(

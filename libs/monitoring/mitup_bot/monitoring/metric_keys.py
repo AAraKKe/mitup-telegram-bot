@@ -180,6 +180,14 @@ class MetricKey(CamelCaseStrEnum):
     FLOW_STARTED = auto()
     """A multi-step flow reached its success end (emitted under the Feature dimension)"""
     FLOW_COMPLETED = auto()
+    """A Patreon consent completed and its pairing code was issued, awaiting confirmation in Telegram"""
+    PATREON_LINK_STAGED = auto()
+    """A pairing code reached the confirmation prompt in Telegram (emitted under the Feature dimension)"""
+    PATREON_LINK_PROMPTED = auto()
+    """A Patreon link attempt ended without linking; the `outcome` property says which branch"""
+    PATREON_LINK_REFUSED = auto()
+    """Pending Patreon links erased by the cleanup run (expired, spent, or purged with their user)"""
+    PATREON_PENDING_LINKS_DELETED = auto()
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

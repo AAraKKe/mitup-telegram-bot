@@ -8,10 +8,12 @@ from telegram import User as TgUser
 
 from mitup_bot.callback_data import (
     CallbackData,
+    CodeCallbackData,
     DateCallbackData,
     MeetingCallbackData,
     PaginatedCallbackData,
     ValidCallbackData,
+    ValidCodeCallbackData,
     ValidDateCallbackData,
     ValidMeetingCallbackData,
     ValidPaginatedCallbackData,
@@ -167,6 +169,23 @@ def valid_callback_data(cb: CallbackData, handler_id: HandlerId) -> ValidCallbac
     if cb.id is None or cb.unknown():
         raise MalformedCallbackData(handler_id, cb)
     return ValidCallbackData(entity=cb.entity, action=cb.action, id=cb.id)
+
+
+def valid_code_callback_data(cb: CodeCallbackData, handler_id: HandlerId) -> ValidCodeCallbackData:
+    """
+    Validates the code-addressed callback `cb`. If the code is missing or the entity is unknown,
+    a MalformedCallbackData exception is raised scoped to the `handler_id` provided.
+
+    Holding a well-formed code proves nothing on its own — the handler still has to match it against
+    a row that the pressing user already claimed. This guard only rules out a callback there is
+    nothing to look up from.
+
+    The output of the guard is a `ValidCodeCallbackData`.
+    """
+    if cb.is_malformed():
+        raise MalformedCallbackData(handler_id, cb)
+    assert cb.code is not None, "is_malformed guarantees the code is set"
+    return ValidCodeCallbackData(entity=cb.entity, action=cb.action, code=cb.code)
 
 
 def valid_paginated_callback_data(cb: PaginatedCallbackData, handler_id: HandlerId) -> ValidPaginatedCallbackData:

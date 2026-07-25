@@ -1045,3 +1045,36 @@ msgstr "formas de apoiar"
 
 msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
 msgstr "límites e vantaxes de Host"
+
+msgid "ButtonMessages.CONFIRM_PATREON_LINK"
+msgstr "Conectar esta conta"
+
+msgid "ButtonMessages.DECLINE_PATREON_LINK"
+msgstr "Agora non"
+
+msgid "CollaborateMessages.LINK_CONFIRM"
+msgstr "<b>${patreon_name}</b>\n\nEsa é a conta de Patreon que esta ligazón conectaría con Mitup.\n\nIsto só debería aparecerche xusto despois de seres ti quen autorizou Mitup en Patreon. Se non acabas de facelo, chegou a este chat a ligazón doutra persoa.\n\nAsí que conéctaa só se recoñeces o nome, e toca Agora non se non che di nada. Non cambia nada ata que confirmes."
+
+msgid "CollaborateMessages.LINK_CONFIRM_REPLACES"
+msgstr "<b>${patreon_name}</b>\n\nEsa é a conta de Patreon que esta ligazón conectaría con Mitup, e agora mesmo tes conectada outra conta de Patreon distinta.\n\nHoxe es ${current_tier}. Conectar esta implica renunciar a iso: a túa insignia de ${current_tier} e os teus límites ampliados desactívanse, e a conta de Patreon coa que realmente apoias Mitup deixa de contar, aínda que sigas pagando por ela.\n\nIsto só debería aparecerche xusto despois de seres ti quen autorizou Mitup en Patreon. Se non acabas de facelo, chegou a este chat a ligazón doutra persoa, e confirmar custaríache as túas vantaxes de ${current_tier} a cambio de nada.\n\nAsí que fai isto só se recoñeces o nome de arriba como a túa propia conta de Patreon. Toca Agora non e non cambia nada."
+
+msgid "CollaborateMessages.LINK_DECLINED"
+msgstr "<b>Non se conectou nada</b>\n\nNon se conectou ningunha conta de Patreon e non cambiou nada na túa conta. Podes vincular a túa propia conta de Patreon cando queiras desde Colabora."
+
+msgid "CollaborateMessages.LINK_NEEDS_SETUP"
+msgstr "<b>Primeiro remata de configurar Mitup</b>\n\nEnvía /start para configurar a túa conta e despois toca de novo a ligazón de confirmación para conectar a túa conta de Patreon. A ligazón segue sendo válida uns minutos máis."
+
+msgid "CollaborateMessages.LINK_CODE_NOT_VALID"
+msgstr "<b>Esta ligazón de confirmación xa non funciona</b>\n\nAs ligazóns de confirmación úsanse unha soa vez e caducan axiña, e esta xa pasou dese punto. Non cambiou nada na túa conta. Abre Colabora para vincular de novo a túa conta de Patreon e recibirás unha ligazón nova."
+
+msgid "CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE"
+msgstr "<b>Esa conta de Patreon xa está conectada</b>\n\nUnha conta de Patreon pode apoiar unha soa conta de Mitup á vez, e esta está conectada a outra conta de Mitup, así que aquí non cambiou nada. Se esa outra conta tamén é túa, abre Colabora alí e desenlázaa primeiro, e despois confirma de novo desde este chat. Se non é túa, ponte en contacto connosco e resolvémolo contigo."
+
+msgid "CollaborateMessages.TIER_NAME_HOST_1"
+msgstr "Brewer"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_2"
+msgstr "Gamemaster"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_3"
+msgstr "Commissioner"

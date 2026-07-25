@@ -960,6 +960,26 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="collaborate_unlink",
     ),
+    Context(
+        handler_id=CollaborateHandlerId.PATREON_LINK_CONFIRM,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_PATREON_LINK.with_code("a-code")),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="collaborate_patreon_link_confirm",
+    ),
+    Context(
+        # A confirm button whose code is missing: the guard rejects it rather than looking up a row
+        # there is no address for.
+        handler_id=CollaborateHandlerId.PATREON_LINK_CONFIRM,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_PATREON_LINK),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="collaborate_patreon_link_confirm_no_code",
+    ),
+    Context(
+        handler_id=CollaborateHandlerId.PATREON_LINK_DECLINE,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_PATREON_LINK.with_code("a-code")),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="collaborate_patreon_link_decline",
+    ),
     # --- Privacy handlers ---
     Context(
         handler_id=PrivacyHandlerId.SHOW,

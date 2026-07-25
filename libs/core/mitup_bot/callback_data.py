@@ -121,6 +121,54 @@ class DateCallbackData(CallbackData):
         return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)
 
 
+class ValidCodeCallbackData(BaseModel):
+    """Validated CodeCallbackData: the code is present and non-empty."""
+
+    entity: str
+    action: str
+    code: str
+
+
+class CodeCallbackData(CallbackData):
+    """CallbackData addressed by an unguessable code instead of a record id.
+
+    Record ids are small sequential integers, so a button carrying one can be forged into a button
+    naming somebody else's row. Where a callback acts on a row the presser must already hold a
+    secret for, the secret itself is the safer address: guessing it is the same problem as guessing
+    the secret. `id` stays unset on the wire, and `is_malformed` gates on the code instead.
+
+    The code alphabet is base64url, which is why the pattern accepts `[A-Za-z0-9_-]`.
+
+    Format string: {action};{entity}:;code:{code}
+    Example: "confirm;plink:;code:xLd2-mQ7..."
+    """
+
+    code: str | None = None
+
+    def __str__(self) -> str:
+        return f"{super().__str__()};code:{self.code or ''}"
+
+    @property
+    @override
+    def pattern_body(self) -> str:
+        return f"{super().pattern_body};code:(?P<code>[A-Za-z0-9_-]*)"
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def validate_code(cls, value: str | None) -> str | None:
+        # An absent code is parsed as an empty string from the wire format; normalize it to None
+        # so `is_malformed` has a single shape to check.
+        return value or None
+
+    @override
+    def is_malformed(self) -> bool:
+        return self.code is None or self.unknown()
+
+    def with_code(self, code: str) -> Self:
+        """Creates a CodeCallbackData with the same information but a different code."""
+        return self.__class__(entity=self.entity, action=self.action, code=code)
+
+
 class ValidPaginatedCallbackData(ValidCallbackData):
     """Validated PaginatedCallbackData with a concrete originating page.
 

@@ -5,6 +5,7 @@ from sqlalchemy.dialects import postgresql
 
 from mitup_bot.events import user_cleanup
 from mitup_bot.events.user_cleanup import DELETION_REQUESTED_USERS_SELECT_STATEMENT, INACTIVE_USERS_SELECT_STATEMENT
+from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import PrivacyMessages
@@ -46,8 +47,9 @@ async def test_no_users_to_purge(
     await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
-    # Three exec calls: LEFT select + DELETION_REQUESTED select + delete
-    assert mock_session.exec.call_count == 3
+    # Four exec calls: LEFT select + DELETION_REQUESTED select + delete users + pending-link sweep.
+    # No per-user pending-link delete: with nobody purged there are no claimers to name.
+    assert mock_session.exec.call_count == 4
 
     # No real user IDs targeted — empty-set form renders as IN (NULL) AND (1 != 1)
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
@@ -220,3 +222,44 @@ async def test_joined_only_users_not_targeted(
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
     # User stays JOINED_ONLY — no side effects.
     assert joined_only_user.status is UserStatus.JOINED_ONLY
+
+
+async def test_finished_pending_links_are_swept_every_run(
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    api: MockApi,
+):
+    # patreon_pending_links has no foreign key to users, so nothing cascades into it. An unclaimed
+    # row belongs to nobody the database can name, which makes this sweep the only thing that ever
+    # erases it -- retention, not housekeeping.
+    await user_cleanup.run(api, metrics_client)
+    await metrics_client.flush()
+
+    swept = next(query for query in mock_session.queries_executed if "DELETE FROM patreon_pending_links" in query)
+    assert "consumed_time IS NOT NULL" in swept
+    assert "expiration <= now()" in swept
+    metrics.assert_emitted(name=MetricKey.PATREON_PENDING_LINKS_DELETED, value=0, unit=MetricUnit.COUNT)
+
+
+async def test_deletion_request_also_erases_that_users_pending_links(
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    api: MockApi,
+    user_with_settings: User,
+):
+    # A claimed row pairs a Telegram id with a Patreon id, so a data-deletion request has to reach
+    # it. Nothing cascades, so the purge names it explicitly.
+    user_with_settings.status = UserStatus.DELETION_REQUESTED
+    mock_session.add_objects_with_statement(
+        user_cleanup.DELETION_REQUESTED_USERS_SELECT_STATEMENT, (user_with_settings,)
+    )
+
+    await user_cleanup.run(api, metrics_client)
+
+    purge = next(
+        query
+        for query in mock_session.queries_executed
+        if "DELETE FROM patreon_pending_links" in query and "claimed_tg_user_id" in query
+    )
+    assert str(user_with_settings.tg_user_id) in purge

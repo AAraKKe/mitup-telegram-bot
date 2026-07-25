@@ -323,14 +323,19 @@ def confirmation_view(
     message: str | FormattedText,
     confirm_callback_data: CallbackData,
     decline_callback_data: CallbackData,
+    confirm_label: ButtonMessages = ButtonMessages.CONFIRM,
+    decline_label: ButtonMessages = ButtonMessages.DECLINE,
 ) -> MitupView:
+    """Accept/decline dialog. The labels default to the generic pair, and a caller overrides them
+    where a bare "Confirm" would under-describe what is being agreed to — a prompt whose whole
+    purpose is to make someone stop and read needs a button that names the act."""
     lang = ctx.lang
     return MitupView(
         message,
         [
             [
-                ButtonConfig(text=ButtonMessages.CONFIRM.get_text(lang=lang), callback_data=confirm_callback_data),
-                ButtonConfig(text=ButtonMessages.DECLINE.get_text(lang=lang), callback_data=decline_callback_data),
+                ButtonConfig(text=confirm_label.get_text(lang=lang), callback_data=confirm_callback_data),
+                ButtonConfig(text=decline_label.get_text(lang=lang), callback_data=decline_callback_data),
             ],
         ],
     )

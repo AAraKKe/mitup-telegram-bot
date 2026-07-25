@@ -11,6 +11,7 @@ from mitup_bot.utils.entities import build_datetime_link
 
 from .command_enums import CommandsId
 from .registry import HandlersRegistry
+from .start_payload import INLINE_KIND, StartPayload, parse_start_payload
 
 if TYPE_CHECKING:
     # Runtime import would be circular (the meeting package pulls in create_meeting.py,
@@ -31,18 +32,21 @@ async def command_start_with_existing_user(
         # which runs before this group) claims those /start updates with ApplicationHandlerStop,
         # so this branch only runs if that routing ever breaks. Stay silent either way.
         return ConversationHandler.END
-    return await existing_user_start(session, update, context)
+    return await existing_user_start(session, update, context, parse_start_payload(context.args))
 
 
 async def existing_user_start(
-    session: AsyncSession, update: Update, context: TMitupContext
+    session: AsyncSession, update: Update, context: TMitupContext, payload: StartPayload | None = None
 ) -> ConversationMeetingState | int:
-    # Entry path only reads `user.lang` for the create-meeting / main-menu views; it never traverses
-    # the meetups/joined_links collections, so skip loading them.
+    """Route a `/start` (or `/main_menu`) into the screen its deep-link payload asks for.
+
+    Every branch reads `user.lang` and nothing that traverses the meetups/joined_links collections,
+    so the user is loaded without them.
+    """
     user = await guards.current_user(update, session, load_collections=False)
     ctx = guards.render_context(user, update, context)
 
-    if context.args and context.args[0] == "inline":
+    if payload is not None and payload.kind == INLINE_KIND:
         # Local import to avoid circular dependency at load time: commands.py must be fully
         # loaded before create_meeting.py registers the conversation handler that references
         # CommandsId.START_WITH_EXISTING_USER as an entry point.
@@ -62,4 +66,5 @@ async def existing_user_start(
 async def command_go_to_main_menu(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState | int:
+    # No payload: `/main_menu` is not a deep-link target, so it always lands on the main menu.
     return await existing_user_start(session, update, context)

@@ -1,15 +1,16 @@
 """Fernet-signed OAuth ``state`` handling and Patreon URL construction.
 
-The ``state`` parameter round-trips the initiating Telegram user id through Patreon's consent
-screen. It is a Fernet token (keyed by ``PatreonConfig.state_secret``) carrying the ``tg_user_id``,
-so the value is opaque and tamper-evident. Fernet stamps every token with a creation time, which the
-``ttl`` check on the way back uses to reject buttons tapped long after they were rendered.
+The OAuth leg is anonymous. ``state`` is a Fernet token (keyed by ``PatreonConfig.state_secret``)
+wrapping nothing but a random nonce, so the value proves the redirect came from us and has not been
+tampered with, and nothing else. Whose Telegram account the consent belongs to is decided afterwards,
+inside Telegram, by redeeming a pairing code (see :mod:`mitup_bot.patreon.pairing`).
 
-Replay is bounded by that TTL, not by a stored nonce: Fernet already gives every token a random 128-bit
-IV, so two states for the same user are distinct ciphertexts, and re-linking is idempotent (it upserts
-the same row), so replaying a still-valid state within the TTL window links the account the user
-already meant to link. Persisting and consuming a single-use nonce would add a datastore round-trip for
-no security gain over the TTL, so we deliberately don't.
+Keeping identity out of ``state`` is what makes the consent URL safe to be seen by anyone: the token
+travels through a browser, so anybody holding it can complete the consent — but completing it grants
+them nothing beyond a pairing code rendered in their own browser.
+
+Fernet stamps every token with a creation time, which the ``ttl`` check on the way back uses to reject
+a consent screen that was left sitting far longer than the flow needs.
 
 These are pure functions over a ``PatreonConfig`` so they stay unit-testable without the runtime
 config holder; callers resolve the live config from :mod:`mitup_bot.patreon` and pass it in.
@@ -17,7 +18,7 @@ config holder; callers resolve the live config from :mod:`mitup_bot.patreon` and
 
 import datetime as dt
 import json
-from dataclasses import dataclass
+import secrets
 from urllib.parse import urlencode
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -37,52 +38,37 @@ USER_SCOPES = "identity"
 # minted through the user OAuth flow above), so nothing here consumes this constant — it is the
 # codified record of what that seeded token needs to be granted.
 CREATOR_SCOPES = "identity w:campaigns.webhook"
-# The state is a Fernet token frozen into the Collaborate-menu button at render time, so this TTL is
-# the clock from when the menu is drawn. A first-time Patreon login (email, 2FA, verification) routinely
-# runs past ten minutes, so an hour tolerates a realistic sitting. The cost is negligible: re-linking is
-# idempotent and the state only carries the initiator's own tg_user_id. Buttons older than the TTL still
-# degrade gracefully to the friendly retry page, which re-renders a fresh state.
-STATE_TTL_SECONDS = 3600
+# The state is frozen into the Collaborate-menu button at render time, so this TTL is the clock from
+# when the menu is drawn. It bounds how long a consent screen stays completable, which keeps a
+# harvested consent URL from being useful much later. A first-time Patreon login (email, 2FA) fits
+# comfortably inside it, and an expired button degrades to the friendly retry page, which re-renders
+# a fresh state.
+STATE_TTL_SECONDS = 900
+# Byte length of the ``state`` nonce. Fernet already randomizes every ciphertext through its IV; the
+# explicit nonce makes the payload's only job — being unguessable and meaningless — self-evident.
+STATE_NONCE_BYTES = 16
 
 
-@dataclass(frozen=True)
-class DecodedState:
-    """The payload carried through Patreon's consent screen inside the signed ``state`` token.
-
-    ``message_id`` is the Collaborate message the user tapped, threaded through so the callback can
-    refresh that message into the linked view. It is optional: states minted before message-id
-    threading carry only ``tg_user_id``, so a decode of such a token yields ``message_id=None`` and
-    the flow degrades to skipping the refresh.
-    """
-
-    tg_user_id: int
-    message_id: int | None
-
-
-def encode_state(config: PatreonConfig, tg_user_id: int, message_id: int | None = None) -> str:
-    """Build the opaque, tamper-evident ``state`` token carrying the initiating Telegram user id
-    and, when known, the Collaborate message id to refresh after linking."""
+def encode_state(config: PatreonConfig) -> str:
+    """Build the opaque, tamper-evident ``state`` token: a random nonce and nothing else."""
     fernet = Fernet(config.state_secret.get_secret_value())
-    payload = json.dumps({"tg_user_id": tg_user_id, "message_id": message_id})
+    payload = json.dumps({"nonce": secrets.token_urlsafe(STATE_NONCE_BYTES)})
     return fernet.encrypt(payload.encode()).decode()
 
 
-def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS) -> DecodedState:
-    """Validate the ``state`` token and return the :class:`DecodedState` it carries.
+def validate_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS) -> None:
+    """Check that ``state`` is one of ours and still fresh, raising when it is not.
 
     Signature validation and age are checked separately so the caller can distinguish an expired
     button (friendly "tap it again") from a genuinely invalid token: decrypting without a ttl
     proves authenticity, then a second decrypt with the ttl gates on age. On expiry the token's
     embedded timestamp is authentic, so the age is measured and carried on the exception — that lets
     the callback tell slow consent from clock skew from a stale button.
-
-    ``message_id`` is read with ``.get`` so a token minted before message-id threading (no such key)
-    decodes cleanly with ``message_id=None`` rather than raising.
     """
     fernet = Fernet(config.state_secret.get_secret_value())
     token = state.encode()
     try:
-        raw = fernet.decrypt(token)
+        fernet.decrypt(token)
     except InvalidToken as error:
         raise PatreonStateInvalid from error
 
@@ -93,24 +79,16 @@ def decode_state(config: PatreonConfig, state: str, ttl: int = STATE_TTL_SECONDS
         age_seconds = (dt.datetime.now(dt.UTC) - minted_at).total_seconds()
         raise PatreonStateExpired(age_seconds=age_seconds) from error
 
-    payload = json.loads(raw)
-    raw_message_id = payload.get("message_id")
-    return DecodedState(
-        tg_user_id=int(payload["tg_user_id"]),
-        message_id=int(raw_message_id) if raw_message_id is not None else None,
-    )
 
-
-def authorization_url(config: PatreonConfig, tg_user_id: int, message_id: int | None = None) -> str:
-    """Build the Patreon consent URL the user is sent to, embedding a fresh signed ``state`` that
-    carries the initiating user id and the Collaborate message id to refresh after linking."""
+def authorization_url(config: PatreonConfig) -> str:
+    """Build the Patreon consent URL the user is sent to, embedding a fresh anonymous ``state``."""
     query = urlencode(
         {
             "response_type": "code",
             "client_id": config.client_id,
             "redirect_uri": config.redirect_uri,
             "scope": USER_SCOPES,
-            "state": encode_state(config, tg_user_id, message_id),
+            "state": encode_state(config),
         }
     )
     return f"{AUTHORIZE_URL}?{query}"

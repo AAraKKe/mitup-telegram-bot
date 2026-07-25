@@ -113,12 +113,18 @@ class PatreonClient:
 
         Returns the parsed response; the caller reads ``.patreon_user_id`` and evaluates membership
         with ``.is_active_member_of(campaign_id)`` (the campaign id lives in config, not the response).
+
+        ``fields[user]=full_name`` is what lets the link-confirmation prompt name the account in
+        words a person recognises instead of a numeric id, which is the whole basis for expecting
+        someone to notice a link that is not theirs. ``full_name`` is served under the plain
+        ``identity`` scope, so asking for it widens neither the consent screen nor what we can read.
         """
         response = await self._get(
             "/identity",
             access_token,
             params={
                 "include": "memberships.campaign",
+                "fields[user]": "full_name",
                 "fields[member]": "patron_status,currently_entitled_amount_cents",
             },
         )

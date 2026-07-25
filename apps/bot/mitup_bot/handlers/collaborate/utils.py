@@ -1,6 +1,5 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram import Message, Update
 
 from mitup_bot import patreon, supporter
 from mitup_bot.mitup_types import TMitupContext
@@ -13,19 +12,6 @@ from mitup_bot.views.collaborate import (
     collaborate_not_linked_view,
 )
 from mitup_bot.views.mitup_view import MitupView
-
-
-def tapped_message_id(update: Update) -> int | None:
-    """The message id of the tapped Collaborate button, or None when it is unavailable.
-
-    Threaded into the OAuth ``state`` so the web callback can refresh this message after linking.
-    PTB delivers an ``InaccessibleMessage`` (no usable id) when the original message is too old, so
-    anything that is not a real ``Message`` degrades to None and the refresh is simply skipped.
-    """
-    query = update.callback_query
-    if query is None:
-        return None
-    return query.message.message_id if isinstance(query.message, Message) else None
 
 
 async def subscription_for_user(session: AsyncSession, user: User) -> SupporterSubscription | None:
@@ -50,19 +36,12 @@ async def hosts_group_button_state(context: TMitupContext, tg_user_id: int) -> t
     return invite_url, in_group
 
 
-async def build_collaborate_view(
-    session: AsyncSession, user: User, context: TMitupContext, message_id: int | None = None
-) -> MitupView:
-    """Resolve which of the three Collaborate states the user is in and build its view.
-
-    ``message_id`` is the Collaborate message being rendered; it is threaded into the OAuth ``state``
-    on the not-linked branch only, so the web callback can refresh that message after linking.
-    """
+async def build_collaborate_view(session: AsyncSession, user: User, context: TMitupContext) -> MitupView:
+    """Resolve which of the three Collaborate states the user is in and build its view."""
     config = patreon.current_config()
     subscription = await subscription_for_user(session, user)
     if subscription is None:
-        authorization_url = oauth.authorization_url(config, user.tg_user_id, message_id)
-        return collaborate_not_linked_view(user.lang, authorization_url)
+        return collaborate_not_linked_view(user.lang, oauth.authorization_url(config))
     if supporter.is_supporter(user.supporter_level):
         active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
         scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)

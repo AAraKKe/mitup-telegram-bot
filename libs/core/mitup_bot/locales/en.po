@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-22 11:46\n"
+"PO-Revision-Date: 2026-07-25 04:36\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -229,6 +229,12 @@ msgstr "💶 Become a Host"
 
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Unlink Patreon account"
+
+msgid "ButtonMessages.CONFIRM_PATREON_LINK"
+msgstr "Connect this account"
+
+msgid "ButtonMessages.DECLINE_PATREON_LINK"
+msgstr "Not now"
 
 msgid "ButtonMessages.HOSTS_GROUP_JOIN"
 msgstr "👥 Join the Hosts-Only Group"
@@ -781,6 +787,33 @@ msgstr "Your Patreon account has been unlinked."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a Host to unlock your Host perks. They'll switch on automatically once your pledge is active."
+
+msgid "CollaborateMessages.LINK_CONFIRM"
+msgstr "<b>${patreon_name}</b>\n\nThat is the Patreon account this link would connect to Mitup.\n\nYou should only be seeing this straight after approving Mitup on Patreon yourself. If you didn't just do that, somebody else's link reached this chat.\n\nSo connect it only if you recognise the name, and tap Not now if it means nothing to you. Nothing changes either way until you confirm."
+
+msgid "CollaborateMessages.LINK_CONFIRM_REPLACES"
+msgstr "<b>${patreon_name}</b>\n\nThat is the Patreon account this link would connect to Mitup, and a different Patreon account is connected right now.\n\nYou are a ${current_tier} today. Connecting this one gives that up: your ${current_tier} badge and raised limits switch off, and the Patreon account you actually back Mitup with stops counting, even though you keep paying for it.\n\nYou should only be seeing this straight after approving Mitup on Patreon yourself. If you didn't just do that, somebody else's link reached this chat, and confirming would cost you your ${current_tier} perks for nothing.\n\nSo do this only if you recognise the name above as your own Patreon. Tap Not now and nothing changes."
+
+msgid "CollaborateMessages.LINK_DECLINED"
+msgstr "<b>Nothing connected</b>\n\nNo Patreon account was connected and nothing on your account changed. You can link your own Patreon account any time from Collaborate."
+
+msgid "CollaborateMessages.TIER_NAME_HOST_1"
+msgstr "Brewer"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_2"
+msgstr "Gamemaster"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_3"
+msgstr "Commissioner"
+
+msgid "CollaborateMessages.LINK_NEEDS_SETUP"
+msgstr "<b>Finish setting up Mitup first</b>\n\nSend /start to set up your account, then tap the confirmation link again to connect your Patreon account. The link stays valid for a few more minutes."
+
+msgid "CollaborateMessages.LINK_CODE_NOT_VALID"
+msgstr "<b>This confirmation link no longer works</b>\n\nConfirmation links can be used once and expire quickly, and this one is past that. Nothing changed on your account. Open Collaborate to link your Patreon account again and you'll get a fresh link."
+
+msgid "CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE"
+msgstr "<b>That Patreon account is already connected</b>\n\nA Patreon account can back one Mitup account at a time, and this one is connected to another Mitup account, so nothing changed here. If that other account is also yours, open Collaborate there and unlink it first, then confirm again from this chat. If it isn't yours, get in touch and we'll sort it out with you."
 
 msgid "SupporterNotificationMessages.GRACE_STARTED"
 msgstr "<b>Your Host perks are in a grace period</b>\n\nWe couldn't confirm an active Patreon pledge on your account, so your Host perks are set to switch off in a week. If your pledge is still active, there's nothing to do and it will renew automatically. Otherwise, you can back Mitup again from the Collaborate menu."

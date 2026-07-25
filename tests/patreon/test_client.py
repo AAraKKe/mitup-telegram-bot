@@ -137,6 +137,38 @@ async def test_fetch_identity_reports_active_member():
     assert identity.is_active_member_of(CAMPAIGN_ID) is True
 
 
+async def test_fetch_identity_requests_and_parses_the_display_name():
+    # The confirmation prompt has to name the Patreon account in words a person recognises, which is
+    # the whole basis for expecting anyone to notice a link that is not theirs. `full_name` is served
+    # under the plain `identity` scope, so asking for it adds no scope.
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["fields[user]"] == "full_name"
+        payload = identity_payload(campaign_id=CAMPAIGN_ID, patron_status="active_patron", cents=500)
+        payload["data"]["attributes"] = {"full_name": "Ada Lovelace"}
+        return httpx.Response(200, json=payload)
+
+    config = create_patreon_config(campaign_id=CAMPAIGN_ID)
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        identity = await client.fetch_identity("user-access")
+
+    assert identity.full_name == "Ada Lovelace"
+
+
+async def test_fetch_identity_tolerates_an_account_with_no_display_name():
+    # Patreon omits the attribute for accounts that never set one; the prompt falls back to the id
+    # rather than the parse failing.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json=identity_payload(campaign_id=CAMPAIGN_ID, patron_status="active_patron", cents=500)
+        )
+
+    config = create_patreon_config(campaign_id=CAMPAIGN_ID)
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        identity = await client.fetch_identity("user-access")
+
+    assert identity.full_name is None
+
+
 async def test_fetch_identity_reports_inactive_when_not_paying():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

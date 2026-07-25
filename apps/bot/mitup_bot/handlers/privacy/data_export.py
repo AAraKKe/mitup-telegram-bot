@@ -14,7 +14,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
-from mitup_bot.models import JoinedUsers, Meetup, Settings, SupporterSubscription, User
+from mitup_bot.models import JoinedUsers, Meetup, PatreonPendingLink, Settings, SupporterSubscription, User
 
 EXPORT_BOT_NAME = "Mitup"
 
@@ -63,6 +63,15 @@ def joined_links_statement(user: User) -> SelectOfScalar[JoinedUsers]:
 
 def subscription_statement(user: User) -> SelectOfScalar[SupporterSubscription]:
     return select(SupporterSubscription).where(SupporterSubscription.user_id == user.db_id)
+
+
+def pending_links_statement(user: User) -> SelectOfScalar[PatreonPendingLink]:
+    """Pending Patreon links this user claimed.
+
+    Only claimed rows are addressable: an unclaimed one carries no Telegram identifier at all, so
+    there is nothing that marks it as this user's to export.
+    """
+    return select(PatreonPendingLink).where(PatreonPendingLink.claimed_tg_user_id == user.tg_user_id)
 
 
 def user_section(user: User) -> dict[str, Any]:
@@ -131,6 +140,19 @@ def patreon_section(subscription: SupporterSubscription) -> dict[str, Any]:
     }
 
 
+def pending_patreon_link_section(pending: PatreonPendingLink) -> dict[str, Any]:
+    """A Patreon link this user opened but has not completed. Short lived, but real data about
+    them while it exists, so an export has to show it. The pairing code is not included because it
+    is not stored — only a hash of it is."""
+    return {
+        "patreon_user_id": pending.patreon_user_id,
+        "patreon_display_name": pending.patreon_full_name,
+        "claimed_time": iso_utc(pending.claimed_time),
+        "expiration": iso_utc(pending.expiration),
+        "confirmed": pending.consumed_time is not None,
+    }
+
+
 async def build_user_export(session: AsyncSession, user: User) -> dict[str, Any]:
     """Assemble the full export envelope for `user`.
 
@@ -141,6 +163,7 @@ async def build_user_export(session: AsyncSession, user: User) -> dict[str, Any]
     meetings = (await session.exec(owned_meetings_statement(user))).all()
     joined_links = (await session.exec(joined_links_statement(user))).all()
     subscription = (await session.exec(subscription_statement(user))).first()
+    pending_links = (await session.exec(pending_links_statement(user))).all()
     return {
         "bot": EXPORT_BOT_NAME,
         "exported_at": iso_utc(dt.datetime.now(dt.UTC)),
@@ -149,6 +172,7 @@ async def build_user_export(session: AsyncSession, user: User) -> dict[str, Any]
         "meetings": [owned_meeting_section(meeting) for meeting in meetings],
         "joined_meetings": [joined_meeting_section(link) for link in joined_links if not link.meetup.is_owned_by(user)],
         "patreon": patreon_section(subscription) if subscription else None,
+        "pending_patreon_links": [pending_patreon_link_section(pending) for pending in pending_links],
     }
 
 

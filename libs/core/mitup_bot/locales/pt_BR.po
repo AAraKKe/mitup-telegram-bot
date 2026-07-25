@@ -845,6 +845,12 @@ msgstr "💶 Ser um Host"
 msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desconectar conta Patreon"
 
+msgid "ButtonMessages.CONFIRM_PATREON_LINK"
+msgstr "Conectar esta conta"
+
+msgid "ButtonMessages.DECLINE_PATREON_LINK"
+msgstr "Agora não"
+
 msgid "ButtonMessages.HOSTS_GROUP_JOIN"
 msgstr "👥 Entrar no Grupo Exclusivo de Hosts"
 
@@ -871,6 +877,33 @@ msgstr "Sua conta Patreon foi desconectada."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Conta Patreon conectada</b>\n\nVocê está conectado. Torne-se um Host para desbloquear seus benefícios de Host. Eles serão ativados automaticamente assim que sua contribuição estiver ativa."
+
+msgid "CollaborateMessages.LINK_CONFIRM"
+msgstr "<b>${patreon_name}</b>\n\nEssa é a conta do Patreon que este link conectaria ao Mitup.\n\nVocê só deveria estar vendo isto logo depois de você mesmo autorizar o Mitup no Patreon. Se você não acabou de fazer isso, o link de outra pessoa chegou a este chat.\n\nEntão conecte esta conta só se você reconhecer o nome, e toque em Agora não se ele não significar nada para você. De um jeito ou de outro, nada muda até você confirmar."
+
+msgid "CollaborateMessages.LINK_CONFIRM_REPLACES"
+msgstr "<b>${patreon_name}</b>\n\nEssa é a conta do Patreon que este link conectaria ao Mitup, e há outra conta do Patreon conectada agora.\n\nHoje você é um ${current_tier}. Conectar esta conta abre mão disso: seu selo de ${current_tier} e seus limites ampliados são desativados, e a conta do Patreon com que você realmente apoia o Mitup deixa de contar, mesmo que você continue pagando por ela.\n\nVocê só deveria estar vendo isto logo depois de você mesmo autorizar o Mitup no Patreon. Se você não acabou de fazer isso, o link de outra pessoa chegou a este chat, e confirmar custaria à toa as suas vantagens de ${current_tier}.\n\nEntão faça isso só se você reconhecer o nome acima como sua própria conta do Patreon. Toque em Agora não e nada muda."
+
+msgid "CollaborateMessages.LINK_DECLINED"
+msgstr "<b>Nada foi conectado</b>\n\nNenhuma conta do Patreon foi conectada e nada mudou na sua conta. Você pode vincular sua própria conta do Patreon quando quiser pelo Colabore."
+
+msgid "CollaborateMessages.TIER_NAME_HOST_1"
+msgstr "Brewer"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_2"
+msgstr "Gamemaster"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_3"
+msgstr "Commissioner"
+
+msgid "CollaborateMessages.LINK_NEEDS_SETUP"
+msgstr "<b>Termine de configurar o Mitup primeiro</b>\n\nEnvie /start para configurar sua conta e depois toque no link de confirmação de novo para conectar sua conta do Patreon. O link continua válido por mais alguns minutos."
+
+msgid "CollaborateMessages.LINK_CODE_NOT_VALID"
+msgstr "<b>Este link de confirmação não funciona mais</b>\n\nOs links de confirmação valem para um único uso e expiram rápido, e este já passou disso. Nada mudou na sua conta. Abra o Colabore para vincular sua conta do Patreon de novo e você receberá um link novo."
+
+msgid "CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE"
+msgstr "<b>Essa conta do Patreon já está conectada</b>\n\nUma conta do Patreon pode apoiar uma conta do Mitup por vez, e esta aqui está conectada a outra conta do Mitup, então nada mudou por aqui. Se essa outra conta também for sua, abra o Colabore por lá e desconecte-a primeiro, depois confirme de novo por este chat. Se ela não for sua, fale com a gente e resolvemos isso junto com você."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""

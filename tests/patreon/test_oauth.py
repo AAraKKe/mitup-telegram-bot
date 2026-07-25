@@ -9,66 +9,46 @@ from mitup_bot.exceptions import PatreonStateExpired, PatreonStateInvalid
 from mitup_bot.patreon import oauth
 from tests.helpers import create_patreon_config
 
-TG_USER_ID = 997_601
-MESSAGE_ID = 4242
 
-
-def test_encode_decode_round_trip_returns_tg_user_id():
+def test_state_carries_no_telegram_identity():
+    # The security property of the whole flow: the token that travels through the browser says
+    # nothing about who started it, so handing the consent URL to somebody else transfers no claim
+    # on anyone's Mitup account.
     config = create_patreon_config()
-    state = oauth.encode_state(config, TG_USER_ID)
+    state = oauth.encode_state(config)
 
-    decoded = oauth.decode_state(config, state)
-    assert decoded.tg_user_id == TG_USER_ID
-    # No message id was supplied, so the round-trip carries None.
-    assert decoded.message_id is None
+    payload = json.loads(Fernet(config.state_secret.get_secret_value()).decrypt(state.encode()))
+    assert set(payload) == {"nonce"}
 
 
-def test_encode_decode_round_trip_carries_message_id():
+def test_validate_accepts_a_freshly_encoded_state():
     config = create_patreon_config()
-    state = oauth.encode_state(config, TG_USER_ID, MESSAGE_ID)
-
-    decoded = oauth.decode_state(config, state)
-    assert decoded.tg_user_id == TG_USER_ID
-    assert decoded.message_id == MESSAGE_ID
+    oauth.validate_state(config, oauth.encode_state(config))
 
 
-def test_decode_legacy_state_without_message_id_key_defaults_to_none():
-    # A state minted before message-id threading has no ``message_id`` key at all. Backward-compat:
-    # it must decode cleanly with message_id=None rather than raising a KeyError.
+def test_encode_produces_distinct_tokens():
     config = create_patreon_config()
-    fernet = Fernet(config.state_secret.get_secret_value())
-    legacy = fernet.encrypt(json.dumps({"tg_user_id": TG_USER_ID}).encode()).decode()
-
-    decoded = oauth.decode_state(config, legacy)
-    assert decoded.tg_user_id == TG_USER_ID
-    assert decoded.message_id is None
+    assert oauth.encode_state(config) != oauth.encode_state(config)
 
 
-def test_encode_produces_distinct_tokens_via_fernet_iv():
-    # No nonce is stored: Fernet's random per-token IV already makes two states for the same user
-    # distinct ciphertexts, and TTL is the replay bound.
-    config = create_patreon_config()
-    assert oauth.encode_state(config, TG_USER_ID) != oauth.encode_state(config, TG_USER_ID)
-
-
-def test_decode_expired_state_raises_and_carries_age():
+def test_validate_expired_state_raises_and_carries_age():
     config = create_patreon_config()
     with freeze_time("2026-07-05 12:00:00"):
-        state = oauth.encode_state(config, TG_USER_ID)
-    # Past the 3600s (1h) TTL: 71 minutes later.
-    with freeze_time("2026-07-05 13:11:00"), pytest.raises(PatreonStateExpired) as excinfo:
-        oauth.decode_state(config, state)
-    # The token's embedded timestamp is authentic, so the age is measurable and roughly 71 minutes.
-    assert excinfo.value.age_seconds == pytest.approx(71 * 60, abs=2)
+        state = oauth.encode_state(config)
+    # Past the 900s TTL: 20 minutes later.
+    with freeze_time("2026-07-05 12:20:00"), pytest.raises(PatreonStateExpired) as excinfo:
+        oauth.validate_state(config, state)
+    # The token's embedded timestamp is authentic, so the age is measurable and roughly 20 minutes.
+    assert excinfo.value.age_seconds == pytest.approx(20 * 60, abs=2)
 
 
-def test_decode_just_under_ttl_still_succeeds():
+def test_validate_just_under_ttl_still_succeeds():
     config = create_patreon_config()
     with freeze_time("2026-07-05 12:00:00"):
-        state = oauth.encode_state(config, TG_USER_ID)
-    # 59 minutes is still inside the 1h window.
-    with freeze_time("2026-07-05 12:59:00"):
-        assert oauth.decode_state(config, state).tg_user_id == TG_USER_ID
+        state = oauth.encode_state(config)
+    # 14 minutes is still inside the 15-minute window.
+    with freeze_time("2026-07-05 12:14:00"):
+        oauth.validate_state(config, state)
 
 
 def test_scope_requests_only_base_identity():
@@ -77,41 +57,41 @@ def test_scope_requests_only_base_identity():
     assert oauth.USER_SCOPES == "identity"
 
 
-def test_state_ttl_is_one_hour():
-    assert oauth.STATE_TTL_SECONDS == 3600
+def test_state_ttl_is_fifteen_minutes():
+    assert oauth.STATE_TTL_SECONDS == 900
 
 
-def test_decode_future_dated_state_reports_negative_age():
+def test_validate_future_dated_state_reports_negative_age():
     # A token minted "ahead" of the validating clock is rejected as expired; its age is negative,
     # which is the clock-skew signal the callback surfaces (age below the TTL yet still rejected).
     config = create_patreon_config()
     with freeze_time("2026-07-05 12:10:00"):
-        state = oauth.encode_state(config, TG_USER_ID)
+        state = oauth.encode_state(config)
     with freeze_time("2026-07-05 12:00:00"), pytest.raises(PatreonStateExpired) as excinfo:
-        oauth.decode_state(config, state)
+        oauth.validate_state(config, state)
     assert excinfo.value.age_seconds == pytest.approx(-600, abs=2)
     assert excinfo.value.age_seconds < oauth.STATE_TTL_SECONDS
 
 
-def test_decode_tampered_state_raises_invalid():
+def test_validate_tampered_state_raises_invalid():
     config = create_patreon_config()
-    state = oauth.encode_state(config, TG_USER_ID)
+    state = oauth.encode_state(config)
     tampered = state[:-4] + ("aaaa" if not state.endswith("aaaa") else "bbbb")
     with pytest.raises(PatreonStateInvalid):
-        oauth.decode_state(config, tampered)
+        oauth.validate_state(config, tampered)
 
 
-def test_decode_state_signed_with_other_key_raises_invalid():
+def test_validate_state_signed_with_other_key_raises_invalid():
     signing_config = create_patreon_config()
     other_config = create_patreon_config()
-    state = oauth.encode_state(signing_config, TG_USER_ID)
+    state = oauth.encode_state(signing_config)
     with pytest.raises(PatreonStateInvalid):
-        oauth.decode_state(other_config, state)
+        oauth.validate_state(other_config, state)
 
 
 def test_authorization_url_carries_oauth_parameters():
     config = create_patreon_config(client_id="cid", redirect_uri="https://bot.example/patreon/callback")
-    url = oauth.authorization_url(config, TG_USER_ID)
+    url = oauth.authorization_url(config)
 
     parsed = urlparse(url)
     query = parse_qs(parsed.query)
@@ -121,26 +101,20 @@ def test_authorization_url_carries_oauth_parameters():
     assert query["client_id"] == ["cid"]
     assert query["redirect_uri"] == ["https://bot.example/patreon/callback"]
     assert query["scope"] == ["identity"]
-    # The state round-trips back to the same user id.
-    assert oauth.decode_state(config, query["state"][0]).tg_user_id == TG_USER_ID
+    oauth.validate_state(config, query["state"][0])
 
 
-def test_authorization_url_state_carries_message_id():
+def test_authorization_url_is_identical_for_every_caller_apart_from_the_state():
+    # Two users tapping Link Patreon account get URLs that differ only by the random state, so the
+    # URL itself cannot be attributed to whoever requested it.
     config = create_patreon_config()
-    url = oauth.authorization_url(config, TG_USER_ID, MESSAGE_ID)
+    first = parse_qs(urlparse(oauth.authorization_url(config)).query)
+    second = parse_qs(urlparse(oauth.authorization_url(config)).query)
 
-    state = parse_qs(urlparse(url).query)["state"][0]
-    decoded = oauth.decode_state(config, state)
-    assert decoded.tg_user_id == TG_USER_ID
-    assert decoded.message_id == MESSAGE_ID
-
-
-def test_authorization_url_without_message_id_decodes_to_none():
-    config = create_patreon_config()
-    url = oauth.authorization_url(config, TG_USER_ID)
-
-    state = parse_qs(urlparse(url).query)["state"][0]
-    assert oauth.decode_state(config, state).message_id is None
+    assert first["state"] != second["state"]
+    assert {key: value for key, value in first.items() if key != "state"} == {
+        key: value for key, value in second.items() if key != "state"
+    }
 
 
 def test_campaign_pledge_url_uses_campaign_id():

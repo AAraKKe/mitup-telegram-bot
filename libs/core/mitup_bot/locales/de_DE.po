@@ -851,6 +851,12 @@ msgstr "👥 Der Hosts-Gruppe beitreten"
 msgid "ButtonMessages.HOSTS_GROUP_OPEN"
 msgstr "👥 Hosts-Gruppe öffnen"
 
+msgid "ButtonMessages.CONFIRM_PATREON_LINK"
+msgstr "Dieses Konto verbinden"
+
+msgid "ButtonMessages.DECLINE_PATREON_LINK"
+msgstr "Jetzt nicht"
+
 msgid "CollaborateMessages.NOT_LINKED"
 msgstr "<b>Hilf mit, Mitup am Laufen zu halten</b>\n\nMitup wird von zwei Brüdern gebaut, nicht von einem großen Unternehmen, und ist für alle kostenlos. Deine Unterstützung bezahlt die Server, die Datenbank und die langen Debugging-Nächte. Jede Hilfe zählt: erzähl deinen Freunden von Mitup, übersetze, melde Fehler oder unterstütze das Projekt finanziell. Die Seite ${collaborate_page} auf unserer Website zeigt alle Wege mitzuhelfen.\n\nDer direkteste Weg zu helfen ist, Mitup-Host auf Patreon zu werden. Als Dankeschön bekommen Hosts ein Abzeichen neben ihrem Namen, eine Gruppe nur für Mitglieder und höhere Limits je nach Stufe: Brewer, Gamemaster oder Commissioner. Die Seite ${limits_page} zeigt, was jede Stufe freischaltet.\n\nVerknüpfe dein Patreon-Konto, um loszulegen, und danke, dass du da bist."
 
@@ -871,6 +877,33 @@ msgstr "<b>🎲 Du bist ein Gamemaster</b>\n\nDanke, dass du Mitup unterstützt.
 
 msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
 msgstr "<b>🏆 Du bist ein Commissioner</b>\n\nDanke, dass du Mitup unterstützt. Dein Commissioner-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest. Du kannst dein Patreon-Konto jederzeit trennen."
+
+msgid "CollaborateMessages.LINK_CONFIRM"
+msgstr "<b>${patreon_name}</b>\n\nDas ist das Patreon-Konto, das dieser Link mit Mitup verbinden würde.\n\nDu solltest das hier nur sehen, wenn du gerade eben selbst Mitup auf Patreon freigegeben hast. Wenn du das nicht gerade getan hast, ist der Link von jemand anderem in diesem Chat gelandet.\n\nVerbinde es also nur, wenn du den Namen erkennst, und tippe auf Jetzt nicht, wenn er dir nichts sagt. So oder so ändert sich nichts, bis du bestätigst."
+
+msgid "CollaborateMessages.LINK_CONFIRM_REPLACES"
+msgstr "<b>${patreon_name}</b>\n\nDas ist das Patreon-Konto, das dieser Link mit Mitup verbinden würde, und im Moment ist bereits ein anderes Patreon-Konto verbunden.\n\nDu bist heute ein ${current_tier}. Wenn du dieses Konto verbindest, gibst du das auf: Dein ${current_tier}-Abzeichen und deine höheren Limits gehen aus, und das Patreon-Konto, mit dem du Mitup wirklich unterstützt, zählt nicht mehr. Du bezahlst weiter dafür und hast nichts mehr davon.\n\nDu solltest das hier nur sehen, wenn du gerade eben selbst Mitup auf Patreon freigegeben hast. Wenn du das nicht gerade getan hast, ist der Link von jemand anderem in diesem Chat gelandet, und eine Bestätigung würde dich deine ${current_tier}-Vorteile kosten, ohne dass du etwas dafür bekommst.\n\nMach das also nur, wenn du den Namen oben als dein eigenes Patreon-Konto erkennst. Tippe auf Jetzt nicht, dann ändert sich nichts."
+
+msgid "CollaborateMessages.LINK_DECLINED"
+msgstr "<b>Nichts verbunden</b>\n\nEs wurde kein Patreon-Konto verbunden und an deinem Konto hat sich nichts geändert. Du kannst dein eigenes Patreon-Konto jederzeit über Mithelfen verknüpfen."
+
+msgid "CollaborateMessages.LINK_CODE_NOT_VALID"
+msgstr "<b>Dieser Bestätigungslink funktioniert nicht mehr</b>\n\nBestätigungslinks lassen sich nur einmal verwenden und laufen schnell ab, dieser hier ist nicht mehr gültig. An deinem Konto hat sich nichts geändert. Öffne Mithelfen, um dein Patreon-Konto erneut zu verknüpfen, dann bekommst du einen frischen Link."
+
+msgid "CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE"
+msgstr "<b>Dieses Patreon-Konto ist bereits verbunden</b>\n\nEin Patreon-Konto kann immer nur ein Mitup-Konto unterstützen, und dieses hier ist mit einem anderen Mitup-Konto verbunden, deshalb hat sich hier nichts geändert. Wenn dir das andere Konto auch gehört, öffne dort Mithelfen und trenne die Verknüpfung zuerst, dann bestätige noch einmal aus diesem Chat. Wenn es dir nicht gehört, melde dich bei uns und wir klären das gemeinsam mit dir."
+
+msgid "CollaborateMessages.LINK_NEEDS_SETUP"
+msgstr "<b>Richte Mitup zuerst fertig ein</b>\n\nSende /start, um dein Konto einzurichten, und tippe dann noch einmal auf den Bestätigungslink, um dein Patreon-Konto zu verbinden. Der Link bleibt noch ein paar Minuten gültig."
+
+msgid "CollaborateMessages.TIER_NAME_HOST_1"
+msgstr "Brewer"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_2"
+msgstr "Gamemaster"
+
+msgid "CollaborateMessages.TIER_NAME_HOST_3"
+msgstr "Commissioner"
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
 msgstr ""

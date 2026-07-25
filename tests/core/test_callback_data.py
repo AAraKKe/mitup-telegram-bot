@@ -5,11 +5,13 @@ import pytest
 
 from mitup_bot.callback_data import (
     CallbackData,
+    CodeCallbackData,
     DateCallbackData,
     MeetingCallbackData,
     MeetingListSource,
     PaginatedCallbackData,
 )
+from mitup_bot.patreon.pairing import generate_pairing_code
 
 
 @pytest.mark.parametrize(
@@ -209,3 +211,45 @@ def test_paginated_callback_data_with_id_keeps_wire_format_of_plain_callback():
 def test_callback_data_is_malformed(id: int | None, entity: str, expected: bool):
     cb = CallbackData(action="show", entity=entity, id=id)
     assert cb.is_malformed() is expected
+
+
+# --- CodeCallbackData: addressed by an unguessable code instead of a record id ---
+
+CODE_CALLBACK = CodeCallbackData(action="confirm", entity="pl")
+
+
+def test_code_callback_data_str_carries_the_code_and_no_id():
+    assert str(CODE_CALLBACK.with_code("xLd2-mQ7_a")) == "confirm;pl:;code:xLd2-mQ7_a"
+
+
+def test_code_callback_data_round_trips_through_its_pattern():
+    original = CODE_CALLBACK.with_code("xLd2-mQ7_a")
+
+    parsed = CodeCallbackData.parse(re.match(CODE_CALLBACK.pattern, str(original)))
+
+    assert parsed.code == "xLd2-mQ7_a"
+    assert parsed.action == "confirm"
+    assert parsed.entity == "pl"
+    # A row id would be a small guessable integer, so the wire format never carries one.
+    assert parsed.id is None
+
+
+def test_code_callback_data_accepts_the_whole_base64url_alphabet():
+    code = "AZaz09-_"
+    parsed = CodeCallbackData.parse(re.match(CODE_CALLBACK.pattern, str(CODE_CALLBACK.with_code(code))))
+    assert parsed.code == code
+
+
+@pytest.mark.parametrize("code", [None, ""])
+def test_code_callback_data_without_a_code_is_malformed(code: str | None):
+    assert CodeCallbackData(action="confirm", entity="pl", code=code).is_malformed()
+
+
+def test_code_callback_data_with_a_code_is_well_formed():
+    assert not CODE_CALLBACK.with_code("xLd2").is_malformed()
+
+
+def test_a_full_length_pairing_code_fits_telegrams_callback_budget():
+    # Telegram caps callback data at 64 bytes, and the code alone spends 32 of them.
+    largest = CODE_CALLBACK.with_code(generate_pairing_code())
+    assert len(str(largest).encode()) <= 64

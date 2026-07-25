@@ -3,7 +3,13 @@ While custom CallbackData classes can be crated, it is common to use the same se
 instances throughout the entire bot.
 """
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData, MeetingCallbackData, PaginatedCallbackData
+from mitup_bot.callback_data import (
+    CallbackData,
+    CodeCallbackData,
+    DateCallbackData,
+    MeetingCallbackData,
+    PaginatedCallbackData,
+)
 
 # Empty callback data. Inline keyboards are forced to include some callback data but sometimes
 # we just need a button for display purposes (i.e. CalendarKeyboard)
@@ -117,6 +123,12 @@ SETTINGS = CallbackData(entity="settings")
 HELP = CallbackData(entity="help")
 COLLABORATE = CallbackData(entity="collaborate")
 UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
+# The link-confirmation pair. Addressed by the pairing code rather than the pending row's id:
+# callback data is client-supplied, and a row id is a small guessable integer, so a forged button
+# could otherwise name somebody else's pending link. The entity is kept to two characters because
+# the code already spends 32 of the 64 bytes Telegram allows.
+CONFIRM_PATREON_LINK = CodeCallbackData(action="confirm", entity="pl")
+DECLINE_PATREON_LINK = CodeCallbackData(action="decline", entity="pl")
 
 # ----------------------------------------
 # Settings callbacks
