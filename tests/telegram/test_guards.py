@@ -514,6 +514,102 @@ async def test_meeting_or_public_raises_not_owned_for_private_meeting_of_somebod
     assert_renders_nothing(context)
 
 
+async def test_meeting_or_public_returns_public_meeting_for_caller_without_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    metrics: MetricAssertions,
+):
+    """Being public is the whole permission, so a Telegram user with no row gets the meeting."""
+    public_meeting = create_meetup(id=42, owner=other_owner(), title="Open to all", public=True)
+    mock_session.add_object(public_meeting)
+
+    result = await guards.meeting(
+        mock_session,
+        None,
+        42,
+        "share meeting",
+        context,
+        access=MeetingAccess.OWNER_OR_PUBLIC,
+    )
+    await context.flush_metrics()
+
+    assert result == public_meeting
+    # No account means no ownership decision, so the series stays untouched.
+    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"))
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_raises_not_owned_for_private_meeting_of_caller_without_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+):
+    """A caller with no account owns nothing, so a non-public meeting is somebody else's by default."""
+    mock_session.add_object(create_meetup(id=42, owner=other_owner(), title="Private"))
+
+    with pytest.raises(MeetingNotOwnedError) as raised:
+        await guards.meeting(
+            mock_session,
+            None,
+            42,
+            "share meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_PUBLIC,
+        )
+
+    error = raised.value
+    # There is no account to read a language preference from, and none to name in the log line.
+    assert error.lang == TranslationEngine.FALLBACK_LANG
+    assert (
+        str(error) == "User tried 'share meeting' with a meeting that does not belong to them. "
+        "Meeting id: 42, user id: anonymous"
+    )
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_raises_gone_for_caller_without_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+):
+    with pytest.raises(MeetingGoneError) as raised:
+        await guards.meeting(
+            mock_session,
+            None,
+            999,
+            "share meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_PUBLIC,
+        )
+
+    error = raised.value
+    assert error.lang == TranslationEngine.FALLBACK_LANG
+    assert (
+        str(error) == "User tried 'share meeting' with a meeting that does not exist. "
+        "Meeting id: 999, user id: anonymous"
+    )
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_raises_not_owned_for_inactive_public_meeting_without_account(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+):
+    """A finished meeting is past sharing: the public flag stops mattering once it is inactive."""
+    mock_session.add_object(create_meetup(id=42, owner=other_owner(), title="Finished", public=True, active=False))
+
+    with pytest.raises(MeetingNotOwnedError) as raised:
+        await guards.meeting(
+            mock_session,
+            None,
+            42,
+            "share meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_PUBLIC,
+        )
+
+    assert raised.value.lang == TranslationEngine.FALLBACK_LANG
+    assert_renders_nothing(context)
+
+
 # --- Shared surfaces ------------------------------------------------------------------------------
 
 

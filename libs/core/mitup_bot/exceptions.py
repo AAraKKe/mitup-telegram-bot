@@ -72,6 +72,15 @@ class ChosenInlineResultNotSet(GuardError):
         super().__init__(f"Expected chosen inline result in Telegram Update not available: {update.to_json()}")
 
 
+def rejected_caller_text(user_db_id: int | None) -> str:
+    """Render the rejected caller for a meeting-rejection message.
+
+    The surfaces open to a Telegram user with no account have no row to name, so the log line says
+    so explicitly rather than printing a bare ``None`` a reader could mistake for a lookup failure.
+    """
+    return "anonymous" if user_db_id is None else str(user_db_id)
+
+
 class MeetingAccessError(GuardError):
     """Base class for the answers ``guards.meeting`` gives a caller it stops.
 
@@ -91,12 +100,17 @@ class MeetingAccessError(GuardError):
 
 
 class MeetingGoneError(MeetingAccessError):
-    """The meeting the caller addressed does not resolve to a row."""
+    """The meeting the caller addressed does not resolve to a row.
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str, keyboard: Keyboard | None = None):
+    ``user_db_id`` is ``None`` when the caller has no account, which the share surface allows.
+    """
+
+    def __init__(
+        self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str, keyboard: Keyboard | None = None
+    ):
         super().__init__(
             f"User tried {action!r} with a meeting that does not exist. "
-            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,
@@ -107,13 +121,14 @@ class MeetingGoneError(MeetingAccessError):
 class MeetingNotOwnedError(MeetingAccessError):
     """The caller holds none of the access the requested profile lets through.
 
-    Carries no keyboard: the screen is the main menu, which navigates on its own.
+    Carries no keyboard: the screen is the main menu, which navigates on its own. ``user_db_id`` is
+    ``None`` when the caller has no account, which the share surface allows.
     """
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str):
+    def __init__(self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str):
         super().__init__(
             f"User tried {action!r} with a meeting that does not belong to them. "
-            f"Meeting id: {meeting_id}, user id: {user_db_id}",
+            f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,

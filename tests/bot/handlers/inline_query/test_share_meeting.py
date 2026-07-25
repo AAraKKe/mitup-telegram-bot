@@ -3,7 +3,9 @@ from telegram import Update
 
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import InlineQueryMessages
 from mitup_bot.views import MitupInlineView
 from mitup_bot.views import meeting as meeting_views
@@ -86,10 +88,137 @@ async def test_share_meeting(
         )
         metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.SHARE_MEETING)})
     else:
+        # The placeholder is the error handler's answer to the guard rejection, rendered in the
+        # sharer's language because the rejection carries it.
         context.api.assert_answer_inline_query_called(
             update=update, results=[meeting_unavailable_view(user.lang)], cache_time=0
         )
         metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
+
+    # A rejection closes the interaction like a handler that ran to the end: whichever way the query
+    # is answered, the fault series carries a single zero and no fault datapoint.
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query="456")], indirect=True)
+async def test_share_meeting_public_meeting_by_unregistered_user(
+    update: Update,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A public meeting card carries a Share button in group chats, so the sharer may be any Telegram
+    user — including one who never started the bot and therefore has no row in the database."""
+    owner = create_user(id=999, tg_user_id=999, first_name="Owner")
+    mock_session.add_user(owner)
+    meetup = create_meetup(456, "Public Meeting", owner=owner, public=True)
+    mock_session.add_object(meetup)
+    mock_session.commit()
+
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
+    await context.flush_metrics()
+
+    _, kwargs = context.api.call_args("answer_inline_query")
+    shared = kwargs["results"][0]
+    assert shared.id == "456"
+    assert shared.title == "Public Meeting"
+    context.api.assert_answer_inline_query_called(
+        update=update, results=[meeting_views.inline_view(meetup)], cache_time=0
+    )
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.SHARE_MEETING)})
+    # Sharing without an account is a normal interaction: no user row is created and nothing faults.
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    mock_session.assert_not_added()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query="457")], indirect=True)
+async def test_share_meeting_non_public_meeting_by_unregistered_user(
+    update: Update,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A user without a profile owns nothing, so a non-public meeting stays behind the placeholder."""
+    owner = create_user(id=999, tg_user_id=999, first_name="Owner")
+    mock_session.add_user(owner)
+    meetup = create_meetup(457, "Private Meeting", owner=owner, public=False)
+    mock_session.add_object(meetup)
+    mock_session.commit()
+
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
+    await context.flush_metrics()
+
+    _, kwargs = context.api.call_args("answer_inline_query")
+    answered = kwargs["results"][0]
+    assert answered.id == "meeting_unavailable"
+    assert "Private Meeting" not in answered.title
+    # The rejection carries no account to read a language from, so the error handler renders the
+    # placeholder in the fallback language.
+    context.api.assert_answer_inline_query_called(
+        update=update, results=[meeting_unavailable_view(TranslationEngine.FALLBACK_LANG)], cache_time=0
+    )
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
+    # A stranger reaching a private meeting is a rejection, not a fault: it lands on the ownership
+    # series and closes the interaction at zero faults.
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    mock_session.assert_not_added()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query="458")], indirect=True)
+async def test_share_meeting_public_meeting_by_pending_deletion_user(
+    update: Update,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A user marked for deletion counts as unregistered: a public meeting still resolves on its own flag."""
+    marked_user = create_user(id=1, tg_user_id=123, first_name="Test", status=UserStatus.DELETION_REQUESTED)
+    mock_session.add_user(marked_user)
+    owner = create_user(id=999, tg_user_id=999, first_name="Owner")
+    meetup = create_meetup(458, "Public Meeting", owner=owner, public=True)
+    mock_session.add_object(meetup)
+    mock_session.commit()
+
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
+    await context.flush_metrics()
+
+    _, kwargs = context.api.call_args("answer_inline_query")
+    shared = kwargs["results"][0]
+    assert shared.id == "458"
+    assert shared.title == "Public Meeting"
+    context.api.assert_answer_inline_query_called(
+        update=update, results=[meeting_views.inline_view(meetup)], cache_time=0
+    )
+    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.SHARE_MEETING)})
+    # The dying account is never touched: the meeting resolves on its own flag, with no fault and no
+    # pending-deletion alert to answer the query with.
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(inline_query="459")], indirect=True)
+async def test_share_meeting_own_meeting_by_pending_deletion_user(
+    update: Update,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A user marked for deletion must not share anything tied to the dying account, ownership included."""
+    marked_user = create_user(id=1, tg_user_id=123, first_name="Test", status=UserStatus.DELETION_REQUESTED)
+    mock_session.add_user(marked_user)
+    meetup = create_meetup(459, "Own Meeting", owner=marked_user, public=False)
+    mock_session.add_object(meetup)
+    mock_session.commit()
+
+    context, _ = await call_handler(InlineQueryId.SHARE_MEETING, handler_context=handler_context)
+    await context.flush_metrics()
+
+    context.api.assert_answer_inline_query_called(
+        update=update, results=[meeting_unavailable_view(TranslationEngine.FALLBACK_LANG)], cache_time=0
+    )
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
+    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
 
 @pytest.mark.parametrize(

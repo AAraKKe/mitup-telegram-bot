@@ -72,12 +72,25 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
 @HandlersRegistry.register_inline_handler(InlineQueryId.SHARE_MEETING, pattern=r"\d+")
 @with_session
 async def share_meeting(session: AsyncSession, update: Update, context: TMitupContext):
+    """Answer an inline query that shares one meeting, identified by its id in the query.
+
+    This handler can be triggered by any Telegram user, whether or not they have a mitup profile:
+    a public meeting resolves for anyone, a non-public one only for its owner, and everything else
+    is answered with the unavailable placeholder. The shared card renders in the meeting's own
+    language, so the sharer's language only drives that card.
     """
-    Handle an inline query to share a meeting.
-    TODO: Right now we are only allowing existing users to share a meeting. We should allow non-existing users to
-    share a meeting as well when public meeting feature is implemented.
-    """
-    user = await guards.current_user(update, session)
+    # load_collections=False: nothing here traverses the sharer's own meetings — ownership is decided
+    # on the meeting's owner leaf.
+    user = (
+        await User.by_tg_user_id(session, update.effective_user.id, load_collections=False)
+        if update.effective_user
+        else None
+    )
+    if user is not None and user.status is UserStatus.DELETION_REQUESTED:
+        # A user marked for deletion must not share meetings tied to the dying account; treating them
+        # as unregistered still lets a public meeting through on its own flag.
+        user = None
+
     meeting_id = await guards.shareable_meeting_id(update, context)
     if meeting_id is None:
         return

@@ -859,6 +859,11 @@ CONTEXTS = [
     #     declare USER_PENDING_DELETION below: the rejection escapes their UserNotFound catch.
     #   - MeetingHandlerId.INVITE_USERS_CALLBACK: uses guards.user_registered, which answers the
     #     callback query with an alert instead of raising when the user is unregistered.
+    #   - InlineQueryId.SHARE_MEETING: a public meeting card carries a Share button for every reader
+    #     of the chat, so the sharer resolves optionally and an unregistered one is a valid case that
+    #     reaches guards.meeting with no user. A user marked for deletion is collapsed to the same
+    #     anonymous caller instead of raising, so neither USER_NOT_FOUND nor USER_PENDING_DELETION
+    #     applies. Both are covered in tests/bot/handlers/inline_query/test_share_meeting.py.
     #
     # --- /start and registration-process handlers ---
     Context(
@@ -1228,10 +1233,12 @@ CONTEXTS = [
         id="wrong_time_message",
     ),
     # --- Inline query ---
+    # Registered-sharer coverage only: the unregistered sharer is a valid case here, not a fault
+    # (see the documented exclusions above).
     Context(
         handler_id=InlineQueryId.SHARE_MEETING,
         update_request=UpdateRequest(inline_query=str(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        error_modes={ErrorMode.MEETING_NOT_OWNED},
         id="inline_share_meeting",
     ),
     # --- Edit meeting title and description content steps ---

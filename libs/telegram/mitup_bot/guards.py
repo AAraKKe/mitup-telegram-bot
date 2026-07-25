@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import cast
+from typing import Literal, cast, overload
 
 import structlog
 from sqlmodel import select
@@ -255,6 +255,9 @@ class MeetingAccess(Enum):
     that render inactive meetings themselves (the past-meetings screens, reactivation, the delete
     flows): the meeting's state is never an obstacle there, and a meeting that cannot be resolved is
     rejected exactly like one the caller does not own.
+
+    `OWNER_OR_PUBLIC` is the only profile whose caller may have no account at all, since being public
+    is the whole permission it grants.
     """
 
     OWNER = auto()
@@ -263,9 +266,37 @@ class MeetingAccess(Enum):
     OWNER_ANY_STATE = auto()
 
 
+@overload
+async def meeting(
+    session: AsyncSession,
+    user: User | None,
+    meeting_id: int,
+    action: str,
+    context: TMitupContext,
+    *,
+    access: Literal[MeetingAccess.OWNER_OR_PUBLIC],
+    lock: bool = False,
+    custom_keyboard: Keyboard | None = None,
+) -> Meetup: ...
+
+
+@overload
 async def meeting(
     session: AsyncSession,
     user: User,
+    meeting_id: int,
+    action: str,
+    context: TMitupContext,
+    *,
+    access: MeetingAccess = ...,
+    lock: bool = False,
+    custom_keyboard: Keyboard | None = None,
+) -> Meetup: ...
+
+
+async def meeting(
+    session: AsyncSession,
+    user: User | None,
     meeting_id: int,
     action: str,
     context: TMitupContext,
@@ -283,6 +314,11 @@ async def meeting(
     each of those carries the screen's language and back-navigation rows, so the guard renders
     nothing itself and needs no `update`.
 
+    `user` is `None` only on `OWNER_OR_PUBLIC`, the surface a Telegram user with no account reaches:
+    such a caller owns nothing, so every ownership test short-circuits and the only way past the
+    guard is the meeting's own `public` flag. Their rejections carry the fallback language, since
+    there is no account to read a preference from.
+
     Participant- or capacity-mutating callers must pass `lock=True` so the meetup row (the
     per-meeting mutex) is locked before any capacity/waiting-list read, and so the ownership check
     itself runs on the locked row. Every decision the guard makes is meeting-rooted, so it never
@@ -290,10 +326,12 @@ async def meeting(
     documented in the guards skill.
     """
     found_meeting = await Meetup.by_id(session, meeting_id, for_update=lock)
+    lang = user.lang if user else TranslationEngine.FALLBACK_LANG
+    user_db_id = user.db_id if user else None
 
     if access is MeetingAccess.OWNER_ANY_STATE:
-        if found_meeting is None or not found_meeting.is_owned_by(user):
-            raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+        if found_meeting is None or user is None or not found_meeting.is_owned_by(user):
+            raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
         return found_meeting
 
@@ -301,13 +339,13 @@ async def meeting(
         raise MeetingGoneError(
             meeting_id=meeting_id,
             action=action,
-            user_db_id=user.db_id,
-            lang=user.lang,
+            user_db_id=user_db_id,
+            lang=lang,
             keyboard=custom_keyboard,
         )
 
     if not found_meeting.active:
-        if found_meeting.is_owned_by(user):
+        if user is not None and found_meeting.is_owned_by(user):
             raise MeetingInactiveOwnerError(
                 meeting_id=meeting_id,
                 action=action,
@@ -315,21 +353,21 @@ async def meeting(
                 lang=user.lang,
                 keyboard=custom_keyboard,
             )
-        raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+        raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
 
-    if found_meeting.is_owned_by(user):
+    if user is not None and found_meeting.is_owned_by(user):
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
         return found_meeting
 
     # The not-owned counter tracks ownership decisions, so a caller reaching a meeting they do not
     # own through one of the wider profiles leaves the series untouched.
-    if access is MeetingAccess.OWNER_OR_JOINED and found_meeting.has_participant(user.db_id):
+    if access is MeetingAccess.OWNER_OR_JOINED and user is not None and found_meeting.has_participant(user.db_id):
         return found_meeting
 
     if access is MeetingAccess.OWNER_OR_PUBLIC and found_meeting.public:
         return found_meeting
 
-    raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+    raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
 
 
 async def meeting_interaction_allowed(
