@@ -277,6 +277,7 @@ async def meeting(
     access: Literal[MeetingAccess.OWNER_OR_PUBLIC],
     lock: bool = False,
     custom_keyboard: Keyboard | None = None,
+    flow_context: MessageBase | None = None,
 ) -> Meetup: ...
 
 
@@ -291,6 +292,7 @@ async def meeting(
     access: MeetingAccess = ...,
     lock: bool = False,
     custom_keyboard: Keyboard | None = None,
+    flow_context: MessageBase | None = None,
 ) -> Meetup: ...
 
 
@@ -304,6 +306,7 @@ async def meeting(
     access: MeetingAccess = MeetingAccess.OWNER,
     lock: bool = False,
     custom_keyboard: Keyboard | None = None,
+    flow_context: MessageBase | None = None,
 ) -> Meetup:
     """Return the meeting the user may act on through the bot chat, or raise the rejection that
     says why they cannot — on which the handler is over and the error handler answers the caller.
@@ -322,8 +325,8 @@ async def meeting(
     Participant- or capacity-mutating callers must pass `lock=True` so the meetup row (the
     per-meeting mutex) is locked before any capacity/waiting-list read, and so the ownership check
     itself runs on the locked row. Every decision the guard makes is meeting-rooted, so it never
-    touches `user.meetups`/`user.joined_links`. Parameter mechanics such as `custom_keyboard` are
-    documented in the guards skill.
+    touches `user.meetups`/`user.joined_links`. Parameter mechanics such as `custom_keyboard` and
+    `flow_context` are documented in the guards skill.
     """
     found_meeting = await Meetup.by_id(session, meeting_id, for_update=lock)
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
@@ -331,7 +334,13 @@ async def meeting(
 
     if access is MeetingAccess.OWNER_ANY_STATE:
         if found_meeting is None or user is None or not found_meeting.is_owned_by(user):
-            raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
+            raise MeetingNotOwnedError(
+                meeting_id=meeting_id,
+                action=action,
+                user_db_id=user_db_id,
+                lang=lang,
+                flow_context=flow_context,
+            )
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
         return found_meeting
 
@@ -342,6 +351,7 @@ async def meeting(
             user_db_id=user_db_id,
             lang=lang,
             keyboard=custom_keyboard,
+            flow_context=flow_context,
         )
 
     if not found_meeting.active:
@@ -352,8 +362,11 @@ async def meeting(
                 user_db_id=user.db_id,
                 lang=user.lang,
                 keyboard=custom_keyboard,
+                flow_context=flow_context,
             )
-        raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
+        raise MeetingNotOwnedError(
+            meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang, flow_context=flow_context
+        )
 
     if user is not None and found_meeting.is_owned_by(user):
         context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
@@ -367,7 +380,9 @@ async def meeting(
     if access is MeetingAccess.OWNER_OR_PUBLIC and found_meeting.public:
         return found_meeting
 
-    raise MeetingNotOwnedError(meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang)
+    raise MeetingNotOwnedError(
+        meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang, flow_context=flow_context
+    )
 
 
 async def meeting_interaction_allowed(
@@ -516,7 +531,13 @@ async def shared_meeting(
 
 
 async def conversation_meeting(
-    session: AsyncSession, user: User, meeting_id: int, action: str, *, lock: bool = False
+    session: AsyncSession,
+    user: User,
+    meeting_id: int,
+    action: str,
+    *,
+    lock: bool = False,
+    flow_context: MessageBase | None = None,
 ) -> Meetup:
     """Return the active meeting an in-flight conversation is about, or raise `MeetingGoneError`.
 
@@ -527,10 +548,14 @@ async def conversation_meeting(
 
     Pass `lock=True` from the step that commits the flow's write, as for `meeting`: the row lock is
     then held from this read through the capacity decision and the insert that follows it.
+    `flow_context` travels to the rejection screen as for `meeting`, and is where a mid-flow step
+    names the flow the caller is being taken out of.
     """
     found_meeting = await Meetup.by_id(session, meeting_id, include_inactive=False, for_update=lock)
     if found_meeting is None:
-        raise MeetingGoneError(meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang)
+        raise MeetingGoneError(
+            meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang, flow_context=flow_context
+        )
     return found_meeting
 
 

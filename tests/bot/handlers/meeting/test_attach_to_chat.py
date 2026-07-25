@@ -8,6 +8,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import MeetingAttachMessages, MeetingDisplayMessages
+from mitup_bot.views import MitupView
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -201,10 +202,13 @@ async def test_attach_to_chat_meeting_not_found(
 
     context, _ = await call_handler(MeetingHandlerId.ATTACH_TO_CHAT, handler_context=handler_context)
 
-    # The user has been notified that the meeting was deleted
+    # The user has been notified that the meeting was deleted. The tapped card is an inline message,
+    # which can sit in any chat, so the banner that replaces it carries no navigation.
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+        view=MitupView(
+            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang), keyboard=[]
+        ),
     )
 
     # Stale meeting metric emitted

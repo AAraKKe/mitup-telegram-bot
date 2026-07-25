@@ -404,11 +404,11 @@ msgstr "<b>Sem Vagas</b>\n\nA lista de convidados está cheia. Você não pode a
 msgid "MeetingInviteMessages.INVITES_DISABLED"
 msgstr "<b>Lista de Convidados Fechada</b>\n\nNão são mais permitidas novas adições para este evento. O organizador fechou a lista."
 
-msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
-msgstr "<b>Isso Foi Inesperado...</b>\n\nPerdi o controle dos detalhes do evento. Isso não deveria acontecer.\n\nPor favor, tente enviar o nome novamente."
-
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Evento Não Encontrado</b>\n\nO evento para o qual você está tentando convidar alguém não existe mais."
+
+msgid "MeetingInviteMessages.FLOW_CONTEXT"
+msgstr "Você estava no meio do processo de convidar alguém."
 
 msgid "MeetingInviteMessages.CANCELED"
 msgstr "O processo de convite foi cancelado."

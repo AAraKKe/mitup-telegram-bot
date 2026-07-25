@@ -9,6 +9,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingJoinMessages, PrivacyMessages
 from mitup_bot.views import MitupView
+from mitup_bot.views import factory as views_factory
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -258,10 +259,14 @@ async def test_user_join_for_non_existing_meeting(
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
-    # The user has been notified
+    # The user has been notified. The tap happened in the bot's own chat, so the banner that replaces
+    # the card is the whole screen and offers the way back to the main menu.
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+        view=MitupView(
+            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+            keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
+        ),
     )
 
 
@@ -430,10 +435,14 @@ async def test_user_leave_for_non_existing_meeting(
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
-    # The user has been notified
+    # The user has been notified. The tap happened in the bot's own chat, so the banner that replaces
+    # the card is the whole screen and offers the way back to the main menu.
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+        view=MitupView(
+            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+            keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
+        ),
     )
 
 
@@ -489,12 +498,12 @@ async def test_action_on_inactive_meeting_shows_finished_message(
 
     context, _ = await call_handler(handler_id, handler_context=handler_context)
 
-    # The "meeting has finished" message is shown with no buttons
+    # The "meeting has finished" banner replaces the card, with the main-menu row the bot chat gets
     context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MitupView(
             description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=inactive_meeting.lang),
-            keyboard=[],
+            keyboard=views_factory.main_menu_back_rows(inactive_meeting.lang),
         ),
     )
 

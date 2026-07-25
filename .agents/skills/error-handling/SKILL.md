@@ -96,7 +96,9 @@ The `private` flag distinguishes private chat errors (where we should mark inact
 
 ### Meeting guard rejections
 
-Every `MeetingAccessError` subclass (see the table above) is answered by `handle_meeting_access_error()` and never reaches the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, and the back-navigation `keyboard` — so no DB round-trip happens here. The guards render nothing themselves.
+Every `MeetingAccessError` subclass (see the table above) is answered by `handle_meeting_access_error()` and never reaches the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, the back-navigation `keyboard`, and the optional `flow_context` — so no DB round-trip happens here. The guards render nothing themselves.
+
+A `flow_context` (see the `guards` skill) is rendered by `meeting_access_view()` as one extra sentence at the end of the screen's description. It never changes the reply shape: still one reply, in whichever shape the table below picks. A rejection that carries none renders the screen exactly as its reason defines it.
 
 For the bot-chat rejections the reply shape comes from the update, not from the exception:
 
@@ -115,6 +117,8 @@ The `SharedMeetingError` subclasses come from a tap on a meeting card that may s
 | `SharedMeetingDeniedError` | `answer_callback_query` alert with the deleted-meeting copy; the card is left alone | `UNAUTHORIZED_MEETING_CALLBACK` |
 
 `SHARED_MEETING_METRICS` maps the rejection type to its counter; a rejection absent from it emits none.
+
+The two banner edits take their keyboard from `shared_banner_keyboard()`: in the bot's own chat the banner is the whole screen the user is left on, so it carries the main-menu row; in a group, a supergroup, a channel, or an inline message (which carries no chat at all) the banner replaces the card in place with no keyboard. The denial is unaffected — the card is never touched.
 
 Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch emits `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `ERROR/MeetingNotOwned`; `MeetingGoneError` and `SharedMeetingDeniedError` log the warning only; `MeetingInactiveOwnerError`, `SharedMeetingGoneError` and `SharedMeetingFinishedError` do neither, since a stale card and the reactivation prompt say nothing about the caller's intent.
 

@@ -419,11 +419,11 @@ msgstr "<b>Sen lugares</b>\n\nA lista de convidados está chea. Non podes engadi
 msgid "MeetingInviteMessages.INVITES_DISABLED"
 msgstr "<b>Lista de convidados pechada</b>\n\nNon se permiten novas adicións nesta quedada. O organizador pechou a lista."
 
-msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
-msgstr "<b>Iso foi inesperado...</b>\n\nDe súpeto perdin pista dos detalles da quedada. Isto non debería pasar.\n\nPor favor intenta enviar o nome de novo."
-
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Quedada non atopada</b>\n\nA quedada á que intentas convidar a alguén non existe."
+
+msgid "MeetingInviteMessages.FLOW_CONTEXT"
+msgstr "Estabas a convidar a alguén."
 
 msgid "MeetingInviteMessages.CANCELED"
 msgstr "O proceso de invitación foi cancelado."

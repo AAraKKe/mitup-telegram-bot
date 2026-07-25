@@ -532,14 +532,16 @@ class MeetingInviteMessages(MessageBase):
         "<b>Guest List Closed</b>\n\n"
         "New additions are no longer allowed for this meeting. The organizer has closed the list."
     )
-    MEETING_LOST_RETRY = (
-        "<b>That Was Unexpected...</b>\n\n"
-        "I suddenly lost track of the meeting details. This shouldn't happen.\n\n"
-        "Please try sending the name again."
-    )
+    # Naming the action ("the meeting you are trying to invite someone to") is deliberate: the invite
+    # flow is entered from a card that may sit in any chat and answered in the bot chat, so its copy
+    # has to reconnect the reader to what they were doing. It is not interchangeable with the generic
+    # deleted-meeting copy.
     MEETING_NOT_FOUND = (
         "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
     )
+    # Appended to the rejection screen when the invite flow's mid-flow guard stops the caller, so the
+    # screen that replaces their prompt says which flow it ended.
+    FLOW_CONTEXT = "You were in the middle of inviting someone."
     CANCELED = "The invitation process has been canceled."
     ADD_FAILED_RETRY = "Something unexpected happened while adding the invited user. Please try again."
 

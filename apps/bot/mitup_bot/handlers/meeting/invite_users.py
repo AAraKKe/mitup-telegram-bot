@@ -178,7 +178,16 @@ async def invite_users_name_message_handler(
         return ConversationHandler.END
 
     with context.meeting_id(ContextId.INVITE_USERS, ensure_clean=False) as meeting_id:
-        meeting = await guards.conversation_meeting(session, user, meeting_id, "invite users to a meeting")
+        # flow_context: the user is typing a name in the bot chat, so a meeting that stops resolving
+        # here replaces their prompt with a screen that says nothing about the invite they were in
+        # the middle of. The sentence rejoins the two.
+        meeting = await guards.conversation_meeting(
+            session,
+            user,
+            meeting_id,
+            "invite users to a meeting",
+            flow_context=MeetingInviteMessages.FLOW_CONTEXT,
+        )
         if not await ensure_invitations_open(context, user, meeting):
             # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(

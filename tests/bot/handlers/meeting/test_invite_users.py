@@ -131,7 +131,11 @@ async def test_invite_with_id_of_meeting_does_not_exist(
     user_with_settings: User,
     mock_session: MockDbSession,
 ):
-    """The invite button on a card whose meeting is gone gets the same answer join and leave give it."""
+    """The invite button on a card whose meeting is gone gets the same answer join and leave give it.
+
+    The conversation runs in the bot's own chat, so the banner that replaces the card there carries the
+    main-menu row: it is the whole screen the user is left looking at.
+    """
     mock_session.add_user(user_with_settings)
     steps = [
         ConversationStep.callback(cb.INVITE.with_id(MEETING_ID)),
@@ -144,7 +148,10 @@ async def test_invite_with_id_of_meeting_does_not_exist(
 
     result.last_context.api.assert_edit_message_called(
         update=result.last_context.get_update(),
-        view=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+        view=MitupView(
+            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+            keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
+        ),
     )
     MetricAssertions(result.last_context.metrics).assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
 
@@ -595,6 +602,9 @@ async def test_meeting_disappears_mid_conversation(
 
     The rejection aborts the step, so it returns no state and the conversation stays where it was —
     what every guard exception does. The screen it lands on navigates out of the flow.
+
+    The name step opts into the flow context, so its screen also names the invite the user was in the
+    middle of; the confirmation step does not, and gets the plain screen.
     """
     setup_db(mock_session, user_with_settings, meeting)
     steps[deactivate_after_step].after = partial(deacivate_meeting, meeting)
@@ -603,11 +613,15 @@ async def test_meeting_disappears_mid_conversation(
 
     final_context = result.last_context
     update = final_context.get_update()
-    expected_view = views_factory.deleted_meeting_view(RenderContext(lang=user_with_settings.lang))
+    lang = user_with_settings.lang
+    expected_view = views_factory.deleted_meeting_view(RenderContext(lang=lang))
     if update.callback_query is not None:
         final_context.api.assert_edit_message_called(update=update, view=expected_view)
     else:
-        final_context.api.assert_send_message_called(update=update, view=expected_view)
+        final_context.api.assert_send_message_called(
+            update=update,
+            view=expected_view.with_footnote(MeetingInviteMessages.FLOW_CONTEXT.get(lang=lang)),
+        )
 
     assert len(meeting.joined_links) == 0
 

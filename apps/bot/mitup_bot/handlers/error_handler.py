@@ -2,7 +2,7 @@ import structlog
 from rich.console import Console
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram import Update
+from telegram import Chat, Update
 from telegram.error import BadRequest
 
 from mitup_bot import db, guards
@@ -21,6 +21,7 @@ from mitup_bot.exceptions import (
     SharedMeetingGoneError,
     UserPendingDeletion,
 )
+from mitup_bot.keyboards import Keyboard
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
@@ -86,12 +87,38 @@ async def handle_pending_deletion_user(context: TMitupContext, error: UserPendin
 
 
 def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupView:
-    """Build the screen that answers a meeting rejection, one per rejection reason."""
+    """Build the screen that answers a meeting rejection, one per rejection reason.
+
+    A rejection raised mid-flow carries a `flow_context`, which is added as one sentence at the end of
+    the screen's description: the screen alone says what happened to the meeting, not which of the
+    user's own steps it interrupted. It is the same single reply either way — a rejection without a
+    flow context renders exactly the screen its reason stands for.
+    """
     if isinstance(error, MeetingGoneError):
-        return factory.deleted_meeting_view(ctx, back_rows=error.keyboard)
-    if isinstance(error, MeetingInactiveOwnerError):
-        return factory.reactivation_prompt_view(ctx, meeting_id=error.meeting_id, back_rows=error.keyboard)
-    return factory.main_menu_view(ctx)
+        view = factory.deleted_meeting_view(ctx, back_rows=error.keyboard)
+    elif isinstance(error, MeetingInactiveOwnerError):
+        view = factory.reactivation_prompt_view(ctx, meeting_id=error.meeting_id, back_rows=error.keyboard)
+    else:
+        view = factory.main_menu_view(ctx)
+
+    if error.flow_context is None:
+        return view
+    return view.with_footnote(error.flow_context.get(lang=error.lang))
+
+
+def shared_banner_keyboard(update: Update, lang: str) -> Keyboard:
+    """The rows a state banner carries in the chat the tapped card sits in.
+
+    In the bot's own chat the banner is the whole screen the user is left looking at, so it offers the
+    way back to the main menu. Anywhere else the card sits in a conversation between people: the
+    banner replaces it in place, keyboard-free, and the main menu is not a screen that belongs there.
+
+    An update whose card is an inline message carries no chat at all (Telegram sends only the
+    `inline_message_id`), and an inline card can sit in any chat — so an absent chat is treated as
+    "not the bot's chat" and the banner keeps no keyboard.
+    """
+    chat = update.effective_chat
+    return factory.main_menu_back_rows(lang) if chat is not None and chat.type == Chat.PRIVATE else []
 
 
 async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, error: SharedMeetingError):
@@ -100,7 +127,8 @@ async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, 
     A denial leaves the card alone and says so in an alert: it is answered with the deleted-meeting
     copy, so a rejection reveals nothing about the meeting's state — only that the id resolves, which
     sequential ids give away anyway. The other two rejections mean the card itself is out of date, so
-    it is replaced by the banner naming the state its meeting is in.
+    it is replaced by the banner naming the state its meeting is in, keyboarded by
+    `shared_banner_keyboard`.
     """
     if isinstance(error, SharedMeetingDeniedError):
         await context.api.answer_callback_query(
@@ -110,14 +138,15 @@ async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, 
         )
         return
 
-    if isinstance(error, SharedMeetingFinishedError):
-        await context.api.edit_message(
-            update=update,
-            view=MitupView(description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=error.lang), keyboard=[]),
-        )
-        return
-
-    await context.api.edit_message(update=update, view=MeetingDisplayMessages.DELETED_BANNER.get(lang=error.lang))
+    banner = (
+        MeetingDisplayMessages.FINISHED_BANNER
+        if isinstance(error, SharedMeetingFinishedError)
+        else MeetingDisplayMessages.DELETED_BANNER
+    )
+    await context.api.edit_message(
+        update=update,
+        view=MitupView(description=banner.get(lang=error.lang), keyboard=shared_banner_keyboard(update, error.lang)),
+    )
 
 
 async def deliver_meeting_access_screen(context: TMitupContext, update: Update, error: MeetingAccessError):

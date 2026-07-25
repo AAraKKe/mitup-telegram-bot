@@ -70,9 +70,9 @@ All guards that take a `session` are async — `await` them.
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` |
+| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None, flow_context=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` |
 | `shared_meeting` | `(session, user: User \| None, meeting_id, action, update, *, lock=False, require_active=True)` | `Meetup` | `SharedMeetingGoneError`, `SharedMeetingDeniedError`, `SharedMeetingFinishedError` |
-| `conversation_meeting` | `(session, user, meeting_id, action, *, lock=False)` | `Meetup` | `MeetingGoneError` |
+| `conversation_meeting` | `(session, user, meeting_id, action, *, lock=False, flow_context=None)` | `Meetup` | `MeetingGoneError` |
 | `meeting_interaction_allowed` | `(session, user: User \| None, meeting, update)` | `bool` | — (a predicate; `shared_meeting` raises on `False`) |
 
 All three guards raise instead of returning `None` and render nothing themselves — the global error handler owns every screen. Pick by where the caller reached the meeting from:
@@ -120,6 +120,8 @@ A non-owner is logged and counted on the `MeetingNotOwned` error metric; the del
 Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. The locked load resets the acting user's `meetups`/`joined_links` to unloaded, so a handler that both locks and opted into the collections must re-load them itself. See the `database` skill's "Per-meeting row locks" section for the full convention.
 
 `custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from. It travels to the renderer on the exception, so the guard never builds a screen itself.
+
+`flow_context` is the opt-in a mid-flow caller passes to `meeting` or `conversation_meeting`: a `MessageBase` member holding one sentence that names what the user was doing. It travels on the exception like `custom_keyboard`, and the error handler appends it to the description of the screen the rejection produces — the same single reply, one sentence longer. Pass it where the rejection interrupts a flow the screen would otherwise not mention (the invite conversation's typing step is the model); leave it out everywhere the screen already stands on its own, and those screens render exactly as they would without the parameter. The `SharedMeetingError` subclasses do not take it: what replaces a shared card is read by everybody in that chat, so it never carries a sentence about one reader's flow.
 
 ### Shared surfaces
 

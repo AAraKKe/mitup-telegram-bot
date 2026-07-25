@@ -1,6 +1,6 @@
 import pytest
 from structlog.testing import capture_logs
-from telegram import Update
+from telegram import Chat, Update
 from telegram.error import TelegramError
 
 from mitup_bot.config import Env
@@ -20,6 +20,7 @@ from mitup_bot.exceptions import (
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
     SharedMeetingDeniedError,
+    SharedMeetingError,
     SharedMeetingFinishedError,
     SharedMeetingGoneError,
     UserNotFound,
@@ -35,7 +36,13 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import CommonMessages, MeetingDisplayMessages, PrivacyMessages
+from mitup_bot.utils.messages import (
+    CommonMessages,
+    MeetingDisplayMessages,
+    MeetingInviteMessages,
+    MessageBase,
+    PrivacyMessages,
+)
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
@@ -48,7 +55,7 @@ from tests.helpers import (
     create_settings,
     create_user,
 )
-from tests.helpers.constants import DEFAULT_USER_ID
+from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_USER_ID
 from tests.helpers.fixtures import create_update
 from tests.helpers.monitoring import MetricAssertions
 
@@ -216,6 +223,9 @@ async def test_pending_deletion_returns_early_when_no_update(app: StubMitupApp, 
 
 BACK_ROWS: Keyboard = [[ButtonConfig(text="Back to the list", callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1))]]
 
+# The one flow that opts into a context sentence today; any MessageBase member would do here.
+INVITE_FLOW_CONTEXT = MeetingInviteMessages.FLOW_CONTEXT
+
 
 def meeting_rejections() -> list[tuple[MeetingAccessError, MitupView]]:
     """Every rejection `guards.meeting` raises, paired with the screen that answers it."""
@@ -365,6 +375,95 @@ async def test_meeting_gone_is_logged_without_touching_the_ownership_counter(
     assert [entry["event"] for entry in warnings] == [str(error)]
 
 
+def rejection_screens(flow_context: MessageBase | None) -> list[tuple[MeetingAccessError, MitupView]]:
+    """Each bot-chat rejection, paired with the screen it stands for before any sentence is appended."""
+    ctx = RenderContext(lang="en")
+    return [
+        (
+            MeetingGoneError(meeting_id=7, action="Edit title", user_db_id=1, lang="en", flow_context=flow_context),
+            factory.deleted_meeting_view(ctx),
+        ),
+        (
+            MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en", flow_context=flow_context),
+            factory.main_menu_view(ctx),
+        ),
+        (
+            MeetingInactiveOwnerError(
+                meeting_id=7, action="Edit title", user_db_id=1, lang="en", flow_context=flow_context
+            ),
+            factory.reactivation_prompt_view(ctx, meeting_id=7),
+        ),
+    ]
+
+
+FLOW_CONTEXT_PARAMS = [
+    pytest.param(error, view, id=type(error).__name__) for error, view in rejection_screens(INVITE_FLOW_CONTEXT)
+]
+
+PLAIN_SCREEN_PARAMS = [pytest.param(error, view, id=type(error).__name__) for error, view in rejection_screens(None)]
+
+
+@pytest.mark.parametrize("error, plain_view", FLOW_CONTEXT_PARAMS)
+async def test_flow_context_adds_one_sentence_to_the_same_screen(
+    app: StubMitupApp, mock_session: MockDbSession, error: MeetingAccessError, plain_view: MitupView
+):
+    """The flow sentence is appended to the screen the rejection already stands for: one reply, one edit."""
+    context = build_callback_context(app)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    delivered: MitupView = context.api.call_args("edit_message").kwargs["view"]
+    assert delivered.description.text == (f"{plain_view.description.text}\n\n{INVITE_FLOW_CONTEXT.get_text(lang='en')}")
+    # The screen itself is untouched: same buttons, and the formatting of the original copy survives.
+    assert delivered.keyboard == plain_view.keyboard
+    assert delivered.description.entities == plain_view.description.entities
+    context.api.assert_method_just_called("edit_message", times=1)
+    context.api.assert_send_message_not_called()
+
+
+@pytest.mark.parametrize("error, plain_view", PLAIN_SCREEN_PARAMS)
+async def test_rejection_without_a_flow_context_renders_the_screen_unchanged(
+    app: StubMitupApp, mock_session: MockDbSession, error: MeetingAccessError, plain_view: MitupView
+):
+    """A call site that opts out gets the screen its rejection stands for, description untouched."""
+    context = build_callback_context(app)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_edit_message_called(context.telegram_update, plain_view)
+
+
+async def test_flow_context_renders_in_the_language_the_rejection_carries(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    """The sentence is part of the screen, so it follows the screen's language, not the default."""
+    context = build_callback_context(app)
+    error = MeetingGoneError(
+        meeting_id=7, action="invite users to a meeting", user_db_id=1, lang="es", flow_context=INVITE_FLOW_CONTEXT
+    )
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    delivered: MitupView = context.api.call_args("edit_message").kwargs["view"]
+    assert delivered.description.text.endswith(INVITE_FLOW_CONTEXT.get_text(lang="es"))
+    assert delivered.keyboard == factory.deleted_meeting_view(RenderContext(lang="es")).keyboard
+
+
+async def test_flow_context_is_not_added_to_the_unavailable_inline_card(app: StubMitupApp, mock_session: MockDbSession):
+    """An inline query carries results, not a screen: it is answered with the card and nothing else."""
+    context = build_inline_context(app)
+    error = MeetingGoneError(
+        meeting_id=7, action="invite users to a meeting", user_db_id=1, lang="en", flow_context=INVITE_FLOW_CONTEXT
+    )
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_answer_inline_query_called(
+        context.telegram_update, results=[meeting_views.unavailable_inline_view("en")], cache_time=0
+    )
+    context.api.assert_edit_message_not_called()
+
+
 async def test_meeting_inactive_owner_is_a_plain_screen(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
@@ -394,7 +493,11 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
     await context.metrics.flush()
 
     context.api.assert_edit_message_called(
-        context.telegram_update, MeetingDisplayMessages.DELETED_BANNER.get(lang="en")
+        context.telegram_update,
+        MitupView(
+            description=MeetingDisplayMessages.DELETED_BANNER.get(lang="en"),
+            keyboard=factory.main_menu_back_rows("en"),
+        ),
     )
     metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
@@ -406,7 +509,7 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
 async def test_shared_meeting_finished_replaces_the_card_with_the_finished_banner(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """The banner is the whole screen: the card carries no buttons once the meeting has run."""
+    """The banner replaces the card; in the bot's chat it keeps the way back to the main menu."""
     error = SharedMeetingFinishedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="es")
 
     await error_handler.handler(context, error, Env.PROD)
@@ -414,10 +517,91 @@ async def test_shared_meeting_finished_replaces_the_card_with_the_finished_banne
 
     context.api.assert_edit_message_called(
         context.telegram_update,
-        MitupView(description=MeetingDisplayMessages.FINISHED_BANNER.get(lang="es"), keyboard=[]),
+        MitupView(
+            description=MeetingDisplayMessages.FINISHED_BANNER.get(lang="es"),
+            keyboard=factory.main_menu_back_rows("es"),
+        ),
     )
     metrics.assert_not_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
     metrics.assert_not_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
+
+
+SHARED_BANNERS: list[tuple[SharedMeetingError, MeetingDisplayMessages]] = [
+    (
+        SharedMeetingGoneError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en"),
+        MeetingDisplayMessages.DELETED_BANNER,
+    ),
+    (
+        SharedMeetingFinishedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en"),
+        MeetingDisplayMessages.FINISHED_BANNER,
+    ),
+]
+
+SHARED_BANNER_PARAMS = [pytest.param(error, banner, id=type(error).__name__) for error, banner in SHARED_BANNERS]
+
+
+@pytest.mark.parametrize("error, banner", SHARED_BANNER_PARAMS)
+@pytest.mark.parametrize("chat_type", [Chat.GROUP, Chat.SUPERGROUP, Chat.CHANNEL])
+async def test_shared_banner_carries_no_keyboard_outside_the_bot_chat(
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    error: SharedMeetingError,
+    banner: MeetingDisplayMessages,
+    chat_type: str,
+):
+    """A card in a conversation between people is replaced in place: the banner offers no navigation."""
+    context = build_card_context(app, chat_type)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_edit_message_called(
+        context.telegram_update, MitupView(description=banner.get(lang="en"), keyboard=[])
+    )
+
+
+@pytest.mark.parametrize("error, banner", SHARED_BANNER_PARAMS)
+async def test_shared_banner_offers_the_main_menu_in_the_bot_chat(
+    app: StubMitupApp, mock_session: MockDbSession, error: SharedMeetingError, banner: MeetingDisplayMessages
+):
+    """In the bot's own chat the banner is the whole screen, so it leads somewhere."""
+    context = build_card_context(app, Chat.PRIVATE)
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_edit_message_called(
+        context.telegram_update,
+        MitupView(description=banner.get(lang="en"), keyboard=factory.main_menu_back_rows("en")),
+    )
+
+
+@pytest.mark.parametrize("error, banner", SHARED_BANNER_PARAMS)
+async def test_shared_banner_carries_no_keyboard_on_an_inline_card(
+    app: StubMitupApp, mock_session: MockDbSession, error: SharedMeetingError, banner: MeetingDisplayMessages
+):
+    """A card shared as an inline message reports no chat at all, and can sit in any of them."""
+    context = build_inline_card_context(app)
+    assert context.telegram_update.effective_chat is None
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_edit_message_called(
+        context.telegram_update, MitupView(description=banner.get(lang="en"), keyboard=[])
+    )
+
+
+async def test_shared_meeting_denied_keeps_the_card_untouched_in_the_bot_chat(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    """The denial is an alert over an untouched card everywhere, the bot's own chat included."""
+    context = build_card_context(app, Chat.PRIVATE)
+    error = SharedMeetingDeniedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
+
+    await error_handler.handler(context, error, Env.PROD)
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get(lang="en"), show_alert=True
+    )
+    context.api.assert_edit_message_not_called()
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
@@ -543,6 +727,18 @@ def test_guard_errors_subclass_guard_error_and_runtime_error(guard_error: type[E
 
 def build_callback_context(app: StubMitupApp) -> StubMitupContext:
     update = create_update(UpdateRequest(callback_query=True))
+    return build_context(update, app)
+
+
+def build_card_context(app: StubMitupApp, chat_type: str) -> StubMitupContext:
+    """A tap on a meeting card sitting in a chat of `chat_type`."""
+    update = create_update(UpdateRequest(callback_query=True), tg_chat=Chat(id=DEFAULT_CHAT_ID, type=chat_type))
+    return build_context(update, app)
+
+
+def build_inline_card_context(app: StubMitupApp) -> StubMitupContext:
+    """A tap on a card shared through inline mode: Telegram sends its id, never the chat it sits in."""
+    update = create_update(UpdateRequest(callback_query=cb.JOIN.with_id(7), from_bot_chat=False))
     return build_context(update, app)
 
 

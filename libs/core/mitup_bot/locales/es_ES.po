@@ -435,11 +435,11 @@ msgstr "<b>Sin lugares disponibles</b>\n\nLa lista de invitados está llena. No 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
 msgstr "<b>Lista de invitados cerrada</b>\n\nYa no se permiten nuevas adiciones para esta quedada. El organizador ha cerrado la lista."
 
-msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
-msgstr "<b>Algo inesperado pasó...</b>\n\nDe repente perdí los detalles de la quedada. Esto no debería pasar.\n\nPor favor, intenta enviar el nombre de nuevo."
-
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Quedada no encontrada</b>\n\nLa quedada a la que intentas invitar a alguien ya no existe."
+
+msgid "MeetingInviteMessages.FLOW_CONTEXT"
+msgstr "Estabas invitando a alguien."
 
 msgid "MeetingInviteMessages.CANCELED"
 msgstr "El proceso de invitación ha sido cancelado."

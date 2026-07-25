@@ -401,11 +401,11 @@ msgstr "<b>Nessun posto libero</b>\n\nLa lista degli ospiti è attualmente piena
 msgid "MeetingInviteMessages.INVITES_DISABLED"
 msgstr "<b>Lista degli ospiti chiusa</b>\n\nI nuovi aggiunti non sono più consentiti per questo incontro. L'organizzatore ha chiuso la lista."
 
-msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
-msgstr "<b>È stato inaspettato...</b>\n\nHo perso improvvisamente traccia dei dettagli dell'incontro. Questo non dovrebbe accadere.\n\nPer favore, prova a inviare di nuovo il nome."
-
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Incontro non trovato</b>\n\nL'incontro a cui stai cercando di invitare qualcuno non esiste più."
+
+msgid "MeetingInviteMessages.FLOW_CONTEXT"
+msgstr "Stavi invitando qualcuno."
 
 msgid "MeetingInviteMessages.CANCELED"
 msgstr "Il processo di invito è stato annullato."

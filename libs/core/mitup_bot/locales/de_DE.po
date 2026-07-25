@@ -725,9 +725,6 @@ msgstr "<i>eingeladen von ${user}</i>"
 msgid "MeetingInviteMessages.CANCELED"
 msgstr "Der Einladungsprozess wurde abgebrochen."
 
-msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
-msgstr "<b>Das war unerwartet...</b>\n\nIch habe plötzlich die Treffendetails verloren. Das sollte nicht passieren.\n\nBitte sende den Namen erneut."
-
 msgid "MeetingInviteMessages.ADD_FAILED_RETRY"
 msgstr "Etwas Unerwartetes ist beim Hinzufügen des eingeladenen Benutzers passiert. Bitte versuche es erneut."
 
@@ -745,6 +742,9 @@ msgstr "<b>Keine Plätze mehr</b>\n\nDie Gästeliste ist derzeit voll. Du kannst
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Treffen nicht gefunden</b>\n\nDas Treffen, zu dem du jemanden einladen möchtest, existiert nicht mehr."
+
+msgid "MeetingInviteMessages.FLOW_CONTEXT"
+msgstr "Du warst gerade dabei, jemanden einzuladen."
 
 msgid "MeetingInviteMessages.ON_EXIT"
 msgstr "Es tut mir leid, ich erwartete den Namen der Person, die du einladen möchtest. Möchtest du ihn senden? Wenn nicht, tippe auf Abbrechen, um zu beenden."

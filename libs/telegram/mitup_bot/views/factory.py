@@ -40,6 +40,11 @@ LANGUAGE_BUTTONS = {
 }
 
 
+def main_menu_back_rows(lang: str) -> Keyboard:
+    """The single "Back to main menu" row a screen falls back to when it navigates nowhere else."""
+    return [[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]]
+
+
 def main_menu_view(ctx: RenderContext, *, message: str | FormattedText | None = None) -> MitupView:
     lang = ctx.lang
     keyboard = [
@@ -362,8 +367,7 @@ def deleted_meeting_view(ctx: RenderContext, *, back_rows: Keyboard | None = Non
     lang = ctx.lang
     return MitupView(
         description=CommonMessages.DELETED_MEETING_ALERT.get(lang=lang),
-        keyboard=back_rows
-        or [[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]],
+        keyboard=back_rows or main_menu_back_rows(lang),
     )
 
 
@@ -375,9 +379,7 @@ def reactivation_prompt_view(ctx: RenderContext, *, meeting_id: int, back_rows: 
     Otherwise a single "Back to main menu" row is rendered.
     """
     lang = ctx.lang
-    resolved_back_rows: Keyboard = back_rows or [
-        [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]
-    ]
+    resolved_back_rows: Keyboard = back_rows or main_menu_back_rows(lang)
     return MitupView(
         description=MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=lang),
         keyboard=[

@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-25 14:18\n"
+"PO-Revision-Date: 2026-07-25 18:26\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -521,11 +521,11 @@ msgstr "<b>No Spots Left</b>\n\nThe guest list is currently full. You cannot add
 msgid "MeetingInviteMessages.INVITES_DISABLED"
 msgstr "<b>Guest List Closed</b>\n\nNew additions are no longer allowed for this meeting. The organizer has closed the list."
 
-msgid "MeetingInviteMessages.MEETING_LOST_RETRY"
-msgstr "<b>That Was Unexpected...</b>\n\nI suddenly lost track of the meeting details. This shouldn't happen.\n\nPlease try sending the name again."
-
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
+
+msgid "MeetingInviteMessages.FLOW_CONTEXT"
+msgstr "You were in the middle of inviting someone."
 
 msgid "MeetingInviteMessages.CANCELED"
 msgstr "The invitation process has been canceled."

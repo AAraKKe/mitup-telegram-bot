@@ -16,6 +16,7 @@ from mitup_bot.exceptions import (
     EffectiveUserNotSet,
     InlineQueryNotSetError,
     MalformedCallbackData,
+    MeetingAccessError,
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
@@ -872,6 +873,71 @@ async def test_conversation_meeting_raises_gone_when_the_meeting_stopped_being_r
         await guards.conversation_meeting(mock_session, user_with_settings, 999, "invite users to a meeting")
 
     assert raised.value.keyboard is None
+    assert raised.value.flow_context is None
+    assert_renders_nothing(context)
+
+
+async def test_conversation_meeting_carries_the_flow_context_to_the_rejection(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """A mid-flow step names its flow, and the sentence travels on the exception to the renderer."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    with pytest.raises(MeetingGoneError) as raised:
+        await guards.conversation_meeting(
+            mock_session,
+            user_with_settings,
+            999,
+            "invite users to a meeting",
+            flow_context=MeetingInviteMessages.FLOW_CONTEXT,
+        )
+
+    assert raised.value.flow_context is MeetingInviteMessages.FLOW_CONTEXT
+    assert_renders_nothing(context)
+
+
+async def test_meeting_carries_the_flow_context_to_every_rejection(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """`meeting` forwards the caller's flow context whichever of its rejections stops them."""
+    inactive_owned = create_meetup(id=5, owner=user_with_settings, active=False)
+    somebody_elses = create_meetup(id=6, owner=other_owner())
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_owned)
+    mock_session.add_object(somebody_elses)
+
+    rejections: list[type[MeetingAccessError]] = [MeetingGoneError, MeetingInactiveOwnerError, MeetingNotOwnedError]
+    for meeting_id, expected in zip([999, 5, 6], rejections, strict=True):
+        with pytest.raises(expected) as raised:
+            await guards.meeting(
+                mock_session,
+                user_with_settings,
+                meeting_id,
+                "Test method",
+                context,
+                flow_context=MeetingInviteMessages.FLOW_CONTEXT,
+            )
+        assert raised.value.flow_context is MeetingInviteMessages.FLOW_CONTEXT
+
+    assert_renders_nothing(context)
+
+
+async def test_meeting_leaves_the_flow_context_unset_when_the_caller_passes_none(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """The opt-in is opt-in: a caller that says nothing produces a rejection with no flow prose."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    with pytest.raises(MeetingGoneError) as raised:
+        await guards.meeting(mock_session, user_with_settings, 999, "Test method", context)
+
+    assert raised.value.flow_context is None
     assert_renders_nothing(context)
 
 

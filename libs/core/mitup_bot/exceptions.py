@@ -8,6 +8,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from mitup_bot.callback_data import CallbackData
     from mitup_bot.handler_id import HandlerId
     from mitup_bot.keyboards import Keyboard
+    from mitup_bot.utils.messages import MessageBase
 
 
 class HandlerRegisteredError(AttributeError):
@@ -89,13 +90,27 @@ class MeetingAccessError(GuardError):
     without a second DB round-trip: the meeting the caller addressed, the action they attempted
     (which the log line and the exception message name), the language to render in, and the
     back-navigation row(s) the screen offers.
+
+    ``flow_context`` is the opt-in extra: a caller that raises mid-flow passes the one sentence
+    naming what the user was doing, which the error handler appends to the screen's description. It
+    stays ``None`` everywhere else, and those screens render exactly as they do without the field.
     """
 
-    def __init__(self, message: str, *, meeting_id: int, action: str, lang: str, keyboard: Keyboard | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        meeting_id: int,
+        action: str,
+        lang: str,
+        keyboard: Keyboard | None = None,
+        flow_context: MessageBase | None = None,
+    ):
         self.meeting_id = meeting_id
         self.action = action
         self.lang = lang
         self.keyboard = keyboard
+        self.flow_context = flow_context
         super().__init__(message)
 
 
@@ -106,7 +121,14 @@ class MeetingGoneError(MeetingAccessError):
     """
 
     def __init__(
-        self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str, keyboard: Keyboard | None = None
+        self,
+        *,
+        meeting_id: int,
+        action: str,
+        user_db_id: int | None,
+        lang: str,
+        keyboard: Keyboard | None = None,
+        flow_context: MessageBase | None = None,
     ):
         super().__init__(
             f"User tried {action!r} with a meeting that does not exist. "
@@ -115,6 +137,7 @@ class MeetingGoneError(MeetingAccessError):
             action=action,
             lang=lang,
             keyboard=keyboard,
+            flow_context=flow_context,
         )
 
 
@@ -125,26 +148,45 @@ class MeetingNotOwnedError(MeetingAccessError):
     ``None`` when the caller has no account, which the share surface allows.
     """
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int | None, lang: str):
+    def __init__(
+        self,
+        *,
+        meeting_id: int,
+        action: str,
+        user_db_id: int | None,
+        lang: str,
+        flow_context: MessageBase | None = None,
+    ):
         super().__init__(
             f"User tried {action!r} with a meeting that does not belong to them. "
             f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,
+            flow_context=flow_context,
         )
 
 
 class MeetingInactiveOwnerError(MeetingAccessError):
     """The owner addressed a meeting of theirs that is no longer active."""
 
-    def __init__(self, *, meeting_id: int, action: str, user_db_id: int, lang: str, keyboard: Keyboard | None = None):
+    def __init__(
+        self,
+        *,
+        meeting_id: int,
+        action: str,
+        user_db_id: int,
+        lang: str,
+        keyboard: Keyboard | None = None,
+        flow_context: MessageBase | None = None,
+    ):
         super().__init__(
             f"User tried {action!r} with an inactive meeting they own. Meeting id: {meeting_id}, user id: {user_db_id}",
             meeting_id=meeting_id,
             action=action,
             lang=lang,
             keyboard=keyboard,
+            flow_context=flow_context,
         )
 
 
@@ -158,6 +200,10 @@ class SharedMeetingError(MeetingAccessError):
 
     Holding the card is the only prerequisite for tapping it, so the caller may have no account at
     all: ``user_db_id`` is ``None`` for them and the message names them as anonymous.
+
+    None of these subclasses accepts ``flow_context``: what replaces the card is read by everybody in
+    that chat, so it says only what state the meeting is in and never a sentence about one reader's
+    flow.
     """
 
 
