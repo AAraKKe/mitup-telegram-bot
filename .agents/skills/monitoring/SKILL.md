@@ -59,6 +59,27 @@ CloudWatch **dimensions** are reserved for **bounded, intentional facets** — o
 When adding a new metric, **default to properties**. Promoting a facet to a dimension is a deliberate cost decision that you must justify by its bounded cardinality — never a convenience for getting a value onto a graph. Dropping an unbounded base dimension and re-attaching it as a property (as handler identity does here, and as an outside-handler client's global copy does when it strips its base dimensions) is this same rule applied, not a special case.
 </critical_rules>
 
+## Properties must be constant for the flush window
+
+A property describes the whole EMF document, not one emission. `EmfBackend` keys its loggers by
+dimensionality, so every emission sharing a dimension set lands in the same document: metric values
+**accumulate into an array** while `set_property` is **last-writer-wins**. A property whose value
+varies per emission therefore survives only for the emission that wrote it last, and is reported as
+if it described all of them.
+
+<critical_rules>
+An EMF property may only carry a fact that holds for the entire flush window (a run id, a broadcast
+id, the handler identity of the one invocation being flushed). Anything that varies per emission —
+an outcome, an attempt number, a target id — belongs on a metric series of its own or on a structlog
+line. `emit_delivery_outcomes` in `apps/events/mitup_bot/events/broadcast/recording.py` is the
+reference implementation: per-delivery status rides as one-hot 0/1 metrics, only the run-constant
+`broadcast_id` rides as a property.
+</critical_rules>
+
+Note how wide a flush window can be: the bot flushes once per handler invocation, but the
+recurrent-events service flushes once per **run**, so a sweep touching hundreds of users produces
+hundreds of samples under a single property set.
+
 ## Emitting metrics from handlers
 
 <critical_rules>

@@ -16,7 +16,7 @@ class ContextOrBotAdapter(Protocol):
     """
 
     @contextmanager
-    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]: ...
+    def with_time_metric(self, prefix: str) -> Generator[None]: ...
 
     def emit_metric(
         self,

@@ -159,9 +159,15 @@ class BotAdapter:
         return self._bot
 
     @contextmanager
-    def with_time_metric(self, prefix: str, handler_metrics: bool = False) -> Generator[None]:
+    def with_time_metric(self, prefix: str) -> Generator[None]:
         """Emit `<prefix>Time` plus a continuous 0/1 `<prefix>Fault` on exit, even when the timed
-        call raises, so latency series keep their failure samples and the fault series is alarmable."""
+        call raises, so latency series keep their failure samples and the fault series is alarmable.
+
+        The outcome rides on `<prefix>Fault` alone, never as a property: an EMF property may only
+        carry a fact that holds for the whole flush window, and within one window metric values
+        accumulate into an array while properties are last-writer-wins. Per-call detail beyond the
+        fault sample belongs on a structlog line.
+        """
         start = perf_counter()
         success = False
         try:
@@ -173,7 +179,6 @@ class BotAdapter:
                 MetricKey.TIME.with_prefix(prefix, separator=""),
                 elapsed,
                 MetricUnit.MILLISECONDS,
-                properties={"Success": success},
             )
             self._metrics.emit(MetricKey.FAULT.with_prefix(prefix, separator=""), 0 if success else 1)
 

@@ -1467,7 +1467,8 @@ async def test_bot_adapter_time_metric_success_emits_time_and_fault_zero(
         name="TelegramApiTime",
         value=AnyFloat(),
         unit=MetricUnit.MILLISECONDS,
-        properties={"Success": True},
+        properties={},
+        properties_exact=True,
     )
     api_metrics.assert_emitted(name="TelegramApiFault", value=0)
 
@@ -1485,9 +1486,35 @@ async def test_bot_adapter_time_metric_emits_even_when_the_call_raises(
         name="TelegramApiTime",
         value=AnyFloat(),
         unit=MetricUnit.MILLISECONDS,
-        properties={"Success": False},
+        properties={},
+        properties_exact=True,
     )
     api_metrics.assert_emitted(name="TelegramApiFault", value=1)
+
+
+async def test_bot_adapter_time_metric_keeps_each_call_outcome_on_its_own_fault_sample(
+    adapter: BotAdapter, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    # A flush window batches every dimensionless emission into one EMF document, where values
+    # accumulate into an array but properties overwrite. The per-call outcome must therefore live
+    # on the fault series — one 0/1 sample per call — and never on a property of the timing metric.
+    with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
+        pass
+    with pytest.raises(TimedOut):
+        with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
+            raise TimedOut()
+
+    await api_metrics_client.flush()
+
+    api_metrics.assert_emitted(name="TelegramApiFault", value=0, times=1)
+    api_metrics.assert_emitted(name="TelegramApiFault", value=1, times=1)
+    api_metrics.assert_emitted(
+        name="TelegramApiTime",
+        unit=MetricUnit.MILLISECONDS,
+        properties={},
+        properties_exact=True,
+        times=2,
+    )
 
 
 # ---------------------------------------------------------------------------

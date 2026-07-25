@@ -194,23 +194,25 @@ async def test_timing_metrics(context: StubMitupContext, metrics: MetricAssertio
     )
 
 
-async def test_timing_metrics_with_handler_properties(context: StubMitupContext, metrics: MetricAssertions):
+async def test_timing_metrics_omit_the_handler_identity(context: StubMitupContext, metrics: MetricAssertions):
     context.prepare_handler_metrics({"HandlerProp": "HandlerValue"})
 
-    with context.with_time_metric("MyMetric", handler_metrics=True):
+    with context.with_time_metric("MyMetric"):
         pass
 
     await context.flush_metrics()
 
-    # Handler identity rides as an EMF property, never as a dimension.
+    # A timed call is not the handler invocation: the timing series stays dimensionless and free of
+    # the handler identity, which the handler's own metrics carry.
     metrics.assert_emitted(
         name="MyMetricTime",
         value=AnyFloat(),
         unit=MetricUnit.MILLISECONDS,
         dimensions={},
         dimensions_exact=True,
-        properties={"HandlerProp": "HandlerValue"},
     )
+    metrics.assert_not_emitted(name="MyMetricTime", properties={"HandlerProp": "HandlerValue"})
+    metrics.assert_not_emitted(name="MyMetricFault", properties={"HandlerProp": "HandlerValue"})
 
 
 def test_prepare_handler_metrics_empty_dict_is_noop(context: StubMitupContext):
@@ -266,7 +268,6 @@ async def test_timing_metrics_success_emits_fault_zero(context: StubMitupContext
         name="MyMetricTime",
         value=AnyFloat(),
         unit=MetricUnit.MILLISECONDS,
-        properties={"Success": True},
     )
     metrics.assert_emitted(name="MyMetricFault", value=0)
 
@@ -284,9 +285,29 @@ async def test_timing_metrics_emit_even_when_the_timed_call_raises(
         name="MyMetricTime",
         value=AnyFloat(),
         unit=MetricUnit.MILLISECONDS,
-        properties={"Success": False},
     )
     metrics.assert_emitted(name="MyMetricFault", value=1)
+
+
+async def test_timing_metrics_keep_each_call_outcome_on_its_own_fault_sample(
+    context: StubMitupContext, metrics: MetricAssertions
+):
+    # A flush window batches every dimensionless emission into one EMF document, where values
+    # accumulate into an array but properties overwrite. The per-call outcome must therefore live
+    # on the fault series — one 0/1 sample per call — and never on a property of the timing metric.
+    with context.with_time_metric("MyMetric"):
+        pass
+    with pytest.raises(ValueError, match="boom"):
+        with context.with_time_metric("MyMetric"):
+            raise ValueError("boom")
+
+    await context.flush_metrics()
+
+    metrics.assert_emitted(name="MyMetricFault", value=0, times=1)
+    metrics.assert_emitted(name="MyMetricFault", value=1, times=1)
+    metrics.assert_emitted(name="MyMetricTime", unit=MetricUnit.MILLISECONDS, times=2)
+    for outcome in (True, False):
+        metrics.assert_not_emitted(name="MyMetricTime", properties={"Success": outcome})
 
 
 async def test_user_data_mutations_emit_no_metrics(context: StubMitupContext, metrics: MetricAssertions):
