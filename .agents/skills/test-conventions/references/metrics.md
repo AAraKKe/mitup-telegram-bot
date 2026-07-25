@@ -106,7 +106,8 @@ metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat())
 
 ## Exception matching
 
-Pass `exception=` to match the exception recorded in a metric's properties:
+Pass `exception=` to match the exception a metric names — the `error_type` property the fault path
+sets, or the one nested under the EMF stack trace's `exception` property:
 
 ```python
 # By class — resolves to fully qualified name for matching
@@ -116,14 +117,17 @@ metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception=UserNotFound)
 metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception="RuntimeError")
 ```
 
-## Fault prefix pattern
+## Metric name prefixes
 
-When a handler raises an exception, it emits a prefixed fault metric:
+`with_prefix` builds a metric name from a **literal** prefix known at author time:
 
 ```python
-MetricKey.FAULT.with_prefix(MetricKey.MEETING_NOT_OWNED)   # "MeetingNotOwned/Fault"
 MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED)    # "MeetingNotOwned/Error"
+MetricKey.TIME.with_prefix("TelegramApi", separator="")     # "TelegramApiTime"
 ```
+
+A prefix taken from a runtime value (an exception class, a user id) is a bug — each one becomes a
+separately-billed CloudWatch series. Assert on the property instead, via `exception=` above.
 
 ## Common handler metrics pattern
 
@@ -137,11 +141,12 @@ metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
 
 For handlers that raise exceptions. Each of the three handler metrics is a single dimensionless
 emission — the handler identity rides as EMF properties, not dimensions (issue #205), so assert
-`times=1` (the default), never a duplicate "global" copy:
+`times=1`, never a duplicate "global" copy. `times=1` on `FAULT` is load-bearing: EMF appends
+repeated values under one name, so a stray second writer would serialise an array that breaks the
+fault alarms and the `filter Fault = 1` triage query:
 
 ```python
-metrics.assert_emitted(name=MetricKey.FAULT, value=1)
-metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
+metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=UserNotFound)
 metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
 metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
 ```

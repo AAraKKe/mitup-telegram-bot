@@ -56,7 +56,7 @@ By the time the drain runs, the DB state is committed and correct — a failing 
 
 - `InactiveUserInteraction` (blocked bot / deleted account) → the tg user id is recorded on the outbox; the lifecycle's reconcile transaction marks the user inactive (emitting `INACTIVE_USER_SET`). The drain continues.
 - BadRequest "message is not modified" → success (two updates can render identical content under concurrency).
-- Any other per-call exception → logged plus `Fault<ErrorType>` and aggregate `Fault` metrics via the adapter (mirroring the error handler's shape), and the drain continues — the remaining entries are independent deliveries to other chats.
+- Any other per-call exception → logged with the queued call name and its payload, plus a `PostCommitApiFault` metric via the adapter, and the drain continues — the remaining entries are independent deliveries to other chats. It never emits the aggregate `Fault`: that is the invocation outcome, the handler is still on its way to completing normally, and a second writer on the shared EMF logger turns the datapoint into an array (see the `monitoring` skill).
 - `NetworkError` (excluding its `BadRequest` subclass) → systemic: every remaining call would fail the same way, so the drain stops and the error surfaces to the global error handler. The reconcile fix-ups collected so far are still applied.
 
 ### The reconcile transaction

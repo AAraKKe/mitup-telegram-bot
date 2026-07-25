@@ -10,6 +10,7 @@ from telegram.ext import ConversationHandler
 from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
+from mitup_bot.exceptions import UserNotFound
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_datetime_entry_view as build_entry_view
 from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import build_edit_time_prompt_view
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
@@ -784,8 +785,7 @@ async def test_date_time_entity_message_user_not_found(
     )
 
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=UserNotFound)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 

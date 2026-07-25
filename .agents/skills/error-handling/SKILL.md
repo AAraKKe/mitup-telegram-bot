@@ -127,10 +127,11 @@ Delivery is best-effort, like every other render in this module: an exception ra
 ### Fault metrics
 
 For all other (unexpected) errors:
-1. A specific fault metric is emitted: `FAULT/<ErrorClassName>` (e.g., `FAULT/ValueError`)
-2. A global `FAULT` metric is emitted for aggregate monitoring
-3. Stack traces are attached to all loggers via `add_stack_trace()`
-4. In `DEV` mode, the exception is logged with Rich formatting
+1. One dimensionless `FAULT` metric is emitted for aggregate monitoring, carrying the exception's qualified class name in an `error_type` EMF property and the trigger in `UpdatePayload`
+2. Stack traces are attached to all loggers via `add_stack_trace()`
+3. In `DEV` mode, the exception is logged with Rich formatting
+
+The exception class is a property, never part of the metric name: a name minted from a runtime value opens a separately-billed CloudWatch series per class that nothing charts or alarms on. `FAULT` itself is written exactly once per logger per flush window — see the single-writer rule in the `monitoring` skill.
 
 ## The `handle_edit_errors` context manager
 

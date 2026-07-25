@@ -1075,11 +1075,8 @@ async def test_execute_queued_not_modified_continues_without_fault(
 
 
 @pytest.mark.parametrize(
-    "error, prefixed_fault",
-    [
-        (RuntimeError("render failed"), "RuntimeError/Fault"),
-        (BadRequest("Something else went wrong"), "BadRequest/Fault"),
-    ],
+    "error",
+    [RuntimeError("render failed"), BadRequest("Something else went wrong")],
     ids=["runtime_error", "unrecognized_bad_request"],
 )
 async def test_execute_queued_generic_failure_counts_fault_and_continues(
@@ -1087,7 +1084,6 @@ async def test_execute_queued_generic_failure_counts_fault_and_continues(
     api_metrics: MetricAssertions,
     api_metrics_client: MetricsClient,
     error: Exception,
-    prefixed_fault: str,
 ):
     executed: list[str] = []
 
@@ -1103,9 +1099,30 @@ async def test_execute_queued_generic_failure_counts_fault_and_continues(
 
     # The DB is already committed, so one failed rendering never blocks the other deliveries.
     assert executed == ["second"]
-    # Mirrors the global error handler's fault shape: per-error-type fault plus the aggregate.
-    api_metrics.assert_emitted(name=prefixed_fault, properties={"QueuedApiCall": "send_message_to_user"})
-    api_metrics.assert_emitted(name=MetricKey.FAULT, properties={"QueuedApiCall": "send_message_to_user"})
+    # A delivery failure counts on its own series and leaves the invocation outcome alone: the
+    # aggregate Fault belongs to the handler, which is still on its way to completing normally.
+    api_metrics.assert_emitted(name=MetricKey.POST_COMMIT_API_FAULT, value=1)
+    api_metrics.assert_not_emitted(name=MetricKey.FAULT)
+    api_metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix(type(error).__name__))
+
+
+async def test_execute_queued_failure_leaves_the_invocation_fault_a_single_datapoint(
+    telegram_api: TelegramApi, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
+):
+    """EMF appends repeated values under one metric name, so a second writer would serialise
+    `Fault: [1, 0]` — an array that the fault alarms average and the triage query stops matching."""
+
+    async def boom():
+        raise RuntimeError("render failed")
+
+    await telegram_api.execute_queued(ApiOutbox(calls=[QueuedApiCall("send_message_to_user", boom)]))
+    # What the registry emits once the handler completes, after the drain.
+    telegram_api.adapter.emit_metric(MetricKey.FAULT, 0)
+    await api_metrics_client.flush()
+
+    # One Fault datapoint in the whole record, and it is the completing handler's scalar 0.
+    api_metrics.assert_emitted(name=MetricKey.FAULT, times=1)
+    api_metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
 
 @pytest.mark.parametrize(

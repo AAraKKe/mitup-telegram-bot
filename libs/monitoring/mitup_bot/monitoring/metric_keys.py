@@ -23,8 +23,17 @@ class MetricKey(CamelCaseStrEnum):
     COUNT = auto()
     """This is a metric to be emitted when there is a processing error, user input error, etc."""
     ERROR = auto()
-    """This is a metric to be emitted when there is a system fault, something that is not expected to happen."""
+    """This is a metric to be emitted when there is a system fault, something that is not expected to happen.
+    It is the outcome of one invocation, written once per logger per flush window by the wrapper that
+    owns the invocation (`callback_with_metrics`, `handle_maintainance`) or by the global error
+    handler it hands the failing path to, and by nothing else: EMF appends repeated values under the
+    same name, and a second writer turns the datapoint into an array that the fault alarms and the
+    `filter Fault = 1` triage query both stop matching."""
     FAULT = auto()
+    """A queued Telegram call failed while the outbox drained after the transaction committed. This is
+    a partial rendering failure, not the invocation outcome — the DB is already correct and the handler
+    goes on to finish on `Fault=0` — so it counts on its own series instead of the aggregate `FAULT`."""
+    POST_COMMIT_API_FAULT = auto()
     """Emitted when in-memory conversation state was lost (e.g. a rolling deploy wiped user_data
     mid-flow, or flow-shaped input arrived with no active flow). Expected consequence of in-memory
     state, not a code fault, so it carries its own metric and bypasses the fault alarms."""

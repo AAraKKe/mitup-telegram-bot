@@ -16,6 +16,7 @@ from telegram import Location, MessageEntity, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import BOT_CONFIG_KEY, ContextId
+from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.admin.enums import AdminHandlerId
 from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId
@@ -1600,9 +1601,9 @@ async def test_callback_fails_with_malformed_callback_data(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    # Dimensionless handler metrics — a single record each (issue #205).
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("MalformedCallbackData"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    # Dimensionless handler metrics — a single record each (issue #205). The exception class rides
+    # on the aggregate fault as the `error_type` property.
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=MalformedCallbackData)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
@@ -1625,8 +1626,7 @@ async def test_callback_fails_when_user_is_not_found(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=UserNotFound)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
@@ -1653,7 +1653,7 @@ async def test_handler_does_not_fault_when_user_is_not_found(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("UserNotFound"))
+    metrics.assert_not_emitted(name=MetricKey.FAULT, exception=UserNotFound)
 
 
 @pytest.mark.parametrize(
@@ -1724,7 +1724,6 @@ async def test_callback_fails_when_missing_necessary_user_data(
 
     metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
-    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 

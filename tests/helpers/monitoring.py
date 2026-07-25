@@ -86,7 +86,9 @@ class MetricAssertions:
                 assert module is not None, "The exception module could not be found."
                 expected_type = f"{module.__name__}.{exception.__name__}"
 
-            actual_type = exc_props.get("error_type", "")
+            # The fault path names the exception in an `error_type` property; the EMF stack trace
+            # nests one of its own under `exception`. Either identifies the same class.
+            actual_type = exc_props.get("error_type", "") or record.properties.get("error_type", "")
             # Support both short name match ("RuntimeError") and fully qualified match
             if expected_type not in actual_type and not actual_type.endswith(expected_type):
                 return False

@@ -293,18 +293,18 @@ async def handler(context: TMitupContext, error: Exception, env: Env):
         await notify_guard_error(context, CommonMessages.CONTEXT_LOST)
         return
 
-    # Emit an error-class-specific fault metric plus the general aggregate FAULT. Both are
-    # dimensionless — the handler identity rides as an EMF property — so the
-    # dimensionless FAULT the infra alarms read is emitted exactly once per fault.
-    error_class = error.__class__.__name__
+    # One dimensionless FAULT for the invocation — the handler identity rides as an EMF property —
+    # so the series the infra alarms read carries exactly one value per fault. The exception class
+    # is a property rather than a metric name: a name minted from a runtime value opens a
+    # separately-billed CloudWatch series per class, and none of them is charted or alarmed.
+    error_type = f"{type(error).__module__}.{type(error).__qualname__}"
     # The failure path deliberately carries the trigger and its context (what the user did, plus
     # who/where — see fault_fields_from_update): the lean happy-path properties are not enough to
     # debug a real fault, and log retention owns the PII lifecycle. `UpdatePayload` is a distinct
     # key so the lean `Update` property emitted by later metrics cannot overwrite it on the
     # shared EMF logger before the flush.
     update_payload = fault_fields_from_update(context.telegram_update) if context.telegram_update else None
-    context.emit_metric(MetricKey.FAULT.with_prefix(error_class), 1, properties={"UpdatePayload": update_payload})
-    context.emit_metric(MetricKey.FAULT, 1, properties={"UpdatePayload": update_payload})
+    context.emit_metric(MetricKey.FAULT, 1, properties={"UpdatePayload": update_payload, "error_type": error_type})
 
     context.metrics.add_stack_trace()
 

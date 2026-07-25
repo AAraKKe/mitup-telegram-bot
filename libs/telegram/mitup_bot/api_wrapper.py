@@ -471,11 +471,11 @@ class TelegramApi:
             payload=queued.payload,
             exc_info=exc,
         )
-        # Mirror the error handler's fault shape: a per-error-type fault plus the aggregate.
-        self.adapter.emit_metric(
-            MetricKey.FAULT.with_prefix(type(exc).__name__), properties={"QueuedApiCall": queued.name}
-        )
-        self.adapter.emit_metric(MetricKey.FAULT, properties={"QueuedApiCall": queued.name})
+        # The aggregate `Fault` belongs to the invocation, which is still on its way to completing
+        # normally — emitting it here would append a second value to the same EMF datapoint. The
+        # per-failure detail rides on the log line above, where a drain with several failures keeps
+        # every one of them; EMF properties are scalar and last-writer-wins on the shared logger.
+        self.adapter.emit_metric(MetricKey.POST_COMMIT_API_FAULT)
 
     def _enqueue(
         self,

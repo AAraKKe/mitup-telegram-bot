@@ -343,7 +343,6 @@ async def test_meeting_rejection_closes_the_interaction_without_a_fault(
 
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
-    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix(type(error).__name__), value=1)
 
 
 async def test_meeting_not_owned_is_counted_and_logged(
@@ -663,21 +662,23 @@ async def test_handle_error_for_uncaght_exception(context: StubMitupContext, met
         await context.metrics.flush()
 
     # The dimensionless aggregate FAULT is emitted exactly once (the infra alarms read it),
-    # carrying the trigger context so the CloudWatch fault record is self-contained.
+    # carrying the trigger context and the exception class so the CloudWatch fault record is
+    # self-contained. The class is a property: a metric name minted per exception class would be a
+    # new billed series nothing charts.
     metrics.assert_emitted(
         name=MetricKey.FAULT,
         value=1,
         times=1,
-        properties={"UpdatePayload": fault_fields_from_update(context.telegram_update)},
-    )
-    # The prefixed fault is emitted once, carrying the handler identity as EMF properties.
-    metrics.assert_emitted(
-        name=MetricKey.FAULT.with_prefix("RuntimeError"),
-        value=1,
         dimensions={},
         dimensions_exact=True,
-        properties={"Handler": "SomeHandler", "HandlerType": "Callback"},
+        properties={
+            "UpdatePayload": fault_fields_from_update(context.telegram_update),
+            "error_type": "builtins.RuntimeError",
+            "Handler": "SomeHandler",
+            "HandlerType": "Callback",
+        },
     )
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("RuntimeError"))
 
 
 async def test_handle_error_logs_the_exception(context: StubMitupContext):
@@ -755,15 +756,20 @@ def build_inline_context(app: StubMitupApp) -> StubMitupContext:
 async def test_guard_error_emits_fault_metrics_and_notifies_user(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """A GuardError must emit both the prefixed and global FAULT metrics and redirect the user."""
+    """A GuardError must emit the single aggregate FAULT naming its class and redirect the user."""
     # No user registered -> resolve_lang falls back to the project default language.
     error = EffectiveMessageNotSet(context.telegram_update)
 
     await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("EffectiveMessageNotSet"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(
+        name=MetricKey.FAULT,
+        value=1,
+        times=1,
+        properties={"error_type": f"{EffectiveMessageNotSet.__module__}.EffectiveMessageNotSet"},
+    )
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("EffectiveMessageNotSet"))
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(
@@ -798,8 +804,8 @@ async def test_non_guard_error_emits_fault_and_notifies(
     await error_handler.handler(context, ValueError("boom"), Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ValueError"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, properties={"error_type": "builtins.ValueError"})
+    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("ValueError"))
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(
@@ -819,8 +825,7 @@ async def test_fault_notification_failure_does_not_raise(
     await error_handler.handler(context, ValueError("boom"), Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("ValueError"), value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, properties={"error_type": "builtins.ValueError"})
 
 
 # --- Context loss handling ---
@@ -839,7 +844,6 @@ async def test_context_lost_notifies_user_and_emits_dedicated_metric(
 
     metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
-    metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("ContextPropertyNotSetError"), value=1)
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(

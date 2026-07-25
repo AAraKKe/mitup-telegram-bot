@@ -115,7 +115,15 @@ All Telegram API calls in `TelegramApi` already use this — do not add redundan
 | `Fault` | `1` on exception, `0` on success (dimensionless) |
 | `DbConnectionsLeaked` | Count of unreturned DB connections (should always be 0) |
 
-Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension. The dimensionless `Fault` series is what the infra CloudWatch fault alarms and the ECS deploy gate read, and it is emitted exactly once per invocation — never emit a duplicate copy.
+Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension.
+
+<critical_rules>
+`Fault` has a single writer. It is the outcome of one invocation, emitted exactly once per logger per flush window — by the wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`), or by the global error handler that wrapper hands the failing path to. Nothing else may emit it — not a handler, not a helper, not the post-commit outbox drain. EMF **appends** repeated values under one metric name, so a second writer serialises `"Fault": [1, 0]`: Logs Insights flattens the array to `Fault.0`/`Fault.1`, which the `filter Fault = 1` triage queries stop matching, and the fault-rate alarm (Average + SampleCount, wired into the ECS rollback bakes) reads half the value on twice the samples. A fact that is not the invocation outcome gets its own metric name — `PostCommitApiFault` is the one for a queued delivery that failed after commit.
+</critical_rules>
+
+<critical_rules>
+Metric **names** are static constants. Never mint one from a runtime value (`MetricKey.FAULT.with_prefix(type(exc).__name__)`): every distinct class creates its own separately-billed CloudWatch series, forever, and none of them is on a widget or in an alarm. Put the varying facet in an EMF property instead — the fault path names the exception class in `error_type`. `with_prefix` is for a literal, bounded prefix known at author time (`TelegramApiTime`, `MeetingNotOwned/Error`).
+</critical_rules>
 
 ## Adding a new `MetricKey`
 
