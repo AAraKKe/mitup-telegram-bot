@@ -569,7 +569,8 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
         [
             [
                 ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
-                ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.NAME),
+                # The rejected step ends the flow, so PTB holds no state for the caller any more.
+                ConversationStep.message("Bruce Wayne", expected_state=None),
             ],
             0,
         ],
@@ -577,9 +578,7 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
             [
                 ConversationStep.callback(cb.INVITE.with_id(MEETING_ID), expected_state=ConversationInviteState.NAME),
                 ConversationStep.message("Bruce Wayne", expected_state=ConversationInviteState.CONFIRMATION),
-                ConversationStep.callback(
-                    cb.CONFIRM_INVITE_USER.with_id(MEETING_ID), expected_state=ConversationInviteState.CONFIRMATION
-                ),
+                ConversationStep.callback(cb.CONFIRM_INVITE_USER.with_id(MEETING_ID), expected_state=None),
             ],
             1,
         ],
@@ -600,8 +599,9 @@ async def test_meeting_disappears_mid_conversation(
     rejection is the bot-chat one rather than the stale-card banner: a message step has no message of
     ours to replace and gets a fresh reply, the confirmation callback replaces the screen it sits on.
 
-    The rejection aborts the step, so it returns no state and the conversation stays where it was —
-    what every guard exception does. The screen it lands on navigates out of the flow.
+    The rejection aborts the step and the invite flow ends with it — what every guard exception does.
+    The screen it lands on navigates out of the flow, so no state may keep claiming the caller's
+    next messages; PTB drops the conversation key, which the tester reads back as no state at all.
 
     The name step opts into the flow context, so its screen also names the invite the user was in the
     middle of; the confirmation step does not, and gets the plain screen.

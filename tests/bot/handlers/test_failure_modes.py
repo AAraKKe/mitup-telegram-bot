@@ -13,6 +13,7 @@ from typing import Final
 
 import pytest
 from telegram import Location, MessageEntity, Update
+from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import BOT_CONFIG_KEY, ContextId
 from mitup_bot.handler_id import HandlerId
@@ -1514,9 +1515,9 @@ async def test_handler_rejects_meeting_not_owned(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    # The rejection aborts the handler, so it produces no conversation state: whatever state the
-    # user was in is the state they stay in, exactly like every other guard exception.
-    assert result is None
+    # The rejection aborts the handler and the user is shown a screen that navigates elsewhere,
+    # so no flow survives the update: the handler ends any conversation it was part of.
+    assert result == ConversationHandler.END
     # MeetingNotOwned error metric is emitted
     metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
@@ -1552,7 +1553,7 @@ async def test_handler_rejects_meeting_that_is_gone(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    assert result is None
+    assert result == ConversationHandler.END
     extra = (
         test_context.extra_metrics_not_found
         if not isinstance(test_context.extra_metrics_not_found, _Unset)
@@ -1753,7 +1754,7 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    assert result is None
+    assert result == ConversationHandler.END
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
 
     back_rows = (
@@ -1796,7 +1797,7 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    assert result is None
+    assert result == ConversationHandler.END
     extra = (
         test_context.extra_metrics_non_owner_inactive
         if not isinstance(test_context.extra_metrics_non_owner_inactive, _Unset)

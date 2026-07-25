@@ -296,8 +296,8 @@ async def test_set_date_past_end_datetime_clears_end_and_shows_alert(
                 datetime=TEST_MEETING_DATETIME_UTC,
                 owner=create_member(id=2, tg_user_id=456),
             ),
-            # The guard rejection aborts the handler, so it returns no conversation state.
-            None,
+            # The guard rejection aborts the handler, so it ends the conversation.
+            ConversationHandler.END,
         ),
     ],
     indirect=["update"],
@@ -307,7 +307,7 @@ async def test_edit_meeting_time_callback(
     mock_session: MockDbSession,
     update: Update,
     meeting: Meetup,
-    expected_response: int | None,
+    expected_response: ConversationMeetingState | int,
     user_with_settings: User,
     handler_context: HandlerContext,
     metrics: MetricAssertions,
@@ -320,7 +320,9 @@ async def test_edit_meeting_time_callback(
     context, response = await call_handler(EditMeetingHandlerId.EDIT_TIME_CALLBACK, handler_context=handler_context)
 
     assert response == expected_response
-    assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) or expected_response is None
+    # The prompt stores the meeting id for the message step that follows it; a rejection ends the
+    # conversation instead and stores nothing.
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_TIME) == (expected_response != ConversationHandler.END)
 
     # show_edit_time_prompt uses meeting.lang (the meeting's own language), not user.lang
     expected_view = MitupView(
@@ -338,7 +340,7 @@ async def test_edit_meeting_time_callback(
     if expected_response == ConversationMeetingState.EDIT_TIME:
         context.api.assert_edit_message_called(update, expected_view)
 
-    if expected_response is None:
+    if expected_response == ConversationHandler.END:
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
     else:
         metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
@@ -805,7 +807,7 @@ async def test_date_time_entity_message_meeting_not_owned(
         with_meeting_id={ContextId.EDIT_MEETING_TIME: 99},
     )
 
-    assert response is None
+    assert response == ConversationHandler.END
 
     # A message update carries no message of ours to replace, so the redirect is a fresh reply.
     context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

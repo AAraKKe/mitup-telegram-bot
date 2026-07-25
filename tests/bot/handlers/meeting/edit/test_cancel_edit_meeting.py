@@ -71,8 +71,8 @@ async def test_cancel_edit_meeting_redirects_when_meeting_no_longer_exists(
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 123},
     )
 
-    # The guard rejection aborts the handler, so it returns no state at all.
-    assert result is None
+    # The guard rejection aborts the handler, so it ends the conversation.
+    assert result == ConversationHandler.END
     context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=meeting.owner.lang)))
 
 
@@ -92,5 +92,5 @@ async def test_cancel_edit_meeting_stops_when_user_does_not_own_meeting(
         context, result = await call_handler(EditMeetingHandlerId.CANCEL, handler_context=handler_context)
         assert "User tried 'Cancel edit meeting' with a meeting that does not belong to them." in caplog.text
 
-    assert result is None
+    assert result == ConversationHandler.END
     context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

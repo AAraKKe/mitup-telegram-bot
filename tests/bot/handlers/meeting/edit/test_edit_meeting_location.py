@@ -208,8 +208,8 @@ async def test_edit_location_name_not_owned(
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_NAME_CALLBACK, handler_context=handler_context
         )
-        # The guard rejection aborts the handler, so it returns no conversation state.
-        assert result is None
+        # The guard rejection aborts the handler, so it ends the conversation.
+        assert result == ConversationHandler.END
         assert "User tried 'Edit location name' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -305,8 +305,8 @@ async def test_edit_location_coordinates_not_owned(
         context, result = await call_handler(
             EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, handler_context=handler_context
         )
-        # The guard rejection aborts the handler, so it returns no conversation state.
-        assert result is None
+        # The guard rejection aborts the handler, so it ends the conversation.
+        assert result == ConversationHandler.END
         assert "User tried 'Edit location coordinates' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -687,7 +687,7 @@ async def test_edit_location_coordinates_message_stops_when_user_does_not_own_me
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 999},
     )
 
-    assert state is None
+    assert state == ConversationHandler.END
     # A message update carries no message of ours to replace, so the redirect is a fresh reply.
     context.api.assert_method_just_called("send_message", times=1)
     context.api.assert_edit_message_not_called()

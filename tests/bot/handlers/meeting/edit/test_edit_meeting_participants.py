@@ -213,7 +213,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, handler_context=handler_context
         )
 
-        assert result is None
+        assert result == ConversationHandler.END
         assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -437,7 +437,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
             EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK, handler_context=handler_context
         )
 
-        assert result is None
+        assert result == ConversationHandler.END
         assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -740,7 +740,7 @@ async def test_edit_max_participants_message_stops_when_meeting_not_owned(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 99},
     )
 
-    assert state is None
+    assert state == ConversationHandler.END
     # Meeting not owned — redirected to main menu. A message update has no message of ours to
     # replace, so the redirect arrives as a fresh reply.
     context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
@@ -770,7 +770,7 @@ async def test_edit_wrong_max_participants_stops_when_meeting_not_owned(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 99},
     )
 
-    assert state is None
+    assert state == ConversationHandler.END
     # Meeting not owned — redirected to main menu, as a fresh reply to the message update.
     context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     context.api.assert_edit_message_not_called()

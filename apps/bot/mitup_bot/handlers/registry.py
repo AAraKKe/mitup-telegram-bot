@@ -79,6 +79,11 @@ def callback_with_metrics(
                 # separate context. Lets handle errors here where we still have the context
                 # of the handler that was executed including metrics context.
                 await error_handler(context, e, env)
+                # No flow survives a handled error: the error handler leaves the user on a screen
+                # that navigates elsewhere, so no conversation state may stay live behind it.
+                # `None` would mean "keep the current state" to PTB and strand the user in a state
+                # whose context data is already gone. PTB ignores the value outside conversations.
+                return_value = ConversationHandler.END
             else:
                 # Dimensionless FAULT=0; the handler identity rides as an EMF property, not a dimension.
                 context.emit_metric(MetricKey.FAULT, 0)

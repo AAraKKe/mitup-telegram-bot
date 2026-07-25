@@ -480,7 +480,7 @@ async def test_end_datetime_entry_callback_shows_end_datetime_view(
     [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(999))],
     indirect=True,
 )
-async def test_end_datetime_entry_callback_meeting_not_accessible_returns_none(
+async def test_end_datetime_entry_callback_meeting_not_accessible_ends_conversation(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -495,8 +495,8 @@ async def test_end_datetime_entry_callback_meeting_not_accessible_returns_none(
         EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK, handler_context=handler_context
     )
 
-    # The guard returns None (id 999 is not the user's meeting id 1), so the handler returns None
-    assert state is None
+    # The guard rejection ends the conversation (id 999 is not the user's meeting id 1)
+    assert state == ConversationHandler.END
 
 
 # ---------------------------------------------------------------------------
@@ -686,7 +686,7 @@ async def test_duration_end_date_nav_meeting_not_accessible(
         EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK, handler_context=handler_context
     )
 
-    assert state is None
+    assert state == ConversationHandler.END
 
 
 # ---------------------------------------------------------------------------
@@ -740,7 +740,7 @@ async def test_back_to_end_datetime_meeting_not_accessible(
         EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK, handler_context=handler_context
     )
 
-    assert state is None
+    assert state == ConversationHandler.END
 
 
 # ---------------------------------------------------------------------------
@@ -805,7 +805,7 @@ async def test_duration_end_time_callback_meeting_not_accessible(
         EditMeetingHandlerId.DURATION_END_TIME_CALLBACK, handler_context=handler_context
     )
 
-    assert state is None
+    assert state == ConversationHandler.END
 
 
 # ---------------------------------------------------------------------------

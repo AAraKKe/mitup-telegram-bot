@@ -255,6 +255,47 @@ async def test_all_handlers_emit_handler_metrics(app: StubMitupApp, update: Upda
 
 
 # ---------------------------------------------------------------------------
+# Error path of the metrics wrapper
+# ---------------------------------------------------------------------------
+
+
+async def test_handled_error_ends_the_conversation(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    """A callback whose exception the wrapper handles reports END, so no conversation stays live
+    behind the screen the error handler leaves the user on.
+
+    `mock_session` backs the language lookup the error handler makes while building that screen.
+    """
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="boom")
+    async def command_boom(update: Update, context: StubMitupContext):
+        raise RuntimeError("something went wrong mid-flow")
+
+    result = await invoke(HandlerTestId.SOME_COMMAND, update, build_context(update, app, metrics=metrics_client))
+
+    assert result == ConversationHandler.END
+    ClearableRegistry.clear()
+
+
+async def test_claimed_update_keeps_carrying_its_state(
+    update: Update, app: StubMitupApp, metrics_client: MetricsClient
+):
+    """ApplicationHandlerStop is a success path: the wrapper re-raises it untouched so the state it
+    carries still reaches PTB."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="claiming")
+    async def command_claiming(update: Update, context: StubMitupContext):
+        raise ApplicationHandlerStop(ConversationStates.STATE_ONE)
+
+    with pytest.raises(ApplicationHandlerStop) as raised:
+        await invoke(HandlerTestId.SOME_COMMAND, update, build_context(update, app, metrics=metrics_client))
+
+    assert raised.value.state == ConversationStates.STATE_ONE
+    ClearableRegistry.clear()
+
+
+# ---------------------------------------------------------------------------
 # Conversation handler registration (merged from test_conversation.py)
 # ---------------------------------------------------------------------------
 
