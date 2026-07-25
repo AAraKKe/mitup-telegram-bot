@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-25 04:36\n"
+"PO-Revision-Date: 2026-07-25 14:18\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -235,6 +235,12 @@ msgstr "Connect this account"
 
 msgid "ButtonMessages.DECLINE_PATREON_LINK"
 msgstr "Not now"
+
+msgid "ButtonMessages.CONFIRM_PATREON_UNLINK"
+msgstr "Unlink this account"
+
+msgid "ButtonMessages.DECLINE_PATREON_UNLINK"
+msgstr "Keep it connected"
 
 msgid "ButtonMessages.HOSTS_GROUP_JOIN"
 msgstr "👥 Join the Hosts-Only Group"
@@ -784,6 +790,12 @@ msgstr "<b>🏆 You're a Commissioner</b>\n\nThanks for backing Mitup. Your Comm
 
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Your Patreon account has been unlinked."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM"
+msgstr "<b>Unlink your Patreon account?</b>\n\nThis disconnects your Patreon account from Mitup. You are not using any Host perks right now, so you are not giving any up. You can link an account again any time from Collaborate."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
+msgstr "<b>Unlink your Patreon account?</b>\n\nYou are a ${current_tier} today. Unlinking switches off your ${current_tier} badge and raised limits, and your access to the Hosts-Only Group ends.\n\nYour pledge on Patreon does not stop by itself. If you want to stop paying, cancel it on Patreon. If you link your account again while your pledge is active, your Host perks come back."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
 msgstr "<b>Patreon account linked</b>\n\nYou're connected. Become a Host to unlock your Host perks. They'll switch on automatically once your pledge is active."

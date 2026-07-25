@@ -857,6 +857,12 @@ msgstr "Dieses Konto verbinden"
 msgid "ButtonMessages.DECLINE_PATREON_LINK"
 msgstr "Jetzt nicht"
 
+msgid "ButtonMessages.CONFIRM_PATREON_UNLINK"
+msgstr "Diesen Account trennen"
+
+msgid "ButtonMessages.DECLINE_PATREON_UNLINK"
+msgstr "Verbunden lassen"
+
 msgid "CollaborateMessages.NOT_LINKED"
 msgstr "<b>Hilf mit, Mitup am Laufen zu halten</b>\n\nMitup wird von zwei Brüdern gebaut, nicht von einem großen Unternehmen, und ist für alle kostenlos. Deine Unterstützung bezahlt die Server, die Datenbank und die langen Debugging-Nächte. Jede Hilfe zählt: erzähl deinen Freunden von Mitup, übersetze, melde Fehler oder unterstütze das Projekt finanziell. Die Seite ${collaborate_page} auf unserer Website zeigt alle Wege mitzuhelfen.\n\nDer direkteste Weg zu helfen ist, Mitup-Host auf Patreon zu werden. Als Dankeschön bekommen Hosts ein Abzeichen neben ihrem Namen, eine Gruppe nur für Mitglieder und höhere Limits je nach Stufe: Brewer, Gamemaster oder Commissioner. Die Seite ${limits_page} zeigt, was jede Stufe freischaltet.\n\nVerknüpfe dein Patreon-Konto, um loszulegen, und danke, dass du da bist."
 
@@ -895,6 +901,12 @@ msgstr "<b>Dieses Patreon-Konto ist bereits verbunden</b>\n\nEin Patreon-Konto k
 
 msgid "CollaborateMessages.LINK_NEEDS_SETUP"
 msgstr "<b>Richte Mitup zuerst fertig ein</b>\n\nSende /start, um dein Konto einzurichten, und tippe dann noch einmal auf den Bestätigungslink, um dein Patreon-Konto zu verbinden. Der Link bleibt noch ein paar Minuten gültig."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM"
+msgstr "<b>Patreon-Konto trennen?</b>\n\nDas trennt dein Patreon-Konto von Mitup. Du nutzt gerade keine Host-Vorteile, also gibst du nichts auf. Du kannst ein Konto jederzeit über Mithelfen erneut verbinden."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
+msgstr "<b>Patreon-Konto trennen?</b>\n\nDu bist heute ein ${current_tier}. Das Trennen schaltet dein ${current_tier}-Abzeichen und deine erweiterten Limits aus, und dein Zugang zur Hosts-Gruppe endet.\n\nDein Patreon-Beitrag stoppt nicht von selbst. Wenn du nicht mehr zahlen möchtest, storniere ihn auf Patreon. Wenn du dein Konto erneut verbindest, während dein Beitrag noch aktiv ist, kommen deine Host-Vorteile zurück."
 
 msgid "CollaborateMessages.TIER_NAME_HOST_1"
 msgstr "Brewer"

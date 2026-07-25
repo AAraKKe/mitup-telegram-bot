@@ -123,6 +123,10 @@ SETTINGS = CallbackData(entity="settings")
 HELP = CallbackData(entity="help")
 COLLABORATE = CallbackData(entity="collaborate")
 UNLINK_PATREON = CallbackData(action="unlink", entity="patreon")
+# The unlink-confirmation pair. The subscription is resolved server-side from the account that
+# presses the button, so the callbacks carry no id: a forged confirm can only unlink the forger.
+CONFIRM_PATREON_UNLINK = CallbackData(action="confirm", entity="patreon_unlink")
+DECLINE_PATREON_UNLINK = CallbackData(action="decline", entity="patreon_unlink")
 # The link-confirmation pair. Addressed by the pairing code rather than the pending row's id:
 # callback data is client-supplied, and a row id is a small guessable integer, so a forged button
 # could otherwise name somebody else's pending link. The entity is kept to two characters because

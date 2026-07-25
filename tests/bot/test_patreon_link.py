@@ -18,11 +18,11 @@ from mitup_bot import patreon_link
 from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import SupporterSubscription
 from mitup_bot.models.users import UserStatus
-from mitup_bot.patreon_link import LinkOutcome, link_patreon_account, upsert_subscription
+from mitup_bot.patreon_link import LinkOutcome, link_patreon_account, upsert_subscription, withdraw_from_hosts_group
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
-from mitup_bot.views.collaborate import hosts_group_readmitted_view, link_confirmation_view
+from mitup_bot.views.collaborate import hosts_group_readmitted_view, hosts_group_removed_view, link_confirmation_view
 from tests.helpers import MockApi, create_supporter_subscription, create_user
 from tests.helpers.stub_db import MockDbSession
 
@@ -314,3 +314,68 @@ async def test_link_supporter_noop_when_hosts_group_unconfigured(reset_hosts_gro
     assert outcome is LinkOutcome.LINKED_SUPPORTER
     api.assert_method_just_called("unban_chat_member", times=0)
     api.mock_method("is_chat_banned").assert_not_called()
+
+
+# --- Hosts-only group withdrawal when the link goes away ---
+
+
+async def test_withdraw_ejects_a_member_and_lifts_the_ban_it_used(reset_hosts_group: None):
+    """A member is removed via ban and immediately unbanned — a kick, not a permanent ban. With the
+    subscription row deleted no sweep can ever unban them, so a ban surviving this call would be
+    unliftable; the join-request gate is what keeps a non-supporter out afterwards."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    user = create_user(id=1, tg_user_id=997_670)
+    api = MockApi()
+    api.register_on_method("is_chat_member", return_value=True)
+
+    await withdraw_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=1)
+    api.assert_method_just_called("unban_chat_member", times=1)
+    assert api.call_args("unban_chat_member").kwargs == {
+        "chat_id": HOSTS_GROUP_CHAT_ID,
+        "tg_user_id": 997_670,
+        "only_if_banned": True,
+    }
+    assert hosts_group_removed_view(user.lang) in sent_views(api)
+
+
+async def test_withdraw_clears_a_stale_ban_without_a_dm(reset_hosts_group: None):
+    """A user banned by an earlier revoke is not a member, so there is nothing to eject and nothing
+    to announce — but the ban is cleared, because nothing else can reach it once the row is gone."""
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    user = create_user(id=1, tg_user_id=997_671)
+    api = MockApi()
+
+    await withdraw_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=0)
+    api.assert_method_just_called("unban_chat_member", times=1)
+    assert sent_views(api) == []
+
+
+async def test_withdraw_skips_group_admins(reset_hosts_group: None):
+    # banChatMember cannot ban the creator and fails on other admins, so an admin is left alone.
+    HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    user = create_user(id=1, tg_user_id=997_672)
+    api = MockApi()
+    api.register_on_method("is_chat_admin", return_value=True)
+    api.register_on_method("is_chat_member", return_value=True)
+
+    await withdraw_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=0)
+    api.assert_method_just_called("unban_chat_member", times=0)
+    assert sent_views(api) == []
+
+
+async def test_withdraw_noop_when_hosts_group_unconfigured(reset_hosts_group: None):
+    # reset_hosts_group leaves chat_id None: the feature is off and the group is never touched.
+    user = create_user(id=1, tg_user_id=997_673)
+    api = MockApi()
+
+    await withdraw_from_hosts_group(api, user)
+
+    api.assert_method_just_called("ban_chat_member", times=0)
+    api.assert_method_just_called("unban_chat_member", times=0)
+    api.mock_method("is_chat_admin").assert_not_called()

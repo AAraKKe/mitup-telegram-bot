@@ -978,6 +978,18 @@ CONTEXTS = [
         id="collaborate_unlink",
     ),
     Context(
+        handler_id=CollaborateHandlerId.UNLINK_CONFIRM,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="collaborate_unlink_confirm",
+    ),
+    Context(
+        handler_id=CollaborateHandlerId.UNLINK_DECLINE,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_PATREON_UNLINK),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="collaborate_unlink_decline",
+    ),
+    Context(
         handler_id=CollaborateHandlerId.PATREON_LINK_CONFIRM,
         update_request=UpdateRequest(callback_query=cb.CONFIRM_PATREON_LINK.with_code("a-code")),
         error_modes={ErrorMode.USER_NOT_FOUND},

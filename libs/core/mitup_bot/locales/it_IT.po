@@ -1048,3 +1048,15 @@ msgstr "modi per sostenere"
 
 msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
 msgstr "limiti e vantaggi Host"
+
+msgid "ButtonMessages.CONFIRM_PATREON_UNLINK"
+msgstr "Scollega questo account"
+
+msgid "ButtonMessages.DECLINE_PATREON_UNLINK"
+msgstr "Tienilo collegato"
+
+msgid "CollaborateMessages.UNLINK_CONFIRM"
+msgstr "<b>Scollegare il tuo account Patreon?</b>\n\nQuesto scollega il tuo account Patreon da Mitup. Al momento non stai usando vantaggi da Host, quindi non perdi nulla. Puoi collegare un account di nuovo quando vuoi da Collabora."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
+msgstr "<b>Scollegare il tuo account Patreon?</b>\n\nOggi sei un ${current_tier}. Scollegare disattiva il tuo badge da ${current_tier} e i limiti più alti, e il tuo accesso all'Hosts-Only Group termina.\n\nIl tuo contributo su Patreon non si ferma da solo. Se vuoi smettere di pagare, annullalo su Patreon. Se colleghi di nuovo il tuo account mentre il tuo contributo è attivo, i tuoi vantaggi da Host tornano."

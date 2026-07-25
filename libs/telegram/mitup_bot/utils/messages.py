@@ -147,6 +147,11 @@ class ButtonMessages(MessageBase):
     # label is a neutral way out rather than one that sounds like abandoning setup.
     CONFIRM_PATREON_LINK = "Connect this account"
     DECLINE_PATREON_LINK = "Not now"
+    # The unlink-confirmation pair, in the same register as the link pair above: the confirming
+    # label names the act so tapping it is a decision instead of a reflex, and the declining label
+    # is the way back that keeps things exactly as they are.
+    CONFIRM_PATREON_UNLINK = "Unlink this account"
+    DECLINE_PATREON_UNLINK = "Keep it connected"
     HOSTS_GROUP_JOIN = f"{Emojis.PEOPLE} Join the Hosts-Only Group"
     HOSTS_GROUP_OPEN = f"{Emojis.PEOPLE} Open the Hosts-Only Group"
 
@@ -842,6 +847,24 @@ class CollaborateMessages(MessageBase):
     )
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
+    # Unlink-confirmation prompt for an account with no active Host perks. Unlinking only
+    # disconnects the Patreon account for them, so there is nothing to warn about beyond that.
+    UNLINK_CONFIRM = (
+        "<b>Unlink your Patreon account?</b>\n\n"
+        "This disconnects your Patreon account from Mitup. You are not using any Host perks right "
+        "now, so you are not giving any up. You can link an account again any time from Collaborate."
+    )
+    # Same prompt for a current Host. This is the destructive case: the copy names the tier being
+    # switched off and states that the Patreon pledge itself keeps running unless cancelled on
+    # Patreon, because unlinking here changes nothing on Patreon's side.
+    UNLINK_CONFIRM_HOST = (
+        "<b>Unlink your Patreon account?</b>\n\n"
+        "You are a ${current_tier} today. Unlinking switches off your ${current_tier} badge and "
+        "raised limits, and your access to the Hosts-Only Group ends.\n\n"
+        "Your pledge on Patreon does not stop by itself. If you want to stop paying, cancel it on "
+        "Patreon. If you link your account again while your pledge is active, your Host perks come "
+        "back."
+    )
     # Telegram message sent after redemption when the linked user is not a Host yet.
     LINK_CONFIRMED_NO_PATRON = (
         "<b>Patreon account linked</b>\n\n"

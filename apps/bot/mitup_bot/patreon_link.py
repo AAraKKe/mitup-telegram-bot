@@ -28,7 +28,7 @@ from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
-from mitup_bot.views.collaborate import hosts_group_readmitted_view, link_confirmation_view
+from mitup_bot.views.collaborate import hosts_group_readmitted_view, hosts_group_removed_view, link_confirmation_view
 
 log = structlog.get_logger(__name__)
 
@@ -81,6 +81,36 @@ async def readmit_to_hosts_group(api: TelegramApiWrapper, user: User):
     if was_banned:
         await api.send_message_to_user(user, hosts_group_readmitted_view(user.lang, hosts_group.invite_url()))
         log.info("Re-admitted host to the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
+
+
+async def withdraw_from_hosts_group(api: TelegramApiWrapper, user: User):
+    """Bring hosts-group state in line with an account that no longer has a Patreon link: out of
+    the group, and free of any ban.
+
+    A current member is ejected and then immediately unbanned, so the removal never leaves a
+    permanent ban behind. That matters because this runs where the subscription row is deleted:
+    without a row the daily sweeps can never nominate this user again, so a ban left here would
+    outlive every mechanism able to lift it. Keeping a non-supporter out is the join-request
+    gate's job, and it needs no ban to do it.
+
+    The same unban clears a stale ban left by an earlier revoke, which nothing else can reach once
+    the row is gone. Group admins are skipped: banChatMember cannot ban the creator and fails on
+    other admins. The removal DM goes only to someone who was actually in the group. A no-op when
+    the feature is unconfigured; the api wrapper swallows Telegram failures.
+    """
+    chat_id = hosts_group.chat_id()
+    if chat_id is None:
+        return
+    if await api.is_chat_admin(chat_id, user.tg_user_id):
+        log.info("Skipping hosts-group withdrawal for a group admin", tg_user_id=user.tg_user_id, chat_id=chat_id)
+        return
+    was_member = await api.is_chat_member(chat_id, user.tg_user_id)
+    if was_member:
+        await api.ban_chat_member(chat_id, user.tg_user_id)
+    await api.unban_chat_member(chat_id, user.tg_user_id, only_if_banned=True)
+    if was_member:
+        await api.send_message_to_user(user, hosts_group_removed_view(user.lang))
+        log.info("Removed unlinked user from the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
 
 
 async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> SupporterSubscription | None:

@@ -1078,3 +1078,15 @@ msgstr "Gamemaster"
 
 msgid "CollaborateMessages.TIER_NAME_HOST_3"
 msgstr "Commissioner"
+
+msgid "ButtonMessages.CONFIRM_PATREON_UNLINK"
+msgstr "Desenlazar esta conta"
+
+msgid "ButtonMessages.DECLINE_PATREON_UNLINK"
+msgstr "Manter conectada"
+
+msgid "CollaborateMessages.UNLINK_CONFIRM"
+msgstr "<b>Desenlazar a túa conta de Patreon?</b>\n\nIsto desconecta a túa conta de Patreon de Mitup. Agora non estás usando ningunhas vantaxes de Host, así que non renuncias a nada. Podes vincular unha conta de novo cando queiras desde Colabora."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
+msgstr "<b>Desenlazar a túa conta de Patreon?</b>\n\nHoxe es ${current_tier}. Desenlazar desactiva a túa insignia de ${current_tier} e os teus límites ampliados, e o teu acceso ao grupo exclusivo de Hosts remata.\n\nA túa achega en Patreon non se para automaticamente. Se queres deixar de pagar, cancélaa en Patreon. Se vinculas a túa conta de novo mentres a túa achega está activa, as túas vantaxes de Host volven."

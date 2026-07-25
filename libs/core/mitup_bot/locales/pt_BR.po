@@ -1078,3 +1078,15 @@ msgstr "formas de apoiar"
 
 msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
 msgstr "limites e vantagens de Host"
+
+msgid "ButtonMessages.CONFIRM_PATREON_UNLINK"
+msgstr "Desconectar esta conta"
+
+msgid "ButtonMessages.DECLINE_PATREON_UNLINK"
+msgstr "Manter conectada"
+
+msgid "CollaborateMessages.UNLINK_CONFIRM"
+msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nIsso desconecta sua conta do Patreon do Mitup. Você não está usando vantagens de Host no momento, então não está abrindo mão de nada. Você pode conectar uma conta quando quiser pelo Colabore."
+
+msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
+msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nVocê é um ${current_tier} hoje. Desconectar desativa seu selo de ${current_tier} e seus limites ampliados, e seu acesso ao Grupo Exclusivo de Hosts termina.\n\nSua contribuição no Patreon não para por si só. Se quiser parar de pagar, cancele-a no Patreon. Se conectar sua conta novamente enquanto sua contribuição está ativa, suas vantagens de Host voltam."

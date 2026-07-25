@@ -61,6 +61,30 @@ def patreon_link_confirmation_view(
     )
 
 
+def patreon_unlink_confirmation_view(ctx: RenderContext, *, current_level: SupporterLevel) -> MitupView:
+    """The prompt the Unlink button opens: what disconnecting costs, before anything is written.
+
+    ``current_level`` picks the variant: a Host reads which tier gets switched off and that their
+    group access ends, everyone else reads that only the connection itself goes away. Confirming is
+    what deletes the subscription; this screen writes nothing.
+    """
+    if supporter.is_supporter(current_level):
+        message = CollaborateMessages.UNLINK_CONFIRM_HOST.get(
+            lang=ctx.lang,
+            current_tier=CollaborateMessages.tier_name_for(current_level).get_text(lang=ctx.lang),
+        )
+    else:
+        message = CollaborateMessages.UNLINK_CONFIRM.get(lang=ctx.lang)
+    return factory.confirmation_view(
+        ctx,
+        message=message,
+        confirm_callback_data=cb.CONFIRM_PATREON_UNLINK,
+        decline_callback_data=cb.DECLINE_PATREON_UNLINK,
+        confirm_label=ButtonMessages.CONFIRM_PATREON_UNLINK,
+        decline_label=ButtonMessages.DECLINE_PATREON_UNLINK,
+    )
+
+
 def patreon_link_declined_view(lang: str) -> MitupView:
     """Reply to declining the confirmation prompt: nothing was connected, and the way back in."""
     return MitupView(

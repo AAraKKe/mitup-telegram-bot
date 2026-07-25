@@ -12,6 +12,8 @@ PATREON_PAIRING_HANDLERS_GROUP = -2
 class CollaborateHandlerId(HandlerId):
     SHOW = auto()
     UNLINK = auto()
+    UNLINK_CONFIRM = auto()
+    UNLINK_DECLINE = auto()
     PATREON_LINK_REDEEM = auto()
     PATREON_LINK_CONFIRM = auto()
     PATREON_LINK_DECLINE = auto()
