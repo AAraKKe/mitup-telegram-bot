@@ -26,7 +26,7 @@ async def callback_edit_meeting_language(session: AsyncSession, update: Update, 
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(session, user, valid_data.id, "Edit meeting language", update, context)
+    meeting = await guards.meeting(session, user, valid_data.id, "Edit meeting language", update, context)
 
     if meeting is None:
         return
@@ -47,9 +47,7 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
-        session, user, valid_data.meeting_id, "Set meeting language", update, context
-    )
+    meeting = await guards.meeting(session, user, valid_data.meeting_id, "Set meeting language", update, context)
 
     if meeting is None:
         return

@@ -1,3 +1,4 @@
+from enum import Enum, auto
 from typing import cast
 
 import structlog
@@ -243,35 +244,37 @@ def chosen_inline_result(update: Update) -> ChosenInlineResult:
     return update.chosen_inline_result
 
 
-async def user_owns_meeting(
+class MeetingAccess(Enum):
+    """Which callers `meeting` lets through, and how it answers the ones it stops.
+
+    `OWNER` and `OWNER_OR_JOINED` are the live-meeting profiles: a meeting that no longer exists
+    gets the deleted-meeting notice, and an inactive one gets the reactivation prompt for its owner
+    and the main-menu redirect for everybody else. `OWNER_ANY_STATE` is for the surfaces that render
+    inactive meetings themselves (the past-meetings screens, reactivation, the delete flows): the
+    meeting's state is never an obstacle there, and a meeting that cannot be resolved is answered
+    exactly like one the caller does not own.
+    """
+
+    OWNER = auto()
+    OWNER_OR_JOINED = auto()
+    OWNER_ANY_STATE = auto()
+
+
+async def notify_meeting_not_owned(
     user: User,
     meeting_id: int,
     action: str,
     update: Update,
     context: TMitupContext,
-    redirect=True,
-) -> Meetup | None:
-    """
-    Check if the user owns the meeting.
-    If the user does, the meeting is returned.
-    If not, if the redirect flag is set to True, warn and send the user to the main menu and None is returned.
-    If the redirect flag is False, None is returned but no communication happens with the user.
-    """
-    if meeting := user.own_meeting(meeting_id):
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
-        return meeting
-
-    if redirect:
-        message = (
-            f"User tried {action!r} with a meeting that does not belong to them. "
-            f"Meeting id: {meeting_id}, user id: {user.db_id}"
-        )
-        log.warning(message)
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
-        await context.api.edit_message(
-            update=update, view=factory.main_menu_view(render_context(user, update, context))
-        )
-    return None
+):
+    """Warn, count the rejection and send the user back to the main menu."""
+    message = (
+        f"User tried {action!r} with a meeting that does not belong to them. "
+        f"Meeting id: {meeting_id}, user id: {user.db_id}"
+    )
+    log.warning(message)
+    context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
+    await context.api.edit_message(update=update, view=factory.main_menu_view(render_context(user, update, context)))
 
 
 async def show_reactivation_prompt(
@@ -323,78 +326,65 @@ async def notify_meeting_removed(
     )
 
 
-async def meeting_accessible(
+async def meeting(
     session: AsyncSession,
     user: User,
     meeting_id: int,
     action: str,
     update: Update,
     context: TMitupContext,
+    *,
+    access: MeetingAccess = MeetingAccess.OWNER,
+    lock: bool = False,
     custom_keyboard: Keyboard | None = None,
-    for_update: bool = False,
 ) -> Meetup | None:
+    """Return the meeting the user may act on through the bot chat, or None once the caller has
+    been told why they cannot — on which handlers must bail immediately.
+
+    The returned instance is always the guard's own meeting-rooted load, so its participant leaves
+    (owner, joined links' user/invited_by) are hydrated and any renderer can traverse them under the
+    async engine. `access` selects who gets through and which screen the rest are answered with.
+
+    Participant- or capacity-mutating callers must pass `lock=True` so the meetup row (the
+    per-meeting mutex) is locked before any capacity/waiting-list read, and so the ownership check
+    itself runs on the locked row. The guard then re-loads the user's collections, which the locked
+    load's `populate_existing` resets to unloaded; the row lock is already held, so the re-read is
+    race-safe. Parameter mechanics such as `custom_keyboard` are documented in the guards skill.
     """
-    Return the meeting when the user may act on it as its owner (bot-chat access only); otherwise
-    inform the user of the failing case (removed, inactive-but-owned → reactivation prompt, not
-    owned → main-menu redirect) and return None, on which callers must bail immediately.
+    found_meeting = await Meetup.by_id(session, meeting_id, for_update=lock)
 
-    Participant- or capacity-mutating callers must pass `for_update=True` so the meetup row (the
-    per-meeting mutex) is locked before any capacity/waiting-list read. Parameter mechanics such
-    as `custom_keyboard` are documented in the guards skill.
-    """
-
-    meeting = await Meetup.by_id(session, meeting_id, for_update=for_update)
-
-    if meeting is None:
-        await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
-        return None
-
-    if for_update:
-        # The locked load ran with populate_existing, which re-hydrates every entity its selectin
-        # cascade touches — including `user` when they own or participate in the meeting —
-        # resetting the lazy="raise" collections the ownership checks below traverse. Re-load
-        # them; the row lock is already held, so the re-read is race-safe.
+    if lock and found_meeting is not None:
         await session.refresh(user, ["meetups", "joined_links"])
 
-    if not meeting.active and user.own_meeting(meeting_id):
-        await show_reactivation_prompt(user, meeting_id, update, context, custom_keyboard)
-        return None
+    if access is MeetingAccess.OWNER_ANY_STATE:
+        if found_meeting is None or not found_meeting.is_owned_by(user):
+            await notify_meeting_not_owned(user, meeting_id, action, update, context)
+            return None
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
+        return found_meeting
 
-    return await user_owns_meeting(user, meeting_id, action, update, context)
-
-
-async def meeting_viewable(
-    session: AsyncSession,
-    user: User,
-    meeting_id: int,
-    action: str,
-    update: Update,
-    context: TMitupContext,
-    custom_keyboard: Keyboard | None = None,
-) -> Meetup | None:
-    """Check whether the user may *view* the meeting, whether they own it or have only joined it.
-
-    Unlike `meeting_accessible`, a non-owner who has joined an active meeting is allowed through so
-    the caller can render the non-owner view (`views.meeting.external_view`) instead of being bounced to the
-    main menu. Can only be used when a meeting is accessed from the bot chat.
-    """
-
-    meeting = await Meetup.by_id(session, meeting_id)
-
-    if meeting is None:
+    if found_meeting is None:
         await notify_meeting_removed(user, meeting_id, action, update, context, custom_keyboard)
         return None
 
-    if not meeting.active:
-        if user.own_meeting(meeting_id):
+    if not found_meeting.active:
+        if found_meeting.is_owned_by(user):
             await show_reactivation_prompt(user, meeting_id, update, context, custom_keyboard)
-            return None
-        return await user_owns_meeting(user, meeting_id, action, update, context)
+        else:
+            await notify_meeting_not_owned(user, meeting_id, action, update, context)
+        return None
 
-    if user.own_meeting(meeting_id) or user.joined_meeting(meeting_id):
-        return meeting
+    if found_meeting.is_owned_by(user):
+        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
+        return found_meeting
 
-    return await user_owns_meeting(user, meeting_id, action, update, context)
+    # The not-owned counter tracks ownership decisions, so a participant reaching a meeting they do
+    # not own leaves the series untouched.
+    if access is MeetingAccess.OWNER_OR_JOINED and found_meeting.has_participant(user.db_id):
+        return found_meeting
+
+    await notify_meeting_not_owned(user, meeting_id, action, update, context)
+    return None
 
 
 async def meeting_interaction_allowed(

@@ -11,7 +11,7 @@ from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
-from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup, create_member
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -57,13 +57,12 @@ async def test_cancel_edit_meeting_fails_with_malformed_callback_data(
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(123))]), indirect=True)
-async def test_cancel_edit_meeting_silent_when_full_meeting_not_found(
+async def test_cancel_edit_meeting_redirects_when_meeting_no_longer_exists(
     mock_session: MockDbSession, update: Update, meeting: Meetup, handler_context: HandlerContext
 ):
-    """The user owns the meeting (guard passes off user.meetups) but the meeting-rooted reload
-    returns None, so the handler ends the conversation without rendering the edit view."""
-    # Register only the owner so user_owns_meeting passes; the meeting is NOT added to the session,
-    # so the Meetup.by_id reload returns None.
+    """A meeting that no longer resolves ends the conversation on the main menu."""
+    # Register only the owner; the meeting is NOT added to the session, so the guard's
+    # meeting-rooted load finds nothing.
     mock_session.add_object(meeting.owner, "tg_user_id")
 
     context, result = await call_handler(
@@ -73,7 +72,7 @@ async def test_cancel_edit_meeting_silent_when_full_meeting_not_found(
     )
 
     assert result is ConversationHandler.END
-    context.api.assert_method_just_called("edit_message", times=0)
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=meeting.owner.lang)))
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=cb.EDIT_MEETING_CANCEL.with_id(999))]), indirect=True)
@@ -84,16 +83,13 @@ async def test_cancel_edit_meeting_returns_end_when_user_does_not_own_meeting(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """When user_owns_meeting returns None (meeting not owned), cancel_edit_meeting returns END.
-    The guard itself redirects the user to the main menu via edit_message."""
+    """A meeting owned by somebody else ends the conversation; the guard redirects to the main menu."""
     mock_session.add_object(user_with_settings, "tg_user_id")
-    # Register a meeting that does NOT belong to the user so user_owns_meeting returns None
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(EditMeetingHandlerId.CANCEL, handler_context=handler_context)
         assert "User tried 'Cancel edit meeting' with a meeting that does not belong to them." in caplog.text
 
     assert result is ConversationHandler.END
-    # The guard (user_owns_meeting) calls edit_message to redirect to main menu
     context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

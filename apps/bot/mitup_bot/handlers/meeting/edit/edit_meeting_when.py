@@ -22,7 +22,7 @@ async def callback_query_when_entry(session: AsyncSession, update: Update, conte
     ).id
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, meeting_id, "edit_meeting_when", update, context)
+    meeting = await guards.meeting(session, user, meeting_id, "edit_meeting_when", update, context)
     if meeting is None:
         return
 
@@ -39,7 +39,7 @@ async def callback_query_clear_times(session: AsyncSession, update: Update, cont
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "clear_times", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "clear_times", update, context)
     if meeting is None:
         return
 
@@ -62,7 +62,7 @@ async def callback_query_confirm_clear_times(session: AsyncSession, update: Upda
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "confirm_clear_times", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "confirm_clear_times", update, context)
     if meeting is None:
         return
 
@@ -90,7 +90,7 @@ async def callback_query_decline_clear_times(session: AsyncSession, update: Upda
     )
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "decline_clear_times", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "decline_clear_times", update, context)
     if meeting is None:
         return
 
@@ -108,7 +108,7 @@ async def callback_query_set_lock_on_start(session: AsyncSession, update: Update
     ).id
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, meeting_id, "set_lock_on_start", update, context)
+    meeting = await guards.meeting(session, user, meeting_id, "set_lock_on_start", update, context)
     if meeting is None:
         return
 

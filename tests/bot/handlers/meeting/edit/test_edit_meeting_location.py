@@ -26,6 +26,7 @@ from tests.helpers import (
     UpdateRequest,
     call_handler,
     create_meetup,
+    create_member,
     owner_with_meeting,
 )
 from tests.helpers.monitoring import MetricAssertions
@@ -112,7 +113,7 @@ async def test_edit_location_meeting_not_owned(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     # For the test case where we give a meeting that does not belong to the user
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, handler_context=handler_context)
@@ -148,7 +149,7 @@ async def test_edit_location_failures(
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
     # For the test case where we give a meeting that does not belong to the user
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, handler_context=handler_context)
@@ -166,6 +167,7 @@ async def test_edit_location_name_works(
     handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     context, result = await call_handler(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, handler_context=handler_context)
     expected_view = MitupView(
@@ -200,7 +202,7 @@ async def test_edit_location_name_not_owned(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     # For the test case where we give a meeting that does not belong to the user
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
@@ -260,6 +262,7 @@ async def test_edit_location_coordinates_works(
     handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
 
     context, result = await call_handler(
         EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, handler_context=handler_context
@@ -296,7 +299,7 @@ async def test_edit_location_coordinates_not_owned(
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
     # For the test case where we give a meeting that does not belong to the user
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
@@ -672,8 +675,7 @@ async def test_edit_location_coordinates_message_ends_when_user_does_not_own_mee
     update: Update,
     handler_context: HandlerContext,
 ):
-    """When meeting_id is set but user doesn't own that meeting, user_owns_meeting returns None,
-    the handler redirects to main_menu_view and returns END."""
+    """A meeting the user does not own redirects to the main menu and ends the conversation."""
     user, meeting = owner_with_meeting(meeting_id=1)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
@@ -690,19 +692,19 @@ async def test_edit_location_coordinates_message_ends_when_user_does_not_own_mee
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(location=Location(longitude=123.4, latitude=567.8))], indirect=True)
-async def test_edit_location_coordinates_message_mutates_reloaded_meeting(
+async def test_edit_location_coordinates_message_mutates_session_meeting(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
 ):
-    """The coordinate write and fan-out must land on the meeting-rooted Meetup.by_id reload, not on
-    the user-rooted guard result whose participant leaves are unloaded under the async engine."""
+    """The coordinate write and fan-out land on the guard's meeting-rooted load, whose participant
+    leaves are hydrated — a user-rooted instance leaves them unloaded under the async engine."""
     user, user_rooted_meeting = owner_with_meeting(meeting_id=1)
-    # A distinct Meetup instance shares the same id: user_owns_meeting resolves the user-rooted one,
-    # while Meetup.by_id resolves this session-loaded one. Only the reload must be mutated.
-    reloaded_meeting = create_meetup(id=1, location=MeetupLocation(name="Session Location"))
+    # A distinct Meetup instance shares the same id: the guard resolves this session-loaded one,
+    # and it is the only one that may be mutated.
+    session_meeting = create_meetup(id=1, owner=user, location=MeetupLocation(name="Session Location"))
     mock_session.add_object(user, query_field="tg_user_id")
-    mock_session.add_object(reloaded_meeting)
+    mock_session.add_object(session_meeting)
 
     context, result = await call_handler(
         EditMeetingHandlerId.LOCATION_COORDINATES_MESSAGE,
@@ -710,9 +712,9 @@ async def test_edit_location_coordinates_message_mutates_reloaded_meeting(
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
 
-    assert reloaded_meeting.location.coordinates == (123.4, 567.8)
+    assert session_meeting.location.coordinates == (123.4, 567.8)
     assert user_rooted_meeting.location.coordinates is None
-    expected_view = edit_location_view(reloaded_meeting).with_context(
+    expected_view = edit_location_view(session_meeting).with_context(
         MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user.lang)
     )
     context.api.assert_send_message_called(update, expected_view)

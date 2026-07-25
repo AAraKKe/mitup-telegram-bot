@@ -51,7 +51,15 @@ async def callback_query_delete_past_meeting(session: AsyncSession, update: Upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Delete past meeting", update, context)
+    meeting = await guards.meeting(
+        session,
+        user,
+        callback_data.id,
+        "Delete past meeting",
+        update,
+        context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
+    )
     if meeting is None:
         return
 
@@ -77,15 +85,19 @@ async def callback_query_show_past_meeting(session: AsyncSession, update: Update
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Show past meeting", update, context)
+    meeting = await guards.meeting(
+        session,
+        user,
+        callback_data.id,
+        "Show past meeting",
+        update,
+        context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
+    )
     if meeting is None:
         return
 
-    full_meeting = await Meetup.by_id(session, callback_data.id, include_inactive=True)
-    if full_meeting is None:
-        return
-
-    await context.api.edit_message(update=update, view=past_meeting_view(full_meeting, user, callback_data.page))
+    await context.api.edit_message(update=update, view=past_meeting_view(meeting, user, callback_data.page))
 
 
 @HandlersRegistry.register_callback_query(
@@ -101,19 +113,23 @@ async def callback_query_confirm_delete_past_meeting(session: AsyncSession, upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Confirm delete past meeting", update, context)
+    meeting = await guards.meeting(
+        session,
+        user,
+        callback_data.id,
+        "Confirm delete past meeting",
+        update,
+        context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
+    )
     if meeting is None:
-        return
-
-    full_meeting = await Meetup.by_id(session, callback_data.id, include_inactive=True)
-    if full_meeting is None:
         return
 
     # Rendered (and queued) before the row is deleted below; the edits themselves run after
     # the deletion commits.
-    await context.api.update_meeting_messages(meeting=full_meeting, was_deleted=True)
+    await context.api.update_meeting_messages(meeting=meeting, was_deleted=True)
 
-    await session.delete(full_meeting)
+    await session.delete(meeting)
 
     view = MitupView(
         description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user.lang),
@@ -142,12 +158,16 @@ async def callback_query_decline_delete_past_meeting(session: AsyncSession, upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Decline delete past meeting", update, context)
+    meeting = await guards.meeting(
+        session,
+        user,
+        callback_data.id,
+        "Decline delete past meeting",
+        update,
+        context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
+    )
     if meeting is None:
         return
 
-    full_meeting = await Meetup.by_id(session, callback_data.id, include_inactive=True)
-    if full_meeting is None:
-        return
-
-    await context.api.edit_message(update=update, view=past_meeting_view(full_meeting, user, callback_data.page))
+    await context.api.edit_message(update=update, view=past_meeting_view(meeting, user, callback_data.page))

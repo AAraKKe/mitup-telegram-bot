@@ -13,7 +13,6 @@ from mitup_bot.handlers.meeting.utils import participant_capacity_rejection
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import CommonMessages, MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
@@ -37,7 +36,7 @@ async def callback_edit_meeting_participants(session: AsyncSession, update: Upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
@@ -62,7 +61,7 @@ async def callback_edit_meeting_max_participants(session: AsyncSession, update: 
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
@@ -98,16 +97,16 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
     )
     user = await guards.current_user(update, session)
 
-    # for_update: capacity changes race with concurrent joins reading `full`, so the write
-    # happens under the per-meeting row lock.
-    meeting = await guards.meeting_accessible(
+    # lock: capacity changes race with concurrent joins reading `full`, so the write happens under
+    # the per-meeting row lock.
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
         "Edit no limit participants",
         update,
         context,
-        for_update=True,
+        lock=True,
     )
 
     if meeting is None:
@@ -154,7 +153,18 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
 
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS) as meeting_id:
-            meeting = await guards.user_owns_meeting(user, meeting_id, "Edit max participants", update, context)
+            # lock: capacity changes race with concurrent joins reading `full`, so the meeting is
+            # resolved and written under the per-meeting row lock.
+            meeting = await guards.meeting(
+                session,
+                user,
+                meeting_id,
+                "Edit max participants",
+                update,
+                context,
+                access=guards.MeetingAccess.OWNER_ANY_STATE,
+                lock=True,
+            )
             if meeting is None:
                 return ConversationHandler.END
     except ContextPropertyNotSetError as exc:
@@ -167,19 +177,6 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
             ),
         )
         return ConversationHandler.END
-
-    # for_update: capacity changes race with concurrent joins reading `full`, so the write happens
-    # under the per-meeting row lock. The ownership guard reads the relationship without touching
-    # the DB; None means the meeting vanished since — end the conversation quietly.
-    meeting = await Meetup.by_id(session, meeting.db_id, for_update=True)
-    if meeting is None:
-        return ConversationHandler.END
-
-    # The locked load ran with populate_existing, which re-hydrates the identity-mapped `user`
-    # (reached via owner/joined_links) and resets its lazy="raise" collections to unloaded. Re-load
-    # them so any later `own_meeting`/`joined_meeting` access is safe; the row lock is already held,
-    # so the re-read is race-safe.
-    await session.refresh(user, ["meetups", "joined_links"])
 
     requested_max = int(cast(str, number))
 
@@ -214,7 +211,15 @@ async def edit_meeting_wrong_max_participants(session: AsyncSession, update: Upd
 
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS, ensure_clean=False) as meeting_id:
-            meeting = await guards.user_owns_meeting(user, meeting_id, "Edit max participants", update, context)
+            meeting = await guards.meeting(
+                session,
+                user,
+                meeting_id,
+                "Edit max participants",
+                update,
+                context,
+                access=guards.MeetingAccess.OWNER_ANY_STATE,
+            )
             if meeting is None:
                 return ConversationHandler.END
             # Default load is enough: this view reads only `meeting.lang` (the acting owner's

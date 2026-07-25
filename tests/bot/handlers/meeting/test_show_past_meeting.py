@@ -280,34 +280,34 @@ async def test_decline_delete_past_meeting_returns_to_past_meeting_view(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.SHOW_PAST_MEETING.with_id(MEETING_ID))], indirect=True
 )
-async def test_show_past_meeting_silent_when_full_meeting_not_found(
+async def test_show_past_meeting_redirects_when_meeting_no_longer_exists(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     inactive_meeting: Meetup,
     handler_context: HandlerContext,
 ):
-    """When the user owns the meeting but Meetup.by_id returns None the handler returns silently."""
+    """A past meeting that no longer resolves is answered like one the user does not own."""
     # Register the user so guards.current_user succeeds, but do NOT register inactive_meeting
-    # so that await Meetup.by_id(session, id, include_inactive=True) returns None.
+    # so the guard's meeting-rooted load finds nothing.
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_method_just_called("edit_message", times=0)
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID))], indirect=True
 )
-async def test_confirm_delete_past_meeting_silent_when_full_meeting_not_found(
+async def test_confirm_delete_past_meeting_redirects_when_meeting_no_longer_exists(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     inactive_meeting: Meetup,
     handler_context: HandlerContext,
 ):
-    """When Meetup.by_id returns None the confirm-delete handler returns silently without deleting anything."""
+    """A meeting that no longer resolves is never deleted: the guard stops the handler first."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(
@@ -315,25 +315,25 @@ async def test_confirm_delete_past_meeting_silent_when_full_meeting_not_found(
     )
 
     mock_session.assert_not_deleted()
-    context.api.assert_method_just_called("edit_message", times=0)
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
     context.api.assert_method_just_called("send_message", times=0)
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID))], indirect=True
 )
-async def test_decline_delete_past_meeting_silent_when_full_meeting_not_found(
+async def test_decline_delete_past_meeting_redirects_when_meeting_no_longer_exists(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     inactive_meeting: Meetup,
     handler_context: HandlerContext,
 ):
-    """When Meetup.by_id returns None the decline-delete handler returns silently."""
+    """A past meeting that no longer resolves is answered like one the user does not own."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(
         MeetingHandlerId.DECLINE_DELETE_PAST_MEETING_CALLBACK, handler_context=handler_context
     )
 
-    context.api.assert_method_just_called("edit_message", times=0)
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

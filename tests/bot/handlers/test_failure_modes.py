@@ -42,6 +42,7 @@ from tests.helpers import (
     call_handler,
     create_bot_config,
     create_meetup,
+    create_member,
     create_user,
 )
 from tests.helpers.constants import DEFAULT_USER_ID
@@ -94,7 +95,9 @@ class Context:
     reactivation_back_keyboard_factory: Callable[[str], Keyboard] | None = (
         None  # Lang-dependent back row for the reactivation prompt
     )
-    shows_deleted_message_when_not_found: bool = True  # False for handlers using user_owns_meeting directly
+    # False for handlers whose guard runs with access=OWNER_ANY_STATE, where a meeting that no
+    # longer resolves is answered as not-owned instead of with the deleted-meeting notice.
+    shows_deleted_message_when_not_found: bool = True
     meeting_id: dict[ContextId, int] | None = None  # Meeting id to store in the context data
     # Extra metric emissions for this handler. Each is a (name, times) pair.
     extra_metrics: list[tuple[str, int]] = field(default_factory=list)
@@ -103,6 +106,15 @@ class Context:
     extra_metrics_not_found: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
     # Override extra_metrics for the non-owner inactive meeting test.
     extra_metrics_non_owner_inactive: list[tuple[str, int]] | None | _Unset = field(default_factory=_Unset)
+
+
+def other_owner() -> User:
+    """The owner of the meetings the acting user must not reach.
+
+    The meeting guard resolves ownership on the loaded meeting (`Meetup.is_owned_by`), so a meeting
+    that stands in for "somebody else's" needs a real owner.
+    """
+    return create_member(id=2, tg_user_id=DEFAULT_USER_ID + 1)
 
 
 def make_admin_if_gated(handler_context: HandlerContext, test_context: Context):
@@ -477,7 +489,7 @@ CONTEXTS = [
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="decline_delete_past_meeting_malformed",
     ),
-    # --- Inactive meeting accessed by owner (meeting_accessible handlers) ---
+    # --- Inactive meeting accessed by owner (handlers guarded with the default access) ---
     Context(
         handler_id=MeetingHandlerId.SHOW_MEETING_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(MEETING_ID_INACTIVE)),
@@ -1395,7 +1407,7 @@ async def test_callback_fails_when_meeting_not_accessible(
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED))
+    mock_session.add_object(create_meetup(id=MEETING_ID_NOT_OWNED, owner=other_owner()))
 
     context, _ = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
@@ -1632,7 +1644,7 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
     metrics: MetricAssertions,
 ):
     """Non-owner accessing an inactive meeting is redirected to main menu (not-owned behavior)."""
-    inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False)
+    inactive_meeting = create_meetup(id=MEETING_ID_INACTIVE, active=False, owner=other_owner())
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
 

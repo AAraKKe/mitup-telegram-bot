@@ -36,7 +36,7 @@ async def edit_meeting_kickout_participants(session: AsyncSession, update: Updat
 
     current_user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         current_user,
         callback_data.meeting_id,
@@ -84,7 +84,7 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
 
     current_user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         current_user,
         callback_data.meeting_id,
@@ -143,17 +143,17 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
 
     current_user = await guards.current_user(update, session)
 
-    # for_update: removing a participant can promote from the waiting list, so the membership
+    # lock: removing a participant can promote from the waiting list, so the membership
     # read and the removal must happen under the per-meeting row lock. The earlier list and
     # confirmation steps are read-only and deliberately stay unlocked.
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         current_user,
         callback_data.meeting_id,
         "Kick out participant confirm",
         update,
         context,
-        for_update=True,
+        lock=True,
     )
 
     if meeting is None:

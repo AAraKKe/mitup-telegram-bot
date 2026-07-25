@@ -495,7 +495,7 @@ async def test_end_datetime_entry_callback_meeting_not_accessible_returns_none(
         EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK, handler_context=handler_context
     )
 
-    # meeting_accessible returns None (id 999 != user's meeting id 1), so handler returns None
+    # The guard returns None (id 999 is not the user's meeting id 1), so the handler returns None
     assert state is None
 
 

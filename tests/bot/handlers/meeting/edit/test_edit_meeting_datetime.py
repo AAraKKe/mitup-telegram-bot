@@ -38,6 +38,7 @@ from tests.helpers import (
     UpdateRequest,
     call_handler,
     create_meetup,
+    create_member,
     make_test_metrics_client,
 )
 from tests.helpers.monitoring import MetricAssertions
@@ -288,7 +289,13 @@ async def test_set_date_past_end_datetime_clears_end_and_shows_alert(
         ),
         (
             UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(11)),
-            create_meetup(id=11, title="TestMeeting", description="Description", datetime=TEST_MEETING_DATETIME_UTC),
+            create_meetup(
+                id=11,
+                title="TestMeeting",
+                description="Description",
+                datetime=TEST_MEETING_DATETIME_UTC,
+                owner=create_member(id=2, tg_user_id=456),
+            ),
             ConversationHandler.END,
         ),
     ],
@@ -787,7 +794,7 @@ async def test_date_time_entity_message_meeting_not_owned(
     handler_context: HandlerContext,
 ):
     """DATE_TIME_ENTITY_MESSAGE stops when the meeting is not accessible to the user."""
-    not_owned_meeting = create_meetup(id=99, title="Not Owned")
+    not_owned_meeting = create_meetup(id=99, title="Not Owned", owner=create_member(id=2, tg_user_id=456))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)
 

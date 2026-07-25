@@ -1,14 +1,13 @@
 """Contract: a same-session `Meetup.by_id` reload re-hydrates the participant leaves the cards render.
 
-This pins the load property every `guards.meeting_accessible` call site silently relies on (incident
-#282). A default user-rooted load (`User.by_tg_user_id` without `load_participants`) reaches an OWNED
-meeting through `user.meetups` with its `joined_links` loaded, but the selectin cascade stops at the
-`User -> Meetup -> JoinedUsers -> User` cycle, so each link's `user` and `invited_by` stay unloaded.
-`meeting_accessible` re-loads the meeting through `Meetup.by_id` before handing it to a card renderer;
-that meetup-rooted reload repeats no mapper and hydrates those leaves, which is what keeps rendering off
-`guards.meeting_accessible` from raising `MissingGreenlet` at every call site. A loader-strategy change
-that broke this reload would reintroduce the incident everywhere without tripping the user-rooted tests
-in `test_selectin_cycle_eager_load.py`, which only assert the joined-meeting root.
+This pins the load property `guards.meeting` is built on (incident #282). A default user-rooted load
+(`User.by_tg_user_id` without `load_participants`) reaches an OWNED meeting through `user.meetups` with
+its `joined_links` loaded, but the selectin cascade stops at the `User -> Meetup -> JoinedUsers -> User`
+cycle, so each link's `user` and `invited_by` stay unloaded. The guard resolves every meeting through
+`Meetup.by_id` instead; that meetup-rooted load repeats no mapper and hydrates those leaves, which is
+what keeps rendering off `guards.meeting` from raising `MissingGreenlet` at every call site. A
+loader-strategy change that broke this load would reintroduce the incident everywhere without tripping
+the user-rooted tests in `test_selectin_cycle_eager_load.py`, which only assert the joined-meeting root.
 
 The reload runs in the SAME session as the user-rooted load: the meetup is already in the identity map
 and its `joined_links` collection is already populated, yet `by_id` still hydrates the leaves and returns

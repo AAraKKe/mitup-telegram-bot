@@ -22,13 +22,14 @@ async def callback_query_show_meeting(session: AsyncSession, update: Update, con
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_viewable(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
         "Show meeting",
         update,
         context,
+        access=guards.MeetingAccess.OWNER_OR_JOINED,
         custom_keyboard=[[meeting_list_button(callback_data.source, callback_data.page, user.lang)]],
     )
     if meeting is None:

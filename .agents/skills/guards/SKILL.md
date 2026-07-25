@@ -55,16 +55,24 @@ All guards that take a `session` are async — `await` them.
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `meeting_accessible` | `(session, user, meeting_id, action, update, context, custom_keyboard=None, for_update=False)` | `Meetup \| None` | — (handles redirect internally) |
-| `meeting_viewable` | `(session, user, meeting_id, action, update, context, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
+| `meeting` | `(session, user, meeting_id, action, update, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None)` | `Meetup \| None` | — (handles redirect internally) |
 | `meeting_interaction_allowed` | `(session, user, meeting, update, context)` | `bool` | — (answers with the deleted-meeting alert) |
-| `user_owns_meeting` | `(user, meeting_id, action, update, context, redirect=True)` | `Meetup \| None` | — (handles redirect internally) |
 
-Use `meeting_accessible` for all handlers that require **ownership** of a meeting from the bot chat (not inline). It handles three cases internally: meeting not found → "meeting deleted" message; meeting inactive + owner → reactivation prompt; non-owner → redirect to main menu. When `None` is returned, the handler must return immediately.
+`guards.meeting` is the single meeting guard for the bot chat (not inline). It resolves the meeting through `Meetup.by_id` and returns **its own** meeting-rooted instance, whose participant leaves (owner, joined links' `user`/`invited_by`) are hydrated — so handlers render straight off the guard result and never re-load. Ownership is decided on that loaded row via `Meetup.is_owned_by`. When `None` is returned, the handler must return immediately: the guard has already answered the user.
 
-Pass `for_update=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. See the `database` skill's "Per-meeting row locks" section for the full convention.
+`access` selects who gets through and which screen everybody else is answered with:
 
-Use `meeting_viewable` for handlers that only need to **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list. It behaves like `meeting_accessible` for the not-found and inactive-owner cases, but a non-owner who has *joined* an active meeting is allowed through so the caller can render `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Non-owners are still redirected to the main menu for meetings they neither own nor joined, and for inactive meetings (only the owner can reactivate).
+| `MeetingAccess` | Lets through | Meeting not found | Inactive meeting |
+|---|---|---|---|
+| `OWNER` (default) | the owner of an active meeting | "meeting deleted" message | owner → reactivation prompt; anyone else → main menu |
+| `OWNER_OR_JOINED` | the owner, plus anyone who joined the active meeting (waiting list included) | "meeting deleted" message | owner → reactivation prompt; anyone else → main menu |
+| `OWNER_ANY_STATE` | the owner, whatever the meeting's state | main menu, as for a meeting the caller does not own | returned to the caller |
+
+Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_JOINED` for screens that only **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list, where the caller renders `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Use `OWNER_ANY_STATE` on the surfaces that render inactive meetings themselves — the past-meetings screens, reactivation, and the delete flows — where the reactivation prompt would replace the screen the user asked for.
+
+A non-owner is logged and counted on the `MeetingNotOwned` error metric before the main-menu redirect; the deleted-meeting and reactivation screens emit no such metric.
+
+Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read, and re-loads the user's `meetups`/`joined_links` afterwards (the locked load resets them). Read-only handlers must leave it `False`. See the `database` skill's "Per-meeting row locks" section for the full convention.
 
 Use `meeting_interaction_allowed` in every handler that acts on a meeting reachable from outside the
 bot chat (join, leave, attach-to-chat, invite). The meeting id arrives in client-supplied callback
@@ -76,9 +84,7 @@ unclaimed inline message authorizes nothing, since anyone can produce one by sha
 own. Call it before any write or render, and return immediately when it is `False` (it has already
 answered the caller with the deleted-meeting alert).
 
-`user_owns_meeting` is a lower-level guard that skips the not-found and inactive checks. Use it only when those cases are handled separately.
-
-For both `meeting_accessible` and `meeting_viewable`, `custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from.
+`custom_keyboard` replaces the default main-menu back button as the back-navigation row(s) in the "meeting deleted" message and the reactivation prompt — pass it when the user should return to the list they came from.
 
 ## Usage pattern
 
@@ -88,7 +94,7 @@ For both `meeting_accessible` and `meeting_viewable`, `custom_keyboard` replaces
 async def show(session: AsyncSession, update: Update, context: TMitupContext):
     meeting_id = guards.valid_callback_data(cb.MY_CALLBACK.parse(context.match), MyHandlerId.SHOW).id
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(session, user, meeting_id, "show meeting", update, context)
+    meeting = await guards.meeting(session, user, meeting_id, "show meeting", update, context)
     if meeting is None:
         return
     # ... proceed with meeting
@@ -97,5 +103,5 @@ async def show(session: AsyncSession, update: Update, context: TMitupContext):
 ## Failure mode registration
 
 <critical_rules>
-  <rule>If a handler uses any of `current_user`, `meeting_accessible`, `meeting_viewable`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/bot/handlers/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
+  <rule>If a handler uses any of `current_user`, `meeting`, `valid_callback_data`, or `valid_meeting_callback_data`, it MUST be registered in `tests/bot/handlers/test_failure_modes.py` under the `CONTEXTS` list using the `Context` dataclass.</rule>
 </critical_rules>

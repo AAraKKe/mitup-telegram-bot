@@ -50,7 +50,7 @@ async def callback_edit_meeting_location(session: AsyncSession, update: Update, 
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
@@ -76,12 +76,14 @@ async def callback_edit_meeting_location_name(session: AsyncSession, update: Upd
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(
+    meeting = await guards.meeting(
+        session,
         user,
         callback_data.id,
         "Edit location name",
         update,
         context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
 
     if meeting is None:
@@ -126,12 +128,14 @@ async def callback_edit_meeting_location_coordinates(session: AsyncSession, upda
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(
+    meeting = await guards.meeting(
+        session,
         user,
         callback_data.id,
         "Edit location coordinates",
         update,
         context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
 
     if meeting is None:
@@ -208,14 +212,17 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
 
     try:
         with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES) as meeting_id:
-            owned_meeting = await guards.user_owns_meeting(
-                user, meeting_id, "Edit location coordinates", update, context, redirect=True
+            meeting = await guards.meeting(
+                session,
+                user,
+                meeting_id,
+                "Edit location coordinates",
+                update,
+                context,
+                access=guards.MeetingAccess.OWNER_ANY_STATE,
             )
-            if owned_meeting is None:
+            if meeting is None:
                 return ConversationHandler.END
-            # Mutate and fan out off a meeting-rooted reload: the user-rooted guard result leaves
-            # participant leaves unloaded under the async engine, and the card fan-out renders them.
-            meeting = await Meetup.by_id(session, meeting_id, must_exist=True)
     except ContextPropertyNotSetError as exc:
         # If the meeting id is not set, we should not be here
         log.error("Meeting id not set in context", exc_info=exc)

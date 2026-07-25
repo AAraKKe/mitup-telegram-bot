@@ -47,7 +47,7 @@ Context(
 | `extra_metrics` | `list[tuple[str, int]]` | No | Additional metrics the handler emits beyond the standard ones, as `(name, times)` pairs |
 | `extra_metrics_not_found` | `list[tuple[str, int]] \| None` | No | Override of `extra_metrics` for the "meeting not found" case; defaults to `extra_metrics`, `[]` asserts none |
 | `extra_metrics_non_owner_inactive` | `list[tuple[str, int]] \| None` | No | Override of `extra_metrics` for the non-owner inactive meeting test |
-| `shows_deleted_message_when_not_found` | `bool` | No | `False` for handlers using `user_owns_meeting` directly |
+| `shows_deleted_message_when_not_found` | `bool` | No | `False` for handlers whose guard runs with `access=MeetingAccess.OWNER_ANY_STATE` |
 | `reactivation_back_keyboard_factory` | `Callable[[str], Keyboard] \| None` | No | For inactive meeting reactivation prompt |
 
 ### Sentinel values

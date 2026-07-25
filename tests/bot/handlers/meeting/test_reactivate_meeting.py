@@ -1,5 +1,4 @@
 import datetime as dt
-from unittest import mock
 
 import pytest
 from telegram import Update
@@ -12,6 +11,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages, SupporterMessages
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.collaborate import supporter_upsell_view
 from tests.helpers import (
@@ -66,24 +66,19 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
 )
-async def test_reactivate_meeting_returns_silently_when_full_meeting_not_found(
+async def test_reactivate_meeting_redirects_when_meeting_no_longer_exists(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """When await Meetup.by_id(include_inactive=True) returns None, the handler returns silently
-    without editing any message."""
+    """A meeting that no longer resolves is answered like one the user does not own."""
+    # Register the user but not the meeting, so the guard's meeting-rooted load finds nothing.
     mock_session.add_object(user_with_settings, "tg_user_id")
-    # Add the meeting so user_owns_meeting succeeds, but patch by_id to return None
-    # for the full meeting lookup (include_inactive=True).
-    mock_session.add_object(user_with_settings.meetups[0])
 
-    with mock.patch.object(Meetup, "by_id", return_value=None):
-        context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
+    context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
 
-    # Handler returned silently — no edit_message call
-    context.api.assert_method_just_called("edit_message", times=0)
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
 
 
 @pytest.mark.parametrize(

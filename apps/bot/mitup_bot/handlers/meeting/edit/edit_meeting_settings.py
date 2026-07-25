@@ -28,7 +28,7 @@ async def callback_query_edit_meeting_settings(session: AsyncSession, update: Up
     ).id
 
     if (
-        meeting := await guards.meeting_accessible(
+        meeting := await guards.meeting(
             session=session,
             user=user,
             meeting_id=meeting_id,
@@ -54,7 +54,7 @@ async def toggle_meeting_setting(
     meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
 
     if (
-        meeting := await guards.meeting_accessible(
+        meeting := await guards.meeting(
             session=session,
             user=user,
             meeting_id=meeting_id,

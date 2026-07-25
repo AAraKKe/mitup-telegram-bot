@@ -5,7 +5,6 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
@@ -27,7 +26,18 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.user_owns_meeting(user, callback_data.id, "Reactivate meeting", update, context)
+    # No lock here: reactivation writes `active` unconditionally without reading any participant or
+    # capacity state, and the flush-time UPDATE takes the row lock on its own. A join that grabs the
+    # per-meeting lock first sees the committed `active` value either way.
+    meeting = await guards.meeting(
+        session,
+        user,
+        callback_data.id,
+        "Reactivate meeting",
+        update,
+        context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
+    )
     if meeting is None:
         return
 
@@ -41,21 +51,14 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     if await active_meetings_cap_reached(user, update, context, back_button=past_meetings_button):
         return
 
-    # No for_update here: reactivation writes `active` unconditionally without reading any
-    # participant or capacity state, and the flush-time UPDATE takes the row lock on its own.
-    # A join that grabs the per-meeting lock first sees the committed `active` value either way.
-    full_meeting = await Meetup.by_id(session, callback_data.id, include_inactive=True)
-    if full_meeting is None:
-        return
-
-    full_meeting.active = True
-    full_meeting.expiration_time = None
-    full_meeting.expiration_notification_sent = False
+    meeting.active = True
+    meeting.expiration_time = None
+    meeting.expiration_notification_sent = False
 
     success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user.lang)
     await context.api.edit_message(
         update=update,
-        view=meeting_views.edit_view(full_meeting).with_context(success_message),
+        view=meeting_views.edit_view(meeting).with_context(success_message),
     )
 
     context.put_feature_metric(Feature.REACTIVATE_MEETING)

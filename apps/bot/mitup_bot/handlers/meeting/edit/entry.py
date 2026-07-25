@@ -8,7 +8,6 @@ from mitup_bot.db import with_session
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from mitup_bot.views import meeting as meeting_views
@@ -26,7 +25,7 @@ async def callback_query_edit_meeting(session: AsyncSession, update: Update, con
 
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "Edit meeting", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit meeting", update, context)
 
     if meeting is None:
         return
@@ -57,17 +56,19 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
         )
         return ConversationHandler.END
 
-    meetup = await guards.user_owns_meeting(user, meeting_id, "Cancel edit meeting", update, context)
+    meetup = await guards.meeting(
+        session,
+        user,
+        meeting_id,
+        "Cancel edit meeting",
+        update,
+        context,
+        access=guards.MeetingAccess.OWNER_ANY_STATE,
+    )
     if meetup is None:
         return ConversationHandler.END
 
-    # Render off a meeting-rooted reload: the user-rooted guard result leaves participant
-    # leaves (owner, joined links' user/invited_by) unloaded under the async engine.
-    full_meeting = await Meetup.by_id(session, meeting_id)
-    if full_meeting is None:
-        return ConversationHandler.END
-
-    await context.api.edit_message(update=update, view=meeting_views.edit_view(full_meeting))
+    await context.api.edit_message(update=update, view=meeting_views.edit_view(meetup))
 
     # Cleanup any possible state set by any handler related with editing the meeting
     cleanup_states(context)

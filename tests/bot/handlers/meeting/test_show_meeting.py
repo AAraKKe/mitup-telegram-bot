@@ -195,7 +195,7 @@ async def test_show_meeting_deleted_fallback_returns_to_originating_page(
     """When a meeting opened from active-list page 3 no longer exists, the fallback back button
     must return to page 3 rather than page 1."""
     mock_session.add_object(user_with_settings, "tg_user_id")
-    # Meeting 99 is never registered, so guards.meeting_accessible takes the "deleted" path
+    # Meeting 99 is never registered, so the guard takes the "deleted" path
     # and renders the custom back keyboard.
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)

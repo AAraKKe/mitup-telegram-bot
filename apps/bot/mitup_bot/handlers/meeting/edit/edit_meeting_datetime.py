@@ -146,9 +146,7 @@ async def callback_query_date_time_entry(
 
     user = await guards.current_user(update, session)
     if (
-        meeting := await guards.meeting_accessible(
-            session, user, callback_data.id, "Edit date and time", update, context
-        )
+        meeting := await guards.meeting(session, user, callback_data.id, "Edit date and time", update, context)
     ) is None:
         return None
 
@@ -218,9 +216,7 @@ async def callback_query_cancel_start_time(session: AsyncSession, update: Update
 
     user = await guards.current_user(update, session)
     if (
-        meeting := await guards.meeting_accessible(
-            session, user, callback_data.id, "Cancel start time edit", update, context
-        )
+        meeting := await guards.meeting(session, user, callback_data.id, "Cancel start time edit", update, context)
     ) is None:
         cleanup_states(context)
         return ConversationHandler.END
@@ -245,9 +241,7 @@ async def callback_query_edit_meeting_date(
     )
 
     user = await guards.current_user(update, session)
-    if (
-        meeting := await guards.meeting_accessible(session, user, callback_data.id, "Edit date", update, context)
-    ) is None:
+    if (meeting := await guards.meeting(session, user, callback_data.id, "Edit date", update, context)) is None:
         return None
 
     now_in_user_timezone = meeting.owner.now_in_tz()
@@ -298,9 +292,7 @@ async def callback_query_back_to_edit_datetime(
 
     user = await guards.current_user(update, session)
     if (
-        meeting := await guards.meeting_accessible(
-            session, user, callback_data.id, "Back to edit datetime", update, context
-        )
+        meeting := await guards.meeting(session, user, callback_data.id, "Back to edit datetime", update, context)
     ) is None:
         return None
 
@@ -420,9 +412,7 @@ async def callback_query_set_meeting_date(
     )
 
     user = await guards.current_user(update, session)
-    if (
-        meeting := await guards.meeting_accessible(session, user, callback_data.id, "Edit date", update, context)
-    ) is None:
+    if (meeting := await guards.meeting(session, user, callback_data.id, "Edit date", update, context)) is None:
         return ConversationHandler.END
 
     if meeting.datetime is None:
@@ -445,7 +435,7 @@ async def callback_query_set_meeting_time(
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
@@ -477,9 +467,7 @@ async def date_time_entity_message_handler(
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(
-            session, current_user, meeting_id, "Set datetime from entity", update, context
-        )
+        meeting = await guards.meeting(session, current_user, meeting_id, "Set datetime from entity", update, context)
 
         if meeting is None:
             return ConversationHandler.END
@@ -539,7 +527,7 @@ async def set_time_message_handler(
 
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(session, current_user, meeting_id, "Set time", update, context)
+        meeting = await guards.meeting(session, current_user, meeting_id, "Set time", update, context)
 
         if meeting is None:
             return ConversationHandler.END
@@ -592,9 +580,7 @@ async def fallback_answer(
 ) -> ConversationMeetingState | int:
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(
-            session, current_user, meeting_id, "Wrong time input", update, context
-        )
+        meeting = await guards.meeting(session, current_user, meeting_id, "Wrong time input", update, context)
         if meeting is None:
             return ConversationHandler.END
 
@@ -637,9 +623,7 @@ async def datetime_state_fallback_answer(
 ) -> ConversationMeetingState | int:
     with context.meeting_id(ContextId.EDIT_MEETING_TIME, ensure_clean=False) as meeting_id:
         current_user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(
-            session, current_user, meeting_id, "Wrong datetime input", update, context
-        )
+        meeting = await guards.meeting(session, current_user, meeting_id, "Wrong datetime input", update, context)
         if meeting is None:
             return ConversationHandler.END
 

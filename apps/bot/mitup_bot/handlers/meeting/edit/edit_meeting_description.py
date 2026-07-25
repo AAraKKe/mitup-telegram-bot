@@ -50,7 +50,7 @@ async def callback_query_edit_meeting_description(session: AsyncSession, update:
     )
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,

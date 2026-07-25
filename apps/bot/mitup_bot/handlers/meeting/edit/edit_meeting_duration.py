@@ -65,7 +65,7 @@ async def callback_query_set_meeting_end_time(
     ).id
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(session, user, meeting_id, "set_meeting_end_time", update, context)
+    meeting = await guards.meeting(session, user, meeting_id, "set_meeting_end_time", update, context)
     if meeting is None:
         return ConversationHandler.END
 
@@ -102,9 +102,7 @@ async def callback_query_cancel_edit_duration(session: AsyncSession, update: Upd
     ).id
     user = await guards.current_user(update, session)
 
-    meeting = await guards.meeting_accessible(
-        session, user, meeting_id, "cancel_edit_meeting_duration", update, context
-    )
+    meeting = await guards.meeting(session, user, meeting_id, "cancel_edit_meeting_duration", update, context)
     if meeting is None:
         return ConversationHandler.END
 
@@ -190,7 +188,7 @@ async def callback_query_end_datetime_entry(
         cb.EDIT_MEETING_END_DATE_TIME.parse(context.match), EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK
     )
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "Edit end datetime", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit end datetime", update, context)
     if meeting is None:
         return None
 
@@ -303,9 +301,7 @@ async def duration_end_datetime_entity_handler(
 
     with context.meeting_id(ContextId.EDIT_MEETING_END_DATETIME, ensure_clean=False) as meeting_id:
         user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(
-            session, user, meeting_id, "Set end datetime from entity", update, context
-        )
+        meeting = await guards.meeting(session, user, meeting_id, "Set end datetime from entity", update, context)
         if meeting is None:
             return ConversationHandler.END
 
@@ -332,9 +328,7 @@ async def duration_end_wrong_input_message_handler(
 ) -> ConversationMeetingState | int:
     with context.meeting_id(ContextId.EDIT_MEETING_END_DATETIME, ensure_clean=False) as meeting_id:
         user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(
-            session, user, meeting_id, "Duration end wrong input", update, context
-        )
+        meeting = await guards.meeting(session, user, meeting_id, "Duration end wrong input", update, context)
         if meeting is None:
             return ConversationHandler.END
 
@@ -360,7 +354,7 @@ async def callback_query_duration_end_date_nav(
         cb.EDIT_MEETING_END_DATE.parse(context.match), EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK
     )
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "Duration end date nav", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "Duration end date nav", update, context)
     if meeting is None:
         return None
 
@@ -400,7 +394,7 @@ async def callback_query_back_to_end_datetime(
         EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK,
     )
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(session, user, callback_data.id, "Back to end datetime", update, context)
+    meeting = await guards.meeting(session, user, callback_data.id, "Back to end datetime", update, context)
     if meeting is None:
         return None
 
@@ -418,9 +412,7 @@ async def callback_query_duration_end_set_date(
         cb.SET_MEETING_END_DATE.parse(context.match), EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK
     )
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
-        session, user, callback_data.id, "Set end date in duration", update, context
-    )
+    meeting = await guards.meeting(session, user, callback_data.id, "Set end date in duration", update, context)
     if meeting is None:
         return ConversationHandler.END
 
@@ -519,9 +511,7 @@ async def callback_query_duration_end_time(
         cb.EDIT_MEETING_END_TIME.parse(context.match), EditMeetingHandlerId.DURATION_END_TIME_CALLBACK
     )
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
-        session, user, callback_data.id, "Edit end time in duration", update, context
-    )
+    meeting = await guards.meeting(session, user, callback_data.id, "Edit end time in duration", update, context)
     if meeting is None:
         return ConversationHandler.END
 
@@ -542,7 +532,7 @@ async def duration_end_set_time_handler(
 
     with context.meeting_id(ContextId.EDIT_MEETING_END_DATETIME, ensure_clean=False) as meeting_id:
         user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(session, user, meeting_id, "Set end time", update, context)
+        meeting = await guards.meeting(session, user, meeting_id, "Set end time", update, context)
         if meeting is None:
             return ConversationHandler.END
 
@@ -583,9 +573,7 @@ async def duration_end_time_wrong_input_message_handler(
 ) -> ConversationMeetingState | int:
     with context.meeting_id(ContextId.EDIT_MEETING_END_DATETIME, ensure_clean=False) as meeting_id:
         user = await guards.current_user(update, session)
-        meeting = await guards.meeting_accessible(
-            session, user, meeting_id, "Duration end time wrong input", update, context
-        )
+        meeting = await guards.meeting(session, user, meeting_id, "Duration end time wrong input", update, context)
         if meeting is None:
             return ConversationHandler.END
 

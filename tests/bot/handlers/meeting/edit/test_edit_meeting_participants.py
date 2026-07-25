@@ -30,6 +30,7 @@ from tests.helpers import (
     assert_locked_meetup_select,
     call_handler,
     create_meetup,
+    create_member,
     create_user,
     owner_with_meeting,
 )
@@ -92,7 +93,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, handler_context=handler_context)
@@ -128,7 +129,7 @@ async def test_edit_meeting_participants_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, handler_context=handler_context)
@@ -182,7 +183,7 @@ async def test_edit_meeting_max_participants_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(
@@ -205,7 +206,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
@@ -401,7 +402,7 @@ async def test_edit_meeting_no_limit_participants_failures(
 ):
     user: User | None = request.getfixturevalue(user_fixture)
     mock_session.add_object(user, "tg_user_id")
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
@@ -429,7 +430,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
     metrics: MetricAssertions,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(create_meetup(999))
+    mock_session.add_object(create_meetup(999, owner=create_member(id=2, tg_user_id=456)))
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(
@@ -673,6 +674,8 @@ async def test_edit_meeting_wrong_max_participants_works(
     handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
     context, result = await call_handler(
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_WRONG_MESSAGE,
         handler_context=handler_context,
@@ -715,7 +718,7 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
 
 
 # ---------------------------------------------------------------------------
-# PARTICIPANTS_MAXIMUM_MESSAGE — meeting is None after user_owns_meeting (line 156)
+# PARTICIPANTS_MAXIMUM_MESSAGE — the guard stops a meeting the user does not own
 # ---------------------------------------------------------------------------
 
 
@@ -726,8 +729,8 @@ async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """When user_owns_meeting returns None (meeting not owned), handler returns ConversationHandler.END."""
-    not_owned_meeting = create_meetup(id=99, title="Not Owned")
+    """A meeting owned by somebody else ends the conversation."""
+    not_owned_meeting = create_meetup(id=99, title="Not Owned", owner=create_member(id=2, tg_user_id=456))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)
 
@@ -743,7 +746,7 @@ async def test_edit_max_participants_message_returns_end_when_meeting_not_owned(
 
 
 # ---------------------------------------------------------------------------
-# PARTICIPANTS_MAXIMUM_WRONG_MESSAGE — meeting is None after user_owns_meeting (line 186)
+# PARTICIPANTS_MAXIMUM_WRONG_MESSAGE — the guard stops a meeting the user does not own
 # ---------------------------------------------------------------------------
 
 
@@ -754,8 +757,8 @@ async def test_edit_wrong_max_participants_returns_end_when_meeting_not_owned(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """When user_owns_meeting returns None in wrong input handler, returns ConversationHandler.END."""
-    not_owned_meeting = create_meetup(id=99, title="Not Owned")
+    """A meeting owned by somebody else ends the conversation from the wrong-input handler too."""
+    not_owned_meeting = create_meetup(id=99, title="Not Owned", owner=create_member(id=2, tg_user_id=456))
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(not_owned_meeting)
 

@@ -117,12 +117,13 @@ async def test_participant_rejoin_survives_locked_meeting_load(db_session: Async
         )
 
 
-async def test_meeting_accessible_for_update_returns_meeting_for_owner(db_session: AsyncSession, app: Application):
-    """`meeting_accessible(..., for_update=True)` must survive its own populate_existing collateral.
+async def test_meeting_guard_under_lock_returns_meeting_for_owner(db_session: AsyncSession, app: Application):
+    """`guards.meeting(..., lock=True)` must survive its own populate_existing collateral.
 
-    The guard checks ownership via `user.own_meeting` right after the locked load, so without
-    the post-lock refresh inside the guard every for_update caller (kickout, edit participants,
-    invite confirm) crashed for the meeting owner exactly like the join path in issue #207.
+    The locked load re-hydrates the identity-mapped owner and resets their `lazy="raise"`
+    collections, so the guard re-loads them before returning. Without that refresh every locked
+    caller (kickout, edit participants, invite confirm) would crash on the first `own_meeting` /
+    `joined_meeting` read in the handler body, exactly like the join path in issue #207.
     """
     async with AsyncSession(async_engine(db_session)) as session:
         meeting = await seed_owned_meeting(session)
@@ -135,8 +136,8 @@ async def test_meeting_accessible_for_update_returns_meeting_for_owner(db_sessio
         )
         context = build_context(update, app)
 
-        guarded_meeting = await guards.meeting_accessible(
-            session, owner, meeting.db_id, "Edit no limit participants", update, context, for_update=True
+        guarded_meeting = await guards.meeting(
+            session, owner, meeting.db_id, "Edit no limit participants", update, context, lock=True
         )
 
         assert guarded_meeting is not None

@@ -47,7 +47,7 @@ async def callback_query_edit_meeting_title(session: AsyncSession, update: Updat
     ).id
 
     user = await guards.current_user(update, session)
-    meeting = await guards.meeting_accessible(
+    meeting = await guards.meeting(
         session,
         user,
         meeting_id,
