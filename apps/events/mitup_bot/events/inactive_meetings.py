@@ -15,11 +15,14 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 log = structlog.get_logger(__name__)
 
-# The amount of time a meeting stays active after it has been created when there is no datetime set
-INTERVAL_TO_DEACTIVATE = "1 year"
+# The amount of time a meeting stays active after it has been created when there is no datetime set.
+# Matches the free scheduling horizon (`LimitsConfig.free_scheduling_horizon_days`): a free owner may
+# only pick a date that far ahead, so a meeting carrying no date at all gets no longer to acquire one.
+# Written in days, not months, so the window is a fixed length like the horizon it matches.
+INTERVAL_TO_DEACTIVATE = "90 days"
 
 # A dateless meeting whose owner has LEFT the bot deactivates this soon after creation instead of the
-# full year: an owner who is gone should not keep undated meetings alive for a year, and once the
+# general window: an owner who is gone should not keep undated meetings alive that long, and once the
 # meeting deactivates the owner stops owning an active meeting and becomes purgeable by user_cleanup.
 LEFT_OWNER_INTERVAL_TO_DEACTIVATE = "1 month"
 

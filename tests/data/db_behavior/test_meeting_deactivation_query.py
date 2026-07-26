@@ -1,6 +1,6 @@
 """DB-integration tests for the dateless-meeting deactivation windows in `inactive_meetings`.
 
-`MEETINGS_TO_DEACTIVATE_STATEMENT` deactivates a dateless meeting a year after creation, but only a
+`MEETINGS_TO_DEACTIVATE_STATEMENT` deactivates a dateless meeting 90 days after creation, but only a
 month after creation when its owner has LEFT the bot. The window is an interval comparison against
 `created_time` gated on the owner's status — real SQL over real rows, which a mock session cannot
 evaluate — so the cases live here. Throwaway data uses the 998_8xx range (single-session, never
@@ -66,8 +66,8 @@ async def test_left_owner_dateless_meeting_within_a_month_is_not_due(db_session:
 
 
 async def test_member_owner_dateless_meeting_older_than_a_month_is_not_due(db_session: AsyncSession):
-    """The short window is LEFT-owner-only: a MEMBER owner's dateless meeting keeps the full year, so
-    one older than a month but younger than a year is not yet due."""
+    """The short window is LEFT-owner-only: a MEMBER owner's dateless meeting keeps the full 90 days,
+    so one older than a month is not yet due."""
     owner = make_owner(998_803, status=UserStatus.MEMBER)
     db_session.add(owner)
     await db_session.flush()
@@ -78,13 +78,26 @@ async def test_member_owner_dateless_meeting_older_than_a_month_is_not_due(db_se
     assert meeting.id not in await due_meeting_ids(db_session)
 
 
-async def test_member_owner_dateless_meeting_older_than_a_year_is_due(db_session: AsyncSession):
-    """The general one-year rule still catches everyone: a MEMBER owner's dateless meeting older than
-    a year is due."""
+async def test_member_owner_dateless_meeting_just_inside_the_general_window_is_not_due(db_session: AsyncSession):
+    """The lower side of the 90-day boundary: a dateless meeting a day short of the window stays
+    active, so the sweep never deactivates a meeting the owner may still date."""
     owner = make_owner(998_804, status=UserStatus.MEMBER)
     db_session.add(owner)
     await db_session.flush()
-    meeting = make_dateless_meetup(owner, created_days_ago=400)
+    meeting = make_dateless_meetup(owner, created_days_ago=89)
+    db_session.add(meeting)
+    await db_session.flush()
+
+    assert meeting.id not in await due_meeting_ids(db_session)
+
+
+async def test_member_owner_dateless_meeting_just_past_the_general_window_is_due(db_session: AsyncSession):
+    """The upper side of the 90-day boundary: a MEMBER owner's dateless meeting a day past the window
+    is due, so the general rule catches owners the LEFT-owner window never sees."""
+    owner = make_owner(998_805, status=UserStatus.MEMBER)
+    db_session.add(owner)
+    await db_session.flush()
+    meeting = make_dateless_meetup(owner, created_days_ago=91)
     db_session.add(meeting)
     await db_session.flush()
 
