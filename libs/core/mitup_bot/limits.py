@@ -17,6 +17,12 @@ if TYPE_CHECKING:
 
 MEETING_MAX_DURATION = dt.timedelta(days=7)
 
+# Ceiling for the owner's `Settings.timeout`, the delay between a meeting's end and its
+# deactivation. An hour is enough for the common case; a day is allowed so a meeting can stay up
+# the day after it finished. Without a ceiling a timeout keeps its owner's meetings active forever,
+# so they never expire and are never cleaned up.
+MEETING_MAX_TIMEOUT_MINUTES = 24 * 60
+
 
 def active_meetings_cap(user: User) -> int | None:
     """Maximum active meetings the user may own, or None (unlimited) for the Organizer tier."""

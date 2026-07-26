@@ -9,11 +9,12 @@ import structlog
 from click.testing import CliRunner, Result
 from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
-from telegram.ext import Application
+from telegram.ext import Application, ConversationHandler
 
 from mitup_bot import api_guards, db, reconcile
 from mitup_bot.bot_cli import cli as bot_cli
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
+from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.models import Meetup, MeetupLocation, Settings
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models import User as UserModel
@@ -151,6 +152,31 @@ def none():
     Specially in places where pytest getfixture value is used to dinamically load fixtures
     """
     return None
+
+
+def clear_registry_conversations():
+    """Drop every conversation state the registry's handler singletons hold."""
+    for wrapper in HandlersRegistry.handlers.values():
+        handler = wrapper.handler
+        if isinstance(handler, ConversationHandler):
+            handler._conversations.clear()
+
+
+@pytest.fixture(autouse=True)
+def clean_conversation_state() -> Generator[None]:
+    """Keep conversation state from crossing test boundaries.
+
+    `HandlersRegistry` builds one `ConversationHandler` per flow at import time and every test in
+    the process drives those same objects, so a test that stops mid-flow leaves live state keyed
+    under the acting user. The next test whose update matches that flow's state handlers is then
+    claimed by the leftover flow instead of by the handler it exercises — and since the acting user
+    is the same fixture user everywhere, and a flow registered with `per_chat=False` is keyed by
+    user alone, the chat id is no defence. Clearing on both sides of every test makes the outcome
+    independent of the order tests run in, which under xdist is not stable.
+    """
+    clear_registry_conversations()
+    yield
+    clear_registry_conversations()
 
 
 @pytest.fixture(autouse=True)

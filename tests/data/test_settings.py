@@ -1,8 +1,10 @@
 import logging
 
 import pytest
+from pydantic import ValidationError
 from pytest import LogCaptureFixture
 
+from mitup_bot.limits import MEETING_MAX_TIMEOUT_MINUTES
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
@@ -20,6 +22,29 @@ def test_invalid_timezone(settings: Settings, caplog: LogCaptureFixture):
     with caplog.at_level(logging.WARNING):
         assert settings.tz.key == "UTC"
         assert "Invalid timezone" in caplog.records[0].message
+
+
+@pytest.mark.parametrize(
+    "timeout",
+    [MEETING_MAX_TIMEOUT_MINUTES + 1, 99_999_999_999],
+    ids=["just_above_cap", "far_above_cap"],
+)
+def test_timeout_above_cap_is_rejected_on_assignment(settings: Settings, timeout: int):
+    """The cap belongs to the model, so it holds on any write path — an over-cap timeout keeps its
+    owner's dated meetings active forever."""
+    with pytest.raises(ValidationError):
+        settings.timeout = timeout
+
+
+def test_timeout_above_cap_is_rejected_on_construction():
+    with pytest.raises(ValidationError):
+        Settings(timeout=MEETING_MAX_TIMEOUT_MINUTES + 1)
+
+
+def test_timeout_at_cap_is_accepted(settings: Settings):
+    settings.timeout = MEETING_MAX_TIMEOUT_MINUTES
+
+    assert settings.timeout == MEETING_MAX_TIMEOUT_MINUTES
 
 
 def expected_default_meeting_options_view(settings: Settings) -> MitupView:

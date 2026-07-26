@@ -142,9 +142,13 @@ async def test_collaborate_not_linked_offers_oauth_link(
     assert link_button.url.startswith("https://www.patreon.com/oauth2/authorize")
     # The button anyone can be handed carries a state that identifies nobody: it validates, and
     # that is all it does.
-    state = parse_qs(urlparse(link_button.url).query)["state"][0]
-    oauth.validate_state(patreon_config, state)
-    assert str(user_with_settings.tg_user_id) not in link_button.url
+    query = parse_qs(urlparse(link_button.url).query)
+    oauth.validate_state(patreon_config, query["state"][0])
+    # Nor does anything else in the URL name the user. The state stays out of this scan: it is
+    # ciphertext, so a digit run matches inside it by chance often enough to fail the odd run, and
+    # what it actually carries is pinned down by `test_state_carries_no_telegram_identity`.
+    readable = [value for name, values in query.items() if name != "state" for value in values]
+    assert not any(str(user_with_settings.tg_user_id) in value for value in readable)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)

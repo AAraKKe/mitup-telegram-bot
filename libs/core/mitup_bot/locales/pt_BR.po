@@ -241,7 +241,10 @@ msgstr "Aqui você pode configurar as opções padrão usadas ao criar um evento
 msgid "SettingsMessages.TIMEOUT_PROMPT"
 msgstr "O tempo limite define por quanto tempo um evento é mantido ativo após seu início. Eventos sem duração definida são desativados quando esse tempo passa. Após a desativação, você pode reativar um evento a partir do seu <b>Menu de eventos anteriores</b>.\n\n"
 "O tempo limite atual é <b>${timeout} minutos</b>\n\n"
-"Envie o tempo limite (em minutos) que você gostaria de usar ou toque em Cancelar para voltar."
+"Envie o tempo limite (em minutos) que você gostaria de usar ou toque em Cancelar para voltar. O máximo é <b>${max_timeout} minutos</b>, o que equivale a um dia."
+
+msgid "SettingsMessages.TIMEOUT_INVALID"
+msgstr "Isso não parece um tempo limite válido. Envie um número inteiro positivo de minutos, até <b>${max_timeout}</b> (um dia). Sem decimais permitidos!"
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Opa! Isso não parece um número válido. Por favor, digite um número inteiro positivo. Sem decimais permitidos!"

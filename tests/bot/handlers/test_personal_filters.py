@@ -6,7 +6,7 @@ from sqlmodel import select
 from telegram import Message, Update
 
 from mitup_bot import guards
-from mitup_bot.handlers import PositiveNumberFilter
+from mitup_bot.handlers import BoundedPositiveNumberFilter, PositiveNumberFilter
 from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
@@ -80,6 +80,33 @@ def test_positive_number_filter_with_wrong_messages(update: Update):
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="1234")], indirect=True)
 def test_positive_number_filter_with_positive_number(update: Update):
     assert PositiveNumberFilter().filter(update) is True
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(message_text="-1"),
+        UpdateRequest(message_text="hinumber"),
+        UpdateRequest(message=False),
+        UpdateRequest(message_text=""),
+        UpdateRequest(message_text="11"),
+        UpdateRequest(message_text="99999999999"),
+    ],
+    ids=["negative", "text", "without_message", "without_text", "above_maximum", "far_above_maximum"],
+    indirect=True,
+)
+def test_bounded_positive_number_filter_rejects(update: Update):
+    assert BoundedPositiveNumberFilter(10).filter(update) is False
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(message_text="1"), UpdateRequest(message_text="10")],
+    ids=["below_maximum", "at_maximum"],
+    indirect=True,
+)
+def test_bounded_positive_number_filter_accepts_up_to_maximum(update: Update):
+    assert BoundedPositiveNumberFilter(10).filter(update) is True
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(rich_message=True)], indirect=True)

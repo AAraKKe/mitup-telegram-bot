@@ -6,12 +6,35 @@ from mitup_bot.patreon.pairing import PAIRING_DEEP_LINK_PREFIX
 from .start_payload import parse_start_payload
 
 
+def positive_number(update: Update) -> int | None:
+    """The update's message text read as a positive whole number, or None when it isn't one."""
+    text = update.effective_message.text if update.effective_message else None
+    if not text or not text.isdigit():
+        return None
+
+    value = int(text)
+    return value if value > 0 else None
+
+
 class PositiveNumberFilter(UpdateFilter):
     def filter(self, update: Update) -> bool:
-        if not update.effective_message or not update.effective_message.text:
-            return False
+        return positive_number(update) is not None
 
-        return update.effective_message.text.isdigit() and int(update.effective_message.text) > 0
+
+class BoundedPositiveNumberFilter(UpdateFilter):
+    """Match a positive whole number that is at most `maximum`.
+
+    A number above the bound does not match, so it reaches the conversation's invalid-input
+    fallback instead of the handler that stores it.
+    """
+
+    def __init__(self, maximum: int):
+        super().__init__()
+        self.maximum = maximum
+
+    def filter(self, update: Update) -> bool:
+        value = positive_number(update)
+        return value is not None and value <= self.maximum
 
 
 class PatreonPairingStartFilter(MessageFilter):

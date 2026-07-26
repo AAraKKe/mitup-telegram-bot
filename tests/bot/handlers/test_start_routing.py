@@ -62,18 +62,14 @@ def conversation_for(handler_id: HandlerId) -> ConversationHandler:
     return cast(ConversationHandler, HandlersRegistry.get_handler(handler_id))
 
 
-def clear_conversation_state():
-    # The conversation handlers are registry singletons shared with every other test in the
-    # process; drop any state keyed under the default (chat, user) so tests stay independent.
-    conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)._conversations.clear()
-    conversation_for(MeetingHandlerId.CREATE_MEETING_CONVERSATION)._conversations.clear()
-
-
 @pytest.fixture
 async def routing_app() -> AsyncGenerator[Application]:
-    """A real application with the full production registry bound, initialized for process_update."""
+    """A real application with the full production registry bound, initialized for process_update.
+
+    The conversation handlers it binds are registry singletons shared with every other test; the
+    autouse `clean_conversation_state` fixture is what keeps their state out of this one.
+    """
     RecordingContext.created.clear()
-    clear_conversation_state()
 
     builder = ApplicationBuilder()
     # Same bot setup as create_test_app: a spec'd mock with no defaults so no scheduler config leaks.
@@ -92,7 +88,6 @@ async def routing_app() -> AsyncGenerator[Application]:
         yield app
     finally:
         await app.shutdown()
-        clear_conversation_state()
 
 
 async def process_update(app: Application, update: Update) -> MockApi:

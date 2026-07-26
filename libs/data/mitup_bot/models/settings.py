@@ -3,9 +3,11 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
-from sqlalchemy import BigInteger, Column, DateTime, FetchedValue
+from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel.main import SQLModelConfig
 
+from mitup_bot.limits import MEETING_MAX_TIMEOUT_MINUTES
 from mitup_bot.translations import TranslationEngine
 
 from .base_model import BaseModel
@@ -15,9 +17,18 @@ if TYPE_CHECKING:  # pragma: no cover
 
 log = structlog.get_logger(__name__)
 
+SETTINGS_TIMEOUT_MAX_CONSTRAINT = "ck_settings_timeout_max"
+
 
 class Settings(BaseModel, SQLModel, table=True):
     __tablename__: str = "settings"
+    __table_args__ = (
+        CheckConstraint(f"timeout <= {MEETING_MAX_TIMEOUT_MINUTES}", name=SETTINGS_TIMEOUT_MAX_CONSTRAINT),
+    )
+    # Validate on assignment so the `timeout` ceiling holds on every write path, not just the
+    # settings flow. Loading is unaffected — SQLAlchemy populates instance state directly, so a row
+    # that is out of range still reads back.
+    model_config = SQLModelConfig(validate_assignment=True)
 
     id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
@@ -30,7 +41,7 @@ class Settings(BaseModel, SQLModel, table=True):
     timezone: str = "UTC"
     notification: bool = True
     notification_time: int = 5
-    timeout: int = Field(default=5, sa_type=BigInteger)
+    timeout: int = Field(default=5, le=MEETING_MAX_TIMEOUT_MINUTES, sa_type=BigInteger)
     default_waiting_list: bool = False
     default_public: bool = False
     default_allow_invitation: bool = False

@@ -197,7 +197,7 @@ class MeetingListMessages(MessageBase):
 class CommonMessages(MessageBase):
     # Stale cancel button alert
     STALE_CANCEL_ALERT = "You've already answered this question"
-    # Shared positive-integer validation (timeout + notification-time flows)
+    # Positive-integer validation for flows without an upper bound (notification time)
     POSITIVE_INTEGER_INVALID = (
         "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
     )
@@ -364,7 +364,12 @@ class SettingsMessages(MessageBase):
         "Meetings without a set duration are deactivated once this time has passed. "
         "After deactivation, you can reactivate a meeting from your <b>Past meetings menu</b>.\n\n"
         "The current timeout is <b>${timeout} minutes</b>\n\n"
-        "Send the timeout (in minutes) you would like to use or touch Cancel to go back."
+        "Send the timeout (in minutes) you would like to use or touch Cancel to go back. "
+        "The maximum is <b>${max_timeout} minutes</b>, which is one day."
+    )
+    TIMEOUT_INVALID = (
+        "That doesn't look like a valid timeout. Send a positive whole number of minutes, "
+        "up to <b>${max_timeout}</b> (one day). No decimals allowed!"
     )
     TIMEOUT_SUCCESS = "Timeout set to: <b>${timeout} minutes</b>"
 

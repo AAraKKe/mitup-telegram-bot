@@ -4,6 +4,7 @@ __all__ = (
     "commands",
     "HandlersRegistry",
     "messages",
+    "BoundedPositiveNumberFilter",
     "PositiveNumberFilter",
     "inline_query",
     "edit_settings",
@@ -24,7 +25,7 @@ from .registry import HandlersRegistry
 
 # Then all other utils
 from . import commands, messages
-from .personal_filters import PositiveNumberFilter
+from .personal_filters import BoundedPositiveNumberFilter, PositiveNumberFilter
 
 # Then subpackages with different handlers registered
 from . import (

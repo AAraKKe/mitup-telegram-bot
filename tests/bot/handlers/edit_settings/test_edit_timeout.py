@@ -3,9 +3,10 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
+from mitup_bot.limits import MEETING_MAX_TIMEOUT_MINUTES
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import CommonMessages, SettingsMessages
+from mitup_bot.utils.messages import SettingsMessages
 from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     HandlerContext,
@@ -28,17 +29,36 @@ async def test_callback_query_timeout(
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEOUT_PROMPT.get(
-            lang=user_with_settings.lang, timeout=user_with_settings.settings.timeout
+            lang=user_with_settings.lang,
+            timeout=user_with_settings.settings.timeout,
+            max_timeout=MEETING_MAX_TIMEOUT_MINUTES,
         ),
     )
 
     context.api.assert_edit_message_called(update, expected_view)
     assert result == ConversationSettingsState.TIMEOUT
 
+    # The prompt states the ceiling with a substituted number, not a leftover placeholder
+    rendered = context.api.call_args("edit_message").kwargs["view"].description.text
+    assert str(MEETING_MAX_TIMEOUT_MINUTES) in rendered
+    assert "${" not in rendered
 
-@pytest.mark.parametrize("update", [UpdateRequest(message_text="10")], indirect=True)
+
+@pytest.mark.parametrize(
+    "update, timeout",
+    [
+        (UpdateRequest(message_text="10"), 10),
+        (UpdateRequest(message_text=str(MEETING_MAX_TIMEOUT_MINUTES)), MEETING_MAX_TIMEOUT_MINUTES),
+    ],
+    ids=["ordinary_value", "at_cap"],
+    indirect=["update"],
+)
 async def test_settings_timeout_text_message_handler(
-    mock_session: MockDbSession, user_with_settings: User, update: Update, handler_context: HandlerContext
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_context: HandlerContext,
+    timeout: int,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
@@ -48,19 +68,25 @@ async def test_settings_timeout_text_message_handler(
 
     expected_view = factory.settings_view(
         RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEOUT_SUCCESS.get(lang=user_with_settings.lang, timeout=10),
+        message=SettingsMessages.TIMEOUT_SUCCESS.get(lang=user_with_settings.lang, timeout=timeout),
     )
 
     mock_session.assert_flushed()
-    assert user_with_settings.settings.timeout == 10
+    assert user_with_settings.settings.timeout == timeout
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationHandler.END
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(message_text="invalid"), UpdateRequest(message_text="-5"), UpdateRequest(message_text="5.5")],
-    ids=["invalid_text", "negative_number", "decimal_number"],
+    [
+        UpdateRequest(message_text="invalid"),
+        UpdateRequest(message_text="-5"),
+        UpdateRequest(message_text="5.5"),
+        UpdateRequest(message_text=str(MEETING_MAX_TIMEOUT_MINUTES + 1)),
+        UpdateRequest(message_text="99999999999"),
+    ],
+    ids=["invalid_text", "negative_number", "decimal_number", "above_cap", "far_above_cap"],
     indirect=True,
 )
 async def test_settings_timeout_invalid_input_handler(
@@ -71,6 +97,7 @@ async def test_settings_timeout_invalid_input_handler(
     handler_context: HandlerContext,
 ):
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    stored_timeout = user_with_settings.settings.timeout
 
     # Frist call the conversation handler with the valid callback
     telegram_user = telegram_user_from_user(user_with_settings)
@@ -98,11 +125,21 @@ async def test_settings_timeout_invalid_input_handler(
 
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
-        message=CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user_with_settings.lang),
+        message=SettingsMessages.TIMEOUT_INVALID.get(
+            lang=user_with_settings.lang, max_timeout=MEETING_MAX_TIMEOUT_MINUTES
+        ),
     )
 
     # Tow messages are sent, one to request the timeout and another one to inform the user that the input was invalid
     context.api.assert_send_message_called(update, expected_view)
+
+    # The rejection states the ceiling with a substituted number, not a leftover placeholder
+    rendered = context.api.call_args("send_message").kwargs["view"].description.text
+    assert str(MEETING_MAX_TIMEOUT_MINUTES) in rendered
+    assert "${" not in rendered
+
+    # Rejected input never reaches the setting, whether it is not a number or above the cap
+    assert user_with_settings.settings.timeout == stored_timeout
 
     # After failing we should still be on the proper state, send now a valid message
     assert update.effective_message is not None

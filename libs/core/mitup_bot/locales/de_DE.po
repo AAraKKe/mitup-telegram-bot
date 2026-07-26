@@ -235,7 +235,10 @@ msgstr "Hier kannst du die Standardoptionen konfigurieren, die beim Erstellen ei
 msgid "SettingsMessages.TIMEOUT_PROMPT"
 msgstr "Das Timeout definiert, wie lange ein Treffen nach seinem Beginn aktiv bleibt. Treffen ohne festgelegte Dauer werden deaktiviert, sobald diese Zeit verstrichen ist. Nach der Deaktivierung kannst du ein Treffen über dein <b>Menü für vergangene Treffen</b> reaktivieren.\n\n"
 "Das aktuelle Timeout beträgt <b>${timeout} Minuten</b>\n\n"
-"Sende das Timeout (in Minuten), das du verwenden möchtest, oder tippe auf Abbrechen, um zurückzugehen."
+"Sende das Timeout (in Minuten), das du verwenden möchtest, oder tippe auf Abbrechen, um zurückzugehen. Das Maximum ist <b>${max_timeout} Minuten</b>, was einem Tag entspricht."
+
+msgid "SettingsMessages.TIMEOUT_INVALID"
+msgstr "Das sieht nicht wie ein gültiges Timeout aus. Sende eine positive ganze Zahl in Minuten, bis zu <b>${max_timeout}</b> (ein Tag). Keine Dezimalzahlen erlaubt!"
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Oops! Das sieht nicht wie eine gültige Zahl aus. Bitte gib eine positive ganze Zahl ein. Keine Dezimalzahlen erlaubt!"

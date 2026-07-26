@@ -250,7 +250,10 @@ msgstr "Acó podes configurar as opcións predeterminadas usadas ao crear unha q
 msgid "SettingsMessages.TIMEOUT_PROMPT"
 msgstr "A prórroga define canto tempo se mantén activa unha quedada despois de que comece. As quedadas sen duración definida desactívanse en canto pasa este tempo. Despois da desactivación, podes reactivar unha quedada desde o menú <b>As túas quedadas pasadas</b>.\n\n"
 "A prórroga actual é <b>${timeout} minutos</b>\n\n"
-"Envía a prórroga (en minutos) que che gustaría usar ou toca Cancelar para volver."
+"Envía a prórroga (en minutos) que che gustaría usar ou toca Cancelar para volver. O máximo é <b>${max_timeout} minutos</b>, que equivale a un día."
+
+msgid "SettingsMessages.TIMEOUT_INVALID"
+msgstr "Vaia! Isto non parece unha prórroga válida. Envía un número enteiro positivo de minutos, ata <b>${max_timeout}</b> (un día). Non se permiten decimais!"
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Vaia! Isto non parece un número válido. Por favor entra un número enteiro positivo. Non se permiten decimais!"

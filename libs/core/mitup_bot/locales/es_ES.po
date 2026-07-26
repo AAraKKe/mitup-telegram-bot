@@ -263,7 +263,7 @@ msgstr "Aquí puedes configurar las opciones predeterminadas cuando creas una nu
 "<b>Bloquear al iniciar</b>: cuando está habilitado y una quedada tiene una duración establecida, los participantes no pueden unirse o abandonar la quedada una vez que ha comenzado. Cuando está deshabilitado, los participantes aún pueden unirse o abandonar libremente."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
-msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene activa después de que comience. Las quedadas sin una duración establecida se desactivan una vez que ha pasado este tiempo. Después de desactivar, puedes reactivar una quedada desde tu <b>Menú de quedadas pasadas</b>.\n\nEl tiempo de prórroga actual es <b>${timeout} minutos</b>\n\nEnvía el tiempo de prórroga (en minutos) que deseas usar o toca Cancelar para volver."
+msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene activa después de que comience. Las quedadas sin una duración establecida se desactivan una vez que ha pasado este tiempo. Después de desactivar, puedes reactivar una quedada desde tu <b>Menú de quedadas pasadas</b>.\n\nEl tiempo de prórroga actual es <b>${timeout} minutos</b>\n\nEnvía el tiempo de prórroga (en minutos) que deseas usar o toca Cancelar para volver. El máximo es <b>${max_timeout} minutos</b>, que equivale a un día."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "¡Vaya! Parece que ese no es un número válido. Por favor, envíame un número entero positivo. ¡No se permiten decimales!"
@@ -1090,3 +1090,6 @@ msgstr "<b>¿Desvincular tu cuenta de Patreon?</b>\n\nEsto desconecta tu cuenta 
 
 msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
 msgstr "<b>¿Desvincular tu cuenta de Patreon?</b>\n\nHoy eres ${current_tier}. Desvincularla apaga tu insignia de ${current_tier} y tus límites ampliados, y tu acceso al Hosts-Only Group termina.\n\nTu aportación en Patreon no se detiene por sí sola. Si quieres dejar de pagar, cancélala en Patreon. Si vuelves a vincular tu cuenta mientras tu aportación está activa, tus ventajas de Host vuelven."
+
+msgid "SettingsMessages.TIMEOUT_INVALID"
+msgstr "¡Vaya! Ese no parece un tiempo de prórroga válido. Envíame un número entero positivo de minutos, hasta <b>${max_timeout}</b> (un día). ¡No se permiten decimales!"
