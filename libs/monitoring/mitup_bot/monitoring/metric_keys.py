@@ -179,8 +179,15 @@ class MetricKey(CamelCaseStrEnum):
     BROADCASTS_SENDING = auto()
     """Backlog gauge: deliveries parked RETRY_PENDING; emitted only on sender ticks with backlog to report"""
     BROADCAST_DELIVERIES_RETRY_PENDING = auto()
-    """Number of expired meetings whose permanent deletion failed (owner unreachable for the notice)"""
+    """Number of expired meetings left undeleted this run because notifying the owner raised an error;
+    they are nominated again on the next run"""
     MEETINGS_DELETION_FAILED = auto()
+    """Number of expired meetings deleted this run without their owner being told, because the owner
+    has blocked the bot or no longer exists (subset of MeetupsDeleted)"""
+    MEETUPS_DELETED_UNNOTIFIED = auto()
+    """Number of expiration warnings that failed to send this run; their meetings stay in the warning
+    pool and are nominated again on the next run"""
+    EXPIRATION_NOTIFICATIONS_FAILED = auto()
     """A callback query reached the registry fallback — no registered handler matched it"""
     UNHANDLED_CALLBACK = auto()
     """A user cancelled a feature flow before completing it (emitted under the Feature dimension)"""

@@ -451,6 +451,34 @@ async def test_send_messages_to_users_general_error_calls_on_error(telegram_api:
     assert isinstance(call_args[0][1], RuntimeError)
 
 
+async def test_send_messages_to_users_general_error_never_reports_success(telegram_api: TelegramApi, bot: AsyncMock):
+    """A failed send must not run `on_success`, even when the caller passed no `on_error`."""
+    user1 = create_user(id=1, tg_user_id=100)
+    on_success_1 = MagicMock()
+    bot.send_message.side_effect = RuntimeError("network failure")
+
+    await telegram_api.send_messages_to_users([user1], ["msg1"], on_success=[on_success_1])
+
+    on_success_1.assert_not_called()
+
+
+async def test_send_messages_to_users_unreachable_user_calls_on_unreachable(telegram_api: TelegramApi, bot: AsyncMock):
+    """A blocked recipient is its own outcome: neither a success nor an error for the caller."""
+    user1 = create_user(id=1, tg_user_id=100)
+    user2 = create_user(id=2, tg_user_id=200)
+    callbacks = {name: [MagicMock(), MagicMock()] for name in ("on_success", "on_error", "on_unreachable")}
+    bot.send_message.side_effect = [Forbidden("Forbidden: bot was blocked by the user"), MagicMock(spec=Message)]
+
+    await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"], **callbacks)
+
+    callbacks["on_unreachable"][0].assert_called_once_with(user1)
+    callbacks["on_success"][0].assert_not_called()
+    callbacks["on_error"][0].assert_not_called()
+    # The batch keeps going: the reachable recipient still resolves as a success.
+    callbacks["on_success"][1].assert_called_once_with(user2)
+    callbacks["on_unreachable"][1].assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # notify_users_promoted_from_waiting_list
 # ---------------------------------------------------------------------------
@@ -1042,8 +1070,8 @@ async def test_enqueue_validates_users_views_mismatch_inside_transaction(telegra
 
 @pytest.mark.parametrize(
     "callback_kwargs",
-    [{"on_success": [MagicMock()]}, {"on_error": [MagicMock()]}],
-    ids=["on_success", "on_error"],
+    [{"on_success": [MagicMock()]}, {"on_error": [MagicMock()]}, {"on_unreachable": [MagicMock()]}],
+    ids=["on_success", "on_error", "on_unreachable"],
 )
 async def test_send_messages_to_users_callbacks_rejected_under_capture(
     telegram_api: TelegramApi, callback_kwargs: dict[str, Any]

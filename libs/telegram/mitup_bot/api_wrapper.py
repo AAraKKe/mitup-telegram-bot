@@ -405,6 +405,7 @@ class TelegramApiWrapper(Protocol):
         views: Sequence[MitupView | FormattedText | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
+        on_unreachable: Sequence[Callable[[User], None]] | None = None,
     ): ...
     async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool: ...
     async def edit_message_for_user(
@@ -749,57 +750,64 @@ class TelegramApi:
         views: Sequence[MitupView | FormattedText | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
+        on_unreachable: Sequence[Callable[[User], None]] | None = None,
     ):
-        """
-        Sends messages to multiple users.
+        """Send one view per user, classifying every user by how their send resolved.
 
-        If a user has blocked the bot or is no longer available, they will be marked as inactive
-        in the database and no exception will be raised. Under capture mode the marking happens
-        in the decorator's reconcile transaction instead of inline.
+        Exactly one callback runs per user: `on_success` when the message reached them,
+        `on_unreachable` when they have blocked the bot or no longer exist, `on_error` for any
+        other failure. An unreachable user is also marked inactive in the database and raises
+        nothing, so a batch never fails on one blocked recipient; under capture mode the marking
+        happens in the decorator's reconcile transaction instead of inline.
         """
 
         if len(users) != len(views):
             raise ValueError("The number of users and views must be the same")
 
         if self._outbox is not None:
-            if on_success or on_error:
-                # The callbacks run against live ORM objects; after commit their effects would
-                # be silently lost. Callers that need them must opt into pre-commit execution.
-                raise ValueError("Result callbacks cannot run after commit; use context.api.immediate instead")
-            for user, view in zip(users, views, strict=True):
-                resolved = resolve_view(view)
-                self._enqueue(
-                    "send_messages_to_users",
-                    partial(self._send_user_message_now, user.tg_user_id, resolved),
-                    {"chat_id": user.tg_user_id} | view_log_payload(resolved),
-                )
+            self._enqueue_user_messages(users, views, has_callbacks=bool(on_success or on_error or on_unreachable))
             return
 
-        awaitables = [
-            self.send_message_to_user(
-                user=user,
-                view=views[i],
-            )
-            for i, user in enumerate(users)
-        ]
+        results = await gather(
+            *(self.send_message_to_user(user=user, view=view) for user, view in zip(users, views, strict=True)),
+            return_exceptions=True,
+        )
 
-        results = await gather(*awaitables, return_exceptions=True)
-
-        for idx, (user, result) in enumerate(zip(users, results, strict=True)):
+        for index, (user, result) in enumerate(zip(users, results, strict=True)):
             if isinstance(result, InactiveUserInteraction):
-                # Handle inactive user different for other errors
-                # we do not want to error out but mark the user as inactive
-                if user.mark_inactive():
-                    log.info("Marking user as inactive", tg_user_id=user.tg_user_id)
-                    self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
-                continue
-
-            # Handle Callbacks
-            if on_error and isinstance(result, Exception):
+                self._mark_user_inactive(user)
+                if on_unreachable:
+                    on_unreachable[index](user)
+            elif isinstance(result, Exception):
                 log.exception("Error sending message to user", user_id=user.id, exc_info=result)
-                on_error[idx](user, result)
+                if on_error:
+                    on_error[index](user, result)
             elif on_success:
-                on_success[idx](user)
+                on_success[index](user)
+
+    def _enqueue_user_messages(
+        self,
+        users: Sequence[User],
+        views: Sequence[MitupView | FormattedText | str],
+        *,
+        has_callbacks: bool,
+    ):
+        if has_callbacks:
+            # The callbacks run against live ORM objects; after commit their effects would
+            # be silently lost. Callers that need them must opt into pre-commit execution.
+            raise ValueError("Result callbacks cannot run after commit; use context.api.immediate instead")
+        for user, view in zip(users, views, strict=True):
+            resolved = resolve_view(view)
+            self._enqueue(
+                "send_messages_to_users",
+                partial(self._send_user_message_now, user.tg_user_id, resolved),
+                {"chat_id": user.tg_user_id} | view_log_payload(resolved),
+            )
+
+    def _mark_user_inactive(self, user: User):
+        if user.mark_inactive():
+            log.info("Marking user as inactive", tg_user_id=user.tg_user_id)
+            self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
 
     async def notify_users_promoted_from_waiting_list(
         self,

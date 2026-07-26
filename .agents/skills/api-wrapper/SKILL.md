@@ -47,7 +47,7 @@ Capture rules baked into `TelegramApi`:
 
 - Queue entries carry **plain data snapshotted at enqueue time** (chat ids, message ids, rendered view content). `update_meeting_messages` renders each stored message into a `MeetingMessageEdit` payload at enqueue; the button persistence (`message.buttons.keyboard = ...`) happens then too, inside the transaction. Nothing reads ORM objects or the session during the drain.
 - Argument validation (missing chat/query, view resolution) also happens at enqueue, inside the transaction, so programming errors fail early and abort.
-- `send_messages_to_users` rejects `on_success`/`on_error` callbacks under capture (they would mutate ORM objects after commit and be lost) — callers needing them must use `immediate`.
+- `send_messages_to_users` rejects its result callbacks under capture (they would mutate ORM objects after commit and be lost) — callers needing them must use `immediate`.
 - `context.api.immediate.X(...)` executes right away, inside the open transaction; its failure aborts the transaction. Keep it rare and greppable.
 
 ### Post-commit error semantics
@@ -124,6 +124,8 @@ A non-handler broadcast (mutate state, then fan out) wraps each critical section
 `send_message_to_user()` catches `Forbidden` (bot blocked) and `BadRequest` with "not found" (deleted account), raising `InactiveUserInteraction(user_id, private=True)`. The error handler then marks the user inactive in the database.
 
 `send_messages_to_users()` handles this internally — inactive users are marked directly without propagating exceptions, so batch sends don't fail on individual user errors.
+
+It classifies every recipient and runs **exactly one** callback per user: `on_success` when the message landed, `on_unreachable` when the user blocked the bot or no longer exists, `on_error` for anything else. A caller that only passes `on_success` therefore learns nothing about the other two outcomes — pass `on_unreachable` whenever an undeliverable notice must still drive a decision (e.g. a cleanup job that has to reach a terminal state rather than re-nominating the same row on every run).
 
 ### Edit error suppression
 
