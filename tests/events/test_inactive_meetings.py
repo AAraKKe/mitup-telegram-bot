@@ -166,6 +166,7 @@ async def test_meeting_with_invited_users(
 
     # Only the invited user (id=3) should be targeted by the DELETE; the regular user (id=2) must not appear.
     assert "DELETE FROM users WHERE users.id IN (3)" in mock_session.queries_executed
+    assert f"DELETE FROM joined_users WHERE joined_users.meetup_id = {meeting.id}" in mock_session.queries_executed
     assert f"DELETE FROM messages WHERE messages.meetup_id = {meeting.id}" in mock_session.queries_executed
 
     metrics.assert_emitted(
@@ -181,6 +182,41 @@ async def test_meeting_with_invited_users(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
         value=0,
+        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+    )
+
+
+async def test_meeting_membership_is_cleared(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """Deactivation empties the meeting: participants and waiting-list entries alike.
+
+    Both live in `joined_users`, so one delete scoped to the meeting covers them. What the meeting
+    reads back afterwards — including through a reactivation — is pinned in
+    tests/data/db_behavior/test_meeting_deactivation_cleanup.py.
+    """
+    meeting = create_meetup(id=1, title="Test Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+
+    participant = create_user(id=2, tg_user_id=200)
+    create_joined_link(user=participant, meetup=meeting, id=1)
+
+    waiting = create_user(id=3, tg_user_id=300)
+    create_joined_link(user=waiting, meetup=meeting, id=2, is_waiting_list=True)
+
+    register_due_meetings(mock_session, meeting)
+    await inactive_meetings.run(api, metrics_client)
+    await metrics_client.flush()
+
+    assert meeting.active is False
+    assert f"DELETE FROM joined_users WHERE joined_users.meetup_id = {meeting.id}" in mock_session.queries_executed
+    # The participants are real users, only their membership goes: nothing deletes users by id
+    # (the JOINED_ONLY sweep at the end of the run deletes by status, not by id).
+    assert not any("DELETE FROM users WHERE users.id IN" in query for query in mock_session.queries_executed)
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED,
+        value=1,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
 
@@ -323,9 +359,9 @@ async def test_joined_only_users_deleted_metric_emitted_when_no_orphans(
 
 # ---------------------------------------------------------------------------
 # JOINED_ONLY cleanup — DB integration tests live in
-# tests/models/db_behavior/test_joined_only_cleanup.py because the cleanup
+# tests/data/db_behavior/test_joined_only_cleanup.py because the cleanup
 # query relies on `NOT EXISTS … active=true` semantics that the mock session
 # cannot replay. The row-lock race tests for the per-meeting critical section
-# live in tests/models/db_behavior/test_inactive_meetings_row_locks.py.
+# live in tests/data/db_behavior/test_inactive_meetings_row_locks.py.
 # Keep this file mock-only.
 # ---------------------------------------------------------------------------

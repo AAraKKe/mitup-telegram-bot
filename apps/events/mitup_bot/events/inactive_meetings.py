@@ -103,6 +103,12 @@ async def deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api: 
     if invited_users_ids:
         await session.exec(delete(User).where(col(User.id).in_(invited_users_ids)))
 
+    # The membership belongs to the run that just ended. Reactivation brings the meeting back as a
+    # fresh one, so it must start empty and everybody joins again instead of being re-enrolled into
+    # a meeting they only ever attended once. The waiting list rides on these same rows and goes
+    # with them. Deleting the invited users above already took their links; this clears the rest.
+    await session.exec(delete(JoinedUsers).where(col(JoinedUsers.meetup_id) == meetup_id))
+
     # Same with messages, any message attached to this meeting is left untracked as the
     # meeting is now considered over
     await session.exec(delete(Message).where(col(Message.meetup_id) == meetup_id))
@@ -112,7 +118,7 @@ async def deactivate_meeting_locked(session: AsyncSession, meetup_id: int, api: 
 async def deactivate_meeting(meetup_id: int, api: TelegramApiWrapper) -> bool:
     """One meeting's deactivation in its own write lifecycle: commit (releasing the row
     lock) before the queued fan-out drains. The bare critical section stays importable for
-    the row-lock race tests in tests/models/db_behavior/."""
+    the row-lock race tests in tests/data/db_behavior/."""
     async with db.begin_write(api) as session:
         return await deactivate_meeting_locked(session, meetup_id, api)
 
