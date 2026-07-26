@@ -95,7 +95,7 @@ async def registration_timezone_text_message_handler(
     # The end of the conversation is the only legitimate JOINED_ONLY/LEFT → MEMBER
     # transition site. Brand-new users are already MEMBER (model default), so this
     # is a no-op for them.
-    user.status = UserStatus.MEMBER
+    user.set_status(UserStatus.MEMBER)
 
     view = registration_complete_view(user, update, context)
 
@@ -140,7 +140,7 @@ async def registration_timezone_location_message_handler(
     # The end of the conversation is the only legitimate JOINED_ONLY/LEFT → MEMBER
     # transition site. Brand-new users are already MEMBER (model default), so this
     # is a no-op for them.
-    user.status = UserStatus.MEMBER
+    user.set_status(UserStatus.MEMBER)
 
     view = registration_complete_view(user, update, context)
 

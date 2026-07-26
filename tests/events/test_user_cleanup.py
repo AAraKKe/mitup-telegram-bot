@@ -1,16 +1,21 @@
+import datetime as dt
 import logging
 
 import pytest
 from sqlalchemy.dialects import postgresql
 
 from mitup_bot.events import user_cleanup
-from mitup_bot.events.user_cleanup import DELETION_REQUESTED_USERS_SELECT_STATEMENT, INACTIVE_USERS_SELECT_STATEMENT
+from mitup_bot.events.user_cleanup import (
+    DELETION_REQUESTED_USERS_SELECT_STATEMENT,
+    DEMOTABLE_LEFT_USERS_SELECT_STATEMENT,
+    INACTIVE_USERS_SELECT_STATEMENT,
+)
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView
-from tests.helpers import MockApi, MockDbSession, create_member, create_user
+from tests.helpers import MockApi, MockDbSession, create_joined_link, create_meetup, create_member, create_user
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 # Farewell delivery failures are not exercised here: under the write lifecycle a failed send
@@ -35,6 +40,13 @@ def purged_count(caplog: pytest.LogCaptureFixture) -> int:
     return record.__dict__["count"]
 
 
+def demoted_count(caplog: pytest.LogCaptureFixture) -> int:
+    """The count field of the demotion log line. Absent when nothing was demoted — the pass logs
+    only when it acted, so a missing line reads as zero."""
+    record = next((record for record in caplog.records if record.message == "LEFT users demoted to JOINED_ONLY"), None)
+    return record.__dict__["count"] if record is not None else 0
+
+
 async def test_no_users_to_purge(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
@@ -47,9 +59,10 @@ async def test_no_users_to_purge(
     await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
-    # Four exec calls: LEFT select + DELETION_REQUESTED select + delete users + pending-link sweep.
-    # No per-user pending-link delete: with nobody purged there are no claimers to name.
-    assert mock_session.exec.call_count == 4
+    # Five exec calls: demotion select + LEFT select + DELETION_REQUESTED select + delete users +
+    # pending-link sweep. No meetup delete (nobody is demoted) and no per-user pending-link delete
+    # either: with nobody purged there are no claimers to name.
+    assert mock_session.exec.call_count == 5
 
     # No real user IDs targeted — empty-set form renders as IN (NULL) AND (1 != 1)
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
@@ -222,6 +235,109 @@ async def test_joined_only_users_not_targeted(
     metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
     # User stays JOINED_ONLY — no side effects.
     assert joined_only_user.status is UserStatus.JOINED_ONLY
+
+
+async def test_stale_left_user_is_demoted_to_joined_only(
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    api: MockApi,
+    caplog: pytest.LogCaptureFixture,
+):
+    """The demotion keeps the row and drops the account: JOINED_ONLY, no stamp, and no message —
+    the user blocked the bot, so there is nobody to tell."""
+    caplog.set_level(logging.INFO)
+    demotable = create_user(
+        id=40, tg_user_id=40, status=UserStatus.LEFT, left_time=dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    )
+    mock_session.add_objects_with_statement(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT, (demotable,))
+
+    await user_cleanup.run(api, metrics_client)
+    await metrics_client.flush()
+
+    assert demotable.status is UserStatus.JOINED_ONLY
+    assert demotable.left_time is None
+    api.assert_method_just_called("send_message_to_user", times=0)
+    metrics.assert_emitted(name=MetricKey.LEFT_USERS_DEMOTED, value=1, unit=MetricUnit.COUNT)
+    assert demoted_count(caplog) == 1
+
+
+async def test_demotion_deletes_owned_inactive_meetings_and_keeps_join_links(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The owned meetings are what the demotion erases (all inactive by now, and their own data
+    cascades with them); the join links are the slots the demotion exists to preserve."""
+    demotable = create_user(
+        id=41,
+        tg_user_id=41,
+        status=UserStatus.LEFT,
+        left_time=dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
+        owned_meetings=[create_meetup(id=50, active=False)],
+    )
+    link = create_joined_link(demotable, create_meetup(id=51))
+    mock_session.add_objects_with_statement(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT, (demotable,))
+
+    await user_cleanup.run(api, metrics_client)
+
+    assert (
+        "DELETE FROM meetups WHERE meetups.owner_id IN (41) AND meetups.active = false" in mock_session.queries_executed
+    )
+    assert demotable.joined_links == [link]
+    assert not any("DELETE FROM joined_users" in query for query in mock_session.queries_executed)
+
+
+async def test_demoted_user_is_not_purged(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """Demotion and purge are exclusive: a demoted user holds a link to an active meeting, which is
+    exactly what keeps them out of the purge select."""
+    demotable = create_user(
+        id=42, tg_user_id=42, status=UserStatus.LEFT, left_time=dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    )
+    mock_session.add_objects_with_statement(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT, (demotable,))
+
+    await user_cleanup.run(api, metrics_client)
+    await metrics_client.flush()
+
+    assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
+    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
+
+
+async def test_no_demotion_candidates_touches_no_meetings(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """The zero count is emitted every run, but an empty pass issues no meeting delete."""
+    await user_cleanup.run(api, metrics_client)
+    await metrics_client.flush()
+
+    assert not any("DELETE FROM meetups" in query for query in mock_session.queries_executed)
+    metrics.assert_emitted(name=MetricKey.LEFT_USERS_DEMOTED, value=0, unit=MetricUnit.COUNT)
+
+
+async def test_demotion_select_filters_correctly(mock_session: MockDbSession, api: MockApi):
+    """The four conditions that make a LEFT user demotable: the status, the elapsed grace period,
+    no active owned meeting, and at least one join link to an active meeting."""
+    client = make_test_metrics_client()
+
+    await user_cleanup.run(api, client)
+
+    compiled = mock_session.normalize_query(
+        str(
+            DEMOTABLE_LEFT_USERS_SELECT_STATEMENT.compile(
+                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+            )
+        )
+    )
+    assert compiled in mock_session.queries_executed
+    assert "users.status = 'left'" in compiled
+    assert "users.left_time + CAST('30 days' AS INTERVAL) < now()" in compiled
+    assert (
+        "NOT (EXISTS (SELECT 1 FROM meetups WHERE meetups.owner_id = users.id AND meetups.active = true))" in compiled
+    )
+    assert (
+        "(EXISTS (SELECT 1 FROM joined_users JOIN meetups ON meetups.id = joined_users.meetup_id "
+        "WHERE joined_users.user_id = users.id AND meetups.active = true))" in compiled
+    )
 
 
 async def test_finished_pending_links_are_swept_every_run(

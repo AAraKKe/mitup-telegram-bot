@@ -94,7 +94,7 @@ async def callback_query_confirm_delete_user_data(session: AsyncSession, update:
 @with_session
 async def callback_query_confirm_delete_user_data_final(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
-    user.status = UserStatus.DELETION_REQUESTED
+    user.set_status(UserStatus.DELETION_REQUESTED)
     log.info("Data deletion request confirmed", user_id=user.db_id)
     # No buttons: the account has stopped working, so there is no screen left to navigate to.
     view = MitupView(description=PrivacyMessages.DELETION_MARKED.get(lang=user.lang), keyboard=[])

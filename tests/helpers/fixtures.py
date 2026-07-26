@@ -163,6 +163,7 @@ def create_user(
     supporter_level: SupporterLevel = SupporterLevel.NONE,
     owned_meetings: list[Meetup] | None = None,
     settings: Settings | None = None,
+    left_time: dt.datetime | None = None,
 ) -> User:
     return User(
         id=id,
@@ -172,6 +173,7 @@ def create_user(
         last_name=last_name,
         status=status,
         supporter_level=supporter_level,
+        left_time=left_time,
         meetups=owned_meetings or [],
         settings=settings or create_settings(),
     )

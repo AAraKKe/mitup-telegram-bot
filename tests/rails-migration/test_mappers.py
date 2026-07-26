@@ -50,6 +50,7 @@ def test_map_user_and_settings_copies_core_fields_and_splits_settings():
         "last_name": "Lovelace",
         "username": "ada",
         "status": UserStatus.MEMBER,
+        "left_time": None,
         "created_time": created,
         "updated_time": updated,
     }
@@ -104,9 +105,13 @@ def test_map_meetup_translates_language_and_keeps_none():
 
 
 def test_map_user_inactive_real_user_becomes_left():
-    row = {"id": 8, "tg_user_id": 100, "first_name": "Gone", "active": False}
+    updated = dt.datetime(2024, 3, 2, 8, 0, tzinfo=dt.UTC)
+    row = {"id": 8, "tg_user_id": 100, "first_name": "Gone", "active": False, "updated_at": updated}
     user, _ = map_user_and_settings(row)
     assert user["status"] is UserStatus.LEFT
+    # The LEFT grace period needs a stamp to measure against, and the row's last change is the
+    # closest Rails has.
+    assert user["left_time"] == updated
 
 
 def test_map_user_defaults_missing_fields():

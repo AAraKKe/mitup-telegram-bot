@@ -59,6 +59,9 @@ class User(BaseModel, SQLModel, table=True):
             server_default=UserStatus.MEMBER.value,
         ),
     )
+    # When the user entered LEFT status, NULL in every other status. `user_cleanup` measures the
+    # LEFT grace period against it, so `set_status` owns the value rather than each caller.
+    left_time: dt.datetime | None = None
     last_name: str | None = None
     username: str | None = None
     # Kept directly on User (rather than joined from supporter_subscriptions) so every handler that
@@ -190,15 +193,27 @@ class User(BaseModel, SQLModel, table=True):
     def lang(self) -> str:
         return self.settings.language
 
+    def set_status(self, status: UserStatus):
+        """Move the user to `status`, keeping `left_time` in sync with it.
+
+        Every status write goes through here: `left_time` drives the LEFT grace period, and a
+        status assigned around this method would leave the stamp describing a status the user
+        is no longer in.
+        """
+        self.status = status
+        self.left_time = dt.datetime.now(dt.UTC) if status is UserStatus.LEFT else None
+
     def mark_inactive(self) -> bool:
         """Transition a MEMBER user to LEFT.
 
         Returns `True` iff a real transition happened. JOINED_ONLY and LEFT
         users are no-ops so callers (e.g. the `INACTIVE_USER_SET` metric path)
-        only react on genuine member departures.
+        only react on genuine member departures — and a LEFT user's grace period
+        keeps running from the first detection instead of restarting on every
+        failed delivery.
         """
         if self.status is UserStatus.MEMBER:
-            self.status = UserStatus.LEFT
+            self.set_status(UserStatus.LEFT)
             return True
         return False
 

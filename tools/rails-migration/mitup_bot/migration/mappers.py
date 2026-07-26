@@ -36,12 +36,18 @@ def map_user_and_settings(row: dict[str, Any]) -> tuple[dict[str, Any], dict[str
     created_at = row.get("created_at")
     updated_at = row.get("updated_at")
 
+    status = map_status(tg_user_id, row.get("active"))
+
     user_kwargs: dict[str, Any] = {
         "tg_user_id": tg_user_id,
         "first_name": row["first_name"],
         "last_name": row.get("last_name"),
         "username": row.get("username"),
-        "status": map_status(tg_user_id, row.get("active")),
+        "status": status,
+        # Rails has no column recording when a user went inactive, and `left_time` is what the
+        # LEFT grace period in `user_cleanup` measures against, so the row's last change is the
+        # closest stamp available for an imported LEFT user.
+        "left_time": updated_at if status is UserStatus.LEFT else None,
         "created_time": created_at,
         "updated_time": updated_at,
     }
