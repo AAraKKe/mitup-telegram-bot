@@ -4,9 +4,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import guards, limits, views
+from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.handlers import BoundedPositiveNumberFilter, HandlersRegistry
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
@@ -22,7 +23,7 @@ async def callback_query_timeout(session: AsyncSession, update: Update, context:
     # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
     user = await guards.current_user(update, session)
     message = SettingsMessages.TIMEOUT_PROMPT.get(
-        lang=user.lang, timeout=user.settings.timeout, max_timeout=limits.MEETING_MAX_TIMEOUT_MINUTES
+        lang=user.lang, timeout=user.settings.timeout, max_timeout=LifecyclePolicy.get().max_timeout_minutes
     )
 
     view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
@@ -34,7 +35,7 @@ async def callback_query_timeout(session: AsyncSession, update: Update, context:
 
 @HandlersRegistry.register_message(
     EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT,
-    BoundedPositiveNumberFilter(limits.MEETING_MAX_TIMEOUT_MINUTES),
+    BoundedPositiveNumberFilter(LifecyclePolicy.get().max_timeout_minutes),
     bindable=False,
 )
 @with_session
@@ -59,7 +60,9 @@ async def settings_timeout_text_message_handler(session: AsyncSession, update: U
 @with_session
 async def settings_timeout_invalid_input_handler(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
-    message = SettingsMessages.TIMEOUT_INVALID.get(lang=user.lang, max_timeout=limits.MEETING_MAX_TIMEOUT_MINUTES)
+    message = SettingsMessages.TIMEOUT_INVALID.get(
+        lang=user.lang, max_timeout=LifecyclePolicy.get().max_timeout_minutes
+    )
 
     view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 

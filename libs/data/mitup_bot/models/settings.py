@@ -7,7 +7,7 @@ from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, FetchedVal
 from sqlmodel import Field, Relationship, SQLModel
 from sqlmodel.main import SQLModelConfig
 
-from mitup_bot.limits import MEETING_MAX_TIMEOUT_MINUTES
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.translations import TranslationEngine
 
 from .base_model import BaseModel
@@ -23,7 +23,9 @@ SETTINGS_TIMEOUT_MAX_CONSTRAINT = "ck_settings_timeout_max"
 class Settings(BaseModel, SQLModel, table=True):
     __tablename__: str = "settings"
     __table_args__ = (
-        CheckConstraint(f"timeout <= {MEETING_MAX_TIMEOUT_MINUTES}", name=SETTINGS_TIMEOUT_MAX_CONSTRAINT),
+        CheckConstraint(
+            f"timeout <= {LifecyclePolicy.get().max_timeout_minutes}", name=SETTINGS_TIMEOUT_MAX_CONSTRAINT
+        ),
     )
     # Validate on assignment so the `timeout` ceiling holds on every write path, not just the
     # settings flow. Loading is unaffected — SQLAlchemy populates instance state directly, so a row
@@ -41,7 +43,7 @@ class Settings(BaseModel, SQLModel, table=True):
     timezone: str = "UTC"
     notification: bool = True
     notification_time: int = 5
-    timeout: int = Field(default=5, le=MEETING_MAX_TIMEOUT_MINUTES, sa_type=BigInteger)
+    timeout: int = Field(default=5, le=LifecyclePolicy.get().max_timeout_minutes, sa_type=BigInteger)
     default_waiting_list: bool = False
     default_public: bool = False
     default_allow_invitation: bool = False

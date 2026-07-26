@@ -4,14 +4,10 @@ from unittest.mock import ANY
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from mitup_bot.config import LimitsConfig
 from mitup_bot.events import inactive_meetings
-from mitup_bot.events.inactive_meetings import (
-    INTERVAL_TO_DEACTIVATE,
-    LEFT_OWNER_INTERVAL_TO_DEACTIVATE,
-    MEETINGS_TO_DEACTIVATE_STATEMENT,
-)
+from mitup_bot.events.inactive_meetings import MEETINGS_TO_DEACTIVATE_STATEMENT
 from mitup_bot.events.service import EventType
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import (
@@ -302,13 +298,10 @@ async def test_multiple_meetings_deactivated(
     )
 
 
-def test_deactivation_statement_has_left_owner_dateless_branch():
-    """The dateless-meeting predicate carries both windows: the general 90-day rule and the
-    one-month rule that applies only when the owner has LEFT the bot. The behavioural coverage of
-    which meetings each window selects lives in the db_behavior deactivation-query tests."""
-    assert INTERVAL_TO_DEACTIVATE == "90 days"
-    assert LEFT_OWNER_INTERVAL_TO_DEACTIVATE == "1 month"
-
+def test_deactivation_statement_generates_a_branch_per_tier_window():
+    """The dateless-meeting predicate carries one branch per distinct tier window plus the LEFT-owner
+    branch, all rendered from the lifecycle policy against `activated_time`. Which meetings each
+    window selects is covered in tests/data/db_behavior/test_lifecycle_windows.py."""
     compiled = " ".join(
         str(
             MEETINGS_TO_DEACTIVATE_STATEMENT.compile(
@@ -316,20 +309,19 @@ def test_deactivation_statement_has_left_owner_dateless_branch():
             )
         ).split()
     )
-    # General window: any dateless meeting older than 90 days.
-    assert "meetups.datetime IS NULL AND meetups.created_time + CAST('90 days' AS INTERVAL) < now()" in compiled
-    # LEFT-owner window: a dateless meeting whose owner has left, older than a month.
+
+    for duration, levels in LifecyclePolicy.levels_by_duration(lambda policy: policy.dateless_lifetime).items():
+        rendered_levels = ", ".join(f"'{level.value}'" for level in levels)
+        assert (
+            f"users.supporter_level IN ({rendered_levels}) AND meetups.activated_time "
+            f"+ CAST('{LifecyclePolicy.interval_days(duration)} days' AS INTERVAL) < now()" in compiled
+        )
+
+    left_days = LifecyclePolicy.interval_days(LifecyclePolicy.get().left_owner_dateless_lifetime)
     assert (
         "meetups.datetime IS NULL AND users.status = 'left' "
-        "AND meetups.created_time + CAST('1 month' AS INTERVAL) < now()" in compiled
+        f"AND meetups.activated_time + CAST('{left_days} days' AS INTERVAL) < now()" in compiled
     )
-
-
-def test_general_dateless_window_matches_the_free_scheduling_horizon():
-    """The dateless window is the free scheduling horizon expressed as a Postgres interval: a free
-    owner cannot pick a date beyond it, so an undated meeting does not outlive it either."""
-    horizon_days = LimitsConfig().free_scheduling_horizon_days
-    assert f"{horizon_days} days" == INTERVAL_TO_DEACTIVATE
 
 
 # ---------------------------------------------------------------------------

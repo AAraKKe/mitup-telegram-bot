@@ -65,6 +65,8 @@ class Meetup(BaseModel, SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
     )
+    # Set on creation, re-stamped on reactivation; the dateless deactivation window reads it.
+    activated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC), nullable=False)
     expiration_time: dt.datetime | None = None
     datetime: dt.datetime | None = None
     max_members: int | None = None
@@ -88,7 +90,7 @@ class Meetup(BaseModel, SQLModel, table=True):
     )
 
     def __hash__(self) -> int:
-        return hash(self.model_dump_json(exclude={"created_time", "updated_time", "id"}))
+        return hash(self.model_dump_json(exclude={"created_time", "updated_time", "activated_time", "id"}))
 
     def __eq__(self, other: object) -> bool:
         return hash(self) == hash(other) if isinstance(other, Meetup) else NotImplemented

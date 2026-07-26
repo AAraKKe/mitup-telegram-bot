@@ -97,6 +97,9 @@ def map_meetup(row: dict[str, Any], owner_new_id: int) -> dict[str, Any]:
         "expiration_time": None,
         "created_time": row.get("created_at"),
         "updated_time": row.get("updated_at"),
+        # Imported meetings enter the lifecycle where they left off, so the activation clock the
+        # deactivation sweep reads starts at the Rails creation time rather than at import time.
+        "activated_time": row.get("created_at") or dt.datetime.now(dt.UTC),
     }
 
 

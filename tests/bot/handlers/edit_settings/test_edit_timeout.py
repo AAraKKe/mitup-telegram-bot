@@ -3,7 +3,7 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
-from mitup_bot.limits import MEETING_MAX_TIMEOUT_MINUTES
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
@@ -31,7 +31,7 @@ async def test_callback_query_timeout(
         message=SettingsMessages.TIMEOUT_PROMPT.get(
             lang=user_with_settings.lang,
             timeout=user_with_settings.settings.timeout,
-            max_timeout=MEETING_MAX_TIMEOUT_MINUTES,
+            max_timeout=LifecyclePolicy.get().max_timeout_minutes,
         ),
     )
 
@@ -40,7 +40,7 @@ async def test_callback_query_timeout(
 
     # The prompt states the ceiling with a substituted number, not a leftover placeholder
     rendered = context.api.call_args("edit_message").kwargs["view"].description.text
-    assert str(MEETING_MAX_TIMEOUT_MINUTES) in rendered
+    assert str(LifecyclePolicy.get().max_timeout_minutes) in rendered
     assert "${" not in rendered
 
 
@@ -48,7 +48,10 @@ async def test_callback_query_timeout(
     "update, timeout",
     [
         (UpdateRequest(message_text="10"), 10),
-        (UpdateRequest(message_text=str(MEETING_MAX_TIMEOUT_MINUTES)), MEETING_MAX_TIMEOUT_MINUTES),
+        (
+            UpdateRequest(message_text=str(LifecyclePolicy.get().max_timeout_minutes)),
+            LifecyclePolicy.get().max_timeout_minutes,
+        ),
     ],
     ids=["ordinary_value", "at_cap"],
     indirect=["update"],
@@ -83,7 +86,7 @@ async def test_settings_timeout_text_message_handler(
         UpdateRequest(message_text="invalid"),
         UpdateRequest(message_text="-5"),
         UpdateRequest(message_text="5.5"),
-        UpdateRequest(message_text=str(MEETING_MAX_TIMEOUT_MINUTES + 1)),
+        UpdateRequest(message_text=str(LifecyclePolicy.get().max_timeout_minutes + 1)),
         UpdateRequest(message_text="99999999999"),
     ],
     ids=["invalid_text", "negative_number", "decimal_number", "above_cap", "far_above_cap"],
@@ -126,7 +129,7 @@ async def test_settings_timeout_invalid_input_handler(
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
         message=SettingsMessages.TIMEOUT_INVALID.get(
-            lang=user_with_settings.lang, max_timeout=MEETING_MAX_TIMEOUT_MINUTES
+            lang=user_with_settings.lang, max_timeout=LifecyclePolicy.get().max_timeout_minutes
         ),
     )
 
@@ -135,7 +138,7 @@ async def test_settings_timeout_invalid_input_handler(
 
     # The rejection states the ceiling with a substituted number, not a leftover placeholder
     rendered = context.api.call_args("send_message").kwargs["view"].description.text
-    assert str(MEETING_MAX_TIMEOUT_MINUTES) in rendered
+    assert str(LifecyclePolicy.get().max_timeout_minutes) in rendered
     assert "${" not in rendered
 
     # Rejected input never reaches the setting, whether it is not a number or above the cap

@@ -5,6 +5,7 @@ from freezegun import freeze_time
 
 from mitup_bot import limits, supporter
 from mitup_bot.config import LimitsConfig
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import User
 from mitup_bot.supporter import SupporterLevel
 from tests.helpers import create_meetup
@@ -182,7 +183,7 @@ def test_within_scheduling_horizon_reads_naive_datetime_as_utc(
 
 def test_within_max_duration_boundary_is_allowed():
     start = dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC)
-    exactly_one_week = start + limits.MEETING_MAX_DURATION
+    exactly_one_week = start + LifecyclePolicy.get().max_duration
     one_minute_beyond = exactly_one_week + dt.timedelta(minutes=1)
     assert limits.within_max_duration(start, exactly_one_week) is True
     assert limits.within_max_duration(start, one_minute_beyond) is False

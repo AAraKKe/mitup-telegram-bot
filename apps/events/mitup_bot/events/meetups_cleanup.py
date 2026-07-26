@@ -6,14 +6,14 @@ from functools import partial
 from typing import Any, cast
 
 import structlog
-from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import and_, col, delete, false, func, literal, null, select, true
+from sqlmodel import and_, col, delete, false, null, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
@@ -21,33 +21,33 @@ from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.meeting_text import rich_title
 
+from .lifecycle_queries import owner_tier_window_elapsed
+
 log = structlog.get_logger(__name__)
 
-"""Meeting permanent expiration age. After having expired, if the meeting is still inactive, it will be deleted."""
-PERMANENT_EXPIRATION_AGE = dt.timedelta(days=180)
-"""Age after expiration at which the owner is notified that the meeting will be permanently deleted."""
-PERMANENT_EXPIRATION_NOTIFICATION_AGE = PERMANENT_EXPIRATION_AGE - dt.timedelta(days=7)
-
-
-def sql_interval(age: dt.timedelta) -> str:
-    """Render *age* as a Postgres interval literal."""
-    return f"{age.days} days"
-
-
-MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
-    and_(
-        Meetup.expiration_notification_sent == false(),
-        Meetup.expiration_time != null(),
-        Meetup.expiration_time + func.cast(literal(sql_interval(PERMANENT_EXPIRATION_NOTIFICATION_AGE)), INTERVAL)
-        < func.now(),
+# Both windows run from `expiration_time` (the deactivation stamp) and both depend on the owner's
+# tier, so each statement joins the owner.
+MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT: SelectOfScalar[Meetup] = (
+    select(Meetup)
+    .join(User)
+    .where(
+        and_(
+            Meetup.expiration_notification_sent == false(),
+            Meetup.expiration_time != null(),
+            owner_tier_window_elapsed(col(Meetup.expiration_time), lambda policy: policy.deletion_warning_delay),
+        )
     )
 )
 
-MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = select(Meetup).where(
-    and_(
-        Meetup.expiration_notification_sent == true(),
-        Meetup.expiration_time != null(),
-        Meetup.expiration_time + func.cast(literal(sql_interval(PERMANENT_EXPIRATION_AGE)), INTERVAL) < func.now(),
+MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = (
+    select(Meetup)
+    .join(User)
+    .where(
+        and_(
+            Meetup.expiration_notification_sent == true(),
+            Meetup.expiration_time != null(),
+            owner_tier_window_elapsed(col(Meetup.expiration_time), lambda policy: policy.inactive_retention),
+        )
     )
 )
 
@@ -94,6 +94,11 @@ async def notify_owners(
     return outcome
 
 
+def owner_policy(meetup: Meetup) -> LifecyclePolicy:
+    """The lifecycle policy this meeting runs on, read off its owner's current tier."""
+    return LifecyclePolicy.get(meetup.owner.supporter_level)
+
+
 def days_overdue(meetup: Meetup, age: dt.timedelta) -> int | None:
     """Whole days the meetup has been eligible for its phase, or None when it never expired.
 
@@ -121,7 +126,7 @@ def deletion_warning_view(meetup: Meetup) -> MitupView:
         description=NotificationMessages.DELETION_WARNING.get(
             lang=meetup.lang,
             meeting_title=rich_title(meetup),
-            days_until_deletion=(PERMANENT_EXPIRATION_AGE - PERMANENT_EXPIRATION_NOTIFICATION_AGE).days,
+            days_until_deletion=LifecyclePolicy.interval_days(LifecyclePolicy.get().deletion_warning_lead),
             past_meetings_button=ButtonMessages.PAST_MEETINGS.get(lang=meetup.user_language),
             reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.get(lang=meetup.user_language),
         ),
@@ -162,14 +167,14 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
             "Expiration warning undelivered",
             meetup,
             ResidueReason.OWNER_UNREACHABLE,
-            PERMANENT_EXPIRATION_NOTIFICATION_AGE,
+            owner_policy(meetup).deletion_warning_delay,
         )
     for meetup in outcome.failed:
         log_residue(
             "Expiration warning failed",
             meetup,
             ResidueReason.OWNER_NOTIFICATION_FAILED,
-            PERMANENT_EXPIRATION_NOTIFICATION_AGE,
+            owner_policy(meetup).deletion_warning_delay,
         )
 
     for meetup in outcome.delivered + outcome.unreachable:
@@ -185,7 +190,7 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
 
 
 async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
-    """Permanently delete every meeting that stayed expired past `PERMANENT_EXPIRATION_AGE`.
+    """Permanently delete every meeting that stayed expired past its owner's `inactive_retention`.
 
     Delivering the notice is not a precondition for the deletion: an owner who has blocked the
     bot has opted out of the notice, and keeping their expired meetings alive to keep retrying
@@ -200,11 +205,14 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
             "Meeting deleted without notifying its owner",
             meetup,
             ResidueReason.OWNER_UNREACHABLE,
-            PERMANENT_EXPIRATION_AGE,
+            owner_policy(meetup).inactive_retention,
         )
     for meetup in outcome.failed:
         log_residue(
-            "Meeting deletion deferred", meetup, ResidueReason.OWNER_NOTIFICATION_FAILED, PERMANENT_EXPIRATION_AGE
+            "Meeting deletion deferred",
+            meetup,
+            ResidueReason.OWNER_NOTIFICATION_FAILED,
+            owner_policy(meetup).inactive_retention,
         )
 
     deletable = outcome.delivered + outcome.unreachable

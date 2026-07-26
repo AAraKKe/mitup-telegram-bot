@@ -3,35 +3,23 @@ from typing import cast
 
 import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
-from sqlmodel import and_, col, delete, exists, func, literal, null, or_, select, true
+from sqlmodel import and_, col, delete, exists, func, null, or_, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
+from .lifecycle_queries import owner_tier_window_elapsed, sql_interval
+
 log = structlog.get_logger(__name__)
 
-# The amount of time a meeting stays active after it has been created when there is no datetime set.
-# Matches the free scheduling horizon (`LimitsConfig.free_scheduling_horizon_days`): a free owner may
-# only pick a date that far ahead, so a meeting carrying no date at all gets no longer to acquire one.
-# Written in days, not months, so the window is a fixed length like the horizon it matches.
-INTERVAL_TO_DEACTIVATE = "90 days"
-
-# A dateless meeting whose owner has LEFT the bot deactivates this soon after creation instead of the
-# general window: an owner who is gone should not keep undated meetings alive that long, and once the
-# meeting deactivates the owner stops owning an active meeting and becomes purgeable by user_cleanup.
-LEFT_OWNER_INTERVAL_TO_DEACTIVATE = "1 month"
-
-# Query to get all active meetings that are due for deactivation. A meeting is due when any of:
-#   - It has a datetime set and the current time is past its window: end_datetime (or datetime when
-#     there is no end) plus the owner's configured timeout.
-#   - It has no datetime and its owner has LEFT the bot, and created_time is older than
-#     LEFT_OWNER_INTERVAL_TO_DEACTIVATE.
-#   - It has no datetime (owner in any status) and created_time is older than INTERVAL_TO_DEACTIVATE.
+# The active meetings due for deactivation: dateless past the owner's tier window, dateless with a
+# LEFT owner past the shorter window, or dated past its end plus the owner's timeout.
 MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
     select(Meetup)
     .join(User)
@@ -42,12 +30,13 @@ MEETINGS_TO_DEACTIVATE_STATEMENT: SelectOfScalar[Meetup] = (
             or_(
                 and_(
                     Meetup.datetime == null(),
-                    Meetup.created_time + func.cast(literal(INTERVAL_TO_DEACTIVATE), INTERVAL) < func.now(),
+                    owner_tier_window_elapsed(col(Meetup.activated_time), lambda policy: policy.dateless_lifetime),
                 ),
                 and_(
                     Meetup.datetime == null(),
                     User.status == UserStatus.LEFT,
-                    Meetup.created_time + func.cast(literal(LEFT_OWNER_INTERVAL_TO_DEACTIVATE), INTERVAL) < func.now(),
+                    col(Meetup.activated_time) + sql_interval(LifecyclePolicy.get().left_owner_dateless_lifetime)
+                    < func.now(),
                 ),
                 and_(
                     Meetup.datetime != null(),

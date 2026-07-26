@@ -29,16 +29,20 @@ MEETING_ID = 1
 def inactive_meeting(user_with_settings: User):
     meeting = user_with_settings.meetups[0]
     meeting.active = False
-    # Use a non-None sentinel so the test can verify the handler clears this field
+    # Non-None sentinels so the test can verify the handler clears each of these fields
     meeting.expiration_time = dt.datetime(2099, 1, 1, tzinfo=dt.UTC)
     meeting.expiration_notification_sent = True
+    meeting.datetime = dt.datetime(2020, 3, 1, 18, 0, tzinfo=dt.UTC)
+    meeting.end_datetime = dt.datetime(2020, 3, 1, 20, 0, tzinfo=dt.UTC)
+    meeting.lock_on_start = True
+    meeting.activated_time = dt.datetime(2020, 1, 1, tzinfo=dt.UTC)
     return meeting
 
 
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
 )
-async def test_reactivate_meeting_sets_active_and_shows_edit_view(
+async def test_reactivate_meeting_restarts_the_meeting_and_shows_edit_view(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -46,14 +50,21 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
+    """Reactivation is a restart: the meeting comes back active as a dateless draft with a fresh
+    activation stamp, so it gets its full dateless window instead of the one it already spent."""
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(inactive_meeting)
+    before = dt.datetime.now(dt.UTC)
 
     context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
 
     assert inactive_meeting.active is True
     assert inactive_meeting.expiration_time is None
     assert inactive_meeting.expiration_notification_sent is False
+    assert inactive_meeting.datetime is None
+    assert inactive_meeting.end_datetime is None
+    assert inactive_meeting.lock_on_start is False
+    assert before <= inactive_meeting.activated_time <= dt.datetime.now(dt.UTC)
 
     success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user_with_settings.lang)
     context.api.assert_edit_message_called(
@@ -61,6 +72,34 @@ async def test_reactivate_meeting_sets_active_and_shows_edit_view(
         meeting_views.edit_view(inactive_meeting).with_context(success_message),
     )
     metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.REACTIVATE_MEETING)})
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_reactivate_meeting_leaves_an_already_active_meeting_untouched(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A second tap on a Reactivate button the owner already used must not restart a live meeting:
+    the dates they set after the first tap survive, and the owner just lands on the edit screen."""
+    inactive_meeting.active = True
+    scheduled_start = dt.datetime(2030, 5, 1, 17, 0, tzinfo=dt.UTC)
+    inactive_meeting.datetime = scheduled_start
+    activated = inactive_meeting.activated_time
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
+
+    assert inactive_meeting.datetime == scheduled_start
+    assert inactive_meeting.activated_time == activated
+    context.api.assert_edit_message_called(update, meeting_views.edit_view(inactive_meeting))
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.REACTIVATE_MEETING)})
 
 
 @pytest.mark.parametrize(

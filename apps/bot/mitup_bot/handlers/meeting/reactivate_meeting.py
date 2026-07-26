@@ -1,3 +1,5 @@
+import datetime as dt
+
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -39,6 +41,13 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
 
+    # A live meeting is left exactly as it is: the restart below clears its dates, and the button can
+    # arrive from a past-meetings list or a deletion warning the owner already acted on, so a second
+    # tap must not wipe the date they set after the first one.
+    if meeting.active:
+        await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
+        return
+
     # Reactivating turns an inactive meeting active again, so it counts against the cap. The meeting
     # being reactivated is inactive and therefore excluded from the count. The back button targets
     # the past-meetings list, where the reactivation buttons live.
@@ -49,7 +58,18 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     if await active_meetings_cap_reached(user, update, context, back_button=past_meetings_button):
         return
 
+    # A reactivation is a restart, not a resume: the meeting comes back as a fresh draft with its
+    # dates cleared, so the owner picks a new date instead of inheriting the one that already passed.
+    # The re-stamped `activated_time` gives the draft the full dateless window again, and the
+    # deactivation sweep judges it from there. Deactivation already dropped the participants and
+    # message cards, so there is nothing else to reset.
     meeting.active = True
+    meeting.activated_time = dt.datetime.now(dt.UTC)
+    meeting.datetime = None
+    meeting.end_datetime = None
+    # `lock_on_start` is a rule about a start time; it goes with the dates, as it does when the owner
+    # clears the times by hand.
+    meeting.lock_on_start = False
     meeting.expiration_time = None
     meeting.expiration_notification_sent = False
 

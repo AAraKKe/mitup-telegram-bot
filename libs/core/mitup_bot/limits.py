@@ -11,17 +11,10 @@ import datetime as dt
 from typing import TYPE_CHECKING
 
 from mitup_bot import supporter
+from mitup_bot.lifecycle import LifecyclePolicy
 
 if TYPE_CHECKING:
     from mitup_bot.models import User
-
-MEETING_MAX_DURATION = dt.timedelta(days=7)
-
-# Ceiling for the owner's `Settings.timeout`, the delay between a meeting's end and its
-# deactivation. An hour is enough for the common case; a day is allowed so a meeting can stay up
-# the day after it finished. Without a ceiling a timeout keeps its owner's meetings active forever,
-# so they never expire and are never cleaned up.
-MEETING_MAX_TIMEOUT_MINUTES = 24 * 60
 
 
 def active_meetings_cap(user: User) -> int | None:
@@ -84,11 +77,11 @@ def within_scheduling_horizon(user: User, when: dt.datetime) -> bool:
 
 
 def within_max_duration(start: dt.datetime, end: dt.datetime) -> bool:
-    """Whether the span from `start` to `end` is at most `MEETING_MAX_DURATION`.
+    """Whether the span from `start` to `end` is at most `LifecyclePolicy.get().max_duration`.
 
     No tier lifts this cap, so it takes no `User`. Naive datetimes are read as UTC, matching how
     meeting datetimes are persisted, so the delta is measured on comparable aware values.
     """
     start_utc = start if start.tzinfo else start.replace(tzinfo=dt.UTC)
     end_utc = end if end.tzinfo else end.replace(tzinfo=dt.UTC)
-    return end_utc - start_utc <= MEETING_MAX_DURATION
+    return end_utc - start_utc <= LifecyclePolicy.get().max_duration

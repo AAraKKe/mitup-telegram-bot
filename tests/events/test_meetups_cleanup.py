@@ -1,15 +1,19 @@
 import datetime as dt
 import logging
 import re
+from collections.abc import Callable
 from typing import cast
 
 import pytest
+from sqlalchemy.dialects import postgresql
+from sqlmodel.sql.expression import SelectOfScalar
 from telegram.error import BadRequest
 
 from mitup_bot.events import meetups_cleanup
 from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
@@ -27,6 +31,11 @@ from tests.helpers import (
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 DELETED_MEETUP_IDS_PATTERN = re.compile(r"DELETE FROM meetups WHERE meetups\.id IN \(([^)]*)\)")
+
+# The owners built here carry no supporter level, so the residue ages are measured against the free
+# policy's windows — derived rather than pinned, so a retuned duration keeps the intended overdue days.
+WARNING_DAYS = LifecyclePolicy.interval_days(LifecyclePolicy.get().deletion_warning_delay)
+RETENTION_DAYS = LifecyclePolicy.interval_days(LifecyclePolicy.get().inactive_retention)
 
 
 @pytest.fixture
@@ -141,7 +150,7 @@ async def test_notify_unreachable_owner_marks_the_warning_as_sent(
     meeting = create_meetup(id=1, title="Blocked Owner Meeting")
     owner = create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
     # Naive UTC, the shape the expiration column reads back with.
-    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=175)
+    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=WARNING_DAYS + 2)
 
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (meeting,))
     api.mock_method("send_message_to_user").side_effect = InactiveUserInteraction(10, private=True)
@@ -199,7 +208,7 @@ async def test_notify_failed_send_leaves_the_meeting_in_the_warning_pool(
     caplog.set_level(logging.WARNING)
     meeting = create_meetup(id=1, title="Unlucky Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
-    meeting.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=174)
+    meeting.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=WARNING_DAYS + 1)
 
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (meeting,))
     api.mock_method("send_message_to_user").side_effect = BadRequest("Bad Request: chat is temporarily unavailable")
@@ -340,7 +349,9 @@ async def test_delete_meeting_whose_owner_is_unreachable(
         id=2, tg_user_id=20, owned_meetings=[meeting_unnotified], settings=create_settings(id=2)
     )
     # Naive UTC, the shape the expiration column reads back with.
-    meeting_unnotified.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=182)
+    meeting_unnotified.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(
+        days=RETENTION_DAYS + 2
+    )
 
     # An invited user of the unnotified meeting must be purged with it, exactly as for a notified one.
     outside_user = create_user(id=3, tg_user_id=-1, first_name="Outside")
@@ -420,7 +431,7 @@ async def test_delete_is_deferred_when_the_notice_raises(
 
     meeting_failed = create_meetup(id=2, title="Unlucky Meeting")
     owner_failed = create_user(id=2, tg_user_id=20, owned_meetings=[meeting_failed], settings=create_settings(id=2))
-    meeting_failed.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=183)
+    meeting_failed.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=RETENTION_DAYS + 3)
 
     mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting_ok, meeting_failed))
     api.mock_method("send_message_to_user").side_effect = [None, BadRequest("Bad Request: chat is unavailable")]
@@ -453,6 +464,32 @@ async def test_delete_is_deferred_when_the_notice_raises(
         properties={"failed_meeting_ids": [2]},
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
+
+
+@pytest.mark.parametrize(
+    ("statement", "duration_of"),
+    [
+        (meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, lambda policy: policy.deletion_warning_delay),
+        (meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, lambda policy: policy.inactive_retention),
+    ],
+    ids=["deletion_warning", "permanent_deletion"],
+)
+def test_cleanup_statements_carry_a_branch_per_tier_window(
+    statement: SelectOfScalar[Meetup], duration_of: Callable[[LifecyclePolicy], dt.timedelta]
+):
+    """Both cleanup windows are rendered from the policy per owner tier, measured from
+    `expiration_time`. Which meetings each one selects is covered in
+    tests/data/db_behavior/test_lifecycle_windows.py."""
+    compiled = " ".join(
+        str(statement.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})).split()
+    )
+
+    for duration, levels in LifecyclePolicy.levels_by_duration(duration_of).items():
+        rendered_levels = ", ".join(f"'{level.value}'" for level in levels)
+        assert (
+            f"users.supporter_level IN ({rendered_levels}) AND meetups.expiration_time "
+            f"+ CAST('{LifecyclePolicy.interval_days(duration)} days' AS INTERVAL) < now()" in compiled
+        )
 
 
 async def test_run_orchestrates_both_functions(

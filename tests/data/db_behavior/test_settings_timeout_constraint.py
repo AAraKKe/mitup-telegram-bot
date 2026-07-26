@@ -3,7 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from mitup_bot.limits import MEETING_MAX_TIMEOUT_MINUTES
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Settings, User
 
 pytestmark = pytest.mark.db_test
@@ -21,7 +21,7 @@ async def test_over_cap_timeout_is_rejected(db_session: AsyncSession):
     bypasses the model — an unbounded timeout keeps its owner's dated meetings active forever."""
     savepoint = await db_session.begin_nested()
     try:
-        user = make_probe_user(MEETING_MAX_TIMEOUT_MINUTES)
+        user = make_probe_user(LifecyclePolicy.get().max_timeout_minutes)
         db_session.add(user)
         await db_session.flush()
 
@@ -29,7 +29,7 @@ async def test_over_cap_timeout_is_rejected(db_session: AsyncSession):
         # statement that skips it.
         with pytest.raises(IntegrityError):
             await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
-                SET_TIMEOUT_SQL.bindparams(timeout=MEETING_MAX_TIMEOUT_MINUTES + 1, user_id=user.id)
+                SET_TIMEOUT_SQL.bindparams(timeout=LifecyclePolicy.get().max_timeout_minutes + 1, user_id=user.id)
             )
     finally:
         await savepoint.rollback()
@@ -38,10 +38,10 @@ async def test_over_cap_timeout_is_rejected(db_session: AsyncSession):
 async def test_timeout_at_cap_is_accepted(db_session: AsyncSession):
     savepoint = await db_session.begin_nested()
     try:
-        user = make_probe_user(MEETING_MAX_TIMEOUT_MINUTES)
+        user = make_probe_user(LifecyclePolicy.get().max_timeout_minutes)
         db_session.add(user)
         await db_session.flush()
 
-        assert user.settings.timeout == MEETING_MAX_TIMEOUT_MINUTES
+        assert user.settings.timeout == LifecyclePolicy.get().max_timeout_minutes
     finally:
         await savepoint.rollback()
