@@ -10,6 +10,15 @@ Announcements, milestones, and notes on where Mitup is headed. Newest first.
 
 <div class="grid cards" markdown>
 
+- :fontawesome-solid-newspaper: **One week in**
+
+    ---
+    <span class="news-card__date">26 July 2026</span>
+
+    A week on the new platform, and a tidier meeting lifecycle: an end for meetings with no date, reactivation that starts a meeting over, and a full year of past meetings for Hosts.
+
+    [Read the post →](one_week_in.md)
+
 - :fontawesome-solid-newspaper: **Welcome to the new Mitup**
 
     ---

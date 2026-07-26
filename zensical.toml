@@ -62,6 +62,7 @@ nav = [
   ] },
   { "News" = [
     { "What's new" = "news/index.md" },
+    { "One week in" = "news/one_week_in.md" },
     { "Welcome to the new Mitup" = "news/welcome_to_the_new_mitup.md" },
   ] },
 ]

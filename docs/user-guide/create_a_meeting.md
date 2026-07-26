@@ -135,7 +135,7 @@ The When menu starts almost empty and grows a button at a time:
   </div>
 </div>
 
-Whether you give the meeting an end time changes when it becomes inactive after it happens. See [meeting lifecycle](meeting_lifecycle.md). How far ahead the start date can be depends on your account: 90 days on a free account, more as a [Host](limits.md#scheduling-ahead).
+Whether you give the meeting an end time changes when it becomes inactive after it happens. See [meeting lifecycle](meeting_lifecycle.md). How far ahead the start date can be depends on your account: 90 days on a free account, more as a [Host](limits.md#scheduling-ahead). The end can be up to [a week after the start](limits.md#how-long-one-meeting-can-last), which covers a festival or a weekend away in a single meeting.
 
 ### Lock on start
 

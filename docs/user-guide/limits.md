@@ -13,6 +13,8 @@ The people who back Mitup are called Hosts, and each [tier](../collaborate/donat
 | Active meetings you own | 5 | 50 | Unlimited |
 | How far ahead you can schedule | 90 days | 365 days | No limit |
 | Participants per meeting | 20 | No cap | No cap |
+| A meeting with no date stays active | 90 days | 365 days | 365 days |
+| A finished meeting is kept | 90 days | 365 days | 365 days |
 
 The Brewer tier is a pure thank-you: it comes with the badge and the Hosts-only group, and keeps the same limits as a free account.
 
@@ -49,6 +51,34 @@ Once a meeting is full, further joins go to the [waiting list](meeting_settings.
 !!! note "Nobody gets kicked out"
 
     If a meeting is already over a cap, everyone on the list stays. That can happen when a Host tier lapses. The meeting simply reads as full until it drops back under the cap.
+
+## Meetings with no date
+
+A meeting with no date stays active so you can add one later, and nothing else will ever finish it, so it gets a clock of its own: 90 days on a free or Brewer account, a year for Gamemasters and Commissioners. The count runs from when you created the meeting, or from the last time you brought it back from *💾 Your past meetings*{.button-like}. When it runs out the meeting becomes inactive and moves into that list, where you can reactivate it.
+
+## How long a finished meeting is kept
+
+An inactive meeting sits in *💾 Your past meetings*{.button-like} for 90 days, or a year on the Gamemaster and Commissioner tiers, and is then deleted permanently. A week before that the bot sends you one heads-up with a button to bring the meeting back. The [meeting lifecycle](meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page follows the whole path.
+
+!!! note "The tier you're on right now decides"
+
+    Both of those windows are measured against your current tier, not the one you were on when
+    the meeting was created. Become a Gamemaster and the finished meetings you already have
+    stretch to a year. If your support lapses, they go back to 90 days.
+
+## How long one meeting can last
+
+A meeting can span a week at most, from its start to its end. That one is the same on every account, Commissioners included. Set an end further out and the bot asks for a closer one:
+
+!!! quote "Longer than a week"
+
+    A meeting can last a week at most. Set an end within a week of the start.
+
+For an all-weekend trip or a three-day tournament, one meeting covers it. For something that runs longer, make a meeting per session.
+
+## The timeout grace period
+
+Your *⌛ Timeout*{.button-like} is how long a meeting stays active after it finishes, five minutes by default. You can stretch it up to a day (1440 minutes), enough to keep a meeting up through the day after it ended. A longer number is turned down, on every tier. See [Your settings](settings.md#timeout).
 
 ## Raising the limits
 
