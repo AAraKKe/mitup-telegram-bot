@@ -1152,6 +1152,7 @@ name = "mitup-telegram"
 version = "0.0.1"
 source = { editable = "libs/telegram" }
 dependencies = [
+    { name = "httpx" },
     { name = "mitup-core" },
     { name = "mitup-data" },
     { name = "mitup-monitoring" },
@@ -1160,6 +1161,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "mitup-core", editable = "libs/core" },
     { name = "mitup-data", editable = "libs/data" },
     { name = "mitup-monitoring", editable = "libs/monitoring" },

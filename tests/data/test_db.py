@@ -455,7 +455,7 @@ async def test_write_mode_reconcile_deletes_messages_reported_gone(
     assert "messages.id IN (7)" in delete_queries[0]
 
 
-async def test_write_mode_connectivity_failure_propagates_after_reconcile(
+async def test_write_mode_connectivity_failure_stays_inside_the_drain(
     mock_session: MockDbSession,
     write_context: SimpleNamespace,
     fanout_bot: mock.AsyncMock,
@@ -465,7 +465,11 @@ async def test_write_mode_connectivity_failure_propagates_after_reconcile(
     blocked = create_user(id=1, tg_user_id=555)
     healthy = create_user(id=2, tg_user_id=556)
     mock_session.add_user(blocked)
-    fanout_bot.send_message.side_effect = [Forbidden("Forbidden: bot was blocked by the user"), TimedOut()]
+    fanout_bot.send_message.side_effect = [
+        Forbidden("Forbidden: bot was blocked by the user"),
+        TimedOut(),
+        mock.MagicMock(),
+    ]
 
     @db.with_session(write=True)
     async def handler(session: AsyncSession, context: SimpleNamespace):
@@ -473,12 +477,12 @@ async def test_write_mode_connectivity_failure_propagates_after_reconcile(
         await context.api.send_message_to_user(healthy, "two")
         await context.api.send_message_to_user(healthy, "three")
 
-    with pytest.raises(TimedOut):
-        await handler(write_context)
+    # The transaction committed before the drain ran, so the caller is told nothing about a
+    # failed delivery: every remaining call is still attempted...
+    await handler(write_context)
     await fanout_metrics_client.flush()
 
-    # The drain stopped at the connectivity failure (the third call never ran)...
-    assert fanout_bot.send_message.await_count == 2
-    # ...but the fix-ups collected before it still landed in the reconcile transaction.
+    assert fanout_bot.send_message.await_count == 3
+    # ...and the fix-ups the drain collected landed in the reconcile transaction.
     assert blocked.status is UserStatus.LEFT
     fanout_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)

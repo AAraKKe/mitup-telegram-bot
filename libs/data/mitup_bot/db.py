@@ -348,8 +348,8 @@ async def begin_write[OutboxT: OutboxProtocol](api: WriteApi[OutboxT]) -> AsyncG
     finally:
         api.end_capture()
     # The transaction is committed and its locks are released; only now run the captured
-    # fan-out. The reconcile applies whatever fix-ups were recorded even when a systemic
-    # failure aborts the drain midway.
+    # fan-out. The drain reports its own failures instead of raising, and the reconcile applies
+    # whatever fix-ups it recorded — including those from a drain that gave up partway.
     try:
         await api.execute_queued(outbox)
     finally:

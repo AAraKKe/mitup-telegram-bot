@@ -4,22 +4,28 @@ from typing import Any, cast
 from unittest import mock
 
 import pytest
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
+from telegram.error import TimedOut
 from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
+from mitup_bot import db
+from mitup_bot.api_wrapper import build_api
 from mitup_bot.callback_data import CallbackData
+from mitup_bot.config import Env
 from mitup_bot.custom_context import BOT_CONFIG_KEY
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
-from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback
+from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback, callback_with_metrics
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import (
     AnyFloat,
+    MockApi,
     StubMitupApp,
     StubMitupContext,
     UpdateRequest,
@@ -475,3 +481,49 @@ async def test_admin_only_dropped_when_no_effective_user(update: Update, app: St
     called.assert_not_awaited()
     assert result is None
     ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
+async def test_post_commit_drain_failure_never_reaches_the_error_handler(
+    update: Update,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    mock_session: MockDbSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The user's action committed before the queued calls ran, so a delivery that fails
+    afterwards leaves them on the screen the handler rendered — the error handler, which would
+    replace it with the generic error screen, is never reached."""
+    monkeypatch.setattr("mitup_bot.api_wrapper.sleep", mock.AsyncMock())
+    context = build_context(update, app, metrics=metrics_client)
+    # The real api, not MockApi: the post-commit drain is what this exercises.
+    context.api = cast(MockApi, build_api(context))
+    edits = 0
+
+    def edit_message_text(**kwargs: Any) -> object:
+        nonlocal edits
+        edits += 1
+        # Only the user's own screen is reachable; the shared cards time out.
+        if edits == 1:
+            return mock.MagicMock()
+        raise TimedOut()
+
+    context.bot.edit_message_text.side_effect = edit_message_text
+
+    @db.with_session(write=True)
+    async def leave_meeting(session: AsyncSession, update: Update, context: StubMitupContext):
+        await context.api.edit_message(update, "You left the meeting")
+        await context.api.edit_message(update, "card shared in another chat")
+
+    wrapped = callback_with_metrics(HandlerTestId.BINDABLE, "CallbackQuery", leave_meeting, Env.PROD)
+
+    with mock.patch("mitup_bot.handlers.registry.error_handler") as error_handler:
+        await wrapped(update, context)
+    await context.flush_metrics()
+
+    error_handler.assert_not_called()
+    assert context.bot.edit_message_text.await_args_list[0].kwargs["text"] == "You left the meeting"
+    # The interaction is counted as completed; the drain records its own failure separately.
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0)
+    metrics.assert_emitted(name=MetricKey.POST_COMMIT_API_FAULT)

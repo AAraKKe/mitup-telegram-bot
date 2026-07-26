@@ -13,6 +13,7 @@ from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.patreon import webhooks as patreon_webhooks
+from mitup_bot.request import build_telegram_request
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from mitup_bot.web import create_app
 
@@ -84,6 +85,9 @@ class MitupRuntime:
 
         # Set rate limiter
         builder.rate_limiter(AIORateLimiter(max_retries=self.config.bot.retries_on_throttle))
+
+        # Short-timeout client for outbound calls; the long-polling request object is left alone.
+        builder.request(build_telegram_request(self.config.bot))
 
         # Updates sharing a (user, chat) key are serialized by construction; distinct keys may
         # overlap once the cap rises above 1. The default cap of 1 keeps processing observably

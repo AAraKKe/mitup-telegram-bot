@@ -11,9 +11,11 @@ from aws_embedded_metrics.logger.metrics_context import MetricsContext
 from aws_embedded_metrics.serializers.log_serializer import LogSerializer
 from aws_embedded_metrics.sinks import Sink
 from click.testing import CliRunner
+from pydantic import SecretStr
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
+from mitup_bot.config import BotConfig
 from mitup_bot.events.service import (
     EventType,
     IntervalsConfiguration,
@@ -65,9 +67,7 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
 
 @patch("mitup_bot.events.service.ExtBot")
 def test_build_bot(mock_ext_bot: MagicMock):
-    bot_config = MagicMock()
-    bot_config.token.get_secret_value.return_value = "test-token"
-    bot_config.retries_on_throttle = 5
+    bot_config = BotConfig(token=SecretStr("test-token"), retries_on_throttle=5, api_read_timeout=1.5)
 
     build_bot(bot_config)
 
@@ -76,15 +76,17 @@ def test_build_bot(mock_ext_bot: MagicMock):
     assert call_kwargs["token"] == "test-token"
     assert call_kwargs["rate_limiter"] is not None
     assert "defaults" not in call_kwargs
+    # The events bots talk to Telegram under the same timeouts as the bot app, so a stalled call
+    # is given up on there too rather than sitting on PTB's longer defaults.
+    assert call_kwargs["request"]._client.timeout.read == 1.5
 
 
 @patch("mitup_bot.events.service.AIORateLimiter")
 @patch("mitup_bot.events.service.ExtBot")
 def test_build_broadcast_bot_applies_configured_rate(mock_ext_bot: MagicMock, mock_rate_limiter: MagicMock):
-    bot_config = MagicMock()
-    bot_config.token.get_secret_value.return_value = "test-token"
-    bot_config.retries_on_throttle = 3
-    bot_config.broadcast_max_rate = 7
+    bot_config = BotConfig(
+        token=SecretStr("test-token"), retries_on_throttle=3, broadcast_max_rate=7, api_read_timeout=1.5
+    )
 
     build_broadcast_bot(bot_config)
 
@@ -95,6 +97,7 @@ def test_build_broadcast_bot_applies_configured_rate(mock_ext_bot: MagicMock, mo
     call_kwargs = mock_ext_bot.call_args.kwargs
     assert call_kwargs["token"] == "test-token"
     assert call_kwargs["rate_limiter"] is mock_rate_limiter.return_value
+    assert call_kwargs["request"]._client.timeout.read == 1.5
 
 
 @pytest.mark.parametrize(

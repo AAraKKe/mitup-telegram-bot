@@ -5,6 +5,7 @@ description = "Telegram rendering layer for mitup-telegram-bot: the PTB api wrap
 requires-python = ">=3.14"
 dependencies = [
     "python-telegram-bot[ext]==22.8",
+    "httpx==0.28.1",
     "mitup-core",
     "mitup-data",
     "mitup-monitoring",

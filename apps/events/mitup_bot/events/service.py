@@ -25,6 +25,7 @@ from mitup_bot.events import (
 from mitup_bot.logging_config import Component, configure_logging
 from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, configure_emf_backend
+from mitup_bot.request import build_telegram_request
 
 log = structlog.get_logger(__name__)
 
@@ -93,6 +94,7 @@ def build_bot(config: BotConfig) -> ExtBot:
     return ExtBot(
         token=config.token.get_secret_value(),
         rate_limiter=AIORateLimiter(max_retries=config.retries_on_throttle),
+        request=build_telegram_request(config),
     )
 
 
@@ -111,6 +113,7 @@ def build_broadcast_bot(config: BotConfig) -> ExtBot:
             overall_time_period=1,
             max_retries=config.retries_on_throttle,
         ),
+        request=build_telegram_request(config),
     )
 
 

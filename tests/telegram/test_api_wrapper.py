@@ -3,6 +3,7 @@
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 from structlog.testing import capture_logs
 from telegram import ChatMember, ChatMemberRestricted, Message, MessageEntity, Update
@@ -12,6 +13,7 @@ from telegram.ext import ExtBot
 
 from mitup_bot.api_wrapper import (
     CALLBACK_QUERY_TEXT_LIMIT,
+    QUEUED_CALL_ATTEMPTS,
     TELEMGRAM_API_TIME_PREFIX,
     ApiOutbox,
     BotAdapter,
@@ -68,6 +70,14 @@ def telegram_api(adapter: BotAdapter) -> TelegramApi:
     api = TelegramApi()
     api.adapter = cast(ContextOrBotAdapter, adapter)
     return api
+
+
+@pytest.fixture
+def no_retry_backoff(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Run the post-commit retries without their backoff wait."""
+    waited = AsyncMock()
+    monkeypatch.setattr("mitup_bot.api_wrapper.sleep", waited)
+    return waited
 
 
 # ---------------------------------------------------------------------------
@@ -1130,24 +1140,187 @@ async def test_execute_queued_failure_leaves_the_invocation_fault_a_single_datap
     [NetworkError("bridge down"), TimedOut()],
     ids=["network_error", "timed_out"],
 )
-async def test_execute_queued_connectivity_error_stops_drain(
-    telegram_api: TelegramApi, connectivity_error: NetworkError
+async def test_execute_queued_network_failure_never_surfaces_to_the_caller(
+    telegram_api: TelegramApi,
+    api_metrics: MetricAssertions,
+    api_metrics_client: MetricsClient,
+    connectivity_error: NetworkError,
 ):
     executed: list[str] = []
 
     async def boom():
         raise connectivity_error
 
-    async def never():
-        executed.append("never")
+    async def ok():
+        executed.append("second")
 
-    outbox = ApiOutbox(calls=[QueuedApiCall("send_message", boom), QueuedApiCall("send_message", never)])
+    outbox = ApiOutbox(calls=[QueuedApiCall("send_message", boom), QueuedApiCall("send_message", ok)])
 
-    # Every remaining call would fail the same way — the drain aborts and the error surfaces
-    # to the global error handler.
-    with pytest.raises(type(connectivity_error)):
+    # The transaction committed before the drain started: the user's action succeeded, so a
+    # failure to render it is recorded and the next (independent) delivery still goes out.
+    await telegram_api.execute_queued(outbox)
+    await api_metrics_client.flush()
+
+    assert executed == ["second"]
+    api_metrics.assert_emitted(name=MetricKey.POST_COMMIT_API_FAULT)
+    api_metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+def with_cause[ErrorT: BaseException](error: ErrorT, cause: Exception) -> ErrorT:
+    """PTB raises its network errors ``from`` the underlying httpx exception; that cause is
+    where the drain reads whether the request ever left this process."""
+    error.__cause__ = cause
+    return error
+
+
+@pytest.mark.parametrize(
+    "idempotent, error, expected_attempts",
+    [
+        (False, with_cause(TimedOut(), httpx.ReadTimeout("read")), 1),
+        (True, with_cause(TimedOut(), httpx.ReadTimeout("read")), QUEUED_CALL_ATTEMPTS),
+        (False, with_cause(TimedOut(), httpx.ConnectTimeout("connect")), QUEUED_CALL_ATTEMPTS),
+        (False, with_cause(NetworkError("httpx.ConnectError"), httpx.ConnectError("refused")), QUEUED_CALL_ATTEMPTS),
+        (False, TimedOut(), 1),
+        (True, BadRequest("Chat not found"), 1),
+    ],
+    ids=[
+        "send_read_timeout_not_retried",
+        "edit_read_timeout_retried",
+        "send_connect_timeout_retried",
+        "send_connect_error_retried",
+        "send_unattributable_timeout_not_retried",
+        "bad_request_never_retried",
+    ],
+)
+async def test_execute_queued_retries_only_when_a_repeat_cannot_double_post(
+    telegram_api: TelegramApi,
+    no_retry_backoff: AsyncMock,
+    idempotent: bool,
+    error: Exception,
+    expected_attempts: int,
+):
+    """Telegram has no idempotency key: a read timeout leaves it unknown whether the call was
+    applied, so only a call that cannot deliver twice — or one that never reached Telegram —
+    may be repeated."""
+    attempts = 0
+
+    async def failing():
+        nonlocal attempts
+        attempts += 1
+        raise error
+
+    outbox = ApiOutbox(calls=[QueuedApiCall("queued_call", failing, idempotent=idempotent)])
+    await telegram_api.execute_queued(outbox)
+
+    assert attempts == expected_attempts
+
+
+async def test_execute_queued_retry_that_lands_reports_no_failure(
+    telegram_api: TelegramApi,
+    no_retry_backoff: AsyncMock,
+    api_metrics: MetricAssertions,
+    api_metrics_client: MetricsClient,
+):
+    attempts = 0
+
+    async def flaky():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise with_cause(TimedOut(), httpx.ConnectTimeout("connect"))
+
+    outbox = ApiOutbox(calls=[QueuedApiCall("send_message", flaky)])
+    await telegram_api.execute_queued(outbox)
+    await api_metrics_client.flush()
+
+    assert attempts == 2
+    api_metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+async def test_execute_queued_abandons_the_queue_once_telegram_looks_unreachable(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock
+):
+    """A dead network would otherwise cost one timeout per remaining delivery, inside a handler
+    whose work is already committed."""
+    attempted: list[str] = []
+
+    def make_call(name: str, fails: bool) -> QueuedApiCall:
+        async def invoke():
+            attempted.append(name)
+            if fails:
+                raise TimedOut()
+
+        return QueuedApiCall(name, invoke)
+
+    outbox = ApiOutbox(
+        calls=[make_call(f"call_{index}", fails=True) for index in range(4)] + [make_call("call_4", fails=False)]
+    )
+
+    with capture_logs() as logs:
         await telegram_api.execute_queued(outbox)
-    assert executed == []
+
+    assert attempted == ["call_0", "call_1", "call_2"]
+    abort_logs = [entry for entry in logs if entry["event"] == "Post-commit drain abandoned: Telegram unreachable"]
+    assert abort_logs[0]["abandoned_calls"] == ["call_3", "call_4"]
+    finished = next(entry for entry in logs if entry["event"] == "Post-commit drain finished")
+    assert (finished["queued"], finished["sent"], finished["failed"], finished["abandoned"]) == (5, 0, 3, 2)
+
+
+async def test_execute_queued_keeps_draining_while_calls_still_reach_telegram(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock
+):
+    """The abort needs *consecutive* network failures: a delivery that lands proves the network
+    is alive, so the count starts over."""
+    attempted: list[str] = []
+
+    def make_call(name: str, fails: bool) -> QueuedApiCall:
+        async def invoke():
+            attempted.append(name)
+            if fails:
+                raise TimedOut()
+
+        return QueuedApiCall(name, invoke)
+
+    outbox = ApiOutbox(
+        calls=[
+            make_call("first_failure", fails=True),
+            make_call("second_failure", fails=True),
+            make_call("delivered", fails=False),
+            make_call("third_failure", fails=True),
+            make_call("fourth_failure", fails=True),
+            make_call("last", fails=False),
+        ]
+    )
+
+    await telegram_api.execute_queued(outbox)
+
+    assert len(attempted) == len(outbox.calls)
+
+
+async def test_enqueued_calls_declare_whether_a_repeat_can_double_post(telegram_api: TelegramApi):
+    """The drain sees opaque closures, so idempotency is declared where the method is known."""
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    update.effective_message.chat.id = 42
+    meeting, msg = make_bot_chat_meeting()
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.send_message(update, "sent")
+    await telegram_api.send_message_to_user(create_user(id=1, tg_user_id=100), "dm")
+    await telegram_api.edit_message(update, "edited")
+    await telegram_api.clear_reply_markup(update)
+    await telegram_api.answer_callback_query(update, "ack", show_alert=False)
+    await telegram_api.update_single_meeting_message(msg, meeting)
+    telegram_api.end_capture()
+
+    assert {call.name: call.idempotent for call in outbox.calls} == {
+        "send_message": False,
+        "send_message_to_user": False,
+        "edit_message": True,
+        "clear_reply_markup": True,
+        "answer_callback_query": True,
+        "update_meeting_message": True,
+    }
 
 
 @pytest.mark.parametrize(

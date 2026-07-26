@@ -276,6 +276,28 @@ def test_concurrency_cap_flows_from_config_into_processor(patch_runtime_deps: Ru
     assert processor.max_concurrent_updates == 4
 
 
+def test_builder_sets_a_short_timeout_request(patch_runtime_deps: RuntimeDeps):
+    """Outbound calls fail fast so the post-commit drain can react within the handler's budget.
+    Supplying the request bypasses the builder's own defaults, so the pool size and the media
+    write timeout have to survive it — and the long-polling request object is left untouched."""
+    config = build_config()
+    config.bot.api_connect_timeout = 1.5
+    config.bot.api_read_timeout = 2.0
+    config.bot.api_write_timeout = 2.5
+    config.bot.api_media_write_timeout = 30.0
+    config.bot.api_connection_pool_size = 64
+
+    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+        MitupRuntime(Env.DEV)
+
+    (request,) = patch_runtime_deps.builder_instance.request.call_args.args
+    timeout = request._client.timeout
+    assert (timeout.connect, timeout.read, timeout.write) == (1.5, 2.0, 2.5)
+    assert request._media_write_timeout == 30.0
+    assert request._client._transport._pool._max_connections == 64
+    patch_runtime_deps.builder_instance.get_updates_request.assert_not_called()
+
+
 def test_bind_called_with_built_app(patch_runtime_deps: RuntimeDeps):
     runtime = MitupRuntime(Env.DEV)
 

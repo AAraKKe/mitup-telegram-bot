@@ -212,6 +212,15 @@ class BotConfig(BaseModel):
     secret_token: SecretStr | None = None
     max_connections: int = 100
     retries_on_throttle: int = 3
+    # HTTP client settings for every outbound Telegram call except getUpdates, which keeps PTB's
+    # long-polling defaults. The timeouts are deliberately shorter than PTB's 5 s so a stalled call
+    # is given up on quickly and the post-commit drain can retry it or move on; the pool must serve
+    # every concurrent update, and uploads need far longer than an ordinary call.
+    api_connect_timeout: float = Field(default=2.0, gt=0)
+    api_read_timeout: float = Field(default=2.0, gt=0)
+    api_write_timeout: float = Field(default=2.0, gt=0)
+    api_media_write_timeout: float = Field(default=20.0, gt=0)
+    api_connection_pool_size: int = Field(default=256, ge=1)
     # Proactive per-second send cap for the dedicated broadcast bot instance. Broadcasts are the
     # highest-rate, least time-sensitive traffic; a low cap keeps their fan-out from competing with
     # time-sensitive events (e.g. meeting reminders) for the shared limiter budget and makes a

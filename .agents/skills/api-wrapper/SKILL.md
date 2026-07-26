@@ -50,14 +50,29 @@ Capture rules baked into `TelegramApi`:
 - `send_messages_to_users` rejects `on_success`/`on_error` callbacks under capture (they would mutate ORM objects after commit and be lost) — callers needing them must use `immediate`.
 - `context.api.immediate.X(...)` executes right away, inside the open transaction; its failure aborts the transaction. Keep it rare and greppable.
 
-### Post-commit error semantics (decided in #188)
+### Post-commit error semantics
 
-By the time the drain runs, the DB state is committed and correct — a failing queued call is a **partial rendering failure**, never a reason to touch the DB or stop unrelated deliveries. `execute_queued` therefore isolates each call:
+By the time the drain runs, the DB state is committed and correct — a failing queued call is a **partial rendering failure**, never a reason to touch the DB, stop unrelated deliveries, or tell the user their action failed. **`execute_queued` never raises**: nothing it hits reaches the global error handler, so the user keeps the success screen the handler already rendered (at worst one of their cards stays stale). Each call is isolated:
 
 - `InactiveUserInteraction` (blocked bot / deleted account) → the tg user id is recorded on the outbox; the lifecycle's reconcile transaction marks the user inactive (emitting `INACTIVE_USER_SET`). The drain continues.
 - BadRequest "message is not modified" → success (two updates can render identical content under concurrency).
-- Any other per-call exception → logged with the queued call name and its payload, plus a `PostCommitApiFault` metric via the adapter, and the drain continues — the remaining entries are independent deliveries to other chats. It never emits the aggregate `Fault`: that is the invocation outcome, the handler is still on its way to completing normally, and a second writer on the shared EMF logger turns the datapoint into an array (see the `monitoring` skill).
-- `NetworkError` (excluding its `BadRequest` subclass) → systemic: every remaining call would fail the same way, so the drain stops and the error surfaces to the global error handler. The reconcile fix-ups collected so far are still applied.
+- Any other per-call exception, network ones included → logged with the queued call name and its payload, plus a `PostCommitApiFault` metric via the adapter, and the drain continues — the remaining entries are independent deliveries to other chats. It never emits the aggregate `Fault`: that is the invocation outcome, the handler is still on its way to completing normally, and a second writer on the shared EMF logger turns the datapoint into an array (see the `monitoring` skill).
+- The drain logs its outcome once (`queued` / `sent` / `failed` / `abandoned`).
+
+#### The retry policy
+
+Telegram has no idempotency key, so a failure that may already have been applied can only be retried when a second delivery is harmless. Each `QueuedApiCall` therefore carries an `idempotent` flag, set at **enqueue** time (the drain sees an opaque closure and cannot tell an edit from a send): edits, markup clears and query answers are idempotent, every send is not. `_invoke_queued_with_retry` retries a `NetworkError` up to `QUEUED_CALL_ATTEMPTS` times, waiting `QUEUED_CALL_RETRY_BACKOFF_SECONDS` doubled per retry, when either:
+
+- the failure proves the request never left this process — its `__cause__` is one of `CONNECT_FAILURE_CAUSES` (PTB wraps httpx errors and keeps the original as `__cause__`); or
+- the call is idempotent.
+
+A read timeout on a send is therefore **never** retried: Telegram may have delivered it. `BadRequest` (a `NetworkError` subclass) is a permanent answer and never retried.
+
+#### The circuit breaker
+
+With short timeouts and a widely-shared meeting, a dead network would otherwise cost one timeout per remaining delivery inside the handler. After `DRAIN_NETWORK_FAILURE_LIMIT` **consecutive** network failures the drain abandons the rest of the queue and logs the abandoned call names. Any non-network outcome (including an unreachable user or an unchanged message — both reached Telegram) resets the counter. The reconcile fix-ups collected before the abort are still applied.
+
+New api methods that enqueue must pass `idempotent=True` only when repeating the call cannot deliver anything twice; the default is the safe answer.
 
 ### The reconcile transaction
 
