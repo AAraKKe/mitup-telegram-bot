@@ -15,7 +15,7 @@ from mitup_bot.views import MitupView
 
 log = structlog.get_logger(__name__)
 
-INACTIVE_USERS_SELECT_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
+INACTIVE_USERS_SELECT_STATEMENT = select(User.id, User.tg_user_id).where(
     and_(
         User.status == UserStatus.LEFT,
         User.tg_user_id != -1,
@@ -28,7 +28,10 @@ INACTIVE_USERS_SELECT_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = se
         ),
     )
 )
-"""Selects IDs of LEFT users who are safe to purge outright.
+"""Selects the ids of LEFT users who are safe to purge outright, with the Telegram id each maps to.
+
+Both ids, not just the primary key: the rows are hard-deleted and this select is the only moment a
+silently erased account's identity can still be recorded.
 
 A LEFT user is retained — not deleted — while they still own an active meeting or hold a join link
 to one: deleting them cascades their owned meetings and drops their participation, silently kicking
@@ -43,8 +46,10 @@ Invited users (tg_user_id == -1) are handled by `inactive_meetings` too.
 """
 
 # How long a user stays LEFT with everything intact. Past it, a user whose only remaining tie to an
-# active meeting is a join link is demoted rather than kept whole indefinitely.
-LEFT_STATUS_GRACE_INTERVAL = "30 days"
+# active meeting is a join link is demoted rather than kept whole indefinitely. Kept as a number so
+# the rule the demotion ran under is a queryable field and not only a fragment of SQL.
+LEFT_STATUS_GRACE_DAYS = 30
+LEFT_STATUS_GRACE_INTERVAL = f"{LEFT_STATUS_GRACE_DAYS} days"
 
 DEMOTABLE_LEFT_USERS_SELECT_STATEMENT: SelectOfScalar[User] = select(User).where(
     and_(
@@ -98,12 +103,55 @@ async def demote_stale_left_users(session: AsyncSession) -> int:
     user_ids = [user.db_id for user in users]
     # Deleting the meetings cascades their join links and message rows. Scoped to inactive ones so
     # the pass can never take down a meeting people are still using.
-    await session.exec(delete(Meetup).where(and_(col(Meetup.owner_id).in_(user_ids), Meetup.active == false())))
+    result = await session.exec(
+        delete(Meetup).where(and_(col(Meetup.owner_id).in_(user_ids), Meetup.active == false()))
+    )
+    meetups_deleted = result.rowcount or 0
+
     for user in users:
+        # Ahead of the flip, which clears the stamp that says which grace period ran out.
+        log.info(
+            "LEFT user demoted",
+            user_id=user.db_id,
+            tg_user_id=user.tg_user_id,
+            left_time=user.left_time,
+            grace_days=LEFT_STATUS_GRACE_DAYS,
+            reason="left_grace_expired_join_link_only",
+        )
         user.set_status(UserStatus.JOINED_ONLY)
 
-    log.info("LEFT users demoted to JOINED_ONLY", count=len(users), user_ids=user_ids)
+    log.info(
+        "LEFT users demoted to JOINED_ONLY",
+        count=len(users),
+        user_ids=user_ids,
+        meetups_deleted=meetups_deleted,
+        grace_days=LEFT_STATUS_GRACE_DAYS,
+    )
     return len(users)
+
+
+async def log_purge_cascade(session: AsyncSession, user_ids: set[int]):
+    """Count what the `DELETE FROM users` will take with it, while the rows still exist.
+
+    `cascade_delete=True` destroys the owned meetings and the join links without naming them, so an
+    erasure that is not counted here leaves no record of its blast radius at all.
+    """
+    if not user_ids:
+        return
+
+    meetups = (
+        await session.exec(select(func.count()).select_from(Meetup).where(col(Meetup.owner_id).in_(user_ids)))
+    ).first() or 0
+    join_links = (
+        await session.exec(select(func.count()).select_from(JoinedUsers).where(col(JoinedUsers.user_id).in_(user_ids)))
+    ).first() or 0
+    log.info(
+        "User purge cascade",
+        user_ids=sorted(user_ids),
+        meetups_deleted=meetups,
+        join_links_deleted=join_links,
+        reason="user_row_deleted",
+    )
 
 
 async def run(api: TelegramApiWrapper, metrics: MetricsClient):
@@ -121,14 +169,26 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     demoted = await demote_stale_left_users()
 
     async with db.begin_write(api) as session:
-        inactive_user_ids = set((await session.exec(INACTIVE_USERS_SELECT_STATEMENT)).all())
+        inactive_users = (await session.exec(INACTIVE_USERS_SELECT_STATEMENT)).all()
+        inactive_user_ids = {user_id for user_id, _ in inactive_users}
         marked_users = (await session.exec(DELETION_REQUESTED_USERS_SELECT_STATEMENT)).all()
+
+        for user_id, tg_user_id in inactive_users:
+            log.info(
+                "User purged",
+                user_id=user_id,
+                tg_user_id=tg_user_id,
+                reason="left_and_no_active_meeting_or_join",
+            )
 
         for user in marked_users:
             farewell = MitupView(description=PrivacyMessages.DELETION_COMPLETE.get(lang=user.lang), keyboard=[])
             await api.send_message_to_user(user, farewell)
+            log.info("Deletion farewell queued", user_id=user.db_id, tg_user_id=user.tg_user_id, lang=user.lang)
+            log.info("User purged", user_id=user.db_id, tg_user_id=user.tg_user_id, reason="deletion_requested")
 
         user_ids = inactive_user_ids | {user.db_id for user in marked_users}
+        await log_purge_cascade(session, user_ids)
         # Pending Patreon links carry no foreign key to users, so deleting the user cascades nothing
         # into them. A purge has to name them itself or a deletion request would leave behind a row
         # pairing the requester's Telegram id with their Patreon account.
@@ -147,3 +207,11 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     # carries the same information.
     log.info("Deletion-requested users purged", count=len(marked_users), pending_links=purged_pending_links)
     log.info("Finished Patreon pending links swept", count=swept_pending_links)
+    log.info(
+        "User cleanup complete",
+        demoted=demoted,
+        inactive_purged=len(inactive_user_ids),
+        deletion_requested_purged=len(marked_users),
+        pending_links_purged=purged_pending_links + swept_pending_links,
+        grace_days=LEFT_STATUS_GRACE_DAYS,
+    )

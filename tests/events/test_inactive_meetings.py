@@ -2,13 +2,20 @@ import datetime as dt
 
 import pytest
 from sqlalchemy.dialects import postgresql
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from mitup_bot.events import inactive_meetings
-from mitup_bot.events.inactive_meetings import MEETINGS_TO_DEACTIVATE_STATEMENT
+from mitup_bot.events.inactive_meetings import (
+    MEETINGS_TO_DEACTIVATE_STATEMENT,
+    DeactivationReason,
+    SkipReason,
+)
 from mitup_bot.events.service import EventType
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers import (
     MockApi,
     MockDbSession,
@@ -30,17 +37,34 @@ def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
 
 
-def register_due_meetings(mock_session: MockDbSession, *meetings: Meetup, still_due: bool = True):
-    """Register a meeting for every read the sweep performs: the unlocked candidate sweep,
+def register_due_meetings(
+    mock_session: MockDbSession,
+    *meetings: Meetup,
+    still_due: bool = True,
+    reason: DeactivationReason = DeactivationReason.PAST_END_DATETIME_PLUS_OWNER_TIMEOUT,
+    level: SupporterLevel = SupporterLevel.NONE,
+):
+    """Register a meeting for every read the sweep performs: the unlocked nomination projection,
     the locked ``by_id`` re-load, and the under-lock eligibility re-check (empty when
-    ``still_due`` is False — the meeting was rescheduled between sweep and lock)."""
-    mock_session.add_objects_with_statement(inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT, meetings)
+    ``still_due`` is False — the meeting was rescheduled between sweep and lock).
+
+    The nomination rows carry what the database projects: the id, the owner's Telegram id and
+    tier, and which arm of the disjunction matched."""
+    mock_session.add_objects_with_statement(
+        inactive_meetings.DUE_MEETING_FACTS_STATEMENT,
+        tuple((meeting.id, meeting.owner.tg_user_id, level.value, reason.value) for meeting in meetings),
+    )
     for meeting in meetings:
         mock_session.add_object(meeting)
         mock_session.add_objects_with_statement(
             inactive_meetings.MEETINGS_TO_DEACTIVATE_STATEMENT.where(Meetup.id == meeting.id),
             (meeting,) if still_due else (),
         )
+
+
+def deactivated_metric(level: SupporterLevel = SupporterLevel.NONE) -> dict[str, str]:
+    """The dimensions one tier's `MeetingsDeactivated` sample carries."""
+    return {"EventType": EventType.DEACTIVATE_MEETINGS.value, "SupporterLevel": level.value}
 
 
 async def test_no_meetings_to_deactivate(
@@ -59,7 +83,7 @@ async def test_no_meetings_to_deactivate(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
@@ -97,7 +121,7 @@ async def test_single_meeting_deactivated(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
@@ -130,7 +154,7 @@ async def test_meeting_no_longer_due_is_skipped(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
@@ -172,7 +196,7 @@ async def test_meeting_with_invited_users(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
@@ -212,7 +236,7 @@ async def test_meeting_membership_is_cleared(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
 
 
@@ -251,7 +275,7 @@ async def test_api_failure_raises_runtime_error(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
     # The failure counter is a number, not a report: the per-meeting id and error are on the
     # `Failed to deactivate meeting` log line, so nothing rides the record.
@@ -291,7 +315,7 @@ async def test_multiple_meetings_deactivated(
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATED,
         value=2,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
+        dimensions=deactivated_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
@@ -359,3 +383,125 @@ async def test_joined_only_users_deleted_metric_emitted_when_no_orphans(
 # live in tests/data/db_behavior/test_inactive_meetings_row_locks.py.
 # Keep this file mock-only.
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Decision records
+# ---------------------------------------------------------------------------
+
+
+async def test_deactivation_names_its_tier_window_and_what_it_destroyed(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The one line that acknowledges a roster existed. After the deletes nothing can reconstruct
+    who was in the meeting, so the branch that nominated it, the owner's tier and window, and the
+    invited users about to be hard-deleted all have to be on it."""
+    meeting = create_meetup(id=1, title="Test Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+    invited = create_user(id=3, tg_user_id=-1, first_name="Outside User")
+    create_joined_link(user=invited, meetup=meeting, id=2)
+
+    register_due_meetings(
+        mock_session, meeting, reason=DeactivationReason.DATELESS_WINDOW_ELAPSED, level=SupporterLevel.HOST_2
+    )
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
+
+    record = next(entry for entry in logs if entry["event"] == "Deactivate meeting")
+    assert record["meeting_id"] == 1
+    assert record["owner_tg_user_id"] == 10
+    assert record["supporter_level"] == SupporterLevel.HOST_2.value
+    assert record["window_days"] == LifecyclePolicy.interval_days(
+        LifecyclePolicy.get(SupporterLevel.HOST_2).dateless_lifetime
+    )
+    assert record["reason"] == DeactivationReason.DATELESS_WINDOW_ELAPSED.value
+    assert record["invited_user_ids"] == [3]
+    assert {"participants_removed", "messages_deleted", "invited_users_deleted"} <= record.keys()
+
+
+async def test_skip_names_the_owner_upgrade_that_stopped_the_window(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """An owner who upgrades between nomination and lock moves to a longer window and stops being
+    due — a real outcome that a bare "no longer due" sentence cannot be told apart from a reschedule."""
+    meeting = create_meetup(id=1, title="Upgraded Owner Meeting")
+    create_user(
+        id=1,
+        tg_user_id=10,
+        owned_meetings=[meeting],
+        settings=create_settings(id=1),
+        supporter_level=SupporterLevel.HOST_2,
+    )
+
+    register_due_meetings(
+        mock_session,
+        meeting,
+        still_due=False,
+        reason=DeactivationReason.DATELESS_WINDOW_ELAPSED,
+        level=SupporterLevel.NONE,
+    )
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
+
+    record = next(entry for entry in logs if entry["event"] == "Skip meeting deactivation")
+    assert record["meeting_id"] == 1
+    assert record["reason"] == SkipReason.TIER_WINDOW_EXTENDED.value
+    assert record["nominated_reason"] == DeactivationReason.DATELESS_WINDOW_ELAPSED.value
+
+
+async def test_joined_only_purge_names_the_accounts_it_took(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A bulk hard delete of real user rows. The ids are selected first because nothing downstream
+    can name an account that is already gone, and a rowcount alone names nobody."""
+    register_due_meetings(mock_session)
+    mock_session.add_objects_with_statement(inactive_meetings.JOINED_ONLY_WITHOUT_ACTIVE_LINKS_STATEMENT, (41, 77))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
+
+    record = next(entry for entry in logs if entry["event"] == "Delete joined-only users without active links")
+    assert (record["user_ids"], record["count"]) == ([41, 77], 2)
+    assert "DELETE FROM users WHERE users.id IN (41, 77)" in mock_session.queries_executed
+
+
+async def test_sweep_summary_reports_the_run_by_reason_and_window(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The flat counters cannot express "the Patron 365-day window suddenly fired on hundreds of
+    meetings", which is the shape the October backfill cohort will arrive in."""
+    meeting = create_meetup(id=1, title="Test Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+
+    register_due_meetings(
+        mock_session, meeting, reason=DeactivationReason.DATELESS_WINDOW_ELAPSED, level=SupporterLevel.HOST_3
+    )
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
+
+    summary = next(entry for entry in logs if entry["event"] == "Deactivation sweep complete")
+    patron_window = LifecyclePolicy.interval_days(LifecyclePolicy.get(SupporterLevel.HOST_3).dateless_lifetime)
+    assert (summary["nominated"], summary["deactivated"], summary["skipped"], summary["failed"]) == (1, 1, 0, 0)
+    assert summary["reasons"] == {DeactivationReason.DATELESS_WINDOW_ELAPSED.value: 1}
+    assert summary["windows"] == {patron_window: 1}
+
+
+async def test_destruction_counter_is_split_by_owner_tier(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """`MeetingsDeactivated = 400` cannot answer whether a free cohort's cliff or a mistakenly
+    aged-out Patron cohort produced it unless the tier is a dimension. Every level is emitted every
+    run so no series reads as missing data on a run that took nobody from it."""
+    meeting = create_meetup(id=1, title="Patron Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+
+    register_due_meetings(mock_session, meeting, level=SupporterLevel.HOST_3)
+    await inactive_meetings.run(api, metrics_client)
+    await metrics_client.flush()
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED, value=1, dimensions=deactivated_metric(SupporterLevel.HOST_3)
+    )
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_DEACTIVATED, value=0, dimensions=deactivated_metric(SupporterLevel.NONE)
+    )

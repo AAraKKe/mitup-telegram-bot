@@ -1,5 +1,6 @@
 import datetime as dt
 
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -15,6 +16,8 @@ from mitup_bot.views import meeting as meeting_views
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
 from .utils import active_meetings_cap_reached
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -45,6 +48,12 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     # arrive from a past-meetings list or a deletion warning the owner already acted on, so a second
     # tap must not wipe the date they set after the first one.
     if meeting.active:
+        log.info(
+            "Skip meeting reactivation",
+            meeting_id=meeting.db_id,
+            tg_user_id=user.tg_user_id,
+            reason="already_active",
+        )
         await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
         return
 
@@ -57,6 +66,19 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     )
     if await active_meetings_cap_reached(user, update, context, back_button=past_meetings_button):
         return
+
+    # Between them the writes below cancel a pending deletion: they reset the retention clock,
+    # discard the record that the owner was warned, and restart the dateless window. Recorded
+    # before the mutation, which is the last moment the values they overwrite still exist.
+    log.info(
+        "Meeting reactivated",
+        meeting_id=meeting.db_id,
+        tg_user_id=user.tg_user_id,
+        previous_activated_time=meeting.activated_time,
+        previous_expiration_time=meeting.expiration_time,
+        was_warned=meeting.expiration_notification_sent,
+        reason="owner_reactivated",
+    )
 
     # A reactivation is a restart, not a resume: the meeting comes back as a fresh draft with its
     # dates cleared, so the owner picks a new date instead of inheriting the one that already passed.

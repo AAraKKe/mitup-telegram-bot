@@ -2,13 +2,17 @@ import datetime as dt
 import logging
 import re
 from collections.abc import Callable
+from dataclasses import replace
 from typing import cast
 
 import pytest
 from sqlalchemy.dialects import postgresql
 from sqlmodel.sql.expression import SelectOfScalar
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 from telegram.error import BadRequest
 
+from mitup_bot import lifecycle
 from mitup_bot.events import meetups_cleanup
 from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
@@ -17,6 +21,7 @@ from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import MitupView
@@ -56,6 +61,11 @@ def deleted_meetup_ids(session: MockDbSession) -> set[int]:
         if match:
             ids.update(int(part) for part in match.group(1).split(",") if part.strip().isdigit())
     return ids
+
+
+def purged_metric(level: SupporterLevel = SupporterLevel.NONE) -> dict[str, str]:
+    """The dimensions one tier's `MeetupsDeleted` sample carries."""
+    return {"EventType": EventType.MEETUPS_CLEANUP.value, "SupporterLevel": level.value}
 
 
 def residue_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogRecord:
@@ -244,7 +254,7 @@ async def test_delete_no_meetings(
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,
         value=0,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
@@ -288,7 +298,7 @@ async def test_delete_meeting_successfully(
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,
         value=1,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
@@ -324,7 +334,7 @@ async def test_delete_meeting_with_outside_users(
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,
         value=1,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DELETION_FAILED,
@@ -378,7 +388,7 @@ async def test_delete_meeting_whose_owner_is_unreachable(
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,
         value=2,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
@@ -451,7 +461,7 @@ async def test_delete_is_deferred_when_the_notice_raises(
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,
         value=1,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
@@ -514,7 +524,7 @@ async def test_run_orchestrates_both_functions(
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED,
         value=0,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
@@ -526,3 +536,121 @@ async def test_run_orchestrates_both_functions(
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
     )
+
+
+# ---------------------------------------------------------------------------
+# Decision records
+# ---------------------------------------------------------------------------
+
+
+async def test_warning_record_tells_a_delivered_notice_from_an_undeliverable_one(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """`expiration_notification_sent = True` is the precondition for the later permanent deletion
+    and is written for both dispositions, so this line is the only place they stay apart."""
+    reached = create_meetup(id=1, title="Reached Owner")
+    create_user(id=1, tg_user_id=10, owned_meetings=[reached], settings=create_settings(id=1))
+    blocked = create_meetup(id=2, title="Blocked Owner")
+    create_user(id=2, tg_user_id=20, owned_meetings=[blocked], settings=create_settings(id=2))
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (reached, blocked))
+    api.mock_method("send_message_to_user").side_effect = [None, InactiveUserInteraction(20, private=True)]
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    records = {entry["meeting_id"]: entry for entry in logs if entry["event"] == "Meetup deletion warning recorded"}
+    assert records[1]["delivery"] == meetups_cleanup.WarningDelivery.DELIVERED.value
+    assert records[2]["delivery"] == meetups_cleanup.WarningDelivery.UNREACHABLE.value
+    assert records[1]["tg_user_id"] == 10
+    assert records[1]["window_days"] == WARNING_DAYS
+    assert reached.expiration_notification_sent is True
+    assert blocked.expiration_notification_sent is True
+
+
+def test_warning_deadline_comes_from_the_owners_own_policy(monkeypatch: pytest.MonkeyPatch):
+    """The message promises a deadline, so a Patron owner must be told their own tier's lead.
+
+    Both tiers carry the same lead today, which is exactly why this test moves the Patron one: with
+    the shipped values the assertion would hold whichever policy the view read.
+    """
+    patron_lead = dt.timedelta(days=14)
+    monkeypatch.setattr(lifecycle, "PATRON_POLICY", replace(lifecycle.PATRON_POLICY, deletion_warning_lead=patron_lead))
+
+    meeting = create_meetup(id=1, title="Patron Meeting")
+    create_user(
+        id=1,
+        tg_user_id=10,
+        owned_meetings=[meeting],
+        settings=create_settings(id=1),
+        supporter_level=SupporterLevel.HOST_3,
+    )
+
+    view = meetups_cleanup.deletion_warning_view(meeting)
+
+    assert view.description == NotificationMessages.DELETION_WARNING.get(
+        lang=meeting.lang,
+        meeting_title=meeting.title,
+        days_until_deletion=patron_lead.days,
+        past_meetings_button=ButtonMessages.PAST_MEETINGS.get(lang=meeting.user_language),
+        reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.get(lang=meeting.user_language),
+    )
+
+
+async def test_a_repeatedly_failing_send_escalates_instead_of_warning_daily_forever(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A send that raised defers the meeting to the next run, which re-nominates and re-warns it at
+    the same level forever. Past the threshold the retry is not working, so the row gets an error of
+    its own — that is what makes the failure counter mean "failing now" rather than "ever failed"."""
+    meeting = create_meetup(id=1, title="Stuck Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(
+        days=RETENTION_DAYS + meetups_cleanup.STUCK_RESIDUE_DAYS + 2
+    )
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting,))
+    api.mock_method("send_message_to_user").side_effect = BadRequest("Telegram is having a moment")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    stuck = next(entry for entry in logs if entry["event"] == "Meeting deletion stuck")
+    assert stuck["log_level"] == "error"
+    assert stuck["meeting_id"] == 1
+    assert stuck["days_overdue"] == meetups_cleanup.STUCK_RESIDUE_DAYS + 2
+    assert stuck["reason"] == "owner_notification_failed_repeatedly"
+    assert not [entry for entry in logs if entry["event"] == "Meeting deletion deferred"]
+
+
+async def test_purge_names_the_meetings_and_the_invitees_it_destroys(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A purge has to leave behind something the warnings that preceded it can be reconciled
+    against — the meeting ids, the owner tiers, and the invitee rows that cascade with them."""
+    meeting = create_meetup(id=1, title="Purged Meeting")
+    create_user(
+        id=1,
+        tg_user_id=10,
+        owned_meetings=[meeting],
+        settings=create_settings(id=1),
+        supporter_level=SupporterLevel.HOST_2,
+    )
+    invited = create_user(id=3, tg_user_id=-1, first_name="Outside")
+    create_joined_link(user=invited, meetup=meeting, id=1)
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting,))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    purged = next(entry for entry in logs if entry["event"] == "Meetups purged")
+    assert (purged["count"], purged["meeting_ids"], purged["unnotified"]) == (1, [1], 0)
+    assert purged["supporter_levels"] == {SupporterLevel.HOST_2.value: 1}
+    assert purged["reason"] == "retention_elapsed"
+
+    invitees = next(entry for entry in logs if entry["event"] == "Invitee users purged")
+    assert (invitees["count"], invitees["user_ids"]) == (1, [3])
+
+    summary = next(entry for entry in logs if entry["event"] == "Meetup purge sweep complete")
+    assert (summary["purged"], summary["invitee_users_purged"]) == (1, 1)

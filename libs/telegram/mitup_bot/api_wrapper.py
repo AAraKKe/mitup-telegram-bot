@@ -777,7 +777,6 @@ class TelegramApi:
 
     def _mark_user_inactive(self, user: User):
         if user.mark_inactive():
-            log.info("Marking user as inactive", tg_user_id=user.tg_user_id)
             self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
 
     async def notify_users_promoted_from_waiting_list(

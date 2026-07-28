@@ -3,6 +3,8 @@ import logging
 
 import pytest
 from sqlalchemy.dialects import postgresql
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from mitup_bot.events import user_cleanup
 from mitup_bot.events.user_cleanup import (
@@ -84,7 +86,10 @@ async def test_inactive_users_deleted_silently(
     inactive_2 = create_user(id=11, tg_user_id=11, status=UserStatus.LEFT)
 
     # Register select result — returns user IDs
-    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive_1.id, inactive_2.id))
+    mock_session.add_objects_with_statement(
+        INACTIVE_USERS_SELECT_STATEMENT,
+        ((inactive_1.id, inactive_1.tg_user_id), (inactive_2.id, inactive_2.tg_user_id)),
+    )
 
     await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
@@ -134,7 +139,7 @@ async def test_left_and_marked_users_purged_together(
     inactive = create_user(id=10, tg_user_id=10, status=UserStatus.LEFT)
     marked = create_member(id=30, tg_user_id=30, status=UserStatus.DELETION_REQUESTED)
 
-    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, (inactive.id,))
+    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, ((inactive.id, inactive.tg_user_id),))
     mock_session.add_objects_with_statement(DELETION_REQUESTED_USERS_SELECT_STATEMENT, (marked,))
 
     await user_cleanup.run(api, metrics_client)
@@ -379,3 +384,64 @@ async def test_deletion_request_also_erases_that_users_pending_links(
         if "DELETE FROM patreon_pending_links" in query and "claimed_tg_user_id" in query
     )
     assert str(user_with_settings.tg_user_id) in purge
+
+
+# ---------------------------------------------------------------------------
+# Decision records
+# ---------------------------------------------------------------------------
+
+
+async def test_demotion_records_each_user_and_the_meetings_it_deleted(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The demotion deletes the user's inactive meetings before dropping the account, so the pass
+    needs a per-user record. It goes ahead of the flip, which clears the stamp that says which
+    grace period ran out."""
+    demotable = create_user(
+        id=40, tg_user_id=40, status=UserStatus.LEFT, left_time=dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    )
+    mock_session.add_objects_with_statement(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT, (demotable,))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await user_cleanup.run(api, metrics_client)
+
+    record = next(entry for entry in logs if entry["event"] == "LEFT user demoted")
+    assert (record["user_id"], record["tg_user_id"]) == (40, 40)
+    assert record["left_time"] == dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    assert record["grace_days"] == user_cleanup.LEFT_STATUS_GRACE_DAYS
+    assert record["reason"] == "left_grace_expired_join_link_only"
+
+    summary = next(entry for entry in logs if entry["event"] == "LEFT users demoted to JOINED_ONLY")
+    assert (summary["count"], summary["user_ids"]) == (1, [40])
+    assert "meetups_deleted" in summary
+
+
+async def test_both_purge_populations_record_who_was_erased(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A hard delete with only a count behind it is a GDPR-shaped erasure with no audit trail. The
+    two dispositions share the event name and differ by reason, and the cascade is counted while the
+    rows still exist because `cascade_delete=True` destroys them without naming them."""
+    inactive = create_user(id=10, tg_user_id=100, status=UserStatus.LEFT)
+    marked = create_member(id=30, tg_user_id=300, status=UserStatus.DELETION_REQUESTED)
+    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, ((inactive.id, inactive.tg_user_id),))
+    mock_session.add_objects_with_statement(DELETION_REQUESTED_USERS_SELECT_STATEMENT, (marked,))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await user_cleanup.run(api, metrics_client)
+
+    purges = {entry["user_id"]: entry for entry in logs if entry["event"] == "User purged"}
+    assert purges[10]["tg_user_id"] == 100
+    assert purges[10]["reason"] == "left_and_no_active_meeting_or_join"
+    assert purges[30]["tg_user_id"] == 300
+    assert purges[30]["reason"] == "deletion_requested"
+
+    farewell = next(entry for entry in logs if entry["event"] == "Deletion farewell queued")
+    assert farewell["tg_user_id"] == 300
+
+    cascade = next(entry for entry in logs if entry["event"] == "User purge cascade")
+    assert cascade["user_ids"] == [10, 30]
+    assert {"meetups_deleted", "join_links_deleted"} <= cascade.keys()
+
+    summary = next(entry for entry in logs if entry["event"] == "User cleanup complete")
+    assert (summary["inactive_purged"], summary["deletion_requested_purged"]) == (1, 1)

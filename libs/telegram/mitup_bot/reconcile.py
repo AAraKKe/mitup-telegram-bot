@@ -28,7 +28,6 @@ async def reconcile_outbox(session: AsyncSession, adapter: ContextOrBotAdapter, 
     for tg_user_id in dict.fromkeys(outbox.inactive_tg_user_ids):
         user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
         if user is not None and user.mark_inactive():
-            log.info("Marking user as inactive", tg_user_id=tg_user_id)
             adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
 
 

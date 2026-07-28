@@ -18,6 +18,8 @@ from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.models.users import UserStatus
 from tests.helpers import MockApi
 
+from .conftest import dated_nomination
+
 pytestmark = pytest.mark.db_test
 
 
@@ -80,7 +82,7 @@ async def test_deactivation_clears_every_membership(db_session: AsyncSession):
     invited_id = invited.db_id
     assert await membership_count(db_session, meetup_id) == 3
 
-    assert await inactive_meetings.deactivate_meeting_locked(db_session, meetup_id, MockApi()) is True
+    assert await inactive_meetings.deactivate_meeting_locked(db_session, dated_nomination(meetup_id), MockApi()) is True
     await db_session.flush()
 
     assert meeting.active is False
@@ -107,7 +109,10 @@ async def test_reactivated_meeting_starts_with_no_participants(db_session: Async
     db_session.add(JoinedUsers(user=participant, meetup=meeting))
     await db_session.flush()
 
-    assert await inactive_meetings.deactivate_meeting_locked(db_session, meeting.db_id, MockApi()) is True
+    assert (
+        await inactive_meetings.deactivate_meeting_locked(db_session, dated_nomination(meeting.db_id), MockApi())
+        is True
+    )
     await db_session.flush()
 
     meeting.active = True

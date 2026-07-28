@@ -34,6 +34,7 @@ from mitup_bot.monitoring import (
 )
 from mitup_bot.request import build_telegram_request
 
+from .lifecycle_queries import loggable_windows
 from .telemetry import error_type_name
 
 log = structlog.get_logger(__name__)
@@ -46,6 +47,20 @@ DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
 DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL = 60
 DEFAULT_SEND_BROADCASTS_INTERVAL = 60
 DEFAULT_SUPPORTER_CHECK_INTERVAL = 86400  # 24 hours
+
+
+def lifecycle_windows() -> dict[str, dict[str, int]]:
+    """The retention windows this process enforces, per duration and supporter level, in days.
+
+    Every lifecycle statement bakes its intervals in at import time, so without this a policy edit
+    ships with the image tag as its only evidence and the running container cannot be asked what it
+    is enforcing.
+    """
+    return {
+        "dateless_lifetime": loggable_windows(lambda policy: policy.dateless_lifetime),
+        "inactive_retention": loggable_windows(lambda policy: policy.inactive_retention),
+        "deletion_warning_delay": loggable_windows(lambda policy: policy.deletion_warning_delay),
+    }
 
 
 class EventType(Enum):
@@ -284,6 +299,7 @@ def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
         admin_count=len(config.bot.admin_tg_ids),
         pool_metrics_enabled=config.db.pool_metrics_enabled,
         broadcast_max_rate=config.bot.broadcast_max_rate,
+        lifecycle_windows=lifecycle_windows(),
     )
 
     # The pool client outlives every run, so it carries the process identity and nothing else: a

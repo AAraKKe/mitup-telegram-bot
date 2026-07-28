@@ -27,6 +27,8 @@ from mitup_bot.models.users import UserStatus
 from tests.helpers import MockApi
 from tests.helpers.locking import race
 
+from .conftest import dated_nomination
+
 pytestmark = pytest.mark.db_test
 
 
@@ -86,7 +88,7 @@ async def provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> AsyncI
 async def deactivate(session: AsyncSession, meetup_id: int) -> bool:
     """The batch job's per-meeting critical section exactly as production runs it. MockApi keeps
     the enqueued fan-out away from Telegram — the DB effects are what these tests race."""
-    return await inactive_meetings.deactivate_meeting_locked(session, meetup_id, MockApi())
+    return await inactive_meetings.deactivate_meeting_locked(session, dated_nomination(meetup_id), MockApi())
 
 
 async def invite_outside_user(session: AsyncSession, meetup_id: int, inviter_tg: int) -> int | None:

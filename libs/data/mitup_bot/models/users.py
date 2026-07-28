@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
+import structlog
 from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlalchemy.orm.interfaces import LoaderOption
@@ -18,6 +19,8 @@ from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from . import JoinedUsers, Meetup, Settings
+
+log = structlog.get_logger(__name__)
 
 
 class UserStatus(StrEnum):
@@ -198,10 +201,27 @@ class User(BaseModel, SQLModel, table=True):
 
         Every status write goes through here: `left_time` drives the LEFT grace period, and a
         status assigned around this method would leave the stamp describing a status the user
-        is no longer in.
+        is no longer in. A write that changes nothing is dropped, so re-detecting a departure
+        cannot restart a grace period that is already running.
+
+        This is also the one place a from/to transition and the grace stamp are both in hand, so
+        it is where the transition is recorded — its callers otherwise spell the same event four
+        different ways, or say nothing at all.
         """
+        if status is self.status:
+            return
+
+        previous_status = self.status
         self.status = status
         self.left_time = dt.datetime.now(dt.UTC) if status is UserStatus.LEFT else None
+        log.info(
+            "User status changed",
+            user_id=self.id,
+            tg_user_id=self.tg_user_id,
+            previous_status=previous_status.value,
+            status=status.value,
+            left_time=self.left_time,
+        )
 
     def mark_inactive(self) -> bool:
         """Transition a MEMBER user to LEFT.

@@ -59,7 +59,9 @@ def make_meetup(owner: User, *, active: bool) -> Meetup:
 
 
 async def inactive_user_ids(db_session: AsyncSession) -> set[int]:
-    return set((await db_session.exec(INACTIVE_USERS_SELECT_STATEMENT)).all())
+    # The statement projects (id, tg_user_id) so the purge can log identities; the assertions here
+    # care about membership only.
+    return {row.id for row in (await db_session.exec(INACTIVE_USERS_SELECT_STATEMENT)).all()}
 
 
 async def demotable_user_ids(db_session: AsyncSession) -> set[int]:

@@ -34,6 +34,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.backend import NullBackend
 from mitup_bot.monitoring.client import MetricsClient
 
+from .conftest import dated_nomination
+
 pytestmark = pytest.mark.db_test
 
 RACE_TIMEOUT = 20.0
@@ -171,7 +173,7 @@ async def test_deactivation_releases_row_lock_before_the_drain(db_session: Async
         probe = LockProbeBot(meetup_id)
 
         async with asyncio.timeout(RACE_TIMEOUT):
-            deactivated = await inactive_meetings.deactivate_meeting(meetup_id, make_probe_api(probe))
+            deactivated = await inactive_meetings.deactivate_meeting(dated_nomination(meetup_id), make_probe_api(probe))
 
         assert deactivated is True
         # The contender, serialized only by its own locked read, acquired the lock during

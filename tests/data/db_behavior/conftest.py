@@ -14,8 +14,10 @@ from testcontainers.postgres import PostgresContainer
 
 from mitup_bot import db
 from mitup_bot.config import DbConfig
+from mitup_bot.events.inactive_meetings import DeactivationReason, DueMeeting
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.monitoring import MetricsClient
+from mitup_bot.supporter import SupporterLevel
 from tests.helpers import make_test_metrics_client
 
 USERNAME = "mitupbot"
@@ -163,3 +165,14 @@ async def seed_joined_link(db_session: AsyncSession, seed_second_user: User, see
     db_session.add(joined)
     await db_session.flush()
     return joined
+
+
+def dated_nomination(meeting_id: int) -> DueMeeting:
+    """The nomination the sweep hands the critical section for a meeting past its end plus the
+    owner's timeout — the branch every dated fixture in this package trips."""
+    return DueMeeting(
+        meeting_id=meeting_id,
+        owner_tg_user_id=0,
+        owner_supporter_level=SupporterLevel.NONE,
+        reason=DeactivationReason.PAST_END_DATETIME_PLUS_OWNER_TIMEOUT,
+    )

@@ -1,6 +1,7 @@
 import datetime as dt
 
 import pytest
+from structlog.testing import capture_logs
 
 from mitup_bot.emojis import Emojis
 from mitup_bot.exceptions import UserNotFound
@@ -145,3 +146,32 @@ def test_set_status_to_left_stamps_left_time():
 
     assert user.status is UserStatus.LEFT
     assert user.left_time is not None
+
+
+def test_status_change_is_recorded_once_at_the_choke_point():
+    """`set_status` owns the status and the grace stamp together, so it is the one place a from/to
+    transition can be recorded. Its callers otherwise spell the same event four different ways."""
+    user = create_user(id=7, tg_user_id=770, status=UserStatus.MEMBER)
+
+    with capture_logs() as logs:
+        user.set_status(UserStatus.LEFT)
+
+    record = next(entry for entry in logs if entry["event"] == "User status changed")
+    assert record["user_id"] == 7
+    assert record["tg_user_id"] == 770
+    assert record["previous_status"] == UserStatus.MEMBER.value
+    assert record["status"] == UserStatus.LEFT.value
+    assert record["left_time"] == user.left_time
+
+
+def test_writing_the_status_a_user_already_has_changes_and_records_nothing():
+    """Re-detecting a departure must not restart a grace period that is already running, and a
+    no-op write is not a transition to report."""
+    user = create_user(id=8, tg_user_id=880, status=UserStatus.LEFT)
+    user.left_time = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+
+    with capture_logs() as logs:
+        user.set_status(UserStatus.LEFT)
+
+    assert user.left_time == dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]

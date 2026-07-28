@@ -16,6 +16,7 @@ from sqlmodel import and_, col, func, literal, or_
 
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import User
+from mitup_bot.supporter import SupporterLevel
 
 
 def sql_interval(duration: dt.timedelta) -> ColumnElement[dt.timedelta]:
@@ -39,3 +40,24 @@ def owner_tier_window_elapsed(
     # single list. `levels_by_duration` covers every level, so there is always at least one.
     first, *rest = conditions
     return or_(first, *rest)
+
+
+def resolved_windows(duration_of: Callable[[LifecyclePolicy], dt.timedelta]) -> dict[SupporterLevel, int]:
+    """The window each supporter level currently runs on, in whole days.
+
+    Generated from the same `levels_by_duration` grouping the predicate's branches are, so a tier
+    that moves to a different duration moves its label with it instead of needing a mirror kept in
+    step by hand. It is what lets a decision name the window that produced it: the statements bake
+    their intervals in at import time, so a policy edit otherwise ships with the image tag as its
+    only evidence and the running container cannot be asked what it is enforcing.
+    """
+    return {
+        level: LifecyclePolicy.interval_days(duration)
+        for duration, levels in LifecyclePolicy.levels_by_duration(duration_of).items()
+        for level in levels
+    }
+
+
+def loggable_windows(duration_of: Callable[[LifecyclePolicy], dt.timedelta]) -> dict[str, int]:
+    """`resolved_windows` keyed by the level's stored value, for a log field."""
+    return {level.value: days for level, days in resolved_windows(duration_of).items()}

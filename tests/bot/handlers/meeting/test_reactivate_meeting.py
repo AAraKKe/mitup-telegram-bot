@@ -1,6 +1,8 @@
 import datetime as dt
 
 import pytest
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 from telegram import Update
 
 from mitup_bot import supporter
@@ -175,3 +177,55 @@ async def test_reactivate_meeting_allowed_below_cap(
 
     assert inactive_meeting.active is True
     context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_reactivation_records_the_pending_deletion_it_cancelled(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+):
+    """The writes reset the retention clock, discard the record that the owner was warned, and
+    restart the dateless window. Recorded before the mutation, which is the last moment the values
+    they overwrite still exist."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
+
+    record = next(entry for entry in logs if entry["event"] == "Meeting reactivated")
+    assert record["meeting_id"] == MEETING_ID
+    assert record["tg_user_id"] == user_with_settings.tg_user_id
+    assert record["previous_activated_time"] == dt.datetime(2020, 1, 1, tzinfo=dt.UTC)
+    assert record["previous_expiration_time"] == dt.datetime(2099, 1, 1, tzinfo=dt.UTC)
+    assert record["was_warned"] is True
+    assert record["reason"] == "owner_reactivated"
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_a_second_tap_on_a_stale_warning_is_recorded_as_a_skip(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+):
+    """A stale warning DM stays tappable, and the early return emits no metric — without a line of
+    its own a second tap is indistinguishable from a real rescue by absence alone."""
+    inactive_meeting.active = True
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
+
+    record = next(entry for entry in logs if entry["event"] == "Skip meeting reactivation")
+    assert (record["meeting_id"], record["reason"]) == (MEETING_ID, "already_active")
+    assert not [entry for entry in logs if entry["event"] == "Meeting reactivated"]
