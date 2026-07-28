@@ -113,9 +113,13 @@ Such a caller owns nothing: every ownership test short-circuits, so an inactive 
 
 Every rejection subclasses `MeetingAccessError` (itself a `GuardError`) and carries `meeting_id`, `action` and `lang`. `MeetingGoneError` and `MeetingInactiveOwnerError` also carry the back-navigation `keyboard`; the others do not, since their screens navigate on their own. The error handler owns every screen they produce. For the bot-chat rejections it picks the reply shape from the update — callback query → edit in place, message → fresh reply, inline query → the unavailable card. The `SharedMeetingError` subclasses answer on the card instead, whatever the update looks like. See the `error-handling` skill for both branches.
 
-`action` is a short free-text description of what the user was doing. It is not user-facing: it names the attempt in the exception message and in the warning line the error handler logs.
+`action` is a short free-text description of what the user was doing. It is not user-facing: it names the attempt in the exception message and on the `Rejected meeting action` line the error handler logs for every rejection.
 
-A non-owner is logged and counted on the `MeetingNotOwned` metric with value `1`; the deleted-meeting and reactivation screens emit no such metric, and the reactivation prompt is not logged at all. A caller who gets through an ownership check emits the same metric with value `0`, so the series carries both outcomes.
+A non-owner is counted on the `MeetingNotOwned` metric with value `1`; the deleted-meeting and reactivation screens emit no such metric. A caller who gets through an ownership check emits the same metric with value `0`, so the series carries both outcomes.
+
+On its success return `meeting` binds `meeting_id` as a structlog contextvar (`granted_meeting`). The bind outlives the guard, the handler and the commit, so every later line of that update — including the post-commit drain and the reconciler — names the meeting without carrying a field of its own. Only a resolved meeting is bound; a rejection carries its id on the exception instead.
+
+Because it uses `bind_contextvars` rather than the scoped `bound_contextvars`, nothing expires it on its own: the bot's update boundary drops it (`update_trace.clear_update_scoped_state`, listed in `UPDATE_SCOPED_BINDS`). Any new bind meant to outlive a guard belongs on that list, or it will be read as the next update's.
 
 Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. The locked load resets the acting user's `meetups`/`joined_links` to unloaded, so a handler that both locks and opted into the collections must re-load them itself. See the `database` skill's "Per-meeting row locks" section for the full convention.
 

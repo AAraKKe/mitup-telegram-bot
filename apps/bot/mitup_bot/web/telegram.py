@@ -8,6 +8,7 @@ from telegram.ext import Application
 
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.update_trace import update_log_context
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application, get_webhook_secret
 from mitup_bot.web.utils import secret_header_matches
 
@@ -75,6 +76,17 @@ async def telegram_webhook(
     update = parse_update(payload, ptb_app, metrics_client)
     if update is None:
         return
+
+    # The arrival timestamp, to difference against the processing that starts out of band, and the
+    # depth of the queue it is being handed to — a backlog is otherwise only visible as latency.
+    chat = update.effective_chat
+    log.info(
+        "Telegram update received",
+        **update_log_context(update),
+        chat_type=chat.type if chat is not None else None,
+        queue_depth=ptb_app.update_queue.qsize(),
+        transport="webhook",
+    )
 
     # Enqueue for PTB's update processor rather than calling process_update()
     # directly. The fetcher task started by Application.start() drains this queue

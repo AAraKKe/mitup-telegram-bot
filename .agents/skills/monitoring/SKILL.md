@@ -176,7 +176,9 @@ client — `timezone_api`, which has the context in hand — passes it explicitl
 Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension.
 
 <critical_rules>
-`Fault` has a single writer, and writes **exactly once — not at most once**. It is the outcome of one invocation, emitted once per logger per flush window by the wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`) and by nothing else — not a handler, not a helper, not the global error handler, not the post-commit outbox drain.
+`Fault` has a single writer, and writes **exactly once — not at most once**. It is the outcome of one invocation, emitted once per logger per flush window by the wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`) and by nothing else — not a handler, not a helper, not `error_handler.handler`, not the post-commit outbox drain.
+
+The one addition to that list covers the invocations that never started: `registry.process_update_error`, registered on PTB via `add_error_handler`, samples a failure that reached PTB's error plane without any wrapped callback owning it. When the update's trace (`update_trace.UPDATE_TRACE`) already carries a fault it skips the update entirely — no sample and no line — so a re-raise from an invocation that already closed itself is recorded once, by the invocation.
 
 *Single* writer, because EMF **appends** repeated values under one metric name: a second writer serialises `"Fault": [1, 0]`, Logs Insights flattens the array to `Fault.0`/`Fault.1` so the `filter Fault = 1` triage queries stop matching, and the fault-rate alarm (Average + SampleCount, wired into the ECS rollback bakes) reads half the value on twice the samples.
 

@@ -6,6 +6,8 @@ from collections import Counter
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
+from dataclasses import dataclass
+from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Any, Concatenate, Literal, Protocol, cast, overload
 
 import structlog
@@ -31,6 +33,44 @@ if TYPE_CHECKING:  # pragma: no cover
     from mitup_bot.protocols import ContextOrBotAdapter
 
 log = structlog.get_logger(__name__)
+
+
+class WritePhase(StrEnum):
+    """Where in a write-mode critical section execution stands.
+
+    The distinction the failure plane is built on: a `BODY` failure rolled the transaction back
+    and the user's action did not happen, while a `POST_COMMIT_FAN_OUT` failure lost a render of
+    a write that landed.
+    """
+
+    BODY = auto()
+    POST_COMMIT_FAN_OUT = auto()
+
+
+@dataclass(frozen=True)
+class WriteState:
+    phase: WritePhase
+    committed: bool
+
+
+# Left set when a critical section leaves through an exception, so the error handler — which runs
+# long after `begin_write` has returned control — can still name the phase the failure came from.
+WRITE_STATE: ContextVar[WriteState | None] = ContextVar("write_state", default=None)
+
+
+def current_write_state() -> WriteState | None:
+    """The write phase of the innermost critical section still accountable for this task."""
+    return WRITE_STATE.get()
+
+
+def clear_write_state():
+    """Forget the phase mark at the boundary of the work that could have set it.
+
+    `begin_write` leaves the mark behind on its failure path, since the error handler reads it
+    long after the critical section returned control. Bounding that to the piece of work it
+    describes is the caller's job: whoever owns the boundary clears it before the next one.
+    """
+    WRITE_STATE.set(None)
 
 
 class OutboxProtocol(Protocol):
@@ -341,6 +381,7 @@ async def begin_write[OutboxT: OutboxProtocol](api: WriteApi[OutboxT]) -> AsyncG
     """
     if __outbox_reconciler is None:
         raise OutboxReconcilerNotRegisteredError()
+    token = WRITE_STATE.set(WriteState(WritePhase.BODY, committed=False))
     outbox = api.begin_capture()
     try:
         async with begin() as session:
@@ -350,10 +391,12 @@ async def begin_write[OutboxT: OutboxProtocol](api: WriteApi[OutboxT]) -> AsyncG
     # The transaction is committed and its locks are released; only now run the captured
     # fan-out. The drain reports its own failures instead of raising, and the reconcile applies
     # whatever fix-ups it recorded — including those from a drain that gave up partway.
+    WRITE_STATE.set(WriteState(WritePhase.POST_COMMIT_FAN_OUT, committed=True))
     try:
         await api.execute_queued(outbox)
     finally:
         await apply_reconcile(api, outbox)
+    WRITE_STATE.reset(token)
 
 
 @overload

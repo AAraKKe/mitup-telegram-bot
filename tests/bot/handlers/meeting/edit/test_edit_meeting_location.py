@@ -26,6 +26,7 @@ from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
     assert_context_lost_logged,
+    assert_meeting_rejection_logged,
     call_handler,
     create_meetup,
     create_member,
@@ -119,7 +120,7 @@ async def test_edit_location_meeting_not_owned(
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, handler_context=handler_context)
         # For the test case where we don´t fail but log a warning and go to main menu
-        assert "User tried 'Edit location' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Edit location", reason="meeting_not_owned")
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )
@@ -211,7 +212,7 @@ async def test_edit_location_name_not_owned(
         )
         # The guard rejection aborts the handler, so it ends the conversation.
         assert result == ConversationHandler.END
-        assert "User tried 'Edit location name' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Edit location name", reason="meeting_not_owned")
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )
@@ -308,7 +309,7 @@ async def test_edit_location_coordinates_not_owned(
         )
         # The guard rejection aborts the handler, so it ends the conversation.
         assert result == ConversationHandler.END
-        assert "User tried 'Edit location coordinates' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Edit location coordinates", reason="meeting_not_owned")
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )

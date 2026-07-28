@@ -1,10 +1,17 @@
 import asyncio
 import datetime
+from collections.abc import MutableMapping
+from typing import Any
 
 import pytest
+import structlog
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 from telegram import Chat, InlineQuery, Message, Update, User
 
+from mitup_bot import db
 from mitup_bot.update_processor import LockKey, PerUserUpdateProcessor, update_lock_key
+from mitup_bot.update_trace import record_handler_invocation
 
 TEST_DATE = datetime.datetime(2024, 7, 1, tzinfo=datetime.UTC)
 
@@ -220,3 +227,155 @@ async def test_exception_releases_lock_and_drains_map():
 
     assert log == ["follower"]
     assert processor._locks == {}
+
+
+# --- The update trace ---
+
+
+def trace_lines(logs: list[MutableMapping[str, Any]]) -> tuple[MutableMapping[str, Any], MutableMapping[str, Any]]:
+    """The entry and exit line of one processed update."""
+    entry = next(line for line in logs if line["event"] == "Processing update")
+    exit_line = next(line for line in logs if line["event"] == "Finished processing update")
+    return entry, exit_line
+
+
+async def test_trace_lines_bracket_a_routed_update():
+    """The pair carries the correlation identity bound before routing, and the exit line reports
+    what the handler layer recorded on the way through."""
+    processor = PerUserUpdateProcessor(4)
+
+    async def routed():
+        record_handler_invocation(faulted=False)
+
+    # merge_contextvars must run inside capture_logs so the bound identity lands on the events;
+    # capture_logs otherwise disables the configured processor chain.
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await processor.do_process_update(message_update(7, user_id=1, chat_id=10), routed())
+
+    entry, exit_line = trace_lines(logs)
+    assert entry["update_id"] == 7
+    assert entry["update_type"] == "message"
+    assert entry["tg_user_id"] == 1
+    assert entry["chat_id"] == 10
+    assert entry["serialized"] is True
+    assert exit_line["outcome"] == "handled"
+    assert exit_line["handlers_run"] == 1
+    assert exit_line["update_id"] == 7
+
+
+async def test_an_update_no_handler_matched_is_reported_as_unrouted():
+    """The line that answers "I pressed it and nothing happened": today such an update produces
+    no record at all."""
+    processor = PerUserUpdateProcessor(4)
+
+    async def matched_nothing(): ...
+
+    with capture_logs() as logs:
+        await processor.do_process_update(message_update(7, user_id=1, chat_id=10), matched_nothing())
+
+    _, exit_line = trace_lines(logs)
+    assert exit_line["outcome"] == "unrouted"
+    assert exit_line["handlers_run"] == 0
+
+
+async def test_a_handler_fault_is_reported_as_failed():
+    """PTB swallows handler exceptions into its own error plane, so the outcome is only knowable
+    from what the wrapped invocation recorded."""
+    processor = PerUserUpdateProcessor(4)
+
+    async def faulted():
+        record_handler_invocation(faulted=True)
+
+    with capture_logs() as logs:
+        await processor.do_process_update(message_update(7, user_id=1, chat_id=10), faulted())
+
+    _, exit_line = trace_lines(logs)
+    assert exit_line["outcome"] == "failed"
+    assert exit_line["handlers_run"] == 1
+
+
+async def test_an_escaping_exception_still_closes_the_trace():
+    processor = PerUserUpdateProcessor(4)
+
+    async def boom():
+        raise ValueError("boom")
+
+    with capture_logs() as logs, pytest.raises(ValueError, match="boom"):
+        await processor.do_process_update(message_update(7, user_id=1, chat_id=10), boom())
+
+    _, exit_line = trace_lines(logs)
+    assert exit_line["outcome"] == "failed"
+
+
+async def test_the_unserialized_short_circuit_traces_identically():
+    """An update with no lock key bypasses serialization; it must not bypass the trace."""
+    processor = PerUserUpdateProcessor(4)
+
+    async def probe(): ...
+
+    with capture_logs() as logs:
+        await processor.do_process_update(Update(7), probe())
+
+    entry, exit_line = trace_lines(logs)
+    assert entry["serialized"] is False
+    assert exit_line["outcome"] == "unrouted"
+
+
+async def test_contention_on_the_same_key_is_warned_once():
+    """Lock waits are invisible latency today: only the update that has to queue says so."""
+    processor = PerUserUpdateProcessor(4)
+    holder_running = asyncio.Event()
+    release_holder = asyncio.Event()
+
+    async def holder():
+        holder_running.set()
+        await release_holder.wait()
+
+    async def follower(): ...
+
+    with capture_logs() as logs:
+        holder_task = asyncio.create_task(
+            processor.do_process_update(message_update(1, user_id=1, chat_id=10), holder())
+        )
+        async with asyncio.timeout(DEADLOCK_TIMEOUT):
+            await holder_running.wait()
+        follower_task = asyncio.create_task(
+            processor.do_process_update(message_update(2, user_id=1, chat_id=10), follower())
+        )
+        for _ in range(5):
+            await asyncio.sleep(0)
+        release_holder.set()
+        async with asyncio.timeout(DEADLOCK_TIMEOUT):
+            await asyncio.gather(holder_task, follower_task)
+
+    contention = [line for line in logs if line["event"] == "Waiting for an in-flight update with the same key"]
+    assert len(contention) == 1
+    assert contention[0]["waiters"] == 2
+    assert contention[0]["reason"] == "same_user_chat_key"
+
+
+async def test_state_one_update_bound_never_reaches_the_next():
+    """At the configured cap of 1 PTB awaits every update inside its own fetcher task
+    (`Application.__update_fetcher`), so one context serves the whole process: a meeting a guard
+    resolved, and the phase a failed critical section left marked, would otherwise be read as the
+    next update's. This drives the two updates the way PTB does, in one task."""
+    processor = PerUserUpdateProcessor(1)
+
+    async def acted_on_a_meeting():
+        structlog.contextvars.bind_contextvars(meeting_id=15467)
+        db.WRITE_STATE.set(db.WriteState(db.WritePhase.BODY, committed=False))
+
+    async def read_only():
+        structlog.get_logger("mitup_bot").info("a later, unrelated update")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await processor.do_process_update(message_update(1, user_id=1, chat_id=10), acted_on_a_meeting())
+        await processor.do_process_update(message_update(2, user_id=2, chat_id=20), read_only())
+
+    # The first update's own exit line still names the meeting it acted on.
+    closed = [line for line in logs if line["event"] == "Finished processing update"]
+    assert closed[0]["meeting_id"] == 15467
+
+    later = next(line for line in logs if line["event"] == "a later, unrelated update")
+    assert "meeting_id" not in later
+    assert db.current_write_state() is None

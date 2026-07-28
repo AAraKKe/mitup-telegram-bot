@@ -21,9 +21,15 @@ from mitup_bot.exceptions import ContextPropertyNotSetError, HandlerNotRegistere
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
-from mitup_bot.handlers.registry import HandlerWrapper, callback_query_fallback, callback_with_metrics
+from mitup_bot.handlers.registry import (
+    HandlerWrapper,
+    callback_query_fallback,
+    callback_with_metrics,
+    process_update_error,
+)
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.update_trace import UPDATE_TRACE, UpdateTrace
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import (
     AnyFloat,
@@ -596,3 +602,175 @@ async def test_post_commit_drain_failure_never_reaches_the_error_handler(
     # The interaction is counted as completed; the drain records its own failure separately.
     metrics.assert_emitted(name=MetricKey.FAULT, value=0)
     metrics.assert_emitted(name=MetricKey.POST_COMMIT_API_FAULT)
+
+
+# ---------------------------------------------------------------------------
+# The handler entry/exit pair
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(7))], indirect=True)
+async def test_the_entry_line_names_what_the_user_pressed(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """What the user tapped exists nowhere in the log today; the entry line is where it lands."""
+
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, auto_answer=False)
+    async def callback_query_probe(update: Update, context: StubMitupContext): ...
+
+    assert update.callback_query is not None
+    context = build_context(update, app)
+    with capture_logs() as logs:
+        await invoke(HandlerTestId.BINDABLE, update, context)
+
+    entries = [entry for entry in logs if entry["event"] == "Entering handler"]
+    assert len(entries) == 1
+    assert entries[0]["log_level"] == "debug"
+    assert entries[0]["callback_data"] == update.callback_query.data
+    ClearableRegistry.clear()
+
+
+HANDLER_EXITS: list[tuple[object, str, str]] = [
+    (ConversationSettingsState.TIMEZONE, "success", "TIMEZONE"),
+    (None, "success", "none"),
+    (ConversationHandler.END, "success", "end"),
+]
+
+
+@pytest.mark.parametrize("return_value, outcome, result", HANDLER_EXITS, ids=["state", "no-state", "end"])
+async def test_the_exit_line_reports_the_conversation_transition(
+    return_value: object,
+    outcome: str,
+    result: str,
+    update: Update,
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+):
+    """PTB reads the return value as the next conversation state and the wrapper then drops it —
+    this is the only record that the user moved (or did not) between steps."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="transition")
+    async def command_transition(update: Update, context: StubMitupContext):
+        return return_value
+
+    context = build_context(update, app)
+    with capture_logs() as logs:
+        await invoke(HandlerTestId.SOME_COMMAND, update, context)
+
+    exits = [entry for entry in logs if entry["event"] == "Leaving handler"]
+    assert len(exits) == 1
+    assert exits[0]["log_level"] == "info"
+    assert exits[0]["outcome"] == outcome
+    assert exits[0]["result"] == result
+    ClearableRegistry.clear()
+
+
+async def test_a_claimed_update_is_reported_as_a_handler_stop(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """`ApplicationHandlerStop` stops every remaining handler group and has never been visible."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="claiming")
+    async def command_claiming(update: Update, context: StubMitupContext):
+        raise ApplicationHandlerStop(ConversationSettingsState.TIMEZONE)
+
+    context = build_context(update, app)
+    with capture_logs() as logs, suppress(ApplicationHandlerStop):
+        await invoke(HandlerTestId.SOME_COMMAND, update, context)
+
+    exits = [entry for entry in logs if entry["event"] == "Leaving handler"]
+    assert [(entry["outcome"], entry["result"]) for entry in exits] == [("handler_stop", "TIMEZONE")]
+    ClearableRegistry.clear()
+
+
+async def test_a_handled_error_is_reported_as_an_error_exit(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """The error handler ends the flow, so the exit line pairs `error` with the END it forced."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="failing")
+    async def command_failing(update: Update, context: StubMitupContext):
+        raise RuntimeError("boom")
+
+    context = build_context(update, app)
+    with capture_logs() as logs:
+        await invoke(HandlerTestId.SOME_COMMAND, update, context)
+
+    exits = [entry for entry in logs if entry["event"] == "Leaving handler"]
+    assert [(entry["outcome"], entry["result"]) for entry in exits] == [("error", "end")]
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("faulted", [False, True], ids=["clean", "faulted"])
+async def test_the_invocation_reports_itself_to_the_update_trace(
+    faulted: bool, update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """The processor writes the update's exit line from outside this wrapper and PTB tells it
+    nothing, so `handled` vs `unrouted` vs `failed` rests on this report."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="reporting")
+    async def command_reporting(update: Update, context: StubMitupContext):
+        if faulted:
+            raise RuntimeError("boom")
+
+    trace = UpdateTrace()
+    token = UPDATE_TRACE.set(trace)
+    try:
+        await invoke(HandlerTestId.SOME_COMMAND, update, build_context(update, app))
+    finally:
+        UPDATE_TRACE.reset(token)
+
+    assert trace.handlers_run == 1
+    assert trace.fault_recorded is faulted
+    ClearableRegistry.clear()
+
+
+# ---------------------------------------------------------------------------
+# The PTB error handler
+# ---------------------------------------------------------------------------
+
+
+def test_bind_registers_the_ptb_error_handler():
+    """Without it PTB logs whatever escapes a callback itself, uncorrelated and unmeasured."""
+    app = ApplicationBuilder().token("AAA").build()
+
+    HandlersRegistry.bind(app)
+
+    assert process_update_error in app.error_handlers
+
+
+async def test_an_error_outside_any_handler_is_correlated_and_counted(
+    update: Update, app: StubMitupApp, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    context = build_context(update, app, metrics=metrics_client)
+    context.error = RuntimeError("nothing owned this")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await process_update_error(update, context)
+
+    lines = [entry for entry in logs if entry["event"] == "An update failed outside its handler"]
+    assert len(lines) == 1
+    assert lines[0]["update_id"] == update.update_id
+    assert lines[0]["error_type"] == "builtins.RuntimeError"
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1)
+
+
+async def test_an_error_a_wrapped_invocation_already_recorded_is_left_alone(
+    update: Update, app: StubMitupApp, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """The invocation owns a failure that passed through it, on both planes: the registry writes
+    the line and `Fault` is exactly-once per invocation. Repeating either here would double-log
+    every re-raise and halve the value the fault-rate alarm reads on twice the denominator."""
+    context = build_context(update, app, metrics=metrics_client)
+    context.error = RuntimeError("the error handler blew up while answering")
+
+    token = UPDATE_TRACE.set(UpdateTrace(handlers_run=1, fault_recorded=True))
+    try:
+        with capture_logs() as logs:
+            await process_update_error(update, context)
+    finally:
+        UPDATE_TRACE.reset(token)
+    await context.flush_metrics()
+
+    assert logs == []
+    metrics.assert_not_emitted(name=MetricKey.FAULT)

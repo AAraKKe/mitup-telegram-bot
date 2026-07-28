@@ -18,6 +18,7 @@ from tests.helpers import (
     HandlerContext,
     UpdateRequest,
     assert_locked_meetup_select,
+    assert_meeting_rejection_logged,
     call_handler,
     create_meetup,
 )
@@ -104,8 +105,7 @@ async def test_delete_meeting_buttons_fails_without_existing_meeting(
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(handler_id, handler_context=handler_context)
 
-        assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
-        assert "Meeting id: 999, user id: 1" in caplog.text
+        assert_meeting_rejection_logged(caplog, action=action, reason="meeting_not_owned")
 
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
@@ -151,8 +151,7 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(handler_id, handler_context=handler_context)
 
-        assert f"User tried '{action}' with a meeting that does not belong to them." in caplog.text
-        assert "Meeting id: 111, user id: 1" in caplog.text
+        assert_meeting_rejection_logged(caplog, action=action, reason="meeting_not_owned")
 
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))

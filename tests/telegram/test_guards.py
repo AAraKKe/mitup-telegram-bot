@@ -3,7 +3,10 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
 import pytest
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 from telegram import Chat, Message, Update
 
 from mitup_bot import guards
@@ -1037,3 +1040,36 @@ def test_valid_inline_query_raises_when_no_inline_query(update: Update):
 def test_valid_callback_query_raises_when_no_callback_query(update: Update):
     with pytest.raises(CallbackQueryNotSet):
         valid_callback_query(update)
+
+
+async def test_the_meeting_guard_names_the_meeting_on_every_later_line(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """The bind outlives the guard, the handler and the commit, so the post-commit drain and the
+    reconciler name the meeting they were rendering without a field of their own."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await guards.meeting(mock_session, user_with_settings, 1, "Test method", context)
+        structlog.get_logger("mitup_bot").info("after the guard")
+
+    assert [entry["meeting_id"] for entry in logs if entry["event"] == "after the guard"] == [1]
+
+
+async def test_a_rejected_meeting_binds_nothing(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """Only a resolved meeting is named: a rejection carries its id on the exception instead."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with pytest.raises(MeetingGoneError):
+            await guards.meeting(mock_session, user_with_settings, 999, "Test method", context)
+        structlog.get_logger("mitup_bot").info("after the rejection")
+
+    assert [entry for entry in logs if "meeting_id" in entry] == []

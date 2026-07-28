@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import StrEnum, auto
 from typing import Any
 
 import structlog
@@ -55,6 +56,31 @@ SHARED_MEETING_METRICS: dict[type, MetricKey] = {
 }
 
 
+class MeetingRejectionReason(StrEnum):
+    """Machine key telling the six meeting rejections apart under one event name."""
+
+    MEETING_NOT_FOUND = auto()
+    MEETING_NOT_OWNED = auto()
+    MEETING_INACTIVE_AND_OWNED = auto()
+    SHARED_MESSAGE_STALE = auto()
+    SHARED_TAP_UNAUTHORIZED = auto()
+    SHARED_MEETING_FINISHED = auto()
+
+
+MEETING_REJECTION_REASONS: dict[type, MeetingRejectionReason] = {
+    MeetingGoneError: MeetingRejectionReason.MEETING_NOT_FOUND,
+    MeetingNotOwnedError: MeetingRejectionReason.MEETING_NOT_OWNED,
+    MeetingInactiveOwnerError: MeetingRejectionReason.MEETING_INACTIVE_AND_OWNED,
+    SharedMeetingGoneError: MeetingRejectionReason.SHARED_MESSAGE_STALE,
+    SharedMeetingDeniedError: MeetingRejectionReason.SHARED_TAP_UNAUTHORIZED,
+    SharedMeetingFinishedError: MeetingRejectionReason.SHARED_MEETING_FINISHED,
+}
+
+# The reactivation prompt and the finished-card banner are screens a healthy system produces, so
+# they are narrative. The other four mean somebody tapped a button that should not have worked.
+MEETING_REJECTIONS_AT_INFO: frozenset[type] = frozenset({MeetingInactiveOwnerError, SharedMeetingFinishedError})
+
+
 @dataclass(frozen=True)
 class FaultOutcome:
     """How the invocation ended, handed back to the wrapper that owns the `FAULT` emission.
@@ -73,6 +99,17 @@ class FaultOutcome:
 HANDLED_OUTCOME = FaultOutcome(0)
 
 
+def write_phase_fields(state: db.WriteState | None) -> dict[str, object]:
+    """Where a failure sits relative to the transaction, when it happened inside a write.
+
+    Without them the fault line reads as a failed action for a write that landed and only failed
+    to render afterwards. A read-only handler runs in no critical section and carries neither.
+    """
+    if state is None:
+        return {}
+    return {"phase": state.phase.value, "committed": state.committed}
+
+
 def fault_error_type(error: Exception) -> str:
     """Name `error`'s class the way a fault record carries it.
 
@@ -85,12 +122,37 @@ def fault_error_type(error: Exception) -> str:
 
 @db.with_session
 async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg_user_id: int):
+    """Flip the user who just proved unreachable from MEMBER to LEFT.
+
+    The transition is what the purge job later acts on, so all three outcomes are recorded: the
+    flip itself, a row the lookup could not find, and a user who was already past MEMBER. The
+    event name is shared with every other producer of MEMBER→LEFT so one filter finds them all.
+    """
     # InactiveUserInteraction carries the TELEGRAM user id (see the api_wrapper raise sites);
     # filtering on the internal primary key silently matched nothing — or the wrong user.
-    if (
-        user := (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
-    ) and user.mark_inactive():
-        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)
+    user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
+    if user is None:
+        log.warning("Could not mark an unknown user inactive", tg_user_id=tg_user_id, reason="user_row_not_found")
+        return
+
+    previous_status = user.status
+    if not user.mark_inactive():
+        log.info(
+            "Skipped marking user inactive",
+            tg_user_id=tg_user_id,
+            reason="already_inactive",
+            previous_status=previous_status.value,
+        )
+        return
+
+    log.info(
+        "Marking user as inactive",
+        tg_user_id=tg_user_id,
+        reason="inactive_user_interaction",
+        previous_status=previous_status.value,
+        new_status=user.status.value,
+    )
+    context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)
 
 
 async def handle_pending_deletion_user(context: TMitupContext, error: UserPendingDeletion):
@@ -115,7 +177,11 @@ async def handle_pending_deletion_user(context: TMitupContext, error: UserPendin
                 update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=error.lang)
             )
     except Exception:
-        log.debug("Failed to deliver the pending-deletion notice to the user.", exc_info=True)
+        log.warning(
+            "Failed to deliver the pending-deletion notice to the user",
+            exc_info=True,
+            reason="pending_deletion_notice_undeliverable",
+        )
 
 
 def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupView:
@@ -206,19 +272,34 @@ async def deliver_meeting_access_screen(context: TMitupContext, update: Update, 
         await context.api.send_message(update=update, view=view)
 
 
+def log_meeting_rejection(error: MeetingAccessError):
+    """Record the rejection under one constant event name, whichever screen answers it.
+
+    An interpolated message would make the `event` value itself vary and leave the rejections
+    uncountable, so the six are told apart by `reason`, and the level separates an anomaly from a
+    screen the system is supposed to produce.
+    """
+    logger = log.info if type(error) in MEETING_REJECTIONS_AT_INFO else log.warning
+    logger(
+        "Rejected meeting action",
+        meeting_id=error.meeting_id,
+        action=error.action,
+        error_type=fault_error_type(error),
+        reason=MEETING_REJECTION_REASONS[type(error)].value,
+    )
+
+
 async def handle_meeting_access_error(context: TMitupContext, error: MeetingAccessError):
     """Answer a caller `guards.meeting` stopped.
 
     Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces,
     not a code fault: the rejection is counted on its own series and the interaction closes as a
-    completed one. Only the rejections that say something about the caller's intent are logged; the
-    reactivation prompt and the finished-card banner are normal screens.
+    completed one.
 
     Delivery is best-effort, like every other render in this module: an exception raised here has no
     handler left above it and would reach `process_update` as a second, unhandled fault.
     """
-    if isinstance(error, MeetingGoneError | MeetingNotOwnedError | SharedMeetingDeniedError):
-        log.warning(str(error))
+    log_meeting_rejection(error)
 
     update = context.telegram_update
     if update is None:
@@ -233,7 +314,11 @@ async def handle_meeting_access_error(context: TMitupContext, error: MeetingAcce
     try:
         await deliver_meeting_access_screen(context, update, error)
     except Exception:
-        log.debug("Failed to deliver the meeting rejection screen to the user.", exc_info=True)
+        log.warning(
+            "Failed to deliver the meeting rejection screen to the user",
+            exc_info=True,
+            reason="meeting_rejection_undeliverable",
+        )
 
 
 def should_ignore_error(error: Exception) -> bool:
@@ -287,7 +372,11 @@ async def notify_guard_error(context: TMitupContext, message: CommonMessages = C
         lang = await resolve_lang(update)
         await send_guard_notification(context, update, lang, message)
     except Exception:
-        log.debug("Failed to deliver the redirect notification to the user.", exc_info=True)
+        log.warning(
+            "Failed to deliver the redirect notification to the user",
+            exc_info=True,
+            reason="redirect_undeliverable",
+        )
 
 
 async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOutcome:
@@ -335,7 +424,13 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
     # correlation the EMF Fault record lacks. exc_info is passed explicitly rather than read from
     # the ambient exception state, which the awaits above may have replaced.
     update_payload = fault_fields_from_update(context.telegram_update) if context.telegram_update else None
-    log.error("An error occurred while handling the update", exc_info=error, update=update_payload)
+    log.error(
+        "An error occurred while handling the update",
+        exc_info=error,
+        error_type=error_type,
+        update_payload=update_payload,
+        **write_phase_fields(db.current_write_state()),
+    )
 
     # Any fault leaves the user stranded mid-action with no feedback, so redirect them to the main
     # menu with the generic notice. This delivery is best-effort and never raises, so it cannot

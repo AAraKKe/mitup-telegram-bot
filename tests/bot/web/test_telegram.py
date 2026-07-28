@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
+from structlog.testing import capture_logs
 from telegram import Update
 
 from mitup_bot.config import RunModes
@@ -246,3 +247,40 @@ async def test_rejected_request_still_flushes_the_web_metrics_client(ptb_app: Ma
 
     assert response.status_code == 403
     assert backend.flush_count == 1
+
+
+async def test_a_received_update_is_logged_with_its_queue_depth(web_app: FastAPI, ptb_app: MagicMock):
+    """Thousands of successful arrivals a day write nothing today: no arrival timestamp to
+    difference against processing, and no number for a backlog."""
+    queue: asyncio.Queue[Update] = asyncio.Queue()
+    ptb_app.update_queue = queue
+
+    with capture_logs() as logs:
+        async with build_web_client(web_app) as client:
+            response = await client.post(
+                "/telegram",
+                json={"update_id": 1, "message": {"message_id": 2, "date": 0, "chat": {"id": 3, "type": "private"}}},
+                headers={TELEGRAM_SECRET_HEADER: SECRET},
+            )
+
+    assert response.status_code == 204
+    arrivals = [entry for entry in logs if entry["event"] == "Telegram update received"]
+    assert len(arrivals) == 1
+    assert arrivals[0]["log_level"] == "info"
+    assert arrivals[0]["update_id"] == 1
+    assert arrivals[0]["update_type"] == "message"
+    assert arrivals[0]["chat_id"] == 3
+    assert arrivals[0]["chat_type"] == "private"
+    assert arrivals[0]["transport"] == "webhook"
+    # Depth before the hand-off: nothing drains the queue in this test.
+    assert arrivals[0]["queue_depth"] == 0
+
+
+async def test_a_rejected_update_never_reaches_the_arrival_line(web_app: FastAPI, ptb_app: MagicMock):
+    """The line stands for an update that entered the system; a 403 is not one."""
+    with capture_logs() as logs:
+        async with build_web_client(web_app) as client:
+            response = await client.post("/telegram", json=VALID_UPDATE_PAYLOAD)
+
+    assert response.status_code == 403
+    assert [entry for entry in logs if entry["event"] == "Telegram update received"] == []

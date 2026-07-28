@@ -1,5 +1,6 @@
 import gc
 
+import pytest
 from structlog._config import BoundLoggerLazyProxy
 from structlog.typing import EventDict
 
@@ -11,6 +12,24 @@ from mitup_bot.exceptions import ContextPropertyNotSetError
 # of silently travelling into it.
 CONTEXT_LOST_LOG_EVENT = "Conversation context was lost while handling the update"
 CONTEXT_LOST_LOG_REASON = "conversation_context_missing"
+
+# Likewise for the one event every meeting rejection is recorded under.
+MEETING_REJECTION_LOG_EVENT = "Rejected meeting action"
+
+
+def assert_meeting_rejection_logged(caplog: pytest.LogCaptureFixture, action: str, reason: str):
+    """Assert the guard's rejection reached the log naming what the caller was attempting.
+
+    The fields ride as `LogRecord` attributes (`render_to_log_kwargs` in the suite's structlog
+    pipeline), so they are read off the record rather than out of `caplog.text`.
+    """
+    rejections = [record for record in caplog.records if record.msg == MEETING_REJECTION_LOG_EVENT]
+    assert len(rejections) == 1, f"expected one rejection line, captured {[record.msg for record in caplog.records]}"
+
+    # The fields are injected onto the record via `extra`, so they are not declared attributes.
+    assert rejections[0].levelname == "WARNING"
+    assert getattr(rejections[0], "reason", None) == reason
+    assert getattr(rejections[0], "action", None) == action
 
 
 def drop_cached_logger_binds():

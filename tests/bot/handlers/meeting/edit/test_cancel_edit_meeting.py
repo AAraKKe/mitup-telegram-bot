@@ -13,7 +13,14 @@ from mitup_bot.models.users import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
-from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup, create_member
+from tests.helpers import (
+    HandlerContext,
+    UpdateRequest,
+    assert_meeting_rejection_logged,
+    call_handler,
+    create_meetup,
+    create_member,
+)
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -102,7 +109,7 @@ async def test_cancel_edit_meeting_stops_when_user_does_not_own_meeting(
 
     with caplog.at_level(logging.WARNING):
         context, result = await call_handler(EditMeetingHandlerId.CANCEL, handler_context=handler_context)
-        assert "User tried 'Cancel edit meeting' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Cancel edit meeting", reason="meeting_not_owned")
 
     assert result == ConversationHandler.END
     context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))

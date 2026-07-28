@@ -2,7 +2,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 from time import perf_counter
 from warnings import filterwarnings
 
@@ -34,6 +34,7 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.mitup_types import HandlerCallback, TMitupContext
 from mitup_bot.monitoring import MetricKey, bound_metrics_client
 from mitup_bot.monitoring.units import MetricUnit
+from mitup_bot.update_trace import current_update_trace, record_handler_invocation, update_log_context
 
 from .error_handler import FaultOutcome, fault_error_type
 from .error_handler import handler as error_handler
@@ -47,6 +48,76 @@ from .error_handler import handler as error_handler
 filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 
 log = structlog.get_logger(__name__)
+
+
+class HandlerOutcome(StrEnum):
+    """How the wrapped callback left, as the handler-exit line names it."""
+
+    SUCCESS = auto()
+    HANDLER_STOP = auto()
+    ERROR = auto()
+
+
+def handler_entry_fields(update: Update) -> dict[str, object]:
+    """What the user pressed or typed, for the handler-entry line.
+
+    A command's arguments are dropped: the command itself is a bounded value, while what follows
+    it is user-supplied text (a deep-link payload, a search term) that no log line may carry.
+    """
+    fields: dict[str, object] = {}
+    if update.callback_query is not None and update.callback_query.data is not None:
+        fields["callback_data"] = update.callback_query.data
+    message = update.effective_message
+    if message is not None and message.text is not None and message.text.startswith("/"):
+        fields["command"] = message.text.split(maxsplit=1)[0]
+    return fields
+
+
+def conversation_result(return_value: object) -> str:
+    """Name the conversation-state transition a callback returned.
+
+    PTB reads the return value as the next state and this is the only place it is visible, so the
+    two values that are not states — no transition at all, and the end of the flow — are named
+    rather than rendered as `None` and `-1`.
+    """
+    if return_value is None:
+        return "none"
+    if return_value == ConversationHandler.END:
+        return "end"
+    return return_value.name if isinstance(return_value, Enum) else str(return_value)
+
+
+async def process_update_error(update: object, context: TMitupContext):
+    """Answer a failure that never reached a wrapped handler callback.
+
+    The two error planes divide the failures between them: `callback_with_metrics` records every
+    fault that passed through an invocation, on that invocation's own line and its own sample;
+    this handler records only what nothing owned — a routing failure, or the re-raise of an error
+    handler that broke while answering. Without it those leave as an uncorrelated stdlib ERROR
+    from inside PTB.
+
+    An update whose trace already carries a fault is therefore skipped whole. The invocation has
+    told that story on both planes, and repeating it here would double the line as well as the
+    sample.
+    """
+    error = context.error
+    if error is None:  # pragma: no cover, PTB always sets the error it dispatches
+        return
+
+    trace = current_update_trace()
+    if trace is not None and trace.fault_recorded:
+        return
+
+    with structlog.contextvars.bound_contextvars(**update_log_context(update)):
+        error_type = fault_error_type(error)
+        log.error(
+            "An update failed outside its handler",
+            exc_info=error,
+            error_type=error_type,
+            reason="no_handler_owned_the_failure",
+        )
+        context.emit_metric(MetricKey.FAULT, 1, properties={"error_type": error_type})
+        await context.flush_metrics()
 
 
 def callback_with_metrics(
@@ -72,20 +143,25 @@ def callback_with_metrics(
             structlog.contextvars.bound_contextvars(**handler_log_context(handler_id, handler_type, update)),
             bound_metrics_client(context.metrics),
         ):
+            log.debug("Entering handler", **handler_entry_fields(update))
             start = perf_counter()
             return_value = None
             outcome = FaultOutcome(0)
+            handler_outcome = HandlerOutcome.SUCCESS
             try:
                 return_value = await callback(update, context)
-            except ApplicationHandlerStop:
+            except ApplicationHandlerStop as stop:
                 # Not a fault: the handler is claiming the update (it carries the next
                 # conversation state). Re-raise so PTB stops the remaining handler groups; the
                 # `finally` below still closes the invocation on Fault=0.
+                handler_outcome = HandlerOutcome.HANDLER_STOP
+                return_value = stop.state
                 raise
             except Exception as e:
                 # Relying on error handlers by the application will result in the creation of a
                 # separate context. Lets handle errors here where we still have the context
                 # of the handler that was executed including metrics context.
+                handler_outcome = HandlerOutcome.ERROR
                 try:
                     outcome = await error_handler(context, e, env)
                 except Exception:
@@ -124,6 +200,16 @@ def callback_with_metrics(
 
                 # Emit leaked database connections (should be 0 if all connections were properly closed)
                 context.emit_metric(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT)
+
+                # The processor writes the update's exit line from outside this wrapper and PTB
+                # tells it nothing, so the invocation reports itself.
+                record_handler_invocation(faulted=bool(outcome.value))
+                log.info(
+                    "Leaving handler",
+                    outcome=handler_outcome.value,
+                    result=conversation_result(return_value),
+                    duration_ms=round(latency, 1),
+                )
 
                 # Make sure we flush the metrics after every callback to drain any buffered metrics
                 await context.flush_metrics()
@@ -391,6 +477,9 @@ class HandlersRegistry:
                 )
             )
         )
+        # Without an error handler registered, PTB logs whatever escapes a callback itself, as an
+        # unstructured stdlib record carrying none of the update's correlation identity.
+        app.add_error_handler(process_update_error)
 
     @classmethod
     def get_handler(cls, key: HandlerId) -> BaseHandler[Update, MitupContext, object]:

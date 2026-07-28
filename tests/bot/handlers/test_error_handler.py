@@ -3,6 +3,7 @@ from structlog.testing import capture_logs
 from telegram import Chat, Update
 from telegram.error import TelegramError
 
+from mitup_bot import db
 from mitup_bot.config import Env
 from mitup_bot.custom_context import BOT_CONFIG_KEY, fault_fields_from_update
 from mitup_bot.exceptions import (
@@ -346,33 +347,80 @@ async def test_meeting_rejection_closes_the_interaction_without_a_fault(
     metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 
-async def test_meeting_not_owned_is_counted_and_logged(
+async def test_meeting_not_owned_is_counted(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """The ownership rejection keeps its own counter and its warning line, both emitted here."""
+    """The ownership rejection is the only one with a counter of its own."""
     error = MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en")
 
-    with capture_logs() as logs:
-        await error_handler.handler(context, error, Env.PROD)
+    await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
-    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
-    assert [entry["event"] for entry in warnings] == [str(error)]
 
 
-async def test_meeting_gone_is_logged_without_touching_the_ownership_counter(
+async def test_meeting_gone_does_not_touch_the_ownership_counter(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
     error = MeetingGoneError(meeting_id=7, action="Edit title", user_db_id=1, lang="en")
 
-    with capture_logs() as logs:
-        await error_handler.handler(context, error, Env.PROD)
+    await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
     metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
-    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
-    assert [entry["event"] for entry in warnings] == [str(error)]
+
+
+# Every rejection, the level it is recorded at, and the machine value that tells it from the other
+# five. A stale or forged button is an anomaly; the reactivation prompt and the finished-card
+# banner are screens the system produces on purpose.
+MEETING_REJECTION_LINES: list[tuple[MeetingAccessError, str, str]] = [
+    (MeetingGoneError(meeting_id=7, action="open", user_db_id=1, lang="en"), "warning", "meeting_not_found"),
+    (MeetingNotOwnedError(meeting_id=7, action="edit", user_db_id=1, lang="en"), "warning", "meeting_not_owned"),
+    (
+        MeetingInactiveOwnerError(meeting_id=7, action="edit", user_db_id=1, lang="en"),
+        "info",
+        "meeting_inactive_and_owned",
+    ),
+    (SharedMeetingGoneError(meeting_id=7, action="join", user_db_id=1, lang="en"), "warning", "shared_message_stale"),
+    (
+        SharedMeetingDeniedError(meeting_id=7, action="join", user_db_id=1, lang="en"),
+        "warning",
+        "shared_tap_unauthorized",
+    ),
+    (
+        SharedMeetingFinishedError(meeting_id=7, action="join", user_db_id=1, lang="en"),
+        "info",
+        "shared_meeting_finished",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "error, level, reason",
+    MEETING_REJECTION_LINES,
+    ids=[type(error).__name__ for error, _, _ in MEETING_REJECTION_LINES],
+)
+async def test_every_meeting_rejection_is_recorded_under_one_countable_event(
+    error: MeetingAccessError, level: str, reason: str, context: StubMitupContext, mock_session: MockDbSession
+):
+    """One constant event name for all six, so rejections can be counted and grouped by cause."""
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+
+    rejections = [entry for entry in logs if entry["event"] == "Rejected meeting action"]
+    assert len(rejections) == 1
+    assert rejections[0]["log_level"] == level
+    assert rejections[0]["reason"] == reason
+    assert rejections[0]["meeting_id"] == 7
+    assert rejections[0]["error_type"] == f"mitup_bot.exceptions.{type(error).__name__}"
+
+
+def test_every_meeting_rejection_has_a_reason():
+    """A subclass added without a reason would log a KeyError instead of the rejection."""
+    families = (*MeetingAccessError.__subclasses__(), *SharedMeetingError.__subclasses__())
+    concrete: set[type] = {cls for cls in families if not cls.__subclasses__()}
+
+    assert concrete == set(error_handler.MEETING_REJECTION_REASONS)
 
 
 def rejection_screens(flow_context: MessageBase | None) -> list[tuple[MeetingAccessError, MitupView]]:
@@ -488,8 +536,7 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
     """A card that outlived its meeting is replaced by the deleted banner, on its own counter."""
     error = SharedMeetingGoneError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
 
-    with capture_logs() as logs:
-        outcome = await error_handler.handler(context, error, Env.PROD)
+    outcome = await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
     context.api.assert_edit_message_called(
@@ -501,8 +548,6 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
     )
     metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
     assert outcome == FaultOutcome(0)
-    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
-    assert [entry["event"] for entry in warnings] == []
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
@@ -611,8 +656,7 @@ async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
     """A denial leaves the card alone and says nothing about the meeting beyond the deleted copy."""
     error = SharedMeetingDeniedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
 
-    with capture_logs() as logs:
-        outcome = await error_handler.handler(context, error, Env.PROD)
+    outcome = await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
     context.api.assert_answer_callback_query_called(
@@ -621,8 +665,6 @@ async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
     context.api.assert_edit_message_not_called()
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
     assert outcome == FaultOutcome(0)
-    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
-    assert [entry["event"] for entry in warnings] == [str(error)]
 
 
 async def test_meeting_rejection_suppresses_delivery_failures(app: StubMitupApp, mock_session: MockDbSession):
@@ -684,10 +726,11 @@ async def test_handle_error_logs_the_exception(context: StubMitupContext):
     assert len(fault_logs) == 1
     assert fault_logs[0]["log_level"] == "error"
     assert fault_logs[0]["exc_info"] is error
+    assert fault_logs[0]["error_type"] == "builtins.ValueError"
     # The failure log carries the trigger and its context so a fault is debuggable from the log
     # alone (what the user sent or pressed, and who/where).
-    assert fault_logs[0]["update"] == fault_fields_from_update(context.telegram_update)
-    assert "trigger_text" in fault_logs[0]["update"] or "callback_data" in fault_logs[0]["update"]
+    assert fault_logs[0]["update_payload"] == fault_fields_from_update(context.telegram_update)
+    assert "trigger_text" in fault_logs[0]["update_payload"] or "callback_data" in fault_logs[0]["update_payload"]
 
 
 # --- Guard error handling ---
@@ -1000,3 +1043,72 @@ async def test_successful_callback_emits_fault_zero_without_notification(
     # The guard-error branch is never reached, so no notification is sent.
     context.api.assert_send_message_not_called()
     context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+# --- The MEMBER→LEFT flip ---
+
+INACTIVE_USER_LINES: list[tuple[UserStatus | None, str, str, str]] = [
+    (UserStatus.MEMBER, "Marking user as inactive", "info", "inactive_user_interaction"),
+    (UserStatus.JOINED_ONLY, "Skipped marking user inactive", "info", "already_inactive"),
+    (None, "Could not mark an unknown user inactive", "warning", "user_row_not_found"),
+]
+
+
+@pytest.mark.parametrize(
+    "status, event, level, reason", INACTIVE_USER_LINES, ids=["transitioned", "not-a-member", "no-row"]
+)
+async def test_every_inactive_user_outcome_is_recorded(
+    status: UserStatus | None,
+    event: str,
+    level: str,
+    reason: str,
+    context: StubMitupContext,
+    mock_session: MockDbSession,
+):
+    """The flip is what the purge job later acts on and the row is eventually hard-deleted, so
+    the line is the only surviving evidence — including for the two outcomes that flip nothing."""
+    if status is not None:
+        mock_session.add_object(create_user(id=42, tg_user_id=777, status=status), query_field="tg_user_id")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, InactiveUserInteraction(777, private=True), Env.DEV)
+
+    lines = [entry for entry in logs if entry["event"] == event]
+    assert len(lines) == 1
+    assert lines[0]["log_level"] == level
+    assert lines[0]["reason"] == reason
+    assert lines[0]["tg_user_id"] == 777
+
+
+async def test_the_transition_line_names_both_statuses(context: StubMitupContext, mock_session: MockDbSession):
+    """The event name is shared with every other producer of MEMBER→LEFT, so one filter finds
+    them all and the statuses say which way this one went."""
+    mock_session.add_object(create_user(id=42, tg_user_id=777, status=UserStatus.MEMBER), query_field="tg_user_id")
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, InactiveUserInteraction(777, private=True), Env.DEV)
+
+    transitions = [entry for entry in logs if entry["event"] == "Marking user as inactive"]
+    assert transitions[0]["previous_status"] == "member"
+    assert transitions[0]["new_status"] == "left"
+
+
+# --- The write phase on the fault line ---
+
+
+@pytest.mark.parametrize(
+    "state, expected",
+    [
+        (None, {}),
+        (db.WriteState(db.WritePhase.BODY, committed=False), {"phase": "body", "committed": False}),
+        (
+            db.WriteState(db.WritePhase.POST_COMMIT_FAN_OUT, committed=True),
+            {"phase": "post_commit_fan_out", "committed": True},
+        ),
+    ],
+    ids=["read-only", "in-transaction", "after-commit"],
+)
+def test_write_phase_fields(state: db.WriteState | None, expected: dict[str, object]):
+    """`committed` is what separates "the user's action failed" from "it landed and the render
+    is stale" — without it the same line reads as failure for both."""
+    assert error_handler.write_phase_fields(state) == expected

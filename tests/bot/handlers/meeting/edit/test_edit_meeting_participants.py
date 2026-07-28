@@ -30,6 +30,7 @@ from tests.helpers import (
     UpdateRequest,
     assert_context_lost_logged,
     assert_locked_meetup_select,
+    assert_meeting_rejection_logged,
     call_handler,
     create_meetup,
     create_member,
@@ -99,7 +100,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, handler_context=handler_context)
 
-        assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Edit participants", reason="meeting_not_owned")
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )
@@ -135,7 +136,7 @@ async def test_edit_meeting_participants_failures(
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, handler_context=handler_context)
         if error_type is None:
-            assert "User tried 'Edit participants' with a meeting that does not belong to them." in caplog.text
+            assert_meeting_rejection_logged(caplog, action="Edit participants", reason="meeting_not_owned")
             context.api.assert_edit_message_called(update, factory.main_menu_view())
 
     assert_metrics_for_failure(error_count, error_type, metrics_client)
@@ -215,7 +216,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
         )
 
         assert result == ConversationHandler.END
-        assert "User tried 'Edit max participants' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Edit max participants", reason="meeting_not_owned")
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )
@@ -412,7 +413,7 @@ async def test_edit_meeting_no_limit_participants_failures(
 
         if error_type is None:
             assert result is ConversationHandler.END
-            assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
+            assert_meeting_rejection_logged(caplog, action="Edit no limit participants", reason="meeting_not_owned")
             context.api.assert_edit_message_called(update, factory.main_menu_view())
 
     assert_metrics_for_failure(error_count, error_type, metrics_client)
@@ -439,7 +440,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
         )
 
         assert result == ConversationHandler.END
-        assert "User tried 'Edit no limit participants' with a meeting that does not belong to them." in caplog.text
+        assert_meeting_rejection_logged(caplog, action="Edit no limit participants", reason="meeting_not_owned")
         context.api.assert_edit_message_called(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )

@@ -17,6 +17,10 @@ The bot uses a structured exception hierarchy combined with a centralized error 
 
 Errors are **not** routed through PTB's built-in error handler — they are caught directly in the registry wrapper so that the handler's metrics context (dimensions, properties) is preserved.
 
+`registry.process_update_error` is registered on PTB all the same, for the failures no wrapped callback owns: a routing failure, or the re-raise of an error handler that broke while answering. Without it PTB logs those itself, as an unstructured stdlib record carrying none of the update's identity.
+
+The two planes divide the failures rather than overlapping on them. A fault that passed through an invocation is the registry's to record, line and sample both; when the update's trace already carries one, `process_update_error` skips the update whole. It writes its correlated `error` line and its `FAULT` sample only for what nothing owned.
+
 ## Exception categories
 
 ### Guard exceptions
@@ -120,7 +124,9 @@ The `SharedMeetingError` subclasses come from a tap on a meeting card that may s
 
 The two banner edits take their keyboard from `shared_banner_keyboard()`: in the bot's own chat the banner is the whole screen the user is left on, so it carries the main-menu row; in a group, a supergroup, a channel, or an inline message (which carries no chat at all) the banner replaces the card in place with no keyboard. The denial is unaffected — the card is never touched.
 
-Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch classifies the invocation as `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `MeetingNotOwned` with value `1`; `MeetingGoneError` and `SharedMeetingDeniedError` log the warning only; `MeetingInactiveOwnerError`, `SharedMeetingGoneError` and `SharedMeetingFinishedError` do neither, since a stale card and the reactivation prompt say nothing about the caller's intent.
+Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch classifies the invocation as `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally emits `MeetingNotOwned` with value `1`; no other rejection carries a counter of its own.
+
+All six are recorded under one constant event name, `Rejected meeting action`, with `MEETING_REJECTION_REASONS` supplying the `reason` that tells them apart — an interpolated message would make the `event` value itself variable and the rejections uncountable. The level splits them: the four that mean somebody tapped a button that should not have worked are warnings, while `MeetingInactiveOwnerError` and `SharedMeetingFinishedError` (listed in `MEETING_REJECTIONS_AT_INFO`) are screens the system produces on purpose and stay at info. A new subclass must be added to the reason map — `test_every_meeting_rejection_has_a_reason` fails otherwise.
 
 Delivery is best-effort, like every other render in this module: an exception raised while answering has no handler left above it and would reach `process_update` as a second, unhandled fault.
 
@@ -128,8 +134,12 @@ Delivery is best-effort, like every other render in this module: an exception ra
 
 For all other (unexpected) errors:
 1. One dimensionless `FAULT` metric is emitted for aggregate monitoring, carrying the exception's qualified class name in an `error_type` EMF property
-2. One `log.error` line carries the traceback and the trigger that produced it (`fault_fields_from_update`), under the handler's bound contextvars
+2. One `log.error` line carries the traceback, the `error_type`, the trigger that produced it (`fault_fields_from_update`, as `update_payload`) and — when the failure happened inside a write-mode critical section — the `phase`/`committed` pair from `db.current_write_state()`, under the handler's bound contextvars
 3. In `DEV` mode, the exception is logged with Rich formatting
+
+`phase`/`committed` are what separate "the user's action failed" from "it landed and the render is stale": `begin_write` marks `BODY` on entry and `POST_COMMIT_FAN_OUT` once the transaction has committed, and leaves the mark behind when the section exits through an exception so the error handler can still read it. A read-only handler is in no critical section and its fault line carries neither field.
+
+Bounding that mark to the work it describes belongs to whoever owns the boundary — for the bot, the update boundary, via `db.clear_write_state()` in `update_trace.clear_update_scoped_state`. Any other caller of `begin_write` (the events jobs drive it directly) owns the same responsibility if it ever reads the mark.
 
 The exception class is a property, never part of the metric name: a name minted from a runtime value opens a separately-billed CloudWatch series per class that nothing charts or alarms on. It travels to the caller on the returned `FaultOutcome` rather than on an emission of this module's own — see the exactly-once rule in the `monitoring` skill.
 

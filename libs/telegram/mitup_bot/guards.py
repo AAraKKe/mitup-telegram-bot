@@ -266,6 +266,17 @@ class MeetingAccess(Enum):
     OWNER_ANY_STATE = auto()
 
 
+def granted_meeting(found_meeting: Meetup) -> Meetup:
+    """Name the meeting on every line the rest of this update emits.
+
+    The bind outlives the guard and the handler both, so the post-commit drain and the reconciler
+    — which run after the handler returned — say which meeting they were rendering, at no extra
+    log volume. One task processes one update, so the bind reaches nothing concurrent.
+    """
+    structlog.contextvars.bind_contextvars(meeting_id=found_meeting.db_id)
+    return found_meeting
+
+
 @overload
 async def meeting(
     session: AsyncSession,
@@ -342,7 +353,7 @@ async def meeting(
                 flow_context=flow_context,
             )
         context.emit_metric(MetricKey.MEETING_NOT_OWNED, 0, unit=MetricUnit.COUNT)
-        return found_meeting
+        return granted_meeting(found_meeting)
 
     if found_meeting is None:
         raise MeetingGoneError(
@@ -370,15 +381,15 @@ async def meeting(
 
     if user is not None and found_meeting.is_owned_by(user):
         context.emit_metric(MetricKey.MEETING_NOT_OWNED, 0, unit=MetricUnit.COUNT)
-        return found_meeting
+        return granted_meeting(found_meeting)
 
     # The not-owned counter tracks ownership decisions, so a caller reaching a meeting they do not
     # own through one of the wider profiles leaves the series untouched.
     if access is MeetingAccess.OWNER_OR_JOINED and user is not None and found_meeting.has_participant(user.db_id):
-        return found_meeting
+        return granted_meeting(found_meeting)
 
     if access is MeetingAccess.OWNER_OR_PUBLIC and found_meeting.public:
-        return found_meeting
+        return granted_meeting(found_meeting)
 
     raise MeetingNotOwnedError(
         meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang, flow_context=flow_context

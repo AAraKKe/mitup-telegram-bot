@@ -486,3 +486,54 @@ async def test_write_mode_connectivity_failure_stays_inside_the_drain(
     # ...and the fix-ups the drain collected landed in the reconcile transaction.
     assert blocked.status is UserStatus.LEFT
     fanout_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)
+
+
+# ---------------------------------------------------------------------------
+# The write phase a failure is read against
+# ---------------------------------------------------------------------------
+
+
+async def test_a_clean_critical_section_leaves_no_write_phase(
+    mock_session: MockDbSession, write_context: SimpleNamespace
+):
+    """The mark exists for the failure plane: a later fault in the same update must not inherit
+    the phase of a write that already finished."""
+    api: TelegramApi = write_context.api
+
+    async with db.begin_write(api):
+        assert db.current_write_state() == db.WriteState(db.WritePhase.BODY, committed=False)
+
+    assert db.current_write_state() is None
+
+
+async def test_a_failing_body_is_still_marked_when_the_error_handler_runs(
+    mock_session: MockDbSession, write_context: SimpleNamespace
+):
+    """The error handler runs long after `begin_write` returned control, so the mark has to
+    outlive the critical section it describes."""
+    api: TelegramApi = write_context.api
+
+    with pytest.raises(RuntimeError, match="sweep blew up"):
+        async with db.begin_write(api):
+            raise RuntimeError("sweep blew up")
+
+    assert db.current_write_state() == db.WriteState(db.WritePhase.BODY, committed=False)
+
+
+async def test_a_failure_after_the_commit_is_marked_as_such(
+    mock_session: MockDbSession, write_context: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+):
+    """The user's action landed and only its rendering fan-out failed: without `committed` the
+    fault line reads as a failure for an action that succeeded."""
+    api: TelegramApi = write_context.api
+
+    async def failing_reconcile(*args: object, **kwargs: object):
+        raise RuntimeError("reconcile blew up")
+
+    monkeypatch.setattr(db, "apply_reconcile", failing_reconcile)
+
+    with pytest.raises(RuntimeError, match="reconcile blew up"):
+        async with db.begin_write(api):
+            ...
+
+    assert db.current_write_state() == db.WriteState(db.WritePhase.POST_COMMIT_FAN_OUT, committed=True)

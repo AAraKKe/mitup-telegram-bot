@@ -40,6 +40,7 @@ __all__ = [
     "integrity_error",
     "assert_locked_meetup_select",
     "assert_context_lost_logged",
+    "assert_meeting_rejection_logged",
     "drop_cached_logger_binds",
 ]
 
@@ -67,7 +68,7 @@ from .fixtures import (
 )
 from .stub_db import MockDbSession, Result
 from .locking import assert_locked_meetup_select
-from .logs import assert_context_lost_logged, drop_cached_logger_binds
+from .logs import assert_context_lost_logged, assert_meeting_rejection_logged, drop_cached_logger_binds
 from .db_errors import integrity_error
 from .filesystem import MITUP_DIR
 from . import console, calendar_july_2024
