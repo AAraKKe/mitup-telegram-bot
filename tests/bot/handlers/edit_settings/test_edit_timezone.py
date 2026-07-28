@@ -18,10 +18,11 @@ from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.timezone_api import TimezoneLookupFailure
 from mitup_bot.utils import ButtonMessages, CommonMessages, RegistrationMessages, SettingsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView, RenderContext, factory
-from tests.helpers import MetricAssertions, StubMitupContext, UpdateRequest
+from tests.helpers import MetricAssertions, StubMitupContext, UpdateRequest, log_record
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -122,14 +123,15 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
 ):
     caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_timezone_from_api.return_value = None
+    get_timezone_from_api.return_value = TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
 
     assert update.effective_message is not None
 
     result = await settings_timezone_text_message_handler(update, context)
 
-    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
-    assert "User provided an invalid timezone, retrying" in caplog.text
+    # structlog event string is the LogRecord message; the fields ride along as record attributes.
+    # The reason is what stops an ordinary typo reading like a system failure.
+    assert log_record(caplog, "Settings step retried").__dict__["reason"] == "address_not_geocoded"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     view = MitupView(
@@ -185,7 +187,7 @@ async def test_edit_timezone_location_log_excludes_coordinates(
 ):
     caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_location_from_api.return_value = None
+    get_location_from_api.return_value = TimezoneLookupFailure.COORDINATES_WITHOUT_TIMEZONE
 
     assert update.effective_message is not None
 
@@ -195,8 +197,8 @@ async def test_edit_timezone_location_log_excludes_coordinates(
     assert "123.6" not in caplog.text  # latitude
     assert "103.5" not in caplog.text  # longitude
     assert "tried to set a location" not in caplog.text  # old leaking phrase
-    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
-    assert "User provided an invalid location, retrying" in caplog.text
+    # structlog event string is the LogRecord message; the fields ride along as record attributes.
+    assert log_record(caplog, "Settings step retried").__dict__["reason"] == "coordinates_without_timezone"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     view = MitupView(

@@ -1,5 +1,6 @@
 from typing import Any, cast
 
+import structlog
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -17,6 +18,8 @@ from mitup_bot.views import meeting as meeting_views
 
 from .enums import SEARCH_QUERY_PREFIX, InlineQueryId
 from .utils import search_chat_meetings_button, sort_meetings
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SEARCH_CHAT_MEETINGS, pattern=r"search:.+")
@@ -50,13 +53,32 @@ async def search_chat_meetings(session: AsyncSession, update: Update, context: T
     # Collect unique active meetings via the already-loaded relationship
     seen: set[int] = set()
     meetings: list[Meetup] = []
+    dropped_no_meetup = 0
+    dropped_inactive = 0
+    dropped_duplicate = 0
     for message in messages:
         meeting = message.meetup
         if not meeting:
-            continue
-        if meeting.active and meeting.db_id not in seen:
+            dropped_no_meetup += 1
+        elif not meeting.active:
+            dropped_inactive += 1
+        elif meeting.db_id in seen:
+            dropped_duplicate += 1
+        else:
             seen.add(meeting.db_id)
             meetings.append(meeting)
+
+    log.info(
+        "Chat meeting search answered",
+        chat_instance=chat_instance,
+        messages_found=len(messages),
+        meetings_listed=len(meetings),
+        dropped_no_meetup=dropped_no_meetup,
+        dropped_inactive=dropped_inactive,
+        dropped_duplicate=dropped_duplicate,
+        lang=lang,
+        reason=None if meetings else "no_active_meetings_for_chat_instance",
+    )
 
     if meetings:
         sorted_meetings = sort_meetings(meetings)

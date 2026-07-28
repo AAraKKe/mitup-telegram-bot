@@ -13,14 +13,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
-from tests.helpers import HandlerContext, UpdateRequest, call_handler
+from tests.helpers import HandlerContext, UpdateRequest, call_handler, log_record
 from tests.helpers.stub_db import MockDbSession
-
-
-def privacy_log_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogRecord:
-    """The captured record for `event`; INFO capture also picks up unrelated framework lines,
-    so the lookup filters by the structlog event string (the LogRecord message)."""
-    return next(record for record in caplog.records if record.message == event)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_PRIVACY)], indirect=True)
@@ -72,9 +66,15 @@ async def test_export_sends_the_user_data_as_a_json_document(
     ]
     # The document is a new message: the privacy screen above keeps its buttons untouched.
     context.api.assert_edit_message_not_called()
-    # structlog event string is the LogRecord message; user_id rides along as a record attribute.
-    export_record = privacy_log_record(caplog, "User data export sent")
+    # structlog event string is the LogRecord message; the fields ride along as record attributes.
+    # The document is never retained, so this line is the only evidence of what was disclosed.
+    export_record = log_record(caplog, "User data export sent")
     assert export_record.__dict__["user_id"] == user_with_settings.db_id
+    assert export_record.__dict__["owned_meetings"] == 2
+    assert export_record.__dict__["joined_meetings"] == 0
+    assert export_record.__dict__["has_patreon"] is False
+    assert export_record.__dict__["document_bytes"] == len(view.document.content)
+    assert export_record.__dict__["export_filename"] == view.document.filename
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SEND_PRIVACY)], indirect=True)
@@ -156,8 +156,14 @@ async def test_final_confirmation_marks_the_user_for_deletion(
         description=PrivacyMessages.DELETION_MARKED.get(lang=user_with_settings.lang), keyboard=[]
     )
     context.api.assert_edit_message_called(update, expected_view)
-    deletion_record = privacy_log_record(caplog, "Data deletion request confirmed")
+    # These rows are hard-deleted later, so the line is the only lasting record of the blast radius.
+    deletion_record = log_record(caplog, "Data deletion requested")
     assert deletion_record.__dict__["user_id"] == user_with_settings.db_id
+    assert deletion_record.__dict__["prior_status"] == UserStatus.MEMBER.value
+    assert deletion_record.__dict__["owned_meetings"] == len(user_with_settings.meetups)
+    assert deletion_record.__dict__["joined_meetings"] == len(user_with_settings.joined_links)
+    assert deletion_record.__dict__["has_patreon_link"] is False
+    assert deletion_record.__dict__["reason"] == "user_confirmed_final"
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_USER_DATA)], indirect=True)

@@ -12,11 +12,22 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import PaginatedMitupView, factory
 
 from .enums import MainMenuHandlerId
+from .utils import MeetingList, log_meeting_list
 
 
-async def show_past_meetings_page(user: User, page_number: int, update: Update, context: TMitupContext):
+async def show_past_meetings_page(user: User, requested_page: int, update: Update, context: TMitupContext):
     past_meetings = sorted([m for m in user.meetups if not m.active], key=lambda m: m.db_id)
-    page_number = PaginatedMitupView.clamp_page(page_number, len(past_meetings))
+    page_number = PaginatedMitupView.clamp_page(requested_page, len(past_meetings))
+
+    log_meeting_list(
+        user,
+        MeetingList.PAST,
+        total=len(user.meetups),
+        listed=len(past_meetings),
+        requested_page=requested_page,
+        page=page_number,
+        dropped_active=len(user.meetups) - len(past_meetings),
+    )
 
     if buttons := [
         ButtonConfig(

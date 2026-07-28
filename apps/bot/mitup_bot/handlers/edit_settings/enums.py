@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 
 from mitup_bot.handler_id import HandlerId
 
@@ -51,3 +51,22 @@ class ConversationSettingsState(Enum):
     TIMEZONE = auto()
     TIMEOUT = auto()
     NOTIFICATION_TIME = auto()
+
+
+class SettingName(StrEnum):
+    """The `setting` facet of the shared `User setting changed` event.
+
+    The five `DEFAULT_*` members double as the `Settings` attribute they flip, which is what lets
+    the default-meeting-option toggles share one call site.
+    """
+
+    LANGUAGE = auto()
+    TIMEZONE = auto()
+    TIMEOUT = auto()
+    NOTIFICATION = auto()
+    NOTIFICATION_TIME = auto()
+    DEFAULT_WAITING_LIST = auto()
+    DEFAULT_PUBLIC = auto()
+    DEFAULT_ALLOW_INVITATION = auto()
+    DEFAULT_INCOGNITO = auto()
+    DEFAULT_LOCK_ON_START = auto()

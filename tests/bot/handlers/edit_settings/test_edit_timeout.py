@@ -2,6 +2,7 @@ import pytest
 from telegram import CallbackQuery, Message, Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot.handlers.edit_settings.edit_timeout import timeout_rejection_reason
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import User
@@ -163,3 +164,18 @@ async def test_settings_timeout_invalid_input_handler(
     )
 
     assert user_with_settings.settings.timeout == 10
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected_reason"),
+    [
+        ("not a number", "not_a_positive_integer"),
+        ("-5", "not_a_positive_integer"),
+        (str(LifecyclePolicy.get().max_timeout_minutes + 1), "timeout_above_maximum"),
+        (None, "not_a_positive_integer"),
+    ],
+    ids=["gibberish", "negative", "above_cap", "no_text"],
+)
+def test_timeout_rejection_reason_separates_a_bad_answer_from_too_long_a_one(answer: str | None, expected_reason: str):
+    """A run of `timeout_above_maximum` means the tier ceiling is the problem, not the prompt."""
+    assert timeout_rejection_reason(answer, LifecyclePolicy.get().max_timeout_minutes) == expected_reason

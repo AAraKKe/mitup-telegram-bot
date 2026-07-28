@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -12,6 +13,9 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import PaginatedMitupView, factory
 
 from .enums import MainMenuHandlerId
+from .utils import MeetingList, log_meeting_list
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -31,6 +35,29 @@ async def callback_query_show_meetings(session: AsyncSession, update: Update, co
         key=lambda meeting: meeting.db_id,
     )
     page_number = PaginatedMitupView.clamp_page(callback_data.id, len(user_meetings))
+
+    # A blank title is the only code-level reason an owner's own active meeting is missing from
+    # this screen, so each drop is named rather than only counted.
+    for meeting in active_meetings:
+        if not meeting.plain_title.strip():
+            log.warning(
+                "Meeting hidden from list",
+                user_id=user.db_id,
+                meeting_id=meeting.db_id,
+                list=MeetingList.ACTIVE.value,
+                reason="blank_title",
+            )
+
+    log_meeting_list(
+        user,
+        MeetingList.ACTIVE,
+        total=len(user.meetups),
+        listed=len(user_meetings),
+        requested_page=callback_data.id,
+        page=page_number,
+        active=len(active_meetings),
+        dropped_blank_title=len(active_meetings) - len(user_meetings),
+    )
 
     if user_meetings_buttons := [
         ButtonConfig(

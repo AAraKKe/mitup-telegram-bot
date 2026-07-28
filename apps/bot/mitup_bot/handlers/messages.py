@@ -38,7 +38,7 @@ async def filter_messages_without_text(session: AsyncSession, update: Update, co
         await context.api.send_message(update=update, view=view)
         return None
 
-    context.clean_all_user_data()
+    context.clean_all_user_data(reason="conversation_abandoned")
     view = factory.main_menu_view(ctx)
     await context.api.send_message(update=update, view=view)
     return ConversationHandler.END
@@ -53,6 +53,6 @@ async def rich_message_handler(session: AsyncSession, update: Update, context: T
     # stranded, and clear any leftover user data.
     user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
-    context.clean_all_user_data()
+    context.clean_all_user_data(reason="idle_rich_message")
     await reply_rich_message_not_supported(ctx, update, context, factory.main_menu_view(ctx))
     return None

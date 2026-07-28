@@ -1,4 +1,5 @@
 import gc
+import logging
 
 import pytest
 from structlog._config import BoundLoggerLazyProxy
@@ -44,6 +45,16 @@ def drop_cached_logger_binds():
     """
     for proxy in (obj for obj in gc.get_objects() if isinstance(obj, BoundLoggerLazyProxy)):
         proxy.__dict__.pop("bind", None)
+
+
+def log_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogRecord:
+    """The captured record for `event`, whose structlog fields ride as record attributes.
+
+    Capture also picks up unrelated framework lines, so the lookup filters by the structlog event
+    string (the LogRecord message) rather than taking whatever was logged last. The fields are not
+    part of `caplog.text`, so asserting on a field means reading it off the record.
+    """
+    return next(record for record in caplog.records if record.message == event)
 
 
 def assert_context_lost_logged(logs: list[EventDict], context_id: ContextId):

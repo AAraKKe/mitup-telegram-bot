@@ -15,11 +15,12 @@ from mitup_bot.handlers.registration_process.enums import (
 )
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
+from mitup_bot.timezone_api import TimezoneLookupFailure
 from mitup_bot.utils import RegistrationMessages
 from mitup_bot.utils.entities import Link, render
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import StubMitupContext, UpdateRequest, call_handler, claimed_state
+from tests.helpers import StubMitupContext, UpdateRequest, call_handler, claimed_state, log_record
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -92,7 +93,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
 ):
     caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_timezone_from_api.return_value = None
+    get_timezone_from_api.return_value = TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
 
     assert update.effective_message is not None
 
@@ -101,7 +102,7 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     )
 
     # structlog event string is the LogRecord message; user_id rides along as a record attribute.
-    assert "User provided an invalid timezone, retrying" in caplog.text
+    assert log_record(caplog, "Onboarding step retried").__dict__["reason"] == "address_not_geocoded"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     context.api.assert_send_message_called(update, RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang))
@@ -157,7 +158,7 @@ async def test_registration_timezone_message_handler_log_excludes_coordinates(
 ):
     caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_location_from_api.return_value = None
+    get_location_from_api.return_value = TimezoneLookupFailure.COORDINATES_WITHOUT_TIMEZONE
 
     assert update.effective_message is not None
 
@@ -168,7 +169,7 @@ async def test_registration_timezone_message_handler_log_excludes_coordinates(
     assert "103.5" not in caplog.text  # longitude
     assert "tried to set a location" not in caplog.text  # old leaking phrase
     # structlog event string is the LogRecord message; user_id rides along as a record attribute.
-    assert "User provided an invalid location, retrying" in caplog.text
+    assert log_record(caplog, "Onboarding step retried").__dict__["reason"] == "coordinates_without_timezone"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     context.api.assert_send_message_called(update, RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang))

@@ -17,6 +17,7 @@ from mitup_bot.exceptions import (
     TimezoneClientNotConfiguredError,
 )
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
+from mitup_bot.timezone_api import TimezoneLookupFailure
 from tests.helpers import AnyFloat
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.types import StubMitupContext
@@ -144,7 +145,7 @@ async def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
     """Text that Google cannot geocode is a user-input problem: None, so callers can re-prompt."""
     geocode_client.geocode.return_value = []
 
-    assert await timezone_api.get_timezone_by_address("Hii", context) is None
+    assert await timezone_api.get_timezone_by_address("Hii", context) is TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
 
     timezone_client.timezone.assert_not_called()
     await context.metrics.flush()
@@ -207,7 +208,10 @@ async def test_get_timezone_by_location_returns_none_when_coordinates_map_to_no_
 ):
     timezone_client.timezone.return_value = None
 
-    assert await timezone_api.get_timezone_by_location(34.0522, -118.2437, context) is None
+    assert (
+        await timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+        is TimezoneLookupFailure.COORDINATES_WITHOUT_TIMEZONE
+    )
 
     await context.metrics.flush()
     metrics.assert_emitted(
@@ -229,7 +233,7 @@ async def test_get_coordinates_returns_none_when_no_results(
 ):
     geocode_client.geocode.return_value = []
 
-    assert await timezone_api.get_coordinates("Invalid address", context) is None
+    assert await timezone_api.get_coordinates("Invalid address", context) is TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
 
     await context.metrics.flush()
     metrics.assert_emitted(
@@ -246,7 +250,7 @@ async def test_get_coordinates_returns_none_when_response_shape_is_unparseable(
 ):
     geocode_client.geocode.return_value = [{"geometry": {"location": {"lat": "not-a-number"}}}]
 
-    assert await timezone_api.get_coordinates("New York", context) is None
+    assert await timezone_api.get_coordinates("New York", context) is TimezoneLookupFailure.GEOCODE_RESPONSE_UNUSABLE
 
     await context.metrics.flush()
     metrics.assert_emitted(

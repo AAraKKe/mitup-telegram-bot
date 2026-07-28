@@ -14,11 +14,12 @@ from mitup_bot.handlers.registration_process.edit_registration_timezone import (
 from mitup_bot.handlers.registration_process.enums import ConversationRegistrationProcessState
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
+from mitup_bot.timezone_api import TimezoneLookupFailure
 from mitup_bot.utils import RegistrationMessages
 from mitup_bot.utils.entities import Link, render
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import StubMitupContext, UpdateRequest, claimed_state, create_user
+from tests.helpers import StubMitupContext, UpdateRequest, claimed_state, create_user, log_record
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -115,7 +116,7 @@ async def test_registration_timezone_text_message_handler_stays_in_timezone_stat
     get_timezone_from_api: mock.MagicMock,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_timezone_from_api.return_value = None
+    get_timezone_from_api.return_value = TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
 
     result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
@@ -216,7 +217,7 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
 ):
     caplog.set_level(logging.WARNING)
     mock_session.add_object(user_with_settings, "tg_user_id")
-    get_location_from_api.return_value = None
+    get_location_from_api.return_value = TimezoneLookupFailure.COORDINATES_WITHOUT_TIMEZONE
 
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 
@@ -231,7 +232,7 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
     assert "103.5" not in caplog.text  # longitude
     assert "tried to set a location" not in caplog.text  # old leaking phrase
     # structlog event string is the LogRecord message; user_id rides along as a record attribute.
-    assert "User provided an invalid location, retrying" in caplog.text
+    assert log_record(caplog, "Onboarding step retried").__dict__["reason"] == "coordinates_without_timezone"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
 
@@ -279,7 +280,7 @@ async def test_joined_only_user_stays_joined_only_when_address_not_recognized(
     joined_only_user = create_user(id=5, tg_user_id=123, status=UserStatus.JOINED_ONLY)
     joined_only_user.settings.language = lang
     mock_session.add_object(joined_only_user, "tg_user_id")
-    get_timezone_from_api.return_value = None
+    get_timezone_from_api.return_value = TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
 
     result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
@@ -342,7 +343,7 @@ async def test_joined_only_user_stays_joined_only_when_location_not_recognized(
     joined_only_user = create_user(id=5, tg_user_id=123, status=UserStatus.JOINED_ONLY)
     joined_only_user.settings.language = lang
     mock_session.add_object(joined_only_user, "tg_user_id")
-    get_location_from_api.return_value = None
+    get_location_from_api.return_value = TimezoneLookupFailure.COORDINATES_WITHOUT_TIMEZONE
 
     result = await claimed_state(registration_timezone_location_message_handler(update, context))
 

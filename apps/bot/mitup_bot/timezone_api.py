@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum, StrEnum, auto
 
 import googlemaps
 import structlog
@@ -42,6 +43,27 @@ class GeocodingResponse(BaseModel):
     geometry: GeocodingGeometry
 
 
+class TimezoneLookupFailure(Enum):
+    """Why a lookup produced no timezone. Callers bind it as `reason` on the line they log.
+
+    The reason has to survive the return: an unresolvable address is an ordinary typo the user can
+    correct, while an unreadable Google response is ours to investigate, and a bare `None` reads
+    the same for both. Deliberately not a `StrEnum`, so that a member stays distinguishable from a
+    timezone id in the `str | TimezoneLookupFailure` returns below.
+    """
+
+    ADDRESS_NOT_GEOCODED = "address_not_geocoded"
+    GEOCODE_RESPONSE_UNUSABLE = "geocode_response_unusable"
+    COORDINATES_WITHOUT_TIMEZONE = "coordinates_without_timezone"
+
+
+class TimezoneInputMethod(StrEnum):
+    """How the user supplied the place to resolve; also the `InputMethod` EMF property value."""
+
+    MESSAGE = auto()
+    LOCATION = auto()
+
+
 def geocode_client() -> Client:
     if __geocode_client is None:
         raise GeocodeClientNotConfiguredError()
@@ -76,22 +98,24 @@ def configure(config: GoogleApiConfig):
         raise IncorrectKeyError() from e
 
 
-async def get_timezone_by_address(address: str, context: TMitupContext) -> str | None:
-    """Return the timezone ID for an address, or None when the address cannot be resolved.
+async def get_timezone_by_address(address: str, context: TMitupContext) -> str | TimezoneLookupFailure:
+    """Resolve an address to a timezone ID, or name why it resolved to none.
 
-    None means the user's input is unusable and they should be asked to try again; a Google-side
-    failure (quota, auth, upstream) raises instead, because that is an operator problem.
+    A failure means the user's input is unusable and they should be asked to try again; a
+    Google-side failure (quota, auth, upstream) raises instead, because that is an operator problem.
     """
 
     location = await get_coordinates(address, context)
-    if location is None:
-        return None
+    if isinstance(location, TimezoneLookupFailure):
+        return location
 
     return await get_timezone_by_location(location.lat, location.lng, context)
 
 
-async def get_timezone_by_location(latitude: float, longitude: float, context: TMitupContext) -> str | None:
-    """Return the timezone ID for a coordinate pair, or None when Google maps it to no zone."""
+async def get_timezone_by_location(
+    latitude: float, longitude: float, context: TMitupContext
+) -> str | TimezoneLookupFailure:
+    """Resolve a coordinate pair to a timezone ID, or name why Google mapped it to no zone."""
 
     client = timezone_client()
     try:
@@ -117,13 +141,13 @@ async def get_timezone_by_location(latitude: float, longitude: float, context: T
         context.put_feature_metric(
             Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_timezone_response"}
         )
-        return None
+        return TimezoneLookupFailure.COORDINATES_WITHOUT_TIMEZONE
 
     return timezone["timeZoneId"]
 
 
-async def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation | None:
-    """Return the coordinates of an address, or None when Google returns no or unparseable results."""
+async def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation | TimezoneLookupFailure:
+    """Return the coordinates of an address, or the reason Google's answer yielded none."""
 
     client = geocode_client()
     try:
@@ -144,10 +168,14 @@ async def get_coordinates(address: str, context: TMitupContext) -> GeocodingLoca
 
     try:
         geocode_result = GeocodingResponse.model_validate(results[0])
-    except IndexError, ValidationError:
+    except (IndexError, ValidationError) as error:
         context.put_feature_metric(
             Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"}
         )
-        return None
+        # An empty result list is Google saying it knows no such place; a result the model rejects
+        # is Google answering in a shape we cannot read. Only the first is the user's to fix.
+        if isinstance(error, IndexError):
+            return TimezoneLookupFailure.ADDRESS_NOT_GEOCODED
+        return TimezoneLookupFailure.GEOCODE_RESPONSE_UNUSABLE
 
     return geocode_result.geometry.location

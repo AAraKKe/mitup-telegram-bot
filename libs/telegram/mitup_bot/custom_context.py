@@ -300,13 +300,21 @@ class MitupContext(
             self.user_data.remove_context(context)
             self.log.debug("User data context cleaned", context_id=context.value)
 
-    def clean_all_user_data(self):
+    def clean_all_user_data(self, reason: str):
+        """Drop every stored conversation context, naming what prompted it.
+
+        This discards state the user is in the middle of, so it is the first thing to check when
+        someone reports that the bot forgot what they were doing. `reason` is required because the
+        line is only actionable if it says which navigation destroyed the state.
+        """
         if self.user_data is None:  # pragma: no cover
             self.log.warning("User data not set while cleaning all user data, skipping")
             return
 
+        contexts_cleared = [context.value for context in self.user_data.registry]
         self.user_data.registry.clear()
         self.user_data.active_context = None
+        self.log.info("User conversation data cleared", contexts_cleared=contexts_cleared, reason=reason)
 
     def prepare_handler_metrics(
         self,

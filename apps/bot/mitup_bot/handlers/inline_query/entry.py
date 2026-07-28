@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -18,6 +19,15 @@ from mitup_bot.views import meeting as meeting_views
 from .enums import InlineQueryId
 from .utils import sort_meetings
 
+log = structlog.get_logger(__name__)
+
+
+def default_results_reason(user: User | None, *, suppressed: bool) -> str:
+    """Name the fork that decided which of the three default-screen shapes was answered."""
+    if suppressed:
+        return "deletion_requested"
+    return "registered_user" if user else "unregistered_user"
+
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.INLINE_VIEW, pattern=r"^\s*$")
 @with_session
@@ -34,10 +44,13 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
         if update.effective_user
         else None
     )
+    suppressed = False
     if user is not None and user.status is UserStatus.DELETION_REQUESTED:
         # A user marked for deletion must not surface their meetings for sharing; treat them as
         # unregistered so this view offers nothing tied to the dying account.
+        log.info("Inline results suppressed", user_id=user.db_id, reason="deletion_requested")
         user = None
+        suppressed = True
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
 
     button_text = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON
@@ -63,9 +76,19 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
         ),
     ]
 
-    if user and (active_meetings := [m for m in user.meetups if m.active]):
-        results.extend(meeting_views.inline_view(meeting) for meeting in sort_meetings(active_meetings))
+    own_active_meetings = [m for m in user.meetups if m.active] if user else []
+    if own_active_meetings:
+        results.extend(meeting_views.inline_view(meeting) for meeting in sort_meetings(own_active_meetings))
 
+    log.info(
+        "Inline default results answered",
+        user_id=user.db_id if user else None,
+        registered=user is not None,
+        lang=lang,
+        own_active_meetings=len(own_active_meetings),
+        results=len(results),
+        reason=default_results_reason(user, suppressed=suppressed),
+    )
     await context.api.answer_inline_query(update=update, results=results, button=button, cache_time=0)
 
 
@@ -89,10 +112,14 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
     if user is not None and user.status is UserStatus.DELETION_REQUESTED:
         # A user marked for deletion must not share meetings tied to the dying account; treating them
         # as unregistered still lets a public meeting through on its own flag.
+        log.info("Inline results suppressed", user_id=user.db_id, reason="deletion_requested")
         user = None
 
     meeting_id = await guards.shareable_meeting_id(update, context)
     if meeting_id is None:
+        # The guard already answered with empty results; the other three rejection causes are
+        # raised by `guards.meeting` below and recorded on the fault path.
+        log.warning("Meeting share rejected", user_id=user.db_id if user else None, reason="non_numeric_inline_query")
         return
 
     # A meeting the caller may not put on a card — gone, finished, or somebody else's and not
@@ -102,5 +129,12 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
         session, user, meeting_id, "share meeting", context, access=guards.MeetingAccess.OWNER_OR_PUBLIC
     )
 
+    log.info(
+        "Meeting shared",
+        user_id=user.db_id if user else None,
+        meeting_id=meeting.db_id,
+        public=meeting.public,
+        is_owner=user is not None and meeting.is_owned_by(user),
+    )
     context.put_feature_metric(Feature.SHARE_MEETING)
     await context.api.answer_inline_query(update=update, results=[meeting_views.inline_view(meeting)], cache_time=0)

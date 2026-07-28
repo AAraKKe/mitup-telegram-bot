@@ -1,5 +1,6 @@
 from typing import cast
 
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -15,7 +16,10 @@ from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
 from mitup_bot.views import MitupView
 
-from .enums import ConversationSettingsState, EditSettingsHandlerId
+from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
+from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
+
+log = structlog.get_logger(__name__)
 
 
 def notification_status(user: User) -> FormattedText:
@@ -65,8 +69,18 @@ async def callback_query_notifications(session: AsyncSession, update: Update, co
 async def callback_query_toggle_notifications(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
 
-    user.settings.notification = not user.settings.notification
+    old_value = user.settings.notification
+    user.settings.notification = not old_value
     await session.flush()
+
+    log.info(
+        SETTING_CHANGED_EVENT,
+        user_id=user.db_id,
+        setting=SettingName.NOTIFICATION.value,
+        old_value=old_value,
+        new_value=user.settings.notification,
+        source=SETTINGS_MENU_SOURCE,
+    )
 
     await context.api.edit_message(update=update, view=edit_notification_view(user))
 
@@ -78,6 +92,13 @@ async def callback_query_toggle_notifications(session: AsyncSession, update: Upd
 async def callback_query_set_notification_time(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
     message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user.lang)
+
+    log.info(
+        "Settings step shown",
+        user_id=user.db_id,
+        setting=SettingName.NOTIFICATION_TIME.value,
+        current_value=user.settings.notification_time,
+    )
 
     view = views.factory.change_settings_element_view(
         guards.render_context(user, update, context), message=message, callback_data=cb.EDIT_NOTIFICATIONS
@@ -100,8 +121,18 @@ async def settings_notification_time_text_message_handler(
 
     notification_time = int(notification_time_str)
 
+    old_notification_time = user.settings.notification_time
     user.settings.notification_time = notification_time
     await session.flush()
+
+    log.info(
+        SETTING_CHANGED_EVENT,
+        user_id=user.db_id,
+        setting=SettingName.NOTIFICATION_TIME.value,
+        old_value=old_notification_time,
+        new_value=notification_time,
+        source=SETTINGS_MENU_SOURCE,
+    )
 
     message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.get(
         lang=user.lang, notifications_time=user.settings.notification_time
@@ -121,6 +152,12 @@ async def settings_notification_time_invalid_input_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ):
     user = await guards.current_user(update, session)
+    log.warning(
+        "Settings step rejected input",
+        user_id=user.db_id,
+        setting=SettingName.NOTIFICATION_TIME.value,
+        reason="not_a_positive_integer",
+    )
     message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
 
     view = views.factory.change_settings_element_view(

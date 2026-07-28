@@ -93,7 +93,7 @@ async def callback_query_set_meeting_end_time(
 )
 @with_session
 async def callback_query_cancel_edit_duration(session: AsyncSession, update: Update, context: TMitupContext) -> int:
-    context.clean_all_user_data()
+    context.clean_all_user_data(reason="duration_edit_cancelled")
 
     meeting_id = guards.valid_callback_data(
         cb.CANCEL_EDIT_MEETING_DURATION.parse(context.match), EditMeetingHandlerId.DURATION_CANCEL_CALLBACK

@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -11,6 +12,8 @@ from mitup_bot.views import MitupView
 from ..registry import HandlersRegistry
 from .enums import InlineQueryId
 from .utils import search_chat_meetings_button
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -26,6 +29,10 @@ async def load_chat_meetings(session: AsyncSession, update: Update, context: TMi
     """
     lang = await user_language(update, session)
     chat_instance = callback_query(update).chat_instance
+
+    # `chat_instance` is the only key that joins this tap to the `search:<chat_instance>` query it
+    # arms, which arrives as a separate inline update from a different handler.
+    log.info("Chat meeting search armed", chat_instance=chat_instance, lang=lang)
 
     view = MitupView(
         description=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),

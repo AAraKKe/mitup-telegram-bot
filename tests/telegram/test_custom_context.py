@@ -116,7 +116,7 @@ def test_context_has_meeting_id(context: StubMitupContext):
     context.store_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME, 123)
     assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
-    context.clean_all_user_data()
+    context.clean_all_user_data(reason="test_navigation")
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
 

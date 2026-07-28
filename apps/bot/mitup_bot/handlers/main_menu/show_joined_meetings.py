@@ -12,6 +12,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import PaginatedMitupView, factory
 
 from .enums import MainMenuHandlerId
+from .utils import MeetingList, log_meeting_list
 
 
 @HandlersRegistry.register_callback_query(
@@ -30,6 +31,16 @@ async def callback_query_show_joined_meetings(session: AsyncSession, update: Upd
         key=lambda meetup: meetup.db_id,
     )
     page_number = PaginatedMitupView.clamp_page(callback_data.id, len(joined_meetings))
+
+    log_meeting_list(
+        user,
+        MeetingList.JOINED,
+        total=len(user.joined_links),
+        listed=len(joined_meetings),
+        requested_page=callback_data.id,
+        page=page_number,
+        dropped_inactive=len(user.joined_links) - len(joined_meetings),
+    )
 
     if user_meetings_buttons := [
         ButtonConfig(

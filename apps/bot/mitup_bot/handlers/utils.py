@@ -28,6 +28,31 @@ class RecoveryReason(StrEnum):
     MALFORMED_CALLBACK_DATA = auto()
 
 
+class Screen(StrEnum):
+    """A navigation-only screen, named as the `screen` facet of `Screen shown`."""
+
+    MAIN_MENU = auto()
+    HELP = auto()
+    SETTINGS = auto()
+    PRIVACY = auto()
+
+
+class ScreenDelivery(StrEnum):
+    """Whether a screen replaced the tapped message or arrived as a new one.
+
+    The two are different user-visible outcomes: the `SEND` variants exist so a standalone message
+    keeps its buttons and an in-flight conversation elsewhere is left undisturbed.
+    """
+
+    EDIT = auto()
+    SEND = auto()
+
+
+def log_screen_shown(user: User, screen: Screen, delivery: ScreenDelivery):
+    """Record a screen that only navigates, so a session is not a gap between mutations."""
+    log.info("Screen shown", user_id=user.db_id, screen=screen.value, delivery=delivery.value)
+
+
 async def recover_from_lost_context(
     update: Update, context: TMitupContext, user: User, exc: ContextPropertyNotSetError, context_id: ContextId
 ) -> int:

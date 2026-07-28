@@ -4,6 +4,7 @@ from telegram import Update
 from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
+from mitup_bot.handlers.utils import Screen, ScreenDelivery, log_screen_shown
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
 
@@ -18,4 +19,5 @@ async def callback_query_help(session: AsyncSession, update: Update, context: TM
     user = await guards.current_user(update, session)
     view = views.factory.help_view(guards.render_context(user, update, context))
 
+    log_screen_shown(user, Screen.HELP, ScreenDelivery.EDIT)
     await context.api.edit_message(update=update, view=view)

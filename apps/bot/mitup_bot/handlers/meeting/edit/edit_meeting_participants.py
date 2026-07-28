@@ -122,7 +122,7 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
 )
 @with_session
 async def callback_cancel_edit_meeting_participants(session: AsyncSession, update: Update, context: TMitupContext):
-    context.clean_all_user_data()
+    context.clean_all_user_data(reason="participants_edit_cancelled")
 
     await callback_edit_meeting_participants(update, context)
 

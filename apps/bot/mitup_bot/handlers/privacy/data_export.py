@@ -176,6 +176,20 @@ async def build_user_export(session: AsyncSession, user: User) -> dict[str, Any]
     }
 
 
+def export_scope(export: dict[str, Any]) -> dict[str, Any]:
+    """The counts that evidence what one disclosure contained.
+
+    The exported document itself is never retained, so the line that records the disclosure is the
+    only lasting evidence of its scope.
+    """
+    return {
+        "owned_meetings": len(export["meetings"]),
+        "joined_meetings": len(export["joined_meetings"]),
+        "has_patreon": export["patreon"] is not None,
+        "pending_patreon_links": len(export["pending_patreon_links"]),
+    }
+
+
 def export_document(export: dict[str, Any]) -> tuple[bytes, str]:
     """Serialize an export envelope to JSON bytes plus its download filename (UTC date)."""
     filename = f"mitup-export-{dt.datetime.now(dt.UTC):%Y-%m-%d}.json"
