@@ -34,6 +34,8 @@ from mitup_bot.monitoring import (
 )
 from mitup_bot.request import build_telegram_request
 
+from .telemetry import error_type_name
+
 log = structlog.get_logger(__name__)
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
@@ -166,20 +168,31 @@ async def handle_maintainance(
 
     start_time = perf_counter()
     fault = False
+    # `flow` names the business unit across every service in the log plane, so one query reads the
+    # bot and events lines together; the metric plane carries the same value as the EventType
+    # dimension. A second log key holding it would be redundant on every line the plane emits.
     # Publishing the run's client makes the outbound-call instrumentation — inside PTB's request
     # object and inside the Patreon client, neither of which is reachable from here — emit into
     # this run's flush window, so its samples inherit the run_id already on these records.
     with (
-        structlog.contextvars.bound_contextvars(flow=event_type.value, event_type=event_type.value, run_id=run_id),
+        structlog.contextvars.bound_contextvars(flow=event_type.value, run_id=run_id),
         bound_metrics_client(client),
     ):
+        # The start line is what makes run_id filterable at all: without it an empty result for a
+        # run_id is ambiguous between "never ran" and "ran and decided nothing".
+        log.info("Recurrent event run started")
         try:
             db.set_connection_context(event_type.value)
             await dispatch_event(event_type, api, client, admin_tg_ids)
-        except Exception:
+        except Exception as error:
             fault = True
             client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
-            log.exception("Recurrent event run failed")
+            log.exception(
+                "Recurrent event run failed",
+                outcome="failed",
+                error_type=error_type_name(error),
+                duration_ms=round((perf_counter() - start_time) * 1000),
+            )
         finally:
             # emit_global adds a dimensionless copy of Fault/Time so a single Mitup/Events alarm can
             # watch "any event type is failing"/aggregate run duration; EventType stays as an EMF
@@ -187,7 +200,14 @@ async def handle_maintainance(
             if not fault:
                 client.emit(MetricKey.FAULT, 0, MetricUnit.COUNT, emit_global=True)
             client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS, emit_global=True)
-            client.emit(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections(event_type.value), MetricUnit.COUNT)
+            leaked_connections = db.get_open_connections(event_type.value)
+            client.emit(MetricKey.DB_CONNECTIONS_LEAKED, leaked_connections, MetricUnit.COUNT)
+            log.info(
+                "Recurrent event run finished",
+                outcome="failed" if fault else "completed",
+                duration_ms=round((perf_counter() - start_time) * 1000),
+                db_connections_leaked=leaked_connections,
+            )
             await client.flush()
 
 
@@ -215,17 +235,35 @@ async def run_all_tasks(
     admin_tg_ids: list[int],
     start_time: float,
 ):
-    async with asyncio.TaskGroup() as tg:
-        for event_type in EventType:
-            tg.create_task(
-                run_periodic(
-                    intervals.get(event_type),
-                    time_before_start=start_time,
-                    event_type=event_type,
-                    bot=select_bot(event_type, bot, broadcast_bot),
-                    admin_tg_ids=admin_tg_ids,
+    try:
+        async with asyncio.TaskGroup() as task_group:
+            for event_type in EventType:
+                selected_bot = select_bot(event_type, bot, broadcast_bot)
+                log.info(
+                    "Registered recurrent event",
+                    flow=event_type.value,
+                    interval_seconds=intervals.get(event_type),
+                    bot="broadcast" if selected_bot is broadcast_bot else "shared",
                 )
-            )
+                task_group.create_task(
+                    run_periodic(
+                        intervals.get(event_type),
+                        time_before_start=start_time,
+                        event_type=event_type,
+                        bot=selected_bot,
+                        admin_tg_ids=admin_tg_ids,
+                    )
+                )
+    except BaseException as error:
+        # handle_maintainance swallows Exception, so the loops can only stop on a BaseException that
+        # takes every recurrent event down at once — the one failure mode with no per-run trace.
+        log.error(
+            "Recurrent event scheduling stopped",
+            reason="cancelled" if isinstance(error, asyncio.CancelledError) else "task_group_aborted",
+            error_type=error_type_name(error),
+            exc_info=error,
+        )
+        raise
 
 
 def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
@@ -235,11 +273,29 @@ def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
         TomlConfigProvider(env=env),
     )
 
-    pool_metrics_client = MetricsClient(EmfBackend()) if config.db.pool_metrics_enabled else None
+    # Ahead of every subsystem below, so a failure while wiring the DB, the reconciler or Patreon is
+    # emitted through the structured pipeline instead of unstructured to stderr.
+    configure_logging(env, Component.EVENTS, config.app.log_level)
+    log.info(
+        "Events service starting",
+        env=env.value,
+        log_level=config.app.log_level,
+        intervals={event_type.value: intervals.get(event_type) for event_type in EventType},
+        admin_count=len(config.bot.admin_tg_ids),
+        pool_metrics_enabled=config.db.pool_metrics_enabled,
+        broadcast_max_rate=config.bot.broadcast_max_rate,
+    )
+
+    # The pool client outlives every run, so it carries the process identity and nothing else: a
+    # run-scoped global property would stick to every record emitted after that run ended.
+    pool_metrics_client = (
+        MetricsClient(EmfBackend(properties={"component": Component.EVENTS.value}))
+        if config.db.pool_metrics_enabled
+        else None
+    )
     db.configure_db(config.db, metrics_client=pool_metrics_client)
     reconcile.register_outbox_reconciler()
     api_guards.register_update_guards()
-    configure_logging(env, Component.EVENTS, config.app.log_level)
     configure_emf_backend(config.metrics)
     configure_patreon(config)
     # Adopt the hosts-only group settings so the supporter-check job can remove lapsed hosts;

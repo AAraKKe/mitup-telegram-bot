@@ -6,6 +6,7 @@ import datetime as dt
 from collections.abc import Sequence
 from typing import Any, cast
 
+import structlog
 from sqlalchemy import Row
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import and_, case, col, func, literal, or_, select, update
@@ -24,6 +25,8 @@ from .types import (
     ClaimedBroadcast,
     PendingDelivery,
 )
+
+log = structlog.get_logger(__name__)
 
 
 @db.with_session
@@ -50,11 +53,21 @@ async def claim_next_broadcast(session: AsyncSession) -> ClaimedBroadcast | None
     if broadcast is None:
         return None
 
+    previous_status = broadcast.status
     broadcast.attempts += 1
     if broadcast.status is BroadcastStatus.QUEUED:
         broadcast.status = BroadcastStatus.SENDING
         broadcast.sending_started_time = dt.datetime.now(dt.UTC)
 
+    log.info(
+        "Broadcast claimed",
+        broadcast_id=broadcast.db_id,
+        author_tg_id=broadcast.author_tg_id,
+        attempts=broadcast.attempts,
+        previous_status=previous_status.value,
+        action="started" if previous_status is BroadcastStatus.QUEUED else "resumed",
+        reason="oldest_queued_or_sending",
+    )
     return ClaimedBroadcast(
         broadcast_id=broadcast.db_id,
         author_tg_id=broadcast.author_tg_id,
@@ -66,7 +79,8 @@ async def claim_next_broadcast(session: AsyncSession) -> ClaimedBroadcast | None
 @db.with_session
 async def count_broadcast_backlog(session: AsyncSession) -> tuple[int, int, int]:
     """Counts of QUEUED broadcasts, SENDING broadcasts, and RETRY_PENDING deliveries across all
-    broadcasts — the backlog gauges every sender tick emits so a stuck queue is graphable."""
+    broadcasts, feeding the backlog gauges so a stuck queue is graphable. The caller suppresses
+    those gauges entirely on a tick with nothing to report (see `emit_backlog_gauges`)."""
     status_rows = (
         await session.exec(
             select(col(Broadcast.status), func.count())
@@ -125,6 +139,12 @@ async def materialize_audience(session: AsyncSession, broadcast_id: int, message
     (broadcast_id, user_id) so a crash-and-resume can never duplicate a recipient's row.
     """
     if existing := await count_deliveries(session, broadcast_id):
+        log.info(
+            "Broadcast audience reused",
+            broadcast_id=broadcast_id,
+            total=existing,
+            reason="snapshot_already_materialized",
+        )
         return existing
 
     language_sent = case(
@@ -152,6 +172,14 @@ async def materialize_audience(session: AsyncSession, broadcast_id: int, message
     broadcast = await session.get(Broadcast, broadcast_id)
     assert broadcast is not None, "The claimed broadcast row must still exist"
     broadcast.total_recipients = total
+    log.info(
+        "Broadcast audience materialized",
+        broadcast_id=broadcast_id,
+        total=total,
+        languages=message_languages,
+        fallback_lang=FALLBACK_LANG,
+        reason="member_and_not_invitee",
+    )
     return total
 
 
@@ -211,6 +239,13 @@ async def claim_pending_batch(session: AsyncSession, broadcast_id: int) -> list[
     if not claimed:
         return []
 
+    log.info(
+        "Broadcast batch claimed",
+        broadcast_id=broadcast_id,
+        size=len(claimed),
+        retries=sum(1 for row in claimed if cast(int, row[3]) > 1),
+        reason="pending_or_due_retry",
+    )
     return await resolve_claimed_recipients(session, claimed)
 
 

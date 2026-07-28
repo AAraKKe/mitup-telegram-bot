@@ -1,3 +1,7 @@
+from collections.abc import Sequence
+from typing import Any
+
+import structlog
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Integer, and_, cast, col, distinct, false, func, literal, null, or_, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -9,6 +13,8 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
+
+log = structlog.get_logger(__name__)
 
 # Pinned literal names: MetricKey's CamelCase folding would render the trailing "24h" as "24H",
 # and the dashboard widgets match these exact names.
@@ -35,7 +41,20 @@ PAST_24H = func.now() - func.cast(literal("24 hours"), INTERVAL)
 NEXT_24H = func.now() + func.cast(literal("24 hours"), INTERVAL)
 
 
-async def users_stats(session: AsyncSession, metrics: MetricsClient):
+def zero_coerced(result: Sequence[Any] | None, width: int, query: str) -> list[int]:
+    """Read an aggregate row as ints, warning when the query matched no row at all.
+
+    An empty table sums to NULL across zero rows, so 0 is the truthful statistic for every gauge —
+    but a system with no users and a query that silently stopped matching produce the same zeros,
+    and the warning is the only thing that tells them apart.
+    """
+    if result is None:
+        log.warning("Stats query returned no rows", query=query, reason="empty_result_set")
+        return [0] * width
+    return [value or 0 for value in result]
+
+
+async def users_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
     member_users = func.sum(cast(User.status == UserStatus.MEMBER, Integer))
     left_users = func.sum(cast(User.status == UserStatus.LEFT, Integer))
     joined_only_users = func.sum(cast(and_(User.status == UserStatus.JOINED_ONLY, User.tg_user_id != -1), Integer))
@@ -57,9 +76,7 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
         )
     ).first()
 
-    # An empty table sums to NULL across zero rows; the truthful statistic is 0 for every gauge.
-    # The annotation pins the type: the ty-suppressed select() overload leaves `result` as Unknown.
-    counts: list[int] = [value or 0 for value in result] if result is not None else [0] * 7
+    counts = zero_coerced(result, 7, query="users")
 
     metrics.emit(MetricKey.ACTIVE_USERS, counts[0], MetricUnit.COUNT)
     metrics.emit(MetricKey.INACTIVE_USERS, counts[1], MetricUnit.COUNT)
@@ -87,8 +104,19 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
     for language, count in counts_by_language.items():
         metrics.emit(MetricKey.ACTIVE_USERS.with_prefix(language), count, MetricUnit.COUNT)
 
+    return {
+        "member_users": counts[0],
+        "left_users": counts[1],
+        "joined_only_users": counts[2],
+        "deletion_requested_users": counts[3],
+        "total_users": counts[4],
+        "invited_users": counts[5],
+        "new_users_24h": counts[6],
+        "member_users_by_language": counts_by_language,
+    }
 
-async def meetings_stats(session: AsyncSession, metrics: MetricsClient):
+
+async def meetings_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
     active_meetings = func.sum(cast(Meetup.active, Integer))
     total_meetings = func.count()
     # The per-facet gauges cover ACTIVE meetings only: they read as feature adoption, not as
@@ -111,8 +139,7 @@ async def meetings_stats(session: AsyncSession, metrics: MetricsClient):
         )
     ).first()
 
-    # An empty table sums to NULL across zero rows; the truthful statistic is 0 for every gauge.
-    counts: list[int] = [value or 0 for value in result] if result is not None else [0] * 6
+    counts = zero_coerced(result, 6, query="meetings")
 
     metrics.emit(MetricKey.ACTIVE_MEETINGS, counts[0], MetricUnit.COUNT)
     metrics.emit(MetricKey.TOTAL_MEETINGS, counts[1], MetricUnit.COUNT)
@@ -131,8 +158,18 @@ async def meetings_stats(session: AsyncSession, metrics: MetricsClient):
 
     metrics.emit(MetricKey.SHARED_MEETINGS, count_result, MetricUnit.COUNT)
 
+    return {
+        "active_meetings": counts[0],
+        "total_meetings": counts[1],
+        "incognito_meetings": counts[2],
+        "public_meetings": counts[3],
+        "meetings_with_invitation": counts[4],
+        "meetings_with_datetime": counts[5],
+        "shared_meetings": count_result,
+    }
 
-async def meeting_activity_stats(session: AsyncSession, metrics: MetricsClient):
+
+async def meeting_activity_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
     created_24h = func.sum(cast(Meetup.created_time > PAST_24H, Integer))
     # `expiration_time` is stamped at deactivation, so a recent value means a recently finished meeting.
     finished_24h = func.sum(cast(Meetup.expiration_time > PAST_24H, Integer))
@@ -152,24 +189,29 @@ async def meeting_activity_stats(session: AsyncSession, metrics: MetricsClient):
 
     result = (await session.exec(select(created_24h, finished_24h, upcoming_24h, in_progress))).first()
 
-    # An empty table sums to NULL across zero rows; the truthful statistic is 0 for every gauge.
-    counts: list[int] = [value or 0 for value in result] if result is not None else [0] * 4
+    counts = zero_coerced(result, 4, query="meeting_activity")
 
     metrics.emit(MEETINGS_CREATED_24H_METRIC, counts[0], MetricUnit.COUNT)
     metrics.emit(MEETINGS_FINISHED_24H_METRIC, counts[1], MetricUnit.COUNT)
     metrics.emit(UPCOMING_MEETINGS_24H_METRIC, counts[2], MetricUnit.COUNT)
     metrics.emit(MetricKey.MEETINGS_IN_PROGRESS, counts[3], MetricUnit.COUNT)
 
+    return {
+        "meetings_created_24h": counts[0],
+        "meetings_finished_24h": counts[1],
+        "upcoming_meetings_24h": counts[2],
+        "meetings_in_progress": counts[3],
+    }
 
-async def participation_stats(session: AsyncSession, metrics: MetricsClient):
+
+async def participation_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
     joins_24h = func.sum(cast(JoinedUsers.created_time > PAST_24H, Integer))
     invited_joins_24h = func.sum(
         cast(and_(JoinedUsers.created_time > PAST_24H, JoinedUsers.invited_by_id != null()), Integer)
     )
     result = (await session.exec(select(joins_24h, invited_joins_24h))).first()
 
-    # An empty table sums to NULL across zero rows; the truthful statistic is 0 for every gauge.
-    counts: list[int] = [value or 0 for value in result] if result is not None else [0] * 2
+    counts = zero_coerced(result, 2, query="participation")
 
     metrics.emit(MEETING_JOINS_24H_METRIC, counts[0], MetricUnit.COUNT)
     metrics.emit(INVITED_JOINS_24H_METRIC, counts[1], MetricUnit.COUNT)
@@ -184,8 +226,14 @@ async def participation_stats(session: AsyncSession, metrics: MetricsClient):
     ).first() or 0
     metrics.emit(MetricKey.WAITING_LIST_SIZE, waiting_list_size, MetricUnit.COUNT)
 
+    return {
+        "meeting_joins_24h": counts[0],
+        "invited_joins_24h": counts[1],
+        "waiting_list_size": waiting_list_size,
+    }
 
-async def supporter_stats(session: AsyncSession, metrics: MetricsClient):
+
+async def supporter_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
     tier_counts = dict(
         (await session.exec(select(User.supporter_level, func.count()).group_by(User.supporter_level))).all()
     )
@@ -200,25 +248,41 @@ async def supporter_stats(session: AsyncSession, metrics: MetricsClient):
     in_grace = func.sum(cast(SupporterSubscription.expiration_notified, Integer))
     result = (await session.exec(select(linked_accounts, in_grace).select_from(SupporterSubscription))).first()
 
-    # An empty table sums to NULL across zero rows; the truthful statistic is 0 for every gauge.
-    counts: list[int] = [value or 0 for value in result] if result is not None else [0] * 2
+    counts = zero_coerced(result, 2, query="supporters")
 
     metrics.emit(MetricKey.LINKED_PATREON_ACCOUNTS, counts[0], MetricUnit.COUNT)
     metrics.emit(MetricKey.SUBSCRIPTIONS_IN_GRACE, counts[1], MetricUnit.COUNT)
 
+    return {
+        "supporters_by_level": {level.value: tier_counts.get(level, 0) for level in SupporterLevel},
+        "linked_patreon_accounts": counts[0],
+        "subscriptions_in_grace": counts[1],
+    }
 
-async def settings_stats(session: AsyncSession, metrics: MetricsClient):
+
+async def settings_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
     notifications_disabled = (
         await session.exec(select(func.count()).select_from(Settings).where(col(Settings.notification) == false()))
     ).first() or 0
     metrics.emit(MetricKey.NOTIFICATIONS_DISABLED, notifications_disabled, MetricUnit.COUNT)
 
+    return {"notifications_disabled": notifications_disabled}
+
 
 @with_session
 async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
-    await users_stats(session, metrics)
-    await meetings_stats(session, metrics)
-    await meeting_activity_stats(session, metrics)
-    await participation_stats(session, metrics)
-    await supporter_stats(session, metrics)
-    await settings_stats(session, metrics)
+    collected: dict[str, Any] = {}
+    for collect_stats in (
+        users_stats,
+        meetings_stats,
+        meeting_activity_stats,
+        participation_stats,
+        supporter_stats,
+        settings_stats,
+    ):
+        collected |= await collect_stats(session, metrics)
+
+    # Assembled from what the collectors return rather than from a list kept here, so a gauge added
+    # to any of them reaches the log without this function being touched — and so an all-zeros run
+    # is visible in the run's own narrative instead of only in CloudWatch.
+    log.info("Stats generated", **collected)

@@ -1,8 +1,14 @@
+import datetime as dt
+from collections.abc import Callable
+
 import pytest
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from mitup_bot.events import notify_meetings
 from mitup_bot.events.service import EventType
 from mitup_bot.models import JoinedUsers
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
@@ -221,3 +227,134 @@ async def test_failed_greater_than_zero_raises_runtime_error(
 
     with pytest.raises(RuntimeError, match="Failed to send notification to 1 users. Check logs for more details."):
         await notify_meetings.run(api, metrics_client)
+
+
+# ---------------------------------------------------------------------------
+# Decision records
+# ---------------------------------------------------------------------------
+
+
+def register_stale_link(mock_session: MockDbSession, link: JoinedUsers):
+    """Register a link the sweep nominated but the re-check rejects, plus the predicate-free read
+    ``skip_reason`` uses to work out which of the six conditions stopped holding."""
+    mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link,))
+    mock_session.add_objects_with_statement(
+        notify_meetings.USERS_TO_NOTIFY_STATEMENT.where(JoinedUsers.id == link.id), ()
+    )
+    mock_session.add_object(link)
+
+
+async def test_the_sweep_names_the_participant_at_every_step(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
+):
+    """Nomination, send and the closing summary all carry the joined link, its meeting and the
+    person whose reminder it is, so the commonest support question this job produces — "this user
+    says they never got their reminder" — is answerable by filtering on the user."""
+    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    settings = create_settings(id=1, language=lang)
+    settings.notification_time = 15
+    joined = create_user(id=1, tg_user_id=555, settings=settings)
+    link = create_joined_link(user=joined, meetup=meeting, id=812)
+
+    register_due_links(mock_session, link)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await notify_meetings.run(api, metrics_client)
+
+    nominated = next(
+        entry for entry in logs if entry["event"] == "Nominate joined link for a starting-soon notification"
+    )
+    assert nominated["joined_link_id"] == 812
+    assert nominated["meeting_id"] == 7
+    assert nominated["tg_user_id"] == 555
+    # The per-user setting that chose the window, so the nomination stays explicable after it changes.
+    assert nominated["lead_time_minutes"] == 15
+    assert nominated["reason"] == "inside_lead_time_window"
+
+    sent = next(entry for entry in logs if entry["event"] == "Send starting-soon notification")
+    # "enqueued", not "sent": the drain happens after the transaction commits.
+    assert sent["outcome"] == "enqueued"
+    assert sent["joined_link_id"] == 812
+    assert sent["tg_user_id"] == 555
+
+    summary = next(entry for entry in logs if entry["event"] == "Starting-soon notification sweep complete")
+    assert (summary["nominated"], summary["sent"], summary["skipped"], summary["failed"]) == (1, 1, 0, 0)
+
+
+def make_stale_link(lang: str) -> JoinedUsers:
+    """A link that satisfied every nomination condition, ready for one of them to be flipped."""
+    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    joined = create_user(id=1, tg_user_id=555, settings=create_settings(id=1, language=lang))
+    return create_joined_link(user=joined, meetup=meeting, id=812)
+
+
+def flag_already_notified(link: JoinedUsers):
+    link.notification_sent = True
+
+
+def move_to_waiting_list(link: JoinedUsers):
+    link.is_waiting_list = True
+
+
+def make_user_leave(link: JoinedUsers):
+    link.user.status = UserStatus.LEFT
+
+
+def disable_notifications(link: JoinedUsers):
+    link.user.settings.notification = False
+
+
+SKIP_REASON_PARAMS = [
+    (flag_already_notified, "already_notified"),
+    (move_to_waiting_list, "moved_to_waiting_list"),
+    (make_user_leave, "user_not_member"),
+    (disable_notifications, "notifications_disabled"),
+]
+
+
+@pytest.mark.parametrize(
+    "break_condition, expected_reason", SKIP_REASON_PARAMS, ids=[reason for _, reason in SKIP_REASON_PARAMS]
+)
+async def test_skip_names_which_condition_stopped_holding(
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    api: MockApi,
+    lang: str,
+    break_condition: Callable[[JoinedUsers], None],
+    expected_reason: str,
+):
+    """Each cause of a skip names itself. They split into user-caused (turned notifications off,
+    moved to the waiting list) and system-caused, and an operator has to know which one they are
+    looking at before deciding whether anything is wrong."""
+    link = make_stale_link(lang)
+    break_condition(link)
+
+    register_stale_link(mock_session, link)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await notify_meetings.run(api, metrics_client)
+
+    skipped = next(entry for entry in logs if entry["event"] == "Skip starting-soon notification")
+    assert skipped["reason"] == expected_reason
+    assert skipped["joined_link_id"] == 812
+    assert skipped["tg_user_id"] == 555
+    api.assert_method_just_called("send_message_to_user", times=0)
+
+
+async def test_skip_reports_a_deleted_link(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
+):
+    """A link deleted between nomination and processing is the one skip cause that leaves no row to
+    re-read, so it is named directly rather than derived from the row's state."""
+    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    joined = create_user(id=1, tg_user_id=555, settings=create_settings(id=1, language=lang))
+    link = create_joined_link(user=joined, meetup=meeting, id=812)
+
+    mock_session.add_objects_with_statement(notify_meetings.USERS_TO_NOTIFY_STATEMENT, (link,))
+    mock_session.add_objects_with_statement(
+        notify_meetings.USERS_TO_NOTIFY_STATEMENT.where(JoinedUsers.id == link.id), ()
+    )
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await notify_meetings.run(api, metrics_client)
+
+    skipped = next(entry for entry in logs if entry["event"] == "Skip starting-soon notification")
+    assert skipped["reason"] == "link_deleted"

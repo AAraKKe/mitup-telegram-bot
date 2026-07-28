@@ -44,7 +44,12 @@ async def notify_author(api: TelegramApiWrapper, author_tg_id: int, summary: Bro
     """
     author = await resolve_author(author_tg_id)
     if author is None:
-        log.warning("Broadcast author has no reachable user, falling back to admins", tg_user_id=author_tg_id)
+        log.warning(
+            "Broadcast author has no reachable user, falling back to admins",
+            broadcast_id=summary.broadcast_id,
+            tg_user_id=author_tg_id,
+            reason="author_has_no_user_row",
+        )
         return False
     view = build_summary_view(summary, author.lang)
     try:
@@ -52,10 +57,18 @@ async def notify_author(api: TelegramApiWrapper, author_tg_id: int, summary: Bro
     except Exception as error:
         log.warning(
             "Broadcast author unreachable for summary, falling back to admins",
+            broadcast_id=summary.broadcast_id,
             tg_user_id=author_tg_id,
+            reason="author_unreachable",
             error=str(error),
         )
         return False
+    log.info(
+        "Broadcast summary delivered",
+        broadcast_id=summary.broadcast_id,
+        tg_user_id=author_tg_id,
+        recipient_role="author",
+    )
     return True
 
 
@@ -74,7 +87,20 @@ async def notify_admins(api: TelegramApiWrapper, admin_tg_ids: list[int], summar
         try:
             await api.send_message_to_user(operator, view)
         except Exception as error:
-            log.warning("Broadcast operator unreachable for summary", tg_user_id=tg_id, error=str(error))
+            log.warning(
+                "Broadcast operator unreachable for summary",
+                broadcast_id=summary.broadcast_id,
+                tg_user_id=tg_id,
+                reason="operator_unreachable",
+                error=str(error),
+            )
+            continue
+        log.info(
+            "Broadcast summary delivered",
+            broadcast_id=summary.broadcast_id,
+            tg_user_id=tg_id,
+            recipient_role="admin",
+        )
 
 
 @db.with_session
@@ -84,7 +110,11 @@ async def load_operators(session: AsyncSession, admin_tg_ids: list[int]) -> dict
         if operator := await User.by_tg_user_id(session, tg_id):
             operators[tg_id] = operator
             continue
-        log.warning("Broadcast operator has no reachable user, skipping summary", tg_user_id=tg_id)
+        log.warning(
+            "Broadcast operator has no reachable user, skipping summary",
+            tg_user_id=tg_id,
+            reason="operator_has_no_user_row",
+        )
     return operators
 
 

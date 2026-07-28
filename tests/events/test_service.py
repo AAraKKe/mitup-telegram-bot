@@ -18,6 +18,7 @@ from structlog.testing import capture_logs
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import BotConfig
 from mitup_bot.events.service import (
+    DEFAULT_USER_CLEANUP_INTERVAL,
     EventType,
     IntervalsConfiguration,
     build_bot,
@@ -187,8 +188,12 @@ async def run_maintainance_with_mocked_db(event_type: EventType, client: Metrics
 
 
 async def test_handle_maintainance_binds_event_contextvars():
-    """A log emitted while an event runs carries flow/event_type (both the dispatched EventType.value)
-    and a run_id, bound by handle_maintainance for the duration of the run."""
+    """A log emitted while an event runs carries the dispatched EventType.value and a run_id, bound
+    by handle_maintainance for the duration of the run.
+
+    `flow` is the plane's only name for the job: it is the key the cross-service infra queries
+    group by, and the metric plane already carries the value as the EventType dimension, so no
+    second log key holds it on every line the plane emits."""
     client = make_test_metrics_client()
 
     def run_emitting_log(_api: object, _client: object):
@@ -202,7 +207,7 @@ async def test_handle_maintainance_binds_event_contextvars():
     assert len(event_logs) == 1
     entry = event_logs[0]
     assert entry["flow"] == EventType.USER_CLEANUP.value  # "UserCleanup"
-    assert entry["event_type"] == EventType.USER_CLEANUP.value  # "UserCleanup"
+    assert "event_type" not in entry
     # run_id is a uuid4().hex — present and a 32-char hex string, but its exact value is random.
     run_id = entry["run_id"]
     assert isinstance(run_id, str)
@@ -210,8 +215,8 @@ async def test_handle_maintainance_binds_event_contextvars():
 
 
 async def test_handle_maintainance_clears_contextvars_between_events():
-    """bound_contextvars auto-clears on exit, so flow/event_type/run_id must not leak from one event
-    into a log emitted after handle_maintainance returns (events run back-to-back in run_periodic)."""
+    """bound_contextvars auto-clears on exit, so flow/run_id must not leak from one event into a log
+    emitted after handle_maintainance returns (events run back-to-back in run_periodic)."""
     client = make_test_metrics_client()
 
     with capture_logs(processors=[merge_contextvars]) as logs:
@@ -247,7 +252,7 @@ async def test_handle_maintainance_uses_distinct_run_id_per_invocation():
 
 async def test_handle_maintainance_fault_logs_exception_under_run_context():
     """A failing run produces one structlog error line with the exception attached, emitted while
-    flow/event_type/run_id are still bound — the log-side half of fault triage."""
+    flow/run_id are still bound — the log-side half of fault triage."""
     client = make_test_metrics_client()
 
     with capture_logs(processors=[merge_contextvars]) as logs:
@@ -264,8 +269,100 @@ async def test_handle_maintainance_fault_logs_exception_under_run_context():
     assert entry["log_level"] == "error"
     assert entry["exc_info"] is True  # log.exception attaches the active exception
     assert entry["flow"] == EventType.USER_CLEANUP.value
-    assert entry["event_type"] == EventType.USER_CLEANUP.value
     assert len(entry["run_id"]) == 32
+    assert entry["outcome"] == "failed"
+    assert entry["error_type"] == "builtins.RuntimeError"
+    assert entry["duration_ms"] >= 0
+
+
+async def test_handle_maintainance_brackets_a_clean_run_with_start_and_finish():
+    """Every run opens with a start line and closes with a finish line, both under the run bind.
+
+    This is the anchor the infra saved query tells operators to copy `run_id` from: six of the eight
+    jobs emit nothing at all on a clean run, so without these two an empty result for a `run_id` is
+    ambiguous between "never ran" and "ran and decided nothing". Asserted once here — the bracket is
+    one mechanism in `handle_maintainance`, not something each job repeats.
+    """
+    client = make_test_metrics_client()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch("mitup_bot.events.service.user_cleanup.run"):
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
+
+    started = next(log for log in logs if log["event"] == "Recurrent event run started")
+    finished = next(log for log in logs if log["event"] == "Recurrent event run finished")
+    assert started["flow"] == EventType.USER_CLEANUP.value
+    assert started["run_id"] == finished["run_id"]
+    assert finished["outcome"] == "completed"
+    assert finished["duration_ms"] >= 0
+    assert finished["db_connections_leaked"] == 0
+
+
+async def test_handle_maintainance_finish_line_reports_a_faulted_run():
+    """A run whose job raised still closes — the finish line is emitted from the `finally`, so the
+    series of run brackets is continuous regardless of exit path, and it carries the failure."""
+    client = make_test_metrics_client()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch("mitup_bot.events.service.dispatch_event", new_callable=AsyncMock, side_effect=RuntimeError("boom")):
+            await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
+
+    finished = next(log for log in logs if log["event"] == "Recurrent event run finished")
+    assert finished["outcome"] == "failed"
+
+
+async def test_run_all_tasks_logs_a_registration_line_per_event():
+    """Each scheduled task announces its event type, interval and which bot it runs on, so the
+    schedule a container is actually running is readable from its own log."""
+    intervals = IntervalsConfiguration(
+        user_cleanup=10,
+        notify_start_meeting=20,
+        notify_meeting_started=25,
+        generate_stats=30,
+        deactivate_meetings=40,
+        meetups_cleanup=50,
+        send_broadcasts=60,
+        supporter_check=70,
+    )
+
+    with capture_logs() as logs:
+        with patch("mitup_bot.events.service.run_periodic", new_callable=AsyncMock):
+            await run_all_tasks(intervals, MagicMock(), MagicMock(), [], start_time=0.0)
+
+    registered = {log["flow"]: log for log in logs if log["event"] == "Registered recurrent event"}
+    assert set(registered) == {event_type.value for event_type in EventType}
+    assert registered[EventType.USER_CLEANUP.value]["interval_seconds"] == 10
+    assert registered[EventType.USER_CLEANUP.value]["bot"] == "shared"
+    # Only SEND_BROADCASTS runs on the separately rate-capped bot.
+    assert registered[EventType.SEND_BROADCASTS.value]["bot"] == "broadcast"
+
+
+async def test_run_all_tasks_logs_why_scheduling_stopped():
+    """`handle_maintainance` swallows Exception, so the only thing that stops the loops is a
+    BaseException that takes every recurrent event down at once. That exit had no log line at all."""
+
+    async def abort(*_args: object, **_kwargs: object):
+        raise RuntimeError("task group aborted")
+
+    intervals = IntervalsConfiguration(
+        user_cleanup=10,
+        notify_start_meeting=20,
+        notify_meeting_started=25,
+        generate_stats=30,
+        deactivate_meetings=40,
+        meetups_cleanup=50,
+        send_broadcasts=60,
+        supporter_check=70,
+    )
+
+    with capture_logs() as logs:
+        with patch("mitup_bot.events.service.run_periodic", side_effect=abort):
+            with pytest.raises(BaseExceptionGroup):
+                await run_all_tasks(intervals, MagicMock(), MagicMock(), [], start_time=0.0)
+
+    stopped = next(log for log in logs if log["event"] == "Recurrent event scheduling stopped")
+    assert stopped["log_level"] == "error"
+    assert stopped["reason"] == "task_group_aborted"
 
 
 MAINTAINANCE_PARAMS = [
@@ -688,7 +785,53 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
         # Flag on: the events pool is instrumented with a metrics client.
         configure_call = mock_db.configure_db.call_args
         assert configure_call.args == (mock_config.db,)
-        assert isinstance(configure_call.kwargs["metrics_client"], MetricsClient)
+        pool_client = configure_call.kwargs["metrics_client"]
+        assert isinstance(pool_client, MetricsClient)
+        # Two alarms page on the pool records, which carried no identity at all. The client outlives
+        # every run, so the identity is set once at construction: `set_global_property` on a
+        # process-lived client would pin a run-scoped value onto every later record. Reading the
+        # backend's property bag is the only way to see what a not-yet-emitted record will carry.
+        assert pool_client._backend._properties == {"component": "events"}  # noqa: SLF001
+
+
+def test_cli_configures_logging_before_wiring_subsystems():
+    """`configure_logging` runs ahead of the DB, reconciler, EMF and Patreon wiring.
+
+    A failure while wiring any of them must reach the structured pipeline: emitted before the
+    pipeline exists it matches no `component = "events"` query, leaving it invisible in exactly
+    the situation an operator goes looking."""
+    runner = CliRunner()
+    call_order: list[str] = []
+
+    with (
+        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch(
+            "mitup_bot.events.service.configure_logging", side_effect=lambda *_a, **_kw: call_order.append("logging")
+        ),
+        # The module logger rather than capture_logs: the sibling CLI tests run the real
+        # configure_logging, which caches this module's bound logger past any later processor swap.
+        patch("mitup_bot.events.service.log") as mock_log,
+        patch("mitup_bot.events.service.db") as mock_db,
+        patch("mitup_bot.events.service.configure_emf_backend", side_effect=lambda *_a: call_order.append("emf")),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
+    ):
+        mock_db.configure_db.side_effect = lambda *_a, **_kw: call_order.append("db")
+        mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = False
+        mock_config.patreon = create_patreon_config()
+        mock_config_cls.return_value = mock_config
+
+        result = runner.invoke(cli, [])
+
+    assert result.exit_code == 0, result.output
+    assert call_order == ["logging", "db", "emf"]
+    starting = next(call for call in mock_log.info.call_args_list if call.args[0] == "Events service starting")
+    # The schedule the container is actually running, readable without reaching for its task definition.
+    assert starting.kwargs["intervals"][EventType.USER_CLEANUP.value] == DEFAULT_USER_CLEANUP_INTERVAL
+    assert starting.kwargs["pool_metrics_enabled"] is False
 
 
 def test_cli_passes_custom_intervals():

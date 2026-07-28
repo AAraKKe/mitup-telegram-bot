@@ -99,6 +99,13 @@ async def release_unattempted(session: AsyncSession, unattempted: list[PendingDe
             attempt_count=col(BroadcastDelivery.attempt_count) - 1,
         )
     )
+    log.info(
+        "Broadcast deliveries released",
+        count=len(delivery_ids),
+        next_attempt_time=next_attempt_time,
+        attempt_refunded=True,
+        reason="flood_control_halt",
+    )
 
 
 async def mark_deliveries(

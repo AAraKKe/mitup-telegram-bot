@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from sqlmodel import select
+from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
 from mitup_bot.config import PatreonConfig
@@ -542,7 +543,7 @@ async def test_process_all_counts_successes():
     async def handler(subscription_id: int):
         handled.append(subscription_id)
 
-    failures: list[str] = []
+    failures: list[int] = []
     results = await supporter_check.process_all(handler, [1, 2, 3], failures)
 
     assert len(results) == 3
@@ -555,13 +556,13 @@ async def test_process_all_isolates_a_failing_subscription():
         if subscription_id == 2:
             raise RuntimeError("boom")
 
-    failures: list[str] = []
+    failures: list[int] = []
     results = await supporter_check.process_all(handler, [1, 2, 3], failures)
 
-    # One row's failure is recorded but the sweep still processes the rest.
+    # One row's failure is recorded but the sweep still processes the rest. The id is recorded as
+    # an id, not a rendered sentence, so the failing row can be joined to its subscription.
     assert len(results) == 2
-    assert len(failures) == 1
-    assert "subscription 2" in failures[0]
+    assert failures == [2]
 
 
 # ---------------------------------------------------------------------------
@@ -643,7 +644,7 @@ async def test_run_logs_summary_on_success(
     with capture_logs() as logs:
         await supporter_check.run(api, metrics_client)
 
-    summary = next(entry for entry in logs if entry["event"] == "supporter check complete")
+    summary = next(entry for entry in logs if entry["event"] == "Supporter check complete")
     assert summary["due_processed"] == 0
     assert summary["extended"] == 0
     assert summary["grace_started"] == 0
@@ -724,7 +725,7 @@ async def test_run_logs_abort_reason_when_creator_token_is_unusable(
     assert abort["reason"] == supporter_check.ABORT_REASON_CREATOR_TOKEN_UNUSABLE
     assert abort["creator_token_ttl_days"] == pytest.approx(5, abs=0.01)
     # Nothing was reconciled, so the run must not claim it completed a pass.
-    assert not [entry for entry in logs if entry["event"] == "supporter check complete"]
+    assert not [entry for entry in logs if entry["event"] == "Supporter check complete"]
 
 
 async def test_run_raises_when_a_subscription_fails(
@@ -865,3 +866,129 @@ async def test_run_counts_grace_extensions(
     # The one due subscription was processed and the sweep saw one active patron.
     metrics.assert_emitted(name=supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC, value=1, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=1, unit=MetricUnit.COUNT)
+
+
+# ---------------------------------------------------------------------------
+# Per-subscription decision records
+# ---------------------------------------------------------------------------
+
+
+async def test_revocation_records_the_level_it_took_away(mock_session: MockDbSession, api: MockApi):
+    """The harshest user-visible transition in the app: it revokes the level, DMs the user and bans
+    them from the hosts group, so the line has to name both the person and the level lost."""
+    subscription, user = make_subscription_user(
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+    )
+    user.supporter_level = SupporterLevel.HOST_2
+    register_due(mock_session, subscription, user)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await supporter_check.process_due_subscription(subscription.db_id, {}, api)
+
+    revoked = next(entry for entry in logs if entry["event"] == "Supporter level revoked")
+    assert revoked["previous_level"] == SupporterLevel.HOST_2.value
+    assert revoked["new_level"] == SupporterLevel.NONE.value
+    assert revoked["patreon_user_id"] == "patreon-1"
+    assert revoked["reason"] == "grace_expired_and_not_active_patron"
+    # Bound by process_due_subscription once the user row is loaded, so the line names the person.
+    assert revoked["user_id"] == user.db_id
+    assert revoked["tg_user_id"] == user.tg_user_id
+
+
+async def test_level_change_records_the_amount_that_caused_it(
+    mock_session: MockDbSession, api: MockApi, config: PatreonConfig
+):
+    """A tier move re-times every inactive meeting that owner holds, so the entitled amount that
+    caused it has to be on the record — it is the only input that explains the move."""
+    subscription, user = make_subscription_user()
+    user.supporter_level = SupporterLevel.HOST_3
+    register_syncable(mock_session, subscription, user)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 500}, config, api)
+
+    changed = next(entry for entry in logs if entry["event"] == "Supporter level changed")
+    assert changed["previous_level"] == SupporterLevel.HOST_3.value
+    assert changed["new_level"] == SupporterLevel.HOST_2.value
+    assert changed["direction"] == "downgrade"
+    assert changed["amount_cents"] == 500
+    assert changed["reason"] == "entitled_amount_changed"
+
+
+async def test_due_skip_names_its_reason(mock_session: MockDbSession, api: MockApi):
+    """Five early returns share one SKIPPED enum value, so the line is the only thing that says
+    which of them was taken."""
+    subscription, _ = make_subscription_user()
+    mock_session.add_objects_with_statement(
+        supporter_check.DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription.id), ()
+    )
+
+    with capture_logs() as logs:
+        await supporter_check.process_due_subscription(subscription.db_id, {}, api)
+
+    skipped = next(entry for entry in logs if entry["event"] == "Due subscription skipped")
+    assert skipped["reason"] == "no_longer_due"
+
+
+async def test_level_sync_skip_names_its_reason(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):
+    subscription, user = make_subscription_user()
+    register_syncable(mock_session, subscription, user)
+
+    with capture_logs() as logs:
+        await supporter_check.sync_subscription_level(subscription.db_id, {}, config, api)
+
+    skipped = next(entry for entry in logs if entry["event"] == "Level sync skipped")
+    assert skipped["reason"] == "not_in_active_patrons"
+
+
+async def test_process_all_failure_line_is_joinable_to_the_subscription():
+    """The failure keys on `subscription_id` and carries the exception class as a field, so a
+    failing row joins to a person by the same id every other line in the plane uses."""
+
+    async def handler(subscription_id: int):
+        if subscription_id == 2:
+            raise RuntimeError("boom")
+
+    failures: list[int] = []
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await supporter_check.process_all(handler, [1, 2, 3], failures)
+
+    failure = next(entry for entry in logs if entry["event"] == "Supporter check failed for a subscription")
+    assert failure["subscription_id"] == 2
+    assert failure["error_type"] == "builtins.RuntimeError"
+    assert failure["reason"] == "subscription_processing_failed"
+
+
+async def test_run_logs_its_summary_even_when_a_subscription_failed(
+    mock_session: MockDbSession,
+    api: MockApi,
+    config: PatreonConfig,
+    metrics_client: MetricsClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The counters land in a `finally`, and so does the summary: a partially-failed run must not
+    end up with complete EMF counters and no log summary, which inverts the doctrine."""
+    configure(config)
+    subscription, _ = make_subscription_user()
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
+    mock_session.add_objects_with_statement(supporter_check.DUE_SUBSCRIPTIONS, (subscription,))
+    mock_session.add_objects_with_statement(supporter_check.LIVE_LINKED_SUBSCRIPTIONS, ())
+
+    client = FakePatreonClient(members=(active_member("patreon-1"),))
+    monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
+
+    async def boom(subscription_id: int, active_amounts: dict[str, int], api: MockApi) -> supporter_check.DueOutcome:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(supporter_check, "process_due_subscription", boom)
+
+    with capture_logs() as logs:
+        with pytest.raises(RuntimeError, match="Supporter check failed for 1 subscriptions"):
+            await supporter_check.run(api, metrics_client)
+
+    failed_summary = next(entry for entry in logs if entry["event"] == "Supporter check finished with failures")
+    assert failed_summary["log_level"] == "warning"
+    assert failed_summary["subscription_ids"] == [subscription.db_id]
+    assert failed_summary["reason"] == "per_subscription_processing_failed"
+    # The run still describes what it managed to do, on the exact runs an operator opens the logs for.
+    assert [entry for entry in logs if entry["event"] == "Supporter check complete"]

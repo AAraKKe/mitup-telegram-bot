@@ -3,6 +3,7 @@ its terminal status, purge, and notify. See the package docstring in `__init__.p
 concurrent-finalization and orphan invariants."""
 
 import datetime as dt
+from dataclasses import asdict
 
 import structlog
 from sqlmodel import and_, col, delete, func, select, update
@@ -43,6 +44,7 @@ async def finalize_and_report(
     outcome to one-hot. Orphans stay visible via the warning log below and the summary DM.
     """
     summary, won_transition, bulk_failed = await finalize_broadcast(broadcast_id, final_status)
+    log_finalization(summary, won_transition)
     if bulk_failed:
         metrics.emit(
             MetricKey.BROADCAST_DELIVERY_FAILED,
@@ -61,6 +63,39 @@ async def finalize_and_report(
     await purge_deliveries(broadcast_id)
     if won_transition:
         await notify_operators(api, admin_tg_ids, author_tg_id, summary)
+
+
+def log_finalization(summary: BroadcastSummary, won_transition: bool):
+    """Record the terminal outcome, and which side of a concurrent finalization this call was.
+
+    Two workers can both drain the same broadcast and both reach finalization; only one performs
+    the SENDING -> terminal transition. The losing side leaves no trace in the DB row, so logging
+    it here is the only thing that makes a double finalization detectable.
+    """
+    if not won_transition:
+        log.info(
+            "Broadcast finalization already performed",
+            broadcast_id=summary.broadcast_id,
+            status=summary.status.value,
+            won_transition=False,
+            reason="lost_terminal_cas",
+        )
+        return
+
+    log.info(
+        "Broadcast finalized",
+        broadcast_id=summary.broadcast_id,
+        status=summary.status.value,
+        attempts=summary.attempts,
+        total=summary.total,
+        sent=summary.sent,
+        failed=summary.failed,
+        skipped=summary.skipped,
+        orphaned=summary.orphaned,
+        breakdown=[asdict(line) for line in summary.breakdown],
+        won_transition=True,
+        reason="attempt_threshold_exceeded" if summary.status is BroadcastStatus.FAILED else "drained",
+    )
 
 
 @db.with_session
@@ -131,7 +166,15 @@ async def fail_unattempted_deliveries(session: AsyncSession, broadcast_id: int) 
         .values(status=BroadcastDeliveryStatus.FAILED)
     )
     # `rowcount` can be None on some drivers; the annotation promises an int.
-    return result.rowcount or 0
+    flipped = result.rowcount or 0
+    if flipped:
+        log.warning(
+            "Broadcast deliveries bulk failed",
+            broadcast_id=broadcast_id,
+            count=flipped,
+            reason="finalized_with_undelivered_rows",
+        )
+    return flipped
 
 
 def build_language_breakdown(
@@ -186,5 +229,15 @@ async def aggregate_delivery_counts(
 
 @db.with_session
 async def purge_deliveries(session: AsyncSession, broadcast_id: int):
-    """Drop every delivery row once the broadcast is terminal — the table has no retention."""
-    await session.exec(delete(BroadcastDelivery).where(col(BroadcastDelivery.broadcast_id) == broadcast_id))
+    """Drop every delivery row once the broadcast is terminal — the table has no retention.
+
+    The count is logged because this is the last moment the per-recipient audit trail exists: after
+    it, nothing can reconcile the delivery lines against DB state.
+    """
+    result = await session.exec(delete(BroadcastDelivery).where(col(BroadcastDelivery.broadcast_id) == broadcast_id))
+    log.info(
+        "Broadcast deliveries purged",
+        broadcast_id=broadcast_id,
+        count=result.rowcount or 0,
+        reason="broadcast_terminal",
+    )

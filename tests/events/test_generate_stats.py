@@ -1,6 +1,7 @@
 import pytest
 from sqlmodel import Integer, and_, cast, col, false, func, null, or_, select, true
 from sqlmodel.sql.expression import Select, SelectOfScalar
+from structlog.testing import capture_logs
 
 from mitup_bot.events import generate_stats
 from mitup_bot.models import JoinedUsers, Meetup, Settings, SupporterSubscription, User
@@ -8,7 +9,7 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
-from tests.helpers import MockDbSession
+from tests.helpers import MockApi, MockDbSession
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 
@@ -349,3 +350,48 @@ async def test_settings_stats_emits_notifications_disabled_count(
     await metrics_client.flush()
 
     metrics.assert_emitted(name=MetricKey.NOTIFICATIONS_DISABLED, value=8, unit=MetricUnit.COUNT)
+
+
+# ---------------------------------------------------------------------------
+# The run's own narrative
+# ---------------------------------------------------------------------------
+
+
+async def test_a_query_matching_no_rows_is_warned(mock_session: MockDbSession, metrics_client: MetricsClient):
+    """An empty table and a query that silently stopped matching produce the same zeros, so the
+    warning is the only thing that separates a quiet system from a broken statistic."""
+    mock_session.add_objects_with_statement(users_stats_statement(), ())
+
+    with capture_logs() as logs:
+        await generate_stats.users_stats(mock_session, metrics_client)
+
+    warning = next(entry for entry in logs if entry["event"] == "Stats query returned no rows")
+    assert warning["log_level"] == "warning"
+    assert warning["query"] == "users"
+    assert warning["reason"] == "empty_result_set"
+
+
+async def test_run_closes_with_one_line_carrying_every_collector(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """One closing line gives a `run_id` filter over a stats run something to return across the
+    job's ~30 gauges. It is assembled from what the collectors return, so a gauge added to any of
+    them reaches the log without this line being maintained by hand."""
+    with capture_logs() as logs:
+        await generate_stats.run(api, metrics_client)
+
+    generated = next(entry for entry in logs if entry["event"] == "Stats generated")
+    # One key per collector family, proving all six contributed rather than a hand-kept subset.
+    assert generated["total_users"] == 0
+    assert generated["total_meetings"] == 0
+    assert generated["meetings_in_progress"] == 0
+    assert generated["waiting_list_size"] == 0
+    assert generated["linked_patreon_accounts"] == 0
+    assert generated["notifications_disabled"] == 0
+    # Families that grow with the enum/catalogue ride as one structured field each.
+    assert set(generated["member_users_by_language"]) >= set(SUPPORTED_LANGUAGES)
+    assert set(generated["supporters_by_level"]) == {level.value for level in SupporterLevel}
+
+    # Nothing registered a row, so every one of the five multi-column aggregates reports it.
+    warned = {entry["query"] for entry in logs if entry["event"] == "Stats query returned no rows"}
+    assert warned == {"users", "meetings", "meeting_activity", "participation", "supporters"}

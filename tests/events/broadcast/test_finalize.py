@@ -240,3 +240,101 @@ async def test_finalize_and_report_warns_only_when_orphans_present(
 
     warnings = [entry for entry in logs if entry["event"] == "Broadcast finalized with orphaned deliveries"]
     assert len(warnings) == (1 if orphaned else 0)
+
+
+# ---------------------------------------------------------------------------
+# Terminal-outcome records
+# ---------------------------------------------------------------------------
+
+
+async def test_finalization_records_the_terminal_outcome(
+    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    """The closing beat of the trail: without it the outcome lives only in the operator DM and the
+    DB row, neither of which a log query can reach."""
+    summary = make_summary(status=BroadcastStatus.DONE, total=6, sent=3, failed=1, skipped=2)
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, True, 0)))
+    monkeypatch.setattr(finalize, "purge_deliveries", mock.AsyncMock())
+    monkeypatch.setattr(finalize, "notify_operators", mock.AsyncMock())
+
+    with capture_logs() as logs:
+        await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.DONE)
+
+    finalized = next(entry for entry in logs if entry["event"] == "Broadcast finalized")
+    assert finalized["status"] == BroadcastStatus.DONE.value
+    assert (finalized["total"], finalized["sent"], finalized["failed"], finalized["skipped"]) == (6, 3, 1, 2)
+    assert finalized["won_transition"] is True
+    assert finalized["reason"] == "drained"
+
+
+async def test_the_losing_side_of_a_concurrent_finalization_is_recorded(
+    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    """Two workers can both drain the same broadcast and both reach finalization; the loser leaves
+    no trace in the DB row, so without this line a double finalization is undetectable."""
+    summary = make_summary(status=BroadcastStatus.DONE)
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, False, 0)))
+    monkeypatch.setattr(finalize, "purge_deliveries", mock.AsyncMock())
+    monkeypatch.setattr(finalize, "notify_operators", mock.AsyncMock())
+
+    with capture_logs() as logs:
+        await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.DONE)
+
+    lost = next(entry for entry in logs if entry["event"] == "Broadcast finalization already performed")
+    assert lost["won_transition"] is False
+    assert lost["reason"] == "lost_terminal_cas"
+    assert not [entry for entry in logs if entry["event"] == "Broadcast finalized"]
+
+
+async def test_terminal_failure_names_the_attempt_threshold_as_its_cause(
+    api: MockApi, metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+):
+    summary = make_summary(status=BroadcastStatus.FAILED, attempts=MAX_BROADCAST_ATTEMPTS + 1)
+    monkeypatch.setattr(finalize, "finalize_broadcast", mock.AsyncMock(return_value=(summary, True, 0)))
+    monkeypatch.setattr(finalize, "purge_deliveries", mock.AsyncMock())
+    monkeypatch.setattr(finalize, "notify_operators", mock.AsyncMock())
+
+    with capture_logs() as logs:
+        await finalize.finalize_and_report(api, metrics_client, [1], 42, 5, BroadcastStatus.FAILED)
+
+    finalized = next(entry for entry in logs if entry["event"] == "Broadcast finalized")
+    assert finalized["reason"] == "attempt_threshold_exceeded"
+
+
+async def test_bulk_failed_rows_state_why_they_were_recorded_as_non_deliveries(mock_session: MockDbSession):
+    """On the terminal-failure path this bulk flip is the reason thousands of recipients end up
+    recorded as failures, so it has to state that cause rather than just how many."""
+    script_exec(mock_session, Result(rowcount=2))
+
+    with capture_logs() as logs:
+        await finalize.fail_unattempted_deliveries(mock_session, 5)
+
+    bulk = next(entry for entry in logs if entry["event"] == "Broadcast deliveries bulk failed")
+    assert bulk["log_level"] == "warning"
+    assert bulk["broadcast_id"] == 5
+    assert bulk["count"] == 2
+    assert bulk["reason"] == "finalized_with_undelivered_rows"
+
+
+async def test_a_no_op_bulk_fail_stays_silent(mock_session: MockDbSession):
+    """The normal drained path flips nothing, and a zero-row line every run would be pure noise."""
+    script_exec(mock_session, Result(rowcount=0))
+
+    with capture_logs() as logs:
+        await finalize.fail_unattempted_deliveries(mock_session, 5)
+
+    assert not [entry for entry in logs if entry["event"] == "Broadcast deliveries bulk failed"]
+
+
+async def test_purge_records_how_much_audit_trail_it_destroyed(mock_session: MockDbSession):
+    """The per-recipient audit table is destroyed here — the last chance to reconcile the delivery
+    lines against DB state."""
+    script_exec(mock_session, Result(rowcount=4))
+
+    with capture_logs() as logs:
+        await finalize.purge_deliveries(5)
+
+    purged = next(entry for entry in logs if entry["event"] == "Broadcast deliveries purged")
+    assert purged["broadcast_id"] == 5
+    assert purged["count"] == 4
+    assert purged["reason"] == "broadcast_terminal"

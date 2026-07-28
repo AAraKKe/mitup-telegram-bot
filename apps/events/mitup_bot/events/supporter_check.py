@@ -36,6 +36,8 @@ from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
 from mitup_bot.views.collaborate import hosts_group_removed_view
 
+from .telemetry import error_type_name
+
 log = structlog.get_logger(__name__)
 
 
@@ -97,7 +99,8 @@ class RunTally:
 
     due_outcomes: list[DueOutcome] = field(default_factory=list)
     sync_outcomes: list[LevelSyncOutcome] = field(default_factory=list)
-    failures: list[str] = field(default_factory=list)
+    # Ids, not rendered sentences: the failing rows have to be filterable and joinable to a person.
+    failures: list[int] = field(default_factory=list)
     active_patrons: int = 0
 
     def count_due(self, outcome: DueOutcome) -> int:
@@ -177,9 +180,14 @@ async def refresh_creator_token(
     try:
         pair = await client.refresh(state.pair)
     except PatreonTokenRevoked:
-        log.error("Patreon creator token refresh rejected with invalid_grant, re-seed required")
         fallback = state.fallback_expiration
         stored_ttl_days = days_until(fallback) if fallback else 0.0
+        log.error(
+            "Patreon creator token refresh rejected, re-seed required",
+            reason="invalid_grant",
+            fallback_expiration=fallback,
+            ttl_days=stored_ttl_days,
+        )
         metrics.emit(CREATOR_TOKEN_TTL_METRIC, stored_ttl_days, MetricUnit.NONE)
         # This branch returns without raising, so the framework Fault never fires for it — this
         # counter and the declining TTL are what mark the creator failure itself in CloudWatch.
@@ -235,6 +243,41 @@ async def remove_from_hosts_group(api: TelegramApiWrapper, user: User):
         await api.send_message_to_user(user, hosts_group_removed_view(user.lang))
 
 
+async def advance_grace_flow(
+    api: TelegramApiWrapper, subscription: SupporterSubscription, user: User, active_amounts: dict[str, int]
+) -> DueOutcome:
+    """Move one due subscription one step along the lapse lifecycle and record which step it was.
+
+    The subscription and user ids are on the ambient bind, so each line names only what its own
+    decision turned on.
+    """
+    if subscription.patreon_user_id in active_amounts:
+        subscription.expiration_notified = False
+        subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
+        log.info("Supporter grace extended", grace_until=subscription.support_expiration, reason="still_active_patron")
+        return DueOutcome.EXTENDED
+
+    if not subscription.expiration_notified:
+        subscription.expiration_notified = True
+        subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
+        await api.send_message_to_user(user, SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang))
+        log.info("Supporter grace started", grace_until=subscription.support_expiration, reason="not_in_active_patrons")
+        return DueOutcome.GRACE_STARTED
+
+    previous = user.supporter_level
+    user.supporter_level = SupporterLevel.NONE
+    log.info(
+        "Supporter level revoked",
+        patreon_user_id=subscription.patreon_user_id,
+        previous_level=previous.value,
+        new_level=SupporterLevel.NONE.value,
+        reason="grace_expired_and_not_active_patron",
+    )
+    await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
+    await remove_from_hosts_group(api, user)
+    return DueOutcome.SUPPORT_LOST
+
+
 async def process_due_subscription(
     subscription_id: int, active_amounts: dict[str, int], api: TelegramApiWrapper
 ) -> DueOutcome:
@@ -249,25 +292,55 @@ async def process_due_subscription(
             await session.exec(DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription_id))
         ).first()
         if subscription is None:
+            log.info("Due subscription skipped", reason="no_longer_due")
             return DueOutcome.SKIPPED
         user = await load_user(session, subscription.user_id)
         if user is None:
+            log.info("Due subscription skipped", reason="user_row_missing")
             return DueOutcome.SKIPPED
 
-        is_member = subscription.patreon_user_id in active_amounts
-        if is_member:
-            subscription.expiration_notified = False
-            subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
-            return DueOutcome.EXTENDED
-        if not subscription.expiration_notified:
-            subscription.expiration_notified = True
-            subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
-            await api.send_message_to_user(user, SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang))
-            return DueOutcome.GRACE_STARTED
-        user.supporter_level = SupporterLevel.NONE
-        await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
-        await remove_from_hosts_group(api, user)
-        return DueOutcome.SUPPORT_LOST
+        with structlog.contextvars.bound_contextvars(user_id=user.db_id, tg_user_id=user.tg_user_id):
+            return await advance_grace_flow(api, subscription, user, active_amounts)
+
+
+async def apply_target_level(
+    api: TelegramApiWrapper, subscription: SupporterSubscription, user: User, amount: int, config: PatreonConfig
+) -> LevelSyncOutcome:
+    """Write the tier the entitled amount buys, tell the user, and record the move.
+
+    The unchanged case is logged too: it is bounded by the number of linked accounts, and it is the
+    only evidence that a tier was checked and deliberately left alone.
+    """
+    previous = user.supporter_level
+    target = supporter.level_for_amount(amount, config)
+    if previous == target:
+        log.info(
+            "Supporter level unchanged",
+            supporter_level=previous.value,
+            amount_cents=amount,
+            reason="entitled_amount_matches_level",
+        )
+        return LevelSyncOutcome.UNCHANGED
+
+    user.supporter_level = target
+    subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
+    subscription.expiration_notified = False
+    upgraded = not supporter.meets(previous, target)
+    log.info(
+        "Supporter level changed",
+        previous_level=previous.value,
+        new_level=target.value,
+        amount_cents=amount,
+        direction="upgrade" if upgraded else "downgrade",
+        reason="entitled_amount_changed",
+    )
+    message = (
+        SupporterNotificationMessages.unlocked_for(target)
+        if upgraded
+        else SupporterNotificationMessages.downgraded_to(target)
+    )
+    await api.send_message_to_user(user, message.get(lang=user.lang))
+    return LevelSyncOutcome.UPGRADED if upgraded else LevelSyncOutcome.DOWNGRADED
 
 
 async def sync_subscription_level(
@@ -286,43 +359,41 @@ async def sync_subscription_level(
             await session.exec(LIVE_LINKED_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription_id))
         ).first()
         if subscription is None:
+            log.info("Level sync skipped", reason="subscription_missing")
             return LevelSyncOutcome.SKIPPED
         amount = active_amounts.get(subscription.patreon_user_id)
         if amount is None:
+            log.info("Level sync skipped", reason="not_in_active_patrons")
             return LevelSyncOutcome.SKIPPED
         user = await load_user(session, subscription.user_id)
         if user is None:
+            log.info("Level sync skipped", reason="user_row_missing")
             return LevelSyncOutcome.SKIPPED
 
-        target = supporter.level_for_amount(amount, config)
-        if user.supporter_level == target:
-            return LevelSyncOutcome.UNCHANGED
-
-        previous = user.supporter_level
-        user.supporter_level = target
-        subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
-        subscription.expiration_notified = False
-        if not supporter.meets(previous, target):
-            message = SupporterNotificationMessages.unlocked_for(user.supporter_level)
-            await api.send_message_to_user(user, message.get(lang=user.lang))
-            return LevelSyncOutcome.UPGRADED
-        message = SupporterNotificationMessages.downgraded_to(user.supporter_level)
-        await api.send_message_to_user(user, message.get(lang=user.lang))
-        return LevelSyncOutcome.DOWNGRADED
+        with structlog.contextvars.bound_contextvars(user_id=user.db_id, tg_user_id=user.tg_user_id):
+            return await apply_target_level(api, subscription, user, amount, config)
 
 
-async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int], failures: list[str]) -> list[T]:
+async def process_all[T](handler: Callable[[int], Awaitable[T]], ids: list[int], failures: list[int]) -> list[T]:
     """Run ``handler`` over each nominated id, isolating failures so one bad row cannot abort the run.
 
     Returns the results of the calls that did not raise (one per processed row), so ``run`` can tally
-    outcomes; a raising row is recorded in ``failures`` and skipped."""
+    outcomes; a raising row is recorded in ``failures`` and skipped. The subscription id is bound for
+    the duration of each pass, so every line the handler and the api wrapper emit under it — the
+    hosts-group removal, the send warnings, the failure below — names the row it belongs to."""
     results: list[T] = []
     for subscription_id in ids:
-        try:
-            results.append(await handler(subscription_id))
-        except Exception as error:
-            failures.append(f"subscription {subscription_id}: {error}")
-            log.exception("Supporter check failed for a subscription", subscription=subscription_id, exc_info=error)
+        with structlog.contextvars.bound_contextvars(subscription_id=subscription_id):
+            try:
+                results.append(await handler(subscription_id))
+            except Exception as error:
+                failures.append(subscription_id)
+                log.exception(
+                    "Supporter check failed for a subscription",
+                    reason="subscription_processing_failed",
+                    error_type=error_type_name(error),
+                    exc_info=error,
+                )
     return results
 
 
@@ -366,6 +437,34 @@ async def reconcile_memberships(api: TelegramApiWrapper, metrics: MetricsClient,
     return True
 
 
+def log_run_summary(tally: RunTally, reconciled: bool):
+    """Record what the run did, on every exit path.
+
+    Runs from ``run``'s ``finally`` alongside ``emit_counters``, so a partially-failed run lands a
+    summary next to its continuous counters rather than leaving the counters as the only account of
+    it. A run that aborted before reconciling anything is described by its abort line instead."""
+    if tally.failures:
+        log.warning(
+            "Supporter check finished with failures",
+            count=len(tally.failures),
+            subscription_ids=tally.failures,
+            reason="per_subscription_processing_failed",
+        )
+    if not reconciled:
+        return
+    log.info(
+        "Supporter check complete",
+        due_processed=len(tally.due_outcomes),
+        extended=tally.count_due(DueOutcome.EXTENDED),
+        grace_started=tally.count_due(DueOutcome.GRACE_STARTED),
+        support_lost=tally.count_due(DueOutcome.SUPPORT_LOST),
+        upgraded=tally.count_synced(LevelSyncOutcome.UPGRADED),
+        downgraded=tally.count_synced(LevelSyncOutcome.DOWNGRADED),
+        active_patrons=tally.active_patrons,
+        subscription_faults=len(tally.failures),
+    )
+
+
 async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     """Validate supporter memberships against Patreon and keep the creator token fresh.
 
@@ -379,20 +478,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         reconciled = await reconcile_memberships(api, metrics, tally)
     finally:
         tally.emit_counters(metrics)
+        log_run_summary(tally, reconciled)
 
     if tally.failures:
         raise RuntimeError(f"Supporter check failed for {len(tally.failures)} subscriptions. Check logs for details.")
-    if not reconciled:
-        return
-
-    log.info(
-        "supporter check complete",
-        due_processed=len(tally.due_outcomes),
-        extended=tally.count_due(DueOutcome.EXTENDED),
-        grace_started=tally.count_due(DueOutcome.GRACE_STARTED),
-        support_lost=tally.count_due(DueOutcome.SUPPORT_LOST),
-        upgraded=tally.count_synced(LevelSyncOutcome.UPGRADED),
-        downgraded=tally.count_synced(LevelSyncOutcome.DOWNGRADED),
-        active_patrons=tally.active_patrons,
-        subscription_faults=len(tally.failures),
-    )

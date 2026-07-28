@@ -2,7 +2,9 @@ from collections.abc import Sequence
 from typing import Any, cast
 from unittest import mock
 
+import pytest
 from sqlalchemy import Row
+from structlog.testing import capture_logs
 
 from mitup_bot.events.broadcast import claiming
 from mitup_bot.events.broadcast.types import MAX_BROADCAST_ATTEMPTS, ClaimedBroadcast
@@ -180,3 +182,83 @@ async def test_reset_broadcast_attempts_issues_update(mock_session: MockDbSessio
     query = mock_session.queries_executed[0]
     assert "UPDATE broadcasts" in query
     assert "attempts=0" in query.replace(" ", "")
+
+
+# ---------------------------------------------------------------------------
+# Claim-phase decision records
+# ---------------------------------------------------------------------------
+
+
+CLAIM_ACTION_PARAMS = [(BroadcastStatus.QUEUED, "started"), (BroadcastStatus.SENDING, "resumed")]
+
+
+@pytest.mark.parametrize(
+    "previous_status, expected_action", CLAIM_ACTION_PARAMS, ids=[p[1] for p in CLAIM_ACTION_PARAMS]
+)
+async def test_claim_records_the_opening_line_of_the_trail(
+    mock_session: MockDbSession, previous_status: BroadcastStatus, expected_action: str
+):
+    """The opening line of the whole trail, so a `broadcast_id` filter starts at the beginning. It
+    is also the only record of the fresh-start vs. resume distinction and of the bumped attempt
+    count that drives terminal failure."""
+    broadcast = create_broadcast(id=7, status=previous_status, attempts=1)
+    script_exec(mock_session, Result(results=(broadcast,)))
+
+    with capture_logs() as logs:
+        await claiming.claim_next_broadcast()
+
+    claimed = next(entry for entry in logs if entry["event"] == "Broadcast claimed")
+    assert claimed["broadcast_id"] == 7
+    assert claimed["author_tg_id"] == 999
+    # The status as it was found, not as it was left: both actions leave the row SENDING.
+    assert claimed["previous_status"] == previous_status.value
+    assert claimed["action"] == expected_action
+    assert claimed["attempts"] == 2
+    assert claimed["reason"] == "oldest_queued_or_sending"
+
+
+async def test_materialized_audience_records_the_snapshot_it_froze(mock_session: MockDbSession):
+    """The snapshot decides irrevocably who receives the broadcast, and the delivery rows encoding
+    it are purged at finalization — this line is the only durable answer to "why did user X never
+    get broadcast N?"."""
+    broadcast = create_broadcast(id=5)
+    mock_session.get = mock.AsyncMock(return_value=broadcast)
+    script_exec(mock_session, Result(results=(0,)), Result(), Result(results=(4,)))
+
+    with capture_logs() as logs:
+        await claiming.materialize_audience(5, ["en", "es_ES"])
+
+    materialized = next(entry for entry in logs if entry["event"] == "Broadcast audience materialized")
+    assert materialized["broadcast_id"] == 5
+    assert materialized["total"] == 4
+    assert materialized["languages"] == ["en", "es_ES"]
+    assert materialized["fallback_lang"] == claiming.FALLBACK_LANG
+    assert materialized["reason"] == "member_and_not_invitee"
+
+
+async def test_reused_audience_is_distinguished_from_a_fresh_one(mock_session: MockDbSession):
+    """A resumed broadcast must not read as if it re-decided its recipients."""
+    script_exec(mock_session, Result(results=(9,)))
+
+    with capture_logs() as logs:
+        await claiming.materialize_audience(5, ["en"])
+
+    reused = next(entry for entry in logs if entry["event"] == "Broadcast audience reused")
+    assert reused["total"] == 9
+    assert reused["reason"] == "snapshot_already_materialized"
+
+
+async def test_batch_claim_separates_retries_from_first_attempts(mock_session: MockDbSession):
+    """Batch size alone cannot distinguish a healthy drain from one churning on retries."""
+    members = (create_member(1, 11, "en"), create_member(2, 12, "en"))
+    # attempt_count is the post-claim value, so 1 is a first attempt and anything above it a retry.
+    script_exec(mock_session, Result(results=((101, 1, "en", 1), (102, 2, "en", 3))), Result(results=members))
+
+    with capture_logs() as logs:
+        await claiming.claim_pending_batch(5)
+
+    claimed = next(entry for entry in logs if entry["event"] == "Broadcast batch claimed")
+    assert claimed["broadcast_id"] == 5
+    assert claimed["size"] == 2
+    assert claimed["retries"] == 1
+    assert claimed["reason"] == "pending_or_due_retry"

@@ -1,4 +1,8 @@
+import datetime as dt
+
 import pytest
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 
 from mitup_bot.events import notify_meetings_started
 from mitup_bot.events.service import EventType
@@ -344,3 +348,124 @@ async def test_failed_meeting_increments_counter_and_raises(
         properties={},
         properties_exact=True,
     )
+
+
+# ---------------------------------------------------------------------------
+# Decision records
+# ---------------------------------------------------------------------------
+
+
+async def test_each_participant_decision_is_recorded(mock_session: MockDbSession, api: MockApi):
+    """Both exclusions the Python participant filter makes are user-visible — someone on the
+    waiting list is deliberately not told the meeting began — so each is named per user and
+    counted, rather than disappearing into the gap between nominated and sent."""
+    meeting = create_meetup(id=9, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    member = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
+    waiting = create_user(id=2, tg_user_id=102, settings=create_settings(id=2))
+    left = create_user(id=3, tg_user_id=103, settings=create_settings(id=3), status=UserStatus.LEFT)
+    meeting.joined_links = [
+        create_joined_link(user=member, meetup=meeting, id=1),
+        create_joined_link(user=waiting, meetup=meeting, id=2, is_waiting_list=True),
+        create_joined_link(user=left, meetup=meeting, id=3),
+    ]
+
+    register_due_meetings(mock_session, meeting)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await notify_meetings_started.notify_meeting_started(meeting.db_id, api)
+
+    skips = {
+        entry["tg_user_id"]: entry["reason"]
+        for entry in logs
+        if entry["event"] == "Skip participant for a started notification"
+    }
+    assert skips == {102: "waiting_list", 103: "user_not_member"}
+    sent = [entry for entry in logs if entry["event"] == "Send started notification"]
+    assert [entry["tg_user_id"] for entry in sent] == [101]
+
+    summary = next(entry for entry in logs if entry["event"] == "Notify meeting participants that it started")
+    assert summary["meeting_id"] == 9
+    assert (summary["participants_notified"], summary["waiting_list_skipped"], summary["inactive_skipped"]) == (1, 1, 1)
+    assert summary["outcome"] == "notified"
+
+
+async def test_sweep_summary_separates_a_skip_from_reaching_nobody(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A run that touched every nominated meeting and reached zero people must not read like a
+    quiet one, so "notified nobody" and "skipped" are separate buckets on the summary."""
+    reached_nobody = create_meetup(id=1, title="Empty meetup", datetime=dt.datetime.now(dt.UTC))
+    reached_nobody.joined_links = []
+    no_longer_due = create_meetup(id=2, title="Deactivated meetup", datetime=dt.datetime.now(dt.UTC))
+
+    mock_session.add_objects_with_statement(
+        notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (reached_nobody, no_longer_due)
+    )
+    mock_session.add_objects_with_statement(
+        notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT.where(Meetup.id == 1), (reached_nobody,)
+    )
+    mock_session.add_objects_with_statement(
+        notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT.where(Meetup.id == 2), ()
+    )
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await notify_meetings_started.run(api, metrics_client)
+
+    summary = next(entry for entry in logs if entry["event"] == "Started notification sweep complete")
+    assert summary["nominated"] == 2
+    # The empty meeting was still flagged and still had its cards edited — that is not a skip.
+    assert summary["meetings_notified"] == 1
+    assert summary["participants_notified"] == 0
+    assert summary["skipped"] == 1
+    assert summary["failed"] == 0
+
+    flagged = next(entry for entry in logs if entry["event"] == "Notify meeting participants that it started")
+    assert flagged["reason"] == "no_eligible_participants"
+
+
+async def test_nomination_reports_how_late_the_runner_is(mock_session: MockDbSession, api: MockApi):
+    """A healthy runner nominates seconds late and a backlogged one hours late, which makes this
+    the cheapest stall detector in the plane."""
+    meeting = create_meetup(id=1, title="Late meetup", datetime=dt.datetime.now(dt.UTC) - dt.timedelta(minutes=42))
+    register_due_meetings(mock_session, meeting)
+
+    with capture_logs() as logs:
+        await notify_meetings_started.due_meeting_ids()
+
+    nominated = next(entry for entry in logs if entry["event"] == "Nominate meeting for a started notification")
+    assert nominated["meeting_id"] == 1
+    assert nominated["minutes_late"] == 42
+    assert nominated["reason"] == "start_time_reached"
+
+
+SKIP_REASON_PARAMS = [
+    ({"active": False}, "meeting_deactivated"),
+    ({"started_notification_sent": True}, "already_notified"),
+    ({"datetime": None}, "datetime_cleared"),
+]
+
+
+@pytest.mark.parametrize("meeting_state, expected_reason", SKIP_REASON_PARAMS, ids=[p[1] for p in SKIP_REASON_PARAMS])
+async def test_skip_names_which_condition_stopped_holding(
+    mock_session: MockDbSession, api: MockApi, meeting_state: dict[str, object], expected_reason: str
+):
+    """Five causes — deleted, deactivated, already notified, datetime cleared, rescheduled into the
+    future — each name themselves. "Rescheduled to future" means a host moved the meeting seconds
+    before it started: a real event that must not read like the two benign causes beside it."""
+    meeting = create_meetup(id=1, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    for field, value in meeting_state.items():
+        setattr(meeting, field, value)
+
+    mock_session.add_objects_with_statement(notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT, (meeting,))
+    mock_session.add_objects_with_statement(
+        notify_meetings_started.MEETINGS_TO_NOTIFY_STARTED_STATEMENT.where(Meetup.id == 1), ()
+    )
+    mock_session.add_object(meeting)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        result = await notify_meetings_started.notify_meeting_started(meeting.db_id, api)
+
+    # None, not 0: the caller must be able to tell a skip from a meeting that reached nobody.
+    assert result is None
+    skipped = next(entry for entry in logs if entry["event"] == "Skip started notification")
+    assert skipped["reason"] == expected_reason
+    assert skipped["meeting_id"] == 1

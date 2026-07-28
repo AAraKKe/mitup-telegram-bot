@@ -19,7 +19,7 @@ from .claiming import (
 from .delivery import build_recipient_views, deliver_batch
 from .finalize import finalize_and_report
 from .recording import emit_delivery_outcomes, record_batch_outcomes
-from .types import BatchResult, ClaimedBroadcast
+from .types import MAX_BROADCAST_ATTEMPTS, BatchResult, ClaimedBroadcast
 
 log = structlog.get_logger(__name__)
 
@@ -60,7 +60,13 @@ async def process_claimed_broadcast(
     api: TelegramApiWrapper, metrics: MetricsClient, admin_tg_ids: list[int], claimed: ClaimedBroadcast
 ):
     if claimed.terminal_failure:
-        log.warning("Broadcast exceeded the attempt threshold, failing it", attempts=claimed.attempts)
+        log.warning(
+            "Broadcast exceeded the attempt threshold, failing it",
+            broadcast_id=claimed.broadcast_id,
+            attempts=claimed.attempts,
+            max_attempts=MAX_BROADCAST_ATTEMPTS,
+            reason="max_broadcast_attempts_exceeded",
+        )
         await finalize_and_report(
             api, metrics, admin_tg_ids, claimed.author_tg_id, claimed.broadcast_id, BroadcastStatus.FAILED
         )
@@ -128,7 +134,13 @@ async def send_all_pending(
         await emit_batch_progress(metrics, broadcast_id, total, result)
         await metrics.flush()
         if result.flood_control:
-            log.warning("Broadcast paused batch draining after flood control", broadcast_id=broadcast_id)
+            log.warning(
+                "Broadcast paused batch draining after flood control",
+                broadcast_id=broadcast_id,
+                backoff_seconds=round(result.flood_backoff.total_seconds()) if result.flood_backoff else None,
+                released=len(result.unattempted),
+                reason="telegram_flood_control",
+            )
             break
 
 
